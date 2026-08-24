@@ -14,6 +14,25 @@ pub(super) fn contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
     }
 }
 
+pub(super) fn runtime_group_id(row_id: &str) -> Option<String> {
+    const INHERITED_RUNTIME_ROWS: [&str; 11] = [
+        "m4-circuit-canonical-print",
+        "m4-circuit-parse",
+        "m4-gate-lookup",
+        "m5-simd-bits",
+        "m5-simd-word",
+        "m5-sparse-xor",
+        "m6-clifford-string",
+        "m6-pauli-iter",
+        "m6-pauli-string",
+        "m10-dem-parse-contract",
+        "m10-dem-print-contract",
+    ];
+    INHERITED_RUNTIME_ROWS
+        .contains(&row_id)
+        .then(|| format!("PERFQ-{}", row_id.to_ascii_uppercase()))
+}
+
 fn replacement(
     legacy_stim_name: &str,
     legacy_stab_name: &str,

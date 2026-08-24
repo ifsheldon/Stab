@@ -94,7 +94,7 @@ Expose thin recipes from a new modular `justfiles/qualification.just` file:
 ```sh
 just qualification::correctness-list
 just qualification::correctness-check
-just qualification::correctness-regenerate --check
+just qualification::correctness-regenerate
 just qualification::correctness-run --tier pr
 just qualification::correctness-run --tier full
 just qualification::correctness-run --tier soak
@@ -252,7 +252,7 @@ Convert the current file-level test hierarchy and feature checklist into a finit
 - No implemented case has a shared or non-resolving primary selector.
 - `CQ-RESOURCE` contains the exact finite boundary-family inventory required by this milestone, with one independent planned or implemented owner per family.
 - The inventory can be regenerated deterministically from pinned Stim and checked without modifying it.
-- `just qualification::correctness-regenerate --check` byte-compares the checked manifest with fresh pinned-source and rustdoc discovery.
+- `just qualification::correctness-check` regenerates in memory and byte-compares the checked manifest with fresh pinned-source and rustdoc discovery; `correctness-regenerate` is write-only.
 
 ## Milestone CQ1: Build The Qualification Harness
 

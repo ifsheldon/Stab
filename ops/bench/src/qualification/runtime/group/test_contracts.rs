@@ -11,6 +11,8 @@ pub(super) fn pauli_contract() -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(super::super::invocation::PAULI_STRING_MULTIPLY_GROUP_ID)
             .expect("group id"),
+        feature_id: ProtocolId::try_new("PERF-STABILIZER-ALGEBRA").expect("feature id"),
+        origin: crate::qualification::model::RowOrigin::Inherited,
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
@@ -49,6 +51,9 @@ pub(super) fn pauli_contract() -> GroupContract {
             "cq-evidence-qualification-3bab0f51237445f6".to_string(),
             "cq-evidence-qualification-489e6445120743c2".to_string(),
         ],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/stabilizers").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::PAULI_STRING_MULTIPLY
@@ -68,6 +73,12 @@ pub(super) fn pauli_iter_contract(
 ) -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
+        feature_id: ProtocolId::try_new("PERF-STABILIZER-ALGEBRA").expect("feature id"),
+        origin: if group_id == super::super::invocation::PAULI_STRING_ITER_RANGE_GROUP_ID {
+            crate::qualification::model::RowOrigin::Inherited
+        } else {
+            crate::qualification::model::RowOrigin::Planned
+        },
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
@@ -84,6 +95,9 @@ pub(super) fn pauli_iter_contract(
             input_digest: InputDigest::try_new("e".repeat(64)).expect("input digest"),
         }],
         correctness_case_ids: vec!["cq-evidence-pauli-iterator".to_string()],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/stabilizers").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::PAULI_STRING_ITER
@@ -103,6 +117,12 @@ pub(super) fn clifford_contract(
 ) -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
+        feature_id: ProtocolId::try_new("PERF-STABILIZER-ALGEBRA").expect("feature id"),
+        origin: if group_id == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID {
+            crate::qualification::model::RowOrigin::Inherited
+        } else {
+            crate::qualification::model::RowOrigin::Planned
+        },
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: if group_id == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID {
@@ -125,6 +145,9 @@ pub(super) fn clifford_contract(
             "cq-evidence-qualification-510e746ec36e7d1c".to_string(),
             "cq-evidence-qualification-ae9390dd6a207cb6".to_string(),
         ],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/stabilizers").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::CLIFFORD_STRING
@@ -182,6 +205,8 @@ fn dem_contract(group_id: &str, workload_id: &str, measurement_id: &str) -> Grou
         .collect();
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
+        feature_id: ProtocolId::try_new("PERF-DEM-MODEL").expect("feature id"),
+        origin: crate::qualification::model::RowOrigin::Inherited,
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
@@ -194,6 +219,9 @@ fn dem_contract(group_id: &str, workload_id: &str, measurement_id: &str) -> Grou
             "cq-evidence-qualification-966ab53fd109b7b3".to_string(),
             "cq-evidence-qualification-ae2cf29058be84b0".to_string(),
         ],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/dem-model").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::DEM_MODEL
@@ -226,47 +254,6 @@ fn runtime_contract_requires_an_explicit_timing_policy() {
         "comparator_sources": []
     });
     assert!(serde_json::from_value::<GroupContract>(value).is_err());
-}
-
-#[test]
-fn runtime_contract_binds_clifford_identity_timing_policy() {
-    use crate::qualification::model::TimingBatchPolicy;
-
-    let root = crate::root::RepoRoot::resolve(
-        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
-    )
-    .expect("repository root");
-    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
-    let (mut file, _) = super::load(&root, &suite.semantic_digest).expect("runtime contract");
-    super::validate_inventory_contracts(&file, &suite).expect("matching ledgers");
-
-    let identity_group = suite
-        .qualification_groups
-        .iter_mut()
-        .find(|group| group.id == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID)
-        .expect("Clifford identity group");
-    assert_eq!(
-        identity_group.timing_policy.batch_policy,
-        TimingBatchPolicy::IndependentThroughput
-    );
-    identity_group.timing_policy.batch_policy = TimingBatchPolicy::CommonIterations;
-    assert!(matches!(
-        super::validate_inventory_contracts(&file, &suite),
-        Err(super::GroupError::InventoryContract(group))
-            if group == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID
-    ));
-
-    let suite = crate::qualification::read(&root).expect("checked performance inventory");
-    file.groups
-        .iter_mut()
-        .find(|group| group.id.to_string() == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID)
-        .expect("runtime Clifford identity group")
-        .timing_batch_policy = TimingBatchPolicy::CommonIterations;
-    assert!(matches!(
-        super::validate_inventory_contracts(&file, &suite),
-        Err(super::GroupError::InventoryContract(group))
-            if group == super::super::invocation::CLIFFORD_IDENTITY_GROUP_ID
-    ));
 }
 
 #[test]

@@ -8,7 +8,7 @@ use super::protocol::{
     InputDigest, ProtocolId, RAW_WORK_TIMING_BOUNDARY, SemanticDigest, Sha256Digest, TimingBoundary,
 };
 use super::run::ClaimClass;
-use crate::qualification::model::{SizeClass, TimingBatchPolicy};
+use crate::qualification::model::{RowOrigin, SizeClass, TimingBatchPolicy};
 use crate::root::RepoRoot;
 
 mod comparators;
@@ -16,13 +16,16 @@ mod comparators;
 mod test_contracts;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-pub(in crate::qualification) const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 10;
+pub(in crate::qualification) const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 11;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_RELEASE_GROUPS: usize = 40;
 const MAX_DIAGNOSTIC_GROUPS: usize = 60;
 const MAX_MEASUREMENTS_PER_GROUP: usize = 64;
 const MAX_CORRECTNESS_CASES_PER_GROUP: usize = 4096;
+const MAX_PUBLIC_API_ITEMS_PER_GROUP: usize = 4096;
+const MAX_CHECKLIST_ITEMS_PER_GROUP: usize = 512;
+const MAX_CHECKLIST_CHILDREN_PER_GROUP: usize = 4096;
 const MAX_SCALES_PER_GROUP: usize = 64;
 const MAX_PROFILER_NOTE_PATH_BYTES: usize = 512;
 const MAX_COMPARATOR_SOURCE_PATH_BYTES: usize = 512;
@@ -43,6 +46,8 @@ pub(super) enum ParityEligibility {
 #[serde(deny_unknown_fields)]
 pub(super) struct GroupContract {
     pub(super) id: ProtocolId,
+    pub(super) feature_id: ProtocolId,
+    pub(super) origin: RowOrigin,
     pub(super) claim_class: ClaimClass,
     pub(super) parity_eligibility: ParityEligibility,
     pub(super) timing_batch_policy: TimingBatchPolicy,
@@ -50,6 +55,12 @@ pub(super) struct GroupContract {
     pub(super) measurement_ids: Vec<ProtocolId>,
     pub(super) scales: Vec<ScaleContract>,
     pub(super) correctness_case_ids: Vec<String>,
+    #[serde(default)]
+    pub(super) public_api_item_ids: Vec<String>,
+    #[serde(default)]
+    pub(super) checklist_item_ids: Vec<String>,
+    #[serde(default)]
+    pub(super) checklist_child_ids: Vec<String>,
     pub(super) owner: ProtocolId,
     pub(super) profiler_note: Option<ProfilerNoteContract>,
     #[serde(default)]
@@ -275,218 +286,77 @@ pub(super) fn check(
     root: &RepoRoot,
     expected_inventory_sha256: &str,
     suite: &super::super::model::QualificationSuite,
+    references: &super::super::discovery::SourceReferences,
 ) -> Result<(), GroupError> {
     let (file, _) = load(root, expected_inventory_sha256)?;
-    validate_inventory_contracts(&file, suite)
+    validate_inventory_contracts(&file, suite, references)
 }
 
 fn validate_inventory_contracts(
     file: &GroupContractFile,
     suite: &super::super::model::QualificationSuite,
+    references: &super::super::discovery::SourceReferences,
 ) -> Result<(), GroupError> {
-    use super::super::model::{
-        CorrectnessBinding, EvidenceState, InputByteCount, MemoryMethod, PerformanceDisposition,
-        QualificationStatus, RunnerFidelity, ThresholdPolicy,
-    };
-
+    let feature_ids = suite
+        .performance_features
+        .iter()
+        .map(|feature| feature.id.as_str())
+        .collect::<BTreeSet<_>>();
     let runtime_group_ids = file
         .groups
         .iter()
-        .filter(|group| group.claim_class == ClaimClass::PromotablePerformance)
         .map(|group| group.id.to_string())
         .collect::<BTreeSet<_>>();
-    let inventory_group_ids = suite
-        .qualification_groups
-        .iter()
-        .filter(|group| {
-            group.status != QualificationStatus::Planned
-                && group.threshold_policy == ThresholdPolicy::Primary1_25
-        })
-        .map(|group| group.id.clone())
-        .collect::<BTreeSet<_>>();
-    if runtime_group_ids != inventory_group_ids {
-        return Err(GroupError::InventoryCoverage {
-            runtime_only: runtime_group_ids
-                .difference(&inventory_group_ids)
-                .cloned()
-                .collect(),
-            inventory_only: inventory_group_ids
-                .difference(&runtime_group_ids)
-                .cloned()
-                .collect(),
-        });
-    }
-    let runtime_diagnostic_ids = file
-        .groups
-        .iter()
-        .filter(|group| group.claim_class == ClaimClass::ProductDiagnostic)
-        .map(|group| group.id.to_string())
-        .collect::<BTreeSet<_>>();
-    let inventory_diagnostic_ids = suite
-        .qualification_groups
-        .iter()
-        .filter(|group| {
-            group.status != QualificationStatus::Planned
-                && group.disposition == PerformanceDisposition::Measured
-                && group.runner_fidelity == RunnerFidelity::StabReportOnly
-                && group.threshold_policy == ThresholdPolicy::ReportOnly
-        })
-        .map(|group| group.id.clone())
-        .collect::<BTreeSet<_>>();
-    if runtime_diagnostic_ids != inventory_diagnostic_ids {
-        return Err(GroupError::DiagnosticInventoryCoverage {
-            runtime_only: runtime_diagnostic_ids
-                .difference(&inventory_diagnostic_ids)
-                .cloned()
-                .collect(),
-            inventory_only: inventory_diagnostic_ids
-                .difference(&runtime_diagnostic_ids)
-                .cloned()
-                .collect(),
-        });
-    }
-
-    for contract in file
-        .groups
-        .iter()
-        .filter(|group| group.claim_class == ClaimClass::PromotablePerformance)
-    {
-        let group = suite
-            .qualification_groups
-            .iter()
-            .find(|candidate| candidate.id == contract.id.to_string())
-            .ok_or_else(|| GroupError::InventoryContract(contract.id.to_string()))?;
-        let contract_scale_ids = contract
-            .scales
-            .iter()
-            .map(|scale| scale.id.to_string())
-            .collect::<Vec<_>>();
-        let inventory_scale_ids = group
-            .workload_family
-            .scales
-            .iter()
-            .map(|scale| scale.id.clone())
-            .collect::<Vec<_>>();
-        let scales_match = contract
-            .scales
-            .iter()
-            .zip(&group.workload_family.scales)
-            .all(|(contract, inventory)| {
-                contract.id.to_string() == inventory.id
-                    && contract.family_id.to_string() == inventory.family_id
-                    && contract.size_class == inventory.size_class
-                    && inventory.semantic_work == Some(contract.work_items.get())
-                    && inventory.input_bytes
-                        == InputByteCount::Exact {
-                            bytes: contract.input_bytes,
-                        }
-                    && inventory.input_digest.as_deref() == Some(contract.input_digest.as_str())
+    let mut inherited_links = BTreeSet::new();
+    let mut public_api_owners = BTreeSet::new();
+    let mut checklist_item_owners = BTreeSet::new();
+    let mut checklist_child_owners = BTreeSet::new();
+    for contract in &file.groups {
+        let group_id = contract.id.to_string();
+        let feature_id = contract.feature_id.to_string();
+        if !feature_ids.contains(feature_id.as_str()) {
+            return Err(GroupError::UnknownFeature {
+                group: group_id,
+                feature: feature_id,
             });
-        let contract_comparator_sources = contract
-            .comparator_sources
-            .iter()
-            .map(|source| (source.path.as_str(), source.sha256.as_str()))
-            .collect::<Vec<_>>();
-        let inventory_comparator_sources = group
-            .output_contract
-            .comparator_sources
-            .iter()
-            .map(|source| (source.path.as_str(), source.sha256.as_str()))
-            .collect::<Vec<_>>();
-        if group.disposition != PerformanceDisposition::Measured
-            || group.runner_fidelity != RunnerFidelity::AdapterLibrary
-            || group.correctness_binding != CorrectnessBinding::ExactCases
-            || group.correctness_cases != contract.correctness_case_ids
-            || group.owner != contract.owner.to_string()
-            || group.planned_correctness_case_id.is_some()
-            || group.output_contract.digest_state != EvidenceState::Existing
-            || group.threshold_policy != ThresholdPolicy::Primary1_25
-            || group.timing_policy.batch_policy != contract.timing_batch_policy
-            || group.status == QualificationStatus::Planned
-            || inventory_scale_ids != contract_scale_ids
-            || group.memory_policy.scale_ids != contract_scale_ids
-            || inventory_comparator_sources != contract_comparator_sources
-            || !scales_match
-        {
-            return Err(GroupError::InventoryContract(contract.id.to_string()));
         }
+        let linked_row = suite
+            .manifest_rows
+            .iter()
+            .find(|row| row.runtime_group_id.as_deref() == Some(group_id.as_str()));
+        match (contract.origin, linked_row) {
+            (RowOrigin::Inherited, Some(row)) if row.performance_feature == feature_id => {
+                inherited_links.insert(group_id.clone());
+            }
+            (RowOrigin::Planned, None) => {}
+            _ => return Err(GroupError::InvalidOrigin(group_id)),
+        }
+        if contract
+            .correctness_case_ids
+            .iter()
+            .any(|case| !references.correctness_cases.contains(case))
+        {
+            return Err(GroupError::UnknownCorrectnessCase(group_id));
+        }
+        validate_public_api_ownership(contract, references, &mut public_api_owners)?;
+        validate_checklist_ownership(
+            contract,
+            references,
+            &mut checklist_item_owners,
+            &mut checklist_child_owners,
+        )?;
     }
-    for contract in file
-        .groups
+    let expected_inherited_links = suite
+        .manifest_rows
         .iter()
-        .filter(|group| group.claim_class == ClaimClass::ProductDiagnostic)
+        .filter_map(|row| row.runtime_group_id.clone())
+        .collect::<BTreeSet<_>>();
+    if inherited_links != expected_inherited_links
+        || expected_inherited_links
+            .iter()
+            .any(|group| !runtime_group_ids.contains(group))
     {
-        let group = suite
-            .qualification_groups
-            .iter()
-            .find(|candidate| candidate.id == contract.id.to_string())
-            .ok_or_else(|| GroupError::InventoryContract(contract.id.to_string()))?;
-        let contract_scale_ids = contract
-            .scales
-            .iter()
-            .map(|scale| scale.id.to_string())
-            .collect::<Vec<_>>();
-        let inventory_scale_ids = group
-            .workload_family
-            .scales
-            .iter()
-            .map(|scale| scale.id.clone())
-            .collect::<Vec<_>>();
-        let diagnostic_policy = file
-            .product_diagnostic_policies
-            .iter()
-            .find(|policy| policy.group_id == contract.id);
-        let contract_memory_scale_ids = diagnostic_policy
-            .into_iter()
-            .flat_map(|policy| &policy.scales)
-            .filter(|scale| scale.max_worker_peak_rss_bytes.is_some())
-            .map(|scale| scale.scale_id.to_string())
-            .collect::<Vec<_>>();
-        let memory_policy_matches = match group.memory_policy.method {
-            MemoryMethod::ProcessRss => {
-                !group.memory_policy.scale_ids.is_empty()
-                    && group.memory_policy.scale_ids == contract_memory_scale_ids
-            }
-            MemoryMethod::NotApplicable => {
-                group.memory_policy.scale_ids.is_empty() && contract_memory_scale_ids.is_empty()
-            }
-            MemoryMethod::StabAllocations => false,
-        };
-        let scales_match = contract
-            .scales
-            .iter()
-            .zip(&group.workload_family.scales)
-            .all(|(contract, inventory)| {
-                contract.id.to_string() == inventory.id
-                    && contract.family_id.to_string() == inventory.family_id
-                    && contract.size_class == inventory.size_class
-                    && inventory.semantic_work == Some(contract.work_items.get())
-                    && inventory.input_bytes
-                        == InputByteCount::Exact {
-                            bytes: contract.input_bytes,
-                        }
-                    && inventory.input_digest.as_deref() == Some(contract.input_digest.as_str())
-            });
-        if group.disposition != PerformanceDisposition::Measured
-            || group.runner_fidelity != RunnerFidelity::StabReportOnly
-            || group.correctness_binding != CorrectnessBinding::ExactCases
-            || group.correctness_cases != contract.correctness_case_ids
-            || group.owner != contract.owner.to_string()
-            || group.planned_correctness_case_id.is_some()
-            || group.output_contract.digest_state != EvidenceState::Existing
-            || group.threshold_policy != ThresholdPolicy::ReportOnly
-            || group.timing_policy.batch_policy != contract.timing_batch_policy
-            || u64::from(group.timing_policy.timeout_seconds)
-                != file.product_diagnostic_suite_timeout_seconds.get()
-            || group.status == QualificationStatus::Planned
-            || inventory_scale_ids != contract_scale_ids
-            || !memory_policy_matches
-            || !group.output_contract.comparator_sources.is_empty()
-            || !contract.comparator_sources.is_empty()
-            || !scales_match
-        {
-            return Err(GroupError::InventoryContract(contract.id.to_string()));
-        }
+        return Err(GroupError::InheritedCoverage);
     }
     for row in &suite.manifest_rows {
         for replacement in &row.replacement_contracts {
@@ -500,6 +370,7 @@ fn validate_inventory_contracts(
                     measurement: replacement.runtime_measurement_id.clone(),
                 })?;
             if contract.claim_class != ClaimClass::PromotablePerformance
+                || contract.feature_id.to_string() != row.performance_feature
                 || !contract.measurement_ids.iter().any(|measurement| {
                     measurement.to_string() == replacement.runtime_measurement_id
                 })
@@ -516,6 +387,90 @@ fn validate_inventory_contracts(
                     measurement: replacement.runtime_measurement_id.clone(),
                 });
             }
+        }
+    }
+    Ok(())
+}
+
+fn validate_public_api_ownership(
+    contract: &GroupContract,
+    references: &super::super::discovery::SourceReferences,
+    owners: &mut BTreeSet<String>,
+) -> Result<(), GroupError> {
+    let group_id = contract.id.to_string();
+    let feature_id = contract.feature_id.to_string();
+    if !contract
+        .public_api_item_ids
+        .windows(2)
+        .all(|pair| matches!(pair, [left, right] if left < right))
+    {
+        return Err(GroupError::InvalidPublicApiOwnership(group_id));
+    }
+    for item_id in &contract.public_api_item_ids {
+        let Some(item) = references.public_api.get(item_id) else {
+            return Err(GroupError::UnknownPublicApi {
+                group: group_id,
+                item: item_id.clone(),
+            });
+        };
+        if !owners.insert(item_id.clone())
+            || !item.performance_groups.contains(&feature_id)
+            || !contract.correctness_case_ids.contains(&item.owner_case_id)
+        {
+            return Err(GroupError::InvalidPublicApiOwnership(group_id));
+        }
+    }
+    Ok(())
+}
+
+fn validate_checklist_ownership(
+    contract: &GroupContract,
+    references: &super::super::discovery::SourceReferences,
+    item_owners: &mut BTreeSet<String>,
+    child_owners: &mut BTreeSet<String>,
+) -> Result<(), GroupError> {
+    let group_id = contract.id.to_string();
+    let feature_id = contract.feature_id.to_string();
+    if !contract
+        .checklist_item_ids
+        .windows(2)
+        .all(|pair| matches!(pair, [left, right] if left < right))
+        || !contract
+            .checklist_child_ids
+            .windows(2)
+            .all(|pair| matches!(pair, [left, right] if left < right))
+    {
+        return Err(GroupError::InvalidChecklistOwnership(group_id));
+    }
+    for item_id in &contract.checklist_item_ids {
+        let Some(item) = references.checklist_items.get(item_id) else {
+            return Err(GroupError::UnknownChecklistItem {
+                group: group_id,
+                item: item_id.clone(),
+            });
+        };
+        if !item_owners.insert(item_id.clone()) || !item.performance_features.contains(&feature_id)
+        {
+            return Err(GroupError::InvalidChecklistOwnership(group_id));
+        }
+    }
+    for child_id in &contract.checklist_child_ids {
+        let Some(child) = references.checklist_children.get(child_id) else {
+            return Err(GroupError::UnknownChecklistChild {
+                group: group_id,
+                child: child_id.clone(),
+            });
+        };
+        let item_owns_child = references
+            .checklist_items
+            .get(&child.item_id)
+            .is_some_and(|item| item.selected_child_ids.contains(child_id));
+        if !child_owners.insert(child_id.clone())
+            || !contract.checklist_item_ids.contains(&child.item_id)
+            || !item_owns_child
+            || !child.performance_features.contains(&feature_id)
+        {
+            return Err(GroupError::InvalidChecklistOwnership(group_id));
         }
     }
     Ok(())
@@ -681,6 +636,9 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
             || group.scales.is_empty()
             || group.scales.len() > MAX_SCALES_PER_GROUP
             || group.correctness_case_ids.len() > MAX_CORRECTNESS_CASES_PER_GROUP
+            || group.public_api_item_ids.len() > MAX_PUBLIC_API_ITEMS_PER_GROUP
+            || group.checklist_item_ids.len() > MAX_CHECKLIST_ITEMS_PER_GROUP
+            || group.checklist_child_ids.len() > MAX_CHECKLIST_CHILDREN_PER_GROUP
         {
             return Err(GroupError::InvalidGroup(group.id.to_string()));
         }
@@ -818,22 +776,24 @@ pub(super) enum GroupError {
     },
     #[error("runtime group contract does not exactly match the executable group registry")]
     ExecutableRegistration,
-    #[error("runtime group contract does not match performance inventory group {0}")]
-    InventoryContract(String),
-    #[error(
-        "runtime and implemented threshold-eligible inventory groups differ: runtime-only={runtime_only:?}, inventory-only={inventory_only:?}"
-    )]
-    InventoryCoverage {
-        runtime_only: Vec<String>,
-        inventory_only: Vec<String>,
-    },
-    #[error(
-        "runtime and implemented Stab-only diagnostic groups differ: runtime-only={runtime_only:?}, inventory-only={inventory_only:?}"
-    )]
-    DiagnosticInventoryCoverage {
-        runtime_only: Vec<String>,
-        inventory_only: Vec<String>,
-    },
+    #[error("runtime group {group} references unknown performance feature {feature}")]
+    UnknownFeature { group: String, feature: String },
+    #[error("runtime group {0} has an invalid inherited/planned origin link")]
+    InvalidOrigin(String),
+    #[error("runtime inherited groups do not exactly cover compact manifest parent links")]
+    InheritedCoverage,
+    #[error("runtime group {0} references an unknown correctness case")]
+    UnknownCorrectnessCase(String),
+    #[error("runtime group {group} references unknown public API item {item}")]
+    UnknownPublicApi { group: String, item: String },
+    #[error("runtime group {0} has invalid or duplicate public API ownership")]
+    InvalidPublicApiOwnership(String),
+    #[error("runtime group {group} references unknown checklist item {item}")]
+    UnknownChecklistItem { group: String, item: String },
+    #[error("runtime group {group} references unknown checklist child {child}")]
+    UnknownChecklistChild { group: String, child: String },
+    #[error("runtime group {0} has invalid or duplicate checklist ownership")]
+    InvalidChecklistOwnership(String),
     #[error("invalid source-owned profiler-note path {0:?}")]
     ProfilerNotePath(String),
     #[error("failed to read source-owned profiler note: {0}")]

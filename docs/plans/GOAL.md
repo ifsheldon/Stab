@@ -10,15 +10,15 @@ Complete E0 through E7 without weakening Stim compatibility, data-loss preventio
 
 - The project-local `reclaim-code-entropy` skill and main-checkout policy are installed.
 - Historical A9 rehearsal records remain valid history; the deleted scratch repository's workflow, binary, target, recipes, and active release requirements have been retired.
-- Performance qualification currently mirrors detailed ownership across a large generated inventory and 28 executable runtime groups; the runtime-group model will become the sole detailed owner.
+- Performance inventory schema 5 is compact, and runtime-group schema 11 is the sole detailed owner for all 28 executable groups and 94 scales. The ambiguous parity alias and duplicate regeneration-check routes are removed.
 - The approved public removals have no proved workspace production consumer or compatibility obligation.
 - No formal timing from an intermediate simplification revision may be promoted.
 
 ## Execution Order
 
 1. E0 and E1 are complete: the contract is frozen and the scratch release lane is historical only.
-2. E2: compact performance ownership into the 28 executable runtime groups and remove redundant command paths.
-3. E3: remove the approved unused public errors and advanced-analysis exports; regenerate API and correctness inventories.
+2. E2 is complete: the speculative detailed backlog and mirrored API/checklist/group contracts are gone, while workload and regression identities remain intact.
+3. E3 is next: remove the approved unused public errors and advanced-analysis exports; regenerate API and correctness inventories.
 4. E4: archive A6 JSON records and delete the superseded executable attestation lifecycle.
 5. E5: consolidate only the proved duplicate parsers, CLI format enum, private DEM-search value types, and tests.
 6. E6: synchronize CI, generated status, release docs, benchmark docs, and architecture docs.

@@ -1,10 +1,6 @@
-use std::collections::BTreeMap;
 use std::path::Path;
 
-use self::model::{
-    CorrectnessBinding, PerformanceDisposition, QualificationSuite, RowClassification, RowDecision,
-    RowOrigin,
-};
+use self::model::{PerformanceDisposition, QualificationSuite, RowClassification, RowDecision};
 use crate::config::PREFIX;
 use crate::error::BenchError;
 use crate::manifest::BenchmarkManifest;
@@ -29,8 +25,8 @@ pub(crate) use runtime::{
 pub(crate) use status::StatusArgs;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "dbcbc29eb17e2ecb2a2196e0b9aa9d4c7e56415c64cff5e087b7afba75bf115c";
-const MAX_SUITE_BYTES: usize = 32 << 20;
+    "5e9ebf4814dfdb24eace0b339d5bf7290de8b616dfc428339a5038d0eadb360b";
+const MAX_SUITE_BYTES: usize = 1 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
     runtime::run_worker(args).map_err(BenchError::Qualification)
@@ -358,15 +354,14 @@ pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(),
     let checked_bytes = read_bytes(root, &root.performance_qualification())?;
     let checked: QualificationSuite = serde_json::from_slice(&checked_bytes)?;
     validation::validate(&checked, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
-    let mut generated = discovery::generate(root, manifest)?;
+    let generated = discovery::generate(root, manifest)?;
     validation::validate(&generated, manifest, &references, "UNFROZEN")?;
-    preserve_checked_checklist_presentation(&mut generated, &checked)?;
     validation::validate(&generated, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
     if checked_bytes != render(&generated)? {
         return Err(BenchError::QualificationDrift);
     }
     migration::check(root, &checked)?;
-    runtime::check_contracts(root, EXPECTED_FROZEN_DIGEST, &checked)
+    runtime::check_contracts(root, EXPECTED_FROZEN_DIGEST, &checked, &references)
         .map_err(BenchError::Qualification)?;
     print_summary(&checked, None);
     Ok(())
@@ -392,93 +387,22 @@ pub(crate) fn list(
     Ok(())
 }
 
-pub(crate) fn regenerate(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    check: bool,
-) -> Result<(), BenchError> {
+pub(crate) fn regenerate(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(), BenchError> {
     let generated = discovery::generate(root, manifest)?;
     let references = discovery::load_source_references(root)?;
     validation::validate(&generated, manifest, &references, "UNFROZEN")?;
     let checked_path = root.performance_qualification();
-    let checked_bytes = read_bytes(root, &checked_path)?;
-    let checked: QualificationSuite = serde_json::from_slice(&checked_bytes)?;
-    if check {
-        validation::validate(&checked, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
-    }
-    let mut normalized = generated.clone();
-    preserve_checked_checklist_presentation(&mut normalized, &checked)?;
-    let normalized_bytes = render(&normalized)?;
-    if check {
-        ensure_frozen()?;
-        validation::validate(&normalized, manifest, &references, EXPECTED_FROZEN_DIGEST)?;
-        if checked_bytes != normalized_bytes {
-            return Err(BenchError::QualificationDrift);
-        }
-        migration::check(root, &checked)?;
-        println!("[{PREFIX}] performance qualification regeneration is clean");
-    } else {
-        let unchanged = checked_bytes == normalized_bytes;
-        let retained = retained_regeneration_inventory(
-            &generated,
-            &normalized,
-            &checked_bytes,
-            &normalized_bytes,
-        );
-        migration::check(root, retained)?;
-        if unchanged {
-            println!(
-                "[{PREFIX}] performance qualification semantics are unchanged; retained frozen checklist presentation"
-            );
-        } else {
-            let bytes = render(&generated)?;
-            atomic_write(root, &checked_path, &bytes)?;
-            println!(
-                "[{PREFIX}] wrote {} checklist rows, {} public API items, {} groups, and {} manifest decisions",
-                generated.checklist_items.len(),
-                generated.public_api_items.len(),
-                generated.qualification_groups.len(),
-                generated.manifest_rows.len()
-            );
-            println!(
-                "[{PREFIX}] performance qualification digest {}",
-                generated.semantic_digest
-            );
-        }
-    }
-    Ok(())
-}
-
-fn retained_regeneration_inventory<'a>(
-    generated: &'a QualificationSuite,
-    normalized: &'a QualificationSuite,
-    checked_bytes: &[u8],
-    normalized_bytes: &[u8],
-) -> &'a QualificationSuite {
-    if checked_bytes == normalized_bytes {
-        normalized
-    } else {
-        generated
-    }
-}
-
-fn preserve_checked_checklist_presentation(
-    generated: &mut QualificationSuite,
-    checked: &QualificationSuite,
-) -> Result<(), BenchError> {
-    let checked_items = checked
-        .checklist_items
-        .iter()
-        .map(|item| (item.id.as_str(), item))
-        .collect::<BTreeMap<_, _>>();
-    for item in &mut generated.checklist_items {
-        if let Some(checked_item) = checked_items.get(item.id.as_str()) {
-            item.source_line = checked_item.source_line;
-            item.anchor_digest.clone_from(&checked_item.anchor_digest);
-            item.raw_status.clone_from(&checked_item.raw_status);
-        }
-    }
-    generated.semantic_digest = discovery::semantic_digest(generated)?;
+    let bytes = render(&generated)?;
+    atomic_write(root, &checked_path, &bytes)?;
+    println!(
+        "[{PREFIX}] wrote {} performance features and {} inherited manifest dispositions",
+        generated.performance_features.len(),
+        generated.manifest_rows.len()
+    );
+    println!(
+        "[{PREFIX}] performance qualification digest {}",
+        generated.semantic_digest
+    );
     Ok(())
 }
 
@@ -517,50 +441,27 @@ fn atomic_write(root: &RepoRoot, path: &Path, bytes: &[u8]) -> Result<(), BenchE
 }
 
 fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
-    let groups = suite
-        .qualification_groups
-        .iter()
-        .filter(|group| feature.is_none_or(|value| group.performance_feature == value))
-        .collect::<Vec<_>>();
     let rows = suite
         .manifest_rows
         .iter()
-        .filter(|row| {
-            feature.is_none_or(|value| {
-                groups.iter().any(|group| {
-                    group.id == row.primary_group_id && group.performance_feature == value
-                })
-            })
-        })
+        .filter(|row| feature.is_none_or(|value| row.performance_feature == value))
         .collect::<Vec<_>>();
-    let mut dispositions = BTreeMap::<String, usize>::new();
-    for group in &groups {
-        *dispositions
-            .entry(format!("{:?}", group.disposition))
-            .or_default() += 1;
-    }
     println!(
         "[{PREFIX}] performance qualification schema={} stim={} commit={} digest={}",
         suite.schema_version, suite.stim_version, suite.stim_commit, suite.semantic_digest
     );
     println!(
-        "[{PREFIX}] selection={} checklist={} public-api={} groups={} manifest-rows={} perf-sources={} perf-symbols={}",
+        "[{PREFIX}] selection={} features={} manifest-rows={} runtime-linked={} perf-sources={} perf-symbols={}",
         feature.unwrap_or("all"),
         suite
-            .checklist_items
+            .performance_features
             .iter()
-            .filter(|item| feature.is_none_or(|value| item
-                .performance_features
-                .iter()
-                .any(|candidate| candidate == value)))
+            .filter(|item| feature.is_none_or(|value| item.id == value))
             .count(),
-        suite
-            .public_api_items
-            .iter()
-            .filter(|item| feature.is_none_or(|value| item.performance_feature == value))
-            .count(),
-        groups.len(),
         rows.len(),
+        rows.iter()
+            .filter(|row| row.runtime_group_id.is_some())
+            .count(),
         suite.upstream_perf_sources.len(),
         suite
             .upstream_perf_sources
@@ -590,135 +491,22 @@ fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
         count_classification(&rows, RowClassification::UnmatchedSubmeasurement)
     );
     println!(
-        "[{PREFIX}] group-dispositions measured={} covered-by-parent={} future-candidate={} not-performance-relevant={} no-faithful-comparator={}",
-        dispositions
-            .get(&format!("{:?}", PerformanceDisposition::Measured))
-            .copied()
-            .unwrap_or(0),
-        dispositions
-            .get(&format!("{:?}", PerformanceDisposition::CoveredByParent))
-            .copied()
-            .unwrap_or(0),
-        dispositions
-            .get(&format!("{:?}", PerformanceDisposition::FutureCandidate))
-            .copied()
-            .unwrap_or(0),
-        dispositions
-            .get(&format!(
-                "{:?}",
-                PerformanceDisposition::NotPerformanceRelevant
-            ))
-            .copied()
-            .unwrap_or(0),
-        dispositions
-            .get(&format!(
-                "{:?}",
-                PerformanceDisposition::NoFaithfulStimComparator
-            ))
-            .copied()
-            .unwrap_or(0)
-    );
-    println!(
-        "[{PREFIX}] primary-rows inherited={} planned={} correctness exact-api-owners={} exact-cases={} planned-preflight={} exact-threshold-pairs={}",
-        groups
-            .iter()
-            .filter(|group| group.row_origin == RowOrigin::Inherited)
-            .count(),
-        groups
-            .iter()
-            .filter(|group| group.row_origin == RowOrigin::Planned)
-            .count(),
-        groups
-            .iter()
-            .filter(|group| group.correctness_binding == CorrectnessBinding::ExactApiOwners)
-            .count(),
-        groups
-            .iter()
-            .filter(|group| group.correctness_binding == CorrectnessBinding::ExactCases)
-            .count(),
-        groups
-            .iter()
-            .filter(|group| group.correctness_binding == CorrectnessBinding::Unresolved)
-            .count(),
+        "[{PREFIX}] dispositions covered-by-parent={} future-candidate={} diagnostic={} not-performance-relevant={} exact-threshold-pairs={}",
+        count_disposition(&rows, PerformanceDisposition::CoveredByParent),
+        count_disposition(&rows, PerformanceDisposition::FutureCandidate),
+        count_disposition(&rows, PerformanceDisposition::Diagnostic),
+        count_disposition(&rows, PerformanceDisposition::NotPerformanceRelevant),
         rows.iter()
             .map(|row| row.threshold_measurement_pairs.len())
-            .sum::<usize>()
+            .sum::<usize>(),
     );
-    println!(
-        "[{PREFIX}] item-dispositions checklist-covered={} checklist-future={} checklist-not-performance={} api-covered={} api-future={} api-not-performance={}",
-        suite
-            .checklist_items
-            .iter()
-            .filter(|item| {
-                feature.is_none_or(|value| {
-                    item.performance_features
-                        .iter()
-                        .any(|candidate| candidate == value)
-                }) && item.disposition == PerformanceDisposition::CoveredByParent
-            })
-            .count(),
-        suite
-            .checklist_items
-            .iter()
-            .filter(|item| {
-                feature.is_none_or(|value| {
-                    item.performance_features
-                        .iter()
-                        .any(|candidate| candidate == value)
-                }) && item.disposition == PerformanceDisposition::FutureCandidate
-            })
-            .count(),
-        suite
-            .checklist_items
-            .iter()
-            .filter(|item| {
-                feature.is_none_or(|value| {
-                    item.performance_features
-                        .iter()
-                        .any(|candidate| candidate == value)
-                }) && item.disposition == PerformanceDisposition::NotPerformanceRelevant
-            })
-            .count(),
-        suite
-            .public_api_items
-            .iter()
-            .filter(|item| {
-                feature.is_none_or(|value| {
-                    item.performance_feature == value
-                        || item
-                            .supporting_performance_features
-                            .iter()
-                            .any(|candidate| candidate == value)
-                }) && item.disposition == PerformanceDisposition::CoveredByParent
-            })
-            .count(),
-        suite
-            .public_api_items
-            .iter()
-            .filter(|item| {
-                feature.is_none_or(|value| {
-                    item.performance_feature == value
-                        || item
-                            .supporting_performance_features
-                            .iter()
-                            .any(|candidate| candidate == value)
-                }) && item.disposition == PerformanceDisposition::FutureCandidate
-            })
-            .count(),
-        suite
-            .public_api_items
-            .iter()
-            .filter(|item| {
-                feature.is_none_or(|value| {
-                    item.performance_feature == value
-                        || item
-                            .supporting_performance_features
-                            .iter()
-                            .any(|candidate| candidate == value)
-                }) && item.disposition == PerformanceDisposition::NotPerformanceRelevant
-            })
-            .count()
-    );
+}
+
+fn count_disposition(
+    rows: &[&model::ManifestRowDisposition],
+    value: PerformanceDisposition,
+) -> usize {
+    rows.iter().filter(|row| row.disposition == value).count()
 }
 
 fn count_decision(rows: &[&model::ManifestRowDisposition], value: RowDecision) -> usize {
@@ -737,84 +525,6 @@ fn count_classification(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
-
-    fn checked_suite() -> QualificationSuite {
-        serde_json::from_str(include_str!(
-            "../../../../benchmarks/stim-qualification-suite.json"
-        ))
-        .expect("checked performance qualification suite")
-    }
-
-    #[test]
-    fn checklist_presentation_changes_do_not_refingerprint_performance_semantics() {
-        let checked = checked_suite();
-        let mut generated = checked.clone();
-        let item = generated
-            .checklist_items
-            .first_mut()
-            .expect("checked checklist item");
-        item.source_line += 17;
-        item.anchor_digest = "a".repeat(64);
-        item.raw_status = "Done for selected scope".to_string();
-        generated.semantic_digest =
-            discovery::semantic_digest(&generated).expect("generated digest");
-
-        preserve_checked_checklist_presentation(&mut generated, &checked)
-            .expect("normalize presentation");
-
-        assert_eq!(generated, checked);
-    }
-
-    #[test]
-    fn unchanged_regeneration_validates_the_retained_normalized_identity() {
-        let checked = checked_suite();
-        let checked_bytes = render(&checked).expect("checked bytes");
-        let mut generated = checked.clone();
-        let item = generated
-            .checklist_items
-            .first_mut()
-            .expect("checked checklist item");
-        item.source_line += 17;
-        generated.semantic_digest =
-            discovery::semantic_digest(&generated).expect("transient generated digest");
-        let transient_digest = generated.semantic_digest.clone();
-        let mut normalized = generated.clone();
-        preserve_checked_checklist_presentation(&mut normalized, &checked)
-            .expect("normalize presentation");
-        let normalized_bytes = render(&normalized).expect("normalized bytes");
-
-        let retained = retained_regeneration_inventory(
-            &generated,
-            &normalized,
-            &checked_bytes,
-            &normalized_bytes,
-        );
-
-        assert_ne!(transient_digest, checked.semantic_digest);
-        assert_eq!(retained.semantic_digest, checked.semantic_digest);
-    }
-
-    #[test]
-    fn checklist_scope_changes_remain_performance_semantic_changes() {
-        let checked = checked_suite();
-        let mut generated = checked.clone();
-        let item = generated
-            .checklist_items
-            .iter_mut()
-            .find(|item| item.raw_status.starts_with("Partial"))
-            .expect("partial checklist item");
-        item.raw_status = "Done for selected scope".to_string();
-        item.deferred_remainder = false;
-        item.deferred_child = None;
-        item.deferred_child_ids.clear();
-        generated.semantic_digest =
-            discovery::semantic_digest(&generated).expect("generated digest");
-
-        preserve_checked_checklist_presentation(&mut generated, &checked)
-            .expect("normalize presentation");
-
-        assert_ne!(generated, checked);
-    }
 
     #[cfg(unix)]
     #[test]

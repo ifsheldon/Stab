@@ -894,6 +894,11 @@ mod tests {
     fn product_diagnostic_memory_evidence_enforces_worker_peak_cap() {
         let contract = GroupContract {
             id: ProtocolId::try_new("product-diagnostic").expect("group"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: ClaimClass::ProductDiagnostic,
             parity_eligibility: ParityEligibility::ReportOnly,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -908,6 +913,9 @@ mod tests {
                 input_digest: InputDigest::try_new("1".repeat(64)).expect("input digest"),
             }],
             correctness_case_ids: vec!["cq-exact".to_string()],
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: ProtocolId::try_new("owner").expect("owner"),
             profiler_note: None,
             comparator_sources: Vec::new(),

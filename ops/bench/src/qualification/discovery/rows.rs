@@ -1,16 +1,10 @@
 use std::collections::BTreeSet;
 
-use super::{
-    MAX_INPUT_BYTES, ThresholdRow, UpstreamPerfSource, sha256_hex, waiver_retirement_mapping,
-};
+use super::{ThresholdRow, UpstreamPerfSource, waiver_retirement_mapping};
 use crate::comparability::ComparabilityClass;
 use crate::error::BenchError;
-use crate::manifest::{BenchmarkRow, Runner, ThresholdClass};
-use crate::qualification::model::{
-    FixtureLocator, InputByteCount, Phase, RowClassification, RowDecision, RunnerFidelity,
-    ScalePoint, SizeClass, StimMapping, ThresholdPolicy, WorkloadFamily,
-};
-use crate::root::RepoRoot;
+use crate::manifest::{BenchmarkRow, Runner};
+use crate::qualification::model::{RowClassification, RowDecision, StimMapping};
 
 pub(super) fn classify_manifest_row(row: &BenchmarkRow) -> Result<&'static str, BenchError> {
     let id = row.id.as_str();
@@ -125,39 +119,6 @@ pub(super) fn classify_manifest_row(row: &BenchmarkRow) -> Result<&'static str, 
     };
     Ok(feature)
 }
-pub(super) fn classify_phase(row: &BenchmarkRow) -> Phase {
-    let id = row.id.as_str();
-    if row.runner == Runner::StimCli {
-        Phase::EndToEnd
-    } else if row.phase == "startup" {
-        Phase::Startup
-    } else if id.contains("parse") || id.contains("reader") || id.contains("dets-layout") {
-        Phase::Parse
-    } else if id.contains("print") || id.contains("write") {
-        Phase::Serialize
-    } else if id.contains("convert") || id.contains("m2d") || id.contains("transpose") {
-        Phase::Convert
-    } else if id.contains("search")
-        || id.contains("graphlike")
-        || id.contains("hypergraph")
-        || id.contains("wcnf")
-    {
-        Phase::Search
-    } else if id.contains("flatten")
-        || id.contains("rounded")
-        || id.contains("without")
-        || id.contains("time-reverse")
-        || id.contains("decompose")
-        || id.contains("feedback")
-    {
-        Phase::Transform
-    } else if id.contains("reference-sample-tree") {
-        Phase::Compile
-    } else {
-        Phase::Execute
-    }
-}
-
 pub(super) fn row_decision(row: &BenchmarkRow) -> RowDecision {
     const REWORKED: [&str; 3] = ["m4-circuit-parse", "m5-simd-bits", "m5-simd-word"];
     const REMOVED: [&str; 2] = ["m7-perf-harness", "m12-primary-performance-matrix"];
@@ -321,37 +282,6 @@ pub(super) fn stim_mapping(row: &BenchmarkRow, waived: bool) -> StimMapping {
     }
 }
 
-pub(super) fn runner_fidelity(row: &BenchmarkRow, waived: bool) -> RunnerFidelity {
-    if waived {
-        RunnerFidelity::AdapterLibrary
-    } else {
-        match row.runner {
-            Runner::StimPerf => RunnerFidelity::StimPerf,
-            Runner::StimCli => RunnerFidelity::ProcessCli,
-            Runner::ContractOnly => RunnerFidelity::AdapterLibrary,
-        }
-    }
-}
-
-pub(super) fn threshold_policy(
-    row: &BenchmarkRow,
-    has_threshold: bool,
-    waived: bool,
-    has_unmatched_submeasurement: bool,
-) -> ThresholdPolicy {
-    if waived || has_unmatched_submeasurement {
-        ThresholdPolicy::ReportOnly
-    } else if has_threshold && row.runner == Runner::StimPerf {
-        ThresholdPolicy::Primary1_25
-    } else if row.threshold_class == ThresholdClass::BaselineMetadata {
-        ThresholdPolicy::NotApplicable
-    } else if row.threshold_class == ThresholdClass::PerformanceGate {
-        ThresholdPolicy::RegressionOnly
-    } else {
-        ThresholdPolicy::ReportOnly
-    }
-}
-
 pub(super) fn selected_stim_symbols(
     row: &BenchmarkRow,
     sources: &[UpstreamPerfSource],
@@ -374,49 +304,4 @@ pub(super) fn selected_stim_symbols(
         })
         .cloned()
         .collect()
-}
-
-pub(super) fn workload_family(
-    root: &RepoRoot,
-    row: &BenchmarkRow,
-) -> Result<WorkloadFamily, BenchError> {
-    let (input_bytes, fixture, deterministic_seed) = if row.stdin_path.is_empty() {
-        (
-            InputByteCount::NotApplicable,
-            FixtureLocator::Inline { id: row.id.clone() },
-            format!("source-owned-inline:{}", row.id),
-        )
-    } else {
-        let path = root.path.join(&row.stdin_path);
-        let bytes =
-            crate::source_file::read_repo_regular_file_bounded(root, &path, MAX_INPUT_BYTES)?;
-        let length = u64::try_from(bytes.len()).map_err(|_| {
-            BenchError::Qualification(format!(
-                "benchmark fixture {} length does not fit in u64",
-                row.stdin_path
-            ))
-        })?;
-        (
-            InputByteCount::Exact { bytes: length },
-            FixtureLocator::RepositoryFile {
-                path: row.stdin_path.clone(),
-                sha256: sha256_hex(&bytes),
-            },
-            "corpus-digest-owned".to_string(),
-        )
-    };
-    Ok(WorkloadFamily {
-        fixture,
-        source: row.upstream_source.clone(),
-        deterministic_seed,
-        scales: vec![ScalePoint {
-            id: "inherited".to_string(),
-            family_id: "default".to_string(),
-            size_class: SizeClass::Small,
-            parameters: row.description.clone(),
-            input_bytes,
-            semantic_work: None,
-            input_digest: None,
-        }],
-    })
 }

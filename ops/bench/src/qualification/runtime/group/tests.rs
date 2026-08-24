@@ -4,6 +4,11 @@ fn valid_contract_file() -> GroupContractFile {
     let mut groups = vec![
         GroupContract {
             id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID).expect("group id"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: ClaimClass::DiagnosticInfrastructure,
             parity_eligibility: ParityEligibility::ReportOnly,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -21,6 +26,9 @@ fn valid_contract_file() -> GroupContractFile {
                 .expect("empty input digest"),
             }],
             correctness_case_ids: Vec::new(),
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: ProtocolId::try_new("ops/bench").expect("owner"),
             profiler_note: None,
             comparator_sources: Vec::new(),
@@ -28,6 +36,11 @@ fn valid_contract_file() -> GroupContractFile {
         GroupContract {
             id: ProtocolId::try_new(super::super::invocation::CIRCUIT_CANONICAL_PRINT_GROUP_ID)
                 .expect("group id"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: ClaimClass::PromotablePerformance,
             parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -42,6 +55,9 @@ fn valid_contract_file() -> GroupContractFile {
                 input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
             }],
             correctness_case_ids: vec!["cq-evidence-canonical-print".to_string()],
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: ProtocolId::try_new("stab-model/circuit-printer").expect("owner"),
             profiler_note: None,
             comparator_sources: Vec::new(),
@@ -49,6 +65,11 @@ fn valid_contract_file() -> GroupContractFile {
         GroupContract {
             id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
                 .expect("group id"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: ClaimClass::PromotablePerformance,
             parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -63,6 +84,9 @@ fn valid_contract_file() -> GroupContractFile {
                 input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
             }],
             correctness_case_ids: vec!["cq-evidence-example".to_string()],
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: ProtocolId::try_new("stab-model/circuit-parser").expect("owner"),
             profiler_note: Some(ProfilerNoteContract {
                 path: ProfilerNotePath::try_new(
@@ -76,6 +100,11 @@ fn valid_contract_file() -> GroupContractFile {
         GroupContract {
             id: ProtocolId::try_new(super::super::invocation::GATE_NAME_HASH_GROUP_ID)
                 .expect("group id"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: ClaimClass::PromotablePerformance,
             parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -93,6 +122,9 @@ fn valid_contract_file() -> GroupContractFile {
                 .expect("empty input digest"),
             }],
             correctness_case_ids: vec!["cq-evidence-gate-name-hash".to_string()],
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: ProtocolId::try_new("stab-core/gates").expect("owner"),
             profiler_note: None,
             comparator_sources: Vec::new(),
@@ -100,6 +132,11 @@ fn valid_contract_file() -> GroupContractFile {
         GroupContract {
             id: ProtocolId::try_new(super::super::invocation::SIMD_BITS_XOR_GROUP_ID)
                 .expect("group id"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: ClaimClass::PromotablePerformance,
             parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -116,6 +153,9 @@ fn valid_contract_file() -> GroupContractFile {
                 input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
             }],
             correctness_case_ids: vec!["cq-evidence-simd-bits-xor".to_string()],
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
             profiler_note: None,
             comparator_sources: comparators::SIMD_BITS_XOR
@@ -130,6 +170,11 @@ fn valid_contract_file() -> GroupContractFile {
         GroupContract {
             id: ProtocolId::try_new(super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID)
                 .expect("group id"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: ClaimClass::PromotablePerformance,
             parity_eligibility: ParityEligibility::ThresholdEligible,
             timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -144,6 +189,9 @@ fn valid_contract_file() -> GroupContractFile {
                 input_digest: InputDigest::try_new("e".repeat(64)).expect("input digest"),
             }],
             correctness_case_ids: vec!["cq-evidence-simd-word-popcount".to_string()],
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
             profiler_note: None,
             comparator_sources: comparators::SIMD_WORD_POPCOUNT
@@ -279,6 +327,11 @@ fn product_diagnostic_contract(
 ) -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
+        feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+            "PERF-RESOURCE-BOUNDARIES",
+        )
+        .expect("feature id"),
+        origin: crate::qualification::model::RowOrigin::Planned,
         claim_class: ClaimClass::ProductDiagnostic,
         parity_eligibility: ParityEligibility::ReportOnly,
         timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -293,6 +346,9 @@ fn product_diagnostic_contract(
             input_digest: InputDigest::try_new("c".repeat(64)).expect("input digest"),
         }],
         correctness_case_ids: vec!["cq-evidence-agent-diagnostic".to_string()],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/agent-diagnostic").expect("owner"),
         profiler_note: None,
         comparator_sources: Vec::new(),
@@ -326,6 +382,11 @@ fn product_diagnostic_policy(group: &GroupContract) -> ProductDiagnosticPolicy {
 fn not_zero_contract(group_id: &str, workload_id: &str) -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
+        feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+            "PERF-RESOURCE-BOUNDARIES",
+        )
+        .expect("feature id"),
+        origin: crate::qualification::model::RowOrigin::Planned,
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -340,6 +401,9 @@ fn not_zero_contract(group_id: &str, workload_id: &str) -> GroupContract {
             input_digest: InputDigest::try_new("f".repeat(64)).expect("input digest"),
         }],
         correctness_case_ids: vec!["cq-evidence-simd-bits-not-zero".to_string()],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::SIMD_BITS_NOT_ZERO
@@ -360,6 +424,11 @@ fn sparse_xor_contract(
 ) -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
+        feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+            "PERF-RESOURCE-BOUNDARIES",
+        )
+        .expect("feature id"),
+        origin: crate::qualification::model::RowOrigin::Planned,
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -374,6 +443,9 @@ fn sparse_xor_contract(
             input_digest: InputDigest::try_new("f".repeat(64)).expect("input digest"),
         }],
         correctness_case_ids: vec!["cq-evidence-sparse-xor".to_string()],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::SPARSE_XOR
@@ -389,6 +461,11 @@ fn sparse_xor_contract(
 fn transpose_contract(group_id: &str, workload_id: &str, measurement_id: &str) -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new(group_id).expect("group id"),
+        feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+            "PERF-RESOURCE-BOUNDARIES",
+        )
+        .expect("feature id"),
+        origin: crate::qualification::model::RowOrigin::Planned,
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -406,6 +483,9 @@ fn transpose_contract(group_id: &str, workload_id: &str, measurement_id: &str) -
             "cq-evidence-qualification-4d0291febfd22b68".to_string(),
             "cq-evidence-qualification-66e29faafe5f2856".to_string(),
         ],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
         profiler_note: None,
         comparator_sources: comparators::BIT_MATRIX_TRANSPOSE
@@ -641,23 +721,6 @@ fn product_diagnostic_suite_timeout_is_bounded_and_matches_inventory() {
         validate(&invalid, &"a".repeat(64)),
         Err(GroupError::InvalidProductDiagnosticSuiteTimeout(3_601))
     ));
-
-    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .expect("repository root");
-    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
-    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
-    suite
-        .qualification_groups
-        .iter_mut()
-        .find(|group| group.id == super::super::invocation::A2_SAMPLER_COMPILE_GROUP_ID)
-        .expect("sampler compile diagnostic")
-        .timing_policy
-        .timeout_seconds = 599;
-    assert!(matches!(
-        validate_inventory_contracts(&file, &suite),
-        Err(GroupError::InventoryContract(group))
-            if group == super::super::invocation::A2_SAMPLER_COMPILE_GROUP_ID
-    ));
 }
 
 #[test]
@@ -857,39 +920,94 @@ fn scale_lookup_is_exact_and_fail_closed() {
 }
 
 #[test]
-fn runtime_contract_rejects_inventory_scale_drift() {
+fn runtime_contract_is_the_single_detailed_performance_owner() {
+    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let references =
+        crate::qualification::discovery::load_source_references(&root).expect("source references");
+    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+
+    validate_inventory_contracts(&file, &suite, &references).expect("matching compact ledgers");
+    assert_eq!(file.groups.len(), 28);
+    assert_eq!(
+        file.groups
+            .iter()
+            .map(|group| group.scales.len())
+            .sum::<usize>(),
+        94
+    );
+}
+
+#[test]
+fn runtime_contract_rejects_unknown_and_duplicate_ownership() {
+    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let references =
+        crate::qualification::discovery::load_source_references(&root).expect("source references");
+    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+
+    let mut unknown_feature = file.clone();
+    unknown_feature
+        .groups
+        .first_mut()
+        .expect("runtime group")
+        .feature_id = ProtocolId::try_new("PERF-UNKNOWN").expect("synthetic feature");
+    assert!(matches!(
+        validate_inventory_contracts(&unknown_feature, &suite, &references),
+        Err(GroupError::UnknownFeature { .. })
+    ));
+
+    let mut duplicate_api = file.clone();
+    let group = duplicate_api
+        .groups
+        .iter_mut()
+        .find(|group| !group.public_api_item_ids.is_empty())
+        .expect("runtime API owner");
+    let duplicate = group
+        .public_api_item_ids
+        .first()
+        .expect("owned API")
+        .clone();
+    group.public_api_item_ids.push(duplicate);
+    group.public_api_item_ids.sort();
+    assert!(matches!(
+        validate_inventory_contracts(&duplicate_api, &suite, &references),
+        Err(GroupError::InvalidPublicApiOwnership(_))
+    ));
+
+    let mut unknown_checklist = file;
+    unknown_checklist
+        .groups
+        .first_mut()
+        .expect("runtime group")
+        .checklist_item_ids
+        .push("PERFC-UNKNOWN".to_string());
+    assert!(matches!(
+        validate_inventory_contracts(&unknown_checklist, &suite, &references),
+        Err(GroupError::UnknownChecklistItem { .. })
+    ));
+}
+
+#[test]
+fn runtime_contract_rejects_orphaned_inherited_links() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
     let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let references =
+        crate::qualification::discovery::load_source_references(&root).expect("source references");
     let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
-    validate_inventory_contracts(&file, &suite).expect("matching ledgers");
-
-    let scale = suite
-        .qualification_groups
+    suite
+        .manifest_rows
         .iter_mut()
-        .find(|group| group.id == super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
-        .and_then(|group| group.workload_family.scales.first_mut())
-        .expect("circuit parse scale");
-    scale.semantic_work = scale.semantic_work.and_then(|work| work.checked_add(1));
+        .find(|row| row.runtime_group_id.is_some())
+        .expect("inherited runtime link")
+        .runtime_group_id = None;
 
     assert!(matches!(
-        validate_inventory_contracts(&file, &suite),
-        Err(GroupError::InventoryContract(group))
-            if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
-    ));
-
-    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
-    let scale = suite
-        .qualification_groups
-        .iter_mut()
-        .find(|group| group.id == super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
-        .and_then(|group| group.workload_family.scales.first_mut())
-        .expect("circuit parse scale");
-    scale.input_digest = Some("e".repeat(64));
-    assert!(matches!(
-        validate_inventory_contracts(&file, &suite),
-        Err(GroupError::InventoryContract(group))
-            if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
+        validate_inventory_contracts(&file, &suite, &references),
+        Err(GroupError::InvalidOrigin(_)) | Err(GroupError::InheritedCoverage)
     ));
 }
 
@@ -898,6 +1016,8 @@ fn runtime_contract_rejects_stale_replacement_measurement() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
     let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let references =
+        crate::qualification::discovery::load_source_references(&root).expect("source references");
     let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     suite
         .manifest_rows
@@ -910,7 +1030,7 @@ fn runtime_contract_rejects_stale_replacement_measurement() {
         .runtime_measurement_id = "stale-measurement".to_string();
 
     assert!(matches!(
-        validate_inventory_contracts(&file, &suite),
+        validate_inventory_contracts(&file, &suite, &references),
         Err(GroupError::ReplacementContract { row, group, measurement })
             if row == "m5-simd-bits"
                 && group == "PERFQ-M5-SIMD-BITS"
@@ -923,6 +1043,8 @@ fn runtime_contract_rejects_stale_replacement_scale() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
     let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let references =
+        crate::qualification::discovery::load_source_references(&root).expect("source references");
     let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
     suite
         .manifest_rows
@@ -935,47 +1057,11 @@ fn runtime_contract_rejects_stale_replacement_scale() {
         .runtime_scale_id = Some("stale-scale".to_string());
 
     assert!(matches!(
-        validate_inventory_contracts(&file, &suite),
+        validate_inventory_contracts(&file, &suite, &references),
         Err(GroupError::ReplacementContract { row, group, measurement })
             if row == "m5-simd-bits"
                 && group == "PERFQ-M5-SIMD-BITS"
                 && measurement == "xor-complete-vector"
-    ));
-}
-
-#[test]
-fn runtime_contract_rejects_inventory_groups_without_runtime_owners() {
-    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-        .expect("repository root");
-    let mut suite = crate::qualification::read(&root).expect("checked performance inventory");
-    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
-    let mut orphan = suite
-        .qualification_groups
-        .iter()
-        .find(|group| group.id == super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
-        .expect("implemented threshold group")
-        .clone();
-    orphan.id = "PERFQ-ORPHAN".to_string();
-    suite.qualification_groups.push(orphan);
-
-    assert!(matches!(
-        validate_inventory_contracts(&file, &suite),
-        Err(GroupError::InventoryCoverage {
-            runtime_only,
-            inventory_only,
-        }) if runtime_only.is_empty() && inventory_only == ["PERFQ-ORPHAN"]
-    ));
-
-    suite.qualification_groups.retain(|group| {
-        group.id != "PERFQ-ORPHAN" && group.id != super::super::invocation::CIRCUIT_PARSE_GROUP_ID
-    });
-    assert!(matches!(
-        validate_inventory_contracts(&file, &suite),
-        Err(GroupError::InventoryCoverage {
-            runtime_only,
-            inventory_only,
-        }) if runtime_only == [super::super::invocation::CIRCUIT_PARSE_GROUP_ID]
-            && inventory_only.is_empty()
     ));
 }
 

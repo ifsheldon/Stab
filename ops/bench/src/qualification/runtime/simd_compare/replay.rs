@@ -639,6 +639,11 @@ mod tests {
             product_diagnostic_policy: None,
             contract: GroupContract {
                 id: ProtocolId::try_new(GROUP_IDS[0]).expect("group"),
+                feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                    "PERF-RESOURCE-BOUNDARIES",
+                )
+                .expect("feature id"),
+                origin: crate::qualification::model::RowOrigin::Planned,
                 claim_class: ClaimClass::PromotablePerformance,
                 parity_eligibility: ParityEligibility::ThresholdEligible,
                 timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -655,6 +660,9 @@ mod tests {
                     input_digest: InputDigest::try_new(digest('a')).expect("input digest"),
                 }],
                 correctness_case_ids: Vec::new(),
+                public_api_item_ids: Vec::new(),
+                checklist_item_ids: Vec::new(),
+                checklist_child_ids: Vec::new(),
                 owner: ProtocolId::try_new("stab-bits/bit-vector").expect("owner"),
                 profiler_note: None,
                 comparator_sources: Vec::new(),
@@ -762,6 +770,11 @@ mod tests {
             product_diagnostic_policy: None,
             contract: GroupContract {
                 id: ProtocolId::try_new(group_id).expect("group"),
+                feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                    "PERF-RESOURCE-BOUNDARIES",
+                )
+                .expect("feature id"),
+                origin: crate::qualification::model::RowOrigin::Planned,
                 claim_class: ClaimClass::PromotablePerformance,
                 parity_eligibility: ParityEligibility::ThresholdEligible,
                 timing_batch_policy: TimingBatchPolicy::CommonIterations,
@@ -786,6 +799,9 @@ mod tests {
                     },
                 ],
                 correctness_case_ids: Vec::new(),
+                public_api_item_ids: Vec::new(),
+                checklist_item_ids: Vec::new(),
+                checklist_child_ids: Vec::new(),
                 owner: ProtocolId::try_new(owner).expect("owner"),
                 profiler_note: None,
                 comparator_sources: Vec::new(),

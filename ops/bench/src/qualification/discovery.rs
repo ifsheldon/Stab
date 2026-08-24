@@ -3,27 +3,22 @@ use std::path::{Component, Path, PathBuf};
 
 use serde::Deserialize;
 
-use super::checklist::{RawChecklistItem, parse as parse_checklist};
+use super::checklist::parse as parse_checklist;
 use super::model::{
-    ChecklistItem, ChecklistScope, CorrectnessBinding, EvidenceState, ManifestRowDisposition,
-    MeasurementPair, MemoryMethod, MemoryPolicy, OutputContract, PerformanceDisposition,
-    PerformanceFeature, QualificationGroup, QualificationStatus, QualificationSuite,
-    RowClassification, RowDecision, RowOrigin, SCHEMA_VERSION, ThresholdPolicy, TimingPolicy,
-    UpstreamPerfSource, WaiverDisposition, WaiverKind, WaiverPair, WaiverSourcePolicy,
+    ManifestRowDisposition, MeasurementPair, PerformanceDisposition, PerformanceFeature,
+    QualificationSuite, RowDecision, SCHEMA_VERSION, UpstreamPerfSource, WaiverDisposition,
+    WaiverKind, WaiverPair, WaiverSourcePolicy,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner, ThresholdClass};
 use crate::root::RepoRoot;
 
-mod api;
-mod graduation;
 mod replacements;
 mod rows;
 
 use rows::{
-    classify_manifest_row, classify_phase, row_classifications, row_decision, runner_fidelity,
-    selected_stim_symbols, stim_mapping, threshold_policy, workload_family,
+    classify_manifest_row, row_classifications, row_decision, selected_stim_symbols, stim_mapping,
 };
 
 pub(super) const PERFORMANCE_FEATURE_IDS: [&str; 16] = [
@@ -45,6 +40,28 @@ pub(super) const PERFORMANCE_FEATURE_IDS: [&str; 16] = [
     "PERF-RESOURCE-BOUNDARIES",
 ];
 
+pub(super) fn manifest_feature(row: &BenchmarkRow) -> Result<&'static str, BenchError> {
+    classify_manifest_row(row)
+}
+
+pub(super) fn inherited_runtime_group_id(row_id: &str) -> Option<String> {
+    replacements::runtime_group_id(row_id)
+}
+
+pub(super) fn manifest_disposition(row: &BenchmarkRow) -> PerformanceDisposition {
+    if inherited_runtime_group_id(&row.id).is_some() {
+        PerformanceDisposition::CoveredByParent
+    } else if row_decision(row) == RowDecision::Removed
+        || row.threshold_class == ThresholdClass::BaselineMetadata
+    {
+        PerformanceDisposition::NotPerformanceRelevant
+    } else if row_decision(row) == RowDecision::Diagnostic {
+        PerformanceDisposition::Diagnostic
+    } else {
+        PerformanceDisposition::FutureCandidate
+    }
+}
+
 const MAX_INPUT_BYTES: usize = 16 << 20;
 const ZERO_DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -65,8 +82,6 @@ struct CorrectnessFeature {
 #[derive(Deserialize)]
 struct CorrectnessApi {
     id: String,
-    path: String,
-    kind: String,
     owner_case_id: String,
     performance_groups: Vec<String>,
 }
@@ -120,6 +135,8 @@ struct RegressionWaiverRow {
 }
 
 pub(super) struct SourceReferences {
+    pub(super) correctness_digest: String,
+    pub(super) correctness_features: BTreeMap<String, Vec<String>>,
     pub(super) correctness_cases: BTreeSet<String>,
     pub(super) threshold_rows: BTreeSet<String>,
     pub(super) threshold_ratios: BTreeMap<String, Option<String>>,
@@ -130,13 +147,23 @@ pub(super) struct SourceReferences {
     pub(super) unstable_pair_waivers: BTreeSet<String>,
     pub(super) waiver_policies: BTreeMap<(String, String), WaiverSourcePolicy>,
     pub(super) public_api: BTreeMap<String, ApiReference>,
+    pub(super) checklist_items: BTreeMap<String, ChecklistReference>,
+    pub(super) checklist_children: BTreeMap<String, ChecklistChildReference>,
 }
 
 pub(super) struct ApiReference {
-    pub(super) path: String,
-    pub(super) kind: String,
     pub(super) owner_case_id: String,
     pub(super) performance_groups: Vec<String>,
+}
+
+pub(super) struct ChecklistReference {
+    pub(super) performance_features: Vec<String>,
+    pub(super) selected_child_ids: Vec<String>,
+}
+
+pub(super) struct ChecklistChildReference {
+    pub(super) item_id: String,
+    pub(super) performance_features: Vec<String>,
 }
 
 pub(super) fn load_source_references(root: &RepoRoot) -> Result<SourceReferences, BenchError> {
@@ -147,6 +174,8 @@ pub(super) fn load_source_references(root: &RepoRoot) -> Result<SourceReferences
     let beta: IdRows<BetaWaiverRow> = read_repo_json_bounded(root, &root.primary_beta_waivers())?;
     let regression: IdRows<RegressionWaiverRow> =
         read_repo_json_bounded(root, &root.primary_regression_waivers())?;
+    let checklist_source = read_repo_text_bounded(root, &root.feature_checklist())?;
+    let checklist = parse_checklist(&checklist_source)?;
     if thresholds.schema_version != 2 || beta.schema_version != 1 || regression.schema_version != 2
     {
         return Err(BenchError::Qualification(format!(
@@ -196,15 +225,55 @@ pub(super) fn load_source_references(root: &RepoRoot) -> Result<SourceReferences
             (
                 item.id,
                 ApiReference {
-                    path: item.path,
-                    kind: item.kind,
                     owner_case_id: item.owner_case_id,
                     performance_groups: item.performance_groups,
                 },
             )
         })
         .collect();
+    let mut checklist_items = BTreeMap::new();
+    let mut checklist_children = BTreeMap::new();
+    for item in checklist {
+        let item_id = item.id.clone();
+        if checklist_items
+            .insert(
+                item_id.clone(),
+                ChecklistReference {
+                    performance_features: item.performance_features.clone(),
+                    selected_child_ids: item.selected_child_ids.clone(),
+                },
+            )
+            .is_some()
+        {
+            return Err(BenchError::Qualification(format!(
+                "duplicate checklist item id {item_id:?}"
+            )));
+        }
+        for ownership in item.selected_child_ownership {
+            let child_id = ownership.child_id;
+            if checklist_children
+                .insert(
+                    child_id.clone(),
+                    ChecklistChildReference {
+                        item_id: item_id.clone(),
+                        performance_features: ownership.performance_features,
+                    },
+                )
+                .is_some()
+            {
+                return Err(BenchError::Qualification(format!(
+                    "duplicate checklist child id {child_id:?}"
+                )));
+            }
+        }
+    }
     Ok(SourceReferences {
+        correctness_digest: correctness.semantic_digest.clone(),
+        correctness_features: correctness
+            .features
+            .iter()
+            .map(|feature| (feature.id.clone(), feature.performance_groups.clone()))
+            .collect(),
         correctness_cases,
         threshold_rows,
         threshold_ratios: thresholds
@@ -271,6 +340,8 @@ pub(super) fn load_source_references(root: &RepoRoot) -> Result<SourceReferences
             }))
             .collect(),
         public_api,
+        checklist_items,
+        checklist_children,
     })
 }
 
@@ -312,8 +383,6 @@ pub(super) fn generate(
             regression_waivers.schema_version
         )));
     }
-    let checklist_source = read_repo_text_bounded(root, &root.feature_checklist())?;
-    let raw_checklist = parse_checklist(&checklist_source)?;
     let upstream_perf_sources = discover_perf_sources(root, benchmark_manifest)?;
 
     let threshold_by_id = thresholds
@@ -331,37 +400,20 @@ pub(super) fn generate(
         .iter()
         .map(|row| (row.id.as_str(), row))
         .collect::<BTreeMap<_, _>>();
-    let mut groups = Vec::with_capacity(benchmark_manifest.rows.len());
     let mut row_dispositions = Vec::with_capacity(benchmark_manifest.rows.len());
     for row in &benchmark_manifest.rows {
         let feature_id = classify_manifest_row(row)?;
-        let group_id = format!("PERFQ-{}", row.id.to_ascii_uppercase());
         let threshold = threshold_by_id.get(row.id.as_str()).copied();
         let regression_waiver = regression_by_id.get(row.id.as_str()).copied();
         let adapter_waived = beta_by_id.contains_key(row.id.as_str())
             || regression_waiver.is_some_and(is_adapter_waiver);
-        let threshold_waived =
-            beta_by_id.contains_key(row.id.as_str()) || regression_waiver.is_some();
         let selected_stim_symbols = selected_stim_symbols(row, &upstream_perf_sources);
-        let correctness_cases = Vec::new();
-        let correctness_binding = CorrectnessBinding::Unresolved;
         let classifications =
             row_classifications(row, threshold, adapter_waived, &selected_stim_symbols);
         let decision = row_decision(row);
-        let disposition = if decision == RowDecision::Removed
-            || row.threshold_class == ThresholdClass::BaselineMetadata
-        {
-            PerformanceDisposition::NotPerformanceRelevant
-        } else {
-            PerformanceDisposition::Measured
-        };
+        let runtime_group_id = replacements::runtime_group_id(&row.id);
+        let disposition = manifest_disposition(row);
         let stim_mapping = stim_mapping(row, adapter_waived);
-        let threshold_policy = threshold_policy(
-            row,
-            threshold.is_some(),
-            threshold_waived,
-            classifications.contains(&RowClassification::UnmatchedSubmeasurement),
-        );
         let supporting_performance_features = if (row.runner == Runner::StimCli
             || row.id.starts_with("pf7-cli-"))
             && feature_id != "PERF-CLI-STARTUP-AND-ERRORS"
@@ -372,8 +424,10 @@ pub(super) fn generate(
         };
         row_dispositions.push(ManifestRowDisposition {
             id: row.id.clone(),
-            primary_group_id: group_id.clone(),
+            performance_feature: feature_id.to_string(),
             supporting_performance_features,
+            disposition,
+            runtime_group_id,
             decision,
             classifications,
             stim_mapping,
@@ -397,133 +451,27 @@ pub(super) fn generate(
             replacement_contracts: replacements::contracts(row),
             waiver_refs: waiver_refs(row, &beta_by_id, &regression_by_id),
         });
-        let mut group = QualificationGroup {
-            id: group_id.clone(),
-            manifest_row: row.id.clone(),
-            row_origin: RowOrigin::Inherited,
-            performance_feature: feature_id.to_string(),
-            checklist_anchors: Vec::new(),
-            checklist_child_ids: Vec::new(),
-            public_api_items: Vec::new(),
-            disposition,
-            phase: classify_phase(row),
-            runner_fidelity: runner_fidelity(row, adapter_waived),
-            correctness_cases,
-            correctness_binding,
-            planned_correctness_case_id: Some(format!("CQPLANNED-{group_id}")),
-            workload_family: workload_family(root, row)?,
-            work_unit: work_unit(feature_id).to_string(),
-            output_contract: OutputContract {
-                expected_shape: format!(
-                    "{} output count, width, and semantic digest from the declared correctness preflight",
-                    row.measurement
-                ),
-                digest_state: EvidenceState::Planned,
-                sink_policy: if row.runner == Runner::StimCli {
-                    "Both public processes consume equivalent complete output sinks after an untimed exact-output preflight."
-                        .to_string()
-                } else {
-                    "Both workers black-box equal semantic work and an untimed output digest."
-                        .to_string()
-                },
-                comparator_sources: Vec::new(),
-            },
-            timing_policy: default_timing_policy(),
-            memory_policy: MemoryPolicy {
-                method: if row.runner == Runner::StimCli {
-                    MemoryMethod::ProcessRss
-                } else if row.threshold_class == ThresholdClass::BaselineMetadata {
-                    MemoryMethod::NotApplicable
-                } else {
-                    MemoryMethod::StabAllocations
-                },
-                scale_ids: vec!["inherited".to_string()],
-                expected_growth: "unclassified until PQ2 through PQ5 provide three-scale evidence"
-                    .to_string(),
-            },
-            threshold_policy,
-            reason: group_reason(decision).to_string(),
-            owner: owner(feature_id).to_string(),
-            status: QualificationStatus::Planned,
-        };
-        graduation::apply(root, &mut group)?;
-        if group.status != QualificationStatus::Implemented {
-            group.disposition = PerformanceDisposition::FutureCandidate;
-            group.threshold_policy = ThresholdPolicy::ReportOnly;
-            group.reason = format!(
-                "Legacy workload {} remains visible as a future candidate until a curated executable qualification contract replaces or retires it.",
-                row.id
-            );
-        }
-        groups.push(group);
     }
-    groups.extend(graduation::additional_groups(root, &groups)?);
-    groups.extend(graduation::curated_api_groups(root, &groups)?);
-    groups.extend(graduation::agent_diagnostic_groups(&groups)?);
-    groups.extend(graduation::decoder_diagnostic_groups(&groups)?);
-    groups.extend(graduation::external_pass_diagnostic_groups(&groups)?);
-    groups.sort_by(|left, right| left.id.cmp(&right.id));
     row_dispositions.sort_by(|left, right| left.id.cmp(&right.id));
-
-    let mut checklist_items = raw_checklist
-        .into_iter()
-        .map(make_checklist_item)
-        .collect::<Vec<_>>();
-    checklist_items.sort_by(|left, right| left.id.cmp(&right.id));
-
-    let mut public_api_items = correctness
-        .public_api_items
-        .iter()
-        .map(api::make_disposition)
-        .collect::<Vec<_>>();
-    public_api_items.sort_by(|left, right| left.path.cmp(&right.path));
-    let group_index = groups
-        .iter()
-        .enumerate()
-        .map(|(index, group)| (group.id.clone(), index))
-        .collect::<BTreeMap<_, _>>();
-    for item in &public_api_items {
-        for parent in &item.parent_group_ids {
-            if let Some(index) = group_index.get(parent).copied()
-                && let Some(group) = groups.get_mut(index)
-            {
-                group.public_api_items.push(item.path.clone());
-            }
-        }
-    }
 
     let performance_features = PERFORMANCE_FEATURE_IDS
         .iter()
         .map(|feature_id| {
-            let group_ids = groups
+            let mut correctness_features = correctness
+                .features
                 .iter()
-                .filter(|group| {
-                    group.performance_feature == *feature_id
-                        && group.disposition == PerformanceDisposition::Measured
+                .filter(|feature| {
+                    feature
+                        .performance_groups
+                        .iter()
+                        .any(|group| group == feature_id)
                 })
-                .map(|group| group.id.clone())
+                .map(|feature| feature.id.clone())
                 .collect::<Vec<_>>();
+            correctness_features.sort();
             PerformanceFeature {
                 id: (*feature_id).to_string(),
-                correctness_features: correctness
-                    .features
-                    .iter()
-                    .filter(|feature| {
-                        feature
-                            .performance_groups
-                            .iter()
-                            .any(|group| group == feature_id)
-                    })
-                    .map(|feature| feature.id.clone())
-                    .collect(),
-                disposition: if group_ids.is_empty() {
-                    PerformanceDisposition::FutureCandidate
-                } else {
-                    PerformanceDisposition::Measured
-                },
-                group_ids,
-                reason: "Only curated executable release workloads are measured; other relevant operations remain visible as future candidates."
-                    .to_string(),
+                correctness_features,
             }
         })
         .collect();
@@ -536,9 +484,6 @@ pub(super) fn generate(
         correctness_digest: correctness.semantic_digest,
         semantic_digest: ZERO_DIGEST.to_string(),
         performance_features,
-        checklist_items,
-        public_api_items,
-        qualification_groups: groups,
         manifest_rows: row_dispositions,
         upstream_perf_sources,
         waiver_rows,
@@ -552,82 +497,6 @@ pub(super) fn semantic_digest(suite: &QualificationSuite) -> Result<String, Benc
     payload.semantic_digest = ZERO_DIGEST.to_string();
     let bytes = serde_json::to_vec(&payload)?;
     Ok(sha256_hex(&bytes))
-}
-
-fn default_timing_policy() -> TimingPolicy {
-    TimingPolicy {
-        batch_policy: super::model::TimingBatchPolicy::CommonIterations,
-        calibration_min_ms: 250,
-        calibration_max_ms: 2_000,
-        common_wide_ratio_max_ms: 20_000,
-        warmup_batches: 3,
-        full_pairs: 9,
-        timeout_seconds: 600,
-        gate_statistic:
-            "median paired normalized seconds-per-work ratio and fixed-seed bootstrap 95% upper bound"
-                .to_string(),
-    }
-}
-
-fn group_reason(decision: RowDecision) -> &'static str {
-    match decision {
-        RowDecision::Retained => {
-            "The inherited operation shape is retained, but PQ1 must add correctness preflight, exact output digest, scales, and paired statistics before qualification."
-        }
-        RowDecision::Reworked => {
-            "The inherited workload requires a faithful runner, exact phase split, scale family, or output contract before it can produce qualification evidence."
-        }
-        RowDecision::Diagnostic => {
-            "The inherited row remains visible as diagnostic evidence and cannot produce a comprehensive ratio in its current shape."
-        }
-        RowDecision::Superseded => {
-            "A more specific row owns this behavior; retain the old identity only until manifest migration removes the duplicate workload."
-        }
-        RowDecision::Removed => {
-            "This row is metadata rather than a timed product workload and must be removed from the executable benchmark manifest."
-        }
-    }
-}
-
-fn make_checklist_item(item: RawChecklistItem) -> ChecklistItem {
-    let disposition =
-        if item.scope == ChecklistScope::Deferred || item.performance_features.is_empty() {
-            PerformanceDisposition::NotPerformanceRelevant
-        } else {
-            PerformanceDisposition::FutureCandidate
-        };
-    let reason = match (item.scope, disposition) {
-        (ChecklistScope::Deferred, _) => {
-            "This product row is explicitly deferred and cannot contribute a passing performance claim."
-                .to_string()
-        }
-        (_, PerformanceDisposition::NotPerformanceRelevant) => {
-            "This row describes packaging, documentation, or evidence infrastructure instead of product runtime work."
-                .to_string()
-        }
-        (_, PerformanceDisposition::FutureCandidate) => "The selected child remains visible as a future workload candidate without creating a speculative benchmark product."
-            .to_string(),
-        _ => "The selected child is covered by an explicit curated workload.".to_string(),
-    };
-    ChecklistItem {
-        id: item.id,
-        source_line: item.source_line,
-        anchor_digest: item.anchor_digest,
-        section: item.section,
-        feature: item.feature,
-        raw_status: item.raw_status,
-        scope: item.scope,
-        deferred_remainder: item.deferred_remainder,
-        selected_child: item.selected_child,
-        deferred_child: item.deferred_child,
-        selected_child_ids: item.selected_child_ids,
-        deferred_child_ids: item.deferred_child_ids,
-        selected_child_ownership: item.selected_child_ownership,
-        performance_features: item.performance_features,
-        disposition,
-        parent_group_ids: Vec::new(),
-        reason,
-    }
 }
 
 fn discover_perf_sources(
@@ -739,7 +608,7 @@ fn merge_waivers(
             WaiverDisposition {
                 id,
                 policies,
-                qualification_disposition: PerformanceDisposition::Measured,
+                qualification_disposition: PerformanceDisposition::Diagnostic,
                 retirement_mapping,
             }
         })
@@ -776,43 +645,6 @@ fn waiver_refs(
     refs
 }
 
-fn work_unit(feature: &str) -> &'static str {
-    match feature {
-        "PERF-BIT-KERNELS" | "PERF-RESULT-IO" => "bits",
-        "PERF-SAMPLING" | "PERF-DEM-SAMPLING" => "shots",
-        "PERF-DETECTION" => "detector-events",
-        "PERF-GATE-CONTRACT" => "gates",
-        "PERF-ERROR-ANALYSIS" | "PERF-DEM-MODEL" => "instructions",
-        "PERF-SEARCH-AND-MATCHING" => "search-nodes",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES" => "flows",
-        "PERF-CIRCUIT-MODEL" | "PERF-GENERATION" => "instructions",
-        "PERF-CONVERT-CLI" | "PERF-CLI-STARTUP-AND-ERRORS" => "bytes",
-        "PERF-STABILIZER-ALGEBRA" => "qubits",
-        "PERF-RESOURCE-BOUNDARIES" => "admission-checks",
-        _ => "operations",
-    }
-}
-
-fn owner(feature: &str) -> &'static str {
-    match feature {
-        "PERF-RESULT-IO" => "stab-records",
-        "PERF-BIT-KERNELS" => "stab-bits",
-        "PERF-GENERATION" => "stab-analysis/generation",
-        "PERF-CONVERT-CLI" | "PERF-CLI-STARTUP-AND-ERRORS" => "stab-cli",
-        "PERF-SAMPLING" => "stab-engine/sampling",
-        "PERF-DETECTION" => "stab-engine/detection",
-        "PERF-DEM-SAMPLING" => "stab-engine/dem-sampling",
-        "PERF-ERROR-ANALYSIS" => "stab-analysis/error-analysis",
-        "PERF-SEARCH-AND-MATCHING" => "stab-analysis/search",
-        "PERF-FLOWS-AND-DETECTOR-UTILITIES" => "stab-analysis/flow-utils",
-        "PERF-STABILIZER-ALGEBRA" => "stab-algebra",
-        "PERF-CIRCUIT-MODEL" => "stab-model",
-        "PERF-GATE-CONTRACT" => "stab-model/gates",
-        "PERF-RESOURCE-BOUNDARIES" => "ops/bench",
-        _ => "stab-core",
-    }
-}
-
 pub(super) use super::runtime::identity::sha256_hex;
 
 fn read_repo_text_bounded(root: &RepoRoot, path: &Path) -> Result<String, BenchError> {
@@ -838,7 +670,6 @@ fn read_repo_json_bounded<T: for<'de> Deserialize<'de>>(
 mod tests {
     use super::*;
     use crate::comparability::ComparabilityClass;
-    use crate::qualification::model::FixtureLocator;
 
     #[test]
     fn benchmark_symbol_extraction_is_exact() {
@@ -940,16 +771,6 @@ mod tests {
     }
 
     #[test]
-    fn performance_domains_follow_physical_component_owners() {
-        assert_eq!(owner("PERF-BIT-KERNELS"), "stab-bits");
-        assert_eq!(owner("PERF-RESULT-IO"), "stab-records");
-        assert_eq!(owner("PERF-STABILIZER-ALGEBRA"), "stab-algebra");
-        assert_eq!(owner("PERF-CIRCUIT-MODEL"), "stab-model");
-        assert_eq!(owner("PERF-SAMPLING"), "stab-engine/sampling");
-        assert_eq!(owner("PERF-ERROR-ANALYSIS"), "stab-analysis/error-analysis");
-    }
-
-    #[test]
     fn pinned_stim_source_paths_reject_absolute_and_parent_components() {
         let directory = tempfile::tempdir().expect("temporary repository");
         std::fs::create_dir_all(directory.path().join("vendor/stim/file_lists"))
@@ -1010,50 +831,5 @@ mod tests {
             .expect_err("symlinked source ancestor must fail");
 
         assert!(error.to_string().contains("source input"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn same_length_fixture_mutation_changes_corpus_digest() {
-        let directory = tempfile::tempdir().expect("temporary repository");
-        let fixture = directory.path().join("benchmarks/fixtures/input.stim");
-        std::fs::create_dir_all(fixture.parent().expect("fixture parent"))
-            .expect("create fixture directory");
-        std::fs::write(&fixture, b"M 0").expect("write first fixture");
-        let root = RepoRoot::resolve(directory.path()).expect("resolve root");
-        let row = BenchmarkRow {
-            id: "fixture-digest-test".to_string(),
-            milestone: crate::manifest::Milestone::M4,
-            threshold_class: ThresholdClass::ReportOnly,
-            runner: Runner::ContractOnly,
-            upstream_source: "src/stim.test.cc".to_string(),
-            stim_perf_filter: String::new(),
-            argv: String::new(),
-            stdin_path: "benchmarks/fixtures/input.stim".to_string(),
-            phase: "parse".to_string(),
-            measurement: "test".to_string(),
-            description: "test fixture digest".to_string(),
-            comparability: ComparabilityClass::ContractOnly,
-        };
-        let first = workload_family(&root, &row).expect("first workload family");
-
-        std::fs::write(&fixture, b"H 0").expect("write same-length fixture mutation");
-        let second = workload_family(&root, &row).expect("second workload family");
-
-        assert_eq!(
-            first.scales.first().expect("first scale").input_bytes,
-            second.scales.first().expect("second scale").input_bytes
-        );
-        let first_digest = match &first.fixture {
-            FixtureLocator::RepositoryFile { sha256, .. } => Some(sha256),
-            _ => None,
-        }
-        .expect("repository fixture");
-        let second_digest = match &second.fixture {
-            FixtureLocator::RepositoryFile { sha256, .. } => Some(sha256),
-            _ => None,
-        }
-        .expect("repository fixture");
-        assert_ne!(first_digest, second_digest);
     }
 }

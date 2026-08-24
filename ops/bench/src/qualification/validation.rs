@@ -2,39 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::discovery::{self, PERFORMANCE_FEATURE_IDS, SourceReferences};
 use super::model::{
-    ChecklistScope, CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
-    PerformanceDisposition, QualificationStatus, QualificationSuite, RowClassification,
-    RowDecision, RowOrigin, SCHEMA_VERSION, StimMapping, ThresholdPolicy, WaiverKind,
+    PerformanceDisposition, QualificationSuite, RowClassification, SCHEMA_VERSION, StimMapping,
+    WaiverKind,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
 use crate::manifest::BenchmarkManifest;
-
-mod counts;
-mod features;
-mod issues;
-mod ownership;
-mod planned;
-mod replacements;
-mod source;
-mod values;
-
-use counts::{validate_classification_count, validate_decision_count, validate_parent_disposition};
-use issues::Issues;
-use planned::validate_planned_workload;
-use values::{
-    filter_matches_any, filter_selects_symbol, validate_digest, validate_fixture_locator,
-    validate_identifier, validate_relative_path, validate_text,
-};
-
-const CORRECTNESS_DIGEST: &str = "7da57fbdd90f10624115ca33cf0dcfcd9d47bd97fbe1a04e95a1441fb0343b20";
-const MAX_RELEASE_GROUPS: usize = 40;
-const MAX_DIAGNOSTIC_GROUPS: usize = 60;
-const EXPECTED_CHECKLIST_ROWS: usize = 129;
-const EXPECTED_MANIFEST_ROWS: usize = 167;
-const EXPECTED_PERF_SOURCES: usize = 23;
-const EXPECTED_PERF_SYMBOLS: usize = 74;
-const EXPECTED_WAIVERS: usize = 4;
 
 pub(super) fn validate(
     suite: &QualificationSuite,
@@ -42,1144 +15,407 @@ pub(super) fn validate(
     references: &SourceReferences,
     expected_digest: &str,
 ) -> Result<(), BenchError> {
-    let mut issues = Issues::default();
-    validate_header(suite, manifest, &mut issues);
-    features::validate(suite, &mut issues);
-    ownership::validate(suite, &mut issues);
-    validate_checklist(suite, &mut issues);
-    validate_apis(suite, references, &mut issues);
-    validate_groups(suite, manifest, references, &mut issues);
-    validate_rows(suite, manifest, references, &mut issues);
-    source::validate_upstream_sources(suite, &mut issues);
-    source::validate_waivers(suite, references, &mut issues);
-    source::validate_waiver_classifications(suite, references, &mut issues);
-    issues.finish()?;
+    validate_header(suite, references)?;
+    validate_features(suite, references)?;
+    validate_rows(suite, manifest, references)?;
+    validate_upstream_sources(suite, manifest)?;
+    validate_waivers(suite, references)?;
 
     let computed = discovery::semantic_digest(suite)?;
     if suite.semantic_digest != computed {
-        return Err(BenchError::Qualification(format!(
+        return fail(format!(
             "semantic digest is {}, computed {computed}",
             suite.semantic_digest
-        )));
+        ));
     }
     if expected_digest != "UNFROZEN" && suite.semantic_digest != expected_digest {
-        return Err(BenchError::Qualification(format!(
+        return fail(format!(
             "semantic digest is {}, expected frozen {expected_digest}",
             suite.semantic_digest
-        )));
+        ));
     }
     Ok(())
 }
 
-fn validate_header(suite: &QualificationSuite, manifest: &BenchmarkManifest, issues: &mut Issues) {
+fn validate_header(
+    suite: &QualificationSuite,
+    references: &SourceReferences,
+) -> Result<(), BenchError> {
     if suite.schema_version != SCHEMA_VERSION {
-        issues.push(format!(
+        return fail(format!(
             "schema version is {}, expected {SCHEMA_VERSION}",
             suite.schema_version
         ));
     }
     if suite.stim_version != STIM_TAG || suite.stim_commit != STIM_COMMIT {
-        issues.push("Stim version or commit differs from the frozen compatibility target");
+        return fail("Stim version or commit differs from the frozen compatibility target");
     }
-    if suite.correctness_digest != CORRECTNESS_DIGEST {
-        issues.push(format!(
-            "correctness digest is {}, expected {CORRECTNESS_DIGEST}",
-            suite.correctness_digest
-        ));
+    if suite.correctness_digest != references.correctness_digest {
+        return fail("performance inventory is bound to a stale correctness inventory");
     }
-    for (label, actual, expected) in [
-        ("performance features", suite.performance_features.len(), 16),
-        (
-            "checklist rows",
-            suite.checklist_items.len(),
-            EXPECTED_CHECKLIST_ROWS,
-        ),
-        (
-            "manifest dispositions",
-            suite.manifest_rows.len(),
-            EXPECTED_MANIFEST_ROWS,
-        ),
-        (
-            "benchmark manifest rows",
-            manifest.rows.len(),
-            EXPECTED_MANIFEST_ROWS,
-        ),
-        (
-            "upstream perf sources",
-            suite.upstream_perf_sources.len(),
-            EXPECTED_PERF_SOURCES,
-        ),
-        ("waiver rows", suite.waiver_rows.len(), EXPECTED_WAIVERS),
-    ] {
-        if actual != expected {
-            issues.push(format!("{label} has {actual} rows, expected {expected}"));
-        }
-    }
+    Ok(())
 }
 
-fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
-    let mut ids = BTreeSet::new();
-    let mut anchors = BTreeSet::new();
-    let mut global_child_domains = BTreeSet::new();
-    let feature_ids = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
-    let group_ids = suite
-        .qualification_groups
-        .iter()
-        .map(|group| group.id.as_str())
-        .collect::<BTreeSet<_>>();
-    let groups = suite
-        .qualification_groups
-        .iter()
-        .map(|group| (group.id.as_str(), group))
-        .collect::<BTreeMap<_, _>>();
-    for item in &suite.checklist_items {
-        validate_identifier("checklist item", &item.id, issues);
-        validate_digest("checklist anchor", &item.anchor_digest, issues);
-        validate_text("checklist section", &item.section, issues);
-        validate_text("checklist feature", &item.feature, issues);
-        validate_text("checklist reason", &item.reason, issues);
-        if item.source_line == 0 {
-            issues.push(format!("checklist item {} has source line zero", item.id));
-        }
-        if !ids.insert(item.id.as_str()) {
-            issues.push(format!("duplicate checklist id {}", item.id));
-        }
-        if !anchors.insert((item.source_line, item.anchor_digest.as_str())) {
-            issues.push(format!("duplicate checklist anchor for {}", item.id));
-        }
-        match item.raw_status.as_str() {
-            value if value.starts_with("Done") => {
-                if item.scope != ChecklistScope::Selected
-                    || item.selected_child.is_none()
-                    || item.deferred_child.is_some()
-                    || item.deferred_remainder
-                    || item.selected_child_ids.is_empty()
-                    || !item.deferred_child_ids.is_empty()
-                {
-                    issues.push(format!(
-                        "done checklist item {} has an invalid split",
-                        item.id
-                    ));
-                }
-            }
-            value if value.starts_with("Reopened") => {
-                if item.scope != ChecklistScope::Selected
-                    || item.selected_child.is_none()
-                    || item.deferred_child.is_some()
-                    || item.deferred_remainder
-                    || item.selected_child_ids.is_empty()
-                    || !item.deferred_child_ids.is_empty()
-                {
-                    issues.push(format!(
-                        "reopened checklist item {} has an invalid split",
-                        item.id
-                    ));
-                }
-            }
-            value if value.starts_with("Partial") => {
-                if item.scope != ChecklistScope::Selected
-                    || item.selected_child.is_none()
-                    || item.deferred_child.is_none()
-                    || !item.deferred_remainder
-                    || item.selected_child_ids.is_empty()
-                    || item.deferred_child_ids.is_empty()
-                {
-                    issues.push(format!(
-                        "partial checklist item {} lacks both children",
-                        item.id
-                    ));
-                }
-            }
-            value if value.starts_with("Deferred") => {
-                if item.scope != ChecklistScope::Deferred
-                    || item.selected_child.is_some()
-                    || item.deferred_child.is_none()
-                    || item.deferred_remainder
-                    || !item.selected_child_ids.is_empty()
-                    || item.deferred_child_ids.is_empty()
-                {
-                    issues.push(format!(
-                        "deferred checklist item {} has an invalid split",
-                        item.id
-                    ));
-                }
-            }
-            value => issues.push(format!(
-                "checklist item {} has unknown status {value:?}",
-                item.id
-            )),
-        }
-        let mut child_ids = BTreeSet::new();
-        for child in item
-            .selected_child_ids
-            .iter()
-            .chain(&item.deferred_child_ids)
-        {
-            validate_identifier("checklist child", child, issues);
-            if !child_ids.insert(child.as_str()) {
-                issues.push(format!(
-                    "checklist item {} repeats child id {child}",
-                    item.id
-                ));
-            }
-        }
-        let mut owned_children = BTreeSet::new();
-        let mut owned_features = BTreeSet::new();
-        for ownership in &item.selected_child_ownership {
-            validate_identifier("owned checklist child", &ownership.child_id, issues);
-            if !owned_children.insert(ownership.child_id.as_str()) {
-                issues.push(format!(
-                    "checklist item {} repeats child ownership {}",
-                    item.id, ownership.child_id
-                ));
-            }
-            let mut child_features = BTreeSet::new();
-            for feature in &ownership.performance_features {
-                if !feature_ids.contains(feature.as_str())
-                    || !item.performance_features.contains(feature)
-                {
-                    issues.push(format!(
-                        "checklist item {} child {} owns unrelated feature {feature}",
-                        item.id, ownership.child_id
-                    ));
-                }
-                if !child_features.insert(feature.as_str()) {
-                    issues.push(format!(
-                        "checklist item {} child {} repeats feature {feature}",
-                        item.id, ownership.child_id
-                    ));
-                }
-                if !global_child_domains.insert((ownership.child_id.as_str(), feature.as_str())) {
-                    issues.push(format!(
-                        "checklist child {} has duplicate primary ownership in {feature}",
-                        ownership.child_id
-                    ));
-                }
-                owned_features.insert(feature.as_str());
-            }
-            if ownership.performance_features.is_empty() {
-                issues.push(format!(
-                    "checklist item {} child {} owns no performance domain",
-                    item.id, ownership.child_id
-                ));
-            }
-        }
-        let selected_children = item
-            .selected_child_ids
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>();
-        let item_features = item
-            .performance_features
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>();
-        let ownership_matches = if item_features.is_empty() {
-            owned_children.is_empty() && owned_features.is_empty()
-        } else {
-            owned_children == selected_children && owned_features == item_features
-        };
-        if !ownership_matches {
-            issues.push(format!(
-                "checklist item {} child ownership does not exactly cover selected ids and performance domains",
-                item.id
-            ));
-        }
-        for feature in &item.performance_features {
-            if !feature_ids.contains(feature.as_str()) {
-                issues.push(format!(
-                    "checklist item {} references unknown {feature}",
-                    item.id
-                ));
-            }
-        }
-        for group in &item.parent_group_ids {
-            if !group_ids.contains(group.as_str()) {
-                issues.push(format!(
-                    "checklist item {} references unknown group {group}",
-                    item.id
-                ));
-            } else if !groups.get(group.as_str()).is_some_and(|parent| {
-                let expected_children = item
-                    .selected_child_ownership
-                    .iter()
-                    .filter(|ownership| {
-                        ownership
-                            .performance_features
-                            .contains(&parent.performance_feature)
-                    })
-                    .map(|ownership| ownership.child_id.as_str())
-                    .collect::<Vec<_>>();
-                parent.disposition == PerformanceDisposition::Measured
-                    && parent.checklist_anchors == [item.id.as_str()]
-                    && parent.checklist_child_ids == expected_children
-                    && item
-                        .performance_features
-                        .contains(&parent.performance_feature)
-                    && parent.id.starts_with("PERFQ-CHECKLIST-")
-            }) {
-                issues.push(format!(
-                    "checklist item {} parent {group} is not its exact measured feature parent",
-                    item.id
-                ));
-            }
-        }
-        validate_parent_disposition(
-            "checklist item",
-            &item.id,
-            item.disposition,
-            &item.parent_group_ids,
-            issues,
-        );
-    }
-}
-
-fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issues: &mut Issues) {
-    let mut ids = BTreeSet::new();
-    let mut paths = BTreeSet::new();
-    let mut kinds = BTreeMap::<&str, usize>::new();
-    let feature_ids = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
-    let measured_groups = suite
-        .qualification_groups
-        .iter()
-        .filter(|group| group.disposition == PerformanceDisposition::Measured)
-        .map(|group| (group.id.as_str(), group))
-        .collect::<BTreeMap<_, _>>();
-    for item in &suite.public_api_items {
-        validate_identifier("public API item", &item.id, issues);
-        validate_text("public API path", &item.path, issues);
-        validate_text("public API reason", &item.reason, issues);
-        let declared_performance_groups = std::iter::once(&item.performance_feature)
-            .chain(&item.supporting_performance_features)
-            .cloned()
-            .collect::<Vec<_>>();
-        if !references.public_api.get(&item.id).is_some_and(|source| {
-            source.path == item.path
-                && source.kind == item.kind
-                && source.owner_case_id == item.correctness_case_id
-                && source.performance_groups == declared_performance_groups
-        }) {
-            issues.push(format!(
-                "public API {} differs from its exact CQ0 path, kind, owner, or performance domains",
-                item.id
-            ));
-        }
-        if !references
-            .correctness_cases
-            .contains(&item.correctness_case_id)
-        {
-            issues.push(format!(
-                "public API {} references unknown exact correctness owner {}",
-                item.id, item.correctness_case_id
-            ));
-        }
-        if !ids.insert(item.id.as_str()) {
-            issues.push(format!("duplicate public API id {}", item.id));
-        }
-        if !paths.insert(item.path.as_str()) {
-            issues.push(format!("duplicate public API path {}", item.path));
-        }
-        *kinds.entry(&item.kind).or_default() += 1;
-        if !feature_ids.contains(item.performance_feature.as_str()) {
-            issues.push(format!(
-                "public API {} references unknown feature {}",
-                item.id, item.performance_feature
-            ));
-        }
-        let mut api_features = BTreeSet::from([item.performance_feature.as_str()]);
-        for feature in &item.supporting_performance_features {
-            if !feature_ids.contains(feature.as_str()) {
-                issues.push(format!(
-                    "public API {} references unknown supporting feature {feature}",
-                    item.id
-                ));
-            }
-            if !api_features.insert(feature.as_str()) {
-                issues.push(format!(
-                    "public API {} repeats performance feature {feature}",
-                    item.id
-                ));
-            }
-        }
-        match item.disposition {
-            PerformanceDisposition::CoveredByParent => {
-                let mut parent_features = BTreeSet::new();
-                for parent in &item.parent_group_ids {
-                    if let Some(group) = measured_groups.get(parent.as_str()).filter(|group| {
-                        group.public_api_items.contains(&item.path)
-                            && api_features.contains(group.performance_feature.as_str())
-                            && matches!(
-                                group.correctness_binding,
-                                CorrectnessBinding::ExactApiOwners | CorrectnessBinding::ExactCases
-                            )
-                            && group.correctness_cases.contains(&item.correctness_case_id)
-                    }) {
-                        if group.runner_fidelity == super::model::RunnerFidelity::StabReportOnly {
-                            parent_features.extend(api_features.iter().copied());
-                        } else {
-                            parent_features.insert(group.performance_feature.as_str());
-                        }
-                    } else {
-                        issues.push(format!(
-                            "public API {} parent {parent} is absent, cross-domain, or not measured",
-                            item.id
-                        ));
-                    }
-                }
-                if parent_features != api_features {
-                    issues.push(format!(
-                        "public API {} parent domains do not preserve all CQ0 performance domains",
-                        item.id
-                    ));
-                }
-            }
-            PerformanceDisposition::NotPerformanceRelevant => {
-                if !item.parent_group_ids.is_empty() {
-                    issues.push(format!(
-                        "non-performance API {} has a parent group",
-                        item.id
-                    ));
-                }
-            }
-            PerformanceDisposition::FutureCandidate => {
-                if !item.parent_group_ids.is_empty() {
-                    issues.push(format!(
-                        "future-candidate API {} has an active parent group",
-                        item.id
-                    ));
-                }
-            }
-            other => issues.push(format!(
-                "PQ0 public API {} has unsupported disposition {other:?}",
-                item.id
-            )),
-        }
-    }
-    let expected_ids = references
-        .public_api
-        .keys()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    if ids != expected_ids {
-        issues.push(format!(
-            "public API ids disagree with CQ0: missing={:?} extra={:?}",
-            expected_ids.difference(&ids).collect::<Vec<_>>(),
-            ids.difference(&expected_ids).collect::<Vec<_>>()
-        ));
-    }
-    let mut expected_kinds = BTreeMap::<&str, usize>::new();
-    for reference in references.public_api.values() {
-        *expected_kinds.entry(reference.kind.as_str()).or_default() += 1;
-    }
-    if kinds != expected_kinds {
-        issues.push(format!(
-            "public API kind counts disagree with CQ0: actual={kinds:?} expected={expected_kinds:?}"
-        ));
-    }
-}
-
-fn validate_groups(
+fn validate_features(
     suite: &QualificationSuite,
-    manifest: &BenchmarkManifest,
     references: &SourceReferences,
-    issues: &mut Issues,
-) {
-    let manifest_ids = manifest
-        .rows
+) -> Result<(), BenchError> {
+    let actual = suite
+        .performance_features
         .iter()
-        .map(|row| row.id.as_str())
-        .collect::<BTreeSet<_>>();
-    let manifest_by_id = manifest
-        .rows
-        .iter()
-        .map(|row| (row.id.as_str(), row))
-        .collect::<BTreeMap<_, _>>();
-    let correctness_ids = suite
-        .qualification_groups
-        .iter()
-        .flat_map(|group| group.correctness_cases.iter().map(String::as_str))
-        .collect::<BTreeSet<_>>();
-    let checklist_ids = suite
-        .checklist_items
-        .iter()
-        .map(|item| item.id.as_str())
-        .collect::<BTreeSet<_>>();
-    let api_paths = suite
-        .public_api_items
-        .iter()
-        .map(|item| item.path.as_str())
-        .collect::<BTreeSet<_>>();
-    let feature_ids = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
-    let mut ids = BTreeSet::new();
-    let mut primary_rows = BTreeSet::new();
-    let release_groups = suite
-        .qualification_groups
-        .iter()
-        .filter(|group| {
-            group.disposition == PerformanceDisposition::Measured
-                && group.runner_fidelity != super::model::RunnerFidelity::StabReportOnly
-        })
-        .count();
-    let diagnostic_groups = suite
-        .qualification_groups
-        .iter()
-        .filter(|group| {
-            group.disposition == PerformanceDisposition::Measured
-                && group.runner_fidelity == super::model::RunnerFidelity::StabReportOnly
-        })
-        .count();
-    if release_groups > MAX_RELEASE_GROUPS {
-        issues.push(format!(
-            "release matrix has {release_groups} groups, maximum is {MAX_RELEASE_GROUPS}"
-        ));
+        .map(|feature| feature.id.as_str())
+        .collect::<Vec<_>>();
+    if actual != PERFORMANCE_FEATURE_IDS {
+        return fail("performance feature ids are incomplete, duplicated, or out of order");
     }
-    if diagnostic_groups > MAX_DIAGNOSTIC_GROUPS {
-        issues.push(format!(
-            "diagnostic matrix has {diagnostic_groups} groups, maximum is {MAX_DIAGNOSTIC_GROUPS}"
-        ));
-    }
-    for group in &suite.qualification_groups {
-        validate_identifier("qualification group", &group.id, issues);
-        if !ids.insert(group.id.as_str()) {
-            issues.push(format!("duplicate qualification group {}", group.id));
-        }
-        validate_identifier("qualification primary row", &group.manifest_row, issues);
-        if !primary_rows.insert(group.manifest_row.as_str()) {
-            issues.push(format!(
-                "duplicate qualification primary row {}",
-                group.manifest_row
-            ));
-        }
-        if group.row_origin == RowOrigin::Inherited {
-            if !manifest_ids.contains(group.manifest_row.as_str()) {
-                issues.push(format!(
-                    "group {} references unknown manifest row {}",
-                    group.id, group.manifest_row
-                ));
-            }
-            if group.status == QualificationStatus::Planned
-                && let Some(row) = manifest_by_id.get(group.manifest_row.as_str())
-            {
-                let inherited_scale = group.workload_family.scales.first();
-                if row.stdin_path.is_empty() {
-                    if !matches!(
-                        &group.workload_family.fixture,
-                        FixtureLocator::Inline { id } if id == &row.id
-                    ) || group.workload_family.deterministic_seed
-                        != format!("source-owned-inline:{}", row.id)
-                        || inherited_scale
-                            .is_none_or(|scale| scale.input_bytes != InputByteCount::NotApplicable)
-                    {
-                        issues.push(format!(
-                            "inherited inline group {} has an invalid corpus or seed contract",
-                            group.id
-                        ));
-                    }
-                } else {
-                    let fixture_matches = matches!(
-                        &group.workload_family.fixture,
-                        FixtureLocator::RepositoryFile { path, sha256 }
-                            if path == &row.stdin_path && crate::qualification::Sha256Digest::is_valid_str(sha256)
-                    );
-                    if !fixture_matches
-                        || group.workload_family.deterministic_seed != "corpus-digest-owned"
-                        || inherited_scale.is_none_or(|scale| {
-                            !matches!(scale.input_bytes, InputByteCount::Exact { bytes } if bytes > 0)
-                        })
-                    {
-                        issues.push(format!(
-                            "inherited fixture group {} lacks a typed path, byte length, or corpus digest",
-                            group.id
-                        ));
-                    }
-                }
-            }
-        } else if manifest_ids.contains(group.manifest_row.as_str()) {
-            issues.push(format!(
-                "planned group {} reuses inherited manifest row {}",
-                group.id, group.manifest_row
-            ));
-        } else {
-            validate_planned_workload(group, references, issues);
-        }
-        validate_fixture_locator(&group.workload_family.fixture, issues);
-        validate_relative_path(
-            "qualification workload source",
-            &group.workload_family.source,
-            issues,
-        );
-        if !feature_ids.contains(group.performance_feature.as_str()) {
-            issues.push(format!(
-                "group {} references unknown feature {}",
-                group.id, group.performance_feature
-            ));
-        }
-        if group.disposition == PerformanceDisposition::Measured {
-            if group.workload_family.scales.is_empty() {
-                issues.push(format!("measured group {} lacks scales", group.id));
-            }
-            if group.work_unit.trim().is_empty() {
-                issues.push(format!("measured group {} lacks a work unit", group.id));
-            }
-        }
-        if group.disposition == PerformanceDisposition::NoFaithfulStimComparator {
-            issues.push(format!(
-                "PQ0 group {} claims no faithful Stim comparator despite a declared runner or adapter path",
-                group.id
-            ));
-        }
-        if group.disposition == PerformanceDisposition::FutureCandidate
-            && group.threshold_policy != ThresholdPolicy::ReportOnly
-        {
-            issues.push(format!(
-                "future-candidate group {} has an active qualification threshold",
-                group.id
-            ));
-        }
-        validate_text(
-            "qualification workload source",
-            &group.workload_family.source,
-            issues,
-        );
-        validate_text(
-            "qualification deterministic seed",
-            &group.workload_family.deterministic_seed,
-            issues,
-        );
-        validate_text("qualification work unit", &group.work_unit, issues);
-        validate_text(
-            "qualification output shape",
-            &group.output_contract.expected_shape,
-            issues,
-        );
-        validate_text(
-            "qualification output sink policy",
-            &group.output_contract.sink_policy,
-            issues,
-        );
-        validate_text(
-            "qualification gate statistic",
-            &group.timing_policy.gate_statistic,
-            issues,
-        );
-        validate_text(
-            "qualification memory growth",
-            &group.memory_policy.expected_growth,
-            issues,
-        );
-        validate_text("qualification owner", &group.owner, issues);
-        let group_id = &group.id;
-        match group.correctness_binding {
-            CorrectnessBinding::ExactApiOwners
-                if group.correctness_cases.is_empty()
-                    || group.planned_correctness_case_id.is_some() =>
-            {
-                issues.push(format!("API-bound group {group_id} lacks exact CQ owners"));
-            }
-            CorrectnessBinding::ExactApiOwners if group.public_api_items.is_empty() => {
-                issues.push(format!(
-                    "non-API group {group_id} claims exact API correctness owners"
-                ));
-            }
-            CorrectnessBinding::ExactCases
-                if group.correctness_cases.is_empty()
-                    || group.planned_correctness_case_id.is_some() =>
-            {
-                issues.push(format!("exact-case group {group_id} lacks exact CQ cases"));
-            }
-            CorrectnessBinding::Unresolved
-                if !group.correctness_cases.is_empty()
-                    || group.planned_correctness_case_id.is_none() =>
-            {
-                issues.push(format!(
-                    "unresolved group {} lacks one planned correctness dependency or lists borrowed cases",
-                    group.id
-                ));
-            }
-            _ => {}
-        }
-        if let Some(planned) = &group.planned_correctness_case_id {
-            validate_identifier("planned correctness case", planned, issues);
-        }
-        for case in &group.correctness_cases {
-            validate_identifier("correctness case", case, issues);
-            if !references.correctness_cases.contains(case) {
-                issues.push(format!(
-                    "group {} references unknown correctness case {case}",
-                    group.id
-                ));
-            }
-        }
-        for anchor in &group.checklist_anchors {
-            if !checklist_ids.contains(anchor.as_str()) {
-                issues.push(format!(
-                    "group {} references unknown checklist {anchor}",
-                    group.id
-                ));
-            }
-        }
-        let mut group_api_paths = BTreeSet::new();
-        for path in &group.public_api_items {
-            if !group_api_paths.insert(path.as_str()) {
-                issues.push(format!(
-                    "group {group_id} repeats public API ownership for {path}"
-                ));
-            }
-            if !api_paths.contains(path.as_str()) {
-                issues.push(format!(
-                    "group {group_id} references unknown public API {path}"
-                ));
-            }
-        }
-        let mut scale_ids = BTreeSet::new();
-        let mut family_tail = BTreeMap::new();
-        for scale in &group.workload_family.scales {
-            validate_identifier("scale", &scale.id, issues);
-            validate_identifier("scale family", &scale.family_id, issues);
-            if !scale_ids.insert(scale.id.as_str()) {
-                issues.push(format!("group {} repeats scale {}", group.id, scale.id));
-            }
-            if let Some((previous_class, previous_work)) = family_tail.insert(
-                scale.family_id.as_str(),
-                (scale.size_class, scale.semantic_work),
-            ) && (previous_class >= scale.size_class
-                || previous_work
-                    .zip(scale.semantic_work)
-                    .is_some_and(|(left, right)| left >= right))
-            {
-                issues.push(format!(
-                    "group {} scale family {} is not monotonic by size class and semantic work",
-                    group.id, scale.family_id
-                ));
-            }
-            validate_text("scale parameters", &scale.parameters, issues);
-            if group.status != QualificationStatus::Planned {
-                if scale.semantic_work.is_none_or(|work| work == 0) {
-                    issues.push(format!(
-                        "implemented group {} scale {} lacks positive typed semantic work",
-                        group.id, scale.id
-                    ));
-                }
-                if scale
-                    .input_digest
-                    .as_deref()
-                    .is_none_or(|digest| !crate::qualification::Sha256Digest::is_valid_str(digest))
-                {
-                    issues.push(format!(
-                        "implemented group {} scale {} lacks a valid input digest",
-                        group.id, scale.id
-                    ));
-                }
-            }
-        }
-        for scale in &group.memory_policy.scale_ids {
-            if !scale_ids.contains(scale.as_str()) {
-                issues.push(format!(
-                    "group {} memory policy references unknown scale {scale}",
-                    group.id
-                ));
-            }
-        }
-        if group.status != QualificationStatus::Planned
-            && (group.correctness_binding == CorrectnessBinding::Unresolved
-                || group.output_contract.digest_state != EvidenceState::Existing)
-        {
-            issues.push(format!(
-                "implemented group {} lacks exact correctness or output evidence",
-                group.id
-            ));
-        }
-        validate_text("qualification group reason", &group.reason, issues);
-        if group.correctness_binding == CorrectnessBinding::ExactApiOwners
-            && (group.public_api_items.is_empty()
-                || !group
-                    .output_contract
-                    .expected_shape
-                    .contains("exact named submeasurement"))
-        {
-            issues.push(format!(
-                "API group {} lacks exact path ownership or submeasurement policy",
-                group.id
-            ));
-        }
-        if group.id.starts_with("PERFQ-CHECKLIST-") && group.checklist_anchors.len() != 1 {
-            issues.push(format!(
-                "checklist group {} owns {} anchors instead of one",
-                group.id,
-                group.checklist_anchors.len()
-            ));
-        }
-        if group.id.starts_with("PERFQ-CHECKLIST-") && group.checklist_child_ids.is_empty() {
-            issues.push(format!(
-                "checklist group {} owns no exact selected child ids",
-                group.id
-            ));
-        }
-        if !group.id.starts_with("PERFQ-CHECKLIST-")
-            && (!group.checklist_anchors.is_empty() || !group.checklist_child_ids.is_empty())
-        {
-            issues.push(format!(
-                "non-checklist group {} claims checklist anchors or children",
-                group.id
+    for feature in &suite.performance_features {
+        let expected = references
+            .correctness_features
+            .iter()
+            .filter(|(_, groups)| groups.contains(&feature.id))
+            .map(|(id, _)| id.clone())
+            .collect::<Vec<_>>();
+        if feature.correctness_features != expected {
+            return fail(format!(
+                "performance feature {} has stale correctness-feature ownership",
+                feature.id
             ));
         }
     }
-    if correctness_ids.is_empty() {
-        issues.push("qualification groups reference no correctness cases");
-    }
+    Ok(())
 }
 
 fn validate_rows(
     suite: &QualificationSuite,
     manifest: &BenchmarkManifest,
     references: &SourceReferences,
-    issues: &mut Issues,
-) {
-    let expected = manifest
+) -> Result<(), BenchError> {
+    if suite.manifest_rows.len() != manifest.rows.len() {
+        return fail(format!(
+            "performance inventory has {} manifest rows, expected {}",
+            suite.manifest_rows.len(),
+            manifest.rows.len()
+        ));
+    }
+    let source_rows = manifest
+        .rows
+        .iter()
+        .map(|row| (row.id.as_str(), row))
+        .collect::<BTreeMap<_, _>>();
+    let mut ids = BTreeSet::new();
+    let mut runtime_links = BTreeSet::new();
+    for row in &suite.manifest_rows {
+        if !ids.insert(row.id.as_str()) {
+            return fail(format!("duplicate manifest disposition {}", row.id));
+        }
+        let source = source_rows.get(row.id.as_str()).ok_or_else(|| {
+            BenchError::Qualification(format!(
+                "performance inventory references unknown manifest row {}",
+                row.id
+            ))
+        })?;
+        let expected_feature = discovery::manifest_feature(source)?;
+        if row.performance_feature != expected_feature
+            || row.runtime_group_id != discovery::inherited_runtime_group_id(&row.id)
+            || row.disposition != discovery::manifest_disposition(source)
+        {
+            return fail(format!(
+                "manifest row {} has stale feature, runtime parent, or disposition",
+                row.id
+            ));
+        }
+        if row.runtime_group_id.as_ref().is_some_and(|group| {
+            !runtime_links.insert(group.as_str())
+                || row.disposition != PerformanceDisposition::CoveredByParent
+        }) {
+            return fail(format!(
+                "manifest row {} has a duplicate or invalid runtime parent",
+                row.id
+            ));
+        }
+        validate_feature_list(
+            &row.id,
+            expected_feature,
+            &row.supporting_performance_features,
+        )?;
+        validate_thresholds(row, references)?;
+        validate_waiver_refs(row, references)?;
+        validate_mapping(row, suite)?;
+        let classification_count = row.classifications.iter().collect::<BTreeSet<_>>().len();
+        if classification_count != row.classifications.len() {
+            return fail(format!("manifest row {} repeats a classification", row.id));
+        }
+        for replacement in &row.replacement_contracts {
+            if replacement.legacy_stim_name.is_empty()
+                || replacement.legacy_stab_name.is_empty()
+                || replacement.runtime_group_id.is_empty()
+                || replacement.runtime_measurement_id.is_empty()
+            {
+                return fail(format!(
+                    "manifest row {} has an incomplete replacement contract",
+                    row.id
+                ));
+            }
+        }
+    }
+    if !suite
+        .manifest_rows
+        .windows(2)
+        .all(|pair| matches!(pair, [left, right] if left.id < right.id))
+    {
+        return fail("manifest dispositions are not in canonical id order");
+    }
+    Ok(())
+}
+
+fn validate_feature_list(
+    row_id: &str,
+    primary: &str,
+    supporting: &[String],
+) -> Result<(), BenchError> {
+    let feature_ids = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::from([primary]);
+    for feature in supporting {
+        if !feature_ids.contains(feature.as_str()) || !seen.insert(feature) {
+            return fail(format!(
+                "manifest row {row_id} has an unknown or duplicate supporting feature {feature}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_thresholds(
+    row: &super::model::ManifestRowDisposition,
+    references: &SourceReferences,
+) -> Result<(), BenchError> {
+    let has_threshold = references.threshold_rows.contains(&row.id);
+    let expected_refs = has_threshold
+        .then(|| "benchmarks/m12-primary-thresholds.json".to_string())
+        .into_iter()
+        .collect::<Vec<_>>();
+    let expected_ratio = references.threshold_ratios.get(&row.id).cloned().flatten();
+    let expected_pairs = references
+        .threshold_pairs
+        .get(&row.id)
+        .cloned()
+        .unwrap_or_default();
+    let actual_pairs = row
+        .threshold_measurement_pairs
+        .iter()
+        .map(|pair| {
+            (
+                pair.stim_name.clone(),
+                pair.stab_name.clone(),
+                pair.max_relative_ratio.clone(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    if row.threshold_refs != expected_refs
+        || row.threshold_max_relative_ratio != expected_ratio
+        || actual_pairs != expected_pairs
+        || actual_pairs.len() != row.threshold_measurement_pairs.len()
+    {
+        return fail(format!(
+            "manifest row {} differs from the source threshold policy",
+            row.id
+        ));
+    }
+    Ok(())
+}
+
+fn validate_waiver_refs(
+    row: &super::model::ManifestRowDisposition,
+    references: &SourceReferences,
+) -> Result<(), BenchError> {
+    let mut expected = Vec::new();
+    if references.beta_waivers.contains(&row.id) {
+        expected.push("benchmarks/m12-primary-beta-waivers.json".to_string());
+    }
+    if references.regression_waivers.contains(&row.id) {
+        expected.push("benchmarks/m12-primary-regression-waivers.json".to_string());
+    }
+    if row.waiver_refs != expected {
+        return fail(format!(
+            "manifest row {} differs from the source waiver policy",
+            row.id
+        ));
+    }
+    let adapter_waived = references.beta_waivers.contains(&row.id)
+        || references.adapter_regression_waivers.contains(&row.id);
+    let adapter_candidate = row
+        .classifications
+        .contains(&RowClassification::AdapterCandidate);
+    if adapter_waived && !adapter_candidate
+        || references.unstable_pair_waivers.contains(&row.id) && adapter_candidate
+    {
+        return fail(format!(
+            "manifest row {} has a stale waiver classification",
+            row.id
+        ));
+    }
+    Ok(())
+}
+
+fn validate_mapping(
+    row: &super::model::ManifestRowDisposition,
+    suite: &QualificationSuite,
+) -> Result<(), BenchError> {
+    match &row.stim_mapping {
+        StimMapping::StimPerf { source, filter } => {
+            let known = suite.upstream_perf_sources.iter().any(|candidate| {
+                candidate.path == *source
+                    && candidate
+                        .symbols
+                        .iter()
+                        .any(|symbol| filter_selects_symbol(filter, symbol))
+            });
+            if !known {
+                return fail(format!(
+                    "manifest row {} selects no pinned Stim benchmark symbol",
+                    row.id
+                ));
+            }
+        }
+        StimMapping::ProcessCli { argv, stdin_path } => {
+            if argv.is_empty() || stdin_path.starts_with('/') {
+                return fail(format!(
+                    "manifest row {} has an invalid process comparator",
+                    row.id
+                ));
+            }
+        }
+        StimMapping::PlannedAdapter { symbol, source } => {
+            if !symbol.starts_with("stim_adapter::") || source.is_empty() {
+                return fail(format!(
+                    "manifest row {} has an invalid adapter mapping",
+                    row.id
+                ));
+            }
+        }
+        StimMapping::None { reason } if reason.is_empty() => {
+            return fail(format!(
+                "manifest row {} has an empty no-comparator reason",
+                row.id
+            ));
+        }
+        StimMapping::None { .. } => {}
+    }
+    Ok(())
+}
+
+fn validate_upstream_sources(
+    suite: &QualificationSuite,
+    manifest: &BenchmarkManifest,
+) -> Result<(), BenchError> {
+    let row_ids = manifest
         .rows
         .iter()
         .map(|row| row.id.as_str())
         .collect::<BTreeSet<_>>();
-    for orphan in references
-        .threshold_rows
-        .iter()
-        .chain(references.beta_waivers.iter())
-        .chain(references.regression_waivers.iter())
-        .filter(|id| !expected.contains(id.as_str()))
-    {
-        issues.push(format!(
-            "threshold or waiver source references unknown manifest row {orphan}"
-        ));
-    }
-    let groups = suite
-        .qualification_groups
-        .iter()
-        .map(|group| (group.id.as_str(), group))
-        .collect::<BTreeMap<_, _>>();
-    let perf_sources = suite
-        .upstream_perf_sources
-        .iter()
-        .map(|source| (source.path.as_str(), source))
-        .collect::<BTreeMap<_, _>>();
-    let feature_ids = PERFORMANCE_FEATURE_IDS.into_iter().collect::<BTreeSet<_>>();
-    let mut seen = BTreeSet::new();
-    for row in &suite.manifest_rows {
-        if !seen.insert(row.id.as_str()) {
-            issues.push(format!("duplicate manifest disposition {}", row.id));
+    let mut paths = BTreeSet::new();
+    let mut symbols = BTreeSet::new();
+    for source in &suite.upstream_perf_sources {
+        if !paths.insert(source.path.as_str())
+            || !source.path.starts_with("src/")
+            || !source.path.ends_with(".perf.cc")
+        {
+            return fail(format!("invalid upstream perf source {}", source.path));
         }
-        if !expected.contains(row.id.as_str()) {
-            issues.push(format!("unknown manifest disposition {}", row.id));
-        }
-        match groups.get(row.primary_group_id.as_str()) {
-            Some(group)
-                if group.row_origin == RowOrigin::Inherited && group.manifest_row == row.id => {}
-            Some(_) => issues.push(format!(
-                "manifest row {} primary group does not own the row",
-                row.id
-            )),
-            None => issues.push(format!(
-                "manifest row {} references unknown group {}",
-                row.id, row.primary_group_id
-            )),
-        }
-        let primary_feature = groups
-            .get(row.primary_group_id.as_str())
-            .map(|group| group.performance_feature.as_str());
-        let mut supporting = BTreeSet::new();
-        for feature in &row.supporting_performance_features {
-            if !feature_ids.contains(feature.as_str()) {
-                issues.push(format!(
-                    "manifest row {} references unknown supporting feature {feature}",
-                    row.id
-                ));
-            }
-            if !supporting.insert(feature.as_str()) {
-                issues.push(format!(
-                    "manifest row {} repeats supporting feature {feature}",
-                    row.id
-                ));
-            }
-            if primary_feature == Some(feature.as_str()) {
-                issues.push(format!(
-                    "manifest row {} repeats its primary feature as supporting",
-                    row.id
+        for symbol in &source.symbols {
+            if symbol.is_empty()
+                || !symbol
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+                || !symbols.insert((source.path.as_str(), symbol.as_str()))
+            {
+                return fail(format!(
+                    "invalid or duplicate upstream symbol {}::{symbol}",
+                    source.path
                 ));
             }
         }
-        if row.classifications.is_empty() {
-            issues.push(format!("manifest row {} is unclassified", row.id));
-        }
-        let mut measurement_pairs = BTreeSet::new();
-        for pair in &row.threshold_measurement_pairs {
-            validate_text("Stim threshold measurement", &pair.stim_name, issues);
-            validate_text("Stab threshold measurement", &pair.stab_name, issues);
-            if pair.max_relative_ratio != "1.25" {
-                issues.push(format!(
-                    "manifest row {} measurement pair has ratio {}, expected 1.25",
-                    row.id, pair.max_relative_ratio
-                ));
-            }
-            if !measurement_pairs.insert((
-                &pair.stim_name,
-                &pair.stab_name,
-                &pair.max_relative_ratio,
-            )) {
-                issues.push(format!(
-                    "manifest row {} repeats threshold measurement pair {:?}/{:?}",
-                    row.id, pair.stim_name, pair.stab_name
-                ));
-            }
-        }
-        if !row.threshold_measurement_pairs.is_empty() && row.threshold_refs.is_empty() {
-            issues.push(format!(
-                "manifest row {} has threshold pairs without a threshold source",
-                row.id
-            ));
-        }
-        replacements::validate(row, primary_feature, &groups, &measurement_pairs, issues);
-        let thresholded = references.threshold_rows.contains(&row.id);
-        if thresholded != !row.threshold_refs.is_empty() {
-            issues.push(format!(
-                "manifest row {} threshold references disagree with the source threshold ledger",
-                row.id
-            ));
-        }
-        let expected_pairs = references
-            .threshold_pairs
-            .get(&row.id)
-            .cloned()
-            .unwrap_or_default();
-        let actual_pairs = row
-            .threshold_measurement_pairs
+        if source
+            .manifest_rows
             .iter()
-            .map(|pair| {
-                (
-                    pair.stim_name.clone(),
-                    pair.stab_name.clone(),
-                    pair.max_relative_ratio.clone(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        if actual_pairs != expected_pairs {
-            issues.push(format!(
-                "manifest row {} measurement pairs disagree with the source threshold ledger",
-                row.id
-            ));
-        }
-        let expected_ratio = references.threshold_ratios.get(&row.id).cloned().flatten();
-        if row.threshold_max_relative_ratio != expected_ratio {
-            issues.push(format!(
-                "manifest row {} row-level ratio disagrees with the source threshold ledger",
-                row.id
-            ));
-        }
-        if row
-            .threshold_max_relative_ratio
-            .as_deref()
-            .is_some_and(|ratio| ratio != "1.25")
+            .any(|row| !row_ids.contains(row.as_str()))
         {
-            issues.push(format!(
-                "manifest row {} row-level ratio is not the 1.25 target",
-                row.id
+            return fail(format!(
+                "upstream source {} references an unknown manifest row",
+                source.path
             ));
-        }
-        let expected_waiver_refs = [
-            references
-                .beta_waivers
-                .contains(&row.id)
-                .then_some("benchmarks/m12-primary-beta-waivers.json"),
-            references
-                .regression_waivers
-                .contains(&row.id)
-                .then_some("benchmarks/m12-primary-regression-waivers.json"),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<BTreeSet<_>>();
-        let actual_waiver_refs = row
-            .waiver_refs
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>();
-        if actual_waiver_refs != expected_waiver_refs {
-            issues.push(format!(
-                "manifest row {} waiver references disagree with source waiver ledgers",
-                row.id
-            ));
-        }
-        if row
-            .classifications
-            .contains(&RowClassification::HeterogeneousMeasurements)
-            && !row
-                .classifications
-                .contains(&RowClassification::UnmatchedSubmeasurement)
-            && row.threshold_refs.is_empty()
-        {
-            issues.push(format!(
-                "heterogeneous row {} has no exact threshold pairing or unmatched marker",
-                row.id
-            ));
-        }
-        match (&row.stim_mapping, row.decision) {
-            (StimMapping::None { .. }, RowDecision::Diagnostic) => {}
-            (StimMapping::None { .. }, _) => issues.push(format!(
-                "manifest row {} lacks a Stim mapping without a diagnostic decision",
-                row.id
-            )),
-            _ => {}
-        }
-        match &row.stim_mapping {
-            StimMapping::StimPerf { source, filter } => match perf_sources.get(source.as_str()) {
-                Some(perf_source) if filter_matches_any(filter, &perf_source.symbols) => {
-                    for pair in &row.threshold_measurement_pairs {
-                        if !perf_source.symbols.contains(&pair.stim_name)
-                            || !filter_selects_symbol(filter, &pair.stim_name)
-                        {
-                            issues.push(format!(
-                                "manifest row {} threshold names unknown Stim measurement {:?}",
-                                row.id, pair.stim_name
-                            ));
-                        }
-                    }
-                }
-                Some(_) => issues.push(format!(
-                    "manifest row {} Stim filter {filter:?} matches no symbol in {source}",
-                    row.id
-                )),
-                None => issues.push(format!(
-                    "manifest row {} references unknown Stim perf source {source}",
-                    row.id
-                )),
-            },
-            StimMapping::ProcessCli { argv, stdin_path } => {
-                validate_text("process CLI argv", argv, issues);
-                if !stdin_path.is_empty() {
-                    validate_relative_path("process CLI stdin", stdin_path, issues);
-                }
-            }
-            StimMapping::PlannedAdapter { symbol, source } => {
-                validate_identifier("planned adapter symbol", symbol, issues);
-                validate_relative_path("planned adapter source", source, issues);
-                if !source.starts_with("src/")
-                    && !source.starts_with("doc/")
-                    && row.decision != RowDecision::Removed
-                {
-                    issues.push(format!(
-                        "manifest row {} adapter source is not a pinned Stim source",
-                        row.id
-                    ));
-                }
-            }
-            StimMapping::None { reason } => {
-                validate_text("missing comparator reason", reason, issues)
-            }
-        }
-        if row
-            .classifications
-            .contains(&RowClassification::InProcessProcessMismatch)
-            && matches!(row.decision, RowDecision::Retained | RowDecision::Reworked)
-            && groups
-                .get(row.primary_group_id.as_str())
-                .is_some_and(|group| group.threshold_policy == ThresholdPolicy::Primary1_25)
-        {
-            issues.push(format!(
-                "manifest row {} uses an asymmetric in-process/process primary gate",
-                row.id
-            ));
-        }
-        if row
-            .classifications
-            .contains(&RowClassification::UnmatchedSubmeasurement)
-            && matches!(row.decision, RowDecision::Retained | RowDecision::Reworked)
-            && groups
-                .get(row.primary_group_id.as_str())
-                .is_some_and(|group| group.threshold_policy != ThresholdPolicy::ReportOnly)
-        {
-            let primary_replaced = row
-                .replacement_contracts
-                .iter()
-                .any(|replacement| replacement.runtime_group_id == row.primary_group_id);
-            if row.decision != RowDecision::Reworked || !primary_replaced {
-                issues.push(format!(
-                    "manifest row {} claims a threshold despite unmatched Stim submeasurements without an exact primary replacement mapping",
-                    row.id
-                ));
-            }
         }
     }
-    for missing in expected.difference(&seen) {
-        issues.push(format!("manifest row {missing} has no disposition"));
-    }
-    let mut primary_owners = BTreeMap::<&str, usize>::new();
-    for row in &suite.manifest_rows {
-        if let Some(group) = groups.get(row.primary_group_id.as_str()) {
-            *primary_owners
-                .entry(group.performance_feature.as_str())
-                .or_default() += 1;
-        }
-    }
-    let expected_primary_owners = BTreeMap::from([
-        ("PERF-CIRCUIT-MODEL", 8),
-        ("PERF-DEM-MODEL", 9),
-        ("PERF-RESULT-IO", 9),
-        ("PERF-GATE-CONTRACT", 3),
-        ("PERF-BIT-KERNELS", 5),
-        ("PERF-STABILIZER-ALGEBRA", 6),
-        ("PERF-GENERATION", 23),
-        ("PERF-CONVERT-CLI", 11),
-        ("PERF-SAMPLING", 10),
-        ("PERF-DETECTION", 17),
-        ("PERF-DEM-SAMPLING", 8),
-        ("PERF-ERROR-ANALYSIS", 11),
-        ("PERF-SEARCH-AND-MATCHING", 21),
-        ("PERF-FLOWS-AND-DETECTOR-UTILITIES", 22),
-        ("PERF-CLI-STARTUP-AND-ERRORS", 3),
-        ("PERF-RESOURCE-BOUNDARIES", 1),
-    ]);
-    if primary_owners != expected_primary_owners {
-        issues.push(format!(
-            "manifest primary performance ownership is stale: {primary_owners:?}"
-        ));
-    }
-    validate_decision_count(suite, RowDecision::Retained, 8, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 140, issues);
-    validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
-    validate_decision_count(suite, RowDecision::Superseded, 13, issues);
-    validate_decision_count(suite, RowDecision::Removed, 2, issues);
-    validate_classification_count(suite, RowClassification::Faithful, 13, issues);
-    validate_classification_count(suite, RowClassification::Diagnostic, 141, issues);
-    validate_classification_count(suite, RowClassification::Proxy, 11, issues);
-    validate_classification_count(suite, RowClassification::Stale, 2, issues);
-    validate_classification_count(suite, RowClassification::Duplicate, 13, issues);
-    validate_classification_count(suite, RowClassification::MissingScale, 129, issues);
-    validate_classification_count(
-        suite,
-        RowClassification::MissingCorrectnessPreflight,
-        164,
-        issues,
-    );
-    validate_classification_count(suite, RowClassification::MissingOutputDigest, 164, issues);
-    validate_classification_count(suite, RowClassification::MissingComparator, 79, issues);
-    validate_classification_count(suite, RowClassification::AdapterCandidate, 79, issues);
-    validate_classification_count(
-        suite,
-        RowClassification::InProcessProcessMismatch,
-        58,
-        issues,
-    );
-    validate_classification_count(
-        suite,
-        RowClassification::HeterogeneousMeasurements,
-        20,
-        issues,
-    );
-    validate_classification_count(
-        suite,
-        RowClassification::UnmatchedSubmeasurement,
-        15,
-        issues,
-    );
+    Ok(())
 }
 
-#[cfg(all(test, unix))]
-mod tests;
+fn validate_waivers(
+    suite: &QualificationSuite,
+    references: &SourceReferences,
+) -> Result<(), BenchError> {
+    let expected_ids = references
+        .beta_waivers
+        .union(&references.regression_waivers)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let actual_ids = suite
+        .waiver_rows
+        .iter()
+        .map(|waiver| waiver.id.clone())
+        .collect::<BTreeSet<_>>();
+    if actual_ids != expected_ids || actual_ids.len() != suite.waiver_rows.len() {
+        return fail("waiver dispositions do not exactly cover the source waiver ledgers");
+    }
+    let mut actual_policies = BTreeMap::new();
+    for waiver in &suite.waiver_rows {
+        if waiver.qualification_disposition != PerformanceDisposition::Diagnostic {
+            return fail(format!(
+                "waiver {} is not classified as inherited diagnostic evidence",
+                waiver.id
+            ));
+        }
+        let no_comparable = waiver
+            .policies
+            .iter()
+            .all(|policy| policy.kind == WaiverKind::NoComparableBaseline);
+        if no_comparable
+            != waiver
+                .retirement_mapping
+                .as_deref()
+                .is_some_and(|mapping| mapping.starts_with("stim_adapter::"))
+        {
+            return fail(format!(
+                "waiver {} has an invalid retirement mapping",
+                waiver.id
+            ));
+        }
+        for policy in &waiver.policies {
+            let key = (policy.waiver_file.clone(), waiver.id.clone());
+            if actual_policies.insert(key, policy).is_some() {
+                return fail(format!("waiver {} repeats a source policy", waiver.id));
+            }
+        }
+    }
+    if actual_policies.len() != references.waiver_policies.len()
+        || references
+            .waiver_policies
+            .iter()
+            .any(|(key, expected)| actual_policies.get(key) != Some(&expected))
+    {
+        return fail("waiver policies differ from their source ledgers");
+    }
+    Ok(())
+}
+
+fn filter_selects_symbol(filter: &str, symbol: &str) -> bool {
+    filter.split(',').any(|candidate| {
+        let candidate = candidate.trim();
+        candidate
+            .strip_suffix('*')
+            .map_or_else(|| candidate == symbol, |prefix| symbol.starts_with(prefix))
+    })
+}
+
+fn fail<T>(message: impl Into<String>) -> Result<T, BenchError> {
+    Err(BenchError::Qualification(message.into()))
+}

@@ -18,6 +18,11 @@ fn digest(byte: char) -> String {
 fn contract() -> GroupContract {
     GroupContract {
         id: ProtocolId::try_new("product-group").expect("group id"),
+        feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+            "PERF-RESOURCE-BOUNDARIES",
+        )
+        .expect("feature id"),
+        origin: crate::qualification::model::RowOrigin::Planned,
         claim_class: ClaimClass::PromotablePerformance,
         parity_eligibility: ParityEligibility::ThresholdEligible,
         timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
@@ -38,6 +43,9 @@ fn contract() -> GroupContract {
             })
             .collect(),
         correctness_case_ids: vec!["cq-one".to_string()],
+        public_api_item_ids: Vec::new(),
+        checklist_item_ids: Vec::new(),
+        checklist_child_ids: Vec::new(),
         owner: ProtocolId::try_new("owner").expect("owner"),
         profiler_note: None,
         comparator_sources: Vec::new(),

@@ -2,9 +2,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-use super::model::{
-    QualificationStatus, QualificationSuite, RowClassification, RowDecision, ThresholdPolicy,
-};
+use super::model::{PerformanceDisposition, QualificationSuite, RowClassification, RowDecision};
 use crate::error::BenchError;
 use crate::root::RepoRoot;
 
@@ -282,7 +280,8 @@ fn validate_current_migration(
             ))
         })?;
     if row.decision != RowDecision::Superseded
-        || row.primary_group_id != migration.replacement_group_id
+        || row.runtime_group_id.as_deref() != Some(migration.replacement_group_id.as_str())
+        || row.disposition != PerformanceDisposition::CoveredByParent
         || !row.classifications.contains(&RowClassification::Duplicate)
         || !row.threshold_refs.is_empty()
         || row.threshold_max_relative_ratio.is_some()
@@ -295,30 +294,7 @@ fn validate_current_migration(
             migration.id
         ));
     }
-    let group = suite
-        .qualification_groups
-        .iter()
-        .find(|group| group.id == migration.replacement_group_id)
-        .ok_or_else(|| {
-            BenchError::Qualification(format!(
-                "threshold migration {} references missing replacement group {}",
-                migration.id, migration.replacement_group_id
-            ))
-        })?;
-    if group.status != QualificationStatus::Implemented
-        || group.threshold_policy != ThresholdPolicy::Primary1_25
-        || migration
-            .replacement_scale_id
-            .as_ref()
-            .is_some_and(|scale_id| {
-                !group
-                    .workload_family
-                    .scales
-                    .iter()
-                    .any(|scale| scale.id == *scale_id)
-            })
-        || group.workload_family.scales.is_empty()
-        || migration.replacement_measurement_id.is_empty()
+    if migration.replacement_measurement_id.is_empty()
         || migration.authorization_completion_path.is_empty()
     {
         return qualification_error(format!(

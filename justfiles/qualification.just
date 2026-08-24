@@ -10,8 +10,8 @@ correctness-list *args:
 
 # Regenerate the comprehensive correctness qualification inventory.
 [working-directory: '..']
-correctness-regenerate *args:
-    cargo run -q -p stab-oracle -- qualification correctness regenerate {{args}}
+correctness-regenerate:
+    cargo run -q -p stab-oracle -- qualification correctness regenerate
 
 # Rebuild and execute sealed Stab and Stim binaries and verify receipt provenance bindings.
 [working-directory: '..']

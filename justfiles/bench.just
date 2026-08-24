@@ -20,8 +20,8 @@ qualification-list *args:
 
 # Regenerate the comprehensive performance qualification ledger.
 [working-directory: '..']
-qualification-regenerate *args:
-    cargo run -q -p stab-bench -- qualification-regenerate {{args}}
+qualification-regenerate:
+    cargo run -q -p stab-bench -- qualification-regenerate
 
 # Regenerate or verify the frozen cross-language Clifford qualification vectors.
 [working-directory: '..']
@@ -77,11 +77,6 @@ qualification-completion-report *args:
 [working-directory: '..']
 qualification-parity *args:
     cargo run -q -p stab-bench --profile release -- qualification-parity {{args}}
-
-# Deprecated alias for the Stim parity check.
-[working-directory: '..']
-qualification-regression *args:
-    cargo run -q -p stab-bench --profile release -- qualification-regression {{args}}
 
 # Check accepted full and soak evidence against Stab's architecture-specific baseline.
 [working-directory: '..']

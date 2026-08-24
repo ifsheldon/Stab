@@ -74,8 +74,6 @@ The architecture migration must regenerate affected correctness and performance 
 
 ```text
 just qualification::correctness-check
-just qualification::correctness-regenerate --check
 just bench::qualification-check
-just bench::qualification-regenerate --check
 just qualification::status --check
 ```

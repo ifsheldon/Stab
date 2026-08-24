@@ -73,33 +73,11 @@ If these sources disagree, the suite inventory must record the disagreement and 
 
 ### Performance Qualification Inventory
 
-Add `benchmarks/stim-qualification-suite.json` as an overlay on `benchmarks/manifest.csv`.
-The manifest remains the row-level workload source of truth, while the qualification inventory owns feature completeness, scale families, comparator fidelity, correctness dependencies, and gate policy.
-Every selected checklist disposition must record exact selected-child ownership by performance domain; sharing a domain does not permit unrelated benchmark groups to claim the row or all of a partial row's children.
+`benchmarks/stim-qualification-suite.json` is the compact overlay on `benchmarks/manifest.csv`. It owns only performance-feature mappings, inherited manifest dispositions and runtime-parent links, legacy threshold and waiver references, and the pinned upstream perf-source index.
 
-Each qualification group must include:
+`benchmarks/qualification-runtime-groups.json` is the sole detailed executable owner. Each runtime group records its stable id, primary feature, inherited or planned origin, claim class, parity eligibility, exact correctness cases, API and checklist ownership, workload and measurement ids, complete family and scale contracts, owner, comparator sources, and profiler-note identity. Planned APIs and checklist rows without an executable parent remain visible in their canonical correctness and checklist inventories; they do not create speculative runtime groups or detailed performance products.
 
-- `id`: stable benchmark qualification group id.
-- `performance_feature`: exactly one primary feature id from the domain matrix in this plan, with every secondary API or inherited-row domain preserved in its source-owned supporting-feature list and corresponding parent group.
-- `checklist_anchors`: exact section and row descriptions from `docs/stab-feature-checklist.md`.
-- `checklist_child_ids`: exact selected child ids owned by a checklist group in its one performance domain; API and inherited-row groups must leave checklist ownership empty.
-- `public_api_items`: exact rustdoc paths covered by the group or disposition.
-- `disposition`: `measured`, `covered-by-parent`, `not-performance-relevant`, `no-faithful-stim-comparator`, or `future-candidate`.
-- `reason`: required for every group so retained, reworked, diagnostic, superseded, removed, and replacement intent remains reviewable.
-- `manifest_row` and `row_origin`: one nonempty stable primary row id classified as `inherited` when it exists in `benchmarks/manifest.csv` or `planned` only for a concrete active or reviewed future candidate. Inventory generation must not synthesize one planned runtime group per API item.
-- `phase`: `startup`, `parse`, `compile`, `execute`, `convert`, `serialize`, `search`, `transform`, or `end-to-end`.
-- `runner_fidelity`: `stim-perf`, `adapter-library`, `process-cli`, or `stab-report-only`.
-- `correctness_cases`: exact CQ0 owner ids that must pass before timing can run, or one stable `planned_correctness_case_id` when PQ0 has proved that no exact workload preflight exists yet; feature-level or truncated fallback cases are forbidden.
-- `workload_family`: a typed repository-file, generated, or inline fixture locator; a deterministic seed or static corpus SHA-256; a registered generator id; exact small, medium, and large scale parameters; and a typed exact or not-applicable input-byte count at every scale.
-- `work_unit`: bytes, bits, shots, gates, instructions, detector events, errors, flows, search nodes, or another named semantic unit.
-- `output_contract`: expected output bytes, record count, width, semantic digest, and sink policy.
-- `timing_policy`: warmup batches, paired samples, calibration bounds, timeout, and gate statistic.
-- `memory_policy`: selected scales, allocation or process-RSS method, and expected growth class.
-- `threshold_policy`: `primary-1.25`, `regression-only`, `report-only`, or `not-applicable`.
-- `owner`: crate or subsystem responsible for regressions.
-- `status`: `planned`, `implemented`, `qualified`, or `blocked`; `future-candidate` is a disposition, not an active measured status.
-
-The inventory schema must deny unknown fields, validate all referenced feature, correctness, fixture, manifest, measurement, and waiver ids, reject unsafe paths and symlinks, bound all row and string counts before expensive work, enforce the 40 release and 60 diagnostic caps, reject `future-candidate` thresholds, and include a frozen semantic digest.
+The compact inventory and runtime schemas must deny unknown fields, validate every referenced feature, correctness case, API item, checklist item, checklist child, manifest row, measurement, policy, and waiver, reject duplicate ownership and orphan runtime links, enforce the 40 release and 60 diagnostic caps, and include a frozen semantic digest. API and checklist ownership is validated directly against the canonical correctness inventory and feature checklist instead of copied into a second per-item performance ledger.
 Benchmark source, fixture, stdin, and checked-output operations must use descriptor-relative nofollow traversal on qualification hosts; until equivalent non-Unix primitives are implemented, the ops binary must fail closed there instead of using path-check-then-open fallbacks.
 
 ### Pinned-Stim Adapter
@@ -133,7 +111,7 @@ Keep the human-facing commands in `justfiles/bench.just` and complex logic in `o
 ```sh
 just bench::qualification-list
 just bench::qualification-check
-just bench::qualification-regenerate --check
+just bench::qualification-regenerate
 just bench::qualification-probe --group <id>
 just bench::qualification-run --tier pr
 just bench::qualification-run --tier full
@@ -145,7 +123,7 @@ just bench::qualification-baseline-candidate --full <full-rollup> --soak <soak-r
 just qualification::status --check
 ```
 
-`qualification-regression` remains temporarily as a deprecated alias for `qualification-parity`. The existing `bench::baseline`, `bench::compare`, `bench::primary-beta`, `bench::primary-regression`, and `bench::primary-memory-regression` commands remain supported as diagnostic compatibility coverage during migration.
+`qualification-parity` and `qualification-self-regression` are intentionally separate commands; the ambiguous `qualification-regression` alias is removed. The existing `bench::baseline`, `bench::compare`, `bench::primary-beta`, `bench::primary-regression`, and `bench::primary-memory-regression` commands remain supported as diagnostic compatibility coverage during migration.
 No recipe may contain complex branching or a multiline shell implementation.
 
 ### Report Contract

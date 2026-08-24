@@ -17,16 +17,16 @@ Formal completion for the current inventories: **not started**. The latest histo
 | Deferred checklist surfaces or remainders | 53 |
 | Release runtime groups | 19 |
 | Diagnostic runtime groups | 9 |
-| Future performance candidates | 156 |
+| Future performance candidates | 150 |
 | Seeded self-regression identities | 18 |
 
 ## Contract Identities
 
 - Correctness inventory: `7da57fbdd90f10624115ca33cf0dcfcd9d47bd97fbe1a04e95a1441fb0343b20`
-- Performance inventory: `dbcbc29eb17e2ecb2a2196e0b9aa9d4c7e56415c64cff5e087b7afba75bf115c`
-- Stim parity policy: `c5107f935b992e9d02b81a70dc2ed9ef6b19361da1d26b014c1119abac279c25`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
+- Performance inventory: `5e9ebf4814dfdb24eace0b339d5bf7290de8b616dfc428339a5038d0eadb360b`
+- Stim parity policy: `80d2c4a50b17baf87091abc30df2abb8e063ffa11a6c57752f1e6bcac15fc9b3`; paired median and confidence upper bound must each be no greater than `1.25x` for threshold-eligible groups.
 - Stab self-regression policy: `eca63423dd201b7be903e458271f4b7e944db98535f00631ce1eae3797a94363`; the default maximum deterioration is `1.15x`.
-- Stab self-regression baselines: `66857e43bfd9c7dfa876396e04dff7d264ee088b0a2c3607122e7940d5d34f1f`; missing identities are unseeded, never passing.
+- Stab self-regression baselines: `7e4b6f93e806ec7564366369abd44e03145c7dcabaecfb919d20dd5d8f38ac32`; missing identities are unseeded, never passing.
 
 ## Interpretation
 

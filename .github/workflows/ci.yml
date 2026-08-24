@@ -106,14 +106,10 @@ jobs:
         run: cargo install just --version 1.58.0 --locked
 
       - name: Check correctness inventory
-        run: |
-          just qualification::correctness-check
-          just qualification::correctness-regenerate --check
+        run: just qualification::correctness-check
 
       - name: Check performance inventory
-        run: |
-          just bench::qualification-check
-          just bench::qualification-regenerate --check
+        run: just bench::qualification-check
 
       - name: Check generated qualification status
         run: just qualification::status --check

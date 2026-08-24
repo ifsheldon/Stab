@@ -860,6 +860,11 @@ mod tests {
     fn contract() -> super::super::group::GroupContract {
         super::super::group::GroupContract {
             id: super::super::protocol::ProtocolId::try_new("group").expect("group id"),
+            feature_id: crate::qualification::runtime::protocol::ProtocolId::try_new(
+                "PERF-RESOURCE-BOUNDARIES",
+            )
+            .expect("feature id"),
+            origin: crate::qualification::model::RowOrigin::Planned,
             claim_class: super::super::run::ClaimClass::PromotablePerformance,
             parity_eligibility: super::super::group::ParityEligibility::ThresholdEligible,
             timing_batch_policy: crate::qualification::model::TimingBatchPolicy::CommonIterations,
@@ -879,6 +884,9 @@ mod tests {
                     .expect("input digest"),
             }],
             correctness_case_ids: Vec::new(),
+            public_api_item_ids: Vec::new(),
+            checklist_item_ids: Vec::new(),
+            checklist_child_ids: Vec::new(),
             owner: super::super::protocol::ProtocolId::try_new("owner").expect("owner id"),
             profiler_note: None,
             comparator_sources: Vec::new(),

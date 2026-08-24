@@ -358,9 +358,9 @@ fn collect(
         .count();
     let diagnostic_groups = runtime.groups.len().saturating_sub(release_groups);
     let future_candidates = suite
-        .qualification_groups
+        .manifest_rows
         .iter()
-        .filter(|group| group.disposition == PerformanceDisposition::FutureCandidate)
+        .filter(|row| row.disposition == PerformanceDisposition::FutureCandidate)
         .count();
     Ok(StatusData {
         correctness_digest: suite.correctness_digest.clone(),

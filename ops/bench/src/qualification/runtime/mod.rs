@@ -426,9 +426,10 @@ pub(crate) fn check_contracts(
     root: &crate::root::RepoRoot,
     inventory_digest: &str,
     suite: &super::model::QualificationSuite,
+    references: &super::discovery::SourceReferences,
 ) -> Result<(), String> {
     host::check_policy(root).map_err(|error| error.to_string())?;
-    group::check(root, inventory_digest, suite).map_err(|error| error.to_string())?;
+    group::check(root, inventory_digest, suite, references).map_err(|error| error.to_string())?;
     parity::check_policy(root, inventory_digest).map_err(|error| error.to_string())?;
     self_regression::check_sources(root, inventory_digest).map_err(|error| error.to_string())
 }

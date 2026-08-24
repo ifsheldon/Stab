@@ -1,7 +1,7 @@
 {
-  "schema_version": 10,
+  "schema_version": 11,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "dbcbc29eb17e2ecb2a2196e0b9aa9d4c7e56415c64cff5e087b7afba75bf115c",
+  "performance_inventory_sha256": "5e9ebf4814dfdb24eace0b339d5bf7290de8b616dfc428339a5038d0eadb360b",
   "product_diagnostic_suite_timeout_seconds": 600,
   "product_diagnostic_policies": [
     {
@@ -216,6 +216,8 @@
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
+      "feature_id": "PERF-RESOURCE-BOUNDARIES",
+      "origin": "planned",
       "claim_class": "diagnostic-infrastructure",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -234,11 +236,17 @@
         }
       ],
       "correctness_case_ids": [],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "ops/bench",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT",
+      "feature_id": "PERF-CIRCUIT-MODEL",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -275,11 +283,19 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-e16abe30d8c7992c"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-e25d6d4ff78e789a"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-model/model-fingerprint",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A2-SAMPLING-REQUEST-FINGERPRINT",
+      "feature_id": "PERF-SAMPLING",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -316,11 +332,20 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-d63aa8cd2dc62e63"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-4688083f377d44d9",
+        "cq-api-item-8a0d80ec3ee0c755"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-engine/compilation-request",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A2-SAMPLING-REQUEST-ESTIMATE",
+      "feature_id": "PERF-RESOURCE-BOUNDARIES",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -357,11 +382,19 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-d65b079751fe7119"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-1a7074d64feac0e2"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-core/resource-estimation",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A2-SAMPLER-COMPILE",
+      "feature_id": "PERF-SAMPLING",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -398,11 +431,22 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-7bcf8fcdbbfa6d68"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-20b5453c1db83b51",
+        "cq-api-item-37fc5a3f546f5734",
+        "cq-api-item-7eb2e37d02d71b02",
+        "cq-api-item-fcb91bdb46f511ef"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-engine/sampling-compiler",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A7-EXACT-ML-COMPILE",
+      "feature_id": "PERF-DETECTION",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -450,11 +494,17 @@
         "cq-evidence-qualification-b376b5e2d4be1223",
         "cq-evidence-qualification-b4fefe4518cc5c2d"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-reference-decoder/exact-ml-compiler",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A7-EXACT-ML-REUSED-DECODE",
+      "feature_id": "PERF-DETECTION",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -502,11 +552,20 @@
         "cq-evidence-qualification-d1877c09db8c3c35",
         "cq-evidence-qualification-f7e633d78cd2e6c6"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-14f07e3df32c47bc",
+        "cq-api-item-5c9d29f0f9715f73"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-decoder/reused-batch-decode",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A7-SAMPLE-DETECT-DECODE-PIPELINE",
+      "feature_id": "PERF-DETECTION",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -548,11 +607,17 @@
         "cq-evidence-qualification-93951fde964ca94d",
         "cq-evidence-qualification-c61285e1ce0e88e8"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-engine/sample-detect-decode-composition",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-A8-EXTERNAL-NOISE-PASS",
+      "feature_id": "PERF-CIRCUIT-MODEL",
+      "origin": "planned",
       "claim_class": "product-diagnostic",
       "parity_eligibility": "report-only",
       "timing_batch_policy": "common-iterations",
@@ -597,11 +662,20 @@
         "cq-evidence-qualification-9271cf708f696d42",
         "cq-evidence-qualification-da7f35283dd1c657"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-9d88075cecdfcd90",
+        "cq-api-item-b11de6e10a2ec41d"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-reference-noise-pass/x-error-transform",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-M4-CIRCUIT-CANONICAL-PRINT",
+      "feature_id": "PERF-CIRCUIT-MODEL",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -639,11 +713,17 @@
         "cq-evidence-qualification-e660819ae9a223c6",
         "cq-evidence-qualification-ef933925fb901877"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-model/circuit-printer",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-M4-CIRCUIT-PARSE",
+      "feature_id": "PERF-CIRCUIT-MODEL",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -681,14 +761,20 @@
         "cq-evidence-qualification-633fa529edf5f549",
         "cq-evidence-qualification-e660819ae9a223c6"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-model/circuit-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
         "sha256": "faf4355da06eecbadc22aa543c687af533d7a6aa2b08d932e3c654478f39a1ab"
-      }
+      },
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-M4-GATE-LOOKUP",
+      "feature_id": "PERF-GATE-CONTRACT",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -725,11 +811,17 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-bd20a013e903a05f"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-model/gates",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": []
     },
     {
       "id": "PERFQ-M5-SIMD-BITS",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -767,6 +859,9 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
@@ -782,6 +877,8 @@
     },
     {
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -819,6 +916,9 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
@@ -834,6 +934,8 @@
     },
     {
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -871,6 +973,9 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
@@ -886,6 +991,8 @@
     },
     {
       "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -923,6 +1030,9 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/bit-vector",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m5-simd-bits-not-zero-late.md",
@@ -941,6 +1051,8 @@
     },
     {
       "id": "PERFQ-M5-SIMD-WORD",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -979,6 +1091,9 @@
         "cq-evidence-qualification-b1530dc4e48e942d",
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/bit-vector",
       "profiler_note": null,
       "comparator_sources": [
@@ -994,6 +1109,8 @@
     },
     {
       "id": "PERFQ-M5-SPARSE-XOR",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1030,6 +1147,9 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-bea77c19e9ae0b24"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/sparse-xor",
       "profiler_note": null,
       "comparator_sources": [
@@ -1045,6 +1165,8 @@
     },
     {
       "id": "PERFQ-M5-SPARSE-XOR-ITEM",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1081,6 +1203,9 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-bea77c19e9ae0b24"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/sparse-xor",
       "profiler_note": null,
       "comparator_sources": [
@@ -1096,6 +1221,8 @@
     },
     {
       "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1133,6 +1260,12 @@
         "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-184350a6353655cd",
+        "cq-api-item-28fa331ea6460f3a"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/bit-matrix",
       "profiler_note": null,
       "comparator_sources": [
@@ -1148,6 +1281,8 @@
     },
     {
       "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
+      "feature_id": "PERF-BIT-KERNELS",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1185,6 +1320,12 @@
         "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-36f42bb383dbc26b",
+        "cq-api-item-95117394f5764632"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-bits/bit-matrix",
       "profiler_note": null,
       "comparator_sources": [
@@ -1200,6 +1341,8 @@
     },
     {
       "id": "PERFQ-M6-PAULI-STRING",
+      "feature_id": "PERF-STABILIZER-ALGEBRA",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1237,6 +1380,12 @@
         "cq-evidence-qualification-3bab0f51237445f6",
         "cq-evidence-qualification-489e6445120743c2"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-1a981c67ca870774",
+        "cq-api-item-309d5897f2b6f286"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-algebra/pauli-string",
       "profiler_note": null,
       "comparator_sources": [
@@ -1252,6 +1401,8 @@
     },
     {
       "id": "PERFQ-M6-PAULI-ITER",
+      "feature_id": "PERF-STABILIZER-ALGEBRA",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1290,6 +1441,16 @@
         "cq-evidence-qualification-489e6445120743c2",
         "cq-evidence-qualification-5331280b58fd49c7"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-0af2f068ea251f14",
+        "cq-api-item-497cc5bc024646a9",
+        "cq-api-item-54add4ab1bd128d1",
+        "cq-api-item-6c48bc00d6234849",
+        "cq-api-item-a0830bce4ec8c364",
+        "cq-api-item-e1b0decc22c2f31a"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-algebra/pauli-string",
       "profiler_note": null,
       "comparator_sources": [
@@ -1305,6 +1466,8 @@
     },
     {
       "id": "PERFQ-M6-PAULI-ITER-SINGLETON",
+      "feature_id": "PERF-STABILIZER-ALGEBRA",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1343,6 +1506,9 @@
         "cq-evidence-qualification-489e6445120743c2",
         "cq-evidence-qualification-5331280b58fd49c7"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-algebra/pauli-string",
       "profiler_note": null,
       "comparator_sources": [
@@ -1358,6 +1524,8 @@
     },
     {
       "id": "PERFQ-M6-CLIFFORD-STRING",
+      "feature_id": "PERF-STABILIZER-ALGEBRA",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "independent-throughput",
@@ -1396,6 +1564,9 @@
         "cq-evidence-qualification-510e746ec36e7d1c",
         "cq-evidence-qualification-ae9390dd6a207cb6"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-algebra/clifford-string",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
@@ -1414,6 +1585,8 @@
     },
     {
       "id": "PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY",
+      "feature_id": "PERF-STABILIZER-ALGEBRA",
+      "origin": "planned",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1452,6 +1625,12 @@
         "cq-evidence-qualification-510e746ec36e7d1c",
         "cq-evidence-qualification-ae9390dd6a207cb6"
       ],
+      "public_api_item_ids": [
+        "cq-api-item-385ae8c6f6fa3e19",
+        "cq-api-item-3b401b947a9e6fed"
+      ],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-algebra/clifford-string",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m6-clifford-string.md",
@@ -1470,6 +1649,8 @@
     },
     {
       "id": "PERFQ-M10-DEM-PARSE-CONTRACT",
+      "feature_id": "PERF-DEM-MODEL",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1557,10 +1738,13 @@
         "cq-evidence-qualification-966ab53fd109b7b3",
         "cq-evidence-qualification-ae2cf29058be84b0"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-model/dem-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "c7d4870347eb43c94d18ba95bf157142b3da8f65c5e5cc123ff7a4f5a1fe37eb"
+        "sha256": "595703be289175d0e88084346caa9d3ec90345c10d584b4f970df4045cb3fd08"
       },
       "comparator_sources": [
         {
@@ -1575,6 +1759,8 @@
     },
     {
       "id": "PERFQ-M10-DEM-PRINT-CONTRACT",
+      "feature_id": "PERF-DEM-MODEL",
+      "origin": "inherited",
       "claim_class": "promotable-performance",
       "parity_eligibility": "threshold-eligible",
       "timing_batch_policy": "common-iterations",
@@ -1662,10 +1848,13 @@
         "cq-evidence-qualification-966ab53fd109b7b3",
         "cq-evidence-qualification-ae2cf29058be84b0"
       ],
+      "public_api_item_ids": [],
+      "checklist_item_ids": [],
+      "checklist_child_ids": [],
       "owner": "stab-model/dem-printer",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m10-dem-model.md",
-        "sha256": "c7d4870347eb43c94d18ba95bf157142b3da8f65c5e5cc123ff7a4f5a1fe37eb"
+        "sha256": "595703be289175d0e88084346caa9d3ec90345c10d584b4f970df4045cb3fd08"
       },
       "comparator_sources": [
         {

@@ -6,17 +6,9 @@ use crate::error::BenchError;
 
 pub(super) struct RawChecklistItem {
     pub(super) id: String,
-    pub(super) source_line: u32,
-    pub(super) anchor_digest: String,
-    pub(super) section: String,
-    pub(super) feature: String,
-    pub(super) raw_status: String,
     pub(super) scope: ChecklistScope,
     pub(super) deferred_remainder: bool,
-    pub(super) selected_child: Option<String>,
-    pub(super) deferred_child: Option<String>,
     pub(super) selected_child_ids: Vec<String>,
-    pub(super) deferred_child_ids: Vec<String>,
     pub(super) selected_child_ownership: Vec<ChecklistChildOwnership>,
     pub(super) performance_features: Vec<String>,
 }
@@ -24,7 +16,7 @@ pub(super) struct RawChecklistItem {
 pub(super) fn parse(source: &str) -> Result<Vec<RawChecklistItem>, BenchError> {
     let mut section = String::new();
     let mut items = Vec::new();
-    for (line_index, line) in source.lines().enumerate() {
+    for line in source.lines() {
         if let Some(heading) = line.strip_prefix("## ") {
             section = heading.to_string();
             continue;
@@ -68,25 +60,14 @@ pub(super) fn parse(source: &str) -> Result<Vec<RawChecklistItem>, BenchError> {
         };
         let performance_features = classify(&section, feature, scope);
         let id = format!("PERFC-{}", stable_suffix(&format!("{section}\0{feature}")));
-        let (selected_child, deferred_child, selected_child_ids, deferred_child_ids) =
-            children(feature, status, &id)?;
+        let (_, _, selected_child_ids, _) = children(feature, status, &id)?;
         let selected_child_ownership =
             child_ownership(feature, status, &selected_child_ids, &performance_features)?;
         items.push(RawChecklistItem {
             id,
-            source_line: u32::try_from(line_index + 1).map_err(|_| {
-                BenchError::Qualification("feature-checklist line number overflow".to_string())
-            })?,
-            anchor_digest: sha256_hex(line.as_bytes()),
-            section: section.clone(),
-            feature: feature.to_string(),
-            raw_status: status.to_string(),
             scope,
             deferred_remainder: status.starts_with("Partial"),
-            selected_child,
-            deferred_child,
             selected_child_ids,
-            deferred_child_ids,
             selected_child_ownership,
             performance_features,
         });
