@@ -22,7 +22,7 @@ The suite must retain the existing benchmark manifest and 1.25x primary gate as 
 
 The performance program is complete for a release matrix only when all of the following are true:
 
-1. Every implemented selected feature and exported Rust API item has a stable performance disposition of `measured`, `covered-by-parent`, `not-performance-relevant`, `no-faithful-stim-comparator`, or `future-candidate`.
+1. Every implemented selected feature and exported Rust API item has a stable performance disposition of `measured`, `covered-by-parent`, `not-performance-relevant`, or `future-candidate`.
 2. Every active release group has an executable representative workload family, and every family declares its phase, scale points, work unit, correctness preflight, output-consumption rule, and memory policy.
 3. Every claimed Stim ratio compares equivalent semantic work through a `stim-perf`, symmetric process CLI, or source-owned pinned-Stim adapter runner.
 4. Every public CLI throughput ratio uses process-versus-process execution, while in-process CLI-body timings remain diagnostic and cannot stand in for end-to-end CLI parity.
@@ -47,7 +47,7 @@ Matrix completion, Stim parity, and Stab self-regression are separate conclusion
 - A slow comparable row is a valid benchmark result but a failed parity target; it must remain visible with an owner and profiler evidence and cannot be waived.
 - Stab self-regression compares current accepted evidence with a reviewed architecture-specific Stab baseline. The default tolerated deterioration is 15 percent; a precommitted justified exception may be at most 25 percent.
 - Missing or identity-mismatched Stab baselines are `unseeded`, never passing. A first architecture run can seed a candidate but cannot retroactively claim a self-regression pass.
-- A row can be `no-faithful-stim-comparator` only when pinned Stim lacks equivalent behavior at that surface and the suite validator proves that the disposition is still current.
+- Do not add a comparatorless active disposition speculatively. A concrete implemented surface without faithful pinned-Stim work remains a reviewed `future-candidate` until its diagnostic contract and claim boundary are deliberately introduced.
 - Existing M12 primary thresholds remain diagnostic compatibility evidence until an equivalent qualification group has accepted evidence and a reviewed migration retires the legacy row.
 
 ## Sources Of Truth
@@ -405,7 +405,6 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 - Reject repository fixtures without a bounded nonsymlink path, exact byte count, and SHA-256 corpus digest, including same-length content changes.
 - Reject a heterogeneous row from `primary-1.25` when any selected Stim symbol lacks an exact named threshold pair.
 - Reject `covered-by-parent` cycles and parents that are not measured.
-- Reject `no-faithful-stim-comparator` when an existing Stim runner or adapter mapping is declared for the same contract.
 - Reject a primary gate row backed only by an in-process-versus-process comparison.
 - Snapshot only the stable coverage counts and unresolved classifications, not machine-specific timing values.
 

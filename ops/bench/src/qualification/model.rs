@@ -30,7 +30,6 @@ pub(super) enum PerformanceDisposition {
     FutureCandidate,
     NotPerformanceRelevant,
     Diagnostic,
-    NoFaithfulStimComparator,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -143,7 +142,6 @@ pub(super) enum RowClassification {
     HeterogeneousMeasurements,
     UnmatchedSubmeasurement,
     AdapterCandidate,
-    NoFaithfulStimComparator,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
