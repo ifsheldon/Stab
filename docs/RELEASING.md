@@ -27,7 +27,7 @@ Read-only GitHub GET operations make at most three attempts after a connection, 
 
 ## Preflight
 
-The A9 procedure permits exactly one status-only descendant after the measured source revision. Once that descendant exists, set `RELEASE_COMMIT` to its full commit identity and verify that the worktree is clean. The release procedure then requires the human operator to verify that every required GitHub CI check for that exact revision has passed. This external exact-revision CI check is mandatory: the local Rust release commands validate source and qualification identities, but they do not query GitHub CI and do not replace this check. Do not continue from the measured evidence parent, an earlier status revision, or a revision whose required CI is pending or failed.
+The A9 procedure permits exactly one status-only descendant after the measured source revision. Once that descendant exists, review the generated [qualification dashboard](qualification-status.md), set `RELEASE_COMMIT` to its full commit identity, and verify that the worktree is clean. The dashboard is the sole documentation owner for current inventory, matrix, and completion counts. The release procedure then requires the human operator to verify that every required GitHub CI check for that exact revision has passed. This external exact-revision CI check is mandatory: the local Rust release commands validate source and qualification identities, but they do not query GitHub CI and do not replace this check. Do not continue from the measured evidence parent, an earlier status revision, or a revision whose required CI is pending or failed.
 
 ```text
 RELEASE_COMMIT="$(git rev-parse HEAD^{commit})"

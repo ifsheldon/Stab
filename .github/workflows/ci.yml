@@ -114,5 +114,8 @@ jobs:
       - name: Check generated qualification status
         run: just qualification::status --check
 
+      - name: Check oracle fixture matrix
+        run: just oracle::matrix --check
+
       - name: Check pinned result-format corpus
         run: just oracle::result-formats --check

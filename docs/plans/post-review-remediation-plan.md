@@ -424,3 +424,7 @@ Every statistical test added by this plan must declare: a fixed seed panel or a 
 - Evidence churn: batching inventory regeneration reduces cost but means the dashboard shows reopened surfaces for the duration of the plan; that is intentional honesty, not drift.
 - WS2b Stage 2's differential exception list is the guard against silently blessing new bugs: any differential mismatch not on the known-witness list stops the stage until explained.
 - The release freeze depends on `docs/plans/GOAL.md` being honored as the single release-authorization contract; if any release action is attempted during the freeze, the P0.0 prohibition list is the controlling document.
+
+## 2026-08-24 Scratch Rehearsal Retirement
+
+The executable scratch-repository rehearsal lane described above is historical. The `ifsheldon/Stab-release-rehearsal` repository was deleted after its unique commits were reconciled, and Stab removed the workflow, operator binary, release target, recipes, tests, and active instruction requirements in the pre-0.2 entropy program. The rehearsal records and their exact identities remain unchanged as historical evidence; `docs/RELEASING.md` now defines the production release lane as the only active release workflow.
