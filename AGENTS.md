@@ -6,6 +6,7 @@
 - Share honest engineering thoughts before acting when a request has design, architecture, security, compatibility, or workflow implications.
 - Think proactively and point out likely sources of rework, especially around Stim compatibility, public file formats, and performance claims.
 - Do not make commits unless the user explicitly asks for a commit.
+- Perform current development directly on the `main` checkout. Do not create another branch or linked worktree unless the user explicitly changes this policy.
 
 ## Documentation
 
