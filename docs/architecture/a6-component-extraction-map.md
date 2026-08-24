@@ -2,6 +2,8 @@
 
 This document freezes the source, API, feature, dependency, test, and benchmark moves for milestone A6 of the [agent-native modular QEC architecture plan](../plans/agent-native-modular-qec-architecture-plan.md).
 
+Status: Historical. The component extraction remains implemented, but the superseded complete-matrix and focused-attestation executable lifecycle was retired during the pre-0.2 entropy pass. Its [measurement contract](../../benchmarks/archive/a6/measurement-contract.json) and [predecessor registry](../../benchmarks/archive/a6/predecessors.json) are preserved byte-for-byte, while the current scalar-versus-portable SIMD compare and report commands remain active.
+
 The map is deliberately written before source relocation. Its purpose is to keep compiler-driven repair from silently changing the intended component boundaries.
 
 ## Decision Summary

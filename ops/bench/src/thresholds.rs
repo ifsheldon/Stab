@@ -37,12 +37,6 @@ pub(crate) struct RegressionThresholdFindings {
     pub(crate) blockers: Vec<String>,
 }
 
-impl BenchmarkThresholds {
-    pub(crate) fn row_ids(&self) -> impl Iterator<Item = &str> {
-        self.rows.iter().map(|row| row.id.as_str())
-    }
-}
-
 pub(crate) fn read_thresholds(path: &Path) -> Result<BenchmarkThresholds, BenchError> {
     let content = std::fs::read(path).map_err(|source| BenchError::ReadThresholds {
         path: path.to_path_buf(),

@@ -9,7 +9,6 @@
     )
 )]
 
-mod a6_focused_evidence;
 mod allocations;
 mod baseline;
 mod beta_gate;
@@ -71,14 +70,6 @@ enum Command {
 
     /// Validate benchmark contracts without running long benchmark workloads.
     Smoke,
-
-    /// Read or validate historical A6 focused-attestation artifacts.
-    #[command(hide = true)]
-    A6FocusedEvidence(a6_focused_evidence::A6FocusedEvidenceArgs),
-
-    /// Read or reproduce a historical A6 Linux-perf receipt.
-    #[command(hide = true)]
-    A6ProfileReceipt(a6_focused_evidence::profile_receipt::A6ProfileReceiptArgs),
 
     /// Validate the comprehensive performance qualification ledger.
     QualificationCheck,
@@ -302,12 +293,6 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                 "[{PREFIX}] benchmark manifest OK: {} planned rows",
                 manifest.rows.len()
             );
-        }
-        Command::A6FocusedEvidence(args) => {
-            a6_focused_evidence::check(&root, args)?;
-        }
-        Command::A6ProfileReceipt(args) => {
-            a6_focused_evidence::profile_receipt::produce(&root, args)?;
         }
         Command::QualificationCheck => {
             let manifest = checked_manifest(&root)?;

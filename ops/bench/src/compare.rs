@@ -32,7 +32,6 @@ const MAX_COMPARE_SOURCE_BYTES: usize = 64 << 20;
 
 use options::validate_compare_options;
 use profiler_notes::ProfilerNoteFindings;
-pub(crate) use profiler_notes::{HOT_PATH_PROFILER_NOTE_RATIO, validate_profiler_note_content};
 use report_output::{CompareReportWrite, write_compare_report};
 
 #[derive(Clone, Debug)]
@@ -552,27 +551,6 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         profiler_note_path: None,
         profiler_note_error: None,
     }
-}
-
-pub(crate) fn rebuild_compare_row_raw_evidence(row: &mut CompareRowResult) {
-    let derived = crate::compare_evidence::derive_measurement_evidence(
-        &row.stim_measurements,
-        &row.stab_measurements,
-        row.comparability,
-    );
-    row.stim_median_seconds = derived.stim_median_seconds;
-    row.stab_median_seconds = derived.stab_median_seconds;
-    row.relative_ratio = derived.relative_ratio;
-    row.measurement_ratios = derived.measurement_ratios;
-    row.stab_allocation_count_max = max_stab_allocation_count(&row.stab_measurements);
-    row.stab_allocation_bytes_max = max_stab_allocation_bytes(&row.stab_measurements);
-    row.stab_resident_bytes_max = max_stab_resident_bytes(&row.stab_measurements);
-    row.stab_resident_delta_bytes_max = max_stab_resident_delta_bytes(&row.stab_measurements);
-    row.pass_fail_status = compare_pass_fail_status(
-        &row.status,
-        BaselineCompareStatus::Comparable,
-        row.relative_ratio,
-    );
 }
 
 fn max_stab_allocation_count(measurements: &[Measurement]) -> Option<u64> {

@@ -1059,6 +1059,8 @@ GitHub Actions run `30623264047` tested the exact measured source revision after
 
 The timing guard restored `/swap.img` with size `137438949376` bytes and priority `-2`, no qualification or benchmark process remained, and the measured worktree was clean. A6 is complete. A7 decoder interoperability is next; the two parked prototype stashes remain historical inputs and will not be restored wholesale.
 
+Post-A6 maintenance retired the superseded complete-matrix and focused-attestation producer, reader, replay, Linux-perf receipt commands, and their tests. The historical measurement contract and predecessor registry moved byte-for-byte to `benchmarks/archive/a6/measurement-contract.json` and `benchmarks/archive/a6/predecessors.json`, retaining SHA-256 digests `9243ced12dcb2ebd0b23f982baa88e104a5b0fd3c5ae492af8217cf23483b3ec` and `6ed72bc49f399054edfb26295e1ec15f3ccd155a09deef0a33d7f291564722dd`. Active scalar-versus-portable SIMD qualification remains unchanged.
+
 ## A7 Decoder Contract Freeze
 
 A7 starts from clean `main` after the A6 closure and the Node.js 24 checkout-action maintenance commit. The active plan now records why decoder compilation remains implementation-specific, why the common hot path is statically dispatched, why true observable outcomes are removed from decoder inputs, and why the model owns bounded error-mechanism traversal semantics. The rejected decoder stashes remain immutable historical prototypes and will not be applied wholesale.

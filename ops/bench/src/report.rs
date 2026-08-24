@@ -57,18 +57,6 @@ pub(crate) struct StabMetadata {
     pub(crate) executable_sha256: String,
 }
 
-impl StabMetadata {
-    pub(crate) fn has_bound_executable(&self) -> bool {
-        crate::qualification::Sha256Digest::is_valid_str(&self.executable_sha256)
-    }
-}
-
-impl MachineMetadata {
-    pub(crate) fn has_private_host_fingerprint(&self) -> bool {
-        crate::qualification::Sha256Digest::is_valid_str(&self.host_fingerprint)
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineCommandMetadata {
     pub(crate) target_seconds: f64,
@@ -771,7 +759,9 @@ mod tests {
             filters: Vec::new(),
             cargo_features: vec!["portable-simd".to_string()],
             timing_boundary: COMPARE_TIMING_BOUNDARY.to_string(),
-            measurement_contract_path: Some("benchmarks/a6-measurement-contract.json".to_string()),
+            measurement_contract_path: Some(
+                "benchmarks/test-measurement-contract.json".to_string(),
+            ),
             measurement_contract_sha256: "b".repeat(64),
             require_profiler_notes: true,
             require_beta_gate: false,
@@ -828,7 +818,7 @@ mod tests {
             value
                 .get("measurement_contract_path")
                 .expect("measurement contract path"),
-            "benchmarks/a6-measurement-contract.json"
+            "benchmarks/test-measurement-contract.json"
         );
         assert_eq!(
             value
