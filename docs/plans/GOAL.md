@@ -12,8 +12,9 @@ Complete E0 through E7 without weakening Stim compatibility, data-loss preventio
 - Historical A9 rehearsal records remain valid history; the deleted scratch repository's workflow, binary, target, recipes, and active release requirements have been retired.
 - Performance inventory schema 5 is compact, and runtime-group schema 11 is the sole detailed owner for all 28 executable groups and 94 scales. The ambiguous parity alias and duplicate regeneration-check routes are removed.
 - Unused core and bit error variants are removed. Reverse-flow classification, sparse tracking, and recurrence machinery remain live implementation details but are no longer exported through `stab_analysis::advanced`.
-- The regenerated correctness inventory contains 7,591 public API items and 2,203 evidence cases under digest `ed8195bb9a9fd29e9509e68b3289e8feafbd0e34fbfc13d338312c8112a3989f`; the compact performance inventory is rebound under digest `61e219da4df930ff3dc595099794b518a933aad94a04ac8388a1b76361c35032`.
+- The regenerated correctness inventory contains 7,591 public API items and 2,203 evidence cases under digest `14614b21280044da7571243b7bb0d5a5e941edd5070999c2f08d98f6e3e923bc`; the compact performance inventory is rebound under digest `88d1e9fcfab579bd2420fbb454fe8d6b57be88d28252f70f2520cc8d10c00bb2`.
 - The superseded A6 focused-attestation implementation and hidden commands are removed. Its two retained JSON contracts are archived byte-for-byte under `benchmarks/archive/a6/`; active SIMD compare and report commands are unchanged.
+- E5 now has one oracle compatibility-matrix parser, one CLI result-format enum, one private DEM-search mask/index representation, model-owned target text assertions, and corpus-owned malformed CLI cases.
 - No formal timing from an intermediate simplification revision may be promoted.
 
 ## Execution Order
@@ -22,8 +23,8 @@ Complete E0 through E7 without weakening Stim compatibility, data-loss preventio
 2. E2 is complete: the speculative detailed backlog and mirrored API/checklist/group contracts are gone, while workload and regression identities remain intact.
 3. E3 is complete: approved unused public errors and advanced-analysis exports are gone, while consumed private engines and public cross-crate helpers remain.
 4. E4 is complete: A6 JSON contracts are archived and the superseded executable attestation lifecycle is gone.
-5. E5 is next: consolidate only the proved duplicate parsers, CLI format enum, private DEM-search value types, and tests.
-6. E6: synchronize CI, generated status, release docs, benchmark docs, and architecture docs.
+5. E5 is complete: the proved duplicate parsers, CLI format enum, private DEM-search value types, and tests are consolidated without dropping semantic coverage.
+6. E6 is next: synchronize CI, generated status, release docs, benchmark docs, and architecture docs.
 7. E7: run entropy verification, milestone-audit, full-code-review, complete local verification, and exact-head CI.
 
 ## Non-Negotiable Gates

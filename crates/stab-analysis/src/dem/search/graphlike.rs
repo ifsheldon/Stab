@@ -7,7 +7,7 @@ pub use algo::{
     shortest_graphlike_undetectable_logical_error_with_limits,
 };
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
@@ -25,89 +25,9 @@ use super::{
         visit_search_graph_errors_with_limits,
     },
     traversal::{FoldedDemTraversal, shifted_targets},
+    values::{DetectorIndex, ObservableMask, SearchGraphKind},
 };
 use crate::{AnalysisError, AnalysisResult};
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct ObservableMask {
-    observables: BTreeSet<DemObservableId>,
-}
-
-impl ObservableMask {
-    pub(super) fn new() -> Self {
-        Self {
-            observables: BTreeSet::new(),
-        }
-    }
-
-    fn symmetric_difference(&self, other: &Self) -> Self {
-        let mut observables = self.observables.clone();
-        for observable in &other.observables {
-            if !observables.insert(*observable) {
-                observables.remove(observable);
-            }
-        }
-        Self { observables }
-    }
-
-    fn symmetric_difference_len(&self, other: &Self) -> usize {
-        self.observables
-            .symmetric_difference(&other.observables)
-            .count()
-    }
-
-    fn len(&self) -> usize {
-        self.observables.len()
-    }
-
-    fn toggle(&mut self, observable: DemObservableId) {
-        if !self.observables.insert(observable) {
-            self.observables.remove(&observable);
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        self.observables.is_empty()
-    }
-
-    fn write_suffix(&self, out: &mut String) {
-        for observable in &self.observables {
-            out.push(' ');
-            out.push_str(&format_observable(*observable));
-        }
-    }
-
-    fn push_targets(&self, targets: &mut Vec<DemTarget>) -> AnalysisResult<()> {
-        for observable in &self.observables {
-            targets.push(DemTarget::logical_observable(observable.get())?);
-        }
-        Ok(())
-    }
-}
-
-impl Default for ObservableMask {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Hash for ObservableMask {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.observables.hash(state);
-    }
-}
-
-impl Ord for ObservableMask {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.observables.cmp(&other.observables)
-    }
-}
-
-impl PartialOrd for ObservableMask {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(super) struct Edge {
@@ -139,7 +59,10 @@ impl Display for Edge {
             Some(detector) => format_detector(detector),
             None => "[boundary]".to_string(),
         };
-        self.observables.write_suffix(&mut text);
+        for observable in self.observables.iter() {
+            text.push(' ');
+            text.push_str(&format_observable(observable));
+        }
         f.write_str(&text)
     }
 }
@@ -218,16 +141,6 @@ impl PartialEq for Graph {
 
 impl Eq for Graph {}
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum DetectorIndex {
-    #[cfg(test)]
-    Identity,
-    Sparse {
-        node_to_detector: Vec<DemDetectorId>,
-        detector_to_node: BTreeMap<DemDetectorId, usize>,
-    },
-}
-
 impl Graph {
     #[cfg(test)]
     pub(super) fn new(node_count: usize, num_observables: usize) -> Self {
@@ -236,7 +149,7 @@ impl Graph {
             .with_max_stored_graph_terms(2_048);
         Self {
             nodes: vec![Node::default(); node_count],
-            detector_index: DetectorIndex::Identity,
+            detector_index: DetectorIndex::identity(),
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
@@ -273,19 +186,9 @@ impl Graph {
         })?;
         nodes.resize(node_count, Node::default());
 
-        let node_to_detector: Vec<_> = detectors.into_iter().collect();
-        let detector_to_node = node_to_detector
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(index, detector)| (detector, index))
-            .collect();
         Ok(Self {
             nodes,
-            detector_index: DetectorIndex::Sparse {
-                node_to_detector,
-                detector_to_node,
-            },
+            detector_index: DetectorIndex::sparse(detectors),
             has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
@@ -302,7 +205,7 @@ impl Graph {
         Self {
             has_declared_detectors: !nodes.is_empty(),
             nodes,
-            detector_index: DetectorIndex::Identity,
+            detector_index: DetectorIndex::identity(),
             num_observables,
             distance_1_error_mask,
             construction_budget: GraphConstructionBudget::new(
@@ -313,44 +216,13 @@ impl Graph {
     }
 
     pub(super) fn detector_for_node_index(&self, index: usize) -> AnalysisResult<DemDetectorId> {
-        match &self.detector_index {
-            #[cfg(test)]
-            DetectorIndex::Identity => {
-                let index = u64::try_from(index).map_err(|_| {
-                    AnalysisError::invalid_detector_error_model(
-                        "graphlike node index does not fit detector id",
-                    )
-                })?;
-                DemDetectorId::try_new(index).map_err(Into::into)
-            }
-            DetectorIndex::Sparse {
-                node_to_detector, ..
-            } => node_to_detector.get(index).copied().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "graphlike sparse node index {index} is outside the graph"
-                ))
-            }),
-        }
+        self.detector_index
+            .detector_for_node_index(index, SearchGraphKind::Graphlike)
     }
 
     pub(super) fn node_index_for_detector(&self, detector: DemDetectorId) -> AnalysisResult<usize> {
-        match &self.detector_index {
-            #[cfg(test)]
-            DetectorIndex::Identity => usize::try_from(detector.get()).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "graphlike detector D{} does not fit usize",
-                    detector.get()
-                ))
-            }),
-            DetectorIndex::Sparse {
-                detector_to_node, ..
-            } => detector_to_node.get(&detector).copied().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "graphlike detector D{} is outside the sparse graph",
-                    detector.get()
-                ))
-            }),
-        }
+        self.detector_index
+            .node_index_for_detector(detector, SearchGraphKind::Graphlike)
     }
 
     pub(super) fn add_outward_edge(
@@ -584,8 +456,8 @@ impl Display for SearchState {
             text.push_str(&format_detector(detector));
             text.push(' ');
         }
-        for observable in &self.observables.observables {
-            text.push_str(&format_observable(*observable));
+        for observable in self.observables.iter() {
+            text.push_str(&format_observable(observable));
             text.push(' ');
         }
         f.write_str(&text)

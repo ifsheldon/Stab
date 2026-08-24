@@ -4,8 +4,6 @@
     reason = "M4 compatibility tests use direct assertions for compact diagnostics"
 )]
 
-use std::str::FromStr;
-
 use stab_core::{
     Circuit, CircuitItem, Gate, GateCategory, MeasureRecordOffset, ObservableId, Pauli,
     Probability, QubitId, RepeatCount, Target, analysis::circuit_without_tags,
@@ -1000,34 +998,6 @@ fn parser_rejects_probability_lists_that_are_not_disjoint_like_stim() {
 }
 
 #[test]
-fn target_from_str_matches_stim_surface_forms() {
-    assert_eq!(
-        Target::from_str("rec[-3]").unwrap(),
-        Target::measurement_record(MeasureRecordOffset::try_new(-3).unwrap())
-    );
-    assert_eq!(
-        Target::from_str("!5").unwrap(),
-        Target::qubit(QubitId::new(5).unwrap(), true)
-    );
-    assert_eq!(Target::from_str("sweep[7]").unwrap(), Target::sweep_bit(7));
-    assert_eq!(
-        Target::from_str("Z11").unwrap(),
-        Target::pauli(Pauli::Z, QubitId::new(11).unwrap(), false)
-    );
-    assert_eq!(
-        Target::from_str("z11").unwrap(),
-        Target::pauli(Pauli::Z, QubitId::new(11).unwrap(), false)
-    );
-    assert!(Target::from_str("+1").is_err());
-    assert!(Target::from_str("16777216").is_err());
-    assert!(Target::from_str("X16777216").is_err());
-    assert!(Target::from_str("rec[0]").is_err());
-    assert!(Target::from_str("rec[-16777216]").is_err());
-    assert!(Target::from_str("sweep[+1]").is_err());
-    assert!(Target::from_str("sweep[16777216]").is_err());
-}
-
-#[test]
 fn target_typed_accessors_match_stim_gate_target_boundaries() {
     // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.test.cc.
     let qubit_id = QubitId::new(5).unwrap();
@@ -1146,15 +1116,6 @@ fn target_classification_matches_stim_gate_target() {
     assert!(z.is_z_target());
     assert_eq!(x.pauli_type(), Some(Pauli::X));
     assert_eq!(qubit.pauli_type(), None);
-}
-
-#[test]
-fn cq2_stim_format_gate_target_fixture_contract() {
-    parser_matches_stim_target_text_boundaries();
-    target_from_str_matches_stim_surface_forms();
-    target_typed_accessors_match_stim_gate_target_boundaries();
-    target_inversion_matches_stim_gate_target();
-    target_classification_matches_stim_gate_target();
 }
 
 trait CircuitItemExt {

@@ -27,6 +27,7 @@ mod streaming;
 
 use agent::{CapabilitiesArgs, InspectArgs, PlanArgs, run_capabilities, run_inspect, run_plan};
 use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
+use clap::builder::{PossibleValuesParser, TypedValueParser as _};
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use convert::{ConvertArgs, run_convert};
@@ -220,6 +221,11 @@ impl RecordFormatArg {
             .sample_format()
             .ok_or(CliError::UnsupportedDetectionFormat { format: "ptb64" })
     }
+}
+
+fn result_record_format_parser() -> impl clap::builder::TypedValueParser<Value = RecordFormatArg> {
+    PossibleValuesParser::new(["01", "b8", "r8", "ptb64", "hits", "dets"])
+        .try_map(|value| RecordFormatArg::from_str(&value, false).map_err(std::io::Error::other))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]

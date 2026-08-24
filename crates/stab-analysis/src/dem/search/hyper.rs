@@ -14,69 +14,13 @@ use super::{
         visit_search_graph_errors_with_limits,
     },
     traversal::{FoldedDemTraversal, shifted_targets},
+    values::{DetectorIndex, ObservableMask, SearchGraphKind},
 };
 use crate::resources::LogicalErrorSearchResource;
 use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
 #[cfg(test)]
 const MAX_HYPERGRAPH_EDGE_DEGREE: usize = 64;
-
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct ObservableMask {
-    observables: BTreeSet<DemObservableId>,
-}
-
-impl ObservableMask {
-    fn new() -> Self {
-        Self {
-            observables: BTreeSet::new(),
-        }
-    }
-
-    fn toggle(&mut self, observable: DemObservableId) {
-        if !self.observables.insert(observable) {
-            self.observables.remove(&observable);
-        }
-    }
-
-    fn symmetric_difference(&self, other: &Self) -> Self {
-        let mut observables = self.observables.clone();
-        for observable in &other.observables {
-            if !observables.insert(*observable) {
-                observables.remove(observable);
-            }
-        }
-        Self { observables }
-    }
-
-    fn symmetric_difference_len(&self, other: &Self) -> usize {
-        self.observables
-            .symmetric_difference(&other.observables)
-            .count()
-    }
-
-    fn len(&self) -> usize {
-        self.observables.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.observables.is_empty()
-    }
-
-    fn write_suffix(&self, out: &mut String) {
-        for observable in &self.observables {
-            out.push(' ');
-            out.push_str(&format_observable(*observable));
-        }
-    }
-
-    fn push_targets(&self, targets: &mut Vec<DemTarget>) -> AnalysisResult<()> {
-        for observable in &self.observables {
-            targets.push(DemTarget::logical_observable(observable.get())?);
-        }
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Edge {
@@ -121,7 +65,10 @@ impl Display for Edge {
                 }
             }
         }
-        self.observables.write_suffix(&mut text);
+        for observable in self.observables.iter() {
+            text.push(' ');
+            text.push_str(&format_observable(observable));
+        }
         f.write_str(&text)
     }
 }
@@ -175,16 +122,6 @@ impl PartialEq for Graph {
 
 impl Eq for Graph {}
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum DetectorIndex {
-    #[cfg(test)]
-    Identity,
-    Sparse {
-        node_to_detector: Vec<DemDetectorId>,
-        detector_to_node: BTreeMap<DemDetectorId, usize>,
-    },
-}
-
 impl Graph {
     #[cfg(test)]
     fn new(node_count: usize, num_observables: usize) -> Self {
@@ -207,7 +144,7 @@ impl Graph {
             edges: Vec::new(),
             edge_index: ArenaIndex::new(),
             edge_incidences: 0,
-            detector_index: DetectorIndex::Identity,
+            detector_index: DetectorIndex::identity(),
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
@@ -244,22 +181,12 @@ impl Graph {
         })?;
         nodes.resize(node_count, Node::default());
 
-        let node_to_detector: Vec<_> = detectors.into_iter().collect();
-        let detector_to_node = node_to_detector
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(index, detector)| (detector, index))
-            .collect();
         Ok(Self {
             nodes,
             edges: Vec::new(),
             edge_index: ArenaIndex::new(),
             edge_incidences: 0,
-            detector_index: DetectorIndex::Sparse {
-                node_to_detector,
-                detector_to_node,
-            },
+            detector_index: DetectorIndex::sparse(detectors),
             has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
@@ -338,44 +265,13 @@ impl Graph {
     }
 
     fn detector_for_node_index(&self, index: usize) -> AnalysisResult<DemDetectorId> {
-        match &self.detector_index {
-            #[cfg(test)]
-            DetectorIndex::Identity => {
-                let index = u64::try_from(index).map_err(|_| {
-                    AnalysisError::invalid_detector_error_model(
-                        "hypergraph node index does not fit detector id",
-                    )
-                })?;
-                DemDetectorId::try_new(index).map_err(Into::into)
-            }
-            DetectorIndex::Sparse {
-                node_to_detector, ..
-            } => node_to_detector.get(index).copied().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "hypergraph sparse node index {index} is outside the graph"
-                ))
-            }),
-        }
+        self.detector_index
+            .detector_for_node_index(index, SearchGraphKind::Hypergraph)
     }
 
     fn node_index_for_detector(&self, detector: DemDetectorId) -> AnalysisResult<usize> {
-        match &self.detector_index {
-            #[cfg(test)]
-            DetectorIndex::Identity => usize::try_from(detector.get()).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "hypergraph detector D{} does not fit usize",
-                    detector.get()
-                ))
-            }),
-            DetectorIndex::Sparse {
-                detector_to_node, ..
-            } => detector_to_node.get(&detector).copied().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "hypergraph detector D{} is outside the sparse graph",
-                    detector.get()
-                ))
-            }),
-        }
+        self.detector_index
+            .node_index_for_detector(detector, SearchGraphKind::Hypergraph)
     }
 
     fn add_edge_from_dem_targets(
@@ -588,8 +484,8 @@ impl Display for SearchState {
             text.push_str(&format_detector(*detector));
             text.push(' ');
         }
-        for observable in &self.observables.observables {
-            text.push_str(&format_observable(*observable));
+        for observable in self.observables.iter() {
+            text.push_str(&format_observable(observable));
             text.push(' ');
         }
         f.write_str(&text)

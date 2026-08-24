@@ -502,6 +502,34 @@ impl CompatibilityMatrix {
         }
     }
 
+    pub(crate) fn required_fixture_rows(&self) -> impl Iterator<Item = (&str, &str, &str)> {
+        self.rows
+            .iter()
+            .filter(|row| {
+                row.source_kind == SourceKind::CxxTest
+                    && matches!(
+                        row.milestone,
+                        Milestone::M4
+                            | Milestone::M5
+                            | Milestone::M6
+                            | Milestone::M7
+                            | Milestone::M8
+                            | Milestone::M9
+                            | Milestone::M10
+                            | Milestone::M11
+                    )
+                    && matches!(row.priority, Priority::P0 | Priority::P1)
+                    && row.status == Status::Planned
+            })
+            .map(|row| {
+                (
+                    row.upstream_path.as_str(),
+                    row.milestone.as_str(),
+                    row.parity_mode.as_str(),
+                )
+            })
+    }
+
     pub(crate) fn print_milestone(&self, milestone: &str) -> Result<(), MatrixError> {
         let rows = self.rows_for_milestone(milestone);
         if rows.is_empty() {

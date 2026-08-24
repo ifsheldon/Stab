@@ -232,6 +232,11 @@ fn cq2_stim_format_target_text_round_trip_matches_stim() {
 }
 
 #[test]
+fn cq2_stim_format_target_text_source_contract() {
+    cq2_stim_format_target_text_round_trip_matches_stim();
+}
+
+#[test]
 fn cq2_stim_format_target_accessors_match_stim() {
     let qubit = q(5);
     assert_eq!(qubit.qubit_id(), QubitId::new(5).ok());
@@ -335,6 +340,14 @@ fn cq2_stim_format_target_classification_matches_stim() {
     assert!(record(-7).is_classical_bit_target());
     assert!(Target::sweep_bit(5).is_classical_bit_target());
     assert!(Target::combiner().is_combiner());
+}
+
+#[test]
+fn cq2_stim_format_gate_target_fixture_contract() {
+    cq2_stim_format_target_text_round_trip_matches_stim();
+    cq2_stim_format_target_accessors_match_stim();
+    cq2_stim_format_target_inversion_matches_stim();
+    cq2_stim_format_target_classification_matches_stim();
 }
 
 #[test]

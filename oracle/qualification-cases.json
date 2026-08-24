@@ -1438,17 +1438,17 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_gate_contract",
-          "cq2_gate_target_text_round_trip_matches_stim",
+          "cq2_stim_format",
+          "cq2_stim_format_target_text_source_contract",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
         "kind": "not-applicable",
-        "detail": "This case proves accepted and rejected qubit, record, sweep, and Pauli target text boundaries."
+        "detail": "The model-owned case proves accepted and rejected qubit, record, sweep, and Pauli target text boundaries."
       },
       "upstream_owners": [
         {

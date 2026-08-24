@@ -3,6 +3,7 @@ mod budget;
 mod error_traversal;
 mod graphlike;
 mod hyper;
+mod values;
 
 pub use budget::LogicalErrorSearchLimits;
 pub use graphlike::{

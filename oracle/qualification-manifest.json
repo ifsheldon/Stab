@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "ed8195bb9a9fd29e9509e68b3289e8feafbd0e34fbfc13d338312c8112a3989f",
+  "semantic_digest": "14614b21280044da7571243b7bb0d5a5e941edd5070999c2f08d98f6e3e923bc",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -69987,7 +69987,7 @@
       "path": "stab_analysis::find_undetectable_logical_error",
       "kind": "function",
       "source_path": "crates/stab-analysis/src/dem/search/hyper.rs",
-      "source_line": 599,
+      "source_line": 495,
       "owner_case_id": "cq-evidence-api-eba3c25e01b08990",
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
@@ -70000,7 +70000,7 @@
       "path": "stab_analysis::find_undetectable_logical_error_with_limits",
       "kind": "function",
       "source_path": "crates/stab-analysis/src/dem/search/hyper.rs",
-      "source_line": 614,
+      "source_line": 510,
       "owner_case_id": "cq-evidence-qualification-e6b906b0657cf170",
       "performance_groups": [
         "PERF-RESOURCE-BOUNDARIES"
@@ -72753,7 +72753,7 @@
       "path": "stab_cli::run_from",
       "kind": "function",
       "source_path": "crates/stab-cli/src/lib.rs",
-      "source_line": 315,
+      "source_line": 321,
       "owner_case_id": "cq-evidence-api-12ed696bea345f58",
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
@@ -197628,9 +197628,9 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "stim_format",
+          "cq2_stim_format",
           "cq2_stim_format_gate_target_fixture_contract",
           "--quiet",
           "--exact"
@@ -204388,10 +204388,10 @@
           "cargo",
           "test",
           "-p",
-          "stab-core",
+          "stab-model",
           "--test",
-          "cq2_gate_contract",
-          "cq2_gate_target_text_round_trip_matches_stim",
+          "cq2_stim_format",
+          "cq2_stim_format_target_text_source_contract",
           "--quiet",
           "--exact"
         ]
@@ -204399,7 +204399,7 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "not-applicable",
-        "detail": "This case proves accepted and rejected qubit, record, sweep, and Pauli target text boundaries."
+        "detail": "The model-owned case proves accepted and rejected qubit, record, sweep, and Pauli target text boundaries."
       },
       "negative_axes": [],
       "performance_groups": [

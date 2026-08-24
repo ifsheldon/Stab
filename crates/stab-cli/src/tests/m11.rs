@@ -973,3 +973,62 @@ fn sample_dem_observable_routing_flags_are_hidden_but_functional() {
         assert_eq!(String::from_utf8(stdout).unwrap(), expected, "{flag}");
     }
 }
+
+#[test]
+fn sample_dem_record_format_options_share_the_six_result_formats() {
+    let mut help_stdout = Vec::new();
+    let mut help_stderr = Vec::new();
+    let help_status = run_from(
+        ["stab", "sample_dem", "--help"].map(OsString::from),
+        b"".as_slice(),
+        &mut help_stdout,
+        &mut help_stderr,
+    );
+    assert_eq!(help_status, 0);
+    assert_eq!(help_stderr, Vec::<u8>::new());
+    let help_text = String::from_utf8(help_stdout).expect("utf-8 help");
+    for option in [
+        "--obs_out_format",
+        "--err_out_format",
+        "--replay_err_in_format",
+    ] {
+        let option_offset = help_text.find(option).expect("format option in help");
+        let option_help = help_text
+            .get(option_offset..)
+            .expect("format option offset is a character boundary");
+        let possible_values = option_help
+            .lines()
+            .find(|line| line.contains("possible values"))
+            .expect("possible values in option help");
+        assert!(
+            possible_values.contains("01, b8, r8, ptb64, hits, dets"),
+            "{option}: {possible_values}"
+        );
+        assert!(
+            !possible_values.contains("stim"),
+            "{option}: {possible_values}"
+        );
+    }
+
+    for option in [
+        "--obs_out_format",
+        "--err_out_format",
+        "--replay_err_in_format",
+    ] {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            ["stab", "sample_dem", option, "stim"].map(OsString::from),
+            b"".as_slice(),
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_ne!(status, 0, "{option}");
+        assert_eq!(stdout, Vec::<u8>::new(), "{option}");
+        let stderr = String::from_utf8(stderr).expect("utf-8 stderr");
+        assert!(
+            stderr.contains("invalid value 'stim'"),
+            "{option}: {stderr}"
+        );
+    }
+}

@@ -4,48 +4,7 @@
     reason = "CQ2 exact gate target contracts use direct assertions for compact diagnostics"
 )]
 
-use std::str::FromStr;
-
 use stab_core::{MeasureRecordOffset, Pauli, QubitId, Target};
-
-#[test]
-fn cq2_gate_target_text_round_trip_matches_stim() {
-    let cases = [
-        (qubit(5, false), "5"),
-        (qubit(7, true), "!7"),
-        (Target::sweep_bit(11), "sweep[11]"),
-        (record(-3), "rec[-3]"),
-        (pauli(Pauli::X, 13, false), "X13"),
-        (pauli(Pauli::X, 17, true), "!X17"),
-        (pauli(Pauli::Y, 19, false), "Y19"),
-        (pauli(Pauli::Y, 23, true), "!Y23"),
-        (pauli(Pauli::Z, 29, false), "Z29"),
-        (pauli(Pauli::Z, 31, true), "!Z31"),
-        (Target::combiner(), "*"),
-    ];
-    for (target, text) in cases {
-        assert_eq!(target.to_string(), text);
-        assert_eq!(Target::from_str(text).unwrap(), target);
-        assert_eq!(target.clone(), target);
-        assert!(!format!("{target:?}").is_empty());
-    }
-    assert_eq!(Pauli::X.to_string(), "X");
-    assert_eq!(Pauli::Y.to_string(), "Y");
-    assert_eq!(Pauli::Z.to_string(), "Z");
-
-    for rejected in [
-        "",
-        "+1",
-        "16777216",
-        "X16777216",
-        "rec[0]",
-        "rec[-16777216]",
-        "sweep[+1]",
-        "sweep[16777216]",
-    ] {
-        assert!(Target::from_str(rejected).is_err(), "{rejected:?}");
-    }
-}
 
 #[test]
 fn cq2_gate_target_accessors_match_stim() {

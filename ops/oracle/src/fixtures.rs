@@ -230,129 +230,6 @@ enum ExpectedStdoutPolicy {
     AllowMissing,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-struct CompatibilityRow {
-    upstream_path: String,
-    source_kind: CompatibilitySourceKind,
-    milestone: CompatibilityMilestone,
-    priority: CompatibilityPriority,
-    parity_mode: CompatibilityParityMode,
-    status: CompatibilityStatus,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-enum CompatibilitySourceKind {
-    #[serde(rename = "cxx-test")]
-    CxxTest,
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-enum CompatibilityMilestone {
-    #[serde(rename = "M4")]
-    M4,
-    #[serde(rename = "M5")]
-    M5,
-    #[serde(rename = "M6")]
-    M6,
-    #[serde(rename = "M7")]
-    M7,
-    #[serde(rename = "M8")]
-    M8,
-    #[serde(rename = "M9")]
-    M9,
-    #[serde(rename = "M10")]
-    M10,
-    #[serde(rename = "M11")]
-    M11,
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-enum CompatibilityPriority {
-    #[serde(rename = "P0")]
-    P0,
-    #[serde(rename = "P1")]
-    P1,
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-enum CompatibilityParityMode {
-    #[serde(rename = "exact-output")]
-    ExactOutput,
-    #[serde(rename = "exact-output-and-statistical")]
-    ExactOutputAndStatistical,
-    #[serde(rename = "property")]
-    Property,
-    #[serde(rename = "statistical")]
-    Statistical,
-    #[serde(rename = "structural")]
-    Structural,
-    #[serde(other)]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
-enum CompatibilityStatus {
-    #[serde(rename = "planned")]
-    Planned,
-    #[serde(other)]
-    Other,
-}
-
-impl CompatibilityRow {
-    fn requires_fixture(&self) -> bool {
-        self.source_kind == CompatibilitySourceKind::CxxTest
-            && matches!(
-                self.milestone,
-                CompatibilityMilestone::M4
-                    | CompatibilityMilestone::M5
-                    | CompatibilityMilestone::M6
-                    | CompatibilityMilestone::M7
-                    | CompatibilityMilestone::M8
-                    | CompatibilityMilestone::M9
-                    | CompatibilityMilestone::M10
-                    | CompatibilityMilestone::M11
-            )
-            && matches!(
-                self.priority,
-                CompatibilityPriority::P0 | CompatibilityPriority::P1
-            )
-            && self.status == CompatibilityStatus::Planned
-    }
-
-    fn fixture_milestone(&self) -> Option<Milestone> {
-        match self.milestone {
-            CompatibilityMilestone::M4 => Some(Milestone::M4),
-            CompatibilityMilestone::M5 => Some(Milestone::M5),
-            CompatibilityMilestone::M6 => Some(Milestone::M6),
-            CompatibilityMilestone::M7 => Some(Milestone::M7),
-            CompatibilityMilestone::M8 => Some(Milestone::M8),
-            CompatibilityMilestone::M9 => Some(Milestone::M9),
-            CompatibilityMilestone::M10 => Some(Milestone::M10),
-            CompatibilityMilestone::M11 => Some(Milestone::M11),
-            CompatibilityMilestone::Other => None,
-        }
-    }
-
-    fn fixture_parity_mode(&self) -> Option<ParityMode> {
-        match self.parity_mode {
-            CompatibilityParityMode::ExactOutput => Some(ParityMode::ExactOutput),
-            CompatibilityParityMode::ExactOutputAndStatistical => {
-                Some(ParityMode::ExactOutputAndStatistical)
-            }
-            CompatibilityParityMode::Property => Some(ParityMode::Property),
-            CompatibilityParityMode::Statistical => Some(ParityMode::Statistical),
-            CompatibilityParityMode::Structural => Some(ParityMode::Structural),
-            CompatibilityParityMode::Other => None,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct FixtureManifest {
     rows: Vec<FixtureRow>,
@@ -606,64 +483,27 @@ impl FixtureManifest {
         let fixture_keys = self
             .rows
             .iter()
-            .map(|row| (row.upstream_source.as_str(), row.milestone, row.parity_mode))
+            .map(|row| {
+                (
+                    row.upstream_source.as_str(),
+                    row.milestone.as_str(),
+                    row.parity_mode.as_str(),
+                )
+            })
             .collect::<BTreeSet<_>>();
-        let matrix_path = root.compatibility_matrix();
-        let bytes = match crate::safe_file::read_regular_file_bounded(
-            &matrix_path,
-            crate::matrix::MAX_COMPATIBILITY_MATRIX_BYTES,
-        ) {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                violations.push(format!("failed to read compatibility matrix: {error}"));
-                return;
-            }
-        };
-        let content = match String::from_utf8(bytes) {
-            Ok(content) => content,
-            Err(error) => {
-                violations.push(format!("compatibility matrix is not UTF-8: {error}"));
-                return;
-            }
-        };
-        let mut reader = csv::ReaderBuilder::new()
-            .trim(csv::Trim::All)
-            .from_reader(content.as_bytes());
-        for row in reader.deserialize::<CompatibilityRow>() {
-            match row {
-                Ok(row) => {
-                    if row.requires_fixture() {
-                        let Some(milestone) = row.fixture_milestone() else {
-                            violations.push(format!(
-                                "missing M2 fixture milestone mapping for {}",
-                                row.upstream_path
-                            ));
-                            continue;
-                        };
-                        let Some(parity_mode) = row.fixture_parity_mode() else {
-                            violations.push(format!(
-                                "missing M2 fixture parity mapping for {}",
-                                row.upstream_path
-                            ));
-                            continue;
-                        };
-                        if !fixture_keys.contains(&(
-                            row.upstream_path.as_str(),
-                            milestone,
-                            parity_mode,
-                        )) {
-                            violations.push(format!(
-                                "missing M2 fixture row for {} ({}/{})",
-                                row.upstream_path,
-                                milestone.as_str(),
-                                parity_mode.as_str()
-                            ));
-                        }
-                    }
-                }
+        let matrix =
+            match crate::matrix::CompatibilityMatrix::read_from_path(root.compatibility_matrix()) {
+                Ok(matrix) => matrix,
                 Err(error) => {
-                    violations.push(format!("failed to parse compatibility matrix row: {error}"));
+                    violations.push(format!("failed to read compatibility matrix: {error}"));
+                    return;
                 }
+            };
+        for (upstream_path, milestone, parity_mode) in matrix.required_fixture_rows() {
+            if !fixture_keys.contains(&(upstream_path, milestone, parity_mode)) {
+                violations.push(format!(
+                    "missing M2 fixture row for {upstream_path} ({milestone}/{parity_mode})"
+                ));
             }
         }
     }

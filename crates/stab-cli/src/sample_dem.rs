@@ -1,7 +1,7 @@
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
-use clap::{Args, ValueEnum};
+use clap::Args;
 use stab_core::{
     CircuitError, DemSampleBatchView, DemSampleSink, DetectionObservableOutputMode,
     DetectorErrorModel, RandomPolicy, RecordFormat, SampleFormat, Seed, ShotCount,
@@ -14,7 +14,7 @@ use stab_core::{
 };
 
 use super::{
-    CliError, SampleOutFormatArg,
+    CliError, RecordFormatArg, SampleOutFormatArg,
     batch_output::DemSampleBatchEncoder,
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo},
@@ -23,41 +23,6 @@ use super::{
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
 const MAX_SAMPLE_DEM_INPUT_BYTES: u64 = 64 * 1024 * 1024;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-enum SampleDemRecordFormatArg {
-    #[value(name = "01")]
-    ZeroOne,
-    #[value(name = "b8")]
-    B8,
-    #[value(name = "r8")]
-    R8,
-    #[value(name = "ptb64")]
-    Ptb64,
-    #[value(name = "hits")]
-    Hits,
-    #[value(name = "dets")]
-    Dets,
-}
-
-impl SampleDemRecordFormatArg {
-    const fn record_format(self) -> RecordFormat {
-        match self {
-            Self::ZeroOne => RecordFormat::ZeroOne,
-            Self::B8 => RecordFormat::B8,
-            Self::R8 => RecordFormat::R8,
-            Self::Ptb64 => RecordFormat::Ptb64,
-            Self::Hits => RecordFormat::Hits,
-            Self::Dets => RecordFormat::Dets,
-        }
-    }
-
-    fn sample_format(self) -> Result<SampleFormat, CliError> {
-        self.record_format()
-            .sample_format()
-            .ok_or(CliError::UnsupportedDetectionFormat { format: "ptb64" })
-    }
-}
 
 #[derive(Debug, Args)]
 pub(super) struct SampleDemArgs {
@@ -94,24 +59,36 @@ pub(super) struct SampleDemArgs {
     obs_output: Option<PathBuf>,
 
     /// Separate observable-flip output format.
-    #[arg(long = "obs_out_format", value_enum, default_value = "01")]
-    obs_out_format: SampleDemRecordFormatArg,
+    #[arg(
+        long = "obs_out_format",
+        value_parser = super::result_record_format_parser(),
+        default_value = "01"
+    )]
+    obs_out_format: RecordFormatArg,
 
     /// Optional sampled-error output path.
     #[arg(long = "err_out")]
     error_output: Option<PathBuf>,
 
     /// Sampled-error output format.
-    #[arg(long = "err_out_format", value_enum, default_value = "01")]
-    err_out_format: SampleDemRecordFormatArg,
+    #[arg(
+        long = "err_out_format",
+        value_parser = super::result_record_format_parser(),
+        default_value = "01"
+    )]
+    err_out_format: RecordFormatArg,
 
     /// Optional sampled-error replay input path.
     #[arg(long = "replay_err_in")]
     replay_error_input: Option<PathBuf>,
 
     /// Sampled-error replay input format.
-    #[arg(long = "replay_err_in_format", value_enum, default_value = "01")]
-    replay_err_in_format: SampleDemRecordFormatArg,
+    #[arg(
+        long = "replay_err_in_format",
+        value_parser = super::result_record_format_parser(),
+        default_value = "01"
+    )]
+    replay_err_in_format: RecordFormatArg,
 }
 
 pub(super) fn run_sample_dem<R, W>(
@@ -181,10 +158,12 @@ where
         args.out_format.record_format(),
         args.obs_output
             .as_ref()
-            .map(|_| args.obs_out_format.record_format()),
+            .map(|_| sample_dem_record_format(args.obs_out_format))
+            .transpose()?,
         args.error_output
             .as_ref()
-            .map(|_| args.err_out_format.record_format()),
+            .map(|_| sample_dem_record_format(args.err_out_format))
+            .transpose()?,
     )?;
     let mut session = plan
         .session(dem_random_policy(args.seed))
@@ -308,6 +287,12 @@ fn invalid_result_format(message: impl Into<String>) -> CliError {
     CliError::from(CircuitError::invalid_result_format(message))
 }
 
+fn sample_dem_record_format(format: RecordFormatArg) -> Result<RecordFormat, CliError> {
+    format
+        .record_format()
+        .ok_or(CliError::UnsupportedDetectionFormat { format: "stim" })
+}
+
 fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
     let selected_routes = usize::from(args.prepend_observables)
         + usize::from(args.append_observables)
@@ -320,10 +305,10 @@ fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
 
 fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
     let uses_ptb64 = args.out_format == SampleOutFormatArg::Ptb64
-        || (args.obs_output.is_some() && args.obs_out_format == SampleDemRecordFormatArg::Ptb64)
-        || (args.error_output.is_some() && args.err_out_format == SampleDemRecordFormatArg::Ptb64)
+        || (args.obs_output.is_some() && args.obs_out_format == RecordFormatArg::Ptb64)
+        || (args.error_output.is_some() && args.err_out_format == RecordFormatArg::Ptb64)
         || (args.replay_error_input.is_some()
-            && args.replay_err_in_format == SampleDemRecordFormatArg::Ptb64);
+            && args.replay_err_in_format == RecordFormatArg::Ptb64);
     if uses_ptb64 {
         validate_ptb64_shot_count(args.shots)?;
     }
@@ -332,7 +317,7 @@ fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
 
 fn for_each_replay_error_record<F>(
     input: &mut InputFile,
-    format: SampleDemRecordFormatArg,
+    format: RecordFormatArg,
     error_count: usize,
     expected_shots: usize,
     visit: F,
@@ -341,26 +326,25 @@ where
     F: FnMut(&[bool]) -> Result<(), CliError>,
 {
     match format {
-        SampleDemRecordFormatArg::Ptb64 => {
+        RecordFormatArg::Ptb64 => {
             for_each_ptb64_replay_error_record(input, error_count, expected_shots, visit)
         }
-        SampleDemRecordFormatArg::B8 => {
+        RecordFormatArg::B8 => {
             for_each_b8_replay_error_record(input, error_count, expected_shots, visit)
         }
-        SampleDemRecordFormatArg::R8 => {
+        RecordFormatArg::R8 => {
             for_each_r8_replay_error_record(input, error_count, expected_shots, visit)
         }
-        SampleDemRecordFormatArg::ZeroOne
-        | SampleDemRecordFormatArg::Hits
-        | SampleDemRecordFormatArg::Dets => {
+        RecordFormatArg::ZeroOne | RecordFormatArg::Hits | RecordFormatArg::Dets => {
             for_each_line_replay_error_record(input, format, error_count, expected_shots, visit)
         }
+        RecordFormatArg::Stim => Err(CliError::UnsupportedDetectionFormat { format: "stim" }),
     }
 }
 
 fn validate_replay_prefix(
     input: &mut InputFile,
-    format: SampleDemRecordFormatArg,
+    format: RecordFormatArg,
     error_count: usize,
     expected_shots: usize,
 ) -> Result<(), CliError> {
@@ -480,7 +464,7 @@ where
 
 fn for_each_line_replay_error_record<F>(
     input: &mut InputFile,
-    format: SampleDemRecordFormatArg,
+    format: RecordFormatArg,
     error_count: usize,
     expected_shots: usize,
     mut visit: F,
@@ -514,7 +498,7 @@ where
                 .ok_or(CliError::InputByteOffsetOverflow {
                     kind: "sample_dem replay text record",
                 })?;
-        let parsed = if format == SampleDemRecordFormatArg::Hits {
+        let parsed = if format == RecordFormatArg::Hits {
             vec![
                 read_hits_replay_record(&line, error_count).map_err(|error| match error {
                     CliError::Circuit(source) => CliError::InputRecord {
@@ -532,7 +516,7 @@ where
                 }
             })?
         };
-        if format == SampleDemRecordFormatArg::Dets && parsed.is_empty() {
+        if format == RecordFormatArg::Dets && parsed.is_empty() {
             skipped_dets_blank_bytes =
                 checked_text_replay_scan_bytes(skipped_dets_blank_bytes, line.len())?;
             continue;
