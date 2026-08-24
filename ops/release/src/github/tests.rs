@@ -56,19 +56,6 @@ fn draft_creation_requires_an_exact_version_confirmation() {
 }
 
 #[test]
-fn rehearsal_draft_requires_the_exact_non_production_repository_confirmation() {
-    assert!(matches!(
-        create_verified_rehearsal_draft(
-            Path::new("."),
-            Path::new("target/releases/not-opened"),
-            "v0.2.0-rehearsal-0123456789abcdef0123456789abcdef01234567",
-            "ifsheldon/Stab"
-        ),
-        Err(ReleaseError::PublicationConfirmation { .. })
-    ));
-}
-
-#[test]
 fn remote_tag_must_be_annotated_and_resolve_to_the_reviewed_commit() {
     let commit = "1".repeat(40);
     let reference = RemoteReference {
@@ -318,31 +305,17 @@ fn complete_private_draft_identity_is_required() {
         target::PRODUCTION,
     )
     .expect("complete published release");
-
-    release.draft = true;
-    release.published_at = None;
-    assert!(
-        validate_release(
-            &release,
-            RELEASE_TAG,
-            &expected,
-            RemoteReleaseState::Draft,
-            target::REHEARSAL,
-        )
-        .is_err(),
-        "production metadata must not cross into the rehearsal lane"
-    );
 }
 
 #[test]
 fn repository_identity_is_numeric_public_and_active() {
     let exact = RemoteRepository {
-        id: target::REHEARSAL.repository_id,
-        full_name: target::REHEARSAL.repository.to_string(),
+        id: target::PRODUCTION.repository_id,
+        full_name: target::PRODUCTION.repository.to_string(),
         private: false,
         archived: false,
     };
-    validate_repository(&exact, target::REHEARSAL).expect("exact scratch repository");
+    validate_repository(&exact, target::PRODUCTION).expect("exact production repository");
 
     for changed in [
         RemoteRepository {
@@ -350,7 +323,7 @@ fn repository_identity_is_numeric_public_and_active() {
             ..exact.clone()
         },
         RemoteRepository {
-            full_name: target::PRODUCTION.repository.to_string(),
+            full_name: "ifsheldon/not-Stab".to_string(),
             ..exact.clone()
         },
         RemoteRepository {
@@ -362,7 +335,7 @@ fn repository_identity_is_numeric_public_and_active() {
             ..exact
         },
     ] {
-        assert!(validate_repository(&changed, target::REHEARSAL).is_err());
+        assert!(validate_repository(&changed, target::PRODUCTION).is_err());
     }
 }
 
@@ -454,129 +427,6 @@ fn draft_creation_sends_the_private_release_contract() {
     )
     .expect("private draft");
     server.join().expect("server");
-}
-
-#[test]
-fn rehearsal_draft_routes_only_to_the_pinned_scratch_repository() {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
-    let address = listener.local_addr().expect("address");
-    let commit = "0123456789abcdef0123456789abcdef01234567";
-    let tag = target::rehearsal_tag(commit).expect("rehearsal tag");
-    let expected_tag = tag.clone();
-    let server = thread::spawn(move || {
-        let (mut stream, _) = listener.accept().expect("create request");
-        let request = read_request(&mut stream);
-        let header_end = find_subslice(&request, b"\r\n\r\n").expect("headers") + 4;
-        let headers =
-            String::from_utf8_lossy(request.get(..header_end).expect("bounded request headers"));
-        assert!(
-            headers
-                .starts_with("POST /repos/ifsheldon/Stab-release-rehearsal/releases HTTP/1.1\r\n")
-        );
-        let request_body: serde_json::Value =
-            serde_json::from_slice(request.get(header_end..).expect("bounded request body"))
-                .expect("request JSON");
-        assert_eq!(
-            request_body,
-            serde_json::json!({
-                "tag_name": expected_tag,
-                "target_commitish": commit,
-                "name": target::REHEARSAL.title,
-                "body": target::REHEARSAL.notes,
-                "draft": true,
-                "prerelease": false,
-                "generate_release_notes": false,
-                "make_latest": "false"
-            })
-        );
-        let response = serde_json::json!({
-            "id": 43,
-            "tag_name": expected_tag,
-            "name": target::REHEARSAL.title,
-            "body": target::REHEARSAL.notes,
-            "draft": true,
-            "prerelease": false,
-            "assets": []
-        })
-        .to_string();
-        write!(
-            stream,
-            "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}",
-            response.len()
-        )
-        .expect("response");
-    });
-    let cancellation = ReleaseCancellation::for_test();
-    let host = format!("http://{address}");
-    let mut api = GitHubApi::with_hosts(host.clone(), host, target::REHEARSAL, cancellation);
-    let release = api
-        .create_draft(
-            &tag,
-            commit,
-            &GitHubToken(SecretString::from("reviewed-token")),
-        )
-        .expect("create rehearsal draft");
-    validate_release(
-        &release,
-        &tag,
-        &[],
-        RemoteReleaseState::Draft,
-        target::REHEARSAL,
-    )
-    .expect("private rehearsal draft");
-    server.join().expect("server");
-}
-
-#[test]
-fn rehearsal_ruleset_check_pins_repository_and_ruleset_identities() {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
-    let address = listener.local_addr().expect("address");
-    let repository = serde_json::json!({
-        "id": target::REHEARSAL.repository_id,
-        "full_name": target::REHEARSAL.repository,
-        "private": false,
-        "archived": false
-    })
-    .to_string();
-    let ruleset = serde_json::json!({
-        "id": target::REHEARSAL.ruleset.id,
-        "name": target::REHEARSAL.ruleset.name,
-        "node_id": target::REHEARSAL.ruleset.node_id,
-        "created_at": target::REHEARSAL.ruleset.created_at,
-        "updated_at": target::REHEARSAL.ruleset.updated_at,
-        "target": "tag",
-        "source_type": "Repository",
-        "source": target::REHEARSAL.repository,
-        "enforcement": "active",
-        "conditions": {
-            "ref_name": {
-                "include": [target::REHEARSAL.ruleset.ref_include],
-                "exclude": []
-            }
-        },
-        "rules": [
-            {"type": "update"},
-            {"type": "deletion"}
-        ],
-    })
-    .to_string();
-    let server = serve_public_json_get_requests(listener, vec![(200, repository), (200, ruleset)]);
-    let cancellation = ReleaseCancellation::for_test();
-    let host = format!("http://{address}");
-    let mut api = GitHubApi::with_hosts(host.clone(), host, target::REHEARSAL, cancellation);
-
-    api.require_release_tag_ruleset(&GitHubToken(SecretString::from("reviewed-token")))
-        .expect("exact scratch ruleset");
-    assert_eq!(
-        server.join().expect("server"),
-        [
-            "/repos/ifsheldon/Stab-release-rehearsal".to_string(),
-            format!(
-                "/repos/ifsheldon/Stab-release-rehearsal/rulesets/{}",
-                target::REHEARSAL.ruleset.id
-            ),
-        ]
-    );
 }
 
 #[test]
@@ -978,13 +828,6 @@ fn serve_json_get_requests(
     responses: Vec<(u16, String)>,
 ) -> thread::JoinHandle<Vec<String>> {
     serve_json_get_requests_with_authorization(listener, responses, true)
-}
-
-fn serve_public_json_get_requests(
-    listener: TcpListener,
-    responses: Vec<(u16, String)>,
-) -> thread::JoinHandle<Vec<String>> {
-    serve_json_get_requests_with_authorization(listener, responses, false)
 }
 
 fn serve_json_get_requests_with_authorization(

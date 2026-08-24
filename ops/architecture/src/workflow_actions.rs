@@ -800,7 +800,7 @@ jobs:
                 .iter()
                 .filter(|violation| violation.code == "workflow-release-missing")
                 .count(),
-            2
+            1
         );
         assert!(
             report
@@ -847,7 +847,7 @@ jobs:
     fn repository_workflows_use_only_immutable_action_refs() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let report = scan_workflow_actions(&root).expect("scan repository workflows");
-        assert_eq!(report.action_use_count, 14);
+        assert_eq!(report.action_use_count, 10);
         assert!(report.violations.is_empty(), "{:?}", report.violations);
     }
 }

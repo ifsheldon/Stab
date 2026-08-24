@@ -54,14 +54,9 @@ if [ "${CARGO_REGISTRY_TOKEN+x}" = x ] ||
     printf '%s\n' 'fake Cargo received a release credential' >&2
     exit 71
 fi
-printf '%s\0' "$@" > "$STAB_RELEASE_RECIPE_CARGO_ARGV"
 mkdir -p "$CARGO_TARGET_DIR/debug"
-case " $* " in
-    *" --bin stab-release-rehearsal "*) operator=stab-release-rehearsal ;;
-    *) operator=stab-release ;;
-esac
-cp "$STAB_RELEASE_FAKE_OPERATOR" "$CARGO_TARGET_DIR/debug/$operator"
-chmod 700 "$CARGO_TARGET_DIR/debug/$operator"
+cp "$STAB_RELEASE_FAKE_OPERATOR" "$CARGO_TARGET_DIR/debug/stab-release"
+chmod 700 "$CARGO_TARGET_DIR/debug/stab-release"
 printf '%s\n' "$CARGO_TARGET_DIR" > "$STAB_RELEASE_RECIPE_TARGET"
 "#,
         );
@@ -80,7 +75,6 @@ printf '%s\n' "$CARGO_TARGET_DIR" > "$STAB_RELEASE_RECIPE_TARGET"
         let argv = self.temporary.path().join(format!("{recipe}-argv"));
         let environment = self.temporary.path().join(format!("{recipe}-environment"));
         let target = self.temporary.path().join(format!("{recipe}-target"));
-        let cargo_argv = self.temporary.path().join(format!("{recipe}-cargo-argv"));
         let mut path = OsString::from(self.fake_bin.as_os_str());
         path.push(":");
         path.push(std::env::var_os("PATH").expect("test PATH"));
@@ -94,8 +88,7 @@ printf '%s\n' "$CARGO_TARGET_DIR" > "$STAB_RELEASE_RECIPE_TARGET"
             .env("STAB_RELEASE_FAKE_OPERATOR", &self.operator)
             .env("STAB_RELEASE_RECIPE_ARGV", &argv)
             .env("STAB_RELEASE_RECIPE_ENV", &environment)
-            .env("STAB_RELEASE_RECIPE_TARGET", &target)
-            .env("STAB_RELEASE_RECIPE_CARGO_ARGV", &cargo_argv);
+            .env("STAB_RELEASE_RECIPE_TARGET", &target);
         for name in RELEASE_CREDENTIALS {
             command.env_remove(name);
         }
@@ -129,12 +122,6 @@ printf '%s\n' "$CARGO_TARGET_DIR" > "$STAB_RELEASE_RECIPE_TARGET"
                 .lines()
                 .map(str::to_string)
                 .collect(),
-            cargo_argv: fs::read(cargo_argv)
-                .expect("recorded Cargo argv")
-                .split(|byte| *byte == 0)
-                .filter(|field| !field.is_empty())
-                .map(|field| String::from_utf8(field.to_vec()).expect("UTF-8 Cargo argument"))
-                .collect(),
             target,
         }
     }
@@ -149,7 +136,6 @@ printf '%s\n' "$CARGO_TARGET_DIR" > "$STAB_RELEASE_RECIPE_TARGET"
 struct RecipeResult {
     argv: Vec<String>,
     credentials: Vec<String>,
-    cargo_argv: Vec<String>,
     target: String,
 }
 
@@ -181,12 +167,6 @@ fn irreversible_recipes_quote_arguments_scrub_credentials_and_isolate_operators(
         ]
     );
     assert_eq!(publish.credentials, ["CARGO_REGISTRY_TOKEN"]);
-    assert!(
-        !publish
-            .cargo_argv
-            .iter()
-            .any(|argument| argument == "stab-release-rehearsal")
-    );
     assert!(!marker.exists());
 
     let draft = fixture.run(
@@ -214,51 +194,9 @@ fn irreversible_recipes_quote_arguments_scrub_credentials_and_isolate_operators(
         ]
     );
     assert_eq!(draft.credentials, ["GITHUB_TOKEN"]);
-    assert!(
-        !draft
-            .cargo_argv
-            .iter()
-            .any(|argument| argument == "stab-release-rehearsal")
-    );
-    assert!(!marker.exists());
-
-    let rehearsal_tag = "v0.2.0-rehearsal-0123456789abcdef0123456789abcdef01234567";
-    let rehearsal = fixture.run(
-        "create-rehearsal-draft",
-        &[
-            "--assets",
-            &hostile,
-            "--tag",
-            rehearsal_tag,
-            "--confirm-repository",
-            "ifsheldon/Stab-release-rehearsal",
-        ],
-        ("GITHUB_TOKEN", "github-secret"),
-    );
-    assert_eq!(
-        rehearsal.argv,
-        [
-            "create-draft",
-            "--assets",
-            hostile.as_str(),
-            "--tag",
-            rehearsal_tag,
-            "--confirm-repository",
-            "ifsheldon/Stab-release-rehearsal",
-        ]
-    );
-    assert_eq!(rehearsal.credentials, ["GITHUB_TOKEN"]);
-    assert!(
-        rehearsal
-            .cargo_argv
-            .windows(2)
-            .any(|arguments| arguments == ["--bin", "stab-release-rehearsal"])
-    );
     assert!(!marker.exists());
 
     assert_ne!(publish.target, draft.target);
-    assert_ne!(publish.target, rehearsal.target);
-    assert_ne!(draft.target, rehearsal.target);
     let operator_root = fixture.root.join("target/releases/operators");
     assert!(
         Path::new(&publish.target).starts_with(&operator_root),
@@ -272,7 +210,7 @@ fn irreversible_recipes_quote_arguments_scrub_credentials_and_isolate_operators(
         draft.target,
         operator_root
     );
-    for target in [&publish.target, &draft.target, &rehearsal.target] {
+    for target in [&publish.target, &draft.target] {
         let mode = fs::metadata(target)
             .expect("operator target metadata")
             .permissions()
@@ -282,5 +220,4 @@ fn irreversible_recipes_quote_arguments_scrub_credentials_and_isolate_operators(
     }
     fixture.remove_target(&publish.target);
     fixture.remove_target(&draft.target);
-    fixture.remove_target(&rehearsal.target);
 }

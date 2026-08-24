@@ -38,25 +38,25 @@ fn public_get_retries_a_transient_gateway_status() {
         listener,
         vec![
             GetResponse::complete(504, "{}".to_string()),
-            GetResponse::complete(200, rehearsal_repository_response()),
-            GetResponse::complete(200, rehearsal_ruleset_response()),
+            GetResponse::complete(200, production_repository_response()),
+            GetResponse::complete(200, production_ruleset_response()),
         ],
         false,
     );
     let cancellation = ReleaseCancellation::for_test();
     let host = format!("http://{address}");
-    let mut api = GitHubApi::with_hosts(host.clone(), host, target::REHEARSAL, cancellation);
+    let mut api = GitHubApi::with_hosts(host.clone(), host, target::PRODUCTION, cancellation);
 
     api.require_release_tag_ruleset(&GitHubToken(SecretString::from("reviewed-token")))
         .expect("transient public identity GET");
     assert_eq!(
         server.join().expect("server").expect("GET server"),
         [
-            "/repos/ifsheldon/Stab-release-rehearsal".to_string(),
-            "/repos/ifsheldon/Stab-release-rehearsal".to_string(),
+            "/repos/ifsheldon/Stab".to_string(),
+            "/repos/ifsheldon/Stab".to_string(),
             format!(
-                "/repos/ifsheldon/Stab-release-rehearsal/rulesets/{}",
-                target::REHEARSAL.ruleset.id
+                "/repos/ifsheldon/Stab/rulesets/{}",
+                target::PRODUCTION.ruleset.id
             ),
         ]
     );
@@ -104,7 +104,7 @@ fn successful_headers_with_a_truncated_body_are_retried() {
     );
     let cancellation = ReleaseCancellation::for_test();
     let host = format!("http://{address}");
-    let api = GitHubApi::with_hosts(host.clone(), host.clone(), target::REHEARSAL, cancellation);
+    let api = GitHubApi::with_hosts(host.clone(), host.clone(), target::PRODUCTION, cancellation);
 
     let value: serde_json::Value = api
         .get_public_json(&format!("{host}/body"), "truncated response test")
@@ -131,7 +131,7 @@ fn get_retry_is_bounded_to_three_attempts() {
     );
     let cancellation = ReleaseCancellation::for_test();
     let host = format!("http://{address}");
-    let api = GitHubApi::with_hosts(host.clone(), host.clone(), target::REHEARSAL, cancellation);
+    let api = GitHubApi::with_hosts(host.clone(), host.clone(), target::PRODUCTION, cancellation);
 
     let error = api
         .get_public_json::<serde_json::Value>(&format!("{host}/bounded"), "bounded retry test")
@@ -157,7 +157,7 @@ fn cancellation_interrupts_get_retry_backoff() {
     let api = GitHubApi::with_hosts_and_retry_delay(
         host.clone(),
         host.clone(),
-        target::REHEARSAL,
+        target::PRODUCTION,
         cancellation,
         Duration::from_secs(5),
     );
@@ -220,28 +220,28 @@ fn asset_upload_post_is_not_retried() {
     assert_eq!(server.join().expect("server").expect("POST observer"), 1);
 }
 
-fn rehearsal_repository_response() -> String {
+fn production_repository_response() -> String {
     serde_json::json!({
-        "id": target::REHEARSAL.repository_id,
-        "full_name": target::REHEARSAL.repository,
+        "id": target::PRODUCTION.repository_id,
+        "full_name": target::PRODUCTION.repository,
         "private": false,
         "archived": false
     })
     .to_string()
 }
 
-fn rehearsal_ruleset_response() -> String {
+fn production_ruleset_response() -> String {
     serde_json::json!({
-        "id": target::REHEARSAL.ruleset.id,
-        "name": target::REHEARSAL.ruleset.name,
-        "node_id": target::REHEARSAL.ruleset.node_id,
-        "created_at": target::REHEARSAL.ruleset.created_at,
-        "updated_at": target::REHEARSAL.ruleset.updated_at,
+        "id": target::PRODUCTION.ruleset.id,
+        "name": target::PRODUCTION.ruleset.name,
+        "node_id": target::PRODUCTION.ruleset.node_id,
+        "created_at": target::PRODUCTION.ruleset.created_at,
+        "updated_at": target::PRODUCTION.ruleset.updated_at,
         "target": "tag",
         "source_type": "Repository",
-        "source": target::REHEARSAL.repository,
+        "source": target::PRODUCTION.repository,
         "enforcement": "active",
-        "conditions": {"ref_name": {"include": [target::REHEARSAL.ruleset.ref_include], "exclude": []}},
+        "conditions": {"ref_name": {"include": [target::PRODUCTION.ruleset.ref_include], "exclude": []}},
         "rules": [{"type": "update"}, {"type": "deletion"}],
     })
     .to_string()

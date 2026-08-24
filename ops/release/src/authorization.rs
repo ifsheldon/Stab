@@ -17,22 +17,7 @@ pub(crate) fn require_a9_release(
         root,
         cancellation,
         "A9 release authorization",
-        &[qualification_status_arguments(root, true)],
-    )
-}
-
-pub(crate) fn require_rehearsal(
-    root: &Path,
-    cancellation: &ReleaseCancellation,
-) -> Result<(), ReleaseError> {
-    require(
-        root,
-        cancellation,
-        "release rehearsal authorization",
-        &[
-            architecture_check_arguments(root),
-            qualification_status_arguments(root, false),
-        ],
+        &[qualification_status_arguments(root)],
     )
 }
 
@@ -72,7 +57,7 @@ fn require(
     cancellation.check(operation)
 }
 
-fn qualification_status_arguments(root: &Path, require_release_completion: bool) -> Vec<OsString> {
+fn qualification_status_arguments(root: &Path) -> Vec<OsString> {
     let mut arguments = [
         "run",
         "--quiet",
@@ -87,26 +72,7 @@ fn qualification_status_arguments(root: &Path, require_release_completion: bool)
     arguments.push(root.as_os_str().to_os_string());
     arguments.push(OsString::from("qualification-status"));
     arguments.push(OsString::from("--check"));
-    if require_release_completion {
-        arguments.push(OsString::from("--require-release-completion"));
-    }
-    arguments
-}
-
-fn architecture_check_arguments(root: &Path) -> Vec<OsString> {
-    let mut arguments = [
-        "run",
-        "--quiet",
-        "--locked",
-        "--package",
-        "stab-architecture",
-        "--",
-        "--root",
-    ]
-    .map(OsString::from)
-    .to_vec();
-    arguments.push(root.as_os_str().to_os_string());
-    arguments.push(OsString::from("check"));
+    arguments.push(OsString::from("--require-release-completion"));
     arguments
 }
 
@@ -118,7 +84,7 @@ mod tests {
     fn authorization_uses_the_checked_a9_status_contract() {
         let root = Path::new("/source");
         assert_eq!(
-            qualification_status_arguments(root, true),
+            qualification_status_arguments(root),
             [
                 "run",
                 "--quiet",
@@ -131,42 +97,6 @@ mod tests {
                 "qualification-status",
                 "--check",
                 "--require-release-completion",
-            ]
-            .map(OsString::from)
-        );
-    }
-
-    #[test]
-    fn rehearsal_uses_architecture_and_non_release_status_contracts() {
-        let root = Path::new("/source");
-        assert_eq!(
-            architecture_check_arguments(root),
-            [
-                "run",
-                "--quiet",
-                "--locked",
-                "--package",
-                "stab-architecture",
-                "--",
-                "--root",
-                "/source",
-                "check",
-            ]
-            .map(OsString::from)
-        );
-        assert_eq!(
-            qualification_status_arguments(root, false),
-            [
-                "run",
-                "--quiet",
-                "--locked",
-                "--package",
-                "stab-bench",
-                "--",
-                "--root",
-                "/source",
-                "qualification-status",
-                "--check",
             ]
             .map(OsString::from)
         );

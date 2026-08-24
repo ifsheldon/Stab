@@ -13,10 +13,6 @@ default-run = "stab-release"
 name = "stab-release"
 path = "src/main.rs"
 
-[[bin]]
-name = "stab-release-rehearsal"
-path = "src/bin/stab-release-rehearsal.rs"
-
 [lints]
 workspace = true
 

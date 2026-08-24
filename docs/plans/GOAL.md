@@ -9,21 +9,20 @@ Complete E0 through E7 without weakening Stim compatibility, data-loss preventio
 ## Current State
 
 - The project-local `reclaim-code-entropy` skill and main-checkout policy are installed.
-- Historical A9 rehearsal records remain valid history, but the scratch release repository has been deleted and its executable lane is now scheduled for retirement.
+- Historical A9 rehearsal records remain valid history; the deleted scratch repository's workflow, binary, target, recipes, and active release requirements have been retired.
 - Performance qualification currently mirrors detailed ownership across a large generated inventory and 28 executable runtime groups; the runtime-group model will become the sole detailed owner.
 - The approved public removals have no proved workspace production consumer or compatibility obligation.
 - No formal timing from an intermediate simplification revision may be promoted.
 
 ## Execution Order
 
-1. E0: freeze this contract and preserve the prior A9 checkpoint as history.
-2. E1: retire the scratch release workflow, binary, repository target, recipes, and active documentation.
-3. E2: compact performance ownership into the 28 executable runtime groups and remove redundant command paths.
-4. E3: remove the approved unused public errors and advanced-analysis exports; regenerate API and correctness inventories.
-5. E4: archive A6 JSON records and delete the superseded executable attestation lifecycle.
-6. E5: consolidate only the proved duplicate parsers, CLI format enum, private DEM-search value types, and tests.
-7. E6: synchronize CI, generated status, release docs, benchmark docs, and architecture docs.
-8. E7: run entropy verification, milestone-audit, full-code-review, complete local verification, and exact-head CI.
+1. E0 and E1 are complete: the contract is frozen and the scratch release lane is historical only.
+2. E2: compact performance ownership into the 28 executable runtime groups and remove redundant command paths.
+3. E3: remove the approved unused public errors and advanced-analysis exports; regenerate API and correctness inventories.
+4. E4: archive A6 JSON records and delete the superseded executable attestation lifecycle.
+5. E5: consolidate only the proved duplicate parsers, CLI format enum, private DEM-search value types, and tests.
+6. E6: synchronize CI, generated status, release docs, benchmark docs, and architecture docs.
+7. E7: run entropy verification, milestone-audit, full-code-review, complete local verification, and exact-head CI.
 
 ## Non-Negotiable Gates
 

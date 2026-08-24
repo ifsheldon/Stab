@@ -30,14 +30,8 @@ const RELEASE_LIST_PAGE_BOUND: usize = 10;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const GET_MAX_ATTEMPTS: u32 = 3;
 const GET_RETRY_BASE_DELAY: Duration = Duration::from_secs(1);
-pub(crate) use target::{REHEARSAL_REPOSITORY, rehearsal_tag};
-
 pub(crate) fn require_production_tag(tag: &str, commit: &str) -> Result<(), ReleaseError> {
     target::PRODUCTION.require_tag(tag, commit)
-}
-
-pub(crate) fn require_rehearsal_tag(tag: &str, commit: &str) -> Result<(), ReleaseError> {
-    target::REHEARSAL.require_tag(tag, commit)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -64,27 +58,6 @@ pub(crate) fn create_verified_draft(
         tag,
         target::PRODUCTION,
         authorization::require_a9_release,
-    )
-}
-
-pub(crate) fn create_verified_rehearsal_draft(
-    root: &Path,
-    assets: &Path,
-    tag: &str,
-    repository_confirmation: &str,
-) -> Result<(), ReleaseError> {
-    if repository_confirmation != REHEARSAL_REPOSITORY {
-        return Err(ReleaseError::PublicationConfirmation {
-            expected: REHEARSAL_REPOSITORY.to_string(),
-            actual: repository_confirmation.to_string(),
-        });
-    }
-    create_verified_draft_for(
-        root,
-        assets,
-        tag,
-        target::REHEARSAL,
-        authorization::require_rehearsal,
     )
 }
 
@@ -180,21 +153,6 @@ pub(crate) fn verify_remote_release(
         expected_state,
         target::PRODUCTION,
         authorization::require_a9_release,
-    )
-}
-
-pub(crate) fn verify_rehearsal_draft(
-    root: &Path,
-    assets: &Path,
-    tag: &str,
-) -> Result<(), ReleaseError> {
-    verify_remote_release_for(
-        root,
-        assets,
-        tag,
-        RemoteReleaseState::Draft,
-        target::REHEARSAL,
-        authorization::require_rehearsal,
     )
 }
 

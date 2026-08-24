@@ -787,10 +787,7 @@ mod tests {
             require_clean_tag(root.path(), RELEASE_TAG),
             Err(ReleaseError::TagKind { .. })
         ));
-        git(
-            root.path(),
-            &["tag", "-a", "rehearsal-tag", "-m", "rehearsal"],
-        );
-        require_clean_tag(root.path(), "rehearsal-tag").expect("alternate annotated tag");
+        git(root.path(), &["tag", "-a", "other-tag", "-m", "other"]);
+        require_clean_tag(root.path(), "other-tag").expect("alternate annotated tag");
     }
 }
