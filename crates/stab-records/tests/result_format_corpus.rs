@@ -50,8 +50,13 @@ fn check_corpus(selected: Acceptance) -> Result<(), Box<dyn std::error::Error>> 
             case.id()
         );
 
-        if case.format() != ResultFormat::Dets || case.layout().is_measurement_only() {
-            check_width_readers(case, case.input(), expected);
+        if let Some(width) = case.measurement_only_width() {
+            check_width_readers(
+                case,
+                case.input(),
+                width,
+                case.measurement_only_canonical_records(),
+            );
         }
         if case.format() == ResultFormat::Dets {
             check_typed_dets_readers(case, case.input(), expected)?;
@@ -60,9 +65,13 @@ fn check_corpus(selected: Acceptance) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-fn check_width_readers(case: &CheckedCase, input: &[u8], expected: Option<&[Vec<bool>]>) {
+fn check_width_readers(
+    case: &CheckedCase,
+    input: &[u8],
+    width: usize,
+    expected: Option<&[Vec<bool>]>,
+) {
     let format = sample_format(case.format());
-    let width = case.layout().total_bits().expect("validated layout");
     assert_records(
         case.id(),
         "materialized",

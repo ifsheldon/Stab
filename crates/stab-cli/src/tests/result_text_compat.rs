@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, ResultFormat};
+use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus};
 use tempfile::tempdir;
 
 use crate::run_from;
@@ -35,11 +35,10 @@ fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
             assert_eq!(stdout, expected, "{} convert output", case.id());
         }
 
-        if case.format() == ResultFormat::Dets && !layout.is_measurement_only() {
+        let Some(width) = case.measurement_only_width() else {
             continue;
-        }
+        };
         let circuit_path = dir.path().join(format!("{}.stim", case.id()));
-        let width = layout.total_bits().expect("validated layout");
         std::fs::write(&circuit_path, measurement_circuit(width)).expect("write corpus circuit");
         let (status, _, stderr) = run_cli_owned(
             vec![

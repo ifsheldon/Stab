@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use serde::Deserialize;
 use thiserror::Error;
 
-pub const CORPUS_SCHEMA_VERSION: u32 = 1;
+pub const CORPUS_SCHEMA_VERSION: u32 = 2;
 pub const PINNED_STIM_TAG: &str = "v1.16.0";
 pub const PINNED_STIM_COMMIT: &str = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07";
 
@@ -50,6 +50,9 @@ pub struct CheckedCase {
     input: Vec<u8>,
     canonical_01: Option<Vec<u8>>,
     canonical_records: Option<Vec<Vec<bool>>>,
+    measurement_only_width: Option<usize>,
+    measurement_only_canonical_01: Option<Vec<u8>>,
+    measurement_only_canonical_records: Option<Vec<Vec<bool>>>,
 }
 
 impl CheckedCase {
@@ -91,6 +94,21 @@ impl CheckedCase {
     #[must_use]
     pub fn canonical_records(&self) -> Option<&[Vec<bool>]> {
         self.canonical_records.as_deref()
+    }
+
+    #[must_use]
+    pub const fn measurement_only_width(&self) -> Option<usize> {
+        self.measurement_only_width
+    }
+
+    #[must_use]
+    pub fn measurement_only_canonical_01(&self) -> Option<&[u8]> {
+        self.measurement_only_canonical_01.as_deref()
+    }
+
+    #[must_use]
+    pub fn measurement_only_canonical_records(&self) -> Option<&[Vec<bool>]> {
+        self.measurement_only_canonical_records.as_deref()
     }
 }
 
@@ -183,6 +201,8 @@ struct CorpusCase {
     acceptance: Acceptance,
     #[serde(default)]
     canonical_01_hex: Option<String>,
+    #[serde(default)]
+    measurement_only_width: Option<usize>,
 }
 
 fn validate(corpus: Corpus) -> Result<CheckedCorpus, CorpusError> {
@@ -250,6 +270,19 @@ fn validate(corpus: Corpus) -> Result<CheckedCorpus, CorpusError> {
             .as_deref()
             .map(|bytes| decode_canonical_01(&case.id, bytes, width, case.replay_shots))
             .transpose()?;
+        let measurement_only_width = validate_measurement_only_width(&case, width)?;
+        let measurement_only_canonical_records =
+            match (measurement_only_width, canonical_records.as_deref()) {
+                (Some(projected_width), Some(records)) => Some(project_canonical_records(
+                    &case.id,
+                    records,
+                    projected_width,
+                )?),
+                _ => None,
+            };
+        let measurement_only_canonical_01 = measurement_only_canonical_records
+            .as_deref()
+            .map(encode_canonical_01);
         checked.push(CheckedCase {
             id: case.id,
             format: case.format,
@@ -259,9 +292,77 @@ fn validate(corpus: Corpus) -> Result<CheckedCorpus, CorpusError> {
             input,
             canonical_01,
             canonical_records,
+            measurement_only_width,
+            measurement_only_canonical_01,
+            measurement_only_canonical_records,
         });
     }
     Ok(CheckedCorpus { cases: checked })
+}
+
+fn validate_measurement_only_width(
+    case: &CorpusCase,
+    total_width: usize,
+) -> Result<Option<usize>, CorpusError> {
+    if case.format != ResultFormat::Dets {
+        if case.measurement_only_width.is_some() {
+            return Err(CorpusError::Invalid(format!(
+                "non-DETS case {} must not set measurement_only_width",
+                case.id
+            )));
+        }
+        return Ok(Some(total_width));
+    }
+
+    if case.layout.is_measurement_only() {
+        if case.measurement_only_width.is_some() {
+            return Err(CorpusError::Invalid(format!(
+                "measurement-only DETS case {} must not repeat measurement_only_width",
+                case.id
+            )));
+        }
+        return Ok(Some(case.layout.measurements()));
+    }
+
+    let Some(width) = case.measurement_only_width else {
+        return Ok(None);
+    };
+    if width == 0 || width != case.layout.measurements() {
+        return Err(CorpusError::Invalid(format!(
+            "mixed-layout DETS case {} measurement_only_width must equal its nonzero measurement count {}",
+            case.id,
+            case.layout.measurements()
+        )));
+    }
+    Ok(Some(width))
+}
+
+fn encode_canonical_01(records: &[Vec<bool>]) -> Vec<u8> {
+    let width = records.first().map_or(0, Vec::len);
+    let mut bytes = Vec::with_capacity(records.len().saturating_mul(width.saturating_add(1)));
+    for record in records {
+        bytes.extend(record.iter().map(|bit| if *bit { b'1' } else { b'0' }));
+        bytes.push(b'\n');
+    }
+    bytes
+}
+
+fn project_canonical_records(
+    case_id: &str,
+    records: &[Vec<bool>],
+    width: usize,
+) -> Result<Vec<Vec<bool>>, CorpusError> {
+    records
+        .iter()
+        .map(|record| {
+            record.get(..width).map(<[bool]>::to_vec).ok_or_else(|| {
+                CorpusError::Invalid(format!(
+                    "case {case_id} measurement-only projection width {width} exceeded canonical record width {}",
+                    record.len()
+                ))
+            })
+        })
+        .collect()
 }
 
 fn validate_case_id(id: &str) -> Result<(), CorpusError> {
@@ -358,7 +459,7 @@ mod tests {
 
     fn valid_corpus() -> Value {
         json!({
-            "schema_version": 1,
+            "schema_version": 2,
             "stim_tag": PINNED_STIM_TAG,
             "stim_commit": PINNED_STIM_COMMIT,
             "cases": [{
@@ -389,7 +490,61 @@ mod tests {
             case.canonical_records(),
             Some([vec![true, false]].as_slice())
         );
+        assert_eq!(case.measurement_only_width(), Some(2));
+        assert_eq!(
+            case.measurement_only_canonical_01(),
+            Some(b"10\n".as_slice())
+        );
+        assert_eq!(
+            case.measurement_only_canonical_records(),
+            Some([vec![true, false]].as_slice())
+        );
         assert_eq!(corpus.accepted_count(), 1);
+    }
+
+    #[test]
+    fn mixed_dets_measurement_projection_is_explicit_and_validated() {
+        let mut value = valid_corpus();
+        value["cases"][0]["format"] = json!("dets");
+        value["cases"][0]["layout"]["detectors"] = json!(1);
+        value["cases"][0]["input_hex"] = json!(hex::encode("shot M0\n"));
+        value["cases"][0]["canonical_01_hex"] = json!(hex::encode("100\n"));
+        value["cases"][0]["measurement_only_width"] = json!(2);
+
+        let corpus = parse(&value).expect("valid mixed DETS projection");
+        let case = &corpus.cases()[0];
+        assert_eq!(case.measurement_only_width(), Some(2));
+        assert_eq!(
+            case.measurement_only_canonical_01(),
+            Some(b"10\n".as_slice())
+        );
+        assert_eq!(
+            case.measurement_only_canonical_records(),
+            Some([vec![true, false]].as_slice())
+        );
+    }
+
+    #[test]
+    fn measurement_projection_rejects_ambiguous_or_redundant_widths() {
+        let mut non_dets = valid_corpus();
+        non_dets["cases"][0]["measurement_only_width"] = json!(2);
+        assert!(parse(&non_dets).is_err());
+
+        let mut measurement_only_dets = valid_corpus();
+        measurement_only_dets["cases"][0]["format"] = json!("dets");
+        measurement_only_dets["cases"][0]["input_hex"] = json!(hex::encode("shot M0\n"));
+        measurement_only_dets["cases"][0]["measurement_only_width"] = json!(2);
+        assert!(parse(&measurement_only_dets).is_err());
+
+        for width in [0, 1, 3] {
+            let mut mixed_dets = valid_corpus();
+            mixed_dets["cases"][0]["format"] = json!("dets");
+            mixed_dets["cases"][0]["layout"]["detectors"] = json!(1);
+            mixed_dets["cases"][0]["input_hex"] = json!(hex::encode("shot M0\n"));
+            mixed_dets["cases"][0]["canonical_01_hex"] = json!(hex::encode("100\n"));
+            mixed_dets["cases"][0]["measurement_only_width"] = json!(width);
+            assert!(parse(&mixed_dets).is_err(), "width {width}");
+        }
     }
 
     #[test]

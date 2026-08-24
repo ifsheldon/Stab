@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, CorpusError};
+use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, CorpusError, ResultFormat};
 use thiserror::Error;
 
 use crate::{
@@ -55,11 +55,49 @@ pub(super) fn run(
             let args = convert_args(checked_case);
             let stim = run_process(&stim_binary, &args, checked_case.input(), Some(&root.path))
                 .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
-            check_process("pinned Stim", checked_case, &stim)?;
+            check_process(
+                "pinned Stim",
+                "typed layout",
+                checked_case,
+                checked_case.canonical_01(),
+                &stim,
+            )?;
 
             let stab = run_process(&stab_binary, &args, checked_case.input(), Some(&root.path))
                 .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
-            check_process("Stab", checked_case, &stab)?;
+            check_process(
+                "Stab",
+                "typed layout",
+                checked_case,
+                checked_case.canonical_01(),
+                &stab,
+            )?;
+
+            if checked_case.format() == ResultFormat::Dets
+                && !checked_case.layout().is_measurement_only()
+                && let Some(width) = checked_case.measurement_only_width()
+            {
+                let args = measurement_only_convert_args(checked_case, width);
+                let stim = run_process(&stim_binary, &args, checked_case.input(), Some(&root.path))
+                    .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
+                check_process(
+                    "pinned Stim",
+                    "measurement-only projection",
+                    checked_case,
+                    checked_case.measurement_only_canonical_01(),
+                    &stim,
+                )?;
+
+                let stab = run_process(&stab_binary, &args, checked_case.input(), Some(&root.path))
+                    .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
+                check_process(
+                    "Stab",
+                    "measurement-only projection",
+                    checked_case,
+                    checked_case.measurement_only_canonical_01(),
+                    &stab,
+                )?;
+            }
         }
     }
 
@@ -99,9 +137,23 @@ fn convert_args(case: &CheckedCase) -> Vec<OsString> {
     ]
 }
 
+fn measurement_only_convert_args(case: &CheckedCase, width: usize) -> Vec<OsString> {
+    vec![
+        OsString::from("convert"),
+        OsString::from("--in_format"),
+        OsString::from(case.format().name()),
+        OsString::from("--out_format"),
+        OsString::from("01"),
+        OsString::from("--num_measurements"),
+        OsString::from(width.to_string()),
+    ]
+}
+
 fn check_process(
     implementation: &'static str,
+    projection: &'static str,
     checked_case: &CheckedCase,
+    expected_canonical: Option<&[u8]>,
     output: &ProcessOutput,
 ) -> Result<(), ResultFormatCorpusError> {
     let expected_success = checked_case.acceptance() == Acceptance::Accepted;
@@ -111,17 +163,17 @@ fn check_process(
             checked_case,
             output,
             format!(
-                "expected {:?} but exit status was {:?}",
+                "{projection}: expected {:?} but exit status was {:?}",
                 checked_case.acceptance(),
                 output.status
             ),
         ));
     }
     if expected_success {
-        let canonical = checked_case.canonical_01().ok_or_else(|| {
+        let canonical = expected_canonical.ok_or_else(|| {
             ResultFormatCorpusError::Invalid(format!(
-                "accepted case {} lost canonical output after validation",
-                checked_case.id()
+                "accepted case {} lost {projection} canonical output after validation",
+                checked_case.id(),
             ))
         })?;
         if output.stdout.bytes != canonical {
@@ -130,7 +182,7 @@ fn check_process(
                 checked_case,
                 output,
                 format!(
-                    "canonical 01 output differed: expected {}, got {}",
+                    "{projection}: canonical 01 output differed: expected {}, got {}",
                     render_hex(canonical),
                     render_hex(&output.stdout.bytes)
                 ),
@@ -141,7 +193,7 @@ fn check_process(
                 implementation,
                 checked_case,
                 output,
-                "accepted case emitted stderr".to_string(),
+                format!("{projection}: accepted case emitted stderr"),
             ));
         }
     } else if !output.stderr.has_non_whitespace() {
@@ -149,7 +201,7 @@ fn check_process(
             implementation,
             checked_case,
             output,
-            "rejected case did not emit a diagnostic".to_string(),
+            format!("{projection}: rejected case did not emit a diagnostic"),
         ));
     }
     Ok(())
