@@ -5,7 +5,7 @@ This file is the effective `AGENTS.md` source for this directory: `AGENTS.md` an
 
 ## Contents
 
-- [plans/](plans/): milestone plans and progress reports. `plans/GOAL.md` is the active execution contract for `plans/agent-native-modular-qec-architecture-plan.md`; the original rewrite and completed qualification plans remain historical sources.
+- [plans/](plans/): milestone plans and progress reports. `plans/GOAL.md` is the active execution contract; it currently drives the pre-`0.2.0` entropy reclamation plan before the architecture plan's release sequence resumes. The original rewrite and completed qualification plans remain historical sources.
 - [architecture/](architecture/): product dependency rules, compilation phases, extension seams, and architecture decision records.
 - [MIGRATING-0.2.md](MIGRATING-0.2.md): coordinated Rust package, facade-tier, and public-path migration guide for Stab 0.2.
 - [RELEASING.md](RELEASING.md): fixed scratch-repository rehearsal plus coordinated crates.io and GitHub release preflight, publication order, recovery, and verification procedure.

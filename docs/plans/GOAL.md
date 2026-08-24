@@ -1,45 +1,47 @@
-# Goal: Qualify And Release Stab 0.2.0
+# Goal: Reclaim Pre-0.2 Code Entropy
 
-Status: Active. Milestones A0 through A8 are complete. A9 has repaired the externally confirmed M10 benchmark-comparability defect and completed its replacement rehearsal; the permitted status descendant and final evidence run remain.
+Status: Active. The release-oriented A9 sequence is temporarily paused while [the pre-0.2 entropy plan](pre-0.2-code-entropy-reclamation-plan.md) removes proved-unused contracts and duplicate ownership. Formal repaired-contract timing has not started for this revision.
 
 ## Objective
 
-Finish Milestone A9 of the [agent-native modular QEC architecture plan](agent-native-modular-qec-architecture-plan.md): bind one final clean source, exercise the reversible release path, produce source-current correctness and controlled-performance evidence, authenticate the one permitted status descendant, publish all ten reviewed crates, and publish protected release `v0.2.0` without weakening compatibility, resource, or performance policy.
+Complete E0 through E7 without weakening Stim compatibility, data-loss prevention, subprocess safety, descriptor-safe evidence publication, benchmark equivalence, the `1.25x` parity gate, or the `1.15x` Stab regression policy. Work directly on `main` in focused commits, then resume A9 from one clean exact-head revision.
 
 ## Current State
 
-- Exact repair revision `72c5f0cb797467ae123ce14160add9ed38ec4311` passed broad local verification, milestone audit, full code review, and both required jobs in GitHub Actions run [32666451468](https://github.com/ifsheldon/Stab/actions/runs/32666451468).
-- M10 is now `partial-match`: only successful exact and independent conversions pair, failed Stab calls remain report-only, the invalid p10 threshold is gone, and a schema-version-2 waiver names exactly the two faithful pairs under the unchanged `1.25x` gate. Performance inventory schema 4 binds the complete typed waiver policy into its semantic digest.
-- Protected annotated tag `v0.2.0-rehearsal-72c5f0cb797467ae123ce14160add9ed38ec4311` produced exactly one workflow-scoped rehearsal run, [32667536583](https://github.com/ifsheldon/Stab-release-rehearsal/actions/runs/32667536583). Both native builds and private-draft verification passed, and all six retained asset digests match private draft `375331393`.
-- Exact revision `66d599b3f6c59ecee512030459729e6fbf0819a8` remains immutable historical evidence: its 138 reports passed, but its invalid M10 pairing prevents release authorization.
-- Private rehearsal drafts `374797341`, `374979714`, `375137275`, and `375331393` must never be published. Any new rehearsal draft is also private and must never be published.
-- Swap is restored as `/swap.img`, size `137438949376` bytes, priority `-2`; no qualification process is running.
+- The project-local `reclaim-code-entropy` skill and main-checkout policy are installed.
+- Historical A9 rehearsal records remain valid history, but the scratch release repository has been deleted and its executable lane is now scheduled for retirement.
+- Performance qualification currently mirrors detailed ownership across a large generated inventory and 28 executable runtime groups; the runtime-group model will become the sole detailed owner.
+- The approved public removals have no proved workspace production consumer or compatibility obligation.
+- No formal timing from an intermediate simplification revision may be promoted.
 
-## Next Actions
+## Execution Order
 
-1. Commit only this permitted three-document rehearsal record, push it, and require exact-head `Rust` and `Qualification Contracts` CI. This documentation descendant becomes the measured revision.
-2. Regenerate PR, full, soak, all eleven exact prerequisites, both live oracle suites, 46 worker receipts, both DEM probes, 138 controlled AArch64 reports, two accepted-maximum DEM memory receipts, 38 rollups, and one schema-version-4 `a9-release` completion at entirely new paths.
-3. Preserve legacy beta, timing, and memory diagnostics honestly. Run milestone-audit and full-code-review against completed evidence; any source fix restarts rehearsal and evidence.
-4. Publish the authenticated seven-path status descendant, require exact-head CI, perform the immutable package preflight, publish all ten reviewed crates, create protected annotated `v0.2.0`, verify the private production draft, publish it, and verify the public release without another source commit.
+1. E0: freeze this contract and preserve the prior A9 checkpoint as history.
+2. E1: retire the scratch release workflow, binary, repository target, recipes, and active documentation.
+3. E2: compact performance ownership into the 28 executable runtime groups and remove redundant command paths.
+4. E3: remove the approved unused public errors and advanced-analysis exports; regenerate API and correctness inventories.
+5. E4: archive A6 JSON records and delete the superseded executable attestation lifecycle.
+6. E5: consolidate only the proved duplicate parsers, CLI format enum, private DEM-search value types, and tests.
+7. E6: synchronize CI, generated status, release docs, benchmark docs, and architecture docs.
+8. E7: run entropy verification, milestone-audit, full-code-review, complete local verification, and exact-head CI.
 
-## Gates
+## Non-Negotiable Gates
 
-- Keep Stim parity at `1.25x`, Stab self-regression at `1.15x`, memory limits, equivalent-work requirements, and the `100000` millidegree Celsius controlled-host policy unchanged.
-- Formal completion creation, offline replay, and checkpoint replay must each pass with soft `RLIMIT_NOFILE=1024`.
-- Disable swap immediately before every formal timing command and restore the exact prior configuration through failure-safe cleanup. Record operator observations honestly; current host evidence does not independently seal active swap-device state.
-- Never reuse a failed, noisy, controller-rejected, host-rejected, or incorrectly dispatched artifact path. Preserve materialized and non-materialized attempts.
-- Do not invent parity pairs, relax thresholds, add broad waivers, rerun stable failures, publish scratch drafts, or promote dirty/shared-host evidence.
-- Deferred Stim products, Python, JS/WASM, GPU, dynamic plugins, runtime gate registration, external decoder transport, and public execution IR remain outside `0.2.0`.
+- Keep the strict result-format corpus, typed DETS grammar, path-alias safety, bounded process supervisor, independent Stim comparator, active SIMD comparison, production release workflow, and legacy M12 diagnostics.
+- Preserve historical reports, tags, digests, and failed artifacts. Mark superseded procedures; do not rewrite their outcomes.
+- Do not add compatibility shims for removed pre-`0.2.0` APIs.
+- Do not create a branch or linked worktree, relax thresholds, add waivers, or run formal controlled-host timing during source refactoring.
+- Run targeted checks for each focused commit and the complete E7 verification from the final clean revision.
 
 ## Sources Of Truth
 
-- [Architecture plan](agent-native-modular-qec-architecture-plan.md), especially A9
-- [Architecture progress report](agent-native-modular-qec-progress-report.md)
+- [Entropy reclamation plan](pre-0.2-code-entropy-reclamation-plan.md)
+- [Architecture plan](agent-native-modular-qec-architecture-plan.md)
 - [Correctness contract](comprehensive-correctness-qualification-plan.md)
 - [Performance contract](comprehensive-stim-performance-qualification-plan.md)
-- [Release procedure](../RELEASING.md)
+- [Generated qualification status](../qualification-status.md)
 - [Specification-gap log](milestone-spec-gaps.md)
 
 ## Done
 
-A9 is complete only when the replacement rehearsal, source-current correctness and performance chain, final audits, authenticated status descendant, ten exact reviewed crate uploads, protected production tag, six verified release assets, and public GitHub release pass; swap is restored; no qualification process remains; and the worktree is clean.
+The entropy program is complete only when E0 through E7 pass, active source and documentation contain no retired route or duplicate owner, all audits and final checks pass on exact `main`, GitHub CI passes that exact head, no linked worktree or qualification process remains, and the worktree is clean. A9 then resumes from that final revision using entirely new evidence paths.
