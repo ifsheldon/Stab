@@ -64,6 +64,14 @@ Common model, algebra-value, plan, session, batch, diagnostic, and policy names 
 
 Execution compilers, plans, sessions, progress values, summaries, and run errors exposed through `stab_core::execution` are direct reexports of their `stab_engine` owners. Values can move between those paths without wrapper conversion. Code that previously called a facade-only `into_circuit_error` method on a detection or DEM execution error should use `CircuitError::from(error)` when it needs the aggregate facade diagnostic.
 
+## Removed Pre-0.2 Residue
+
+The following public items had no product, test, benchmark, example, or documented external consumer at the frozen pre-0.2 boundary and are removed without compatibility adapters.
+
+- `stab_bits::BitError::MatrixShapeMismatch` is removed. No bit operation constructed it; matrix operations continue to report their actual `LengthMismatch`, `NotSquareMatrix`, row, size, or allocation errors.
+- `stab_core::CircuitError::{ParseLine, UnterminatedRepeatBlock, UnexpectedRepeatTerminator}` are removed. Circuit and DEM parsing now reports the typed `CircuitError::Parse(ParseError)` contract with stable codes, spans, and context.
+- `stab_analysis::advanced::{ReverseFlowTransition, reverse_flow_transition, check_unsigned_flows_with_sparse_tracker, AnalyzerProbeBudget, ShiftedRecurrence, ShiftedRecurrenceSearch, SparseReverseFrameTracker, search_shifted_recurrence}` are removed from the public namespace. They were implementation details of supported flow checking, circuit-to-DEM conversion, and error-analysis operations; use those high-level APIs instead.
+
 ## Feature Selection
 
 Scalar behavior is the default for every product crate. Portable SIMD remains additive and opt-in:
