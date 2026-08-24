@@ -28,18 +28,7 @@ pub(super) struct GitHubTarget {
 }
 
 impl GitHubTarget {
-    pub(super) fn require_tag(self, tag: &str, _commit: &str) -> Result<(), ReleaseError> {
-        if tag == RELEASE_TAG {
-            Ok(())
-        } else {
-            Err(ReleaseError::TagName {
-                expected: RELEASE_TAG.to_string(),
-                actual: tag.to_string(),
-            })
-        }
-    }
-
-    pub(super) fn require_tag_shape(self, tag: &str) -> Result<(), ReleaseError> {
+    pub(super) fn require_tag(self, tag: &str) -> Result<(), ReleaseError> {
         if tag == RELEASE_TAG {
             Ok(())
         } else {
@@ -57,11 +46,7 @@ mod tests {
 
     #[test]
     fn production_accepts_only_the_exact_tag() {
-        PRODUCTION
-            .require_tag(RELEASE_TAG, "unused")
-            .expect("production tag");
-        assert!(PRODUCTION.require_tag("v0.2.1", "unused").is_err());
-        assert!(PRODUCTION.require_tag_shape(RELEASE_TAG).is_ok());
-        assert!(PRODUCTION.require_tag_shape("v0.2.1").is_err());
+        PRODUCTION.require_tag(RELEASE_TAG).expect("production tag");
+        assert!(PRODUCTION.require_tag("v0.2.1").is_err());
     }
 }

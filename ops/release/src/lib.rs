@@ -88,8 +88,8 @@ pub fn publish_reviewed(preflight: &Path, confirmation: &str) -> Result<(), Rele
 
 pub fn build_binary(target: &str, output: &Path, tag: &str) -> Result<(), ReleaseError> {
     let root = repository_root()?;
-    let commit = repository::require_clean(&root)?;
-    github::require_production_tag(tag, &commit)?;
+    repository::require_clean(&root)?;
+    github::require_production_tag(tag)?;
     let packaged = artifact::build_binary(&root, target, output, tag)?;
     println!(
         "[stab-release] wrote {}, {}, and {}",
@@ -102,8 +102,8 @@ pub fn build_binary(target: &str, output: &Path, tag: &str) -> Result<(), Releas
 
 pub fn verify_assets(assets: &Path, tag: &str) -> Result<(), ReleaseError> {
     let root = repository_root()?;
-    let commit = repository::require_clean(&root)?;
-    github::require_production_tag(tag, &commit)?;
+    repository::require_clean(&root)?;
+    github::require_production_tag(tag)?;
     artifact::verify_assets(&root, assets, tag)?;
     println!(
         "[stab-release] verified release assets in {}",

@@ -30,8 +30,8 @@ const RELEASE_LIST_PAGE_BOUND: usize = 10;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const GET_MAX_ATTEMPTS: u32 = 3;
 const GET_RETRY_BASE_DELAY: Duration = Duration::from_secs(1);
-pub(crate) fn require_production_tag(tag: &str, commit: &str) -> Result<(), ReleaseError> {
-    target::PRODUCTION.require_tag(tag, commit)
+pub(crate) fn require_production_tag(tag: &str) -> Result<(), ReleaseError> {
+    target::PRODUCTION.require_tag(tag)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -52,27 +52,12 @@ pub(crate) fn create_verified_draft(
             actual: confirmation.to_string(),
         });
     }
-    create_verified_draft_for(
-        root,
-        assets,
-        tag,
-        target::PRODUCTION,
-        authorization::require_a9_release,
-    )
-}
-
-fn create_verified_draft_for(
-    root: &Path,
-    assets: &Path,
-    tag: &str,
-    target: target::GitHubTarget,
-    authorize: fn(&Path, &ReleaseCancellation) -> Result<(), ReleaseError>,
-) -> Result<(), ReleaseError> {
     let mut reviewed = artifact::review_assets(root, assets, tag)?;
     let commit = reviewed.commit().to_string();
-    target.require_tag(tag, &commit)?;
+    let target = target::PRODUCTION;
+    target.require_tag(tag)?;
     let cancellation = ReleaseCancellation::for_signals()?;
-    authorize(root, &cancellation)?;
+    authorization::require_a9_release(root, &cancellation)?;
     reviewed.revalidate()?;
     repository::require_unchanged(root, &commit)?;
 
@@ -146,29 +131,12 @@ pub(crate) fn verify_remote_release(
     tag: &str,
     expected_state: RemoteReleaseState,
 ) -> Result<(), ReleaseError> {
-    verify_remote_release_for(
-        root,
-        assets,
-        tag,
-        expected_state,
-        target::PRODUCTION,
-        authorization::require_a9_release,
-    )
-}
-
-fn verify_remote_release_for(
-    root: &Path,
-    assets: &Path,
-    tag: &str,
-    expected_state: RemoteReleaseState,
-    target: target::GitHubTarget,
-    authorize: fn(&Path, &ReleaseCancellation) -> Result<(), ReleaseError>,
-) -> Result<(), ReleaseError> {
     let reviewed = artifact::review_assets(root, assets, tag)?;
     let commit = reviewed.commit().to_string();
-    target.require_tag(tag, &commit)?;
+    let target = target::PRODUCTION;
+    target.require_tag(tag)?;
     let cancellation = ReleaseCancellation::for_signals()?;
-    authorize(root, &cancellation)?;
+    authorization::require_a9_release(root, &cancellation)?;
     reviewed.revalidate()?;
     repository::require_unchanged(root, &commit)?;
 
@@ -570,7 +538,7 @@ impl DraftPublisher for GitHubApi {
         commit: &str,
         token: &GitHubToken,
     ) -> Result<(), ReleaseError> {
-        self.target.require_tag(tag, commit)?;
+        self.target.require_tag(tag)?;
         let reference_url = format!(
             "{}/repos/{}/git/ref/tags/{tag}",
             self.api_host, self.target.repository
@@ -592,7 +560,7 @@ impl DraftPublisher for GitHubApi {
         commit: &str,
         token: &GitHubToken,
     ) -> Result<RemoteRelease, ReleaseError> {
-        self.target.require_tag(tag, commit)?;
+        self.target.require_tag(tag)?;
         let url = format!(
             "{}/repos/{}/releases",
             self.api_host, self.target.repository
@@ -634,7 +602,7 @@ impl DraftPublisher for GitHubApi {
         tag: &str,
         token: &GitHubToken,
     ) -> Result<RemoteRelease, ReleaseError> {
-        self.target.require_tag_shape(tag)?;
+        self.target.require_tag(tag)?;
         let url = format!(
             "{}/repos/{}/releases/tags/{tag}",
             self.api_host, self.target.repository
@@ -647,7 +615,7 @@ impl DraftPublisher for GitHubApi {
         tag: &str,
         token: &GitHubToken,
     ) -> Result<RemoteRelease, ReleaseError> {
-        self.target.require_tag_shape(tag)?;
+        self.target.require_tag(tag)?;
         let mut matches: Vec<RemoteRelease> = Vec::new();
         for page in 1..=RELEASE_LIST_PAGE_BOUND {
             let url = format!(
