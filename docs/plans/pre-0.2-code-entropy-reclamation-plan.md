@@ -154,7 +154,7 @@ These symbols have no workspace production consumer, dynamic entrypoint, persist
 
 ### Acceptance
 
-- No deleted symbol remains in production source, generated API inventories, or current public documentation.
+- No removed item remains publicly exported, generated in the public API inventory, or presented as current public documentation; a same-name crate-private implementation may remain only when a production consumer proves it is load-bearing.
 - All surviving advanced exports have a real production or documented external role.
 
 ## E4: Archive Historical A6 Attestation Code

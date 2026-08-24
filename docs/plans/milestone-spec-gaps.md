@@ -1830,3 +1830,12 @@ Current text: direct-match benchmark policy required equivalent operation shape 
 Gap: pinned Stim's failed p10 and p100 decomposition calls leave the final Newton iterate in output parameters, while Stab's public API returns `None`. Positional pairing therefore compared different observable work even though function inputs, control flow, and success status looked related.
 Proposed amendment: require every Stim-relative pair to match success and failure result semantics, including output state retained on failure. When public contracts differ, retain the Stab timing as report-only and pair only the independently verified common subset.
 Resolution: `m10-error-decomp` is now `partial-match`; successful exact and independent conversions remain paired, failed Stab calls use explicit public-`None` report-only names, and the invalid p10 threshold is removed. The typed regression waiver names the exact two allowed pairs and rejects missing, extra, duplicate, renamed, or above-gate evidence. Performance qualification inventory schema version 4 binds the complete typed waiver policy into its semantic digest, and the comprehensive performance contract states the failed-output witness rule.
+
+## 2026-08-24 - E3: Public Surface Versus Consumed Internals
+
+Status: Resolved
+Revealed by: milestone audit of the pre-0.2 public-surface removal acceptance criteria.
+Current text: E3 required unused public residue to be removed, but its original acceptance sentence also prohibited every deleted symbol name from remaining anywhere in production source.
+Gap: a public export can be correctly removed while a same-name crate-private implementation remains load-bearing for real production consumers. The original sentence therefore contradicted the milestone's task to retain consumed engines and could encourage deleting working internals merely to satisfy a name-based check.
+Proposed amendment: define removal at the public compatibility boundary and require any same-name private implementation to have a proved production consumer.
+Resolution: E3 now requires removed items to disappear from public exports, generated public API inventories, and current public documentation while allowing consumer-proved crate-private implementations to remain.
