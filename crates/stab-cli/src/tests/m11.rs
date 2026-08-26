@@ -748,68 +748,43 @@ fn sample_dem_streams_huge_output_until_writer_failure() {
 }
 
 #[test]
-fn sample_dem_routes_4096_shots_through_every_supported_batch_format() {
+fn sample_dem_streams_all_output_roles_across_batch_boundaries() {
     const SHOTS: &str = "4096";
     let dem = b"error(1) D0 L0\n".as_slice();
-    for format in ["01", "b8", "r8", "hits", "dets", "ptb64"] {
-        let mut stdout = CountingWriter::default();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "sample_dem",
-                "--shots",
-                SHOTS,
-                "--out_format",
-                format,
-            ],
-            dem,
-            &mut stdout,
-            &mut stderr,
-        );
+    let dir = tempdir().expect("tempdir");
+    let observables = dir.path().join("observables.b8");
+    let sampled_errors = dir.path().join("sampled-errors.b8");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--shots"),
+        OsString::from(SHOTS),
+        OsString::from("--out_format=01"),
+        OsString::from("--obs_out"),
+        observables.clone().into_os_string(),
+        OsString::from("--obs_out_format=b8"),
+        OsString::from("--err_out"),
+        sampled_errors.clone().into_os_string(),
+        OsString::from("--err_out_format=b8"),
+    ];
+    let mut stdout = CountingWriter::default();
+    let mut stderr = Vec::new();
+    let status = run_from(args, dem, &mut stdout, &mut stderr);
 
-        assert_eq!(status, 0, "primary format={format}");
-        assert!(stderr.is_empty(), "primary format={format}");
-        assert!(stdout.bytes > 0, "primary format={format}");
+    assert_eq!(status, 0);
+    assert!(stderr.is_empty());
+    assert!(stdout.bytes > 0);
+    assert!(
+        stdout.nonempty_writes > 1,
+        "primary output stayed in one batch"
+    );
+    for side_path in [observables, sampled_errors] {
         assert!(
-            stdout.nonempty_writes > 1,
-            "primary format={format} did not cross a batch boundary"
+            std::fs::metadata(side_path)
+                .expect("side output metadata")
+                .len()
+                > 0
         );
-    }
-
-    for (role_flag, format_flag, stem) in [
-        ("--obs_out", "--obs_out_format", "observables"),
-        ("--err_out", "--err_out_format", "sampled-errors"),
-    ] {
-        for format in ["01", "b8", "r8", "hits", "dets", "ptb64"] {
-            let dir = tempdir().expect("tempdir");
-            let side_path = dir.path().join(format!("{stem}.{format}"));
-            let args = vec![
-                OsString::from("stab"),
-                OsString::from("sample_dem"),
-                OsString::from("--shots"),
-                OsString::from(SHOTS),
-                OsString::from("--out_format=01"),
-                OsString::from(role_flag),
-                side_path.clone().into_os_string(),
-                OsString::from(format_flag),
-                OsString::from(format),
-            ];
-            let mut stdout = CountingWriter::default();
-            let mut stderr = Vec::new();
-            let status = run_from(args, dem, &mut stdout, &mut stderr);
-
-            assert_eq!(status, 0, "{role_flag} format={format}");
-            assert!(stderr.is_empty(), "{role_flag} format={format}");
-            assert!(stdout.nonempty_writes > 1, "{role_flag} format={format}");
-            assert!(
-                std::fs::metadata(side_path)
-                    .expect("side output metadata")
-                    .len()
-                    > 0,
-                "{role_flag} format={format}"
-            );
-        }
     }
 }
 

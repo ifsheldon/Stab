@@ -299,8 +299,13 @@ coverage = [
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "convert_real_process_covers_layout_and_format_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-convert-ptb64-observable-output"
@@ -362,8 +367,13 @@ coverage = [
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "detect_real_process_covers_options_and_output_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-m2d"
@@ -379,8 +389,13 @@ coverage = [
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "m2d_real_process_covers_measurement_sweep_and_output_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-m2d-ptb64-observable-output-rejection"
@@ -423,8 +438,13 @@ coverage = ["route:sample-output/01", "route:sample-output/b8", "route:sample-ou
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "sample_real_process_covers_options_and_all_output_formats"
+minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-sample-dem"
@@ -439,8 +459,13 @@ coverage = [
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "sample_dem_real_process_covers_primary_side_and_replay_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-sample-dem-replay"
@@ -453,8 +478,13 @@ coverage = [
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "sample_dem_real_process_covers_primary_side_and_replay_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.streaming-and-typed-dets"
@@ -713,8 +743,13 @@ owner = "stab-cli"
 divergence_kind = "stab-extension"
 rationale = "Stim has no global structured diagnostic stream for agent and automation consumers."
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "json_diagnostics_real_process_keeps_machine_output_separate"
+minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.stim-canonical-convert"

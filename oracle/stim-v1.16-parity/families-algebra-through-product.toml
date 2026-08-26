@@ -331,8 +331,13 @@ coverage = ["command:analyze_errors", "option:analyze_errors/--allow_gauge_detec
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "analyze_errors_real_process_routes_all_nondeprecated_options"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.convert"
@@ -343,8 +348,13 @@ coverage = ["command:convert", "option:convert/--bits_per_shot", "option:convert
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "convert_real_process_covers_layout_and_format_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.deprecated-compatibility-removal"
@@ -365,8 +375,13 @@ coverage = ["command:detect", "option:detect/--append_observables", "option:dete
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "detect_real_process_covers_options_and_output_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.diagram"
@@ -395,8 +410,13 @@ coverage = ["command:gen", "option:gen/--after_clifford_depolarization", "option
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "gen_real_process_routes_geometry_noise_and_paths"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.help"
@@ -425,8 +445,13 @@ coverage = ["command:m2d", "option:m2d/--append_observables", "option:m2d/--circ
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "m2d_real_process_covers_measurement_sweep_and_output_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.repl"
@@ -446,8 +471,13 @@ coverage = ["command:sample", "option:sample/--in", "option:sample/--out", "opti
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "sample_real_process_covers_options_and_all_output_formats"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.sample-dem"
@@ -458,8 +488,13 @@ coverage = ["command:sample_dem", "option:sample_dem/--err_out", "option:sample_
 status = "done"
 owner = "stab-cli"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "sample_dem_real_process_covers_primary_side_and_replay_routes"
+minimum_tier = "pr"
 
 [[families]]
 id = "dem-model.approximate-equality"
