@@ -323,6 +323,15 @@ fn convert_ptb64_round_trips_and_interops_with_other_formats() {
     let records = alternating_records_64(5);
     let layout = ["--num_detectors", "2", "--num_observables", "3"];
     let ptb64 = convert_between_formats(records.as_bytes(), "01", "ptb64", &layout);
+    assert_eq!(
+        ptb64,
+        [
+            0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
+            0xaa, 0xaa, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0xaa, 0xaa, 0xaa, 0xaa,
+            0xaa, 0xaa, 0xaa, 0xaa, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,
+        ],
+        "each PTB64 word packs one alternating shot column in little-endian order"
+    );
     let decoded = convert_between_formats(&ptb64, "ptb64", "01", &layout);
     assert_eq!(String::from_utf8(decoded).unwrap(), records);
 
@@ -369,6 +378,10 @@ fn convert_ptb64_observable_side_output_round_trips() {
     assert_eq!(String::from_utf8(primary).unwrap(), expected_primary);
 
     let side = std::fs::read(&obs_path).expect("read side output");
+    assert_eq!(
+        side, [0xaa; 8],
+        "the observable column is true on odd shot indexes"
+    );
     let decoded = run_ok(
         &[
             "stab",

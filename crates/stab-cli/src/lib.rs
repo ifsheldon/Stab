@@ -73,6 +73,14 @@ struct Cli {
     command: Option<Command>,
 }
 
+/// Returns the complete Clap command descriptor used by the `stab` binary.
+///
+/// Repository tooling uses this descriptor to derive CLI capability and compatibility checks from
+/// the parser that actually owns command dispatch.
+pub fn command_descriptor() -> clap::Command {
+    Cli::command()
+}
+
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Prints Stab-native command, format, and gate help.

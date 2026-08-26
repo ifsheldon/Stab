@@ -25,6 +25,10 @@ sha2 = { workspace = true }
 signal-hook = { workspace = true }
 stab-compat-corpus = { path = "../../test-support/compat-corpus" }
 stab-core = { path = "../../crates/stab-core", default-features = false }
+stab-cli = { path = "../../crates/stab-cli" }
+stab-model = { path = "../../crates/stab-model" }
+stab-records = { path = "../../crates/stab-records" }
 statrs = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
+toml = { workspace = true }

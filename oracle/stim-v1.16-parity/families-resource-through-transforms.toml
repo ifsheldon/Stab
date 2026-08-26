@@ -1,0 +1,949 @@
+[[families]]
+id = "resource-safety.algebra-size-limits"
+area = "resource-safety"
+contract = "Algebra constructors and operations enforce typed Pauli, Clifford, tableau, flow, iterator, and growth limits before allocation or RNG consumption."
+stim_refs = ["src/stim/stabilizers/pauli_string.test.cc", "src/stim/stabilizers/tableau.test.cc"]
+status = "divergence"
+owner = "stab-algebra"
+divergence_kind = "resource-limit"
+rationale = "Stab uses explicit fallible size admission, including a 512-qubit dense tableau boundary, instead of relying on host allocation failure."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-algebra"
+kind = "test"
+target = "cq2_algebra_values"
+name = "cq2_algebra_error_and_resource_contract_is_exhaustive"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.circuit-count-overflow"
+area = "resource-safety"
+contract = "Circuit aggregate counts accept exact u64 maxima and return a typed overflow error at the first excess instead of saturating."
+stim_refs = ["src/stim/circuit/circuit.cc", "src/stim/circuit/circuit.test.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "resource-limit"
+rationale = "Stab rejects unrepresentable counts while pinned Stim C++ count helpers saturate at UINT64_MAX."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_circuit_api_counts"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.cli-file-hardlink-identities"
+area = "resource-safety"
+contract = "Explicit CLI input and output aliases through hardlinks are rejected before truncation across every active file-role pairing."
+stim_refs = ["src/stim/cmd/command_sample.test.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::path_alias::hardlink_file_role_aliases_fail_without_truncation"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.cli-file-lexical-identities"
+area = "resource-safety"
+contract = "Explicit CLI input and output aliases using the same lexical path are rejected before truncation across every active file-role pairing."
+stim_refs = ["src/stim/cmd/command_sample.test.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::path_alias::explicit_direct_file_role_aliases_fail_without_truncation"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.cli-file-normalized-identities"
+area = "resource-safety"
+contract = "Explicit CLI input and output aliases using normalized relative paths are rejected before truncation across every active file-role pairing."
+stim_refs = ["src/stim/cmd/command_sample.test.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::path_alias::normalized_relative_file_role_aliases_fail_without_truncation"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.cli-file-symlink-identities"
+area = "resource-safety"
+contract = "Explicit CLI input and output aliases through symlinks are rejected before truncation across every active file-role pairing."
+stim_refs = ["src/stim/cmd/command_sample.test.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::path_alias::symlink_file_role_aliases_fail_without_truncation"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.dem-coordinate-map-limit"
+area = "resource-safety"
+contract = "Full DEM detector-coordinate maps reject above one million entries while selected coordinate queries remain available on compact large models."
+stim_refs = ["src/stim/dem/detector_error_model.test.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "resource-limit"
+rationale = "Stab bounds inherently expanded full coordinate maps while retaining sparse selected queries."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-core"
+kind = "test"
+target = "dem_api"
+name = "pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.detection-compile-limits"
+area = "resource-safety"
+contract = "Detection conversion compilation admits exact repeat and expanded-instruction limits and rejects the first excess with the corresponding typed resource kind."
+stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc"]
+status = "divergence"
+owner = "stab-engine"
+divergence_kind = "resource-limit"
+rationale = "Stab gives detection conversion explicit repeat-count and expanded-instruction admission boundaries."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "a2_detection_work_policy_admission"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.engine-work-and-buffer-limits"
+area = "resource-safety"
+contract = "Sampling and DEM compilation and sessions enforce the implemented sampled-error work, replay work, materialized unit and byte, batch-storage, and active-buffer limits before RNG advancement or sink mutation."
+stim_refs = ["src/stim/simulators/frame_simulator.test.cc", "src/stim/simulators/dem_sampler.test.cc"]
+status = "divergence"
+owner = "stab-engine"
+divergence_kind = "resource-limit"
+rationale = "Stab gives batch sampling and DEM sampling explicit caller-visible work and storage boundaries instead of relying on host allocation failure."
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "resource-safety.generation-qubit-limit"
+area = "resource-safety"
+contract = "Built-in circuit generation admits exact family boundaries and rejects a projected physical-qubit count above 131072 before materialization."
+stim_refs = ["src/stim/gen/gen_rep_code.test.cc", "src/stim/gen/gen_surface_code.test.cc", "src/stim/gen/gen_color_code.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab uses a typed generated-circuit qubit admission boundary to prevent hostile materialization."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_generation"
+name = "resource::cq2_generation_resource_admission_checks_family_boundaries_before_materialization"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.model-circuit-parse-limits"
+area = "resource-safety"
+contract = "Circuit parsing admits the exact configured source-line and repeat-depth boundaries and rejects the first excess."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "resource-limit"
+rationale = "Stab gives circuit parsing explicit source-line and repeat-depth admission boundaries."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "a2_circuit_parse_policy_admission"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.model-dem-parse-limits"
+area = "resource-safety"
+contract = "DEM parsing admits the exact configured source-line boundary and rejects the first excess."
+stim_refs = ["src/stim/dem/detector_error_model.test.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "resource-limit"
+rationale = "Stab gives DEM parsing an explicit source-line admission boundary."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "a2_dem_parse_policy_admission"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.model-remaining-parse-limits"
+area = "resource-safety"
+contract = "Circuit and DEM parsing enforce typed byte, instruction-count, and target-count admission not covered by the circuit and DEM line and repeat-depth rows before allocation."
+stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/dem/detector_error_model.test.cc"]
+status = "missing"
+owner = "stab-model"
+milestone = "P1"
+
+[[families]]
+id = "resource-safety.record-streaming-bounds"
+area = "resource-safety"
+contract = "DETS dense, packed, token, and SparseShot visitors keep allocations bounded by layout width instead of record count."
+stim_refs = ["src/stim/io/measure_record_reader.test.cc"]
+status = "divergence"
+owner = "stab-records"
+divergence_kind = "resource-limit"
+rationale = "Stab exposes and tests an explicit bounded DETS streaming-storage guarantee beyond Stim's compatibility contract."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-records"
+kind = "test"
+target = "resource_contracts"
+name = "dets_visitors_keep_allocation_bounded_by_width_not_record_count"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.record-streaming-other-formats"
+area = "resource-safety"
+contract = "All non-DETS result readers, writers, and visitors allocate by record width and group size, stop promptly, and do not grow with record count."
+stim_refs = ["src/stim/io/measure_record_reader.test.cc", "src/stim/io/measure_record_writer.test.cc"]
+status = "done"
+owner = "stab-records"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "resource-safety.search-materialization-limits"
+area = "resource-safety"
+contract = "Graphlike, hypergraph, and SAT operations enforce implemented traversal, mechanism, target, graph, state, transition, payload, clause, literal, and output limits before persistent materialization and leave source models unchanged."
+stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab exposes typed search and SAT admission boundaries for inherently materialized graph, state, and WCNF products."
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "resource-safety.wcnf-shape-limits"
+area = "resource-safety"
+contract = "WCNF shape admission accepts exact variable, clause, and literal maxima and rejects the first excess."
+stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab gives WCNF production explicit typed variable, clause, literal, and output boundaries."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "sat_materialization_limits"
+name = "cnf_shape_limits_accept_exact_maxima_and_reject_first_excess"
+minimum_tier = "pr"
+
+[[families]]
+id = "result-formats.codecs-and-strict-grammars"
+area = "result-formats"
+contract = "The six result formats preserve exact accepted encodings, strict malformed-input rejection, record termination, widths, and duplicate semantics."
+stim_refs = ["doc/result_formats.md", "src/stim/io/measure_record_reader.test.cc", "src/stim/io/measure_record_writer.test.cc"]
+coverage = ["format:01", "format:b8", "format:r8", "format:hits", "format:dets", "format:ptb64"]
+status = "done"
+owner = "stab-records"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "result-formats.routes-convert"
+area = "result-formats"
+contract = "convert accepts all six input formats and emits the five Stim-supported single-record output formats for primary M/D/L records and observable side output."
+stim_refs = ["src/stim/cmd/command_convert.test.cc"]
+coverage = [
+    "route:convert-input/01", "route:convert-input/b8", "route:convert-input/r8", "route:convert-input/hits", "route:convert-input/dets", "route:convert-input/ptb64",
+    "route:convert-observable-output/01", "route:convert-observable-output/b8", "route:convert-observable-output/r8", "route:convert-observable-output/hits", "route:convert-observable-output/dets",
+    "route:convert-output/01", "route:convert-output/b8", "route:convert-output/r8", "route:convert-output/hits", "route:convert-output/dets",
+]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "result-formats.routes-convert-ptb64-observable-output"
+area = "result-formats"
+contract = "convert writes PTB64 observable side output in complete 64-record groups despite pinned Stim's advertised route failing in its single-record writer."
+stim_refs = ["src/stim/cmd/command_convert.cc", "src/stim/io/measure_record_writer.cc"]
+coverage = ["route:convert-observable-output/ptb64"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim advertises PTB64 observable output but rejects it as incompatible with SingleMeasurementRecord; Stab implements the documented grouped encoding."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::convert::convert_ptb64_observable_side_output_round_trips"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
+minimum_tier = "pr"
+
+[[families]]
+id = "result-formats.routes-convert-ptb64-output"
+area = "result-formats"
+contract = "convert writes primary PTB64 output in complete 64-record groups despite pinned Stim's advertised route failing in its single-record writer."
+stim_refs = ["src/stim/cmd/command_convert.cc", "src/stim/io/measure_record_writer.cc"]
+coverage = ["route:convert-output/ptb64"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim advertises PTB64 primary output but rejects it as incompatible with SingleMeasurementRecord; Stab implements the documented grouped encoding."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::convert::convert_ptb64_round_trips_and_interops_with_other_formats"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
+minimum_tier = "pr"
+
+[[families]]
+id = "result-formats.routes-detect"
+area = "result-formats"
+contract = "detect emits all six formats for detector and appended or separate observable records."
+stim_refs = ["src/stim/cmd/command_detect.test.cc"]
+coverage = [
+    "route:detect-observable-output/01", "route:detect-observable-output/b8", "route:detect-observable-output/r8", "route:detect-observable-output/hits", "route:detect-observable-output/dets", "route:detect-observable-output/ptb64",
+    "route:detect-output/01", "route:detect-output/b8", "route:detect-output/r8", "route:detect-output/hits", "route:detect-output/dets", "route:detect-output/ptb64",
+]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "result-formats.routes-m2d"
+area = "result-formats"
+contract = "m2d accepts all six measurement and sweep formats and emits the five Stim-supported detector and observable output formats."
+stim_refs = ["src/stim/cmd/command_m2d.test.cc"]
+coverage = [
+    "route:m2d-measurement-input/01", "route:m2d-measurement-input/b8", "route:m2d-measurement-input/r8", "route:m2d-measurement-input/hits", "route:m2d-measurement-input/dets", "route:m2d-measurement-input/ptb64",
+    "route:m2d-observable-output/01", "route:m2d-observable-output/b8", "route:m2d-observable-output/r8", "route:m2d-observable-output/hits", "route:m2d-observable-output/dets",
+    "route:m2d-output/01", "route:m2d-output/b8", "route:m2d-output/r8", "route:m2d-output/hits", "route:m2d-output/dets",
+    "route:m2d-sweep-input/01", "route:m2d-sweep-input/b8", "route:m2d-sweep-input/r8", "route:m2d-sweep-input/hits", "route:m2d-sweep-input/dets", "route:m2d-sweep-input/ptb64",
+]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "result-formats.routes-m2d-ptb64-observable-output-rejection"
+area = "result-formats"
+contract = "m2d rejects PTB64 observable side output before writing, matching pinned Stim's single-record writer limitation."
+stim_refs = ["src/stim/simulators/measurements_to_detection_events.inl", "src/stim/io/measure_record_writer.cc"]
+coverage = ["route:m2d-observable-output/ptb64"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::m9::m2d_rejects_ptb64_observable_output_like_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "result-formats.routes-m2d-ptb64-output-rejection"
+area = "result-formats"
+contract = "m2d rejects PTB64 primary detector output before writing, matching pinned Stim's single-record writer limitation."
+stim_refs = ["src/stim/simulators/measurements_to_detection_events.inl", "src/stim/io/measure_record_writer.cc"]
+coverage = ["route:m2d-output/ptb64"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::m9::m2d_rejects_ptb64_detector_output_like_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "result-formats.routes-sample"
+area = "result-formats"
+contract = "sample emits measurement records in each of the six result formats."
+stim_refs = ["src/stim/cmd/command_sample.test.cc"]
+coverage = ["route:sample-output/01", "route:sample-output/b8", "route:sample-output/r8", "route:sample-output/hits", "route:sample-output/dets", "route:sample-output/ptb64"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "result-formats.routes-sample-dem"
+area = "result-formats"
+contract = "sample_dem emits detector, observable, and sampled-error records in all six formats."
+stim_refs = ["src/stim/cmd/command_sample_dem.test.cc"]
+coverage = [
+    "route:sample-dem-error-output/01", "route:sample-dem-error-output/b8", "route:sample-dem-error-output/r8", "route:sample-dem-error-output/hits", "route:sample-dem-error-output/dets", "route:sample-dem-error-output/ptb64",
+    "route:sample-dem-observable-output/01", "route:sample-dem-observable-output/b8", "route:sample-dem-observable-output/r8", "route:sample-dem-observable-output/hits", "route:sample-dem-observable-output/dets", "route:sample-dem-observable-output/ptb64",
+    "route:sample-dem-output/01", "route:sample-dem-output/b8", "route:sample-dem-output/r8", "route:sample-dem-output/hits", "route:sample-dem-output/dets", "route:sample-dem-output/ptb64",
+]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "result-formats.routes-sample-dem-replay"
+area = "result-formats"
+contract = "sample_dem accepts replayed sampled-error records in all six result formats with exact requested-shot prefix semantics."
+stim_refs = ["src/stim/cmd/command_sample_dem.test.cc", "src/stim/simulators/dem_sampler_pybind_test.py"]
+coverage = [
+    "route:sample-dem-replay-input/01", "route:sample-dem-replay-input/b8", "route:sample-dem-replay-input/r8", "route:sample-dem-replay-input/hits", "route:sample-dem-replay-input/dets", "route:sample-dem-replay-input/ptb64",
+]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "result-formats.streaming-and-typed-dets"
+area = "result-formats"
+contract = "Streaming dense, packed, sparse, typed-token, and typed-DETS sinks preserve namespaces, duplicates, bounded storage, and prompt cancellation."
+stim_refs = ["src/stim/io/measure_record_reader.test.cc", "src/stim/io/sparse_shot.test.cc"]
+status = "done"
+owner = "stab-records"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "sampling.circuit-common-measurement-and-reset"
+area = "sampling"
+contract = "Batch circuit sampling implements the selected measurement, reset, measure-reset, pair-measurement, MPP, MPAD, record-feedback, repeat, and reference-sample semantics used by current Rust and CLI workflows."
+stim_refs = ["src/stim/simulators/frame_simulator.test.cc", "src/stim/simulators/tableau_simulator.test.cc"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "sampling.circuit-core-gates"
+area = "sampling"
+contract = "All 46 fixed-tableau gate cases execute through batch sampling with inverse cancellation."
+stim_refs = ["src/stim/simulators/frame_simulator.test.cc"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-core"
+kind = "test"
+target = "gate_semantic_execution"
+name = "fixed_tableau_gates_execute_across_current_public_surfaces"
+minimum_tier = "pr"
+
+[[families]]
+id = "sampling.circuit-remaining-gate-target-surface"
+area = "sampling"
+contract = "Batch circuit sampling executes every legal instruction, target shape, repeat form, and classical control beyond the separately owned common measurement, 46 fixed-tableau gate, sweep, noise, and loop-folding contracts."
+stim_refs = ["src/stim/simulators/frame_simulator.test.cc", "src/stim/simulators/tableau_simulator.test.cc"]
+coverage = ["consumer:sampling"]
+status = "missing"
+owner = "stab-engine"
+milestone = "P4"
+
+[[families]]
+id = "sampling.circuit-sweep-controls"
+area = "sampling"
+contract = "Ordinary circuit sampling accepts legal sweep-controlled Pauli operations and treats omitted sweep data as all false."
+stim_refs = ["src/stim/simulators/tableau_simulator.test.cc", "src/stim/simulators/frame_simulator.test.cc"]
+status = "missing"
+owner = "stab-engine"
+milestone = "P4"
+
+[[families]]
+id = "sampling.dem-sampling-and-replay"
+area = "sampling"
+contract = "Compiled DEM sampling preserves detector, observable, correlated-error, repeat, sampled-error, and replay semantics through reusable sessions."
+stim_refs = ["src/stim/simulators/dem_sampler.test.cc"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "dem_sampling_plan_session"
+name = "streamed_sessions_match_materialized_sampling_across_dem_families"
+minimum_tier = "pr"
+
+[[families]]
+id = "sampling.exact-stim-random-streams"
+area = "sampling"
+contract = "Seeded Stab sampling reproduces Stim's exact random bit stream across implementations, batching, SIMD widths, and releases."
+stim_refs = ["doc/stim.pyi", "doc/usage_command_line.md"]
+status = "deferred"
+rationale = "Stim does not promise this identity itself; Stab requires deterministic semantic and statistical equivalence instead."
+
+[[families]]
+id = "sampling.loop-folding-selection"
+area = "sampling"
+contract = "The sample loop-folding option changes the compilation strategy while preserving output semantics instead of being an accepted no-op."
+stim_refs = ["src/stim/cmd/command_sample.cc", "src/stim/cmd/command_sample.test.cc"]
+status = "missing"
+owner = "stab-engine"
+milestone = "P4"
+
+[[families]]
+id = "sampling.noise-complete"
+area = "sampling"
+contract = "All Pauli, correlated, heralded, reset, measurement, and measure-reset noise families have deterministic boundary and statistical parity evidence."
+stim_refs = ["src/stim/simulators/frame_simulator.test.cc"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "search.graphlike-shortest-error"
+area = "search"
+contract = "Graphlike DEM construction and shortest undetectable logical-error search match Stim witnesses and distances."
+stim_refs = ["src/stim/search/graphlike/algo.test.cc", "src/stim/search/graphlike/graph.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-core"
+kind = "test"
+target = "dem_search"
+name = "pf6_direct_dem_graphlike_search_matches_upstream_distance_cases"
+minimum_tier = "pr"
+
+[[families]]
+id = "search.hypergraph-heuristic"
+area = "search"
+contract = "Hypergraph heuristic search matches Stim undetectable-logical-error witnesses across flat and folded DEMs."
+stim_refs = ["src/stim/search/hyper/algo.test.cc", "src/stim/search/hyper/graph.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-core"
+kind = "test"
+target = "dem_search"
+name = "pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases"
+minimum_tier = "pr"
+
+[[families]]
+id = "search.likeliest-error-wcnf-common"
+area = "search"
+contract = "Likeliest-error weighted CNF generation matches Stim variables, clauses, weights, observables, and unsatisfiable behavior for direct DEMs including sparse identifiers and the implemented compact zero-shift repeat families."
+stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "search.likeliest-error-wcnf-remaining"
+area = "search"
+contract = "Likeliest-error weighted CNF generation matches Stim for every remaining shifted-active, non-flat, and broader mixed repeat family without selected-subset exits."
+stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "search.shortest-error-wcnf"
+area = "search"
+contract = "Shortest-error weighted CNF generation matches Stim variables, clauses, observables, and unsatisfiable cases."
+stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "stab-extensions.agent-capabilities"
+area = "stab-extensions"
+contract = "The capabilities command emits source-derived product, command, format, backend, and limit discovery in a stable machine-readable schema."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:agent-capabilities"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no machine-readable command that exposes Stab's component and capability graph."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::agent::capabilities_json_is_generated_from_product_and_clap_descriptors"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.agent-inspect"
+area = "stab-extensions"
+contract = "The inspect command reports bounded circuit and DEM structure without executing the model."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:agent-inspect"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no nonexecuting structured model-inspection command."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::agent::inspect_json_reports_exact_circuit_and_dem_structure_without_execution"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.agent-plan"
+area = "stab-extensions"
+contract = "The plan command validates and reports a sampling compilation plan without consuming entropy or producing shots."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:agent-plan"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no dry-run compilation-plan command for agent orchestration."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::agent::plan_sample_separates_compilation_identity_from_run_configuration"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.circuit-pass"
+area = "stab-extensions"
+contract = "CircuitPass admits typed input and projected output resources, validates the returned closed model, and preserves implementation diagnostics."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+coverage = ["extension:circuit-pass"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stab-extension"
+rationale = "CircuitPass is Stab's bounded external transformation seam, not a Stim API."
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "stab-extensions.decoder-session"
+area = "stab-extensions"
+contract = "DecoderSession reuses decoder state across batches while preserving layout checks, completed-prefix semantics, cancellation, and partition equivalence."
+stim_refs = ["doc/file_format_dem_detector_error_model.md"]
+coverage = ["extension:decoder-session"]
+status = "divergence"
+owner = "stab-decoder"
+divergence_kind = "stab-extension"
+rationale = "Stim produces detection data but does not define a reusable decoder session interface."
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "stab-extensions.json-diagnostics"
+area = "stab-extensions"
+contract = "The global error-format option emits bounded schema-versioned JSON Lines diagnostics while keeping successful machine output on stdout."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:json-diagnostics"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no global structured diagnostic stream for agent and automation consumers."
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "stab-extensions.stim-canonical-convert"
+area = "stab-extensions"
+contract = "convert accepts .stim input and emits canonical .stim output while rejecting result-only roles before touching their paths."
+stim_refs = ["doc/file_format_stim_circuit.md", "src/stim/circuit/circuit.test.cc"]
+coverage = ["extension:stim-canonical-convert"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no result-convert route for canonical .stim to .stim conversion."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::diagnostics::model_cli_paths_accept_opaque_metadata_bytes_and_preserve_stim_conversion"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-decomposition-common"
+area = "transforms"
+contract = "Circuit decomposition lowers the currently supported ISWAP, MPP, pair-measurement, and metadata-preserving common families."
+stim_refs = ["src/stim/circuit/gate_decomposition.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_circuit_api_decomposed_transform"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-decomposition-remaining"
+area = "transforms"
+contract = "Circuit decomposition lowers every Stim-decomposable gate and legal classical target shape beyond the owned common families, including XCZ and YCZ feedback, while preserving tags, noise, measurements, and flows."
+stim_refs = ["src/stim/circuit/gate_decomposition.test.cc", "src/stim/util_top/simplified_circuit.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.circuit-flattening"
+area = "transforms"
+contract = "Circuit flattening removes repeat blocks and applies coordinate shifts while preserving canonical instruction order and tags."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_circuit_api_flattened_transform"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-simplification-common"
+area = "transforms"
+contract = "Circuit simplification rewrites the implemented single- and two-qubit Clifford families into the H, S, CX, M, and R base while preserving repeats and unsupported instructions."
+stim_refs = ["src/stim/util_top/simplified_circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_simplify"
+name = "cq2_circuit_api_simplified_contract_matches_selected_stim_scope"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-simplification-remaining"
+area = "transforms"
+contract = "Circuit simplification lowers every remaining Stim-supported instruction and target shape into the declared base set while preserving semantics and metadata."
+stim_refs = ["src/stim/util_top/simplified_circuit.test.cc"]
+coverage = ["capability:circuit-simplification"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.circuit-tag-removal"
+area = "transforms"
+contract = "Circuit tag removal recursively erases instruction and repeat tags without mutating the source or fusing instruction boundaries."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "gate_and_tag_contracts"
+name = "circuit_without_tags_is_recursive_non_mutating_and_preserves_boundaries"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-unitary-inverse-common"
+area = "transforms"
+contract = "Unitary circuit inversion reverses instruction order and replaces supported unitary gates with their pinned Stim inverse while preserving qubit order semantics."
+stim_refs = ["src/stim/util_top/circuit_inverse_unitary.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_inverse"
+name = "circuit_inverse_unitary_matches_stim_example"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-unitary-inverse-remaining"
+area = "transforms"
+contract = "Unitary circuit inversion handles every Stim-legal unitary circuit annotation and instruction, including TICK and preserved leading QUBIT_COORDS metadata."
+stim_refs = ["src/stim/util_top/circuit_inverse_unitary.test.cc", "src/stim/circuit/circuit.pybind.cc"]
+coverage = ["capability:circuit-unitary-inverse"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.dem-tag-removal"
+area = "transforms"
+contract = "DEM tag removal recursively erases instruction and repeat tags without changing detector error model semantics."
+stim_refs = ["src/stim/dem/detector_error_model.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "transforms.feedback-inlining-common"
+area = "transforms"
+contract = "Feedback inlining preserves the implemented demolition, interleaved-order, MPP, XCZ, YCZ, bounded-loop, and selected nested-repeat cases."
+stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "transforms.feedback-inlining-remaining"
+area = "transforms"
+contract = "Feedback inlining supports every remaining legal measurement-record control and compact repeat shape without selected-control or bounded-expansion gaps."
+stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.inverse-qec-common"
+area = "transforms"
+contract = "Inverse-QEC construction supports the implemented unitary, reset, measurement, measure-reset, pair-product, MPP, MPAD, detector-flow, observable, and selected-noise packets."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "transforms.inverse-qec-remaining"
+area = "transforms"
+contract = "Inverse-QEC construction supports every remaining Stim flow-driven reset, measurement, detector, observable, noise, feedback, and duplicate-target surface."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.qasm-quirk-crumble-exports"
+area = "transforms"
+contract = "Circuit export produces QASM, Quirk URLs, and Crumble URLs."
+stim_refs = ["src/stim/circuit/circuit2.pybind.cc"]
+status = "deferred"
+rationale = "QASM, Quirk, and Crumble exports are explicitly deferred and do not include ordinary .stim, .dem, or result-format serialization."
+
+[[families]]
+id = "transforms.remaining-gate-target-surface"
+area = "transforms"
+contract = "Each in-scope circuit transform accepts every Stim-legal instruction and target shape not covered by its dedicated family row and rejects only the same invalid or semantically unsupported inputs."
+stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/util_top/simplified_circuit.test.cc"]
+coverage = ["consumer:transform"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.time-reversal-for-flows-common"
+area = "transforms"
+contract = "Time reversal for flows supports the implemented folded unitary, measurement-rich, detector, observable, coordinate, product-measurement, MPAD, ordinary-noise, generated-code, and bounded-repeat workflows."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "transforms.time-reversal-for-flows-remaining"
+area = "transforms"
+contract = "Time reversal for flows supports every remaining legal QEC circuit, feedback, heralded-record, duplicate-target, and compact-repeat surface and returns exact transformed flows."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.without-noise"
+area = "transforms"
+contract = "Noise removal erases noise while preserving annotations, records, tags, and heralded measurement padding."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_circuit_api_without_noise_transform"
+minimum_tier = "pr"

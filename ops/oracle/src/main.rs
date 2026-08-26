@@ -12,6 +12,7 @@
 mod blocker_ledger;
 mod fixtures;
 mod matrix;
+mod parity;
 mod process;
 mod qualification;
 mod result_format_corpus;
@@ -145,6 +146,12 @@ enum Command {
         rebuild_stim: bool,
     },
 
+    /// Validate, execute, or render the atomic Stim parity ledger.
+    Parity {
+        #[command(subcommand)]
+        command: parity::Command,
+    },
+
     /// Build, inspect, or validate comprehensive qualification inventories.
     Qualification {
         #[command(subcommand)]
@@ -179,6 +186,9 @@ enum OracleError {
 
     #[error(transparent)]
     ResultFormatCorpus(#[from] result_format_corpus::ResultFormatCorpusError),
+
+    #[error(transparent)]
+    Parity(#[from] parity::ParityError),
 
     #[error("{0}")]
     InvalidRunSelection(String),
@@ -569,6 +579,10 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         } => {
             validate_stim_source(&root)?;
             result_format_corpus::run(&root, check, rebuild_stim)?;
+        }
+        Command::Parity { command } => {
+            validate_stim_source(&root)?;
+            parity::run(&root, command)?;
         }
         Command::Qualification { command } => {
             validate_stim_source(&root)?;

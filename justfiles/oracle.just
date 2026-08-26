@@ -37,3 +37,18 @@ blockers *args:
 [working-directory: '..']
 result-formats *args:
     cargo run -q -p stab-oracle -- result-formats {{args}}
+
+# Validate the atomic Stim v1.16.0 parity ledger.
+[working-directory: '..']
+parity-check *args:
+    cargo run -q -p stab-oracle -- parity check {{args}}
+
+# Run canonical parity-owner tests for a PR, full, or soak tier.
+[working-directory: '..']
+parity-run *args:
+    cargo run -q -p stab-oracle -- parity run {{args}}
+
+# Render or check the generated parity document.
+[working-directory: '..']
+parity-render *args:
+    cargo run -q -p stab-oracle -- parity render {{args}}

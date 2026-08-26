@@ -108,6 +108,15 @@ jobs:
       - name: Check correctness inventory
         run: just qualification::correctness-check
 
+      - name: Check generated Stim parity view
+        run: just oracle::parity-render --check
+
+      - name: Check Stim parity ledger and all evidence selectors
+        run: just oracle::parity-check
+
+      - name: Run PR-tier parity owners
+        run: just oracle::parity-run --tier pr
+
       - name: Check performance inventory
         run: just bench::qualification-check
 

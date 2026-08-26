@@ -1,0 +1,161 @@
+schema_version = 1
+family_files = [
+    "oracle/stim-v1.16-parity/families-algebra-through-product.toml",
+    "oracle/stim-v1.16-parity/families-resource-through-transforms.toml",
+]
+
+[stim]
+version = "v1.16.0"
+commit = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07"
+
+[[command_surfaces]]
+command = "analyze_errors"
+options = ["--allow_gauge_detectors", "--approximate_disjoint_errors", "--block_decompose_from_introducing_remnant_edges", "--decompose_errors", "--fold_loops", "--ignore_decomposition_failures", "--in", "--out"]
+stim_refs = ["src/stim/cmd/command_analyze_errors.cc", "src/stim/cmd/command_analyze_errors.test.cc"]
+
+[[command_surfaces]]
+command = "convert"
+options = ["--bits_per_shot", "--circuit", "--dem", "--in", "--in_format", "--num_detectors", "--num_measurements", "--num_observables", "--obs_out", "--obs_out_format", "--out", "--out_format", "--types"]
+stim_refs = ["src/stim/cmd/command_convert.cc", "src/stim/cmd/command_convert.test.cc"]
+
+[[command_surfaces]]
+command = "detect"
+options = ["--append_observables", "--in", "--obs_out", "--obs_out_format", "--out", "--out_format", "--seed", "--shots"]
+stim_refs = ["src/stim/cmd/command_detect.cc", "src/stim/cmd/command_detect.test.cc"]
+
+[[command_surfaces]]
+command = "gen"
+options = ["--after_clifford_depolarization", "--after_reset_flip_probability", "--before_measure_flip_probability", "--before_round_data_depolarization", "--code", "--distance", "--in", "--out", "--rounds", "--task"]
+stim_refs = ["src/stim/cmd/command_gen.cc", "src/stim/cmd/command_gen.test.cc"]
+
+[[command_surfaces]]
+command = "m2d"
+options = ["--append_observables", "--circuit", "--in", "--in_format", "--obs_out", "--obs_out_format", "--out", "--out_format", "--ran_without_feedback", "--skip_reference_sample", "--sweep", "--sweep_format"]
+stim_refs = ["src/stim/cmd/command_m2d.cc", "src/stim/cmd/command_m2d.test.cc"]
+
+[[command_surfaces]]
+command = "sample"
+options = ["--in", "--out", "--out_format", "--seed", "--shots", "--skip_loop_folding", "--skip_reference_sample"]
+stim_refs = ["src/stim/cmd/command_sample.cc", "src/stim/cmd/command_sample.test.cc"]
+
+[[command_surfaces]]
+command = "sample_dem"
+options = ["--err_out", "--err_out_format", "--in", "--obs_out", "--obs_out_format", "--out", "--out_format", "--replay_err_in", "--replay_err_in_format", "--seed", "--shots"]
+stim_refs = ["src/stim/cmd/command_sample_dem.cc", "src/stim/cmd/command_sample_dem.test.cc"]
+
+[[format_routes]]
+id = "convert-input"
+command = "convert"
+role = "input"
+record_types = ["M", "D", "L"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "convert-observable-output"
+command = "convert"
+role = "side-output"
+record_types = ["L"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets"]
+stim_bug_divergences = ["ptb64"]
+stim_refs = ["doc/usage_command_line.md", "src/stim/cmd/command_convert.cc", "src/stim/io/measure_record_writer.cc"]
+
+[[format_routes]]
+id = "convert-output"
+command = "convert"
+role = "output"
+record_types = ["M", "D", "L"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets"]
+stim_bug_divergences = ["ptb64"]
+stim_refs = ["doc/usage_command_line.md", "src/stim/cmd/command_convert.cc", "src/stim/io/measure_record_writer.cc"]
+
+[[format_routes]]
+id = "detect-observable-output"
+command = "detect"
+role = "side-output"
+record_types = ["L"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "detect-output"
+command = "detect"
+role = "output"
+record_types = ["D", "L"]
+dets_observable_order = "prepend-by-default"
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "m2d-measurement-input"
+command = "m2d"
+role = "input"
+record_types = ["M"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "m2d-observable-output"
+command = "m2d"
+role = "side-output"
+record_types = ["L"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets"]
+rejected_formats = ["ptb64"]
+stim_refs = ["doc/usage_command_line.md", "src/stim/simulators/measurements_to_detection_events.inl", "src/stim/io/measure_record_writer.cc"]
+
+[[format_routes]]
+id = "m2d-output"
+command = "m2d"
+role = "output"
+record_types = ["D", "L"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets"]
+rejected_formats = ["ptb64"]
+stim_refs = ["doc/usage_command_line.md", "src/stim/simulators/measurements_to_detection_events.inl", "src/stim/io/measure_record_writer.cc"]
+
+[[format_routes]]
+id = "m2d-sweep-input"
+command = "m2d"
+role = "input"
+record_types = ["M"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "sample-dem-error-output"
+command = "sample_dem"
+role = "side-output"
+record_types = ["M"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "sample-dem-observable-output"
+command = "sample_dem"
+role = "side-output"
+record_types = ["L"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "sample-dem-output"
+command = "sample_dem"
+role = "output"
+record_types = ["D"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "sample-dem-replay-input"
+command = "sample_dem"
+role = "replay-input"
+record_types = ["M"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]
+
+[[format_routes]]
+id = "sample-output"
+command = "sample"
+role = "output"
+record_types = ["M"]
+accepted_formats = ["01", "b8", "r8", "hits", "dets", "ptb64"]
+stim_refs = ["doc/usage_command_line.md"]

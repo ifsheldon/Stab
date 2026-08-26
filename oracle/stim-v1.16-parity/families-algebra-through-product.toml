@@ -1,0 +1,785 @@
+[[families]]
+id = "algebra.clifford-values"
+area = "algebra"
+contract = "Single-qubit Clifford values and Clifford strings preserve Stim composition, naming, indexing, and growth semantics."
+stim_refs = ["src/stim/stabilizers/clifford_string.test.cc"]
+status = "done"
+owner = "stab-algebra"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-algebra"
+kind = "test"
+target = "clifford_contracts"
+name = "cq2_algebra_clifford_string_contract_covers_growth_and_composition"
+minimum_tier = "pr"
+
+[[families]]
+id = "algebra.flows"
+area = "algebra"
+contract = "Flow values preserve input and output Paulis, measurement indexes, included observables, multiplication, and canonical text."
+stim_refs = ["src/stim/stabilizers/flow.test.cc"]
+status = "done"
+owner = "stab-algebra"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-algebra"
+kind = "test"
+target = "cq2_algebra_values"
+name = "cq2_algebra_flow_value_contract_canonicalizes_and_reports_typed_errors"
+minimum_tier = "pr"
+
+[[families]]
+id = "algebra.interactive-simulators"
+area = "algebra"
+contract = "Public TableauSimulator, FlipSimulator, graph-simulator, and vector-simulator products expose interactive mutation and inspection."
+stim_refs = ["src/stim/simulators/tableau_simulator.h", "src/stim/simulators/frame_simulator.h", "src/stim/simulators/graph_simulator.h", "src/stim/simulators/vector_simulator.h"]
+status = "deferred"
+rationale = "Interactive simulator products are explicitly deferred while their internal tableau and frame semantics remain required by batch workflows."
+
+[[families]]
+id = "algebra.pauli-values"
+area = "algebra"
+contract = "Pauli strings preserve phases, indexing, text, multiplication, commutation, and typed value semantics."
+stim_refs = ["src/stim/stabilizers/pauli_string.test.cc"]
+status = "done"
+owner = "stab-algebra"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "algebra.representation-neutral-conversions-common"
+area = "algebra"
+contract = "The implemented Pauli, Clifford, tableau, stabilizer, unitary, and circuit conversions preserve value semantics across the representations used by current Rust workflows."
+stim_refs = ["src/stim/stabilizers/tableau.test.cc", "src/stim/stabilizers/pauli_string.test.cc"]
+status = "done"
+owner = "stab-algebra"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "algebra.representation-neutral-conversions-remaining"
+area = "algebra"
+contract = "Pauli, Clifford, tableau, stabilizer, unitary, state-vector, and circuit representations support every remaining nondeferred conversion and application exposed by Stim's stable behavior."
+stim_refs = ["src/stim/stabilizers/tableau.test.cc", "src/stim/stabilizers/pauli_string.test.cc"]
+status = "missing"
+owner = "stab-algebra"
+milestone = "P5"
+
+[[families]]
+id = "algebra.tableaux"
+area = "algebra"
+contract = "Tableaux preserve canonical generator access, composition, inversion, and forward and inverse Pauli actions."
+stim_refs = ["src/stim/stabilizers/tableau.test.cc"]
+status = "done"
+owner = "stab-algebra"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "analysis.circuit-to-dem-common-generated-qec"
+area = "analysis"
+contract = "Circuit-to-DEM analysis matches pinned Stim semantics for the generated rotated-surface-code regression workload."
+stim_refs = ["src/stim/util_top/circuit_to_dem.test.cc", "src/stim/simulators/error_analyzer.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "generated_qec_dem"
+name = "generated_qec_dem_rotated_surface_code_semantics_match_pinned_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "analysis.circuit-to-dem-remaining-gate-surface"
+area = "analysis"
+contract = "Circuit-to-DEM analysis accepts every legal in-scope instruction and target shape beyond the separately owned generated and selected gate surfaces and rejects only Stim-invalid inputs."
+stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/util_top/circuit_to_dem.test.cc"]
+coverage = ["consumer:analysis"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "analysis.circuit-to-dem-selected-gate-surface"
+area = "analysis"
+contract = "Circuit-to-DEM analysis implements the selected Pauli, Clifford, noise, measurement, product, heralded, feedback, decomposition, gauge, coordinate, and folded-repeat surface recorded by current Rust workflows."
+stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/util_top/circuit_to_dem.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "analysis.detecting-regions-common"
+area = "analysis"
+contract = "Detecting-region analysis handles the implemented Clifford, product-measurement, annotation, noise, bounded-repeat, selected feedback, generated-code, target-filter, and ignored-anticommutation workflows."
+stim_refs = ["src/stim/util_top/circuit_to_detecting_regions.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "analysis.detecting-regions-remaining"
+area = "analysis"
+contract = "Detecting-region analysis handles every remaining legal gate, classical control, compact repeat, anticommutation mode, and target shape supported by Stim."
+stim_refs = ["src/stim/util_top/circuit_to_detecting_regions.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "analysis.error-explanations"
+area = "analysis"
+contract = "DEM errors map back to full physical circuit provenance and repeat-stack locations."
+stim_refs = ["src/stim/simulators/error_matcher.test.cc"]
+status = "deferred"
+rationale = "The explain_errors product and full ErrorMatcher provenance are explicitly deferred."
+
+[[families]]
+id = "analysis.flow-generation-and-checking-common"
+area = "analysis"
+contract = "Flow generation, unsigned and selected signed checking, diagnostics, and GF(2) measurement solving work for the implemented unitary, measurement, reset, product, feedback, noise, and bounded-repeat circuit subset."
+stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc", "src/stim/util_top/has_flow.test.cc"]
+coverage = ["consumer:flow"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "analysis.flow-generation-and-checking-remaining"
+area = "analysis"
+contract = "Flow generation, checking, diagnostics, and measurement solving work for every remaining legal in-scope circuit instead of a selected gate or repeat subset."
+stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc", "src/stim/util_top/has_flow.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "analysis.loop-folding-common"
+area = "analysis"
+contract = "Circuit-to-DEM loop folding preserves the pinned simple nested-repeat detector, observable, and error regression shape."
+stim_refs = ["src/stim/simulators/error_analyzer.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_analyzer_loop_folding"
+name = "dem_analyzer_fold_loops_preserves_simple_nested_repeat_like_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "analysis.loop-folding-feedback-common"
+area = "analysis"
+contract = "Loop folding preserves the implemented selected measurement-feedback, sweep-control, long-period, gauge, coordinate, nested-repeat, and generated-code analysis cases."
+stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/simulators/sparse_rev_frame_tracker.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "analysis.loop-folding-feedback-remaining"
+area = "analysis"
+contract = "Loop folding preserves every remaining legal repeat-contained measurement and sweep feedback shape without bounded unrolling fallbacks."
+stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/simulators/sparse_rev_frame_tracker.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "analysis.missing-detectors-common"
+area = "analysis"
+contract = "Missing-detector discovery handles the implemented reset, measurement, product-measurement, observable, Clifford, Pauli-product, bounded-repeat, and generated-code suffix cases."
+stim_refs = ["src/stim/util_top/missing_detectors.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "analysis.missing-detectors-remaining"
+area = "analysis"
+contract = "Missing-detector discovery handles every remaining legal in-scope circuit and folded repeat shape."
+stim_refs = ["src/stim/util_top/missing_detectors.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "circuit-model.approximate-equality"
+area = "circuit-model"
+contract = "Circuit approximate equality compares instruction structure and numeric arguments with Stim-compatible absolute tolerance semantics."
+stim_refs = ["doc/stim.pyi"]
+coverage = ["capability:circuit-approximate-equality"]
+status = "missing"
+owner = "stab-model"
+milestone = "P3"
+
+[[families]]
+id = "circuit-model.coordinates-and-counts"
+area = "circuit-model"
+contract = "Circuit counts, final coordinate shifts, qubit coordinates, detector coordinates, and repeat-aware indexes match Stim semantics."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "circuit-model.determined-measurements"
+area = "circuit-model"
+contract = "Determined-measurement counting matches Stim for known-zero and unknown initial states over the supported batch circuit surface."
+stim_refs = ["doc/stim.pyi", "src/stim/util_top/count_determined_measurements.test.cc"]
+coverage = ["capability:circuit-determined-measurements"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-core"
+kind = "test"
+target = "circuit_api"
+name = "pf1_circuit_reference_determined_count_determined_measurements_matches_public_helper_subset"
+minimum_tier = "pr"
+
+[[families]]
+id = "circuit-model.mutation-and-values"
+area = "circuit-model"
+contract = "Circuit instructions and repeat blocks support typed value inspection, append, insertion, removal, concatenation, repetition, and clear operations."
+stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/circuit/circuit_instruction.test.cc"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "circuit-model.reference-sample"
+area = "circuit-model"
+contract = "Circuit reference sampling returns the noiseless measurement-indexed reference record used by compiled batch sampling."
+stim_refs = ["doc/stim.pyi", "src/stim/util_top/reference_sample_tree.test.cc"]
+coverage = ["capability:circuit-reference-sample"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-core"
+kind = "test"
+target = "circuit_api"
+name = "pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler"
+minimum_tier = "pr"
+
+[[families]]
+id = "circuit-model.reference-signs"
+area = "circuit-model"
+contract = "Reference detector and observable signs match Stim for noiseless circuits, including folded repeats and Pauli observables."
+stim_refs = ["doc/stim.pyi", "src/stim/circuit/circuit_pybind_test.py"]
+coverage = ["capability:circuit-reference-signs"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P3"
+
+[[families]]
+id = "circuit-model.syntax-and-canonical-text"
+area = "circuit-model"
+contract = "The .stim dialect parses and canonically renders comments, tags, numeric arguments, targets, instructions, and nested nonzero repeats."
+stim_refs = ["doc/file_format_stim_circuit.md", "src/stim/circuit/circuit.test.cc"]
+coverage = ["dialect:stim"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "circuit-model.target-grammar-and-validation"
+area = "circuit-model"
+contract = "Qubit, inverted, record, sweep, Pauli, and combiner targets preserve Stim parsing, grouping, bounds, and role validation."
+stim_refs = ["src/stim/circuit/gate_target.test.cc", "src/stim/circuit/circuit_instruction.test.cc"]
+coverage = ["target:combiner", "target:inverted-pauli", "target:inverted-qubit", "target:measurement-record", "target:pad-bit", "target:pauli", "target:qubit", "target:sweep-bit"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "cli.analyze-errors"
+area = "cli"
+contract = "analyze_errors accepts every nondeprecated Stim option and routes it into the typed circuit-to-DEM workflow."
+stim_refs = ["src/stim/cmd/command_analyze_errors.cc", "src/stim/cmd/command_analyze_errors.test.cc"]
+coverage = ["command:analyze_errors", "option:analyze_errors/--allow_gauge_detectors", "option:analyze_errors/--approximate_disjoint_errors", "option:analyze_errors/--block_decompose_from_introducing_remnant_edges", "option:analyze_errors/--decompose_errors", "option:analyze_errors/--fold_loops", "option:analyze_errors/--ignore_decomposition_failures", "option:analyze_errors/--in", "option:analyze_errors/--out"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "cli.convert"
+area = "cli"
+contract = "convert accepts every nondeprecated Stim option and routes typed circuit, DEM, explicit-layout, primary-output, and observable-output arguments."
+stim_refs = ["src/stim/cmd/command_convert.cc", "src/stim/cmd/command_convert.test.cc"]
+coverage = ["command:convert", "option:convert/--bits_per_shot", "option:convert/--circuit", "option:convert/--dem", "option:convert/--in", "option:convert/--in_format", "option:convert/--num_detectors", "option:convert/--num_measurements", "option:convert/--num_observables", "option:convert/--obs_out", "option:convert/--obs_out_format", "option:convert/--out", "option:convert/--out_format", "option:convert/--types"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "cli.deprecated-compatibility-removal"
+area = "cli"
+contract = "Stab removes legacy top-level dispatch, deprecated frame and observable-order aliases, hidden sample_dem observable aliases, and stale help advertising instead of maintaining a second compatibility parser."
+stim_refs = ["src/stim/cmd/command_analyze_errors.test.cc", "src/stim/cmd/command_detect.cc", "src/stim/cmd/command_sample.cc", "src/stim/cmd/command_sample_dem.cc"]
+coverage = ["obsolete:analyze-detector-hypergraph", "obsolete:detect-prepend-observables", "obsolete:help-frame0", "obsolete:legacy-dispatch", "obsolete:sample-dem-append-observables", "obsolete:sample-dem-prepend-observables", "obsolete:sample-frame0"]
+status = "missing"
+owner = "stab-cli"
+milestone = "P6"
+
+[[families]]
+id = "cli.detect"
+area = "cli"
+contract = "detect accepts every nondeprecated Stim option and routes sampling, output-format, and observable-output arguments."
+stim_refs = ["src/stim/cmd/command_detect.cc", "src/stim/cmd/command_detect.test.cc"]
+coverage = ["command:detect", "option:detect/--append_observables", "option:detect/--in", "option:detect/--obs_out", "option:detect/--obs_out_format", "option:detect/--out", "option:detect/--out_format", "option:detect/--seed", "option:detect/--shots"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "cli.diagram"
+area = "cli"
+contract = "diagram renders Stim circuit and DEM visualization products and aliases."
+stim_refs = ["src/stim/cmd/command_diagram.cc", "src/stim/cmd/command_diagram.test.cc"]
+coverage = ["command:diagram"]
+status = "deferred"
+rationale = "Diagram and visualization products are explicitly deferred."
+
+[[families]]
+id = "cli.explain-errors"
+area = "cli"
+contract = "explain_errors reports full physical circuit provenance for detector error model mechanisms."
+stim_refs = ["src/stim/cmd/command_explain_errors.cc", "src/stim/cmd/command_explain_errors.test.cc"]
+coverage = ["command:explain_errors"]
+status = "deferred"
+rationale = "The explain_errors command and full ErrorMatcher provenance are explicitly deferred."
+
+[[families]]
+id = "cli.gen"
+area = "cli"
+contract = "gen accepts every nondeprecated Stim option and routes validated generation-family, task, geometry, noise, input, and output arguments."
+stim_refs = ["src/stim/cmd/command_gen.cc", "src/stim/cmd/command_gen.test.cc"]
+coverage = ["command:gen", "option:gen/--after_clifford_depolarization", "option:gen/--after_reset_flip_probability", "option:gen/--before_measure_flip_probability", "option:gen/--before_round_data_depolarization", "option:gen/--code", "option:gen/--distance", "option:gen/--in", "option:gen/--out", "option:gen/--rounds", "option:gen/--task"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "cli.help"
+area = "cli"
+contract = "help provides structural discovery for implemented commands, formats, and gate names without reproducing Stim documentation byte for byte."
+stim_refs = ["src/stim/cmd/command_help.cc", "doc/usage_command_line.md"]
+coverage = ["command:help"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stab intentionally presents concise implemented-only structural help instead of bundling deferred Stim product documentation."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::help::help_topics_cover_commands_formats_and_gates"
+minimum_tier = "pr"
+
+[[families]]
+id = "cli.m2d"
+area = "cli"
+contract = "m2d accepts every nondeprecated Stim option and routes circuit, measurement, sweep, feedback, output-format, and observable-output arguments."
+stim_refs = ["src/stim/cmd/command_m2d.cc", "src/stim/cmd/command_m2d.test.cc"]
+coverage = ["command:m2d", "option:m2d/--append_observables", "option:m2d/--circuit", "option:m2d/--in", "option:m2d/--in_format", "option:m2d/--obs_out", "option:m2d/--obs_out_format", "option:m2d/--out", "option:m2d/--out_format", "option:m2d/--ran_without_feedback", "option:m2d/--skip_reference_sample", "option:m2d/--sweep", "option:m2d/--sweep_format"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "cli.repl"
+area = "cli"
+contract = "repl exposes Stim's interactive stabilizer simulation command."
+stim_refs = ["src/stim/cmd/command_repl.cc"]
+coverage = ["command:repl"]
+status = "deferred"
+rationale = "The interactive REPL product is explicitly deferred."
+
+[[families]]
+id = "cli.sample"
+area = "cli"
+contract = "sample accepts every nondeprecated Stim option and routes circuit input, shot, seed, loop-folding, reference-sample, format, and output arguments."
+stim_refs = ["src/stim/cmd/command_sample.cc", "src/stim/cmd/command_sample.test.cc"]
+coverage = ["command:sample", "option:sample/--in", "option:sample/--out", "option:sample/--out_format", "option:sample/--seed", "option:sample/--shots", "option:sample/--skip_loop_folding", "option:sample/--skip_reference_sample"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "cli.sample-dem"
+area = "cli"
+contract = "sample_dem accepts every nondeprecated Stim option and routes DEM input, sampling, replay, primary, observable, and sampled-error streams."
+stim_refs = ["src/stim/cmd/command_sample_dem.cc", "src/stim/cmd/command_sample_dem.test.cc"]
+coverage = ["command:sample_dem", "option:sample_dem/--err_out", "option:sample_dem/--err_out_format", "option:sample_dem/--in", "option:sample_dem/--obs_out", "option:sample_dem/--obs_out_format", "option:sample_dem/--out", "option:sample_dem/--out_format", "option:sample_dem/--replay_err_in", "option:sample_dem/--replay_err_in_format", "option:sample_dem/--seed", "option:sample_dem/--shots"]
+status = "done"
+owner = "stab-cli"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "dem-model.approximate-equality"
+area = "dem-model"
+contract = "Detector error model approximate equality compares structure and floating-point arguments with Stim-compatible absolute tolerance semantics."
+stim_refs = ["doc/stim.pyi"]
+coverage = ["capability:dem-approximate-equality"]
+status = "missing"
+owner = "stab-model"
+milestone = "P3"
+
+[[families]]
+id = "dem-model.counts-coordinates-and-values"
+area = "dem-model"
+contract = "DEM values expose typed instructions, targets, counts, detector coordinates, shifts, mutation, concatenation, and repeat semantics."
+stim_refs = ["src/stim/dem/detector_error_model.test.cc", "src/stim/dem/dem_instruction.test.cc"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "dem-model.syntax-and-canonical-text"
+area = "dem-model"
+contract = "The .dem dialect parses and canonically renders five instruction kinds, tags, probabilities, targets, shifts, comments, and nested repeats."
+stim_refs = ["doc/file_format_dem_detector_error_model.md", "src/stim/dem/detector_error_model.test.cc"]
+coverage = ["dialect:dem"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "dem-model.transforms"
+area = "dem-model"
+contract = "DEM flattening, flattened error iteration, and probability rounding preserve Stim semantics."
+stim_refs = ["src/stim/dem/detector_error_model.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_transforms"
+name = "cq2_dem_materialized_transform_matrix_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "detection.common-frame-gate-surface"
+area = "detection"
+contract = "Detection sampling and conversion implement the selected Clifford, measurement, reset, pair-product, MPP, MPAD, Pauli-observable, noise, feedback, and bounded-repeat frame paths."
+stim_refs = ["src/stim/simulators/frame_simulator_util.test.cc", "src/stim/simulators/measurements_to_detection_events.test.cc"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "detection.reference-correction"
+area = "detection"
+contract = "Measurement flips are compared against the reference sample before detector and observable parity conversion."
+stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-core"
+kind = "test"
+target = "reference_flip_semantics"
+name = "certain_measurement_flips_convert_like_pinned_stim_through_m2d"
+minimum_tier = "pr"
+
+[[families]]
+id = "detection.remaining-frame-gate-surface"
+area = "detection"
+contract = "Detection sampling and conversion support every legal gate and target shape beyond the separately owned common frame, reference-correction, and feedback contracts without selected-subset exits."
+stim_refs = ["src/stim/simulators/frame_simulator_util.test.cc", "src/stim/simulators/measurements_to_detection_events.test.cc"]
+coverage = ["consumer:detection"]
+status = "missing"
+owner = "stab-engine"
+milestone = "P4"
+
+[[families]]
+id = "detection.sweep-and-feedback-common"
+area = "detection"
+contract = "Measurement conversion accepts omitted all-false and six-format explicit sweep records and honors the implemented selected feedback and ran_without_feedback transformations."
+stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc", "src/stim/cmd/command_m2d.test.cc"]
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "detection.sweep-and-feedback-remaining"
+area = "detection"
+contract = "Measurement conversion honors every remaining legal sweep-conditioned and repeat-contained feedback shape supported by Stim."
+stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc", "src/stim/cmd/command_m2d.test.cc"]
+status = "missing"
+owner = "stab-engine"
+milestone = "P4"
+
+[[families]]
+id = "gate-catalog.catalog-membership"
+area = "gate-catalog"
+contract = "The frozen catalog contains exactly all 81 canonical Stim instruction names and all 12 accepted aliases, with no duplicate or extra entry."
+stim_refs = ["doc/gates.md", "src/stim/gates/gates.test.cc"]
+coverage = [
+    "gate:I", "gate:X", "gate:Y", "gate:Z", "gate:C_NXYZ", "gate:C_NZYX", "gate:C_XNYZ", "gate:C_XYNZ", "gate:C_XYZ", "gate:C_ZNYX", "gate:C_ZYNX", "gate:C_ZYX",
+    "gate:H", "gate:H_NXY", "gate:H_NXZ", "gate:H_NYZ", "gate:H_XY", "gate:H_YZ", "gate:S", "gate:SQRT_X", "gate:SQRT_X_DAG", "gate:SQRT_Y", "gate:SQRT_Y_DAG", "gate:S_DAG",
+    "gate:CX", "gate:CXSWAP", "gate:CY", "gate:CZ", "gate:CZSWAP", "gate:II", "gate:ISWAP", "gate:ISWAP_DAG", "gate:SQRT_XX", "gate:SQRT_XX_DAG", "gate:SQRT_YY", "gate:SQRT_YY_DAG", "gate:SQRT_ZZ", "gate:SQRT_ZZ_DAG", "gate:SWAP", "gate:SWAPCX", "gate:XCX", "gate:XCY", "gate:XCZ", "gate:YCX", "gate:YCY", "gate:YCZ",
+    "gate:DEPOLARIZE1", "gate:DEPOLARIZE2", "gate:E", "gate:ELSE_CORRELATED_ERROR", "gate:HERALDED_ERASE", "gate:HERALDED_PAULI_CHANNEL_1", "gate:II_ERROR", "gate:I_ERROR", "gate:PAULI_CHANNEL_1", "gate:PAULI_CHANNEL_2", "gate:X_ERROR", "gate:Y_ERROR", "gate:Z_ERROR",
+    "gate:M", "gate:MR", "gate:MRX", "gate:MRY", "gate:MX", "gate:MY", "gate:R", "gate:RX", "gate:RY", "gate:MXX", "gate:MYY", "gate:MZZ", "gate:MPP", "gate:SPP", "gate:SPP_DAG", "gate:REPEAT", "gate:DETECTOR", "gate:MPAD", "gate:OBSERVABLE_INCLUDE", "gate:QUBIT_COORDS", "gate:SHIFT_COORDS", "gate:TICK",
+    "alias:H_XZ", "alias:SQRT_Z", "alias:SQRT_Z_DAG", "alias:CNOT", "alias:ZCX", "alias:ZCY", "alias:ZCZ", "alias:SWAPCZ", "alias:CORRELATED_ERROR", "alias:MZ", "alias:MRZ", "alias:RZ",
+]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "gate-catalog.flow-metadata"
+area = "gate-catalog"
+contract = "Every gate with pinned stabilizer-flow metadata exposes the same flow set, and gates without flow metadata reject the query."
+stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
+coverage = ["capability:gate-flow-metadata"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_gate_flow_metadata_contract"
+minimum_tier = "pr"
+
+[[families]]
+id = "gate-catalog.h-s-cx-m-r-decomposition-metadata"
+area = "gate-catalog"
+contract = "Every gate with pinned H/S/CX/M/R decomposition metadata matches Stim's exact decomposition text and lowers to the declared base set."
+stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_gate_decomposition_metadata_contract"
+minimum_tier = "pr"
+
+[[families]]
+id = "gate-catalog.remaining-metadata"
+area = "gate-catalog"
+contract = "Every canonical instruction not fully asserted by the selected-metadata and decomposition-metadata owners matches Stim's inverse, category, argument, and target metadata."
+stim_refs = ["doc/gates.md", "src/stim/gates/gates.test.cc"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "needs-owner"
+milestone = "P1"
+
+[[families]]
+id = "gate-catalog.selected-metadata"
+area = "gate-catalog"
+contract = "Representative Clifford, controlled, product, noise, measurement, reset, and annotation instructions expose their pinned Stim aliases and metadata."
+stim_refs = ["doc/gates.md", "src/stim/gates/gates.test.cc"]
+status = "done"
+owner = "stab-model"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "gate_contract"
+name = "canonical_gate_registry_owns_aliases_and_metadata"
+minimum_tier = "pr"
+
+[[families]]
+id = "gate-catalog.tableau-metadata"
+area = "gate-catalog"
+contract = "Every Clifford gate with pinned tableau metadata exposes the same local tableau, and gates without tableau metadata reject the query."
+stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
+coverage = ["capability:gate-tableau-metadata"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "pf1_gate_tableau_metadata"
+minimum_tier = "pr"
+
+[[families]]
+id = "gate-catalog.unitary-metadata"
+area = "gate-catalog"
+contract = "Every one- and two-qubit gate with pinned fixed-shape unitary metadata exposes the same little-endian matrix and inverse relation, and unsupported gates reject the query."
+stim_refs = ["src/stim/gates/gates.test.cc", "src/stim/gates/gates_test.py"]
+coverage = ["capability:gate-unitary-metadata"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_gate_unitary_matrix_contract"
+minimum_tier = "pr"
+
+[[families]]
+id = "generation.color-code-memory"
+area = "generation"
+contract = "Color-code memory generation matches pinned Stim layout, hint, circuit structure, and noise placement."
+stim_refs = ["src/stim/gen/gen_color_code.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_generation"
+name = "cq2_generation_color_matches_complete_pinned_stim_case"
+minimum_tier = "pr"
+
+[[families]]
+id = "generation.parameters-and-noise"
+area = "generation"
+contract = "Generator distance, rounds, task, and four noise controls validate and alter generated circuits like Stim."
+stim_refs = ["src/stim/gen/circuit_gen_params.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_generation"
+name = "cq2_generation_parameter_contract_covers_typed_values_and_noise_builders"
+minimum_tier = "pr"
+
+[[families]]
+id = "generation.repetition-code-memory"
+area = "generation"
+contract = "Repetition-code memory generation matches pinned Stim layout, hint, circuit structure, and noise placement."
+stim_refs = ["src/stim/gen/gen_rep_code.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_generation"
+name = "cq2_generation_repetition_matches_complete_pinned_stim_case"
+minimum_tier = "pr"
+
+[[families]]
+id = "generation.surface-code-memory"
+area = "generation"
+contract = "The four rotated and unrotated surface-code memory tasks match pinned Stim layout, hint, circuit structure, and noise placement."
+stim_refs = ["src/stim/gen/gen_surface_code.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_generation"
+name = "cq2_generation_surface_matches_complete_pinned_stim_cases"
+minimum_tier = "pr"
+
+[[families]]
+id = "product-surface.ecosystem-integrations"
+area = "product-surface"
+contract = "Stab interoperates through Stim's Cirq, Sinter, Crumble, stimflow, ZX, and lattice-surgery glue packages."
+stim_refs = ["glue/cirq/stimcirq/__init__.py", "glue/sample/src/sinter/__init__.py", "glue/stimflow/README.md"]
+status = "deferred"
+rationale = "Ecosystem integrations are explicitly deferred until the core Rust and CLI product is complete."
+
+[[families]]
+id = "product-surface.gpu-execution"
+area = "product-surface"
+contract = "Stab exposes a measured GPU execution backend for batch-parallel workloads."
+stim_refs = ["src/stim/simulators/frame_simulator.h"]
+status = "deferred"
+rationale = "GPU execution is explicitly deferred; CPU execution and portable SIMD leaf kernels remain the current target."
+
+[[families]]
+id = "product-surface.javascript-wasm-bindings"
+area = "product-surface"
+contract = "Stab exposes Stim-compatible JavaScript and WebAssembly circuit, Pauli, tableau, and simulator products."
+stim_refs = ["glue/javascript/README.md"]
+status = "deferred"
+rationale = "JavaScript and WebAssembly bindings are explicitly deferred."
+
+[[families]]
+id = "product-surface.python-bindings"
+area = "product-surface"
+contract = "Stab exposes Stim-compatible Python package, object, method, argument, and return-value shapes."
+stim_refs = ["doc/stim.pyi"]
+status = "deferred"
+rationale = "Python binding shape is explicitly deferred; stable Python capabilities inform idiomatic Rust behavior only."
+
+[[families]]
+id = "product-surface.visualization-products"
+area = "product-surface"
+contract = "Circuit and detector error model diagrams cover Stim's text, SVG, 3D, HTML, and Crumble visualization products."
+stim_refs = ["src/stim/cmd/command_diagram.cc", "src/stim/diagram/ascii_diagram.cc"]
+status = "deferred"
+rationale = "Diagram and visualization products are explicitly deferred."

@@ -77,6 +77,7 @@ tar = "0.4.46"
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["io-util", "macros", "process", "rt-multi-thread", "signal"] }
+toml = "1.1.4"
 unicode-general-category = "1.1.0"
 ureq = "3.3.0"
 yaml-rust2 = "0.11.0"
