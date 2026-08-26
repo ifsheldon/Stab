@@ -1,8 +1,8 @@
 # Partial Feature Closure Plan
 
-Historical note: this document is retained as the first post-beta PF planning pass.
+Status: Historical first post-beta PF planning pass, superseded by [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md).
 PFM-B5 supersedes its staged PF6 analyzer and search benchmark references; retired `pf6-*` row IDs in this file are historical evidence only, and current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
-The successor `docs/plans/non-deferred-partial-feature-milestones.md` program is complete, and `docs/plans/GOAL.md` now points at the active comprehensive correctness and performance qualification plans.
+The successor `docs/plans/non-deferred-partial-feature-milestones.md` program is complete, and `docs/plans/GOAL.md` now points at the active parity plan.
 
 ## Summary
 

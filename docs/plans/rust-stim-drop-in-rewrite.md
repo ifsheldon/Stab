@@ -2,6 +2,8 @@
 
 ## Status
 
+Historical founding roadmap, superseded for current execution and feature status by [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) and its generated ledger.
+
 Created: 2026-06-26
 
 Target: Stim v1.16.0, tag commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.

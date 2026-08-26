@@ -1,13 +1,12 @@
 # Remaining Partial Feature Milestones
 
-Historical note: PFM-B5 supersedes the staged PF6 analyzer and search benchmark references in this plan. Retired `pf6-*` row IDs below are historical evidence only; current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+Status: Historical implementation plan, superseded by [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md). PFM-B5 also superseded the staged PF6 analyzer and search benchmark references in this plan; retired `pf6-*` row IDs below are historical evidence only.
 
 ## Summary
 
 This historical plan covers every feature row marked `Partial` in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred.
 It turned the checklist into executable RPF milestones with owned tests, oracle evidence, benchmark rows, acceptance criteria, and explicit exclusions.
 
-The current execution plan is now `docs/plans/non-deferred-partial-feature-milestones.md`.
 Keep this document as historical RPF source material and update it only when old RPF references would otherwise mislead an implementation agent.
 
 Use `docs/plans/lessons-learned.md` while executing every milestone.

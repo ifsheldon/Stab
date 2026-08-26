@@ -1,6 +1,6 @@
 # Pre-0.2 Code Entropy Reclamation Plan
 
-Status: Active until E0 through E7 are complete. This plan temporarily supersedes the release-oriented A9 execution sequence in [GOAL.md](GOAL.md); the architecture plan remains the long-term product roadmap.
+Status: Historical completed entropy-reclamation input. [The Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) now owns execution; this document preserves the consumer proofs and deletion rationale that informed it.
 
 ## Purpose
 

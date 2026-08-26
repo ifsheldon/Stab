@@ -2,7 +2,9 @@
 
 ## Status
 
-Planned: 2026-07-13.
+Historical qualification contract. Its durable semantic and safety requirements feed [the active core parity plan](stim-core-parity-and-lean-evidence-plan.md), but its per-export inventory and evidence lifecycle no longer define current work or feature status.
+
+Originally planned: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` in `vendor/stim`.
 
@@ -303,7 +305,7 @@ Make every comparator, selector, statistical plan, artifact, timeout, and report
 
 ## Milestone CQ2: Deterministic Models, Formats, Generation, And Algebra
 
-Status: Current generated counts and identities live in [../qualification-status.md](../qualification-status.md). Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` passed 406 of 406 PR executions and 612 of 612 full and soak executions under correctness inventory `7a0f0fd50bc46221d4c1b489f9bb3d52f0a2e8ced996087f5714c72699645c7b`. The repaired result-format domain also passed the live 62-case pinned-Stim corpus, closing the strict text grammar, typed DETS API, CLI propagation, and file-role-safety reopening. Historical runs remain valid only for their exact producer and inventory. Exact current evidence is recorded in [qualification-economy-regression-progress-report.md](qualification-economy-regression-progress-report.md), while [cq2-deterministic-qualification-progress-report.md](cq2-deterministic-qualification-progress-report.md) preserves earlier CQ2 history.
+Historical status at the time: generated counts and identities lived in [../qualification-status.md](../qualification-status.md). Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` passed 406 of 406 PR executions and 612 of 612 full and soak executions under correctness inventory `7a0f0fd50bc46221d4c1b489f9bb3d52f0a2e8ced996087f5714c72699645c7b`. The repaired result-format domain also passed the live 62-case pinned-Stim corpus, closing the strict text grammar, typed DETS API, CLI propagation, and file-role-safety reopening. Historical runs remain valid only for their exact producer and inventory. Exact evidence from that program is recorded in [qualification-economy-regression-progress-report.md](qualification-economy-regression-progress-report.md), while [cq2-deterministic-qualification-progress-report.md](cq2-deterministic-qualification-progress-report.md) preserves earlier CQ2 history.
 
 ### Objective
 

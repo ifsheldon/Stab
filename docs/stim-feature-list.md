@@ -1,12 +1,14 @@
 # Stim v1.16.0 Feature And API Inventory
 
+> Historical inventory: this document is a source-research input, not the current Stab scope or status contract. Use the generated [Stim parity view](stim-parity.md), its source ledger at `../oracle/stim-v1.16-parity.toml`, and the active [GOAL](plans/GOAL.md).
+
 This inventory targets the pinned Stim submodule at `vendor/stim`, which is `v1.16.0` at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
 Primary sources are Stim's upstream generated references and binding/source files: [README.md](../vendor/stim/README.md), [doc/python_api_reference_vDev.md](../vendor/stim/doc/python_api_reference_vDev.md), [doc/stim.pyi](../vendor/stim/doc/stim.pyi), [doc/usage_command_line.md](../vendor/stim/doc/usage_command_line.md), [doc/gates.md](../vendor/stim/doc/gates.md), [doc/file_format_stim_circuit.md](../vendor/stim/doc/file_format_stim_circuit.md), [doc/file_format_dem_detector_error_model.md](../vendor/stim/doc/file_format_dem_detector_error_model.md), [doc/result_formats.md](../vendor/stim/doc/result_formats.md), and the public-header umbrella [src/stim.h](../vendor/stim/src/stim.h).
 
 Stim's stable 1.x compatibility contract covers the Python API and command-line API. The C++ API is exposed through headers but explicitly makes no compatibility guarantees, so this document treats it as an implementation and porting surface instead of a stable public contract.
 
-The current Stab mapping is [stab-feature-checklist.md](stab-feature-checklist.md), while case-level correctness and feature-level performance qualification of the implemented selected surface are planned in [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md) and [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md).
+The historical Stab mapping is [stab-feature-checklist.md](stab-feature-checklist.md). Its former correctness and performance qualification contracts are retained in [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md) and [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md).
 
 ## 1. Top-Level Product Surface
 
@@ -40,8 +42,8 @@ The current Stab mapping is [stab-feature-checklist.md](stab-feature-checklist.m
 
 - **Dense text:** `01` stores each shot as a newline-terminated row of `0` and `1` characters.
 - **Dense binary:** `b8` stores each shot as little-endian bit-packed bytes padded to a byte boundary.
-- **Sparse text:** `dets` stores each shot as `shot` followed by sparse `M#`, `D#`, and `L#` terms.
-- **Sparse binary:** `hits` and `r8` store sparse hit indices in compact binary encodings.
+- **Sparse text:** `hits` stores comma-separated hit indexes, while `dets` stores each shot as `shot` followed by sparse `M#`, `D#`, and `L#` terms.
+- **Sparse binary:** `r8` stores sparse hit indexes as run lengths terminated by a zero byte.
 - **Transposed packed binary:** `ptb64` stores 64-shot groups in a transposed SIMD-friendly layout.
 - **Context dependency:** formats intentionally omit metadata, so readers need external context such as bits per shot, detector count, observable count, result type order, and record count.
 - **Result prefixes:** `M` means measurement, `D` means detector, and `L` means logical observable frame change.
@@ -162,15 +164,15 @@ The current Stab mapping is [stab-feature-checklist.md](stab-feature-checklist.m
 ### 11.2 Command Options
 
 - **`analyze_errors`:** `--allow_gauge_detectors`, `--approximate_disjoint_errors [probability]`, `--block_decompose_from_introducing_remnant_edges`, `--decompose_errors`, `--fold_loops`, `--ignore_decomposition_failures`, `--in`, `--out`.
-- **`convert`:** `--bits_per_shot`, `--circuit`, `--in`, `--in_format`, `--num_detectors`, `--num_measurements`, `--num_observables`, `--obs_out`, `--obs_out_format`, `--out`, `--out_format`, `--types`.
+- **`convert`:** `--bits_per_shot`, `--circuit`, `--dem`, `--in`, `--in_format`, `--num_detectors`, `--num_measurements`, `--num_observables`, `--obs_out`, `--obs_out_format`, `--out`, `--out_format`, `--types`.
 - **`detect`:** `--append_observables`, `--in`, `--obs_out`, `--obs_out_format`, `--out`, `--out_format`, `--seed`, `--shots`.
 - **`diagram`:** `--filter_coords`, `--in`, `--out`, `--remove_noise`, `--tick`, `--type`.
 - **`explain_errors`:** `--dem_filter`, `--in`, `--out`, `--single`.
-- **`gen`:** `--after_clifford_depolarization`, `--after_reset_flip_probability`, `--before_measure_flip_probability`, `--before_round_data_depolarization`, `--code`, `--distance`, `--out`, `--rounds`, `--task`.
+- **`gen`:** `--after_clifford_depolarization`, `--after_reset_flip_probability`, `--before_measure_flip_probability`, `--before_round_data_depolarization`, `--code`, `--distance`, `--in`, `--out`, `--rounds`, `--task`.
 - **`m2d`:** `--append_observables`, `--circuit`, `--in`, `--in_format`, `--obs_out`, `--obs_out_format`, `--out`, `--out_format`, `--ran_without_feedback`, `--skip_reference_sample`, `--sweep`, `--sweep_format`.
 - **`sample`:** `--in`, `--out`, `--out_format`, `--seed`, `--shots`, `--skip_loop_folding`, `--skip_reference_sample`.
 - **`sample_dem`:** `--err_out`, `--err_out_format`, `--in`, `--obs_out`, `--obs_out_format`, `--out`, `--out_format`, `--replay_err_in`, `--replay_err_in_format`, `--seed`, `--shots`.
-- **Legacy dispatch modes:** `--sample`, `--detect`, `--gen`, `--m2d`, `--detector_hypergraph`, `--frame0`, and `--prepend_observables` exist in upstream Stim command dispatch. This inventory records their existence; Stab's checklist is the source of truth for which deprecated legacy modes are intentionally kept or excluded from Stab CLI parity.
+- **Legacy dispatch modes:** `--sample`, `--detect`, `--gen`, `--m2d`, `--detector_hypergraph`, `--frame0`, and `--prepend_observables` exist in upstream Stim command dispatch. This inventory records their existence; the active parity plan owns the authoritative deprecated-exclusion decision.
 - **Source:** [usage_command_line.md](../vendor/stim/doc/usage_command_line.md), [main_namespaced.cc](../vendor/stim/src/stim/main_namespaced.cc), [cmd](../vendor/stim/src/stim/cmd).
 
 ## 12. Python API

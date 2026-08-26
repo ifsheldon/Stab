@@ -1,6 +1,6 @@
 # Agent-Native Modular QEC Architecture Plan
 
-Active architecture migration contract as of 2026-07-27.
+Durable architecture rationale as of 2026-07-27. The crate boundaries and extension seams remain design input, while [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) owns the current execution sequence and feature status.
 
 ## Summary
 
@@ -942,7 +942,7 @@ Status: Complete. Closure is recorded against measured source revision `c797ebc9
 
 ## Milestone A9: Qualification And Stab 0.2.0
 
-Status: Active but temporarily paused by the [pre-0.2 entropy reclamation plan](pre-0.2-code-entropy-reclamation-plan.md). Complete `515e4a04` and `66d599b3` evidence chains and all scratch-release rehearsals are historical. The repaired M10 partial-match contract requires a complete fresh evidence run before the production release sequence resumes.
+Historical A9 execution status. The pre-0.2 entropy reclamation program and complete `515e4a04` and `66d599b3` evidence chains are retained as history; [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) now owns any future qualification and release sequence.
 
 ### Tasks
 
@@ -980,7 +980,7 @@ Status: Active but temporarily paused by the [pre-0.2 entropy reclamation plan](
 
 - Benchmark manifest and qualification checks.
 - Legacy primary suite as diagnostic continuity.
-- Controlled AArch64 full and soak evidence for every promotable release group derived from the checked runtime ledger; [the generated qualification dashboard](../qualification-status.md) owns the current group count.
+- Controlled AArch64 full and soak evidence for every promotable release group derived from the checked runtime ledger; the [transitional qualification dashboard](../qualification-status.md) preserves the old program's group count, while the active parity ledger owns current product status.
 - One source-derived schema-version-4 `a9-release` completion manifest covering the full and soak rollups for every current promotable group, with each group bound to its own exact correctness prerequisite receipt and only genuinely common source, inventory, worker, timing, host, and policy identities shared across groups; retain `dem-r6` as a historical scoped completion and never treat it as release completion.
 - Publish one schema-version-3 accepted-maximum memory receipt for DEM parse and one for DEM print from the clean measured revision. Each receipt must contain verified controlled-host evidence, bind `raw-work-v2`, the repository revision, both worker source, build, and binary identities, and all three family maxima, and be retained and revalidated by creation, replay, checkpoint publication, and checked status. Produce the Stab side with the same sealed private worker constructor used by formal timing; diagnostic current-process fingerprints and historical schema-version-2 receipts are not promotable.
 - Retain one descriptor-safe correctness tree per exact prerequisite identity during completion reconstruction instead of one tree per source report. Identical case sets must use identical evidence, and the release scope must derive its prerequisite artifacts and report matrix from the checked runtime ledger. Creation, offline replay, and checkpoint replay of that complete scope must each pass with and record a soft `RLIMIT_NOFILE` of 1024; the production-shape resource test must use real correctness trees and final descriptor-backed Git auditing. Descriptor exhaustion is a resource failure and must never be reported as artifact mutation.

@@ -1,5 +1,7 @@
 # Instructions for Benchmark Contracts
 
+The benchmark systems below are transitional until P7 of the [active Stim core parity and lean evidence plan](../docs/plans/stim-core-parity-and-lean-evidence-plan.md) replaces them with `benchmarks/suite.toml`. Preserve their valid safety and measurement contracts, but do not expand their inventories or treat them as the destination performance architecture.
+
 - Treat `manifest.csv` as the source-owned benchmark contract manifest for M3 and later performance work.
 - Keep benchmark rows explicit about owning milestone, threshold class, runner, upstream source, phase, measurement family, and description.
 - Use `contract-only` only when there is no direct pinned C++ executable runner yet, and keep those rows tied to an upstream source or future compatibility-matrix anchor.

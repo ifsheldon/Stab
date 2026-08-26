@@ -2,14 +2,14 @@
 
 Stab(ilizer) is an agent-native toolkit for quantum error correction (QEC) research: a safe-Rust codebase that researchers and their AI agents can safely modify and extend.
 
-Its first milestone is a drop-in replacement for [Stim](https://github.com/quantumlib/Stim), the standard simulator and analysis tool for QEC research. Selected implemented Stab surfaces have pinned Stim v1.16.0 compatibility evidence; the generated current state is in [docs/qualification-status.md](docs/qualification-status.md), and the active execution contract is [docs/plans/GOAL.md](docs/plans/GOAL.md).
-Stab currently implements selected `.stim`, `.dem`, `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, `sample_dem`, and result-format surfaces. Support and qualification are tracked separately in [docs/stab-feature-checklist.md](docs/stab-feature-checklist.md); a feature being implemented does not by itself mean its compatibility qualification is complete.
+Its first milestone is a drop-in replacement for [Stim](https://github.com/quantumlib/Stim), the standard simulator and analysis tool for QEC research. Selected implemented Stab surfaces have pinned Stim v1.16.0 compatibility evidence; the generated current parity view is [docs/stim-parity.md](docs/stim-parity.md), and the active execution contract is [docs/plans/GOAL.md](docs/plans/GOAL.md).
+Stab currently implements selected `.stim`, `.dem`, `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, `sample_dem`, and result-format surfaces. The generated parity view separates completed, missing, deferred, and deliberately divergent behavior; implementation alone does not imply compatibility qualification.
 
-> Compatibility: Selected implemented surfaces are checked against the real Stim through pinned parity tests and benchmark comparisons. The pinned Stim v1.16.0 sources are committed in [vendor/stim](vendor/stim). The generated dashboard and feature checklist distinguish implemented, qualified, reopened, and deferred surfaces. Please report discrepancies so they can be reproduced against the pinned target.
+> Compatibility: Selected implemented surfaces are checked against the real Stim through pinned parity tests and benchmark comparisons. The pinned Stim v1.16.0 sources are committed in [vendor/stim](vendor/stim). The generated parity view is the current feature source of truth; the older feature inventory and checklist are historical inputs. Please report discrepancies so they can be reproduced against the pinned target.
 
 The longer-term vision is composable Rust components for QEC tooling.
 
-The exact implemented scope, including deliberate deferrals such as Python bindings, WASM, diagrams, and `explain_errors`, is recorded in [docs/stab-feature-checklist.md](docs/stab-feature-checklist.md).
+The exact core parity scope, including deliberate deferrals such as Python bindings, WASM, diagrams, interactive simulators, and `explain_errors`, is recorded in [docs/stim-parity.md](docs/stim-parity.md).
 Rust users moving from the original monolithic facade should follow [docs/MIGRATING-0.2.md](docs/MIGRATING-0.2.md); Stab 0.2 provides independently consumable model, bits, records, algebra, analysis, engine, and decoder-interoperability crates plus a curated `stab-core` facade. The analysis crate also exposes an experimental typed circuit-pass seam with pre-lowering output-resource admission, proven by a separate Stable consumer crate.
 
 ## Quickstart

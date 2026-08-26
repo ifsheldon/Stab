@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 is the current milestone; P1 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 is the current milestone; P2 through P9 have not started.
 
 ## Summary
 
@@ -31,8 +31,9 @@ The cleanup must preserve the parts that prove real risk: strict result-format g
 - Circuit parsing, printing, inspection, generation, transformation, flow analysis, sampling, detection conversion, and detector error model conversion.
 - Detector error model parsing, printing, transformation, sampling, search, and satisfiability behavior that belongs to the selected core API.
 - The `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` result formats, including materialized, streaming, packed, sparse, and typed-layout workflows where those representations are useful.
-- The seven computational CLI commands `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem`, plus Stab-native help and agent inspection commands.
-- Idiomatic Rust public APIs for the same capabilities. Source-level C++ API or header compatibility is not a goal.
+- The seven computational CLI commands `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem`, plus the Stim `help` discovery surface. Stab's concise implemented-only help text is an explicit divergence from Stim's bundled documentation.
+- Idiomatic Rust public APIs for the same stable capabilities. Stim's stable Python API defines relevant behavior, but Python object shape and source compatibility are not goals; C++ implementation and tests provide semantic examples, not a stable API contract.
+- Stab-native agent inspection commands, JSON Lines diagnostics, decoder sessions, external circuit passes, and `.stim -> .stim` canonical conversion remain tested extensions, but they do not count toward Stim parity completion.
 - Safe typed limits for hostile input, allocation, recursion, output size, and process control. A deliberate limit may differ from Stim when the ledger documents the divergence and tests the boundary.
 
 ### Deferred
@@ -43,11 +44,23 @@ The cleanup must preserve the parts that prove real risk: strict result-format g
 - `diagram`.
 - `explain_errors` and full `ErrorMatcher` provenance.
 - `repl` and interactive simulator products.
+- Public `TableauSimulator` and `FlipSimulator` products; their internal algebra and frame semantics remain required by batch workflows.
 - QASM, Quirk, and other export surfaces.
 - GPU execution.
 - Exact reproduction of Stim's random bit streams.
 
 Deprecated Stim functions and flags are omitted instead of deferred. Confirmed Stim bugs are not copied silently; each intentional correction must be recorded as an explicit divergence with a pinned reproduction and a Stab regression test.
+
+### Deprecated Exclusions
+
+| Surface | Reason for exclusion | Pinned source |
+|---|---|---|
+| Legacy top-level dispatch flags `--sample`, `--detect`, `--gen`, `--m2d`, and `--analyze_errors` | Superseded by named subcommands; P6 removes Stab's compatibility normalization instead of preserving a second parser path. | `src/stim/main_namespaced.test.cc` and command-specific tests |
+| `--detector_hypergraph` | Deprecated Stim spelling for `analyze_errors`; the named command is the supported surface. | `src/stim/cmd/command_analyze_errors.test.cc` |
+| `sample --frame0` | Deprecated alias for `--skip_reference_sample`. | `src/stim/cmd/command_sample.cc` |
+| `detect --prepend_observables` | Deprecated observable ordering that Stim itself warns against. | `src/stim/cmd/command_detect.cc` |
+
+Stim's MBQC decomposition helper is also excluded because it feeds rich help rendering instead of a stable computational API. Stab's concise structural help is already an explicit divergence. Python-only deprecated aliases are outside the selected Rust and CLI product boundary.
 
 ## Target Product Architecture
 
@@ -59,7 +72,7 @@ Deprecated Stim functions and flags are omitted instead of deferred. Confirmed S
 - `stab-algebra` owns Pauli, Clifford, tableau, and flow algebra.
 - `stab-analysis` owns circuit-to-DEM lowering, flow and detector analysis, inverse and reverse analyses, search, and satisfiability.
 - `stab-engine` owns compilation and execution plans, sampling sessions, detection conversion sessions, and detector error model sampling sessions.
-- `stab-decoder` owns decoder contracts and reusable decoder sessions.
+- `stab-decoder` owns Stab-native decoder contracts and reusable decoder sessions; this is an extension boundary, not a Stim parity requirement.
 - `stab-kernels-simd` owns measured SIMD leaf kernels only.
 - `stab-cli` owns argument parsing, file-role preflight, process-level workflows, help, and exit behavior.
 - `stab-core` is a thin convenience facade. It may re-export stable common types and compose components, but it must not own algorithms, duplicate data models, or translate every domain error into a facade error.
@@ -80,39 +93,41 @@ The CLI should depend directly on the component crates that own each operation. 
 
 ## Single Parity Source Of Truth
 
-P0 introduces `oracle/stim-v1.16-parity.toml` as the sole current feature-parity ledger. Each entry records:
+P0 introduces `oracle/stim-v1.16-parity.toml` as the sole current feature-parity ledger manifest. It names bounded, normalized family fragments under `oracle/stim-v1.16-parity/` so the logical ledger remains one validated source without creating an oversized contract file. Each entry records:
 
 - a stable behavior-family ID;
 - the user-observable contract;
-- one status: `done`, `missing`, `deferred`, or `divergence`;
+- one implementation status: `done`, `missing`, `deferred`, or `divergence`;
 - the owning product crate;
-- the canonical semantic test selector when status is `done`;
+- a separate evidence status: `verified` with one canonical semantic test selector, or `needs-owner` with the milestone that replaces broad historical evidence;
 - the pinned Stim source or test references;
-- the implementation milestone when status is `missing`;
+- the completion milestone when behavior is `missing`;
 - a rationale when status is `deferred` or `divergence`.
 
-There is no `partial` status. A broad row that contains both implemented and missing behavior must be split until every row has one honest status. Entries describe behavior families, not every Rust export, every upstream test file, or every fixture.
+There is no `partial` status. A broad row that contains both implemented and missing behavior must be split until every row has one honest implementation status. Missing canonical evidence never changes an implemented row back to `missing`; it changes only the evidence state. Entries describe behavior families, not every Rust export, every upstream test file, or every fixture.
 
 The ledger generates `docs/stim-parity.md`. That generated document replaces `docs/stim-feature-list.md`, `docs/stab-feature-checklist.md`, the blocker ledger, and hand-maintained feature counts as the current status view. Historical files remain until P9, when their durable rationale is extracted and the superseded files are deleted.
 
-## Milestone P0: Freeze Scope And Replace Status Ledgers
+## Milestone P0: Freeze Scope And Replace Status Ledgers (Complete)
 
 ### Tasks
 
 1. Add this plan and make `GOAL.md` the short active execution contract.
 2. Build the parity ledger from the pinned Stim source, current feature documents, public Rust APIs, CLI command definitions, and explicit unsupported-path errors.
-3. Split every currently partial row into atomic behavior families and classify it as `done`, `missing`, `deferred`, or `divergence`.
-4. Cover both model dialects, the complete frozen gate catalog, all aliases and legal target families, six result formats, seven computational commands, help, generators, transforms, sampling, conversion, analysis, search, algebra, and resource boundaries.
-5. Mark all older implementation and qualification plans as superseded by this plan without deleting history yet.
-6. Add Rust operations and thin `just` recipes for `oracle::parity-check`, `oracle::parity-run`, and `oracle::parity-render`.
-7. Generate `docs/stim-parity.md` deterministically and make CI reject drift.
+3. Split every currently partial row into atomic behavior families, classify its implementation state, and record evidence readiness separately.
+4. Cover both model dialects, all 81 canonical instructions, all 12 aliases and legal target families, six result formats, seven computational commands, help, generators, transforms, sampling, conversion, analysis, search, algebra, and resource boundaries.
+5. Record an explicit command, role, record-type, and format applicability matrix so a general codec claim cannot silently stand in for an unsupported CLI route.
+6. Mark all older implementation and qualification plans as superseded by this plan without deleting history yet.
+7. Add Rust operations and thin `just` recipes for `oracle::parity-check`, `oracle::parity-run`, and `oracle::parity-render`.
+8. Generate `docs/stim-parity.md` deterministically and make CI reject drift.
+9. Derive implemented command-option validation from `stab_cli::command_descriptor()` so removing an option from the live Clap parser invalidates its parity claim even when the frozen Stim map and ledger still agree.
 
 ### Tests
 
 - Reject duplicate IDs, unknown statuses, missing rationales, missing owners, stale test selectors, and mismatched Stim identities.
 - Prove that every frozen gate and alias, each of the six result formats, both text dialects, and every in-scope CLI command appears in exactly one complete behavior-family partition.
 - Prove that generated Markdown is byte-stable and changes only when the ledger or renderer changes.
-- Run each `done` selector independently; a broad crate or file pass is supporting evidence only.
+- Run each `verified` selector independently; a broad crate or file pass is supporting evidence only.
 
 ### Benchmarks
 
@@ -121,9 +136,11 @@ No timing work is allowed in P0. The future E2E workload families are named and 
 ### Done Criteria
 
 - Every in-scope behavior is honestly classified and no `partial` row remains.
-- Each `done` row has one meaningful semantic owner.
+- Each implemented row is visibly either `verified` or `needs-owner`, and each verified row has one meaningful semantic owner.
 - `GOAL.md`, this plan, the parity ledger, and generated parity view are the only active scope/status sources.
 - A milestone audit finds no hidden nondeferred behavior outside the ledger.
+
+P0 completed in `07ebf4c8` with 132 atomic families, 50 independently executable canonical owners, live Clap option validation, bounded modular family fragments, deterministic rendering, and CI drift checks. The milestone audit and full-code-review findings were fixed before the source commit.
 
 ## Milestone P1: Build A Lean Correctness Suite
 
@@ -249,16 +266,17 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 - All stochastic parity rows pass their predeclared semantic tests without RNG-stream identity claims.
 - Sampling and detection use one compiled-plan/session architecture and one conversion plan.
 
-## Milestone P5: Close Analysis, Transform, Search, And Decoder Parity
+## Milestone P5: Close Analysis, Transform, Search, And Algebra Parity
 
 ### Tasks
 
 1. Support circuit-to-DEM lowering for every in-scope gate and target shape.
 2. Complete loop folding, gauge handling, approximation controls, decomposition, correlated errors, coordinate propagation, and feedback across repeats.
-3. Complete the selected public transforms: flattening, noise insertion, error decomposition, simplification, feedback handling, inverse, time reversal, flows, detecting regions, and missing-detector discovery.
+3. Complete the selected public transforms: flattening, noise removal, error decomposition, simplification, feedback handling, inverse QEC construction, time reversal for flows, flow generation and checking, detecting regions, and missing-detector discovery.
 4. Make the reverse tracker the sole implementation for reverse-flow state instead of preserving parallel representations.
-5. Retain DEM search, satisfiability, detector-hyperedge semantics needed by analysis, and reusable decoder sessions.
-6. Keep full `ErrorMatcher` provenance deferred rather than exposing a partial public contract.
+5. Retain and independently prove graphlike shortest-error search, hypergraph heuristic search, shortest-error WCNF production, likeliest-error WCNF production, and detector-hyperedge semantics needed by analysis.
+6. Keep reusable decoder sessions as a Stab extension with their own conformance tests and self-regression workflow; do not use them to close a Stim parity row.
+7. Keep full `ErrorMatcher` provenance deferred rather than exposing a partial public contract.
 
 ### Tests
 
@@ -266,17 +284,17 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 - Folded-versus-unrolled and forward-versus-reverse cross-checks for repeats, feedback, coordinates, observables, and detector regions.
 - Sparse-high-index, deeply nested, empty, zero-probability, high-observable, and resource-boundary cases.
 - Search and satisfiability cross-checks against exhaustive small models and fixed independent witnesses.
-- Decoder-session tests for reset, reuse, dimension mismatch, deterministic decoding, and batch behavior.
+- Extension conformance tests for decoder-session reset, reuse, dimension mismatch, deterministic decoding, and batch behavior.
 
 ### Benchmarks
 
 - Folded circuit analysis through `analyze_errors`.
-- A reusable Rust sample-detect-decode workflow that includes the public component boundaries but excludes one-time process startup.
+- A Stab-only reusable Rust sample-detect-decode workflow that covers the extension boundary and excludes one-time process startup.
 - Diagnostic phase probes only for a profile-confirmed analysis or decoder bottleneck.
 
 ### Done Criteria
 
-- Every nondeferred analysis, transform, search, and decoder row has one executable owner test.
+- Every nondeferred analysis, transform, search, and algebra row has one executable owner test; decoder conformance is reported separately as a Stab extension.
 - Public APIs do not expose knowingly selected subsets as though they were complete.
 - No duplicate reverse-tracking or DEM traversal representation remains.
 
@@ -286,7 +304,7 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 
 1. Complete the seven computational commands and help for all nondeprecated Stim-visible arguments and combinations in scope.
 2. Remove deprecated top-level mode flags, hidden compatibility aliases, redundant routing, and unsupported flags that only advertise a future implementation.
-3. Keep `.stim -> .stim` canonical conversion and agent-native inspection commands as documented Stab additions.
+3. Keep `.stim -> .stim` canonical conversion, Stab-native help text, and agent-native inspection commands as documented Stab additions or divergences, not Stim parity claims.
 4. Expose idiomatic Rust workflows through direct component crates and the thin facade without recreating Python-shaped APIs.
 5. Keep command-wide typed file-role validation before truncation for every path-bearing command.
 
@@ -321,20 +339,20 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 
 ### Release Matrix
 
-| Family | User workflow | Cases | Comparator |
-|---|---|---:|---|
-| `generate-surface` | Generate and serialize rotated surface-code circuits | 2 | Stim CLI |
-| `canonicalize-circuit` | Parse and canonically print `.stim` input | 2 | Stim CLI |
-| `convert-dense` | Convert dense `01` and `b8` records in both practical width classes | 2 | Stim CLI |
-| `convert-typed-dets` | Convert detector and observable records with side output | 2 | Stim CLI |
-| `sample-surface` | Sample noisy surface-code circuits | 3 | Stim CLI |
-| `sample-folded-ptb64` | Sample compact repeated circuits to PTB64 | 2 | Stim CLI |
-| `detect-observables` | Sample detections and observables from noisy circuits | 3 | Stim CLI |
-| `m2d-packed-sweep` | Convert packed measurements and sweep data to detections | 3 | Stim CLI |
-| `analyze-folded` | Convert folded circuits to detector error models | 3 | Stim CLI |
-| `sample-dem` | Sample repeated and sparse detector error models | 3 | Stim CLI |
-| `qec-cli-pipeline` | Generate, analyze, then sample a detector error model | 2 | Stim CLI pipeline |
-| `qec-rust-pipeline` | Reuse compiled sample, detect, and decode sessions | 2 | Stab self-regression only |
+| Family | User workflow | Cases | Comparator | Parity prerequisites |
+|---|---|---:|---|---|
+| `generate-surface` | Generate and serialize rotated surface-code circuits | 2 | Stim CLI | `generation.surface-code-memory`, `generation.parameters-and-noise`, `cli.gen` |
+| `convert-sparse` | Convert `hits` and `r8` records in practical sparse-width classes | 2 | Stim CLI | `result-formats.codecs-and-strict-grammars`, `result-formats.routes-convert`, `cli.convert` |
+| `convert-dense` | Convert dense `01` and `b8` records in both practical width classes | 2 | Stim CLI | `result-formats.codecs-and-strict-grammars`, `result-formats.routes-convert`, `cli.convert` |
+| `convert-typed-dets` | Convert detector and observable records with side output | 2 | Stim CLI | `result-formats.codecs-and-strict-grammars`, `result-formats.streaming-and-typed-dets`, `result-formats.routes-convert`, `cli.convert` |
+| `sample-surface` | Sample noisy surface-code circuits | 3 | Stim CLI | `sampling.circuit-common-measurement-and-reset`, `sampling.circuit-core-gates`, `sampling.noise-complete`, `result-formats.routes-sample`, `cli.sample` |
+| `sample-folded-ptb64` | Sample compact repeated circuits to PTB64 | 2 | Stim CLI | `circuit-model.syntax-and-canonical-text`, `sampling.loop-folding-selection`, `result-formats.routes-sample`, `cli.sample` |
+| `detect-observables` | Sample detections and observables from noisy circuits | 3 | Stim CLI | `detection.common-frame-gate-surface`, `detection.reference-correction`, `result-formats.routes-detect`, `cli.detect` |
+| `m2d-packed-sweep` | Convert packed measurements and sweep data to detections | 3 | Stim CLI | `detection.reference-correction`, `detection.sweep-and-feedback-common`, `result-formats.routes-m2d`, `cli.m2d` |
+| `analyze-folded` | Convert folded circuits to detector error models | 3 | Stim CLI | `analysis.circuit-to-dem-selected-gate-surface`, `analysis.loop-folding-feedback-common`, `cli.analyze-errors` |
+| `sample-dem` | Sample repeated and sparse detector error models | 3 | Stim CLI | `dem-model.syntax-and-canonical-text`, `sampling.dem-sampling-and-replay`, `result-formats.routes-sample-dem`, `result-formats.routes-sample-dem-replay`, `cli.sample-dem` |
+| `qec-cli-pipeline` | Generate, analyze, then sample a detector error model | 2 | Stim CLI pipeline | `generation.surface-code-memory`, `analysis.circuit-to-dem-selected-gate-surface`, `sampling.dem-sampling-and-replay`, `cli.gen`, `cli.analyze-errors`, `cli.sample-dem` |
+| `qec-rust-pipeline` | Reuse compiled sample, detect, and decode sessions | 2 | Stab self-regression only | `sampling.circuit-common-measurement-and-reset`, `sampling.circuit-core-gates`, `detection.common-frame-gate-surface`; decoder session is a separately tested Stab extension |
 
 The initial matrix contains 29 family-scale cases. Exact arguments, deterministic inputs, semantic work units, expected outputs, and scale labels live only in `benchmarks/suite.toml`.
 

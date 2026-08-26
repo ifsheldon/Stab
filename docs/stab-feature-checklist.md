@@ -1,10 +1,12 @@
 # Stab Feature Checklist Against Stim v1.16.0
 
+> Historical assessment: this checklist is retained as a detailed P0 input, not the current scope or status source. Use the generated [Stim parity view](stim-parity.md), its source ledger at `../oracle/stim-v1.16-parity.toml`, and the active [GOAL](plans/GOAL.md).
+
 This checklist maps the Stim v1.16.0 inventory in [stim-feature-list.md](stim-feature-list.md) onto the current Stab codebase.
 It is a feature-availability document, not a new roadmap.
-Use [qualification-status.md](qualification-status.md) for generated current counts and evidence state, [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md) and [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md) for the normative contracts, and [plans/GOAL.md](plans/GOAL.md) for the active execution sequence; the historical implementation roadmap remains [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md).
+The former generated counts, qualification contracts, and implementation roadmap remain linked for historical research only. They do not override the active ledger, plan, or GOAL.
 
-Status key:
+Historical status vocabulary used by this retained assessment:
 
 - `Done`: implemented for the current Rust core or CLI surface and backed by source, tests, oracle rows, reports, or benchmark evidence.
 - `Reopened`: implemented, but a prior qualification claim has been withdrawn until the named remediation and fresh evidence are complete.
@@ -52,7 +54,7 @@ Status key:
 | `01` dense text | Done for selected Rust and CLI scope | The shared byte lexer requires LF or CRLF after every record across materialized, streaming, convert, replay, and `m2d` paths. Clean PR, full, and soak qualification plus the live checked corpus cover exact records, CR/LF boundaries, malformed termination, and consumer propagation. |
 | `b8` dense binary | Done for selected Rust and CLI scope | Exact CQ2 qualification covers byte packing, non-byte-aligned padding, 64/128/256/504/2048-bit records, large tables, conversion, and width rejection. |
 | `r8` sparse binary | Done for selected Rust and CLI scope | Exact CQ2 qualification covers sparse run encoding, long gaps, malformed terminators and overflows, conversion, and large-table round trips. |
-| `hits` sparse text or binary sparse index format | Done for selected Rust and CLI scope | The shared byte lexer rejects malformed separators and unterminated records while preserving selected HITS duplicate contracts across materialized and streaming consumers. Clean PR, full, and soak qualification plus the live pinned corpus cover the grammar and propagation. |
+| `hits` sparse text index format | Done for selected Rust and CLI scope | The shared byte lexer rejects malformed separators and unterminated records while preserving selected HITS duplicate contracts across materialized and streaming consumers. Clean PR, full, and soak qualification plus the live pinned corpus cover the grammar and propagation. |
 | `dets` sparse text | Done for selected Rust and CLI scope | Layout-aware readers preserve independent M/D/L namespaces; dense and packed consumers set duplicate bits, typed visitors preserve source order and duplicates, `SparseShot` applies parity only to observables, and width-only APIs reject D/L tokens. Clean PR, full, and soak qualification plus the live pinned corpus cover strict grammar, namespace bounds, duplicates, and consumer propagation. |
 | `ptb64` transposed packed format | Done for selected Rust and CLI scope | Exact CQ2 qualification covers 64-shot grouping, 64-bit word layout, non-word-aligned widths, validation, large tables, conversion, and relevant CLI paths. `m2d --out_format=ptb64` and `--obs_out_format=ptb64` intentionally reject like pinned Stim v1.16.0. |
 | Format conversion command coverage | Done for selected CLI scope | WS3 of [plans/post-review-remediation-plan.md](plans/post-review-remediation-plan.md) made `--in_format` required like pinned Stim (the silent `01` default is gone), with a regression asserting exit status, stderr class, and that no output path is touched; formal qualification rerun remains pending. The command surface covers `.stim -> .stim` canonicalization and result conversion across `01`, `b8`, `r8`, HITS, DETS, and `ptb64`. Conversion uses the shared strict lexer and typed DETS layout, explicit input/output aliases fail before truncation, and clean PR, full, and soak qualification covers the repaired path. |
@@ -218,21 +220,19 @@ The final 37-case execution matrix turns that contract integrity into completion
 
 ## 16. Test And Benchmark Surface
 
-The rows below describe current evidence, not the planned comprehensive qualification claim.
-The CQ and PQ plans must split partial checklist rows into exact implemented and unimplemented children, create a case-level correctness disposition for every selected contract, and assign every performance-relevant implemented contract a faithful benchmark disposition before this section can claim comprehensive qualification.
-Planning those suites does not change a feature's current availability status until their executable evidence lands.
+The rows below preserve the historical CQ and PQ evidence assessment. They do not describe current feature status; use the generated [Stim parity ledger](stim-parity.md) for that.
 
 | Feature | Stab status | Evidence and notes |
 | --- | --- | --- |
-| Upstream test inventory and porting plan | Done for current selected qualification scope | [plans/stim-test-porting-plan.md](plans/stim-test-porting-plan.md) groups upstream files and historical Rust port priorities. [qualification-status.md](qualification-status.md) provides generated current inventory counts. Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` passed the source-current PR, full, and soak selections after the corrected result-format oracle landed; CQ3 through CQ6 still own the explicitly planned expansion. |
-| Oracle fixture matrix | Done for current implemented surfaces and CQ1 harness acceptance | `oracle/fixtures/manifest.csv`, `ops/oracle`, and the checked correctness inventory track current exact, statistical, structural, and semantic-mining ownership. The generated [qualification dashboard](qualification-status.md) owns current inventory counts and completion status. The CQ1 comparator, selector, statistical, property, resource, receipt, report, and PR/full/soak execution harness is implemented; [plans/cq2-deterministic-qualification-progress-report.md](plans/cq2-deterministic-qualification-progress-report.md) preserves historical checkpoints with their exact revisions, digests, replay status, and current-versus-historical classification. CQ3 through CQ6 still own feature-domain expansion. |
-| Benchmark manifest and primary beta gate | Done for current performance infrastructure; PQ0 inventory complete | `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, and `benchmarks/m12-primary-beta-waivers.json` preserve the legacy M12 matrix. The compact PQ0 disposition overlay and the runtime-group ledger own current qualification relationships and executable workloads; the generated [qualification dashboard](qualification-status.md) owns volatile counts and the current completion checkpoint. Historical PQ1 reports remain report-only harness evidence, and formal source-current completion has not started under this entropy revision. |
-| Historical M12 beta performance gate | Done for its recorded report state | The unchanged `1.25x` M12 gate and its source-owned no-ratio waivers remain diagnostic compatibility evidence. Current release qualification, parity, and self-regression status are reported separately by the generated [qualification dashboard](qualification-status.md) and active [GOAL](plans/GOAL.md). |
+| Upstream test inventory and porting plan | Done for its historical selected qualification scope | [plans/stim-test-porting-plan.md](plans/stim-test-porting-plan.md) groups upstream files and historical Rust port priorities. [qualification-status.md](qualification-status.md) preserves generated transitional inventory counts. Clean revision `68d107a42f655254f31628f0cbedc55479f6c0f3` passed the then-current PR, full, and soak selections after the corrected result-format oracle landed. |
+| Oracle fixture matrix | Done for historical selected surfaces and CQ1 harness acceptance | `oracle/fixtures/manifest.csv`, `ops/oracle`, and the checked correctness inventory preserve exact, statistical, structural, and semantic-mining ownership from the old program. The generated [transitional qualification dashboard](qualification-status.md) owns those inventory and completion counts only. [plans/cq2-deterministic-qualification-progress-report.md](plans/cq2-deterministic-qualification-progress-report.md) preserves checkpoints with their exact revisions, digests, replay status, and current-versus-historical classification. |
+| Benchmark manifest and primary beta gate | Done for the retained historical performance infrastructure | `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, and `benchmarks/m12-primary-beta-waivers.json` preserve the legacy M12 matrix. The PQ0 overlay, runtime-group ledger, and [transitional qualification dashboard](qualification-status.md) preserve old relationships, counts, and completion checkpoints; they do not define current feature status. |
+| Historical M12 beta performance gate | Done for its recorded report state | The unchanged `1.25x` M12 gate and its source-owned no-ratio waivers remain diagnostic compatibility evidence. The generated [Stim parity ledger](stim-parity.md) reports current feature status; active performance claims resume under P7 through P9 of [GOAL](plans/GOAL.md). |
 | Tests for deferred Python, JS, diagrams, and ecosystem packages | Deferred | These are intentionally future work and should not be used as blockers for the current Rust/CLI beta surface. |
 
-## 17. Highest-Priority Remaining Feature Gaps
+## 17. Historical Remaining Gaps At The Last Assessment
 
-This section is a short triage view of gaps that are visible after mapping the Stim inventory onto Stab.
+This section preserves the triage view from the checklist's last active assessment. It is not a current work queue; current gaps and milestone ownership come only from the generated [Stim parity view](stim-parity.md).
 
 | Gap | Status | Why it matters |
 | --- | --- | --- |
@@ -247,8 +247,8 @@ This section is a short triage view of gaps that are visible after mapping the S
 | JS/WASM and ecosystem packages | Deferred | Separate product and integration projects, not part of current core Rust/CLI beta. |
 | Generated feature/status matrix tooling | Deferred | Rust API documentation is already covered by the section 15 `Generated API docs` row. Generated feature/status matrix tooling remains outside the current Rust and CLI beta closure; plan it separately if it becomes a product requirement. |
 
-## 18. Maintenance Notes
+## 18. Historical Maintenance Notes
 
-- When a Stab feature moves from `Partial`, `Deferred`, or `Missing` to `Done`, update this checklist in the same change set as the implementation and tests.
-- When a deferred surface becomes in scope, first update [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md) and [plans/GOAL.md](plans/GOAL.md), then add tests or oracle rows before claiming checklist completion.
-- Do not use this checklist to weaken existing milestone done criteria; milestone-specific reports remain the evidence source for whether a planned slice is complete.
+- Do not update this checklist as current work advances. Update `../oracle/stim-v1.16-parity.toml`, regenerate [stim-parity.md](stim-parity.md), and update the active [GOAL](plans/GOAL.md) when milestone state changes.
+- When a deferred surface becomes in scope, revise the active parity plan and ledger before implementation or evidence claims.
+- Preserve this file only as historical research until P9 extracts any durable rationale and deletes superseded status documents.

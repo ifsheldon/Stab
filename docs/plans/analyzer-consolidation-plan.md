@@ -1,5 +1,7 @@
 # Analyzer Consolidation Plan
 
+Status: Historical completed implementation record. Current analysis parity scope and remaining work live in [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md).
+
 Stage-gated execution record for WS2b of [post-review-remediation-plan.md](post-review-remediation-plan.md), per maintainer decision D6: retire the forward `Analyzer` and `GaugeTracker` so `SparseReverseFrameTracker` becomes the single sensitivity-propagation engine.
 Each stage below is a merge gate; a stage's code may not merge until the previous stage's exit criteria are recorded here.
 
