@@ -5,21 +5,23 @@ This file is the effective `AGENTS.md` source for this directory: `AGENTS.md` an
 
 ## Contents
 
-- [plans/](plans/): milestone plans and progress reports. `plans/GOAL.md` is the active execution contract; it currently drives the pre-`0.2.0` entropy reclamation plan before the architecture plan's release sequence resumes. The original rewrite and completed qualification plans remain historical sources.
+- [plans/](plans/): milestone plans and progress reports. `plans/GOAL.md` is the short active execution contract and `plans/stim-core-parity-and-lean-evidence-plan.md` is the active implementation plan. Earlier rewrite, entropy, and qualification plans are historical or transitional inputs, not parallel roadmaps.
 - [architecture/](architecture/): product dependency rules, compilation phases, extension seams, and architecture decision records.
 - [MIGRATING-0.2.md](MIGRATING-0.2.md): coordinated Rust package, facade-tier, and public-path migration guide for Stab 0.2.
 - [RELEASING.md](RELEASING.md): coordinated crates.io and GitHub release preflight, publication order, recovery, and verification procedure.
-- [stab-feature-checklist.md](stab-feature-checklist.md): Stab feature availability against Stim v1.16.0.
-- [stim-feature-list.md](stim-feature-list.md): the upstream Stim v1.16.0 feature inventory that the checklist maps onto.
-- [qualification-status.md](qualification-status.md): generated current qualification counts, contract identities, and completion checkpoint.
+- [stab-feature-checklist.md](stab-feature-checklist.md): historical Stab feature assessment used as an input to P0; the generated parity view will replace it.
+- [stim-feature-list.md](stim-feature-list.md): historical Stim v1.16.0 inventory used as an input to P0; the parity ledger will replace its status role.
+- [qualification-status.md](qualification-status.md): generated status for the transitional qualification system until the lean parity and E2E evidence sources replace it.
 
 ## Documentation Policy
 
-- CQ1 and PQ1 harness acceptance is recorded in `plans/cq1-correctness-harness-progress-report.md` and `plans/pq1-performance-harness-progress-report.md`; CQ2 history remains at `plans/cq2-deterministic-qualification-progress-report.md`, and the current repaired-contract checkpoint is recorded in `plans/qualification-economy-regression-progress-report.md`. Any later correctness or performance inventory digest change makes current evidence historical until the affected tiers are rerun from a clean committed revision.
+- Historical CQ and PQ reports preserve prior evidence and remain useful while their commands are operational, but they do not define current feature scope or the destination evidence architecture. The active plan replaces them only after its lean correctness and E2E systems pass, and P9 then deletes superseded prose after retaining durable decisions.
 - When changing planned scope, milestone order, compatibility targets, public CLI behavior, or benchmark acceptance gates, update the matching plan document in the same change set.
 - Use `.agents/skills/milestone-audit` when auditing whether a milestone implementation satisfies its objective, tasks, linked tests, benchmarks, and done criteria, or when implementation reveals milestone loopholes or under-specified scope.
 
 ## Correctness Qualification Contracts
+
+The commands below remain the transitional verification surface during P0 and P1. Do not extend their inventories with new per-export ownership or treat them as the active parity roadmap; the active plan replaces them with the parity ledger and behavior-oriented suite before deleting them.
 
 - Use `just qualification::correctness-list` and `just qualification::correctness-check` for the CQ0 case and public-API inventory. Use `just qualification::correctness-regenerate` only to replace the checked manifest after reviewed source ownership changes, then update the frozen digest and run the canonical check. `oracle/qualification-cases.json` is the source-owned exact-parent ledger for collapsing reviewed upstream, public-API, and oracle owners onto independently selectable qualification cases; stale, duplicate, cross-feature, comparator-mismatched, or shared-primary mappings must fail closed.
 - Use `just qualification::correctness-provenance-probe` to rebuild private Stab and Stim binaries, execute one real source-owned case through the normal qualification runner, and validate the published request, execution, report, completion, and preflight bindings.
@@ -32,6 +34,8 @@ This file is the effective `AGENTS.md` source for this directory: `AGENTS.md` an
 - Every selected public item still needs inventory ownership, but ordinary derived traits, trivial accessors, marker declarations, and Rust `Debug` formatting do not need standalone runtime assertions unless their behavior or representation is part of the compatibility contract. Test resource promises through bounded allocation, capacity, and cancellation behavior instead of pointer identity unless the public API explicitly promises storage identity.
 
 ## Oracle Corpus Workflows
+
+The strict result-format corpus and pinned Stim executable remain durable compatibility evidence. The broader compatibility matrix and blocker ledgers are transitional inputs to P0 and must not acquire new duplicate status rows.
 
 - Use `just oracle::version` to validate that `vendor/stim` is pinned to Stim v1.16.0, and use `just oracle::run --case smoke/help` plus `just oracle::run --case smoke/tiny-circuit` for M0 oracle smoke checks.
 - Use `just oracle::list` to inspect and validate the M2 fixture corpus, including coverage of planned M4 through M11 P0/P1 C++ compatibility-matrix rows by upstream source, milestone, and parity mode; use `just oracle::list --milestone Mx` and `just oracle::run --milestone Mx` for milestone-scoped fixture work, `just oracle::record --check-clean` to verify committed runnable exact-output fixtures against pinned Stim, `just oracle::run --implemented-only` for implemented fixture parity, and `just oracle::run --all` to report red or manifest-only future fixtures.
