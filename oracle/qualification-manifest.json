@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "14614b21280044da7571243b7bb0d5a5e941edd5070999c2f08d98f6e3e923bc",
+  "semantic_digest": "4db5a19a74d7ec6f875415e0c6fecb5c62767128d8feb3af12da749207d37603",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -14957,7 +14957,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-9a0890f4cb4cd44d"
         }
       ]
     },
@@ -14979,7 +14979,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-d7cbd872c7ca92be"
         }
       ]
     },
@@ -15859,7 +15859,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-68ed704239e9ce1e"
         }
       ]
     },
@@ -15881,7 +15881,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-e922c305b41a71ba"
         }
       ]
     },
@@ -15903,7 +15903,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-39d9c0b932d136f1"
         }
       ]
     },
@@ -15925,7 +15925,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-b434478e055fdf87"
         }
       ]
     },
@@ -15947,7 +15947,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-a6a0214b26e004b6"
         }
       ]
     },
@@ -15969,7 +15969,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-c2ce1b60558798b6"
         }
       ]
     },
@@ -16123,7 +16123,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-ad821e2d3ad7506f"
         }
       ]
     },
@@ -16145,7 +16145,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-1375a110b7e7ae61"
         }
       ]
     },
@@ -16167,7 +16167,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-fc20c738f6685e28"
         }
       ]
     },
@@ -16189,7 +16189,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-069fa9cc112e228a"
         }
       ]
     },
@@ -16211,7 +16211,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-2381e1f133a2a11d"
         }
       ]
     },
@@ -16233,7 +16233,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-48f9fcdb1981903e"
         }
       ]
     },
@@ -16255,7 +16255,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-9f8e4d13ee3107db"
         }
       ]
     },
@@ -16277,7 +16277,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-63c092d98ef4a531"
         }
       ]
     },
@@ -16299,7 +16299,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-96ec0aac45b32bc1"
         }
       ]
     },
@@ -16453,7 +16453,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-3d5cbe000e627f63"
         }
       ]
     },
@@ -16475,7 +16475,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-a91382de077afc24"
         }
       ]
     },
@@ -16497,7 +16497,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-e7dac78992aa84bd"
         }
       ]
     },
@@ -16519,7 +16519,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-b29849f2e051ff0a"
         }
       ]
     },
@@ -16541,7 +16541,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-b73522c1c69e3ed8"
         }
       ]
     },
@@ -16563,7 +16563,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-41f72583e3caaba6"
+          "owner_case_id": "cq-evidence-upstream-cab040a7eff7ceb8"
         }
       ]
     },
@@ -17179,7 +17179,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-e03dd7e16358b9f8"
         }
       ]
     },
@@ -17201,7 +17201,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-c5d120bd68620a9c"
         }
       ]
     },
@@ -17223,7 +17223,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-02f7713f0b2383e9"
         }
       ]
     },
@@ -17245,7 +17245,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-66592ba08860e972"
         }
       ]
     },
@@ -17267,7 +17267,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-4acdfbc8a63f980c"
         }
       ]
     },
@@ -17289,7 +17289,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-002a4bd5cc1eaa43"
         }
       ]
     },
@@ -17311,7 +17311,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-457b8ef95ec4eb55"
         }
       ]
     },
@@ -17333,7 +17333,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-6f1faa2f36525150"
         }
       ]
     },
@@ -17355,7 +17355,7 @@
         {
           "feature_id": "CQ-RESULT-FORMATS",
           "comparator": "exact-bytes",
-          "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7"
+          "owner_case_id": "cq-evidence-upstream-9089c6f8f3161321"
         }
       ]
     },
@@ -72747,13 +72747,26 @@
       ]
     },
     {
+      "id": "cq-api-item-80532298b2e19f5f",
+      "feature_id": "CQ-CLI",
+      "crate_name": "stab_cli",
+      "path": "stab_cli::command_descriptor",
+      "kind": "function",
+      "source_path": "crates/stab-cli/src/lib.rs",
+      "source_line": 80,
+      "owner_case_id": "cq-evidence-api-337e57e87ff4b137",
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ]
+    },
+    {
       "id": "cq-api-item-492d377feb9fb152",
       "feature_id": "CQ-CLI",
       "crate_name": "stab_cli",
       "path": "stab_cli::run_from",
       "kind": "function",
       "source_path": "crates/stab-cli/src/lib.rs",
-      "source_line": 321,
+      "source_line": 329,
       "owner_case_id": "cq-evidence-api-12ed696bea345f58",
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
@@ -110793,7 +110806,7 @@
       "kind": "function",
       "source_path": "crates/stab-core/src/result_streaming.rs",
       "source_line": 79,
-      "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "owner_case_id": "cq-evidence-api-51ab63170b08b70a",
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
@@ -110807,7 +110820,7 @@
       "kind": "function",
       "source_path": "crates/stab-core/src/result_streaming.rs",
       "source_line": 72,
-      "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "owner_case_id": "cq-evidence-api-af1ba80240e72a9c",
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
@@ -110821,7 +110834,7 @@
       "kind": "function",
       "source_path": "crates/stab-core/src/result_streaming.rs",
       "source_line": 101,
-      "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "owner_case_id": "cq-evidence-api-820c3c4d5c24f37d",
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
@@ -110835,7 +110848,7 @@
       "kind": "function",
       "source_path": "crates/stab-core/src/result_streaming.rs",
       "source_line": 90,
-      "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "owner_case_id": "cq-evidence-api-a21869ecb7ce320a",
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
@@ -110933,7 +110946,7 @@
       "kind": "function",
       "source_path": "crates/stab-core/src/result_formats.rs",
       "source_line": 74,
-      "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "owner_case_id": "cq-evidence-api-f8673b150dffbe3e",
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
@@ -110947,7 +110960,7 @@
       "kind": "function",
       "source_path": "crates/stab-core/src/result_formats.rs",
       "source_line": 66,
-      "owner_case_id": "cq-evidence-qualification-26a553fce110f2b7",
+      "owner_case_id": "cq-evidence-api-5b5c686e39e525bb",
       "performance_groups": [
         "PERF-RESULT-IO",
         "PERF-CONVERT-CLI"
@@ -162991,6 +163004,50 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-337e57e87ff4b137",
+      "feature_id": "CQ-CLI",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_cli::command_descriptor",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "cq_evidence_api_337e57e87ff4b137",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-3493f0852ade7156",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "rust-api",
@@ -164281,6 +164338,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-51ab63170b08b70a",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_core::advanced::records::for_each_dets_packed_record",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_51ab63170b08b70a",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-5426b124b2cbd58e",
       "feature_id": "CQ-CIRCUIT-API",
       "behavioral_surface": "rust-api",
@@ -164747,6 +164849,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-api-5b5c686e39e525bb",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_core::advanced::records::read_measurement_records",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_5b5c686e39e525bb",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -166266,6 +166413,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-api-820c3c4d5c24f37d",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_core::advanced::records::for_each_dets_sparse_shot",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_820c3c4d5c24f37d",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -167912,6 +168104,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-api-a21869ecb7ce320a",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_core::advanced::records::for_each_dets_token_record",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_a21869ecb7ce320a",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-api-a251f2f29ca36af7",
       "feature_id": "CQ-ANALYZER",
       "behavioral_surface": "rust-api",
@@ -168528,6 +168765,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-api-af1ba80240e72a9c",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_core::advanced::records::for_each_dets_record",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_af1ba80240e72a9c",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -171534,6 +171816,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DEM-SAMPLING"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-api-f8673b150dffbe3e",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "rust-api",
+      "provenance": "public-rust-api",
+      "source_id": "stab_core::advanced::records::read_dets_records",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_evidence_api_f8673b150dffbe3e",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -203479,58 +203806,6 @@
       "status": "implemented"
     },
     {
-      "id": "cq-evidence-qualification-26a553fce110f2b7",
-      "feature_id": "CQ-RESULT-FORMATS",
-      "behavioral_surface": "file-format",
-      "provenance": "qualification-plan",
-      "source_id": "cq2-result-reader-boundary-type-newline-contract",
-      "comparator": "exact-bytes",
-      "execution": {
-        "tiers": [
-          "pr",
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "existing",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-core",
-          "--test",
-          "result_format_corpus",
-          "checked_accepted_corpus_matches_every_applicable_core_reader",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "bounded-materialized",
-        "detail": "The checked pinned-Stim corpus proves LF and CRLF handling, DETS EOF handling, empty HITS and DETS records, typed namespace offsets, duplicate semantics, and reusable materialized, dense, packed, sparse, token, and SparseShot consumers."
-      },
-      "negative_axes": [
-        "namespace-offset-alias",
-        "line-ending-normalization",
-        "duplicate-semantics-drift"
-      ],
-      "performance_groups": [
-        "PERF-RESULT-IO",
-        "PERF-CONVERT-CLI"
-      ],
-      "status": "implemented"
-    },
-    {
       "id": "cq-evidence-qualification-26f92a9730fa66a5",
       "feature_id": "CQ-RESOURCE",
       "behavioral_surface": "resource-boundary",
@@ -203714,7 +203989,7 @@
           "test",
           "-p",
           "stab-cli",
-          "tests::m9::batch_formats::detect_routes_4096_shots_through_every_supported_batch_format",
+          "tests::m9::batch_formats::detect_streams_primary_and_side_output_across_batch_boundaries",
           "--quiet",
           "--exact"
         ]
@@ -205655,7 +205930,7 @@
           "test",
           "-p",
           "stab-cli",
-          "tests::m11::sample_dem_routes_4096_shots_through_every_supported_batch_format",
+          "tests::m11::sample_dem_streams_all_output_roles_across_batch_boundaries",
           "--quiet",
           "--exact"
         ]
@@ -206301,62 +206576,6 @@
       ],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "cq-evidence-qualification-41f72583e3caaba6",
-      "feature_id": "CQ-RESULT-FORMATS",
-      "behavioral_surface": "file-format",
-      "provenance": "qualification-plan",
-      "source_id": "cq2-result-reader-malformed-input-contract",
-      "comparator": "exact-bytes",
-      "execution": {
-        "tiers": [
-          "pr",
-          "full",
-          "soak"
-        ],
-        "timeout_ms": 120000,
-        "stdout_limit_bytes": 1048576,
-        "stderr_limit_bytes": 1048576,
-        "artifact_limit_bytes": 2101248,
-        "expected_skip": "never"
-      },
-      "statistical_plan": null,
-      "property_plan": null,
-      "primary_selector": {
-        "state": "existing",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-core",
-          "--test",
-          "result_format_corpus",
-          "checked_rejected_corpus_matches_every_applicable_core_reader",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "supporting_selectors": [],
-      "resource_contract": {
-        "kind": "bounded-materialized",
-        "detail": "The checked pinned-Stim corpus rejects unterminated 01 and HITS records, malformed separators, invalid bytes, numeric overflow, namespace crossings, out-of-range tokens, and malformed DETS prefixes through every applicable reader family."
-      },
-      "negative_axes": [
-        "integer-overflow",
-        "record-width-mismatch",
-        "sparse-index-out-of-range",
-        "invalid-dets-prefix",
-        "unterminated-text-record",
-        "malformed-text-separator",
-        "namespace-boundary-crossing"
-      ],
-      "performance_groups": [
-        "PERF-RESULT-IO",
-        "PERF-CONVERT-CLI"
       ],
       "status": "implemented"
     },
@@ -219378,7 +219597,7 @@
           "test",
           "-p",
           "stab-cli",
-          "tests::m9::batch_formats::m2d_routes_4096_records_through_every_supported_batch_format",
+          "tests::m9::batch_formats::m2d_streams_primary_and_side_output_across_batch_boundaries",
           "--quiet",
           "--exact"
         ]
@@ -226815,6 +227034,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-002a4bd5cc1eaa43",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-c9af886deab9f438",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_c9af886deab9f438_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-0033a4cc02fd6e61",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "engine",
@@ -227275,6 +227539,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-02f7713f0b2383e9",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-9e725904d4ed394b",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_9e725904d4ed394b_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -227783,6 +228092,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-069fa9cc112e228a",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-65c359bc8ca4823f",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_65c359bc8ca4823f_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -229903,6 +230257,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-1375a110b7e7ae61",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-6b5071858285335d",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_6b5071858285335d_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -232259,6 +232658,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-2381e1f133a2a11d",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-30302063470fe525",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_30302063470fe525_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -236099,6 +236543,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-39d9c0b932d136f1",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-4ea965f692b55692",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_4ea965f692b55692_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-3a3ef0ff82f4ebe4",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "engine",
@@ -236511,6 +237000,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-3d5cbe000e627f63",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-0424a2575cf28bf9",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_0424a2575cf28bf9_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -237639,6 +238173,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-457b8ef95ec4eb55",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-cbe867dd40d8d3b7",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_cbe867dd40d8d3b7_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-45884006bd6a0ce7",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "engine",
@@ -238191,6 +238770,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-48f9fcdb1981903e",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-34610d34bb528961",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_34610d34bb528961_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-495c64ada598c096",
       "feature_id": "CQ-ANALYZER",
       "behavioral_surface": "engine",
@@ -238363,6 +238987,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-4acdfbc8a63f980c",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-ff296c1ec4f83ad2",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_ff296c1ec4f83ad2_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -242143,6 +242812,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-63c092d98ef4a531",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-f80a248e1875bbcb",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_f80a248e1875bbcb_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-63dbaaa617d6aaf2",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "engine",
@@ -242687,6 +243401,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-66592ba08860e972",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-8104dc6f6979203e",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_8104dc6f6979203e_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-6723204cb4df64f8",
       "feature_id": "CQ-CLI",
       "behavioral_surface": "cli",
@@ -242959,6 +243718,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-68ed704239e9ce1e",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-0c34c5f36aff8761",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_0c34c5f36aff8761_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -243507,6 +244311,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-6f1faa2f36525150",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-f5598bc545cac0f2",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_f5598bc545cac0f2_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -248151,6 +249000,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-9089c6f8f3161321",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-6aeb5ecae296ce5b",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_6aeb5ecae296ce5b_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-90e4ea43a247f5ba",
       "feature_id": "CQ-ANALYZER",
       "behavioral_surface": "engine",
@@ -249191,6 +250085,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-96ec0aac45b32bc1",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-7644f85aa79e1357",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_7644f85aa79e1357_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-96f1c34b7f51b1ce",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "engine",
@@ -249459,6 +250398,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-9a0890f4cb4cd44d",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-d6bf5c228fdeb84a",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_d6bf5c228fdeb84a_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -250467,6 +251451,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-9f8e4d13ee3107db",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-9b19409f7838eb62",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_9b19409f7838eb62_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -251563,6 +252592,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-a6a0214b26e004b6",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-ee7066d36f4b6c62",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_ee7066d36f4b6c62_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-a70c431bbce41a06",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "engine",
@@ -251975,6 +253049,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-a91382de077afc24",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-e86a7383ea3668ef",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_e86a7383ea3668ef_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -252755,6 +253874,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-ad821e2d3ad7506f",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-47c1d688354ea1ed",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_47c1d688354ea1ed_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-adacbe8cca39428c",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "engine",
@@ -253211,6 +254375,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-b29849f2e051ff0a",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-ec905ca919f79e64",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_ec905ca919f79e64_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-b3013c145df365f3",
       "feature_id": "CQ-FLOW-UTILS",
       "behavioral_surface": "engine",
@@ -253343,6 +254552,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SAMPLING"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-b434478e055fdf87",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-8f45d6a6f7e5bfa9",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_8f45d6a6f7e5bfa9_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -253939,6 +255193,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-SEARCH-AND-MATCHING"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-b73522c1c69e3ed8",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-c611ee3ed4f15eb5",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_c611ee3ed4f15eb5_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -256147,6 +257446,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-c2ce1b60558798b6",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-4f433713df44b526",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_4f433713df44b526_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-c2d0cea3461c15f7",
       "feature_id": "CQ-SEARCH",
       "behavioral_surface": "engine",
@@ -256599,6 +257943,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-ERROR-ANALYSIS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-c5d120bd68620a9c",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-49bcd3b1a1261c22",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_49bcd3b1a1261c22_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -257591,6 +258980,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-cab040a7eff7ceb8",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-c682d99b2dc368f2",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_c682d99b2dc368f2_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -259475,6 +260909,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-d7cbd872c7ca92be",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-2c6f15fae13a652e",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_2c6f15fae13a652e_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-d7f191cd2effe3fc",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "engine",
@@ -260775,6 +262254,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-e03dd7e16358b9f8",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-d5c7bf6da165c138",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_d5c7bf6da165c138_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-e15696b3da66af46",
       "feature_id": "CQ-SAMPLING",
       "behavioral_surface": "engine",
@@ -261903,6 +263427,51 @@
       "status": "planned"
     },
     {
+      "id": "cq-evidence-upstream-e7dac78992aa84bd",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-38569e60058ef82b",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_38569e60058ef82b_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
+      ],
+      "status": "planned"
+    },
+    {
       "id": "cq-evidence-upstream-e811587823762cff",
       "feature_id": "CQ-DETECTION",
       "behavioral_surface": "engine",
@@ -261943,6 +263512,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-DETECTION"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-e922c305b41a71ba",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-68f825592d97034e",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_68f825592d97034e_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },
@@ -265727,6 +267341,51 @@
       "negative_axes": [],
       "performance_groups": [
         "PERF-CLI-STARTUP-AND-ERRORS"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "cq-evidence-upstream-fc20c738f6685e28",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "behavioral_surface": "file-format",
+      "provenance": "upstream-semantic-case",
+      "source_id": "cq-upstream-cpp-dcde4246aa915e44",
+      "comparator": "exact-bytes",
+      "execution": {
+        "tiers": [
+          "full",
+          "soak"
+        ],
+        "timeout_ms": 120000,
+        "stdout_limit_bytes": 1048576,
+        "stderr_limit_bytes": 1048576,
+        "artifact_limit_bytes": 2101248,
+        "expected_skip": "never"
+      },
+      "statistical_plan": null,
+      "property_plan": null,
+      "primary_selector": {
+        "state": "planned",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "cq_upstream_cpp_dcde4246aa915e44_cq_result_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "supporting_selectors": [],
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
+      },
+      "negative_axes": [],
+      "performance_groups": [
+        "PERF-RESULT-IO",
+        "PERF-CONVERT-CLI"
       ],
       "status": "planned"
     },

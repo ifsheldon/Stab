@@ -2620,7 +2620,6 @@ dependencies = [
  "stab-algebra",
  "stab-analysis",
  "stab-bits",
- "stab-compat-corpus",
  "stab-decoder",
  "stab-engine",
  "stab-model",

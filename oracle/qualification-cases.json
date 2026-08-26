@@ -6963,7 +6963,7 @@
           "test",
           "-p",
           "stab-cli",
-          "tests::m9::batch_formats::detect_routes_4096_shots_through_every_supported_batch_format",
+          "tests::m9::batch_formats::detect_streams_primary_and_side_output_across_batch_boundaries",
           "--quiet",
           "--exact"
         ]
@@ -6991,7 +6991,7 @@
           "test",
           "-p",
           "stab-cli",
-          "tests::m9::batch_formats::m2d_routes_4096_records_through_every_supported_batch_format",
+          "tests::m9::batch_formats::m2d_streams_primary_and_side_output_across_batch_boundaries",
           "--quiet",
           "--exact"
         ]
@@ -7019,7 +7019,7 @@
           "test",
           "-p",
           "stab-cli",
-          "tests::m11::sample_dem_routes_4096_shots_through_every_supported_batch_format",
+          "tests::m11::sample_dem_streams_all_output_roles_across_batch_boundaries",
           "--quiet",
           "--exact"
         ]
@@ -13647,138 +13647,6 @@
       "standalone": true
     },
     {
-      "id": "cq2-result-reader-boundary-type-newline-contract",
-      "feature_id": "CQ-RESULT-FORMATS",
-      "comparator": "exact-bytes",
-      "primary_selector": {
-        "state": "existing",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-core",
-          "--test",
-          "result_format_corpus",
-          "checked_accepted_corpus_matches_every_applicable_core_reader",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "resource_contract": {
-        "kind": "bounded-materialized",
-        "detail": "The checked pinned-Stim corpus proves LF and CRLF handling, DETS EOF handling, empty HITS and DETS records, typed namespace offsets, duplicate semantics, and reusable materialized, dense, packed, sparse, token, and SparseShot consumers."
-      },
-      "negative_axes": [
-        "namespace-offset-alias",
-        "line-ending-normalization",
-        "duplicate-semantics-drift"
-      ],
-      "upstream_owners": [
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.Format01_MultipleRecords_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.Format01_MultipleRecords_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.Format01_MultipleRecords_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_MultipleShortRecords_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_MultipleShortRecords_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_MultipleShortRecords_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_01_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_01_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_01_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_hits_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_hits_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_hits_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_dets_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_dets_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.read_windows_newlines_dets_64",
-          "subcase": "W=64"
-        }
-      ],
-      "public_api_owners": [
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::advanced::records::read_measurement_records"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::advanced::records::read_dets_records"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::advanced::records::for_each_dets_record"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::advanced::records::for_each_dets_packed_record"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::advanced::records::for_each_dets_token_record"
-        },
-        {
-          "crate_name": "stab_core",
-          "owner_path": "stab_core::advanced::records::for_each_dets_sparse_shot"
-        }
-      ]
-    },
-    {
       "id": "cq2-result-reader-typed-layout-matrix",
       "feature_id": "CQ-RESULT-FORMATS",
       "comparator": "exact-bytes",
@@ -13908,124 +13776,6 @@
         {
           "path": "src/stim/io/measure_record_reader.test.cc",
           "symbol": "MeasureRecordReader.FormatDets_HugeObservables_64",
-          "subcase": "W=64"
-        }
-      ]
-    },
-    {
-      "id": "cq2-result-reader-malformed-input-contract",
-      "feature_id": "CQ-RESULT-FORMATS",
-      "comparator": "exact-bytes",
-      "primary_selector": {
-        "state": "existing",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-core",
-          "--test",
-          "result_format_corpus",
-          "checked_rejected_corpus_matches_every_applicable_core_reader",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "resource_contract": {
-        "kind": "bounded-materialized",
-        "detail": "The checked pinned-Stim corpus rejects unterminated 01 and HITS records, malformed separators, invalid bytes, numeric overflow, namespace crossings, out-of-range tokens, and malformed DETS prefixes through every applicable reader family."
-      },
-      "negative_axes": [
-        "integer-overflow",
-        "record-width-mismatch",
-        "sparse-index-out-of-range",
-        "invalid-dets-prefix",
-        "unterminated-text-record",
-        "malformed-text-separator",
-        "namespace-boundary-crossing"
-      ],
-      "upstream_owners": [
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "read_unsigned_int.BasicUsage"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "read_unsigned_int.ValueTooBig"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.Format01_InvalidInput_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.Format01_InvalidInput_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.Format01_InvalidInput_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatHits_InvalidInput_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatHits_InvalidInput_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatHits_InvalidInput_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatHits_InvalidInput_sparse_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatHits_InvalidInput_sparse_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatHits_InvalidInput_sparse_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Sparse_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Sparse_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Sparse_64",
-          "subcase": "W=64"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Dense_128",
-          "subcase": "W=128"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Dense_256",
-          "subcase": "W=256"
-        },
-        {
-          "path": "src/stim/io/measure_record_reader.test.cc",
-          "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Dense_64",
           "subcase": "W=64"
         }
       ]

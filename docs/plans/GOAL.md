@@ -20,7 +20,7 @@ Complete every nondeferred Stim v1.16.0 core Rust and CLI behavior through the e
 
 - The component-crate split is retained; no new product crate is planned.
 - The current correctness and benchmark systems remain operational only until their lean replacements pass.
-- P0 completed in `07ebf4c8`: the validated ledger contains 132 atomic families, 50 executable canonical owners, and 47 explicit P1 owner debts; [stim-parity.md](../stim-parity.md) is the generated current status view.
+- P0 completed in `07ebf4c8`; the CLI ownership slice in `75485342` raised the validated ledger to 63 verified families, 58 unique executable canonical owners, and 33 explicit P1 owner debts. [stim-parity.md](../stim-parity.md) is the generated current status view.
 - Existing feature and qualification documents are historical or transitional inputs, not parallel status sources.
 - Historical timing remains historical. No intermediate refactor revision may produce promotable evidence.
 - Development occurs directly on `main`; do not create a branch or linked worktree.
