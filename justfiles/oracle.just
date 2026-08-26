@@ -38,6 +38,11 @@ blockers *args:
 result-formats *args:
     cargo run -q -p stab-oracle -- result-formats {{args}}
 
+# Compare the canonical Stab gate catalog against pinned Stim metadata.
+[working-directory: '..']
+gates *args:
+    cargo run -q -p stab-oracle -- gates {{args}}
+
 # Validate the atomic Stim v1.16.0 parity ledger.
 [working-directory: '..']
 parity-check *args:

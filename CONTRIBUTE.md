@@ -60,9 +60,10 @@ Validate and execute the atomic Stim v1.16.0 core parity ledger with:
 just oracle::parity-check
 just oracle::parity-run --tier pr
 just oracle::parity-render --check
+just oracle::gates
 ```
 
-`oracle/stim-v1.16-parity.toml` is the current source of feature status. The check proves the finite dialect, format, command, format-route, canonical-instruction, and alias partition and resolves each completed semantic owner to exactly one Cargo test. The run command executes each eligible owner independently; `full` and `soak` include all lower tiers. The renderer owns [docs/stim-parity.md](docs/stim-parity.md), which must not be edited directly.
+`oracle/stim-v1.16-parity.toml` is the current source of feature status. The check proves the finite dialect, format, command, format-route, canonical-instruction, and alias partition and resolves each completed semantic owner to exactly one Cargo test. The run command executes each eligible owner independently; `full` and `soak` include all lower tiers. The renderer owns [docs/stim-parity.md](docs/stim-parity.md), which must not be edited directly. The gate command compares `stab-model`'s canonical metadata directly against a helper linked to pinned `libstim`.
 
 Run the M0 oracle smoke cases with:
 

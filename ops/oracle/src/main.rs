@@ -11,6 +11,7 @@
 
 mod blocker_ledger;
 mod fixtures;
+mod gate_catalog;
 mod matrix;
 mod parity;
 mod process;
@@ -36,7 +37,7 @@ const VENDOR_STIM_PATH: &str = "vendor/stim";
 const BUILD_DIR: &str = "target/oracle/stim-v1.16.0";
 const BUILD_STAMP_FILE: &str = "stab-oracle-build-stamp.txt";
 const STIM_HELPER_SOURCE_DIR: &str = "ops/oracle/stim_helpers";
-const STIM_REVERSE_FLOW_HELPER_BUILD_DIR: &str = "target/oracle/stim-v1.16.0/reverse-flow-helper";
+const STIM_HELPER_BUILD_DIR: &str = "target/oracle/stim-v1.16.0/helpers";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -146,6 +147,13 @@ enum Command {
         rebuild_stim: bool,
     },
 
+    /// Compare canonical gate metadata against pinned Stim.
+    Gates {
+        /// Reconfigure and rebuild the C++ Stim oracle before checking metadata.
+        #[arg(long)]
+        rebuild_stim: bool,
+    },
+
     /// Validate, execute, or render the atomic Stim parity ledger.
     Parity {
         #[command(subcommand)]
@@ -177,6 +185,9 @@ enum OracleError {
 
     #[error(transparent)]
     Fixture(#[from] fixtures::FixtureError),
+
+    #[error(transparent)]
+    GateCatalog(#[from] gate_catalog::GateCatalogError),
 
     #[error(transparent)]
     Matrix(#[from] matrix::MatrixError),
@@ -370,17 +381,14 @@ impl RepoRoot {
         self.path.join(STIM_HELPER_SOURCE_DIR)
     }
 
-    fn stim_reverse_flow_helper_build_dir(&self) -> PathBuf {
-        self.path.join(STIM_REVERSE_FLOW_HELPER_BUILD_DIR)
+    fn stim_helper_build_dir(&self) -> PathBuf {
+        self.path.join(STIM_HELPER_BUILD_DIR)
     }
 
-    fn stim_reverse_flow_helper_binary(&self) -> PathBuf {
-        self.stim_reverse_flow_helper_build_dir()
+    fn stim_helper_binary(&self, target: &str) -> PathBuf {
+        self.stim_helper_build_dir()
             .join("out")
-            .join(format!(
-                "stab_stim_reverse_flow{}",
-                std::env::consts::EXE_SUFFIX
-            ))
+            .join(format!("{target}{}", std::env::consts::EXE_SUFFIX))
     }
 
     fn build_stamp(&self) -> PathBuf {
@@ -579,6 +587,10 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         } => {
             validate_stim_source(&root)?;
             result_format_corpus::run(&root, check, rebuild_stim)?;
+        }
+        Command::Gates { rebuild_stim } => {
+            validate_stim_source(&root)?;
+            gate_catalog::run(&root, rebuild_stim)?;
         }
         Command::Parity { command } => {
             validate_stim_source(&root)?;
@@ -797,6 +809,14 @@ fn ensure_stim_reverse_flow_helper(
     root: &RepoRoot,
     rebuild_stim: bool,
 ) -> Result<PathBuf, OracleError> {
+    ensure_stim_helper(root, rebuild_stim, "stab_stim_reverse_flow")
+}
+
+fn ensure_stim_helper(
+    root: &RepoRoot,
+    rebuild_stim: bool,
+    target: &'static str,
+) -> Result<PathBuf, OracleError> {
     ensure_stim_binary(root, rebuild_stim)?;
     let library = root.stim_library();
     if rebuild_stim || !library.is_file() {
@@ -821,7 +841,7 @@ fn ensure_stim_reverse_flow_helper(
     if !source_dir.is_dir() {
         return Err(OracleError::MissingStimArtifact(source_dir));
     }
-    let helper_build_dir = root.stim_reverse_flow_helper_build_dir();
+    let helper_build_dir = root.stim_helper_build_dir();
     std::fs::create_dir_all(&helper_build_dir).map_err(|source| OracleError::CreateBuildDir {
         path: helper_build_dir.clone(),
         source,
@@ -846,13 +866,13 @@ fn ensure_stim_reverse_flow_helper(
             OsString::from("--build"),
             helper_build_dir.into_os_string(),
             OsString::from("--target"),
-            OsString::from("stab_stim_reverse_flow"),
+            OsString::from(target),
             OsString::from("--parallel"),
         ],
         b"",
         Some(&root.path),
     )?;
-    let binary = root.stim_reverse_flow_helper_binary();
+    let binary = root.stim_helper_binary(target);
     if !binary.is_file() {
         return Err(OracleError::MissingStimBinary(binary));
     }
