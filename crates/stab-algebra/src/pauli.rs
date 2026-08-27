@@ -383,6 +383,24 @@ impl PauliString {
         }
     }
 
+    pub(crate) fn replace_bases_preserving_terms(
+        &mut self,
+        targets: &[usize],
+        bases: &[PauliBasis],
+    ) {
+        debug_assert_eq!(targets.len(), bases.len());
+        debug_assert!(self.has_terms);
+        for (&target, &basis) in targets.iter().zip(bases) {
+            self.write_basis_in_bounds(target, basis);
+        }
+        // A valid Clifford maps every non-identity generator to another non-identity generator.
+        self.has_terms = true;
+    }
+
+    pub(crate) fn flip_sign_in_place(&mut self) {
+        self.sign = self.sign.flipped();
+    }
+
     pub(crate) fn clear_known_terms(&mut self, positions: &[usize]) {
         for position in positions.iter().copied() {
             self.write_basis_in_bounds(position, PauliBasis::I);

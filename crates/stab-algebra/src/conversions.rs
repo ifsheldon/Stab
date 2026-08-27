@@ -3,6 +3,18 @@ use super::{
     Tableau,
 };
 
+pub(crate) fn canonicalize_stabilizers(
+    stabilizers: &[PauliString],
+) -> StabilizerResult<Vec<PauliString>> {
+    let num_qubits = stabilizers.len();
+    StabilizerResource::StabilizerSolveQubits.ensure(num_qubits)?;
+    let mut selected = StabilizerSelection::new(num_qubits);
+    for stabilizer in stabilizers {
+        selected.add_input(stabilizer, false)?;
+    }
+    selected.span.into_canonical_basis()
+}
+
 /// Synthesizes a tableau from a deterministic set of commuting stabilizer generators.
 ///
 /// This M6 helper validates redundancy, underconstraint, and anticommutation according
@@ -175,6 +187,40 @@ impl PauliSpan {
         }
         Ok(reduced)
     }
+
+    fn into_canonical_basis(self) -> StabilizerResult<Vec<PauliString>> {
+        let mut values = self
+            .rows
+            .into_iter()
+            .map(|row| row.value)
+            .collect::<Vec<_>>();
+        let mut next_pivot = 0;
+        for qubit in 0..self.num_qubits {
+            for basis in [PauliBasis::X, PauliBasis::Z] {
+                let Some(pivot_index) = values
+                    .iter()
+                    .enumerate()
+                    .skip(next_pivot)
+                    .find(|(_, value)| has_basis_component(value, qubit, basis))
+                    .map(|(index, _)| index)
+                else {
+                    continue;
+                };
+                let pivot = values
+                    .get(pivot_index)
+                    .cloned()
+                    .ok_or(StabilizerError::InvalidStabilizerTableauSynthesis)?;
+                for (row_index, value) in values.iter_mut().enumerate() {
+                    if row_index != pivot_index && has_basis_component(value, qubit, basis) {
+                        *value = value.multiply_real(&pivot)?;
+                    }
+                }
+                values.swap(next_pivot, pivot_index);
+                next_pivot += 1;
+            }
+        }
+        Ok(values)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -242,6 +288,14 @@ fn has_vector_bit(pauli: &PauliString, num_qubits: usize, bit: usize) -> bool {
             .get(bit - num_qubits)
             .is_some_and(|basis| basis.z_bit())
     }
+}
+
+fn has_basis_component(pauli: &PauliString, qubit: usize, basis: PauliBasis) -> bool {
+    pauli.get(qubit).is_some_and(|value| match basis {
+        PauliBasis::X => value.x_bit(),
+        PauliBasis::Z => value.z_bit(),
+        PauliBasis::I | PauliBasis::Y => false,
+    })
 }
 
 fn symplectic_equation(

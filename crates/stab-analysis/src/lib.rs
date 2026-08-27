@@ -12,6 +12,7 @@ mod circuit_generation;
 mod circuit_inverse;
 mod circuit_missing_detectors;
 mod circuit_pass;
+mod circuit_pauli;
 mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_to_dem;
@@ -24,6 +25,7 @@ mod matched_error;
 mod mbqc_decomposition;
 mod resources;
 mod sparse_rev_frame_tracker;
+mod tableau_circuit;
 
 pub use circuit::circuit_without_tags;
 pub use circuit_detecting_regions::{
@@ -54,6 +56,7 @@ pub use circuit_pass::{
     CircuitPass, CircuitPassContext, CircuitPassError, CircuitPassInput, CircuitPassLimits,
     CircuitPassOutput, CircuitPassProjectionError, CircuitPassResources, run_circuit_pass,
 };
+pub use circuit_pauli::{pauli_after_circuit, pauli_before_circuit};
 pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;
 pub use circuit_to_dem::{
@@ -90,6 +93,7 @@ pub use matched_error::{
 };
 pub use mbqc_decomposition::mbqc_decomposition;
 pub use resources::{CircuitPassStage, ResourceKind, ResourceLimitError, ResourceOperation};
+pub use tableau_circuit::tableau_to_circuit;
 
 /// Low-level lowering operations shared with compilation engines.
 pub mod advanced {

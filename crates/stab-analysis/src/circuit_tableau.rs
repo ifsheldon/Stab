@@ -1,6 +1,4 @@
-use stab_algebra::{
-    PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResource, Tableau,
-};
+use stab_algebra::{StabilizerResource, Tableau};
 use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, QubitId, Target};
 
 use crate::{AnalysisError, AnalysisResult};
@@ -217,8 +215,11 @@ fn apply_unitary_group_to_tableau(
             target_ids.len()
         )));
     }
-    let expanded = scatter_tableau(&local, &target_ids, result.len())?;
-    *result = compose_tableaus(result, &expanded)?;
+    let targets = target_ids
+        .iter()
+        .map(|target| target.get() as usize)
+        .collect::<Vec<_>>();
+    result.append(&local, &targets).map_err(map_tableau_error)?;
     Ok(())
 }
 
@@ -240,87 +241,6 @@ fn gate_tableau_for_name(gate_name: &str) -> AnalysisResult<Tableau> {
     crate::gate_tableau(gate)
 }
 
-fn scatter_tableau(
-    local: &Tableau,
-    targets: &[QubitId],
-    num_qubits: usize,
-) -> AnalysisResult<Tableau> {
-    let mut xs = Vec::with_capacity(num_qubits);
-    let mut zs = Vec::with_capacity(num_qubits);
-    for global_index in 0..num_qubits {
-        if let Some(local_index) = local_index_for_global(targets, global_index) {
-            xs.push(expand_pauli(
-                local.x_output(local_index).map_err(map_tableau_error)?,
-                targets,
-                num_qubits,
-            )?);
-            zs.push(expand_pauli(
-                local.z_output(local_index).map_err(map_tableau_error)?,
-                targets,
-                num_qubits,
-            )?);
-        } else {
-            xs.push(single_pauli(
-                num_qubits,
-                global_index,
-                PauliBasis::X,
-                PauliSign::Plus,
-            ));
-            zs.push(single_pauli(
-                num_qubits,
-                global_index,
-                PauliBasis::Z,
-                PauliSign::Plus,
-            ));
-        }
-    }
-    Ok(stab_algebra::advanced::tableau_from_output_columns_unchecked(xs, zs))
-}
-
-fn expand_pauli(
-    local: &PauliString,
-    targets: &[QubitId],
-    num_qubits: usize,
-) -> AnalysisResult<PauliString> {
-    let mut bases = vec![PauliBasis::I; num_qubits];
-    for (local_index, target) in targets.iter().enumerate() {
-        let global_index = target.get() as usize;
-        let basis = local.get(local_index).ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion("local tableau Pauli length mismatch")
-        })?;
-        if let Some(slot) = bases.get_mut(global_index) {
-            *slot = basis;
-        } else {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "target qubit {global_index} outside tableau length {num_qubits}"
-            )));
-        }
-    }
-    Ok(stab_algebra::advanced::pauli_from_bases_unchecked(
-        local.sign(),
-        bases,
-    ))
-}
-
-fn local_index_for_global(targets: &[QubitId], global_index: usize) -> Option<usize> {
-    targets
-        .iter()
-        .position(|target| target.get() as usize == global_index)
-}
-
-fn single_pauli(len: usize, index: usize, basis: PauliBasis, sign: PauliSign) -> PauliString {
-    stab_algebra::advanced::pauli_from_bases_unchecked(
-        sign,
-        (0..len).map(|candidate| {
-            if candidate == index {
-                basis
-            } else {
-                PauliBasis::I
-            }
-        }),
-    )
-}
-
-fn map_tableau_error(error: StabilizerError) -> AnalysisError {
+fn map_tableau_error(error: stab_algebra::StabilizerError) -> AnalysisError {
     AnalysisError::invalid_tableau_conversion(error.to_string())
 }

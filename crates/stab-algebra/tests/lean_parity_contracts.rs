@@ -194,18 +194,16 @@ fn tableaux_preserve_generators_composition_inversion_and_actions() {
     assert!(cnot.y_output(2).is_err());
     assert!(cnot.z_output_pauli_xyz(0, 2).is_err());
 
-    assert!(
-        !Tableau::gate1("+X", "+X")
-            .expect("malformed one-qubit tableau")
-            .satisfies_invariants()
-            .expect("check malformed invariants")
+    let malformed = stab_algebra::advanced::tableau_from_output_columns_unchecked(
+        vec![PauliString::from_str("+X").expect("malformed X output")],
+        vec![PauliString::from_str("+X").expect("malformed Z output")],
     );
     assert!(
-        !Tableau::gate2("+X_", "+Z_", "+X_", "+Z_")
-            .expect("duplicate-output tableau")
+        !malformed
             .satisfies_invariants()
-            .expect("check duplicate-output invariants")
+            .expect("check malformed advanced Tableau")
     );
+    assert!(Tableau::gate1("+X", "+X").is_err());
     assert_eq!(
         Tableau::gate1("XX", "Z"),
         Err(StabilizerError::LengthMismatch { left: 2, right: 1 })

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{PauliPhase, StabilizerResource};
+use super::{PauliBasis, PauliPhase, StabilizerResource};
 use stab_bits::BitError;
 
 pub type StabilizerResult<T> = Result<T, StabilizerError>;
@@ -52,6 +52,48 @@ pub enum StabilizerError {
 
     #[error("Tableau index {index} is outside length {len}")]
     TableauIndexOutOfRange { index: usize, len: usize },
+
+    #[error(
+        "Tableau has {x_generators} conjugated X generator(s) but {z_generators} conjugated Z generator(s)"
+    )]
+    TableauGeneratorCountMismatch {
+        x_generators: usize,
+        z_generators: usize,
+    },
+
+    #[error(
+        "conjugated {basis} generator {index} has width {width}, expected Tableau width {expected}"
+    )]
+    TableauGeneratorWidthMismatch {
+        basis: PauliBasis,
+        index: usize,
+        width: usize,
+        expected: usize,
+    },
+
+    #[error("conjugated X and Z generators at index {index} commute")]
+    ConjugatedGeneratorPairCommutes { index: usize },
+
+    #[error(
+        "conjugated {left_basis} generator {left_index} anticommutes with conjugated {right_basis} generator {right_index}"
+    )]
+    ConjugatedGeneratorsAnticommute {
+        left_basis: PauliBasis,
+        left_index: usize,
+        right_basis: PauliBasis,
+        right_index: usize,
+    },
+
+    #[error(
+        "{tableau_qubits}-qubit Tableau requires {tableau_qubits} target(s), got {target_count}"
+    )]
+    TableauTargetCountMismatch {
+        tableau_qubits: usize,
+        target_count: usize,
+    },
+
+    #[error("Tableau target {target} is outside {num_qubits} destination qubit(s)")]
+    TableauTargetOutOfRange { target: usize, num_qubits: usize },
 
     #[error("duplicate Tableau target {target}")]
     DuplicateTableauTarget { target: usize },

@@ -41,6 +41,24 @@ impl Tableau {
         Self { xs, zs }
     }
 
+    /// Creates a Tableau from the images of its canonical X and Z generators.
+    ///
+    /// [`PauliString`] makes Hermiticity explicit by construction: each generator has a real
+    /// positive or negative sign. This constructor additionally checks the generator counts and
+    /// widths, then requires the complete canonical symplectic commutation relation. That relation
+    /// proves the output map is invertible, so a second rank calculation would be redundant.
+    pub fn from_conjugated_generators(
+        xs: Vec<PauliString>,
+        zs: Vec<PauliString>,
+    ) -> StabilizerResult<Self> {
+        let result = Self { xs, zs };
+        result.validate_shape()?;
+        if let Some(error) = result.first_symplectic_error()? {
+            return Err(error);
+        }
+        Ok(result)
+    }
+
     /// Creates a random valid Clifford tableau using the caller-owned RNG.
     ///
     /// Passing a seeded `rand` RNG gives deterministic Stab output. This hook samples from a
@@ -106,10 +124,7 @@ impl Tableau {
         let z = z_output.parse::<PauliString>()?;
         ensure_pauli_len(&x, 1)?;
         ensure_pauli_len(&z, 1)?;
-        Ok(Self {
-            xs: vec![x],
-            zs: vec![z],
-        })
+        Self::from_conjugated_generators(vec![x], vec![z])
     }
 
     pub fn gate2(
@@ -125,10 +140,7 @@ impl Tableau {
         for pauli in [&x1, &z1, &x2, &z2] {
             ensure_pauli_len(pauli, 2)?;
         }
-        Ok(Self {
-            xs: vec![x1, x2],
-            zs: vec![z1, z2],
-        })
+        Self::from_conjugated_generators(vec![x1, x2], vec![z1, z2])
     }
 
     pub fn from_pauli_string(pauli: &PauliString) -> StabilizerResult<Self> {
@@ -228,12 +240,143 @@ impl Tableau {
         Ok(Self { xs, zs })
     }
 
+    /// Appends a local Clifford action to the selected output qubits in place.
+    ///
+    /// This is semantically equivalent to composing with `gate.embedded(self.len(), targets)`,
+    /// while one- and two-qubit gates update the existing symplectic rows without constructing a
+    /// full-width temporary Tableau.
+    pub fn append(&mut self, gate: &Self, targets: &[usize]) -> StabilizerResult<()> {
+        self.validate_shape()?;
+        gate.validate_shape()?;
+        validate_tableau_targets(gate.len(), self.len(), targets)?;
+
+        if gate.len() > 2 {
+            let expanded = gate.embedded(self.len(), targets)?;
+            *self = self.then(&expanded)?;
+            return Ok(());
+        }
+
+        let images = local_pauli_images(gate)?;
+        for output in self.xs.iter_mut().chain(&mut self.zs) {
+            let code =
+                targets
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .fold(0_usize, |code, (local_index, target)| {
+                        let basis = output.get(target).unwrap_or(PauliBasis::I);
+                        code | (usize::from(pauli_xyz(basis)) << (2 * local_index))
+                    });
+            let image = images
+                .get(code)
+                .ok_or(StabilizerError::TableauIndexOutOfRange {
+                    index: code,
+                    len: images.len(),
+                })?;
+            if image.phase.sign().is_negative() {
+                output.flip_sign_in_place();
+            }
+            let bases =
+                image
+                    .bases
+                    .get(..gate.len())
+                    .ok_or(StabilizerError::TableauIndexOutOfRange {
+                        index: gate.len(),
+                        len: image.bases.len(),
+                    })?;
+            output.replace_bases_preserving_terms(targets, bases);
+        }
+        Ok(())
+    }
+
+    /// Raises this Tableau to a signed integer power by repeated squaring.
+    pub fn pow(&self, exponent: i64) -> StabilizerResult<Self> {
+        self.validate_shape()?;
+        let mut power = exponent.unsigned_abs();
+        let mut base = if exponent < 0 {
+            self.inverse()?
+        } else {
+            self.clone()
+        };
+        let mut result = Self::identity_unchecked(self.len());
+        while power != 0 {
+            if power & 1 != 0 {
+                result = result.then(&base)?;
+            }
+            power >>= 1;
+            if power != 0 {
+                base = base.then(&base)?;
+            }
+        }
+        Ok(result)
+    }
+
+    /// Returns the tensor-product action of `self` and `other` on disjoint qubits.
+    pub fn direct_sum(&self, other: &Self) -> StabilizerResult<Self> {
+        self.validate_shape()?;
+        other.validate_shape()?;
+        let num_qubits = self.len().saturating_add(other.len());
+        super::StabilizerResource::TableauQubits.ensure(num_qubits)?;
+        let left_targets = (0..self.len()).collect::<Vec<_>>();
+        let right_targets = (self.len()..num_qubits).collect::<Vec<_>>();
+        let mut xs = Vec::with_capacity(num_qubits);
+        let mut zs = Vec::with_capacity(num_qubits);
+        for index in 0..self.len() {
+            xs.push(expand_pauli(
+                self.x_output(index)?,
+                &left_targets,
+                num_qubits,
+            )?);
+            zs.push(expand_pauli(
+                self.z_output(index)?,
+                &left_targets,
+                num_qubits,
+            )?);
+        }
+        for index in 0..other.len() {
+            xs.push(expand_pauli(
+                other.x_output(index)?,
+                &right_targets,
+                num_qubits,
+            )?);
+            zs.push(expand_pauli(
+                other.z_output(index)?,
+                &right_targets,
+                num_qubits,
+            )?);
+        }
+        Ok(Self::from_output_columns_unchecked(xs, zs))
+    }
+
+    /// Embeds this Tableau into `num_qubits`, acting on `targets` in the supplied order.
+    pub fn embedded(&self, num_qubits: usize, targets: &[usize]) -> StabilizerResult<Self> {
+        self.validate_shape()?;
+        super::StabilizerResource::TableauQubits.ensure(num_qubits)?;
+        validate_tableau_targets(self.len(), num_qubits, targets)?;
+        let mut result = Self::identity_unchecked(num_qubits);
+        for (local_index, global_index) in targets.iter().copied().enumerate() {
+            result.set_outputs(
+                global_index,
+                expand_pauli(self.x_output(local_index)?, targets, num_qubits)?,
+                expand_pauli(self.z_output(local_index)?, targets, num_qubits)?,
+            )?;
+        }
+        Ok(result)
+    }
+
     pub fn inverse(&self) -> StabilizerResult<Self> {
         self.inverse_with_signs(true)
     }
 
     pub fn inverse_skipping_signs(&self) -> StabilizerResult<Self> {
         self.inverse_with_signs(false)
+    }
+
+    /// Returns the unique row-reduced generators stabilizing this Tableau's output state.
+    pub fn canonical_stabilizers(&self) -> StabilizerResult<Vec<PauliString>> {
+        self.validate_shape()?;
+        let stabilizers = self.zs.clone();
+        crate::conversions::canonicalize_stabilizers(&stabilizers)
     }
 
     pub fn to_pauli_string(&self) -> StabilizerResult<PauliString> {
@@ -280,21 +423,80 @@ impl Tableau {
     }
 
     pub fn satisfies_invariants(&self) -> StabilizerResult<bool> {
-        for left in 0..self.len() {
-            if self.x_output(left)?.commutes(self.z_output(left)?)? {
-                return Ok(false);
-            }
-            for right in left + 1..self.len() {
-                if !self.x_output(left)?.commutes(self.x_output(right)?)?
-                    || !self.x_output(left)?.commutes(self.z_output(right)?)?
-                    || !self.z_output(left)?.commutes(self.x_output(right)?)?
-                    || !self.z_output(left)?.commutes(self.z_output(right)?)?
-                {
-                    return Ok(false);
+        self.validate_shape()?;
+        Ok(self.first_symplectic_error()?.is_none())
+    }
+
+    fn validate_shape(&self) -> StabilizerResult<()> {
+        if self.xs.len() != self.zs.len() {
+            return Err(StabilizerError::TableauGeneratorCountMismatch {
+                x_generators: self.xs.len(),
+                z_generators: self.zs.len(),
+            });
+        }
+        let expected = self.len();
+        super::StabilizerResource::TableauQubits.ensure(expected)?;
+        for (basis, generators) in [(PauliBasis::X, &self.xs), (PauliBasis::Z, &self.zs)] {
+            for (index, generator) in generators.iter().enumerate() {
+                if generator.len() != expected {
+                    return Err(StabilizerError::TableauGeneratorWidthMismatch {
+                        basis,
+                        index,
+                        width: generator.len(),
+                        expected,
+                    });
                 }
             }
         }
-        Ok(true)
+        Ok(())
+    }
+
+    fn first_symplectic_error(&self) -> StabilizerResult<Option<StabilizerError>> {
+        for left in 0..self.len() {
+            if self.x_output(left)?.commutes(self.z_output(left)?)? {
+                return Ok(Some(StabilizerError::ConjugatedGeneratorPairCommutes {
+                    index: left,
+                }));
+            }
+            for right in left + 1..self.len() {
+                for (left_basis, left_output, right_basis, right_output) in [
+                    (
+                        PauliBasis::X,
+                        self.x_output(left)?,
+                        PauliBasis::X,
+                        self.x_output(right)?,
+                    ),
+                    (
+                        PauliBasis::X,
+                        self.x_output(left)?,
+                        PauliBasis::Z,
+                        self.z_output(right)?,
+                    ),
+                    (
+                        PauliBasis::Z,
+                        self.z_output(left)?,
+                        PauliBasis::X,
+                        self.x_output(right)?,
+                    ),
+                    (
+                        PauliBasis::Z,
+                        self.z_output(left)?,
+                        PauliBasis::Z,
+                        self.z_output(right)?,
+                    ),
+                ] {
+                    if !left_output.commutes(right_output)? {
+                        return Ok(Some(StabilizerError::ConjugatedGeneratorsAnticommute {
+                            left_basis,
+                            left_index: left,
+                            right_basis,
+                            right_index: right,
+                        }));
+                    }
+                }
+            }
+        }
+        Ok(None)
     }
 
     fn inverse_with_signs(&self, include_signs: bool) -> StabilizerResult<Self> {
@@ -431,15 +633,7 @@ fn single_qubit_gate_tableau(
     target: usize,
     clifford: SingleQubitClifford,
 ) -> StabilizerResult<Tableau> {
-    ensure_tableau_target(num_qubits, target)?;
-    let local = clifford.tableau();
-    let mut result = Tableau::identity_unchecked(num_qubits);
-    result.set_outputs(
-        target,
-        scatter_pauli(local.x_output(0)?, &[target], num_qubits)?,
-        scatter_pauli(local.z_output(0)?, &[target], num_qubits)?,
-    )?;
-    Ok(result)
+    clifford.tableau().embedded(num_qubits, &[target])
 }
 
 fn cnot_gate_tableau(
@@ -447,45 +641,17 @@ fn cnot_gate_tableau(
     control: usize,
     target: usize,
 ) -> StabilizerResult<Tableau> {
-    ensure_tableau_target(num_qubits, control)?;
-    ensure_tableau_target(num_qubits, target)?;
-    if control == target {
-        return Err(StabilizerError::DuplicateTableauTarget { target });
-    }
     let local = Tableau::gate2("+XX", "+Z_", "+_X", "+ZZ")?;
-    let targets = [control, target];
-    let mut result = Tableau::identity_unchecked(num_qubits);
-    for (local_index, global_index) in targets.iter().copied().enumerate() {
-        result.set_outputs(
-            global_index,
-            scatter_pauli(local.x_output(local_index)?, &targets, num_qubits)?,
-            scatter_pauli(local.z_output(local_index)?, &targets, num_qubits)?,
-        )?;
-    }
-    Ok(result)
+    local.embedded(num_qubits, &[control, target])
 }
 
-fn scatter_pauli(
+fn expand_pauli(
     local: &PauliString,
     targets: &[usize],
     num_qubits: usize,
 ) -> StabilizerResult<PauliString> {
-    if local.len() != targets.len() {
-        return Err(StabilizerError::LengthMismatch {
-            left: local.len(),
-            right: targets.len(),
-        });
-    }
     let mut bases = vec![PauliBasis::I; num_qubits];
-    let mut seen = Vec::with_capacity(targets.len());
     for (local_index, global_index) in targets.iter().copied().enumerate() {
-        ensure_tableau_target(num_qubits, global_index)?;
-        if seen.contains(&global_index) {
-            return Err(StabilizerError::DuplicateTableauTarget {
-                target: global_index,
-            });
-        }
-        seen.push(global_index);
         let basis = local
             .get(local_index)
             .ok_or(StabilizerError::TableauIndexOutOfRange {
@@ -504,6 +670,117 @@ fn scatter_pauli(
     Ok(PauliString::from_bases_unchecked(local.sign(), bases))
 }
 
+#[derive(Clone, Copy)]
+struct LocalPauliImage {
+    phase: PauliPhase,
+    bases: [PauliBasis; 2],
+}
+
+impl LocalPauliImage {
+    const IDENTITY: Self = Self {
+        phase: PauliPhase::Plus,
+        bases: [PauliBasis::I; 2],
+    };
+}
+
+fn local_pauli_images(gate: &Tableau) -> StabilizerResult<[LocalPauliImage; 16]> {
+    debug_assert!(gate.len() <= 2);
+    let image_count = 1_usize << (2 * gate.len());
+    let mut images = [LocalPauliImage::IDENTITY; 16];
+    for (code, image) in images.iter_mut().enumerate().take(image_count) {
+        for index in 0..gate.len() {
+            let basis = basis_from_xyz((code >> (2 * index)) & 3);
+            let factor = local_generator_image(gate, index, basis)?;
+            multiply_local_images(image, factor);
+        }
+        if image.phase.is_imaginary() {
+            return Err(StabilizerError::ImaginaryProduct { phase: image.phase });
+        }
+    }
+    Ok(images)
+}
+
+fn local_generator_image(
+    gate: &Tableau,
+    index: usize,
+    basis: PauliBasis,
+) -> StabilizerResult<LocalPauliImage> {
+    match basis {
+        PauliBasis::I => Ok(LocalPauliImage::IDENTITY),
+        PauliBasis::X => local_image_from_pauli(gate.x_output(index)?),
+        PauliBasis::Z => local_image_from_pauli(gate.z_output(index)?),
+        PauliBasis::Y => {
+            let mut image = local_image_from_pauli(gate.x_output(index)?)?;
+            multiply_local_images(&mut image, local_image_from_pauli(gate.z_output(index)?)?);
+            image.phase = image.phase.multiply(PauliPhase::PlusI);
+            Ok(image)
+        }
+    }
+}
+
+fn local_image_from_pauli(pauli: &PauliString) -> StabilizerResult<LocalPauliImage> {
+    let mut image = LocalPauliImage {
+        phase: pauli.phase(),
+        ..LocalPauliImage::IDENTITY
+    };
+    for (index, basis) in image.bases.iter_mut().enumerate().take(pauli.len()) {
+        *basis = pauli
+            .get(index)
+            .ok_or(StabilizerError::TableauIndexOutOfRange {
+                index,
+                len: pauli.len(),
+            })?;
+    }
+    Ok(image)
+}
+
+fn multiply_local_images(left: &mut LocalPauliImage, right: LocalPauliImage) {
+    left.phase = left.phase.multiply(right.phase);
+    for (left_basis, right_basis) in left.bases.iter_mut().zip(right.bases) {
+        let (basis, phase) = left_basis.multiply(right_basis);
+        *left_basis = basis;
+        left.phase = left.phase.multiply(phase);
+    }
+}
+
+fn basis_from_xyz(code: usize) -> PauliBasis {
+    match code {
+        0 => PauliBasis::I,
+        1 => PauliBasis::X,
+        2 => PauliBasis::Y,
+        _ => PauliBasis::Z,
+    }
+}
+
+fn validate_tableau_targets(
+    tableau_qubits: usize,
+    num_qubits: usize,
+    targets: &[usize],
+) -> StabilizerResult<()> {
+    if targets.len() != tableau_qubits {
+        return Err(StabilizerError::TableauTargetCountMismatch {
+            tableau_qubits,
+            target_count: targets.len(),
+        });
+    }
+    for (index, target) in targets.iter().copied().enumerate() {
+        if target >= num_qubits {
+            return Err(StabilizerError::TableauTargetOutOfRange { target, num_qubits });
+        }
+        let prior_targets =
+            targets
+                .get(..index)
+                .ok_or(StabilizerError::TableauIndexOutOfRange {
+                    index,
+                    len: targets.len(),
+                })?;
+        if prior_targets.contains(&target) {
+            return Err(StabilizerError::DuplicateTableauTarget { target });
+        }
+    }
+    Ok(())
+}
+
 fn random_distinct_target<R>(num_qubits: usize, first: usize, rng: &mut R) -> usize
 where
     R: Rng + ?Sized,
@@ -513,16 +790,6 @@ where
         target += 1;
     }
     target
-}
-
-fn ensure_tableau_target(num_qubits: usize, target: usize) -> StabilizerResult<()> {
-    if target >= num_qubits {
-        return Err(StabilizerError::TableauIndexOutOfRange {
-            index: target,
-            len: num_qubits,
-        });
-    }
-    Ok(())
 }
 
 fn flex_from_pauli(pauli: &PauliString) -> StabilizerResult<FlexPauliString> {
