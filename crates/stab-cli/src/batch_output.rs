@@ -1,9 +1,10 @@
 use std::io::{self, Write};
 
-use stab_core::{
-    BitPlane64Batch, CircuitError, DemSampleBatchView, DetectionBatchView,
-    DetectionObservableOutputMode, PackedShotBatchView, RecordFormat,
-    advanced::records::{DetsResultType, MeasureRecordWriter},
+use stab_bits::BitSlice;
+use stab_core::{CircuitError, DetectionObservableOutputMode};
+use stab_records::{
+    BitPlane64Batch, DemSampleBatchView, DetectionBatchView, DetsResultType, MeasureRecordWriter,
+    PackedShotBatchView, RecordFormat,
 };
 
 use crate::{
@@ -297,7 +298,7 @@ impl RecordBatchEncoder {
     fn write_part(
         &mut self,
         result_type: DetsResultType,
-        bits: stab_core::advanced::storage::BitSlice<'_>,
+        bits: BitSlice<'_>,
         output_bit: &mut usize,
     ) -> io::Result<()> {
         match self {
@@ -404,7 +405,7 @@ fn invalid_result_format(message: impl Into<String>) -> CliError {
 
 #[cfg(test)]
 mod tests {
-    use stab_core::{DetectionBatchView, PackedShotBatch};
+    use stab_records::{DetectionBatchView, PackedShotBatch};
 
     use super::{DetectionObservableOutputMode, DetsResultType, RecordBatchEncoder, RecordFormat};
 

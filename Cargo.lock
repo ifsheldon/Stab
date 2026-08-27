@@ -2591,8 +2591,11 @@ dependencies = [
  "same-file",
  "serde",
  "serde_json",
+ "stab-bits",
  "stab-compat-corpus",
  "stab-core",
+ "stab-model",
+ "stab-records",
  "tempfile",
  "thiserror",
 ]

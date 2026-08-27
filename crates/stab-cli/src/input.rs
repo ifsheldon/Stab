@@ -6,20 +6,20 @@ use std::fs::File;
 #[cfg(test)]
 use std::path::PathBuf;
 
-use stab_core::advanced::records::RecordStreamReadError;
+use stab_records::RecordStreamReadError;
 
 use crate::CliError;
 use crate::io_plan::InputFile;
 
-/// Maps a shared [`stab_core::advanced::records::RecordStreamReader`] failure onto the CLI's
+/// Maps a shared [`stab_records::RecordStreamReader`] failure onto the CLI's
 /// transport-aware error surface: transport failures keep their path context and format
 /// violations keep their typed diagnostics.
 pub(crate) fn record_stream_error(error: RecordStreamReadError, path: Option<&Path>) -> CliError {
     match error {
         RecordStreamReadError::Io(source) => read_stream_error(path, source),
-        RecordStreamReadError::Format(error) => CliError::from(stab_core::CircuitError::from(
-            stab_core::FormatError::from(error),
-        )),
+        RecordStreamReadError::Format(error) => {
+            CliError::from(stab_core::CircuitError::from(error))
+        }
     }
 }
 

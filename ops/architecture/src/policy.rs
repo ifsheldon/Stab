@@ -15,7 +15,11 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
     ProductPackageContract::stable("stab-algebra", &["stab-bits", "stab-kernels-simd"]),
     ProductPackageContract::stable("stab-analysis", &["stab-algebra", "stab-model"]),
     ProductPackageContract::stable("stab-bits", &["stab-kernels-simd"]),
-    ProductPackageContract::nightly("stab-cli", &["stab-core"], &["stab"]),
+    ProductPackageContract::nightly(
+        "stab-cli",
+        &["stab-bits", "stab-core", "stab-model", "stab-records"],
+        &["stab"],
+    ),
     ProductPackageContract::nightly(
         "stab-core",
         &[
