@@ -26,7 +26,7 @@ Dynamic Rust plugins are forbidden.
 
 The pass boundary accepts and returns `Circuit`. It does not add extension instructions, mutate the gate table, expose executable IR, or imply a runtime registry. Pass-specific inability to lower remains a typed pass diagnostic, while an attempted unknown gate is independently rejected by construction at the closed model boundary.
 
-The `stab-core::experimental` facade tier reexports only the externally proven pass contract and built-in pass. The canonical Stable owner remains `stab-analysis`.
+`stab-analysis` is the canonical Stable owner of the pass contract and built-in pass. Direct consumers import those APIs from `stab_analysis`; facade consumers reach the same type identities through the direct `stab_core::analysis` crate alias. `stab-core` has no experimental tier or pass adapter.
 
 Sampling compilation produces the sole scalar plan and exposes its implementation identity through the plan fingerprint. Agent discovery does not advertise a selection policy or an unavailable implementation.
 

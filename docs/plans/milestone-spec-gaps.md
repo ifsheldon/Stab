@@ -1841,3 +1841,21 @@ Current text: E3 required unused public residue to be removed, but its original 
 Gap: a public export can be correctly removed while a same-name crate-private implementation remains load-bearing for real production consumers. The original sentence therefore contradicted the milestone's task to retain consumed engines and could encourage deleting working internals merely to satisfy a name-based check.
 Proposed amendment: define removal at the public compatibility boundary and require any same-name private implementation to have a proved production consumer.
 Resolution: E3 now requires removed items to disappear from public exports, generated public API inventories, and current public documentation while allowing consumer-proved crate-private implementations to remain.
+
+## 2026-08-27 - P2: Incremental Replay Sink Lifetime
+
+Status: Resolved
+Revealed by: milestone audit of the public architecture reset.
+Current text: the P2 closeout sequence said incremental DEM replay passed a sink only for each delivery call, while the precise done criterion allowed one sink borrow for a transaction's lexical lifetime.
+Gap: the two statements described incompatible APIs. Per-call sinks permit cross-sink delivery and finalization, while a sink-bound transaction prevents it by construction.
+Proposed amendment: make the transaction lifetime the sole contract and state that reusable replay sessions retain no caller borrow after the transaction ends.
+Resolution: the plan and feature checklist now describe `DemReplayTransaction` as binding exactly one sink for its lexical lifetime. The transaction tests cover same-sink delivery, abandonment, forgotten transactions, and reset behavior.
+
+## 2026-08-27 - P2: Diagnostic Benchmark Trigger
+
+Status: Resolved
+Revealed by: milestone audit of the public architecture reset.
+Current text: P2 required diagnostic probes when a moved hot path changed ownership or allocation behavior without naming the observable trigger, selectors, or completion evidence.
+Gap: package ownership alone cannot determine whether timing is warranted, and the milestone could be accepted or delayed based on agent preference.
+Proposed amendment: trigger a probe only when an active row's steady-state loop, batch capacity, warmed allocation behavior, codec path, or process boundary changes; require the exact affected manifest IDs and a fresh baseline/compare outcome in the implementation checkpoint.
+Resolution: P2 now defines those triggers. The integrated changes preserve those timed boundaries, so the checked benchmark smoke and the pre-reset A4/A5 work and output witnesses close P2 without a new timing claim; P7 owns replacement E2E timing.

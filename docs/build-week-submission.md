@@ -1,5 +1,7 @@
 # OpenAI Build Week Submission Plan
 
+> Historical submission artifact: product and architecture statements below describe the July 2026 submission checkpoint and are not source-current. Use [architecture/README.md](architecture/README.md), [stim-parity.md](stim-parity.md), and [plans/GOAL.md](plans/GOAL.md) for the current architecture, parity state, and execution contract.
+
 This document records the positioning, evidence, and action plan for the OpenAI Build Week Challenge submission.
 Key facts: submissions are due July 21 at 5:00 PM PT; the track is Developer tools; judging criteria are Technological Implementation (skillful Codex use), Design (complete product experience), Potential Impact (real problem, real audience), and Quality of the Idea.
 Submission components: a working project built with Codex and GPT-5.6, a project description, a public YouTube demo video under three minutes with audio covering how Codex and GPT-5.6 were used, a public repository URL with setup instructions and sample data, a way for judges to test without rebuilding from scratch, and the Codex `/feedback` session ID recorded on the submission form.

@@ -1,6 +1,6 @@
 # Agent-Native Modular QEC Architecture Plan
 
-Durable architecture rationale as of 2026-07-27. The crate boundaries and extension seams remain design input, while [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) owns the current execution sequence and feature status. This historical proposal's `BackendPreference`, unavailable-backend, and `plan sample --backend` details were explicitly superseded by P2: sampling now has one scalar implementation identity and no caller-selectable placeholder.
+Durable architecture rationale as of 2026-07-27. The crate boundaries and extension seams remain design input, while [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) owns the current execution sequence and feature status. This historical proposal's `BackendPreference`, unavailable-backend, and `plan sample --backend` details were explicitly superseded by P2: sampling now has one scalar implementation identity and no caller-selectable placeholder. Its temporary `CompiledSampler`, `CompiledDetectionConverter`, and `CompiledDemSampler` retention steps are also historical; final P2 removed those adapters after callers migrated to compiler-plan-session-sink ownership.
 
 ## Summary
 
@@ -463,13 +463,13 @@ Each included row requires byte-exact preservation of opaque tag payloads on sur
 
 | Transform or model-producing operation | Required preservation | Exact test selector |
 | --- | --- | --- |
-| Circuit flattening | Repeat-body instruction tags are copied to every materialized occurrence. | `cargo test -p stab-core --test opaque_tag_transform_regressions flattened_circuit_preserves_opaque_instruction_tags -- --exact` |
-| Circuit noise removal | Tags on surviving operations remain byte-identical, and removed noise contributes no tag. | `cargo test -p stab-core --test opaque_tag_transform_regressions circuit_without_noise_preserves_opaque_tags_on_surviving_records -- --exact` |
-| Circuit simplification | Every replacement operation inherits the byte-identical tag of the source operation it replaces. | `cargo test -p stab-core --test opaque_tag_transform_regressions simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations -- --exact` |
-| Circuit decomposition | Every decomposed operation inherits the byte-identical tag of the source operation it replaces. | `cargo test -p stab-core --test opaque_tag_transform_regressions simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations -- --exact` |
-| Unitary inversion | Instruction and repeat-block tags remain attached to their semantic inverse after order reversal. | `cargo test -p stab-core --test opaque_tag_transform_regressions inverse_circuits_preserve_opaque_tags_in_reversed_models -- --exact` |
-| QEC inversion | Measurement-family tags remain attached to the reversed measurement operation. | `cargo test -p stab-core --test opaque_tag_transform_regressions inverse_circuits_preserve_opaque_tags_in_reversed_models -- --exact` |
-| Feedback inlining | Surviving operations retain their tags, and an introduced correction record inherits the tag of the consumed feedback operation. | `cargo test -p stab-core --test opaque_tag_transform_regressions feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operations -- --exact` |
+| Circuit flattening | Repeat-body instruction tags are copied to every materialized occurrence. | `cargo test -p stab-analysis --test opaque_tag_transform_regressions flattened_circuit_preserves_opaque_instruction_tags -- --exact` |
+| Circuit noise removal | Tags on surviving operations remain byte-identical, and removed noise contributes no tag. | `cargo test -p stab-analysis --test opaque_tag_transform_regressions circuit_without_noise_preserves_opaque_tags_on_surviving_records -- --exact` |
+| Circuit simplification | Every replacement operation inherits the byte-identical tag of the source operation it replaces. | `cargo test -p stab-analysis --test opaque_tag_transform_regressions simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations -- --exact` |
+| Circuit decomposition | Every decomposed operation inherits the byte-identical tag of the source operation it replaces. | `cargo test -p stab-analysis --test opaque_tag_transform_regressions simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations -- --exact` |
+| Unitary inversion | Instruction and repeat-block tags remain attached to their semantic inverse after order reversal. | `cargo test -p stab-analysis --test opaque_tag_transform_regressions inverse_circuits_preserve_opaque_tags_in_reversed_models -- --exact` |
+| QEC inversion | Measurement-family tags remain attached to the reversed measurement operation. | `cargo test -p stab-analysis --test opaque_tag_transform_regressions inverse_circuits_preserve_opaque_tags_in_reversed_models -- --exact` |
+| Feedback inlining | Surviving operations retain their tags, and an introduced correction record inherits the tag of the consumed feedback operation. | `cargo test -p stab-analysis --test opaque_tag_transform_regressions feedback_inlining_preserves_opaque_tags_on_surviving_and_introduced_operations -- --exact` |
 | DEM probability rounding | Instruction and repeat-block tags remain byte-identical through numeric rounding. | `cargo test -p stab-analysis --test dem_transforms rounded_dem_preserves_opaque_instruction_and_repeat_tags -- --exact` |
 | DEM flattening | Every materialized instruction retains the byte-identical source instruction tag after detector-offset rewriting. | `cargo test -p stab-analysis --test dem_transforms flattened_dem_preserves_opaque_tags_on_materialized_instructions -- --exact` |
 | Circuit-to-DEM analysis without loop folding | Distinct opaque error tags remain distinct and are not merged merely because their detector effects match. | `cargo test -p stab-analysis --test dem_analyzer_tags dem_analyzer_keeps_distinct_opaque_error_tags_unmerged -- --exact` |
@@ -502,13 +502,11 @@ Allocation invariants are correctness gates, not timing reports.
 Run the parser admission invariants directly:
 
 ```text
-cargo test -p stab-core --test resource_policies parse_preallocation_is_bounded_by_the_admitted_line_prefix -- --exact
-cargo test -p stab-core --test resource_policies byte_parse_admission_does_not_copy_an_unterminated_rejected_line -- --exact
+cargo test -p stab-model --test model_parse_diagnostics attacker_controlled_parser_text_is_stored_as_bounded_utf8_excerpts -- --exact
+cargo test -p stab-model --test model_parse_diagnostics rejected_parser_diagnostic_allocation_is_independent_of_token_length -- --exact
 ```
 
-The workload compares a short rejected suffix with a 100,000-line or one-million-byte rejected suffix after the same admitted prefix.
-
-Acceptance requires identical allocation measurements for parser preallocation and byte preparation, proving that rejected trailing input does not increase allocation count, total bytes, or peak retained bytes.
+The workload compares 1,024-byte and 16,384-byte rejected tokens and verifies that retained diagnostics stay bounded while allocation count and bytes remain within the source-owned constant allowance.
 
 Run the circuit-flatten rejection invariant directly:
 

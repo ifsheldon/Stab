@@ -2,13 +2,13 @@
 
 This directory defines Stab's active product architecture.
 
-The detailed migration sequence, tests, benchmarks, and release criteria live in [the agent-native modular QEC plan](../plans/agent-native-modular-qec-architecture-plan.md).
+The active migration sequence, tests, benchmarks, and release criteria live in [the Stim core parity and lean evidence plan](../plans/stim-core-parity-and-lean-evidence-plan.md).
 
-The exact A6 source, API, feature, test, and benchmark relocation contract is frozen in [the A6 physical component extraction map](a6-component-extraction-map.md).
+The completed A6 extraction contract is preserved as historical rationale in [the A6 physical component extraction map](a6-component-extraction-map.md).
 
 The starting package graph and public inventory are frozen in [the pre-0.2 baseline](pre-0.2-api-baseline.md).
 
-Intentional public Rust API changes are tracked in [the Stab 0.2 API migration inventory](0.2-api-migration-inventory.md).
+The source-current public Rust migration guide is [Migrating to Stab 0.2](../MIGRATING-0.2.md). The earlier [Stab 0.2 API migration inventory](0.2-api-migration-inventory.md) is a historical ledger of the incremental extraction, not the final facade contract.
 
 The stable byte contract for source-model identities is defined by [model fingerprint schema version 1](model-fingerprint-schema-v1.md).
 
@@ -60,7 +60,7 @@ Stab does not extend the Stim gate table through a runtime registry.
 | Engine | Compilation, private IR, plans, sessions, sampling, detection conversion, DEM sampling over shared analysis lowering | Text codecs, paths, CLI, ops |
 | Analysis | Pure circuit and DEM transforms, search, generation, error matching | CLI, operational plans, mutable execution sessions |
 | Decoder API | Detection input and prediction output contracts | Decoder implementations, simulation internals |
-| Facade | Curated ergonomic composition and conveniences | Qualification plans |
+| Facade | Finite canonical root contracts and direct component namespaces | Algorithms, duplicate models, universal errors, qualification plans |
 | CLI | Argument parsing, file-role preflight, sink construction, rendering | Quantum algorithms |
 | Ops | Tests, oracle, qualification, benchmarks, release operations | Product runtime behavior |
 
@@ -76,7 +76,7 @@ stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 stab-reference-decoder -> stab-decoder + stab-model + stab-records
 stab-reference-noise-pass -> stab-analysis + stab-model
 stab-decoder -> stab-model + stab-records
-stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-records + stab-decoder
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-analysis -> stab-model + stab-algebra
 stab-model -> no Stab crate
@@ -84,7 +84,7 @@ stab-algebra -> stab-bits
 stab-records -> stab-bits
 ```
 
-`stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, and `stab-decoder` are physical Cargo packages. `stab-model` owns the complete circuit and DEM compatibility models. `stab-analysis` owns every implemented pure analysis slice: gate-to-algebra semantic projections, recursive circuit and DEM tag stripping, full-circuit tableau conversion, simplification, decomposition, bounded circuit and DEM flattening, DEM probability rounding, SAT/WCNF materialization, graphlike and hypergraph logical-error search, error matching and provenance values, noise removal, repetition/surface/color circuit generation, MBQC decomposition, unsigned flow checking/generation/solving, sparse reverse-frame tracking, unitary and selected QEC inversion, tracker-driven flow reversal, bounded feedback lowering, detecting regions, missing-detector analysis, circuit-to-DEM lowering, loop folding, and XYZ error-probability decomposition. `stab-engine` owns backend-neutral compilation-request fingerprints, execution-side biased randomization, circuit-sampling plans and sessions, measurement-to-detection plans and sessions, direct or fused circuit detection sampling, DEM compilation and execution, reference-sample trees, and sampled-flow execution. Its typed measurement, detection, and DEM-sample sinks preserve cancellation, progress, poisoning, reusable-buffer, reference-sample, sweep-state, replay, and bounded active-storage contracts without importing codecs, paths, CLI, or ops. `stab-decoder` owns truth-hidden detector input, caller-owned observable prediction, preflight, cancellation, progress, and statically dispatched session contracts while leaving compilation to each implementation. `stab-core` directly reexports canonical engine and decoder identities and curates common values, batches, diagnostics, policies, and compatibility conveniences; explicit storage, records, backend, traversal, algebra, and pre-0.2 adapters live under `stab_core::advanced`. The current reference tree preserves the established bounded flat materialization contract; optimized folded construction for enormous compact repeats is future performance work and is not conflated with Stim's folded-tree benchmark. Dependency arrows point from a consumer to its dependency:
+`stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, and `stab-decoder` are physical Cargo packages with one owner per capability. `stab-core` reexports common owned values and aliases `analysis`, `decoder`, and `execution` directly to their component crates. Low-level storage, codecs, traversal, algorithms, and extension contracts remain in their owners. Dependency arrows point from a consumer to its dependency:
 
 ```text
 stab-kernels-simd -> no Stab crate
@@ -97,7 +97,7 @@ stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-decoder -> stab-model + stab-records
-stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-records + stab-decoder
 stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 
 ops -> product crates
@@ -110,7 +110,7 @@ The unpublished `stab-reference-decoder` proves decoder composition using only `
 
 The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects test-support dependencies on product or operations code except the exact public-component edges assigned to the two proof crates above. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
 
-The checker parses facade and product Rust sources with `syn`. It requires the exact public root modules, rejects module path overrides and item-generating macros in facade tier entry files, rejects exported macros anywhere in `stab-core`, rejects root glob exports and direct definitions, compares every named root reexport against `ops/architecture/facade-root-reexports.txt`, requires `advanced` to expose only its assigned top-level modules, and compares `experimental` against the exact A8 circuit-pass allowlist. Portable-SIMD inspection follows direct, grouped, lexically scoped aliased, and macro-token `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
+The checker parses facade and product Rust sources with `syn`. It requires the `analysis`, `decoder`, and `execution` crate aliases, rejects public facade modules, module path overrides, item-generating macros, exported macros, glob exports, and direct public definitions, and compares every common root reexport against `ops/architecture/facade-root-reexports.txt`. Portable-SIMD inspection follows direct, grouped, lexically scoped aliased, and macro-token `std` or `core` paths plus nested `cfg_attr` feature gates without treating comments or string literals as code.
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
@@ -140,17 +140,15 @@ Dense and packed readers apply HITS and DETS token events directly, so duplicate
 
 Stable components must compile without enabling or parsing Nightly-only code.
 
-## Public API Tiers
+## Public Facade
 
-- Facade root: common owned models, compilers, plans, sessions, batches, diagnostics, and policies.
-- `advanced`: supported low-level storage, layout, explicit backend, and bounded traversal APIs.
-- `experimental`: extension contracts that have real implementations but may change before 1.0.
+- The facade root contains only the mechanically checked canonical contracts listed in `ops/architecture/facade-root-reexports.txt`. The inventory is limited to common values, their directly coupled errors, and sink/session contracts.
+- `stab_core::analysis`, `stab_core::decoder`, and `stab_core::execution` are direct crate aliases with the same type identities as their owners.
+- Sampling request estimation is engine-owned and available as `stab_engine::estimate_sampling_request` or `stab_core::execution::estimate_sampling_request`.
+- Low-level storage and kernels use `stab-bits`; codecs and traversal use `stab-records` or `stab-model`; pure algorithms and extension contracts use `stab-analysis`; execution plans use `stab-engine`.
+- `advanced`, `experimental`, duplicate owner-shaped modules, universal facade errors, and backend placeholders are absent.
 
-Default root reexports are curated.
-`analysis` and `execution` remain semantic facade namespaces; implementation-owner namespaces such as `bits`, `stabilizers`, `result_formats`, and `result_streaming` are not public facade modules.
-The `experimental` namespace contains only the circuit-pass contract and built-in without-noise pass proven by the separate Stable noise-pass crate. Decoder interoperability has a Stable component contract and remains reexported directly from the facade root. Backend preference stays under `advanced::backend`; no backend trait, GPU placeholder, or dynamic plugin API is exposed.
-
-The qualification inventory records every exported item, but inventory ownership does not imply that every item belongs at the facade root.
+The root inventory is intentionally smaller than the union of component APIs. Convenience does not imply facade ownership.
 
 ## Resource And Diagnostic Policy
 
@@ -162,7 +160,7 @@ Semantic hard limits are not configurable.
 
 A public policy is introduced only when callers can meaningfully choose the budget. The presence of an internal safety constant alone is not sufficient justification for another public limits type.
 
-Domain errors retain typed context and convert losslessly into structured diagnostics.
+Domain errors retain typed context. Applications and the CLI compose them into structured diagnostics only at their workflow boundary.
 
 Human rendering is for people.
 

@@ -10,7 +10,7 @@ Stab currently implements selected `.stim`, `.dem`, `gen`, `convert`, `sample`, 
 The longer-term vision is composable Rust components for QEC tooling.
 
 The exact core parity scope, including deliberate deferrals such as Python bindings, WASM, diagrams, interactive simulators, and `explain_errors`, is recorded in [docs/stim-parity.md](docs/stim-parity.md).
-Rust users moving from the original monolithic facade should follow [docs/MIGRATING-0.2.md](docs/MIGRATING-0.2.md); Stab 0.2 provides independently consumable model, bits, records, algebra, analysis, engine, and decoder-interoperability crates plus a curated `stab-core` facade. The analysis crate also exposes an experimental typed circuit-pass seam with pre-lowering output-resource admission, proven by a separate Stable consumer crate.
+Rust users moving from the original monolithic facade should follow [docs/MIGRATING-0.2.md](docs/MIGRATING-0.2.md); Stab 0.2 provides independently consumable model, bits, records, algebra, analysis, engine, and decoder-interoperability crates plus a curated `stab-core` facade. The analysis crate also exposes a pre-stable typed circuit-pass seam with pre-lowering output-resource admission, proven by a separate Stable consumer crate.
 
 ## Quickstart
 

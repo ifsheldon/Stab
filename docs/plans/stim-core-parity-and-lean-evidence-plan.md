@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 is complete; P2 is in progress; P3 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 and P2 are complete; P3 is next; P4 through P9 have not started.
 
 ## Summary
 
@@ -75,7 +75,7 @@ Stim's MBQC decomposition helper is also excluded because it feeds rich help ren
 - `stab-decoder` owns Stab-native decoder contracts and reusable decoder sessions; this is an extension boundary, not a Stim parity requirement.
 - `stab-kernels-simd` owns measured SIMD leaf kernels only.
 - `stab-cli` owns argument parsing, file-role preflight, process-level workflows, help, and exit behavior.
-- `stab-core` is a thin convenience facade. It may re-export stable common types and compose components, but it must not own algorithms, duplicate data models, or translate every domain error into a facade error.
+- `stab-core` is a thin convenience facade. It may re-export stable common types and direct component namespaces, but it must not own algorithms, duplicate data models, or translate every domain error into a facade error.
 
 The CLI should depend directly on the component crates that own each operation. The facade exists for users who prefer one dependency, not as an internal service locator.
 
@@ -189,15 +189,24 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 ### Tasks
 
 1. Make `stab-cli` use the owning component crates directly.
-2. Move facade-owned algorithms to their proper component owners and leave `stab-core` as a thin re-export and composition layer.
+2. Move facade-owned algorithms to their proper component owners and leave `stab-core` as a thin re-export layer.
 3. Replace catch-all errors with owning domain errors and typed context.
 4. Consolidate result-format naming on `RecordFormat`. Completed: the duplicate `SampleFormat` type and its conversions are removed, generic readers accept all six formats, and one-record writers reject grouped-only PTB64 construction.
-5. Replace legacy compiled/materialized/callback adapters with one compiler-plan-session-batch/sink model.
+5. Replace legacy compiled/materialized/callback adapters with one compiler-plan-session-optional transaction-batch/sink model. Transactions exist only where several incremental calls must share one sink finalization lifecycle.
 6. Remove backend placeholders, unavailable backend choices, compatibility descriptors, duplicate exports, and forwarding-only modules. Completed for sampling backend choice, descriptor metadata, the one-element registry, circuit path helpers, and empty facade forwarding files; broader compatibility-adapter deletion remains under task 5.
 7. Keep consumer fixtures for direct component use, facade use, an external `CircuitPass`, a reusable `DecoderSession`, and SIMD-kernel isolation.
 8. Update API, migration, architecture, and generated documentation in the same changes.
 
-Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `CompiledDemSampler`, their materialized or encoded return paths, callback visitors, facade-only helpers, and hidden engine bridges used only by those adapters are deleted. Sampling, measurement-to-detection conversion, and DEM sampling now expose compilers, immutable plans, mutable sessions, and typed sinks as their only routes. The obsolete whole-output budgets and public record DTOs are gone; canonical sessions retain bounded batch scratch while callers own output retention.
+Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `CompiledDemSampler`, their materialized or encoded return paths, callback visitors, facade-only helpers, and hidden engine bridges used only by those adapters are deleted. Sampling, measurement-to-detection conversion, and DEM sampling expose compilers, immutable plans, owned mutable sessions, typed sinks, and only the short-lived transactions needed to bind one sink across incremental writes and finalization. The obsolete whole-output budgets and public record DTOs are gone; canonical sessions retain bounded batch scratch while callers own output retention. Incremental conversion uses `MeasurementToDetectionTransaction`; incremental DEM replay uses owned `DemReplaySession` state plus `DemReplayTransaction`. Neither transaction is a compatibility route, and each makes cross-sink completion impossible by construction.
+
+### Closeout Sequence
+
+1. Complete: incremental DEM replay owns mutable state, while one short-lived transaction binds exactly one output sink for its lexical lifetime and releases that borrow when finalized or dropped.
+2. Finish moving model, analysis, engine, and record semantics into tests owned by the crate that implements them; leave cross-component tests only where they prove an actual integration contract.
+3. Bind every facade root re-export to its exact component source in the checked finite inventory and reject missing, duplicate, reordered, or wrong-owner entries.
+4. Update direct-consumer fixtures, benchmark prerequisite ownership, migration guidance, component contracts, and generated ledgers from the final source graph.
+5. Run owner tests first, then architecture checks, parity owners, oracle contracts, generated-contract checks, workspace formatting, warnings-denied Clippy, workspace tests, benchmark smoke, and pre-commit.
+6. Run `milestone-audit` and `full-code-review` on the integrated diff, fix confirmed findings, and commit the source, generated contracts, and documentation in focused changes before selecting P3 work.
 
 ### Tests
 
@@ -205,18 +214,32 @@ Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `
 - Compile and execute the supported external-consumer fixtures.
 - Search for every removed public path and reject stale source, docs, examples, manifests, and generated entries.
 - Verify that the facade and direct component route produce the same observable outputs on representative workflows.
+- Require each parity family’s canonical semantic test to run in its declared product-owner package; `stab-oracle` is the only exception for independent pinned-source evidence.
 
 ### Benchmarks
 
-- Capture untimed work and output digests for the future E2E workflows before the move.
-- Run temporary diagnostic probes only when a moved hot path changes ownership or allocation behavior; do not promote them into the release matrix automatically.
+- Preserve the pre-reset A4 and A5 work and output witnesses recorded from clean revision `18099bf3` in [Benchmark Contracts](../../benchmarks/README.md): A4 owns the sampling phase and generated-circuit CLI witnesses, while A5 owns detection, conversion, DEM phase, and eleven CLI witnesses.
+- Run temporary diagnostic probes only when the P2 diff changes an active row's steady-state loop body, batch capacity, post-warmup allocation behavior, codec path, or process boundary. Pure package/test ownership moves and preflight or finalization checks do not trigger timing. For a triggered row, run that exact manifest ID through a fresh local baseline and compare and record the selector and outcome in this milestone's implementation checkpoint; do not promote the probe into the release matrix automatically.
+- The integrated P2 changes preserve the existing execution loops, batch capacities, warmed storage, codec paths, and CLI process boundaries, so the source-current benchmark smoke plus the pre-reset A4 and A5 work/output witnesses satisfy this milestone. P7 remains responsible for the replacement user-visible timing system.
 
 ### Done Criteria
 
 - Each algorithm has one production owner.
 - The facade has no unique algorithm, duplicate model, or universal error type.
 - No compatibility shim remains for a removed pre-1.0 Stab API.
-- The public API supports later Python wrapping without exposing borrowed internals or compatibility-specific lifetimes.
+- Public compilers return owned immutable plans and plans create owned mutable sessions. No reusable public plan or session stores a borrow into a caller-owned circuit, DEM, decoder, sink, or output buffer. A public incremental transaction may borrow one session and exactly one sink only for that transaction's lexical lifetime; it must not permit a different sink to receive finalization, survive forgotten lifecycle state as usable, or expose a second compatibility route.
+- Every exported facade root item is identity-preserving and appears in the mechanically checked finite inventory; component operations remain under direct component namespaces.
+
+### Implementation Checkpoint
+
+- `stab-core` contains documentation, direct component namespaces, and a finite checked root re-export set. Facade-owned algorithms, duplicate models, the universal error, backend placeholders, forwarding modules, and legacy compiled adapters are removed.
+- CLI and operational hot paths changed by P2 use owning crates directly. External consumer fixtures prove direct stable component use, scalar and nightly facade use, mixed feature unification, external circuit passes, decoder sessions, and SIMD isolation.
+- Incremental measurement conversion and DEM replay bind one sink for one transaction lifetime. Abandoned committed transactions fail closed, reset rules are explicit, zero-shot behavior is defined, and cancellation reports cumulative committed progress.
+- Semantic tests were moved to `stab-model`, `stab-analysis`, `stab-records`, and `stab-engine`; low-value derive and representation assertions were removed. The graph/vector simulator cross-check was deleted because those products remain deferred and the test duplicated owned algebra evidence.
+- The facade checker binds every root export to its exact source crate and rejects crate-level behavioral attributes, local definitions, globs, wrong owners, duplicates, omissions, and reordering. The parity validator separately forbids `stab-core` from owning a semantic family.
+- Formatting, warnings-denied workspace Clippy, all-feature workspace tests, architecture and consumer checks, 100 canonical parity owners, the live 62-case result-format corpus, 313 compatibility rows, 122 blocker cases, the implemented oracle suite, 48 runtime benchmark prerequisites, qualification status, and benchmark smoke pass on the integrated worktree.
+- Milestone audit and full code review found no remaining implementation blocker or specification gap. The two revealed ambiguities, transaction sink lifetime and benchmark-probe triggering, are resolved in `milestone-spec-gaps.md`.
+- P2 preserves active steady-state loops, batch capacities, warmed allocation behavior, codec paths, and CLI process boundaries. No diagnostic timing probe is triggered and no new performance claim is made; P7 owns replacement E2E evidence.
 
 ## Milestone P3: Close Model, Gate, And Record-Format Parity
 

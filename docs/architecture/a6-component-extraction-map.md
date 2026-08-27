@@ -173,7 +173,7 @@ Any helper that samples, constructs a mutable execution frame, or depends on `st
 
 | Current source | Destination | Public ownership and rationale |
 | --- | --- | --- |
-| `sampling.rs`, `sampling/*` | `sampling/*` | Own sampling compiler, immutable plan, session, private operations, execution frames, and compatibility sampler. |
+| `sampling.rs`, `sampling/*` | `sampling/*` | Own the sampling compiler, immutable plan, mutable session, private operations, execution frames, and typed sink delivery. |
 | `execution/reference_sample_tree.rs` | `reference_sample_tree.rs` | Own bounded reference-tree construction, lookup, simplification, decompression, storage admission, and typed failures. |
 | `execution/sampled_flow.rs` | `sampled_flow.rs` | Own simulator-backed sampled-flow execution, typed shot and randomness inputs, batching, compilation, and typed failures. |
 | `detection.rs`, `detection/*` | `detection/*` | Own measurement-to-detection compilation, direct detector-frame and fused detection sampling, sessions, delivery, and limits. |
@@ -186,9 +186,9 @@ The crate depends on exact-version `stab-model`, `stab-records`, `stab-algebra`,
 
 It does not depend on `stab-kernels-simd`: the current sampling plans do not execute through the raw XOR or Clifford kernels, so a kernel edge would blur build-time leaf acceleration with engine backend ownership.
 
-Execution code does not import `SampleFormat`, text codecs, filesystem paths, CLI types, or ops descriptors. Byte-oriented materializers that remain for compatibility live in the facade and delegate through typed sinks.
+Execution code does not import result-format enums, text codecs, filesystem paths, CLI types, or ops descriptors. Byte-oriented output lives in `stab-records` codec sinks and remains outside the execution engine.
 
-`detection/output.rs` does not move as written because it imports `SampleFormat` and byte writers. Its semantic detector and observable routing moves behind typed sinks, while byte-format compatibility wrappers remain in `stab-core`.
+The old `detection/output.rs` did not move as written because it mixed result codecs with execution. Its semantic detector and observable routing moved behind typed sinks; byte formatting moved to `stab-records`, and P2 removed the facade compatibility wrappers.
 
 The scalar engine is physically extracted. `stab-engine` owns `CompilationOperation`, `CompilationRequestFingerprint`, `biased_randomize_bits`, source-owned descriptors for all four public compiler families, the sampling, detection, and DEM compilers, immutable plans, mutable sessions, direct-Z, small-frame, general-frame, deterministic reference samples, conversion reference and sweep state, direct detector-frame execution, fused sample-and-convert execution, lowered folded DEM execution, detector-only and sampled-error DEM sampling, incremental replay, reference-sample trees, sampled-flow execution, cancellation, progress, poisoning, and typed measurement, detection, and DEM-sample delivery. Descriptors explicitly report when a compiler has no public request-fingerprint identity instead of omitting the compiler or inventing an identity. Reference trees have private checked structure, exact logical-size and nesting admission, iterative random access and decompression, and fallible materialization. The crate root is the sole canonical public execution namespace. P2 deleted `CompiledSampler`, `CompiledDetectionConverter`, `CompiledDemSampler`, their callback or whole-output routes, byte encoding, facade-only helpers, and hidden engine bridges; all three execution families now have one compiler-plan-session-sink route.
 

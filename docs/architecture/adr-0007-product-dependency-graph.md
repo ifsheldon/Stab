@@ -25,7 +25,7 @@ stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-decoder -> stab-model + stab-records
-stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
+stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-records + stab-decoder
 stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 
 ops -> product crates
@@ -44,7 +44,7 @@ Stable components declare Rust 1.97.1 as their minimum supported version and mus
 - Pure analysis and mutable execution have one dependency direction and cannot share algorithms through a cycle.
 - Qualification, benchmark, and repository operations can inspect product crates, but product crates cannot import operational policy.
 - Adding or reversing a product edge requires an architecture decision update, exact consumer evidence, and architecture-check changes in the same change set.
-- Facade convenience may require adapters, but an adapter cannot create a second canonical type or algorithm owner.
+- Facade convenience is limited to direct namespaces and the finite identity-preserving root inventory in `ops/architecture/facade-root-reexports.txt`; it does not require adapters or a direct low-level bits edge.
 
 ## Enforcement
 
