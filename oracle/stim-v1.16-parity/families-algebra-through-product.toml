@@ -534,9 +534,16 @@ area = "cli"
 contract = "Stab removes legacy top-level dispatch, deprecated frame and observable-order aliases, hidden sample_dem observable aliases, and stale help advertising instead of maintaining a second compatibility parser."
 stim_refs = ["src/stim/cmd/command_analyze_errors.test.cc", "src/stim/cmd/command_detect.cc", "src/stim/cmd/command_sample.cc", "src/stim/cmd/command_sample_dem.cc"]
 coverage = ["obsolete:analyze-detector-hypergraph", "obsolete:detect-prepend-observables", "obsolete:help-frame0", "obsolete:legacy-dispatch", "obsolete:sample-dem-append-observables", "obsolete:sample-dem-prepend-observables", "obsolete:sample-frame0"]
-status = "missing"
+status = "done"
 owner = "stab-cli"
-milestone = "P6"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "removed_compatibility_routes_are_absent_from_real_binary_and_help"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.detect"

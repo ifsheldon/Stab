@@ -8,8 +8,8 @@ Pinned target: `v1.16.0` at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
 | Status | Families |
 | --- | ---: |
-| done | 88 |
-| missing | 1 |
+| done | 89 |
+| missing | 0 |
 | deferred | 13 |
 | divergence | 51 |
 
@@ -17,9 +17,9 @@ Status describes implementation only. A `done` row may still need a lean canonic
 
 | Evidence | Families |
 | --- | ---: |
-| verified | 139 |
+| verified | 140 |
 | needs-owner | 0 |
-| not-applicable | 14 |
+| not-applicable | 13 |
 
 ## Result Format Applicability
 
@@ -104,7 +104,7 @@ Status describes implementation only. A `done` row may still need a lean canonic
 | --- | --- | --- | --- | --- | --- | --- |
 | `cli.analyze-errors` | done | verified | `stab-cli` | analyze_errors accepts every nondeprecated Stim option and routes it into the typed circuit-to-DEM workflow. | `cargo test -p stab-cli --test parity_workflows -- analyze_errors_real_process_routes_all_nondeprecated_options --exact --include-ignored` (pr) | [`src/stim/cmd/command_analyze_errors.cc`](../vendor/stim/src/stim/cmd/command_analyze_errors.cc), [`src/stim/cmd/command_analyze_errors.test.cc`](../vendor/stim/src/stim/cmd/command_analyze_errors.test.cc) |
 | `cli.convert` | done | verified | `stab-cli` | convert accepts every nondeprecated Stim option and routes typed circuit, DEM, explicit-layout, primary-output, and observable-output arguments. | `cargo test -p stab-cli --test parity_workflows -- convert_real_process_covers_layout_and_format_routes --exact --include-ignored` (pr) | [`src/stim/cmd/command_convert.cc`](../vendor/stim/src/stim/cmd/command_convert.cc), [`src/stim/cmd/command_convert.test.cc`](../vendor/stim/src/stim/cmd/command_convert.test.cc) |
-| `cli.deprecated-compatibility-removal` | missing | not-applicable | `stab-cli` | Stab removes legacy top-level dispatch, deprecated frame and observable-order aliases, hidden sample_dem observable aliases, and stale help advertising instead of maintaining a second compatibility parser. | Finish in P6 | [`src/stim/cmd/command_analyze_errors.test.cc`](../vendor/stim/src/stim/cmd/command_analyze_errors.test.cc), [`src/stim/cmd/command_detect.cc`](../vendor/stim/src/stim/cmd/command_detect.cc), [`src/stim/cmd/command_sample.cc`](../vendor/stim/src/stim/cmd/command_sample.cc), [`src/stim/cmd/command_sample_dem.cc`](../vendor/stim/src/stim/cmd/command_sample_dem.cc) |
+| `cli.deprecated-compatibility-removal` | done | verified | `stab-cli` | Stab removes legacy top-level dispatch, deprecated frame and observable-order aliases, hidden sample_dem observable aliases, and stale help advertising instead of maintaining a second compatibility parser. | `cargo test -p stab-cli --test parity_workflows -- removed_compatibility_routes_are_absent_from_real_binary_and_help --exact --include-ignored` (pr) | [`src/stim/cmd/command_analyze_errors.test.cc`](../vendor/stim/src/stim/cmd/command_analyze_errors.test.cc), [`src/stim/cmd/command_detect.cc`](../vendor/stim/src/stim/cmd/command_detect.cc), [`src/stim/cmd/command_sample.cc`](../vendor/stim/src/stim/cmd/command_sample.cc), [`src/stim/cmd/command_sample_dem.cc`](../vendor/stim/src/stim/cmd/command_sample_dem.cc) |
 | `cli.detect` | done | verified | `stab-cli` | detect accepts every nondeprecated Stim option and routes sampling, output-format, and observable-output arguments. | `cargo test -p stab-cli --test parity_workflows -- detect_real_process_covers_options_and_output_routes --exact --include-ignored` (pr) | [`src/stim/cmd/command_detect.cc`](../vendor/stim/src/stim/cmd/command_detect.cc), [`src/stim/cmd/command_detect.test.cc`](../vendor/stim/src/stim/cmd/command_detect.test.cc) |
 | `cli.diagram` | deferred | not-applicable | - | diagram renders Stim circuit and DEM visualization products and aliases. | Diagram and visualization products are explicitly deferred. | [`src/stim/cmd/command_diagram.cc`](../vendor/stim/src/stim/cmd/command_diagram.cc), [`src/stim/cmd/command_diagram.test.cc`](../vendor/stim/src/stim/cmd/command_diagram.test.cc) |
 | `cli.explain-errors` | deferred | not-applicable | - | explain_errors reports full physical circuit provenance for detector error model mechanisms. | The explain_errors command and full ErrorMatcher provenance are explicitly deferred. | [`src/stim/cmd/command_explain_errors.cc`](../vendor/stim/src/stim/cmd/command_explain_errors.cc), [`src/stim/cmd/command_explain_errors.test.cc`](../vendor/stim/src/stim/cmd/command_explain_errors.test.cc) |
