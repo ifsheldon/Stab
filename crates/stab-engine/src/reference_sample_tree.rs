@@ -86,7 +86,6 @@ impl ReferenceSampleTree {
         circuit: &Circuit,
     ) -> Result<Self, ReferenceSampleTreeError> {
         let sampler = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
-        sampler.validate_legacy_adapter_storage_for_core()?;
         let mut sweep_record = try_bool_buffer(
             sampler.sweep_bit_count(),
             "reference sample tree sweep record",

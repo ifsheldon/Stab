@@ -197,6 +197,8 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 7. Keep consumer fixtures for direct component use, facade use, an external `CircuitPass`, a reusable `DecoderSession`, and SIMD-kernel isolation.
 8. Update API, migration, architecture, and generated documentation in the same changes.
 
+Sampling checkpoint: `CompiledSampler`, its materialized and encoded return paths, its callback visitors, the facade-only reference helpers, and the hidden engine bridges used only by those adapters are deleted. `SamplingCompiler`, `SamplingPlan`, `SamplingSession`, `MeasurementSink`, `circuit_reference_sample`, and `ReferenceSampleTree::from_circuit_reference_sample` now own the surviving behavior directly. Detection and DEM compatibility adapters remain to be removed before P2 closes.
+
 ### Tests
 
 - Run owner-crate semantic suites after each moved behavior.

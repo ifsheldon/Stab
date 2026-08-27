@@ -1,13 +1,13 @@
 use std::hint::black_box;
 
-use stab_core::advanced::compat::{
-    CompiledDetectionConverter, CompiledSampler, sample_detection_events,
-};
+use stab_core::advanced::compat::{CompiledDetectionConverter, sample_detection_events};
 use stab_core::{
     Circuit, DetectionConversionOptions, ErrorAnalyzerOptions, Gate, Probability,
     analysis::{gate_has_tableau, gate_tableau},
     circuit_flow_generators, circuit_to_detector_error_model,
 };
+use stab_engine::{RandomPolicy, SamplingCompiler, SamplingPlan, Seed, ShotCount};
+use stab_records::{MeasurementBatchView, MeasurementSink};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -114,10 +114,12 @@ impl GateSemanticCorpus {
 
 pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let corpus = GateSemanticCorpus::new(&row.id)?;
-    let samplers = corpus
+    let sampling_plans = corpus
         .execution_circuits()
         .map(|circuit| {
-            CompiledSampler::compile(circuit).map_err(|error| stab_runner_error(&row.id, error))
+            SamplingCompiler::new()
+                .compile(circuit)
+                .map_err(|error| stab_runner_error(&row.id, error))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let analyzer_options = ErrorAnalyzerOptions {
@@ -132,8 +134,8 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
             "stab_pf3_gate_sampler_execution",
             STAB_COMPARE_ITERATIONS,
             || {
-                for sampler in &samplers {
-                    black_box(sampler.sample_zero_one_with_seed(1, Some(29)));
+                for plan in &sampling_plans {
+                    black_box(materialize_sample(plan, 29, row)?);
                 }
                 Ok(())
             },
@@ -142,10 +144,9 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
             "stab_pf3_gate_reference_sampling",
             STAB_COMPARE_ITERATIONS,
             || {
-                for sampler in &samplers {
+                for plan in &sampling_plans {
                     black_box(
-                        sampler
-                            .reference_sample()
+                        plan.try_reference_sample()
                             .map_err(|error| stab_runner_error(&row.id, error))?,
                     );
                 }
@@ -257,6 +258,48 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
             },
         )?,
     ])
+}
+
+fn materialize_sample(
+    plan: &SamplingPlan,
+    seed: u64,
+    row: &BenchmarkRow,
+) -> Result<Vec<Vec<bool>>, BenchError> {
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = MeasurementCollector::default();
+    session
+        .run(ShotCount::new(1), &mut sink)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(sink.records)
+}
+
+#[derive(Default)]
+struct MeasurementCollector {
+    records: Vec<Vec<bool>>,
+}
+
+impl MeasurementSink for MeasurementCollector {
+    type Error = &'static str;
+
+    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
+        for shot in 0..batch.shot_count() {
+            let record = (0..batch.width().get())
+                .map(|bit| {
+                    batch
+                        .get(shot, bit)
+                        .ok_or("measurement batch escaped its validated dimensions")
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            self.records.push(record);
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 pub(super) fn measurement_work(name: &str) -> Option<(f64, &'static str)> {

@@ -4,8 +4,10 @@
     reason = "PF3 gate semantic execution tests use compact per-gate diagnostics"
 )]
 
+mod support;
+
 use stab_core::advanced::compat::{
-    CompiledDetectionConverter, CompiledSampler, DetectionEventRecord, sample_detection_events,
+    CompiledDetectionConverter, DetectionEventRecord, sample_detection_events,
 };
 use stab_core::{
     Circuit, CircuitError, DetectionConversionOptions, ErrorAnalyzerOptions, Gate,
@@ -13,13 +15,15 @@ use stab_core::{
     circuit_to_detector_error_model,
 };
 
+use support::SamplingFixture;
+
 #[test]
 fn fixed_tableau_gates_execute_across_current_public_surfaces() {
     let cases = fixed_tableau_gate_cases();
     assert_eq!(cases.len(), 46);
 
     for case in cases {
-        let sampler = CompiledSampler::compile(&case.circuit)
+        let sampler = SamplingFixture::compile(&case.circuit)
             .unwrap_or_else(|error| panic!("sampler rejected {}: {error}", case.gate_name));
         assert_eq!(
             sampler.sample_zero_one(1),
@@ -49,7 +53,7 @@ fn mpad_executes_across_current_public_surfaces() {
     )
     .expect("parse MPAD circuit");
 
-    let sampler = CompiledSampler::compile(&circuit).expect("compile MPAD sampler");
+    let sampler = SamplingFixture::compile(&circuit).expect("compile MPAD sampler");
     assert_eq!(
         sampler.sample_zero_one(2),
         vec![vec![false, true], vec![false, true]]
@@ -140,7 +144,7 @@ fn stochastic_mpad_executes_across_sampler_and_detection_surfaces() {
     const SHOTS: usize = 4000;
 
     let circuit = Circuit::from_stim_str("MPAD(0.25) 0 1\n").expect("parse stochastic MPAD");
-    let sampler = CompiledSampler::compile(&circuit).expect("compile stochastic MPAD sampler");
+    let sampler = SamplingFixture::compile(&circuit).expect("compile stochastic MPAD sampler");
     let shots = sampler.sample_zero_one_with_seed(SHOTS, Some(17));
 
     let first_flips = shots
@@ -255,7 +259,7 @@ fn mpp_executes_across_current_public_surfaces() {
     )
     .expect("parse MPP circuit");
 
-    let sampler = CompiledSampler::compile(&circuit).expect("compile MPP sampler");
+    let sampler = SamplingFixture::compile(&circuit).expect("compile MPP sampler");
     assert_eq!(
         sampler.sample_zero_one(2),
         vec![vec![false, true], vec![false, true]]
@@ -346,7 +350,7 @@ fn stochastic_mpp_executes_across_sampler_and_detection_surfaces() {
 
     let circuit = Circuit::from_stim_str("X 1\nMPP(0.25) Z0 Z1\n")
         .expect("parse stochastic MPP sampler circuit");
-    let sampler = CompiledSampler::compile(&circuit).expect("compile stochastic MPP sampler");
+    let sampler = SamplingFixture::compile(&circuit).expect("compile stochastic MPP sampler");
     let shots = sampler.sample_zero_one_with_seed(SHOTS, Some(31));
 
     let first_flips = shots
@@ -473,9 +477,9 @@ fn variable_target_spp_execution_matches_decomposed_circuit() {
         let circuit = Circuit::from_stim_str(circuit_text).expect("parse SPP circuit");
         let decomposed = decomposed_circuit(&circuit).expect("decompose SPP circuit");
 
-        let sampler = CompiledSampler::compile(&circuit)
+        let sampler = SamplingFixture::compile(&circuit)
             .unwrap_or_else(|error| panic!("sampler rejected {circuit_text}: {error}"));
-        let decomposed_sampler = CompiledSampler::compile(&decomposed)
+        let decomposed_sampler = SamplingFixture::compile(&decomposed)
             .unwrap_or_else(|error| panic!("sampler rejected decomposed {circuit_text}: {error}"));
         assert_eq!(
             sampler.sample_zero_one_with_seed(16, Some(5)),
@@ -521,9 +525,9 @@ fn variable_target_spp_matches_hard_coded_phase_product_decompositions() {
     let explicit_x = Circuit::from_stim_str("H 0\nS 0\nH 0\nM 0\nDETECTOR rec[-1]\n")
         .expect("parse explicit SPP X decomposition");
 
-    let spp_sampler = CompiledSampler::compile(&spp_x).expect("compile SPP X sampler");
+    let spp_sampler = SamplingFixture::compile(&spp_x).expect("compile SPP X sampler");
     let explicit_sampler =
-        CompiledSampler::compile(&explicit_x).expect("compile explicit SPP X sampler");
+        SamplingFixture::compile(&explicit_x).expect("compile explicit SPP X sampler");
     assert_eq!(
         spp_sampler.sample_zero_one_with_seed(32, Some(11)),
         explicit_sampler.sample_zero_one_with_seed(32, Some(11))
@@ -570,12 +574,12 @@ fn anti_hermitian_spp_execution_is_rejected_by_sampler_and_detection_conversion(
             Circuit::from_stim_str(&format!("{gate_name} X0*Z0\nM 0\nDETECTOR rec[-1]\n"))
                 .expect("parse anti-Hermitian SPP circuit");
 
-        let sampler_error = CompiledSampler::compile(&circuit)
+        let sampler_error = SamplingFixture::compile(&circuit)
             .expect_err("sampler should reject anti-Hermitian SPP");
         assert!(
             matches!(
                 sampler_error,
-                CircuitError::InvalidSamplerCompilation { .. }
+                stab_core::SamplingCompileError::InvalidCircuit { .. }
             ),
             "{gate_name}: {sampler_error}"
         );

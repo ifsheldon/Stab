@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use num_complex::Complex32;
 use stab_core::advanced::compat::{
-    CompiledDetectionConverter, CompiledSampler, convert_measurements_to_detection_events,
+    CompiledDetectionConverter, convert_measurements_to_detection_events,
 };
 use stab_core::{
     Circuit, CircuitItem, DetectionConversionOptions, ErrorAnalyzerOptions, Gate, GateArgumentRule,
@@ -23,6 +23,9 @@ use stab_core::{
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
     unitary_to_tableau,
 };
+
+mod support;
+use support::SamplingFixture;
 
 #[test]
 fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
@@ -606,7 +609,7 @@ fn gate_execution_contract_accepts_supported_spp_execution_paths() {
         let circuit = Circuit::from_stim_str(&format!("{gate_name} Z0\nM 0\nDETECTOR rec[-1]\n"))
             .expect("parse SPP");
         let sampler =
-            CompiledSampler::compile(&circuit).expect("sampler should accept supported SPP");
+            SamplingFixture::compile(&circuit).expect("sampler should accept supported SPP");
         assert_eq!(sampler.sample_zero_one(1), vec![vec![false]]);
         for skip_reference_sample in [false, true] {
             CompiledDetectionConverter::compile(

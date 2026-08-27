@@ -69,5 +69,4 @@ pub mod compat {
         try_for_each_sampled_detection_event_with_limits, write_detection_records,
         write_observable_records, write_ptb64_detection_records, write_ptb64_observable_records,
     };
-    pub use crate::sampling::CompiledSampler;
 }

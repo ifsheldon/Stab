@@ -8,7 +8,7 @@ use std::convert::Infallible;
 use std::thread;
 
 use sha2::{Digest as _, Sha256};
-use stab_core::advanced::{compat::CompiledSampler, records::MeasurementCodecSink};
+use stab_core::advanced::records::MeasurementCodecSink;
 use stab_core::{
     Circuit, CircuitError, MeasurementBatchView, MeasurementSink, RandomPolicy, RecordFormat,
     RunError, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
@@ -94,23 +94,22 @@ fn noisy_plan() -> stab_core::SamplingPlan {
 fn fallible_reference_helpers_preserve_sparse_direct_z_admission() {
     let circuit =
         Circuit::from_stim_str("M 16777215\n").expect("parse maximum-id sparse Direct-Z circuit");
-    let sampler = CompiledSampler::compile(&circuit).expect("compile facade sampler");
+    let plan = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile sampling plan");
 
     assert_eq!(
-        sampler
-            .reference_sample()
-            .expect("compute facade reference sample"),
+        plan.try_reference_sample()
+            .expect("compute reference sample"),
         vec![false]
     );
     assert_eq!(
-        sampler
-            .count_determined_measurements(false)
+        plan.try_count_determined_measurements(false)
             .expect("count known-input measurements"),
         1
     );
     assert_eq!(
-        sampler
-            .count_determined_measurements(true)
+        plan.try_count_determined_measurements(true)
             .expect("count unknown-input measurements"),
         0
     );
@@ -139,31 +138,14 @@ fn compiler_uses_scalar_backend_and_fingerprints_the_plan() {
     let first = SamplingCompiler::new()
         .compile(&circuit)
         .expect("compile sampling plan");
-    let legacy = CompiledSampler::compile(&circuit).expect("compile migration adapter");
 
     assert_eq!(first.backend(), SamplingBackend::Scalar);
     assert_eq!(SamplingBackend::Scalar.as_str(), "scalar");
-    assert_eq!(legacy.plan().fingerprint(), first.fingerprint());
     assert_eq!(
         first.fingerprint().request_fingerprint(),
         first.request_fingerprint()
     );
     assert_eq!(first.fingerprint().backend(), SamplingBackend::Scalar);
-}
-
-#[test]
-fn compiled_sampler_equality_preserves_lowered_execution_compatibility() {
-    let plain = Circuit::from_stim_str("M 0\n").expect("parse plain circuit");
-    let tagged = Circuit::from_stim_str("M[tag] 0\n").expect("parse tagged circuit");
-
-    let plain = CompiledSampler::compile(&plain).expect("compile plain circuit");
-    let tagged = CompiledSampler::compile(&tagged).expect("compile tagged circuit");
-
-    assert_eq!(plain, tagged);
-    assert_ne!(
-        plain.plan().request_fingerprint(),
-        tagged.plan().request_fingerprint()
-    );
 }
 
 #[test]
@@ -591,15 +573,6 @@ fn compact_huge_measurement_count_returns_a_typed_storage_error() {
     let plan = SamplingCompiler::new()
         .compile(&circuit)
         .expect("compile folded sampling plan");
-    let legacy_error = CompiledSampler::compile(&circuit)
-        .expect_err("legacy sampler must reject plans its infallible adapters cannot execute");
-    assert!(
-        legacy_error
-            .to_string()
-            .contains("exceeding the 268435456-byte safety limit"),
-        "{legacy_error}"
-    );
-
     let mut result = None;
     let allocations = allocation_counter::measure(|| {
         result = Some(plan.session(RandomPolicy::Seeded(Seed::new(1))));
@@ -618,50 +591,6 @@ fn compact_huge_measurement_count_returns_a_typed_storage_error() {
         allocations.bytes_total, 0,
         "storage admission allocated before rejecting: {allocations:?}"
     );
-}
-
-#[test]
-fn callback_adapters_stop_at_the_exact_visitor_error_across_batches() {
-    let circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse callback circuit");
-    let sampler = CompiledSampler::compile(&circuit).expect("compile callback sampler");
-
-    let mut try_calls = 0_usize;
-    let result =
-        sampler.try_for_each_sample_with_seed_and_reference_mode(129, Some(41), false, |_| {
-            try_calls += 1;
-            if try_calls == 65 {
-                Err("stop-at-second-batch")
-            } else {
-                Ok(())
-            }
-        });
-    match result {
-        Err(RunError::Sink {
-            phase,
-            source,
-            progress,
-        }) => {
-            assert_eq!(phase, SinkFailurePhase::WriteBatch);
-            assert_eq!(source, "stop-at-second-batch");
-            assert_eq!(progress.committed_shots(), ShotCount::new(64));
-            assert_eq!(progress.attempted_batch_shots(), ShotCount::new(64));
-        }
-        other => panic!("unexpected error-aware callback result: {other:?}"),
-    }
-    assert_eq!(try_calls, 65);
-
-    let mut legacy_calls = 0_usize;
-    let legacy_result =
-        sampler.for_each_sample_with_seed_and_reference_mode(129, Some(41), false, |_| {
-            legacy_calls += 1;
-            if legacy_calls == 65 {
-                Err("legacy-stop")
-            } else {
-                Ok(())
-            }
-        });
-    assert_eq!(legacy_result, Err("legacy-stop"));
-    assert_eq!(legacy_calls, 65);
 }
 
 #[test]

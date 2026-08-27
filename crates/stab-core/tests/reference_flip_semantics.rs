@@ -12,10 +12,14 @@
 //! These tests fail against the pre-fix reference semantics that applied the flip
 //! (docs/plans/post-review-remediation-plan.md, WS1).
 
+mod support;
+
 use stab_core::advanced::compat::{
-    CompiledSampler, convert_measurements_to_detection_events, sample_detection_events,
+    convert_measurements_to_detection_events, sample_detection_events,
 };
 use stab_core::{Circuit, DetectionConversionOptions};
+
+use support::SamplingFixture;
 
 fn parse(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("test circuit should parse")
@@ -31,7 +35,7 @@ fn measurement_flip_probabilities_never_reach_the_reference_sample() {
         "MX(1) 0\n",
         "MPP(1) Z0\n",
     ] {
-        let sampler = CompiledSampler::compile(&parse(text)).expect("compile sampler");
+        let sampler = SamplingFixture::compile(&parse(text)).expect("compile sampler");
         assert_eq!(
             sampler.reference_sample().expect("reference sample"),
             vec![false],
@@ -40,7 +44,7 @@ fn measurement_flip_probabilities_never_reach_the_reference_sample() {
     }
 
     // Static target inversion belongs to the noiseless circuit and stays in the reference.
-    let inverted = CompiledSampler::compile(&parse("M(1) !0\n")).expect("compile sampler");
+    let inverted = SamplingFixture::compile(&parse("M(1) !0\n")).expect("compile sampler");
     assert_eq!(
         inverted.reference_sample().expect("reference sample"),
         vec![true]

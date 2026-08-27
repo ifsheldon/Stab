@@ -4,7 +4,7 @@ use super::*;
 fn gate_surface_contract_mpp_stochastic() {
     let plan = statistical_plan("pfm3-contract-mpp-stochastic");
     let sampler_circuit = circuit("MPP(0.25) Z0\n");
-    let sampler = CompiledSampler::compile(&sampler_circuit).expect("compile stochastic MPP");
+    let sampler = SamplingFixture::compile(&sampler_circuit).expect("compile stochastic MPP");
     let samples = sampler.sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
     assert_statistical_counts(
         plan.case_id,
@@ -63,7 +63,7 @@ fn gate_surface_contract_mpp_stochastic() {
 fn gate_surface_contract_mpad_stochastic() {
     let plan = statistical_plan("pfm3-contract-mpad-stochastic");
     let sampler_circuit = circuit("MPAD(0.25) 0\n");
-    let sampler = CompiledSampler::compile(&sampler_circuit).expect("compile stochastic MPAD");
+    let sampler = SamplingFixture::compile(&sampler_circuit).expect("compile stochastic MPAD");
     let samples = sampler.sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
     assert_statistical_counts(
         plan.case_id,
@@ -285,7 +285,7 @@ fn gate_surface_contract_correlated_errors() {
 
     let empty_first = circuit("E(1)\nELSE_CORRELATED_ERROR(1) X0\nM 0\n");
     assert_eq!(
-        CompiledSampler::compile(&empty_first)
+        SamplingFixture::compile(&empty_first)
             .expect("compile empty first branch")
             .sample_zero_one_with_seed(4, Some(1)),
         vec![vec![false]; 4],
@@ -294,7 +294,7 @@ fn gate_surface_contract_correlated_errors() {
     let empty_else =
         circuit("E(0) X0\nELSE_CORRELATED_ERROR(1)\nELSE_CORRELATED_ERROR(1) X0\nM 0\n");
     assert_eq!(
-        CompiledSampler::compile(&empty_else)
+        SamplingFixture::compile(&empty_else)
             .expect("compile empty else branch")
             .sample_zero_one_with_seed(4, Some(1)),
         vec![vec![false]; 4],
@@ -381,7 +381,7 @@ fn assert_deterministic_noise_effect(text: &str, expected_sample: &[bool], expec
         vec![false; expected_sample.len()]
     );
     assert_eq!(
-        CompiledSampler::compile(&circuit)
+        SamplingFixture::compile(&circuit)
             .expect("compile deterministic noise circuit")
             .sample_zero_one_with_seed(8, Some(47)),
         vec![expected_sample.to_vec(); 8]
@@ -397,7 +397,7 @@ fn assert_depolarizing_gate_effect(
 ) {
     const SHOTS: usize = 4_096;
     let circuit = circuit(text);
-    let samples = CompiledSampler::compile(&circuit)
+    let samples = SamplingFixture::compile(&circuit)
         .expect("compile depolarizing general circuit")
         .sample_zero_one_with_seed(SHOTS, Some(43));
     assert_eq!(
@@ -464,7 +464,7 @@ fn sample_records(
     text: &str,
     plan: &super::super::super::GateContractStatisticalPlan,
 ) -> Vec<Vec<bool>> {
-    CompiledSampler::compile(&circuit(text))
+    SamplingFixture::compile(&circuit(text))
         .expect("compile statistical sampler")
         .sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed))
 }

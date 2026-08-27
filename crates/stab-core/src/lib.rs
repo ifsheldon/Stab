@@ -26,9 +26,7 @@ mod mbqc_decomposition;
 mod resources;
 mod result_formats;
 mod result_streaming;
-mod sampling;
 mod sampling_estimate;
-mod sampling_output_compat;
 
 pub use analysis::{
     GateUnitaryMatrix, InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,
@@ -84,13 +82,14 @@ pub use error::{
     CircuitError, CircuitResult, ModelError, ModelResult, ValidationError, ValidationErrorCode,
 };
 pub use error_matcher::explain_errors_from_circuit;
-pub use execution::CountDeterminedMeasurementsError;
+pub use execution::{CircuitReferenceSampleError, CountDeterminedMeasurementsError};
 pub use execution::{
-    PlanFingerprint, RandomPolicy, ReferenceSampleMode, ReferenceSampleTree, RunError,
-    SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
-    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
-    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
-    count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
+    PlanFingerprint, RandomPolicy, ReferenceSampleMode, ReferenceSampleTree,
+    ReferenceSampleTreeError, RunError, SamplingCancellation, SamplingCompileError,
+    SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
+    SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
+    sample_if_circuit_has_stabilizer_flows,
 };
 pub use matched_error::{
     CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,
@@ -129,10 +128,8 @@ pub use stab_model::{
 };
 
 pub(crate) use detection::{DetectionConversionOutput, DetectionEventRecord};
-pub(crate) use result_formats::{DetsLayout, DetsToken, MeasurementCodecSink};
+pub(crate) use result_formats::{DetsLayout, DetsToken};
 pub(crate) use stab_bits::BitSlice;
 
 #[cfg(test)]
 pub(crate) use detection::{CompiledDetectionConverter, sample_detection_events};
-#[cfg(test)]
-pub(crate) use sampling::CompiledSampler;

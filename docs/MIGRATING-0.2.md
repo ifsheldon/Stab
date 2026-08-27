@@ -36,7 +36,7 @@ Use a component crate directly when only one layer is needed. Use `stab-core` fo
 | `stab_core::advanced::records::...` | Explicit layouts, concrete codecs, materialized helpers, and bounded visitors |
 | `stab_core::advanced::traversal::...` | Flattened and folded traversal primitives |
 | `stab_core::advanced::algebra::...` | Algebra iterators and admitted unchecked constructors |
-| `stab_core::advanced::compat::...` | Pre-0.2 materialized and callback-oriented adapters |
+| `stab_core::advanced::compat::...` | Remaining pre-0.2 detection and DEM adapters scheduled for deletion in P2 |
 | `stab_core::experimental::...` | Implemented extension contracts that may change before 1.0 |
 
 `experimental` contains the circuit-pass contract and built-in without-noise pass proven by a separate Stable crate. Pass implementations must conservatively project folded output resources before lowering; the common executor admits that projection, reports a typed input/projection/output rejection stage, validates the actual closed-model result, and rejects underestimation. Projected payload bytes exclude allocator metadata and spare collection capacity. The canonical pass owner is `stab-analysis`; the facade tier is pre-stable convenience. Decoder interoperability remains available from `stab-decoder` or the facade root. No placeholder backend, GPU, dynamic plugin, or runtime gate-registry traits are published.
@@ -54,7 +54,7 @@ The supported `analysis` and `execution` namespaces remain because they describe
 | `stab_core::result_formats::DetsLayout` | `stab_core::advanced::records::DetsLayout` or `stab_records::DetsLayout` |
 | `stab_core::result_streaming::for_each_record` | `stab_core::advanced::records::for_each_record` or `stab_records::try_for_each_record` |
 | No circuit-pass facade | `stab_core::experimental::{CircuitPass, run_circuit_pass, CircuitPassContext, CircuitPassLimits, CircuitPassResources, CircuitPassStage}` or canonical `stab_analysis` paths |
-| `stab_core::CompiledSampler` | `stab_core::advanced::compat::CompiledSampler`; new code should use `SamplingCompiler`, `SamplingPlan`, and `SamplingSession` |
+| `stab_core::CompiledSampler` | Removed. Compile with `SamplingCompiler`, create a `SamplingSession`, and deliver output through a `MeasurementSink`. Use `MeasurementCodecSink` when encoded bytes are the intended result. |
 | `stab_core::CompiledDetectionConverter` | `stab_core::advanced::compat::CompiledDetectionConverter`; new code should use the measurement-to-detection compiler, plan, session, and sink adapter |
 | `stab_core::CompiledDemSampler` | `stab_core::advanced::compat::CompiledDemSampler`; new code should use `DemSamplingCompiler`, `DemSamplingPlan`, and a sampling or replay session |
 
@@ -91,7 +91,7 @@ Every publishable Stab product package is versioned `0.2.0`, and every publishab
 
 The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-review-remediation-plan.md), WS1, WS3, and WS5) changed the following 0.2-line APIs and semantics before any 0.2 crate publication.
 
-- `CompiledSampler::count_determined_measurements` and `CompiledSampler::reference_sample` now return `CircuitResult`; the duplicate `try_count_determined_measurements` and `try_reference_sample` methods are removed. Append `?` or `.expect(...)` at call sites.
+- `CompiledSampler`, its materialized record methods, byte encoders, and callback visitors are removed. Use `SamplingPlan::try_count_determined_measurements`, `SamplingPlan::try_reference_sample`, or the sweep-aware `circuit_reference_sample` operation for reference work, and use a typed sink for sampling output.
 - The panicking `SamplingPlan::count_determined_measurements` and `SamplingPlan::reference_sample` compatibility methods are removed; use `try_count_determined_measurements` and `try_reference_sample`. A parseable hostile circuit can no longer panic a public entry point.
 - The free `count_determined_measurements` now returns `Result<u64, CountDeterminedMeasurementsError>`, a two-variant enum over compile and execution errors that converts into `CircuitError`.
 - `count_determined_measurements` now matches pinned Stim v1.16.0 semantics: measurement flip arguments are ignored (determinism is a state property), and circuits containing `MPAD` or heralded noise records are rejected with a typed error, mirroring Stim's `count_determined_measurements` rejection of unhandled measurement types.

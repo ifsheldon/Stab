@@ -6,13 +6,10 @@
 
 use std::{collections::BTreeMap, ops::Bound};
 
-use stab_core::advanced::compat::CompiledSampler;
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, QubitId,
     RepeatBlock, RepeatCount, detection_record_width,
-    execution::{
-        circuit_reference_sample, circuit_reference_sample_tree, count_determined_measurements,
-    },
+    execution::{circuit_reference_sample, count_determined_measurements},
     measurement_record_count,
 };
 
@@ -740,10 +737,7 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
          M 0 1 2 3 4 5 6 7\n",
     )
     .expect("parse circuit");
-    let expected = CompiledSampler::compile(&circuit)
-        .expect("compile sampler")
-        .reference_sample()
-        .expect("reference sample");
+    let expected = circuit_reference_sample(&circuit).expect("reference sample");
 
     assert_eq!(
         circuit_reference_sample(&circuit).expect("reference sample"),
@@ -760,7 +754,8 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
 #[test]
 fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference_sample() {
     let circuit = Circuit::from_stim_str("M 0\nX 0\nM 0\n").expect("parse circuit");
-    let tree = circuit_reference_sample_tree(&circuit).expect("reference sample tree");
+    let tree = stab_core::ReferenceSampleTree::from_circuit_reference_sample(&circuit)
+        .expect("reference sample tree");
 
     assert_eq!(
         tree.decompress().expect("decompress reference sample tree"),
@@ -780,7 +775,8 @@ fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference
          }\n",
     )
     .expect("parse repeated circuit");
-    let repeated_tree = circuit_reference_sample_tree(&repeated).expect("reference sample tree");
+    let repeated_tree = stab_core::ReferenceSampleTree::from_circuit_reference_sample(&repeated)
+        .expect("reference sample tree");
     assert_eq!(
         repeated_tree
             .decompress()

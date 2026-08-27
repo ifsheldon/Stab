@@ -3,13 +3,12 @@
     reason = "parser fast-path tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::advanced::compat::{
-    CompiledDetectionConverter, CompiledSampler, sample_detection_events,
-};
+use stab_core::advanced::compat::{CompiledDetectionConverter, sample_detection_events};
 use stab_core::{
     Circuit, CircuitError, CircuitItem, DetectionConversionOptions, ErrorAnalyzerOptions,
     MeasureRecordOffset, Target, circuit_to_detector_error_model,
 };
+use stab_engine::SamplingCompiler;
 
 #[test]
 fn common_phase_and_annotation_paths_preserve_public_semantics() {
@@ -144,11 +143,12 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
         circuit_to_detector_error_model(&feedback, ErrorAnalyzerOptions::default())
             .expect("Stim analyzer treats negative-zero feedback as having no effect");
     assert_eq!(feedback_model.to_dem_string(), "");
-    let sampling_error = CompiledSampler::compile(&feedback)
+    let sampling_error = SamplingCompiler::new()
+        .compile(&feedback)
         .expect_err("zero lookback must not compile for sampling");
     assert!(matches!(
         sampling_error,
-        CircuitError::InvalidSamplerCompilation { .. }
+        stab_engine::SamplingCompileError::InvalidCircuit { .. }
     ));
     assert!(sampling_error.to_string().contains("rec[-0]"));
 

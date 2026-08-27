@@ -9,12 +9,12 @@ CapabilitySet
 Circuit
 CircuitDetectorId
 CircuitError
-CountDeterminedMeasurementsError
 CircuitErrorLocation
 CircuitErrorLocationStackFrame
 CircuitFlattenLimits
 CircuitInstruction
 CircuitItem
+CircuitReferenceSampleError
 CircuitResult
 CircuitTargetsInsideInstruction
 CliffordString
@@ -26,6 +26,7 @@ CompilationCapability
 CompilationOperation
 CompilationRequestFingerprint
 CorrectionWidth
+CountDeterminedMeasurementsError
 DecodeBatchError
 DecodeBatchStatus
 DecodeBatchSummary
@@ -120,6 +121,7 @@ RecordEncoding
 RecordFormat
 ReferenceSampleMode
 ReferenceSampleTree
+ReferenceSampleTreeError
 RepeatBlock
 RepeatCount
 RepeatNestingLimit
@@ -175,6 +177,7 @@ circuit_has_unsigned_stabilizer_flow
 circuit_inverse_qec
 circuit_inverse_qec_with_options
 circuit_inverse_unitary
+circuit_reference_sample
 circuit_time_reversed_for_flows
 circuit_time_reversed_for_flows_with_options
 circuit_to_detector_error_model

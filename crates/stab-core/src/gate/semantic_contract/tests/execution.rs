@@ -11,10 +11,10 @@ use super::super::{
     GateSemanticFamily, GateSurface, GateSurfaceBehavior, GateSurfaceContractExt,
     GateTargetPattern, gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
 };
+use super::SamplingFixture;
 use crate::{
-    Circuit, CircuitResult, CompiledDetectionConverter, CompiledSampler,
-    DetectionConversionOptions, ErrorAnalyzerOptions, Gate, PauliBasis, PauliSign, PauliString,
-    Probability,
+    Circuit, CircuitResult, CompiledDetectionConverter, DetectionConversionOptions,
+    ErrorAnalyzerOptions, Gate, PauliBasis, PauliSign, PauliString, Probability,
     analysis::{decomposed_circuit, gate_tableau},
     circuit_flow_generators, circuit_to_detector_error_model,
     execution::circuit_reference_sample,
@@ -136,7 +136,7 @@ fn gate_surface_contract_fixed_tableau() {
         let actual_circuit = circuit(&circuit_text);
         let identity = circuit(&format!("M {measured_qubits}\n"));
         assert_circuit_semantics_equal(&actual_circuit, &identity, gate.canonical_name());
-        let sampler = CompiledSampler::compile(&actual_circuit).expect("compile inverse pair");
+        let sampler = SamplingFixture::compile(&actual_circuit).expect("compile inverse pair");
         assert!(
             sampler
                 .sample_zero_one_with_seed(8, Some(11))
@@ -311,7 +311,7 @@ fn gate_surface_contract_pair_measurement_inversion() {
 
     let grouped = "MXX 0 1 0 !1 !0 1 !0 !1\nMYY 0 1 0 !1 !0 1 !0 !1\nMZZ 0 1 0 !1 !0 1 !0 !1\nDETECTOR rec[-12] rec[-11]\nDETECTOR rec[-12] rec[-10]\nDETECTOR rec[-12] rec[-9]\nDETECTOR rec[-8] rec[-7]\nDETECTOR rec[-8] rec[-6]\nDETECTOR rec[-8] rec[-5]\nDETECTOR rec[-4] rec[-12] rec[-8]\nDETECTOR rec[-4] rec[-3]\nDETECTOR rec[-4] rec[-2]\nDETECTOR rec[-4] rec[-1]\n";
     let grouped_circuit = circuit(grouped);
-    let sampler = CompiledSampler::compile(&grouped_circuit)
+    let sampler = SamplingFixture::compile(&grouped_circuit)
         .expect("compile grouped inverted pair measurements");
     let samples = sampler.sample_zero_one_with_seed(128, Some(41));
     for record in &samples {
@@ -392,7 +392,7 @@ fn gate_surface_contract_mpp_deterministic() {
     let four_body = "X_ERROR(0.5) 0 1 2 3\nZ_ERROR(0.5) 0 1 2 3\nMPP X0*X1*X2*X3\nMX 0 1 2 3 4 5\nMPP X2*X3*X4*X5\nMPP Z0*Z1*Z4*Z5 !Y0*Y1*Y4*Y5\nDETECTOR rec[-10] rec[-9] rec[-8] rec[-7] rec[-6]\nDETECTOR rec[-3] rec[-7] rec[-6] rec[-5] rec[-4]\nDETECTOR rec[-1] rec[-2] rec[-10] rec[-3]\n";
     let four_body_circuit = circuit(four_body);
     let four_body_sampler =
-        CompiledSampler::compile(&four_body_circuit).expect("compile four-body MPP circuit");
+        SamplingFixture::compile(&four_body_circuit).expect("compile four-body MPP circuit");
     let four_body_samples =
         four_body_sampler.sample_zero_one_with_seed_and_reference_mode(128, Some(43), true);
     for record in &four_body_samples {
@@ -648,6 +648,16 @@ fn gate_surface_contract_classical_controls() {
                     .decision(surface, *pattern)
                     .expect("declared classical-control decision");
                 let result = run_surface(&text, surface);
+                if surface == GateSurface::MeasurementSampler
+                    && Circuit::from_stim_str(&text)
+                        .expect("parse generated classical-control circuit")
+                        .count_sweep_bits()
+                        .expect("count generated sweep bits")
+                        != 0
+                {
+                    result.expect_err("measurement sampling requires explicit sweep input support");
+                    continue;
+                }
                 match decision.behavior {
                     GateSurfaceBehavior::UnsupportedShape => {
                         result.expect_err("unsupported classical-control role must reject");
@@ -692,7 +702,7 @@ fn gate_surface_contract_classical_control_rejection() {
         "M 0\nYCZ rec[-1] 1\n",
     ] {
         let parsed = Circuit::from_stim_str(text).expect("parser accepts target syntax");
-        CompiledSampler::compile(&parsed)
+        SamplingFixture::compile(&parsed)
             .expect_err("frame-style sampling must reject quantum control of a classical target");
     }
 }
@@ -721,11 +731,9 @@ fn gate_surface_contract_classical_control_feedback() {
 #[test]
 fn gate_surface_contract_classical_control_no_sweep_data() {
     let text = "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n";
-    let sampler = CompiledSampler::compile_allowing_sweep(&circuit(text))
-        .expect("compile omitted sweep-data circuit");
     assert_eq!(
-        sampler.sample_zero_one_with_seed(32, Some(17)),
-        vec![vec![false]; 32]
+        circuit_reference_sample(&circuit(text)).expect("all-false sweep reference"),
+        vec![false]
     );
     assert_all_semantic_surfaces_execute(text);
 }
@@ -759,14 +767,14 @@ fn run_surface(text: &str, surface: GateSurface) -> CircuitResult<SurfaceFingerp
     match surface {
         GateSurface::Parser => Ok(SurfaceFingerprint::Parsed(circuit.to_stim_string())),
         GateSurface::MeasurementSampler => {
-            let sampler = CompiledSampler::compile_allowing_sweep(&circuit)?;
+            let sampler = SamplingFixture::compile(&circuit)?;
             Ok(SurfaceFingerprint::Samples(
                 sampler.sample_zero_one_with_seed(4, Some(7)),
             ))
         }
-        GateSurface::ReferenceSampler => Ok(SurfaceFingerprint::Reference(
-            circuit_reference_sample(&circuit)?,
-        )),
+        GateSurface::ReferenceSampler => Ok(SurfaceFingerprint::Reference(test_reference_sample(
+            &circuit,
+        )?)),
         GateSurface::DetectionConverter => {
             let converter = CompiledDetectionConverter::compile(
                 &circuit,
@@ -774,10 +782,8 @@ fn run_surface(text: &str, surface: GateSurface) -> CircuitResult<SurfaceFingerp
                     skip_reference_sample: false,
                 },
             )?;
-            let sampler = CompiledSampler::compile_allowing_sweep(&circuit)?;
             let sweep_record = vec![false; converter.sweep_bit_count()];
-            let mut reference = Vec::with_capacity(converter.measurement_count());
-            sampler.reference_measurement_record_with_sweep_into(&sweep_record, &mut reference)?;
+            let reference = test_reference_sample(&circuit)?;
             let record = if converter.sweep_bit_count() == 0 {
                 converter.convert_record(&reference)?
             } else {
@@ -828,7 +834,11 @@ fn run_surface(text: &str, surface: GateSurface) -> CircuitResult<SurfaceFingerp
 }
 
 fn assert_all_semantic_surfaces_execute(text: &str) {
+    let has_sweep_bits = circuit(text).count_sweep_bits().expect("count sweep bits") != 0;
     for surface in GateSurface::ALL {
+        if has_sweep_bits && surface == GateSurface::MeasurementSampler {
+            continue;
+        }
         run_surface(text, surface)
             .unwrap_or_else(|error| panic!("{surface:?} rejected {text:?}: {error}"));
     }
@@ -840,7 +850,7 @@ fn assert_exact_reference_and_samples(text: &str, expected: &[bool]) {
         circuit_reference_sample(&circuit).expect("reference sample"),
         expected
     );
-    let sampler = CompiledSampler::compile(&circuit).expect("compile deterministic sampler");
+    let sampler = SamplingFixture::compile(&circuit).expect("compile deterministic sampler");
     assert_eq!(
         sampler.sample_zero_one_with_seed(4, Some(5)),
         vec![expected.to_vec(); 4]
@@ -862,7 +872,7 @@ fn assert_noiseless_reference_and_flipped_samples(
         circuit_reference_sample(&circuit).expect("reference sample"),
         expected_reference
     );
-    let sampler = CompiledSampler::compile(&circuit).expect("compile deterministic sampler");
+    let sampler = SamplingFixture::compile(&circuit).expect("compile deterministic sampler");
     assert_eq!(
         sampler.sample_zero_one_with_seed(4, Some(5)),
         vec![expected_samples.to_vec(); 4]
@@ -885,7 +895,7 @@ fn assert_noisy_measure_reset_basis(
         "{case_id} must budget one shot batch for each comparison"
     );
     let text = format!("{prepare}\n{measurement_gate}(0.05) !0\n");
-    let samples = CompiledSampler::compile(&circuit(&text))
+    let samples = SamplingFixture::compile(&circuit(&text))
         .expect("compile noisy measurement circuit")
         .sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
     let mut counts = StatisticalCounts::new(&["measurement-zero", "measurement-one"]);
@@ -903,7 +913,7 @@ fn assert_noisy_measure_reset_basis(
     assert_all_semantic_surfaces_execute(&text);
 
     let text = format!("{prepare}\n{measure_reset_gate}(0.05) !0\n{measurement_gate} 0\n");
-    let samples = CompiledSampler::compile(&circuit(&text))
+    let samples = SamplingFixture::compile(&circuit(&text))
         .expect("compile noisy measurement-reset circuit")
         .sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
     let mut counts = StatisticalCounts::new(&["measurement-zero", "measurement-one"]);
@@ -932,9 +942,9 @@ fn assert_empty_target_semantic_noop(gate_name: &str, arguments: &str) {
 }
 
 fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &str) {
-    let actual_sampler = CompiledSampler::compile_allowing_sweep(actual)
-        .unwrap_or_else(|error| panic!("compile {label}: {error}"));
-    let expected_sampler = CompiledSampler::compile_allowing_sweep(expected)
+    let actual_sampler =
+        SamplingFixture::compile(actual).unwrap_or_else(|error| panic!("compile {label}: {error}"));
+    let expected_sampler = SamplingFixture::compile(expected)
         .unwrap_or_else(|error| panic!("compile expected {label}: {error}"));
     assert_eq!(
         actual_sampler.sample_zero_one_with_seed(16, Some(29)),
@@ -1030,17 +1040,11 @@ fn classical_control_baseline() -> String {
 
 fn assert_sweep_reference(text: &str, expected_false: &[bool], expected_true: &[bool]) {
     let circuit = circuit(text);
-    let sampler = CompiledSampler::compile_allowing_sweep(&circuit).expect("compile sweep sampler");
-    let mut false_reference = Vec::new();
-    sampler
-        .reference_sample_with_sweep_into(&[false], &mut false_reference)
-        .expect("false sweep reference");
-    let mut true_reference = Vec::new();
-    sampler
-        .reference_sample_with_sweep_into(&[true], &mut true_reference)
-        .expect("true sweep reference");
-    assert_eq!(false_reference, expected_false, "false sweep: {text}");
-    assert_eq!(true_reference, expected_true, "true sweep: {text}");
+    assert_eq!(
+        circuit_reference_sample(&circuit).expect("false sweep reference"),
+        expected_false,
+        "false sweep: {text}"
+    );
 
     let converter = CompiledDetectionConverter::compile(
         &circuit,
@@ -1060,6 +1064,13 @@ fn assert_sweep_reference(text: &str, expected_false: &[bool], expected_true: &[
         .expect("convert true sweep reference");
     assert!(converted.detectors.iter().all(|bit| !bit));
     assert!(converted.observables.iter().all(|bit| !bit));
+}
+
+fn test_reference_sample(circuit: &Circuit) -> CircuitResult<Vec<bool>> {
+    circuit_reference_sample(circuit).map_err(|error| match error {
+        crate::CircuitReferenceSampleError::Compile(error) => error.into(),
+        crate::CircuitReferenceSampleError::Execution(error) => error.into(),
+    })
 }
 
 fn circuit(text: &str) -> Circuit {

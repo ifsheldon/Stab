@@ -39,17 +39,6 @@ pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor:
     false,
 );
 
-impl SamplingCompiler {
-    /// Compatibility bridge for facade-owned reference-sampling adapters.
-    #[doc(hidden)]
-    pub fn compile_allowing_sweep_for_core(
-        self,
-        circuit: &Circuit,
-    ) -> Result<SamplingPlan, SamplingCompileError> {
-        self.compile_allowing_sweep(circuit)
-    }
-}
-
 impl SamplingPlan {
     /// Counts deterministic measurements after admitting and allocating bounded analysis storage.
     pub fn try_count_determined_measurements(
@@ -81,16 +70,6 @@ impl SamplingPlan {
         api::compute_reference_sample(&self.inner)
     }
 
-    /// Compatibility bridge for facade-owned reference-sampling adapters.
-    #[doc(hidden)]
-    pub fn reference_measurement_record_with_sweep_into_for_core(
-        &self,
-        sweep_record: &[bool],
-        output: &mut Vec<bool>,
-    ) -> Result<(), SamplingExecutionError> {
-        self.reference_measurement_record_with_sweep_into(sweep_record, output)
-    }
-
     pub(crate) fn sweep_bit_count(&self) -> usize {
         self.inner.sweep_bit_count
     }
@@ -100,12 +79,6 @@ impl SamplingPlan {
             return 1;
         }
         general_frame_work_storage_bytes(self.inner.qubit_count, self.inner.measurement_count)
-    }
-
-    /// Temporary bridge for core detection during the facade migration.
-    #[doc(hidden)]
-    pub fn validate_legacy_adapter_storage_for_core(&self) -> Result<(), SamplingExecutionError> {
-        api::validate_legacy_adapter_plan(self)
     }
 
     fn sample_shot_in_mode_into<R>(
@@ -170,6 +143,30 @@ pub enum CountDeterminedMeasurementsError {
     Compile(#[from] SamplingCompileError),
     #[error(transparent)]
     Execution(#[from] SamplingExecutionError),
+}
+
+/// Error from computing a circuit's deterministic all-zero-sweep reference sample.
+#[derive(Debug, thiserror::Error)]
+pub enum CircuitReferenceSampleError {
+    #[error(transparent)]
+    Compile(#[from] SamplingCompileError),
+    #[error(transparent)]
+    Execution(#[from] SamplingExecutionError),
+}
+
+/// Computes a circuit's deterministic reference sample with every sweep bit set to false.
+pub fn circuit_reference_sample(
+    circuit: &Circuit,
+) -> Result<Vec<bool>, CircuitReferenceSampleError> {
+    let plan = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
+    let mut sweep_record = api::try_bool_buffer(plan.sweep_bit_count(), "reference sweep record")?;
+    sweep_record.resize(plan.sweep_bit_count(), false);
+    let mut output = api::try_bool_buffer(
+        plan.measurement_width().get(),
+        "reference measurement output",
+    )?;
+    plan.reference_measurement_record_with_sweep_into(&sweep_record, &mut output)?;
+    Ok(output)
 }
 
 pub fn count_determined_measurements(

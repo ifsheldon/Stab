@@ -190,7 +190,7 @@ Execution code does not import `SampleFormat`, text codecs, filesystem paths, CL
 
 `detection/output.rs` does not move as written because it imports `SampleFormat` and byte writers. Its semantic detector and observable routing moves behind typed sinks, while byte-format compatibility wrappers remain in `stab-core`.
 
-The scalar engine is physically extracted. `stab-engine` owns `CompilationOperation`, `CompilationRequestFingerprint`, `biased_randomize_bits`, source-owned descriptors for all four public compiler families, the sampling, detection, and DEM compilers, immutable plans, mutable sessions, direct-Z, small-frame, general-frame, deterministic reference-sample, conversion reference and sweep state, direct detector-frame execution, fused sample-and-convert execution, lowered folded DEM execution, detector-only and sampled-error DEM sampling, incremental replay, reference-sample trees, sampled-flow execution, cancellation, progress, poisoning, and typed measurement, detection, and DEM-sample delivery. Descriptors explicitly report when a compiler has no public request-fingerprint identity instead of omitting the compiler or inventing an identity. Reference trees have private checked structure, exact logical-size and nesting admission, iterative random access and decompression, and fallible materialization. The crate root is the sole canonical public execution namespace. `stab-core` retains common plan and session reexports, while `CompiledSampler`, `CompiledDetectionConverter`, `CompiledDemSampler`, callback streaming, materialized records, byte encoding, and output routing are explicit `advanced::compat` adapters. Additive fallible sampler adapters preserve allocation and execution failures, while source-compatible infallible methods document their panic contract. Direct benchmark callers use canonical component APIs or qualification-tracked advanced facade paths. Source-current M8, M9, and M11 evidence preserves every valid comparator and gate; the non-equivalent M8 flat-tree diagnostic is explicitly report-only and cannot pair with Stim's folded-tree measurements.
+The scalar engine is physically extracted. `stab-engine` owns `CompilationOperation`, `CompilationRequestFingerprint`, `biased_randomize_bits`, source-owned descriptors for all four public compiler families, the sampling, detection, and DEM compilers, immutable plans, mutable sessions, direct-Z, small-frame, general-frame, deterministic reference samples, conversion reference and sweep state, direct detector-frame execution, fused sample-and-convert execution, lowered folded DEM execution, detector-only and sampled-error DEM sampling, incremental replay, reference-sample trees, sampled-flow execution, cancellation, progress, poisoning, and typed measurement, detection, and DEM-sample delivery. Descriptors explicitly report when a compiler has no public request-fingerprint identity instead of omitting the compiler or inventing an identity. Reference trees have private checked structure, exact logical-size and nesting admission, iterative random access and decompression, and fallible materialization. The crate root is the sole canonical public execution namespace. P2 deleted `CompiledSampler`, callback sampling, whole-output materialization, byte encoding, facade-only reference helpers, and hidden engine bridges; measurement sampling now has one compiler-plan-session-sink route. `CompiledDetectionConverter`, `CompiledDemSampler`, and their callback or materialized routes remain pending P2 deletion.
 
 ### `stab-kernels-simd`
 
@@ -209,15 +209,15 @@ The facade retains:
 
 - curated root reexports for common models, algebra values, compilers, plans, sessions, batches, diagnostics, and policies;
 - `advanced` reexports for explicit storage, layout, backend, and bounded traversal APIs;
-- an intentionally empty `experimental` namespace that will accept later pass, decoder, or backend seams only after an external implementation proves the contract;
-- filesystem and byte-materializing compatibility conveniences;
-- `sampling_output_compat.rs` and the byte-oriented portion of `detection/output.rs`, rewritten as adapters over engine sessions and records-owned codecs;
+- an intentionally empty `experimental` namespace pending P2 deletion;
+- remaining filesystem and byte-materializing detection and DEM compatibility conveniences;
+- the byte-oriented portion of `detection/output.rs`, retained only until the detection adapter is removed;
 - non-lossy `StabError` or `CircuitError` compatibility conversion;
 - capability aggregation across model, records, engine, decoder, and pass descriptors.
 
 The facade does not retain implementation modules after their owner moves.
 
-`CompiledSampler`, `CompiledDemSampler`, record-at-a-time visitors, and byte-returning helpers remain only where the `0.2` migration inventory explicitly labels them adapters. They delegate through component APIs and are not architectural extension points.
+`CompiledSampler` and its record-at-a-time or byte-returning helpers are gone. `CompiledDemSampler` and the remaining detection adapters delegate through component APIs only until the rest of P2 removes them.
 
 ## Feature Map
 

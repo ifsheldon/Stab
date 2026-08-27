@@ -100,7 +100,6 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
 ) -> SampledFlowResult<bool> {
     let augmented = augmented_flow_test_circuit(circuit, flow, measurement_count)?;
     let plan = SamplingCompiler::new().compile(&augmented)?;
-    plan.validate_legacy_adapter_storage_for_core()?;
     let witness_index = measurement_count;
     let mut session = plan.session(random_policy)?;
     let mut sink = SampledFlowWitnessSink {

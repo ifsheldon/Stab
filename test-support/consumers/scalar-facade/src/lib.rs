@@ -5,7 +5,6 @@ use std::error::Error;
 pub use stab_core::experimental;
 
 use stab_core::advanced::{
-    compat::CompiledSampler,
     records::{
         DetsLayout, FormatError as RecordFormatError, MeasurementCodecSink, RecordResult,
         RecordStreamReader,
@@ -15,7 +14,7 @@ use stab_core::advanced::{
 };
 use stab_core::{
     Circuit, MeasurementBatchView, MeasurementSink, MeasurementWidth, PackedShotBatch,
-    RecordFormat, SamplingCompiler,
+    RandomPolicy, RecordFormat, SamplingCompiler, Seed, ShotCount,
 };
 
 pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>> {
@@ -27,7 +26,14 @@ pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>>
     let _: CircuitFlattenedInstructionIter<'_> = circuit.iter_flattened_instructions();
     let layout = DetsLayout::try_new(1, 1, 0)?;
     let plan = SamplingCompiler::new().compile(&circuit)?;
-    let adapter = CompiledSampler::compile(&circuit)?;
+    let mut session = plan.session(RandomPolicy::Seeded(Seed::new(7)))?;
+    let mut sample_sink =
+        MeasurementCodecSink::try_new(RecordFormat::ZeroOne, plan.measurement_width())?;
+    session.run(ShotCount::new(1), &mut sample_sink)?;
+    let sampled = sample_sink.into_bytes()?;
+    if sampled != b"0\n" {
+        return Err(std::io::Error::other("facade sampling changed bytes").into());
+    }
 
     let encoded = encode_streamed_records(b"10\n01\n")?;
     if encoded != [0x01, 0x02] {
@@ -37,7 +43,7 @@ pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>>
     Ok((
         left.len(),
         layout.total_bits(),
-        plan.measurement_width().get() + adapter.plan().measurement_width().get(),
+        plan.measurement_width().get() + sampled.len(),
     ))
 }
 

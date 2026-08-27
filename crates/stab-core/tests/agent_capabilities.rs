@@ -5,13 +5,16 @@
 
 use std::collections::BTreeSet;
 
-use stab_core::advanced::compat::CompiledSampler;
 use stab_core::{
     CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint,
     EncodedSizeEstimate, Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat,
+    SamplingCompiler,
     advanced::records::{read_records, write_records},
     estimate_sampling_request,
 };
+
+mod support;
+use support::SamplingFixture;
 
 const RICH_CIRCUIT: &str = "X_ERROR[π](0.12345641) 0\n\
 M !1\n\
@@ -278,13 +281,19 @@ fn sampling_compilation_is_deterministic_and_preserves_circuit_semantics() {
     .expect("sampling compilation circuit");
     let model_before = circuit.fingerprint();
 
-    let first = CompiledSampler::compile(&circuit).expect("first compilation");
-    let second = CompiledSampler::compile(&circuit).expect("second compilation");
+    let first = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("first compilation");
+    let second = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("second compilation");
 
     assert_eq!(first, second);
     assert_eq!(circuit.fingerprint(), model_before);
     assert_eq!(
-        first.sample_zero_one_with_seed(3, Some(5)),
+        SamplingFixture::compile(&circuit)
+            .expect("sampling fixture")
+            .sample_zero_one_with_seed(3, Some(5)),
         vec![
             vec![true, false, true, false],
             vec![true, false, true, false],

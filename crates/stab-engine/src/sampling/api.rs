@@ -1002,13 +1002,6 @@ fn session_storage_bytes(plan: &SamplingPlanInner, reference_mode: ReferenceSamp
     estimated_bytes
 }
 
-pub(super) fn validate_legacy_adapter_plan(
-    plan: &SamplingPlan,
-) -> Result<(), SamplingExecutionError> {
-    validate_session_storage(&plan.inner, ReferenceSampleMode::UseReferenceSample)?;
-    validate_session_storage(&plan.inner, ReferenceSampleMode::SkipReferenceSample)
-}
-
 pub(super) fn try_bool_buffer(
     capacity: usize,
     label: &'static str,

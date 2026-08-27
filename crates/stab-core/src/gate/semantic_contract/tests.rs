@@ -5,14 +5,93 @@
 )]
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::convert::Infallible;
 
 use super::{
     GateSemanticFamily, GateShapeExclusion, GateSurface, GateSurfaceBehavior,
     GateSurfaceContractExt, GateTargetPattern, gate_semantic_family,
 };
-use crate::{Circuit, CompiledSampler, Gate, MeasureRecordOffset, Pauli, QubitId, Target};
+use crate::{
+    Circuit, CircuitResult, Gate, MeasureRecordOffset, MeasurementBatchView, MeasurementSink,
+    Pauli, QubitId, RandomPolicy, ReferenceSampleMode, SamplingCompiler, SamplingPlan, Seed,
+    ShotCount, Target,
+};
 
 mod execution;
+
+#[derive(Debug)]
+struct SamplingFixture {
+    plan: SamplingPlan,
+}
+
+impl SamplingFixture {
+    fn compile(circuit: &Circuit) -> CircuitResult<Self> {
+        SamplingCompiler::new()
+            .compile(circuit)
+            .map(|plan| Self { plan })
+            .map_err(Into::into)
+    }
+
+    fn sample_zero_one_with_seed(&self, shots: usize, seed: Option<u64>) -> Vec<Vec<bool>> {
+        self.sample_zero_one_with_seed_and_reference_mode(shots, seed, false)
+    }
+
+    fn sample_zero_one_with_seed_and_reference_mode(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        skip_reference_sample: bool,
+    ) -> Vec<Vec<bool>> {
+        let random_policy = seed.map_or(RandomPolicy::Entropy, |seed| {
+            RandomPolicy::Seeded(Seed::new(seed))
+        });
+        let reference_mode = if skip_reference_sample {
+            ReferenceSampleMode::SkipReferenceSample
+        } else {
+            ReferenceSampleMode::UseReferenceSample
+        };
+        let mut session = self
+            .plan
+            .session_with_reference_mode(random_policy, reference_mode)
+            .expect("construct semantic sampling session");
+        let mut sink = MeasurementCollector::default();
+        session
+            .run(
+                ShotCount::new(u64::try_from(shots).expect("semantic shot count fits u64")),
+                &mut sink,
+            )
+            .expect("run semantic sampling session");
+        sink.records
+    }
+}
+
+#[derive(Default)]
+struct MeasurementCollector {
+    records: Vec<Vec<bool>>,
+}
+
+impl MeasurementSink for MeasurementCollector {
+    type Error = Infallible;
+
+    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
+        for shot in 0..batch.shot_count() {
+            self.records.push(
+                (0..batch.width().get())
+                    .map(|bit| {
+                        batch
+                            .get(shot, bit)
+                            .expect("validated semantic batch coordinate")
+                    })
+                    .collect(),
+            );
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
 
 #[test]
 fn gate_surface_contract_covers_every_canonical_gate_surface_and_target_pattern() {
@@ -371,7 +450,7 @@ fn gate_surface_contract_pauli_product_phase_matches_sampler_validation() {
                 .expect("one generated product pattern");
             let circuit = Circuit::from_stim_str(&format!("MPP {}\n", terms.join("*")))
                 .expect("generated MPP parses");
-            let compilation = CompiledSampler::compile(&circuit);
+            let compilation = SamplingFixture::compile(&circuit);
             match pattern {
                 GateTargetPattern::HermitianPauliProduct => {
                     compilation.expect("Hermitian product must compile");

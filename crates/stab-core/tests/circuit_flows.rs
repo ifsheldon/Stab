@@ -10,7 +10,7 @@ use stab_core::{
     check_if_circuit_has_unsigned_stabilizer_flows,
     check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
     circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
-    sample_if_circuit_has_stabilizer_flows, solve_for_flow_measurements,
+    solve_for_flow_measurements,
 };
 
 #[test]
@@ -325,60 +325,6 @@ fn circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics(
         &folded_measurement_circuit,
         &[flow("Z -> rec[-1]")]
     ));
-}
-
-#[test]
-fn sampled_flow_facade_preserves_engine_output_and_error_mapping() {
-    let unitary_circuit = circuit(
-        "
-        R 2 3
-        X 1 3
-        ",
-    );
-    let flows = [
-        flow("Z0 -> Z0"),
-        flow("Z1 -> -Z1"),
-        flow("Z0 -> -Z0"),
-        flow("Z1 -> Z1"),
-    ];
-    let expected = stab_engine::sample_if_circuit_has_stabilizer_flows(
-        &unitary_circuit,
-        &flows,
-        stab_engine::ShotCount::new(256),
-        stab_engine::RandomPolicy::Seeded(stab_engine::Seed::new(5)),
-    )
-    .expect("canonical sampled flow");
-    assert_eq!(
-        sample_if_circuit_has_stabilizer_flows(&unitary_circuit, &flows, 256, Some(5))
-            .expect("root sampled-flow facade"),
-        expected
-    );
-    assert_eq!(
-        stab_core::execution::sample_if_circuit_has_stabilizer_flows(
-            &unitary_circuit,
-            &flows,
-            256,
-            Some(5),
-        )
-        .expect("execution sampled-flow facade"),
-        expected
-    );
-
-    let error = sample_if_circuit_has_stabilizer_flows(
-        &circuit("M 0\n"),
-        &[flow("Z -> rec[-2]")],
-        8,
-        Some(19),
-    )
-    .expect_err("reject out-of-range sampled flow record");
-    assert!(matches!(
-        error,
-        CircuitError::InvalidDetectorErrorModel { .. }
-    ));
-    assert!(
-        error.to_string().contains("outside sampled flow circuit"),
-        "{error}"
-    );
 }
 
 #[test]
