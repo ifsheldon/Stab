@@ -133,19 +133,19 @@ fn detection_conversion_uses_reference_sample_for_detectors_and_observables() {
     assert_eq!(
         output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![true, false],
                 observables: vec![false, false, false],
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![true, true],
                 observables: vec![false, false, true],
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![false, false],
                 observables: vec![false, false, false],
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![false, true],
                 observables: vec![false, false, true],
             },
@@ -169,19 +169,19 @@ fn detection_conversion_can_skip_reference_sample() {
     assert_eq!(
         output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![false, false],
                 observables: vec![false, false, false],
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![false, true],
                 observables: vec![false, false, true],
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![true, false],
                 observables: vec![false, false, false],
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![true, true],
                 observables: vec![false, false, true],
             },
@@ -199,7 +199,7 @@ fn detection_conversion_handles_repeats_coordinates_and_empty_detectors() {
 
     assert_eq!(
         output.records,
-        vec![DetectionEventRecord {
+        vec![DetectionRecordBuffer {
             detectors: vec![false, true, true, true, false],
             observables: Vec::new(),
         }],
@@ -214,11 +214,11 @@ fn detection_conversion_handles_empty_detector_circuits() {
     assert_eq!(
         output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: Vec::new(),
                 observables: Vec::new(),
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: Vec::new(),
                 observables: Vec::new(),
             },
@@ -250,11 +250,11 @@ fn detection_conversion_skip_reference_sample_ignores_sweep_reference() {
     assert_eq!(
         output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![false],
                 observables: Vec::new(),
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![true],
                 observables: Vec::new(),
             },
@@ -273,11 +273,11 @@ fn detection_conversion_supports_sweep_controlled_error_propagation_and_repeats(
     assert_eq!(
         output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![false],
                 observables: Vec::new(),
             },
-            DetectionEventRecord {
+            DetectionRecordBuffer {
                 detectors: vec![true],
                 observables: Vec::new(),
             },
@@ -292,7 +292,7 @@ fn detection_conversion_supports_sweep_controlled_error_propagation_and_repeats(
     );
     assert_eq!(
         repeated.records,
-        vec![DetectionEventRecord {
+        vec![DetectionRecordBuffer {
             detectors: vec![true],
             observables: Vec::new(),
         }]

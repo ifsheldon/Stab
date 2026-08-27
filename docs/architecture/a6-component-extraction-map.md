@@ -177,7 +177,7 @@ Any helper that samples, constructs a mutable execution frame, or depends on `st
 | `execution/reference_sample_tree.rs` | `reference_sample_tree.rs` | Own bounded reference-tree construction, lookup, simplification, decompression, storage admission, and typed failures. |
 | `execution/sampled_flow.rs` | `sampled_flow.rs` | Own simulator-backed sampled-flow execution, typed shot and randomness inputs, batching, compilation, and typed failures. |
 | `detection.rs`, `detection/*` | `detection/*` | Own measurement-to-detection compilation, direct detector-frame and fused detection sampling, sessions, delivery, and limits. |
-| `dem_sampler.rs`, `dem_sampler/*` | `dem_sampling/*` | Own DEM compilation, sampling, replay, sessions, compatibility adapter, and limits. |
+| `dem_sampler.rs`, `dem_sampler/*` | `dem_sampling/*` | Own DEM compilation, sampling, replay, sessions, and limits; the old facade files are deleted. |
 | `probability_util.rs` | `probability.rs` | Own execution-side randomization helpers. |
 | `compilation_fingerprint.rs` | `fingerprint.rs` | Own backend-neutral request fingerprints. |
 | Engine-owned portions of `capabilities.rs` | `capabilities.rs` | Own compiler descriptors and actual plan implementation identity. |
@@ -190,7 +190,7 @@ Execution code does not import `SampleFormat`, text codecs, filesystem paths, CL
 
 `detection/output.rs` does not move as written because it imports `SampleFormat` and byte writers. Its semantic detector and observable routing moves behind typed sinks, while byte-format compatibility wrappers remain in `stab-core`.
 
-The scalar engine is physically extracted. `stab-engine` owns `CompilationOperation`, `CompilationRequestFingerprint`, `biased_randomize_bits`, source-owned descriptors for all four public compiler families, the sampling, detection, and DEM compilers, immutable plans, mutable sessions, direct-Z, small-frame, general-frame, deterministic reference samples, conversion reference and sweep state, direct detector-frame execution, fused sample-and-convert execution, lowered folded DEM execution, detector-only and sampled-error DEM sampling, incremental replay, reference-sample trees, sampled-flow execution, cancellation, progress, poisoning, and typed measurement, detection, and DEM-sample delivery. Descriptors explicitly report when a compiler has no public request-fingerprint identity instead of omitting the compiler or inventing an identity. Reference trees have private checked structure, exact logical-size and nesting admission, iterative random access and decompression, and fallible materialization. The crate root is the sole canonical public execution namespace. P2 deleted `CompiledSampler`, `CompiledDetectionConverter`, their callback or whole-output routes, byte encoding, facade-only helpers, and hidden engine bridges; measurement sampling and detection conversion now each have one compiler-plan-session-sink route. `CompiledDemSampler` and its callback or materialized routes remain pending P2 deletion.
+The scalar engine is physically extracted. `stab-engine` owns `CompilationOperation`, `CompilationRequestFingerprint`, `biased_randomize_bits`, source-owned descriptors for all four public compiler families, the sampling, detection, and DEM compilers, immutable plans, mutable sessions, direct-Z, small-frame, general-frame, deterministic reference samples, conversion reference and sweep state, direct detector-frame execution, fused sample-and-convert execution, lowered folded DEM execution, detector-only and sampled-error DEM sampling, incremental replay, reference-sample trees, sampled-flow execution, cancellation, progress, poisoning, and typed measurement, detection, and DEM-sample delivery. Descriptors explicitly report when a compiler has no public request-fingerprint identity instead of omitting the compiler or inventing an identity. Reference trees have private checked structure, exact logical-size and nesting admission, iterative random access and decompression, and fallible materialization. The crate root is the sole canonical public execution namespace. P2 deleted `CompiledSampler`, `CompiledDetectionConverter`, `CompiledDemSampler`, their callback or whole-output routes, byte encoding, facade-only helpers, and hidden engine bridges; all three execution families now have one compiler-plan-session-sink route.
 
 ### `stab-kernels-simd`
 
@@ -217,7 +217,7 @@ The facade retains:
 
 The facade does not retain implementation modules after their owner moves.
 
-`CompiledSampler` and its record-at-a-time or byte-returning helpers are gone. `CompiledDemSampler` and the remaining detection adapters delegate through component APIs only until the rest of P2 removes them.
+The pre-0.2 compiled sampler, detection converter, and DEM sampler adapters are gone. Component-owned compilers, immutable plans, mutable sessions, and typed sinks are the only execution routes.
 
 ## Feature Map
 

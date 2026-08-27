@@ -13,7 +13,6 @@ mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_transforms;
 mod dem;
-mod dem_sampler;
 mod diagnostics;
 mod error;
 mod error_matcher;
@@ -66,7 +65,6 @@ pub use dem::{
     shortest_graphlike_undetectable_logical_error_with_limits,
     try_disjoint_to_independent_xyz_errors,
 };
-pub use dem_sampler::DemSamplerLimits;
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext, ParseError,
     ParseErrorCode, ParseErrorContext,
@@ -77,12 +75,13 @@ pub use error::{
 pub use error_matcher::explain_errors_from_circuit;
 pub use execution::{CircuitReferenceSampleError, CountDeterminedMeasurementsError};
 pub use execution::{
-    DetectionConversionLimits, PlanFingerprint, RandomPolicy, ReferenceSampleMode,
-    ReferenceSampleTree, ReferenceSampleTreeError, RunError, SamplingCancellation,
-    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
-    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
-    Seed, ShotCount, SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
-    detection_record_width, detection_record_width_with_limits, measurement_record_count,
+    DemSamplerLimits, DetectionConversionLimits, PlanFingerprint, RandomPolicy,
+    ReferenceSampleMode, ReferenceSampleTree, ReferenceSampleTreeError, RunError,
+    SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
+    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
+    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
+    circuit_reference_sample, count_determined_measurements, detection_record_width,
+    detection_record_width_with_limits, measurement_record_count,
     measurement_record_count_with_limits, sample_if_circuit_has_stabilizer_flows,
     validate_detection_sampling_circuit, validate_detection_sampling_circuit_with_limits,
 };
@@ -122,6 +121,5 @@ pub use stab_model::{
     RepeatNestingLimitError, SourceLineLimit, Target,
 };
 
-pub(crate) use dem_sampler::DetectionEventRecord;
 pub(crate) use result_formats::{DetsLayout, DetsToken};
 pub(crate) use stab_bits::BitSlice;

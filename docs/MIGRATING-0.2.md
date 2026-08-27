@@ -36,7 +36,7 @@ Use a component crate directly when only one layer is needed. Use `stab-core` fo
 | `stab_core::advanced::records::...` | Explicit layouts, concrete codecs, materialized helpers, and bounded visitors |
 | `stab_core::advanced::traversal::...` | Flattened and folded traversal primitives |
 | `stab_core::advanced::algebra::...` | Algebra iterators and admitted unchecked constructors |
-| `stab_core::advanced::compat::...` | Remaining pre-0.2 detection and DEM adapters scheduled for deletion in P2 |
+| `stab_core::advanced::compat::...` | Removed. Use the owning compiler, plan, session, and sink APIs. |
 | `stab_core::experimental::...` | Implemented extension contracts that may change before 1.0 |
 
 `experimental` contains the circuit-pass contract and built-in without-noise pass proven by a separate Stable crate. Pass implementations must conservatively project folded output resources before lowering; the common executor admits that projection, reports a typed input/projection/output rejection stage, validates the actual closed-model result, and rejects underestimation. Projected payload bytes exclude allocator metadata and spare collection capacity. The canonical pass owner is `stab-analysis`; the facade tier is pre-stable convenience. Decoder interoperability remains available from `stab-decoder` or the facade root. No placeholder backend, GPU, dynamic plugin, or runtime gate-registry traits are published.
@@ -56,7 +56,7 @@ The supported `analysis` and `execution` namespaces remain because they describe
 | No circuit-pass facade | `stab_core::experimental::{CircuitPass, run_circuit_pass, CircuitPassContext, CircuitPassLimits, CircuitPassResources, CircuitPassStage}` or canonical `stab_analysis` paths |
 | `stab_core::CompiledSampler` | Removed. Compile with `SamplingCompiler`, create a `SamplingSession`, and deliver output through a `MeasurementSink`. Use `MeasurementCodecSink` when encoded bytes are the intended result. |
 | `stab_core::CompiledDetectionConverter` | Removed. Compile with `MeasurementToDetectionCompiler`, create a `MeasurementToDetectionSession`, and route records through `MeasurementToDetectionSinkAdapter` into a `DetectionSink`. |
-| `stab_core::CompiledDemSampler` | `stab_core::advanced::compat::CompiledDemSampler`; new code should use `DemSamplingCompiler`, `DemSamplingPlan`, and a sampling or replay session |
+| `stab_core::CompiledDemSampler` | Removed. Compile with `DemSamplingCompiler`, create a sampling or replay session, and deliver typed batches through `DemSampleSink`. |
 
 Common model, algebra-value, plan, session, batch, diagnostic, and policy names remain available from the facade root.
 
@@ -106,6 +106,7 @@ The August 2026 remediation ([plans/post-review-remediation-plan.md](plans/post-
 - `FlexPauliString::from_str` rejects doubled sign prefixes (`+-X`, `--X`, `-+X`, `i-X`, `-i+X`) with typed invalid-character errors mirroring pinned Stim instead of silently corrupting the sign.
 - `Circuit` now implements `Drop`, `Clone`, and `PartialEq` iteratively (mirroring `DetectorErrorModel`), so deeply nested API-built circuits no longer abort the process; its `Debug` output elides nested bodies (`Circuit { top_level_items: N, .. }`), and moving `items` out of a `Circuit` by value is no longer possible because the type implements `Drop`.
 - `CompiledDetectionConverter`, its facade forwards, whole-output DTOs, callback visitors, and byte writers are removed. Use `MeasurementToDetectionCompiler`, its immutable plan and mutable session, and a typed `DetectionSink`; scratch allocation and execution failures surface through the owning engine error types.
+- `CompiledDemSampler`, `DetectionEventRecord`, DEM whole-output materializers, and callback visitors are removed. Use `DemSamplingCompiler`, `DemSamplingPlan`, `DemSamplingSession` or `DemReplaySession`, and `DemSampleSink`. `DemSamplerLimits::max_active_batch_bytes` now names the reusable session storage it actually bounds; the obsolete whole-output unit budget is removed.
 - `stab_records::RecordStreamReader::next_b8_packed_record` and its `stab_core::advanced::records` reexport expose one borrowed, validated B8 frame without dense expansion. The frame preserves input padding bits; consumers that emit canonical B8 must clear bits beyond the declared record width before writing.
 
 The detailed decision ledger remains [architecture/0.2-api-migration-inventory.md](architecture/0.2-api-migration-inventory.md). The frozen pre-0.2 inventory remains historical and is not rewritten.

@@ -9,8 +9,7 @@ pub(crate) type DemResult<T> = Result<T, DemError>;
 pub enum DemResourceKind {
     SampledErrorApplications,
     ReplayWorkUnits,
-    MaterializedUnits,
-    MaterializedBytes,
+    ActiveBatchBytes,
 }
 
 /// Typed resource-admission failure owned by the DEM sampling engine.
@@ -38,17 +37,9 @@ impl DemResourceLimitError {
         )
     }
 
-    pub(crate) const fn materialized_units(actual: usize, limit: usize) -> Self {
+    pub(crate) const fn active_batch_bytes(actual: usize, limit: usize) -> Self {
         Self::new(
-            DemResourceKind::MaterializedUnits,
-            actual as u64,
-            limit as u64,
-        )
-    }
-
-    pub(crate) const fn materialized_bytes(actual: usize, limit: usize) -> Self {
-        Self::new(
-            DemResourceKind::MaterializedBytes,
+            DemResourceKind::ActiveBatchBytes,
             actual as u64,
             limit as u64,
         )
@@ -83,14 +74,14 @@ impl Display for DemResourceLimitError {
                 "cannot compile circuit sampler: DEM sampler would apply {} sampled errors; current limit is {}",
                 self.actual, self.limit
             ),
-            DemResourceKind::ReplayWorkUnits | DemResourceKind::MaterializedUnits => write!(
+            DemResourceKind::ReplayWorkUnits => write!(
                 formatter,
-                "cannot compile circuit sampler: DEM sampler would require {} buffered units; current limit is {}",
+                "cannot compile circuit sampler: DEM sampler would require {} replay work units; current limit is {}",
                 self.actual, self.limit
             ),
-            DemResourceKind::MaterializedBytes => write!(
+            DemResourceKind::ActiveBatchBytes => write!(
                 formatter,
-                "cannot compile circuit sampler: DEM sampler would require at least {} materialized bytes; current limit is {}",
+                "cannot compile circuit sampler: DEM sampling session would require at least {} active batch bytes; current limit is {}",
                 self.actual, self.limit
             ),
         }

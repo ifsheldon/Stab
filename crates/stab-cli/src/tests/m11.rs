@@ -813,7 +813,7 @@ fn sample_dem_replay_work_rejects_before_prefix_read_or_output_truncation() {
     assert_eq!(stdout, b"");
     let stderr = String::from_utf8(stderr).expect("UTF-8 diagnostics");
     assert!(
-        stderr.contains("64000002 buffered units; current limit is 64000000"),
+        stderr.contains("64000002 replay work units; current limit is 64000000"),
         "{stderr}"
     );
     assert!(

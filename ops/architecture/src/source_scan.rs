@@ -25,7 +25,7 @@ const FACADE_EXPERIMENTAL_REEXPORTS: [&str; 13] = [
     "WithoutNoiseReport",
     "run_circuit_pass",
 ];
-const FACADE_ADVANCED_MODULES: [&str; 5] = ["storage", "algebra", "records", "traversal", "compat"];
+const FACADE_ADVANCED_MODULES: [&str; 4] = ["storage", "algebra", "records", "traversal"];
 
 mod rust_source;
 
@@ -764,7 +764,7 @@ mod tests {
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
             assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), ""),
@@ -786,7 +786,7 @@ mod tests {
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
             assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), ""),
@@ -810,7 +810,7 @@ mod tests {
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
             assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), ""),
@@ -860,7 +860,7 @@ mod tests {
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
             assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
@@ -893,7 +893,7 @@ mod tests {
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
             assigned_experimental_surface(),
             FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
@@ -918,7 +918,7 @@ mod tests {
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
+                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
             ),
             assigned_experimental_surface(),
             FacadeSource::new(
@@ -967,7 +967,7 @@ mod tests {
             ),
             FacadeSource::new(
                 Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod compat {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\npub use crate::Circuit;\npub struct Escape;\n",
+                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\npub use crate::Circuit;\npub struct Escape;\n",
             ),
             FacadeSource::new(
                 Path::new("experimental.rs"),

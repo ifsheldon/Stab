@@ -1,8 +1,6 @@
 use std::ffi::OsString;
 use std::hint::black_box;
 
-use sha2::{Digest, Sha256};
-use stab_core::advanced::compat::{CompiledDemSampler, DetectionConversionOutput};
 use stab_engine::{DemSamplingCompiler, RandomPolicy, Seed, ShotCount};
 use stab_model::DetectorErrorModel;
 
@@ -85,15 +83,6 @@ const DENSE_DETECTOR_COUNT: usize = 128;
 #[cfg(test)]
 const DENSE_DETECTOR_COUNT: usize = 16;
 const HIGH_DETECTOR_COUNT: usize = 4096;
-const COMPILED_DEM_SAMPLER_WITNESS_DOMAIN: &[u8] =
-    b"stab-m11-compiled-dem-sampler-ordered-output-v1";
-#[cfg(not(test))]
-const COMPILED_DEM_SAMPLER_OUTPUT_DIGEST: &str =
-    "12498ae027584fdcbc5aaf446a6f30922427ad79f17bd4bdef7251e31f18db26";
-#[cfg(test)]
-const COMPILED_DEM_SAMPLER_OUTPUT_DIGEST: &str =
-    "a6ea43800f7bdbeb3e331b62feffc16e2c399fef4e38b251ae7d3dda653679ea";
-
 pub(super) fn run_dem_sampling_compare_row(
     root: &RepoRoot,
     profile: &str,
@@ -185,65 +174,41 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
 
 fn run_compiled_dem_sampler_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let model = parse_dem(&row.id, &surface_like_dem_fixture())?;
-    let sampler =
-        CompiledDemSampler::compile(&model).map_err(|error| stab_runner_error(&row.id, error))?;
-    let preflight = sampler
-        .sample_detection_events_with_seed(M11_SAMPLE_DEM_SHOTS, Some(5))
+    let plan = DemSamplingCompiler::new()
+        .compile(&model)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    ensure_compiled_dem_sampler_output(row, &preflight)?;
+    let mut preflight_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut preflight_sink = DemDigestSink::default();
+    let preflight = preflight_session
+        .run(
+            ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64),
+            &mut preflight_sink,
+        )
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    ensure_dem_phase_witness(
+        row,
+        "compiled DEM sampler preflight",
+        DEM_DETECTOR_FIRST_WITNESS,
+        preflight.committed_shots().get(),
+        preflight_sink.witness(),
+    )?;
     Ok(vec![measure_stab_iterations(
         "stab_dem_sampler_sample_surface_like_1024",
         M11_CONTRACT_ITERATIONS,
         || {
-            let output = sampler
-                .sample_detection_events_with_seed(M11_SAMPLE_DEM_SHOTS, Some(5))
+            let mut session = plan
+                .session(RandomPolicy::Seeded(Seed::new(5)))
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(output.records.len());
+            let mut sink = DemDigestSink::default();
+            let summary = session
+                .run(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64), &mut sink)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((summary, sink.witness()));
             Ok(())
         },
     )?])
-}
-
-fn ensure_compiled_dem_sampler_output(
-    row: &BenchmarkRow,
-    output: &DetectionConversionOutput,
-) -> Result<(), BenchError> {
-    let actual_digest = compiled_dem_sampler_output_digest(output);
-    if output.detector_count == DENSE_DETECTOR_COUNT
-        && output.observable_count == 1
-        && output.records.len() == M11_SAMPLE_DEM_SHOTS
-        && actual_digest == COMPILED_DEM_SAMPLER_OUTPUT_DIGEST
-    {
-        return Ok(());
-    }
-    Err(stab_runner_error(
-        &row.id,
-        format!(
-            "compiled DEM sampler ordered full-content witness changed: expected detector/observable/record counts ({DENSE_DETECTOR_COUNT}, 1, {M11_SAMPLE_DEM_SHOTS}) and digest {COMPILED_DEM_SAMPLER_OUTPUT_DIGEST}, got ({}, {}, {}) and digest {actual_digest}",
-            output.detector_count,
-            output.observable_count,
-            output.records.len(),
-        ),
-    ))
-}
-
-fn compiled_dem_sampler_output_digest(output: &DetectionConversionOutput) -> String {
-    let mut digest = Sha256::new();
-    digest.update(COMPILED_DEM_SAMPLER_WITNESS_DOMAIN);
-    digest.update((output.detector_count as u64).to_be_bytes());
-    digest.update((output.observable_count as u64).to_be_bytes());
-    digest.update((output.records.len() as u64).to_be_bytes());
-    for record in &output.records {
-        digest.update((record.detectors.len() as u64).to_be_bytes());
-        for bit in &record.detectors {
-            digest.update([u8::from(*bit)]);
-        }
-        digest.update((record.observables.len() as u64).to_be_bytes());
-        for bit in &record.observables {
-            digest.update([u8::from(*bit)]);
-        }
-    }
-    hex::encode(digest.finalize())
 }
 
 fn run_process_cli_row(
@@ -759,13 +724,7 @@ mod tests {
 
     use std::path::Path;
 
-    use stab_core::advanced::compat::CompiledDemSampler;
-
-    use super::{
-        COMPILED_DEM_SAMPLER_OUTPUT_DIGEST, M11_SAMPLE_DEM_SHOTS, compare_note,
-        compiled_dem_sampler_output_digest, ensure_compiled_dem_sampler_output, measurement_work,
-        parse_dem, run_dem_sampling_compare_row, surface_like_dem_fixture,
-    };
+    use super::{compare_note, measurement_work, run_dem_sampling_compare_row};
     use crate::{manifest::BenchmarkManifest, root::RepoRoot};
 
     #[test]
@@ -839,52 +798,5 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn compiled_dem_sampler_preflight_rejects_same_count_wrong_content() {
-        let row_id = "m11-dem-sampler";
-        let model =
-            parse_dem(row_id, &surface_like_dem_fixture()).expect("parse benchmark fixture");
-        let sampler = CompiledDemSampler::compile(&model).expect("compile benchmark fixture");
-        let mut output = sampler
-            .sample_detection_events_with_seed(M11_SAMPLE_DEM_SHOTS, Some(5))
-            .expect("sample benchmark fixture");
-        assert_eq!(
-            compiled_dem_sampler_output_digest(&output),
-            COMPILED_DEM_SAMPLER_OUTPUT_DIGEST
-        );
-
-        let original_record_count = output.records.len();
-        let first_detector = output
-            .records
-            .first_mut()
-            .and_then(|record| record.detectors.first_mut())
-            .expect("benchmark output has a detector bit");
-        *first_detector = !*first_detector;
-        assert_eq!(output.records.len(), original_record_count);
-
-        let row = BenchmarkManifest::read(
-            &RepoRoot::resolve(
-                Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .parent()
-                    .and_then(Path::parent)
-                    .expect("repository root"),
-            )
-            .expect("resolve repository root"),
-        )
-        .expect("read benchmark manifest")
-        .rows
-        .into_iter()
-        .find(|row| row.id == row_id)
-        .expect("manifest row");
-        let error = ensure_compiled_dem_sampler_output(&row, &output)
-            .expect_err("same-count mutation must fail");
-        assert!(
-            error
-                .to_string()
-                .contains("ordered full-content witness changed"),
-            "unexpected error: {error}"
-        );
     }
 }

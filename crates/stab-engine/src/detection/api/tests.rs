@@ -19,7 +19,7 @@ use crate::{DetectionError, DetectionResourceKind, Seed};
 
 #[derive(Default)]
 struct CollectSink {
-    records: Vec<DetectionEventRecord>,
+    records: Vec<DetectionRecordBuffer>,
     batch_sizes: Vec<usize>,
     finish_count: usize,
 }
@@ -46,7 +46,7 @@ impl DetectionSink for CollectSink {
                         .expect("observable bit")
                 })
                 .collect();
-            self.records.push(DetectionEventRecord {
+            self.records.push(DetectionRecordBuffer {
                 detectors,
                 observables,
             });

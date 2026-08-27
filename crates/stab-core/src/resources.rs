@@ -134,8 +134,7 @@ enum ResourceLimitCause {
     DetectionCompiledBytes,
     DetectorErrorModelSampledErrorApplications,
     DetectorErrorModelReplayWorkUnits,
-    DetectorErrorModelMaterializedUnits,
-    DetectorErrorModelMaterializedBytes,
+    DetectorErrorModelActiveBatchBytes,
 }
 
 /// Typed resource-admission failure with compatibility-preserving human output.
@@ -251,18 +250,9 @@ impl ResourceLimitError {
         }
     }
 
-    pub(crate) const fn dem_materialized_units(actual: usize, limit: usize) -> Self {
+    pub(crate) const fn dem_active_batch_bytes(actual: usize, limit: usize) -> Self {
         Self {
-            cause: ResourceLimitCause::DetectorErrorModelMaterializedUnits,
-            actual: actual as u64,
-            limit: limit as u64,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn dem_materialized_bytes(actual: usize, limit: usize) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectorErrorModelMaterializedBytes,
+            cause: ResourceLimitCause::DetectorErrorModelActiveBatchBytes,
             actual: actual as u64,
             limit: limit as u64,
             span: None,
@@ -309,8 +299,7 @@ impl ResourceLimitError {
             | ResourceLimitCause::DetectionCompiledBytes => ResourceOperation::DetectionConversion,
             ResourceLimitCause::DetectorErrorModelSampledErrorApplications
             | ResourceLimitCause::DetectorErrorModelReplayWorkUnits
-            | ResourceLimitCause::DetectorErrorModelMaterializedUnits
-            | ResourceLimitCause::DetectorErrorModelMaterializedBytes => {
+            | ResourceLimitCause::DetectorErrorModelActiveBatchBytes => {
                 ResourceOperation::DetectorErrorModelSampling
             }
         }
@@ -379,10 +368,7 @@ impl ResourceLimitError {
                 ResourceKind::SampledErrorApplications
             }
             ResourceLimitCause::DetectorErrorModelReplayWorkUnits => ResourceKind::ReplayWorkUnits,
-            ResourceLimitCause::DetectorErrorModelMaterializedUnits => {
-                ResourceKind::MaterializedUnits
-            }
-            ResourceLimitCause::DetectorErrorModelMaterializedBytes => {
+            ResourceLimitCause::DetectorErrorModelActiveBatchBytes => {
                 ResourceKind::MaterializedBytes
             }
         }
@@ -463,8 +449,7 @@ impl From<stab_engine::DemResourceLimitError> for ResourceLimitError {
                 Self::dem_sampled_error_applications(actual, limit)
             }
             DemResourceKind::ReplayWorkUnits => Self::dem_replay_work_units(actual, limit),
-            DemResourceKind::MaterializedUnits => Self::dem_materialized_units(actual, limit),
-            DemResourceKind::MaterializedBytes => Self::dem_materialized_bytes(actual, limit),
+            DemResourceKind::ActiveBatchBytes => Self::dem_active_batch_bytes(actual, limit),
         }
     }
 }
@@ -537,14 +522,9 @@ impl Display for ResourceLimitError {
                 "cannot compile circuit sampler: DEM sampler would require {} buffered units; current limit is {}",
                 self.actual, self.limit
             ),
-            ResourceLimitCause::DetectorErrorModelMaterializedUnits => write!(
+            ResourceLimitCause::DetectorErrorModelActiveBatchBytes => write!(
                 formatter,
-                "cannot compile circuit sampler: DEM sampler would require {} buffered units; current limit is {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::DetectorErrorModelMaterializedBytes => write!(
-                formatter,
-                "cannot compile circuit sampler: DEM sampler would require at least {} materialized bytes; current limit is {}",
+                "cannot compile circuit sampler: DEM sampling session would require at least {} active batch bytes; current limit is {}",
                 self.actual, self.limit
             ),
         }

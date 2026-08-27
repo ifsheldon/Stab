@@ -9,12 +9,12 @@ use std::fmt::{Display, Formatter};
 use stab_model::Circuit;
 use stab_records::{DetectionBatchView, DetectionSink, MeasurementBatchView, PackedShotBatch};
 
-use super::{DetectionEventRecord, DetectionSamplingCompiler, MeasurementToDetectionCompiler};
+use super::{DetectionRecordBuffer, DetectionSamplingCompiler, MeasurementToDetectionCompiler};
 use crate::{RandomPolicy, ReferenceSampleMode, Seed, ShotCount};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct DetectionConversionOutput {
-    pub(super) records: Vec<DetectionEventRecord>,
+    pub(super) records: Vec<DetectionRecordBuffer>,
     pub(super) detector_count: usize,
     pub(super) observable_count: usize,
 }
@@ -119,7 +119,7 @@ pub(super) fn sample_detection_events(
 
 #[derive(Default)]
 struct CollectSink {
-    records: Vec<DetectionEventRecord>,
+    records: Vec<DetectionRecordBuffer>,
 }
 
 impl DetectionSink for CollectSink {
@@ -143,7 +143,7 @@ impl DetectionSink for CollectSink {
                         .expect("declared observable bit")
                 })
                 .collect();
-            self.records.push(DetectionEventRecord {
+            self.records.push(DetectionRecordBuffer {
                 detectors,
                 observables,
             });

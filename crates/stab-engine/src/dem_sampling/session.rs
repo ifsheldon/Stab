@@ -14,7 +14,7 @@ use thiserror::Error;
 use super::plan::DemSamplingPlan;
 use super::program::dem_sampler_rng;
 use super::{DemError, DemResourceLimitError, DemSamplerLimits};
-use crate::{DetectionEventRecord, RandomPolicy, ShotCount, SinkFailurePhase};
+use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount, SinkFailurePhase};
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_DEM_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
@@ -206,7 +206,7 @@ pub struct DemSamplingSession {
     plan: DemSamplingPlan,
     limits: DemSamplerLimits,
     rng: SmallRng,
-    record: DetectionEventRecord,
+    record: DetectionRecordBuffer,
     error_record: Option<Vec<bool>>,
     batch: SessionBatch,
     cancellation: OnceLock<Arc<AtomicBool>>,
@@ -966,16 +966,15 @@ fn validate_session_storage(
     include_sampled_errors: bool,
     limits: DemSamplerLimits,
 ) -> Result<(), DemSamplingExecutionError> {
-    plan.validate_sample_buffer_units_with_limits(1, include_sampled_errors, limits)?;
     let estimated_bytes = session_storage_bytes(plan, shot_count, include_sampled_errors);
-    if estimated_bytes > limits.max_materialized_bytes() as u128 {
+    if estimated_bytes > limits.max_active_batch_bytes() as u128 {
         let actual = usize::try_from(estimated_bytes).map_err(|_| {
             DemSamplingExecutionError::InvalidRequest(DemError::invalid_sampler_compilation(
                 "DEM sampling session active byte estimate overflowed usize",
             ))
         })?;
         return Err(DemSamplingExecutionError::InvalidRequest(
-            DemResourceLimitError::materialized_bytes(actual, limits.max_materialized_bytes())
+            DemResourceLimitError::active_batch_bytes(actual, limits.max_active_batch_bytes())
                 .into(),
         ));
     }
@@ -1000,7 +999,7 @@ fn session_storage_bytes(
     } else {
         0
     };
-    let scratch = (std::mem::size_of::<DetectionEventRecord>() as u128)
+    let scratch = (std::mem::size_of::<DetectionRecordBuffer>() as u128)
         .saturating_add(detector_width)
         .saturating_add(observable_width)
         .saturating_add(if include_sampled_errors {

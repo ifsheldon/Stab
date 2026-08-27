@@ -1,8 +1,9 @@
 use std::hint::black_box;
 
-use stab_core::DetectorErrorModel;
-use stab_core::advanced::compat::{CompiledDemSampler, DetectionConversionOutput};
+use stab_engine::{DemSamplingCompiler, DemSamplingPlan, RandomPolicy, Seed, ShotCount};
+use stab_model::DetectorErrorModel;
 
+use crate::baseline::batch_sinks::DemDigestSink;
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
@@ -46,40 +47,35 @@ pub(super) fn run_dem_sampler_repeat_row(
     let fixture = sampler_repeat_fixture();
     let model = DetectorErrorModel::from_dem_str(&fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let sampler =
-        CompiledDemSampler::compile(&model).map_err(|error| stab_runner_error(&row.id, error))?;
+    let plan = compile_plan(row, &model)?;
     let no_op_fixture = sampler_no_op_repeat_fixture();
     let no_op_model = DetectorErrorModel::from_dem_str(&no_op_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let no_op_sampler = CompiledDemSampler::compile(&no_op_model)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let no_op_plan = compile_plan(row, &no_op_model)?;
     let deterministic_fixture = sampler_deterministic_repeat_fixture();
     let deterministic_model = DetectorErrorModel::from_dem_str(&deterministic_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let deterministic_sampler = CompiledDemSampler::compile(&deterministic_model)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let deterministic_plan = compile_plan(row, &deterministic_model)?;
     let single_stochastic_fixture = sampler_single_stochastic_repeat_fixture();
     let single_stochastic_model = DetectorErrorModel::from_dem_str(&single_stochastic_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let single_stochastic_sampler = CompiledDemSampler::compile(&single_stochastic_model)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let single_stochastic_plan = compile_plan(row, &single_stochastic_model)?;
     let flat_stochastic_fixture = sampler_flat_stochastic_repeat_fixture();
     let flat_stochastic_model = DetectorErrorModel::from_dem_str(&flat_stochastic_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let flat_stochastic_sampler = CompiledDemSampler::compile(&flat_stochastic_model)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let flat_stochastic_plan = compile_plan(row, &flat_stochastic_model)?;
     let nested_stochastic_fixture = sampler_nested_stochastic_repeat_fixture();
     let nested_stochastic_model = DetectorErrorModel::from_dem_str(&nested_stochastic_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let nested_stochastic_sampler = CompiledDemSampler::compile(&nested_stochastic_model)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let nested_stochastic_plan = compile_plan(row, &nested_stochastic_model)?;
 
     Ok(vec![
         measure_stab_batched(
             "stab_pf4_dem_sampler_compile_folded_repeat",
             TRANSFORM_REPETITIONS,
             || {
-                let compiled = CompiledDemSampler::compile(&model)
+                let compiled = DemSamplingCompiler::new()
+                    .compile(&model)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(compiled.error_count());
                 Ok(())
@@ -89,10 +85,7 @@ pub(super) fn run_dem_sampler_repeat_row(
             "stab_pf4_dem_sampler_sample_folded_repeat",
             TRANSFORM_REPETITIONS,
             || {
-                let output = sampler
-                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(detection_output_checksum(&output));
+                black_box(sample_witness(row, &plan)?);
                 Ok(())
             },
         )?,
@@ -100,10 +93,7 @@ pub(super) fn run_dem_sampler_repeat_row(
             "stab_pf4_dem_sampler_sample_zero_probability_folded_repeat",
             TRANSFORM_REPETITIONS,
             || {
-                let output = no_op_sampler
-                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(detection_output_checksum(&output));
+                black_box(sample_witness(row, &no_op_plan)?);
                 Ok(())
             },
         )?,
@@ -111,10 +101,7 @@ pub(super) fn run_dem_sampler_repeat_row(
             "stab_pf4_dem_sampler_sample_deterministic_parity_repeat",
             TRANSFORM_REPETITIONS,
             || {
-                let output = deterministic_sampler
-                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(detection_output_checksum(&output));
+                black_box(sample_witness(row, &deterministic_plan)?);
                 Ok(())
             },
         )?,
@@ -122,10 +109,7 @@ pub(super) fn run_dem_sampler_repeat_row(
             "stab_pf4_dem_sampler_sample_single_stochastic_parity_repeat",
             TRANSFORM_REPETITIONS,
             || {
-                let output = single_stochastic_sampler
-                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(detection_output_checksum(&output));
+                black_box(sample_witness(row, &single_stochastic_plan)?);
                 Ok(())
             },
         )?,
@@ -133,10 +117,7 @@ pub(super) fn run_dem_sampler_repeat_row(
             "stab_pf4_dem_sampler_sample_flat_stochastic_parity_repeat",
             TRANSFORM_REPETITIONS,
             || {
-                let output = flat_stochastic_sampler
-                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(detection_output_checksum(&output));
+                black_box(sample_witness(row, &flat_stochastic_plan)?);
                 Ok(())
             },
         )?,
@@ -144,10 +125,7 @@ pub(super) fn run_dem_sampler_repeat_row(
             "stab_pf4_dem_sampler_sample_nested_stochastic_parity_repeat",
             TRANSFORM_REPETITIONS,
             || {
-                let output = nested_stochastic_sampler
-                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(detection_output_checksum(&output));
+                black_box(sample_witness(row, &nested_stochastic_plan)?);
                 Ok(())
             },
         )?,
@@ -271,17 +249,25 @@ repeat {SAMPLER_NESTED_STOCHASTIC_REPEAT_COUNT} {{
     )
 }
 
-fn detection_output_checksum(output: &DetectionConversionOutput) -> u64 {
-    let mut checksum = output.records.len() as u64;
-    checksum ^= (output.detector_count as u64).rotate_left(7);
-    checksum ^= (output.observable_count as u64).rotate_left(13);
-    for record in &output.records {
-        for (index, bit) in record.detectors.iter().enumerate() {
-            checksum = checksum.rotate_left(3) ^ ((index as u64) << 1) ^ u64::from(*bit);
-        }
-        for (index, bit) in record.observables.iter().enumerate() {
-            checksum = checksum.rotate_left(5) ^ ((index as u64) << 1) ^ u64::from(*bit);
-        }
-    }
-    checksum
+fn compile_plan(
+    row: &BenchmarkRow,
+    model: &DetectorErrorModel,
+) -> Result<DemSamplingPlan, BenchError> {
+    DemSamplingCompiler::new()
+        .compile(model)
+        .map_err(|error| stab_runner_error(&row.id, error))
+}
+
+fn sample_witness(
+    row: &BenchmarkRow,
+    plan: &DemSamplingPlan,
+) -> Result<(u64, u64, u64), BenchError> {
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut sink = DemDigestSink::default();
+    session
+        .run(ShotCount::new(SAMPLER_SHOTS as u64), &mut sink)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(sink.witness())
 }

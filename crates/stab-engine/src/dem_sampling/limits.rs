@@ -1,15 +1,13 @@
-const MAX_DEM_SAMPLER_BUFFER_UNITS: usize = 64_000_000;
-const MAX_DEM_SAMPLER_BUFFER_BYTES: usize = 64 * 1024 * 1024;
+const MAX_DEM_SAMPLER_ACTIVE_BATCH_BYTES: usize = 64 * 1024 * 1024;
 const MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS: usize = 64_000_000;
 const MAX_DEM_SAMPLER_REPLAY_WORK_UNITS: usize = 64_000_000;
 
-/// Admission limits for DEM sampling work and materialized output.
+/// Admission limits for DEM sampling work and reusable session storage.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DemSamplerLimits {
     max_sampled_error_applications: usize,
     max_replay_work_units: usize,
-    max_materialized_units: usize,
-    max_materialized_bytes: usize,
+    max_active_batch_bytes: usize,
 }
 
 impl DemSamplerLimits {
@@ -21,12 +19,8 @@ impl DemSamplerLimits {
         self.max_replay_work_units
     }
 
-    pub const fn max_materialized_units(self) -> usize {
-        self.max_materialized_units
-    }
-
-    pub const fn max_materialized_bytes(self) -> usize {
-        self.max_materialized_bytes
+    pub const fn max_active_batch_bytes(self) -> usize {
+        self.max_active_batch_bytes
     }
 
     #[must_use]
@@ -45,14 +39,8 @@ impl DemSamplerLimits {
     }
 
     #[must_use]
-    pub const fn with_max_materialized_units(mut self, max_materialized_units: usize) -> Self {
-        self.max_materialized_units = max_materialized_units;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_max_materialized_bytes(mut self, max_materialized_bytes: usize) -> Self {
-        self.max_materialized_bytes = max_materialized_bytes;
+    pub const fn with_max_active_batch_bytes(mut self, max_active_batch_bytes: usize) -> Self {
+        self.max_active_batch_bytes = max_active_batch_bytes;
         self
     }
 }
@@ -62,8 +50,7 @@ impl Default for DemSamplerLimits {
         Self {
             max_sampled_error_applications: MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS,
             max_replay_work_units: MAX_DEM_SAMPLER_REPLAY_WORK_UNITS,
-            max_materialized_units: MAX_DEM_SAMPLER_BUFFER_UNITS,
-            max_materialized_bytes: MAX_DEM_SAMPLER_BUFFER_BYTES,
+            max_active_batch_bytes: MAX_DEM_SAMPLER_ACTIVE_BATCH_BYTES,
         }
     }
 }

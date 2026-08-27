@@ -4,7 +4,7 @@ use stab_model::advanced::{FoldedDemBlock, FoldedDemItem, dem_instruction_detect
 use stab_model::{DemInstruction, DemInstructionKind, DemTarget};
 
 use super::{DemError, DemResult};
-use crate::DetectionEventRecord;
+use crate::DetectionRecordBuffer;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct DemSampleBlock {
@@ -213,7 +213,7 @@ pub(super) fn sample_block_into<R>(
     block: &DemSampleBlock,
     detector_shift: u64,
     rng: &mut R,
-    record: &mut DetectionEventRecord,
+    record: &mut DetectionRecordBuffer,
     mut error_output: SampledErrorOutput<'_>,
 ) -> DemResult<()>
 where
@@ -292,7 +292,7 @@ pub(super) fn apply_error_record_block(
     detector_shift: u64,
     error_record: &[bool],
     cursor: &mut usize,
-    record: &mut DetectionEventRecord,
+    record: &mut DetectionRecordBuffer,
 ) -> DemResult<()> {
     for operation in &block.operations {
         match operation {
@@ -332,7 +332,7 @@ pub(super) fn apply_error_record_block(
 fn apply_error_to_record(
     error: &DemSampleError,
     detector_shift: u64,
-    record: &mut DetectionEventRecord,
+    record: &mut DetectionRecordBuffer,
 ) -> DemResult<()> {
     for detector in &error.detectors {
         let shifted = detector_shift
@@ -487,7 +487,7 @@ fn sample_folded_repeat_errors<R>(
     errors: &[DemSampleError],
     detector_shift: u64,
     rng: &mut R,
-    record: &mut DetectionEventRecord,
+    record: &mut DetectionRecordBuffer,
 ) -> DemResult<()>
 where
     R: Rng,
@@ -543,7 +543,7 @@ where
 }
 
 pub(super) fn reset_detection_record(
-    record: &mut DetectionEventRecord,
+    record: &mut DetectionRecordBuffer,
     detector_count: usize,
     observable_count: usize,
 ) {

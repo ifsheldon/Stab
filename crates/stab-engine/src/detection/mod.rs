@@ -62,9 +62,9 @@ pub const DETECTION_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor =
     );
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DetectionEventRecord {
-    pub detectors: Vec<bool>,
-    pub observables: Vec<bool>,
+pub(crate) struct DetectionRecordBuffer {
+    pub(crate) detectors: Vec<bool>,
+    pub(crate) observables: Vec<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -120,8 +120,8 @@ impl PreparedMeasurementToDetection {
         self.plan.observable_terms.len()
     }
 
-    fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
-        Ok(DetectionEventRecord {
+    fn try_reusable_detection_record(&self) -> CircuitResult<DetectionRecordBuffer> {
+        Ok(DetectionRecordBuffer {
             detectors: try_false_vec(
                 self.detector_count(),
                 "detection conversion detector record",
@@ -145,7 +145,7 @@ impl PreparedMeasurementToDetection {
         measurement_record: &[bool],
         sweep_record: &[bool],
         reference_sample: &mut Vec<bool>,
-        record: &mut DetectionEventRecord,
+        record: &mut DetectionRecordBuffer,
         reference_scratch: Option<&mut ReferenceSampleScratch>,
     ) -> CircuitResult<()> {
         self.validate_measurement_record_width(measurement_record)?;
@@ -809,7 +809,7 @@ impl ConversionPlan {
         &self,
         measurement_record: &[bool],
         reference_sample: &[bool],
-        record: &mut DetectionEventRecord,
+        record: &mut DetectionRecordBuffer,
     ) -> CircuitResult<()> {
         record.detectors.clear();
         for terms in &self.detector_terms {

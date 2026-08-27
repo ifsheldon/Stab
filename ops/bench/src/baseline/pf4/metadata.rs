@@ -10,7 +10,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures the shared folded cursor behind bounded all-detector DEM coordinate maps, selected detector lookup through a huge-repeat model, sparse flat and nested overlapping selected-coordinate lookups, and many-selected flat-overlap lookup; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         "pf4-dem-sampler-folded-repeat" => Some(
-            "contract-only: Stab measures shared-tree CompiledDemSampler compilation, stochastic direct sample behavior, zero-probability repeat skipping, deterministic zero-shift parity folding, and single, flat, and nested stochastic zero-shift parity folding; sampled-error materialization, replay, and shifted stochastic work caps are source-owned because those outputs or applications are inherently expanded",
+            "contract-only: Stab measures shared-tree DEM plan compilation, session-and-sink stochastic sampling, zero-probability repeat skipping, deterministic zero-shift parity folding, and single, flat, and nested stochastic zero-shift parity folding; sampled-error delivery, replay, and shifted stochastic work caps are source-owned because those outputs or applications are inherently expanded",
         ),
         "pf4-dem-folded-traversal" => Some(
             "contract-only: Stab measures shared folded-visitor hypergraph and SAT collection, zero-probability skipping, detector-touching zero-shift folding, weighted SAT probability folding, and source-owned complexity caps for shifted active mechanisms; analyzer and ErrorMatcher circuit traversal remain separately capped because they do not consume compact DEM input",

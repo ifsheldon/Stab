@@ -6,14 +6,14 @@ use stab_model::DetectorErrorModel;
 use stab_model::advanced::{FoldedDemTraversal, MAX_DEM_REPEAT_NESTING};
 use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 
-use super::buffers::{try_false_vec, try_vec_with_capacity, validate_vector_capacity};
+use super::buffers::{try_false_vec, try_vec_with_capacity};
 use super::program::{
     DemSampleBlock, SampledErrorOutput, apply_error_record_block, compile_block,
     reset_detection_record, sample_block_into, usize_from_u64,
 };
 use super::session::{DemSamplingExecutionError, DemSamplingSession};
 use super::{DemError, DemResourceLimitError, DemResult, DemSamplerLimits};
-use crate::{DetectionEventRecord, RandomPolicy, ShotCount};
+use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount};
 
 /// Compiler for immutable detector-error-model sampling plans.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -127,71 +127,6 @@ impl DemSamplingPlan {
         self.validate_replay_work_units_with_limits(shots, limits)
     }
 
-    pub fn validate_sample_buffer_units_with_limits(
-        &self,
-        shots: usize,
-        include_error_records: bool,
-        limits: DemSamplerLimits,
-    ) -> DemResult<()> {
-        let mut units_per_shot = self
-            .detector_count()
-            .checked_add(self.observable_count())
-            .ok_or_else(|| {
-                DemError::invalid_sampler_compilation(
-                    "DEM sampler output width overflowed while validating buffer size",
-                )
-            })?;
-        if include_error_records {
-            units_per_shot = units_per_shot
-                .checked_add(self.error_count())
-                .ok_or_else(|| {
-                    DemError::invalid_sampler_compilation(
-                        "DEM sampler output and error width overflowed while validating buffer size",
-                    )
-                })?;
-        }
-        let units_per_shot = units_per_shot.max(1);
-        let total_units = shots.checked_mul(units_per_shot).ok_or_else(|| {
-            DemError::invalid_sampler_compilation("DEM sampler buffer size overflowed")
-        })?;
-        if total_units > limits.max_materialized_units() {
-            return Err(DemResourceLimitError::materialized_units(
-                total_units,
-                limits.max_materialized_units(),
-            )
-            .into());
-        }
-        self.validate_materialized_bytes_with_limits(shots, include_error_records, limits)?;
-        validate_vector_capacity::<DetectionEventRecord>(shots, "DEM detection record container")?;
-        validate_vector_capacity::<bool>(self.detector_count(), "DEM detector record")?;
-        validate_vector_capacity::<bool>(self.observable_count(), "DEM observable record")?;
-        if include_error_records {
-            validate_vector_capacity::<Vec<bool>>(shots, "DEM sampled-error record container")?;
-            validate_vector_capacity::<bool>(self.error_count(), "DEM sampled-error record")?;
-        }
-        Ok(())
-    }
-
-    pub fn validate_materialized_bytes_with_limits(
-        &self,
-        shots: usize,
-        include_error_records: bool,
-        limits: DemSamplerLimits,
-    ) -> DemResult<()> {
-        let bytes_per_shot = self.materialized_bytes_per_shot(include_error_records)?;
-        let total_bytes = shots.checked_mul(bytes_per_shot).ok_or_else(|| {
-            DemError::invalid_sampler_compilation("DEM sampler buffer byte size overflowed")
-        })?;
-        if total_bytes > limits.max_materialized_bytes() {
-            return Err(DemResourceLimitError::materialized_bytes(
-                total_bytes,
-                limits.max_materialized_bytes(),
-            )
-            .into());
-        }
-        Ok(())
-    }
-
     pub fn validate_replay_work_units_with_limits(
         &self,
         shots: usize,
@@ -243,21 +178,21 @@ impl DemSamplingPlan {
         self.validate_sample_work_units(shots, self.error_count(), limits)
     }
 
-    pub fn try_reusable_detection_record(&self) -> DemResult<DetectionEventRecord> {
-        Ok(DetectionEventRecord {
+    pub(super) fn try_reusable_detection_record(&self) -> DemResult<DetectionRecordBuffer> {
+        Ok(DetectionRecordBuffer {
             detectors: try_false_vec(self.detector_count(), "DEM detector record")?,
             observables: try_false_vec(self.observable_count(), "DEM observable record")?,
         })
     }
 
-    pub fn try_reusable_error_record(&self) -> DemResult<Vec<bool>> {
+    pub(super) fn try_reusable_error_record(&self) -> DemResult<Vec<bool>> {
         try_vec_with_capacity(self.error_count(), "DEM sampled-error record")
     }
 
     pub(super) fn sample_detection_record_into<R>(
         &self,
         rng: &mut R,
-        record: &mut DetectionEventRecord,
+        record: &mut DetectionRecordBuffer,
     ) -> DemResult<()>
     where
         R: Rng,
@@ -275,7 +210,7 @@ impl DemSamplingPlan {
     pub(super) fn sample_detection_record_and_error_record_into<R>(
         &self,
         rng: &mut R,
-        record: &mut DetectionEventRecord,
+        record: &mut DetectionRecordBuffer,
         error_record: &mut Vec<bool>,
     ) -> DemResult<()>
     where
@@ -292,7 +227,7 @@ impl DemSamplingPlan {
         )
     }
 
-    pub fn validate_error_record_width(
+    pub(super) fn validate_error_record_width(
         &self,
         error_record: &[bool],
         shot_index: Option<usize>,
@@ -314,10 +249,10 @@ impl DemSamplingPlan {
         )))
     }
 
-    pub fn detection_record_from_error_record_into(
+    pub(super) fn detection_record_from_error_record_into(
         &self,
         error_record: &[bool],
-        record: &mut DetectionEventRecord,
+        record: &mut DetectionRecordBuffer,
     ) -> DemResult<()> {
         self.validate_error_record_width(error_record, None)?;
         reset_detection_record(record, self.detector_count(), self.observable_count());
@@ -329,35 +264,6 @@ impl DemSamplingPlan {
             ));
         }
         Ok(())
-    }
-
-    pub fn materialized_bytes_per_shot(&self, include_error_records: bool) -> DemResult<usize> {
-        let detector_observable_bytes = self
-            .detector_count()
-            .checked_add(self.observable_count())
-            .ok_or_else(|| {
-                DemError::invalid_sampler_compilation(
-                    "DEM sampler output width overflowed while validating buffer bytes",
-                )
-            })?;
-        let mut bytes = std::mem::size_of::<DetectionEventRecord>()
-            .checked_add(detector_observable_bytes)
-            .ok_or_else(|| {
-                DemError::invalid_sampler_compilation(
-                    "DEM sampler per-shot output byte size overflowed",
-                )
-            })?;
-        if include_error_records {
-            bytes = bytes
-                .checked_add(std::mem::size_of::<Vec<bool>>())
-                .and_then(|value| value.checked_add(self.error_count()))
-                .ok_or_else(|| {
-                    DemError::invalid_sampler_compilation(
-                        "DEM sampler per-shot error byte size overflowed",
-                    )
-                })?;
-        }
-        Ok(bytes.max(1))
     }
 
     fn validate_sample_work_units(

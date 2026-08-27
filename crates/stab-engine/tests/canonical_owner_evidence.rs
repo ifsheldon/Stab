@@ -77,13 +77,6 @@ impl DetectionSink for DetectionWitnessSink {
     }
 }
 
-fn expect_dem_resource(error: DemError) -> stab_engine::DemResourceLimitError {
-    match error {
-        DemError::ResourceLimit(resource) => resource,
-        other => panic!("expected DEM resource-limit error, got {other:?}"),
-    }
-}
-
 fn expect_detection_resource(error: DetectionError) -> DetectionResourceLimitError {
     match error {
         DetectionError::ResourceLimit(resource) => resource,
@@ -298,34 +291,6 @@ fn collect_measurements(plan: &SamplingPlan, seed: u64, shots: u64) -> Measureme
 }
 
 #[test]
-fn a2_dem_sampler_byte_policy_admission() {
-    let plan = dem_plan("");
-    let bytes_per_shot = plan
-        .materialized_bytes_per_shot(false)
-        .expect("compute exact materialized byte charge");
-    let exact_bytes = bytes_per_shot
-        .checked_mul(3)
-        .expect("small fixture byte count must fit");
-    let limits = DemSamplerLimits::default().with_max_materialized_bytes(exact_bytes);
-
-    plan.validate_materialized_bytes_with_limits(3, false, limits)
-        .expect("the exact materialized-byte maximum must be admitted");
-    let resource = expect_dem_resource(
-        plan.validate_materialized_bytes_with_limits(4, false, limits)
-            .expect_err("the first byte above the limit must be rejected"),
-    );
-    assert_eq!(resource.kind(), DemResourceKind::MaterializedBytes);
-    assert_eq!(
-        resource.actual(),
-        u64::try_from(bytes_per_shot * 4).expect("fixture byte count fits u64")
-    );
-    assert_eq!(
-        resource.limit(),
-        u64::try_from(exact_bytes).expect("fixture byte limit fits u64")
-    );
-}
-
-#[test]
 fn a2_dem_sampler_replay_work_policy_admission() {
     let plan = dem_plan("error(1) D0\n");
     let records = vec![vec![true], vec![false]];
@@ -363,34 +328,6 @@ fn a2_dem_sampler_replay_work_policy_admission() {
     assert_eq!((resource.actual(), resource.limit()), (4, 3));
     assert_eq!(rejected_sink.write_calls, 0);
     assert_eq!(rejected_sink.finish_calls, 0);
-}
-
-#[test]
-fn a2_dem_sampler_unit_policy_admission() {
-    let plan = dem_plan("");
-    let exact = DemSamplerLimits::default().with_max_materialized_units(3);
-
-    plan.validate_sample_buffer_units_with_limits(3, false, exact)
-        .expect("three empty records reach the exact ownership-unit maximum");
-    let resource = expect_dem_resource(
-        plan.validate_sample_buffer_units_with_limits(4, false, exact)
-            .expect_err("the first excess ownership unit must be rejected"),
-    );
-    assert_eq!(resource.kind(), DemResourceKind::MaterializedUnits);
-    assert_eq!((resource.actual(), resource.limit()), (4, 3));
-
-    let error_plan = dem_plan("error(0.5) D0\n");
-    let exact_with_errors = DemSamplerLimits::default().with_max_materialized_units(2);
-    error_plan
-        .validate_sample_buffer_units_with_limits(1, true, exact_with_errors)
-        .expect("one detector and one sampled-error bit reach two units");
-    let resource = expect_dem_resource(
-        error_plan
-            .validate_sample_buffer_units_with_limits(2, true, exact_with_errors)
-            .expect_err("a second materialized error record must exceed the unit budget"),
-    );
-    assert_eq!(resource.kind(), DemResourceKind::MaterializedUnits);
-    assert_eq!((resource.actual(), resource.limit()), (4, 2));
 }
 
 #[test]

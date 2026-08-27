@@ -52,13 +52,3 @@ pub mod traversal {
         DemFlattenedInstructionIter,
     };
 }
-
-/// Compatibility adapters for the pre-0.2 materialized and callback-oriented APIs.
-///
-/// New code should prefer compilers, immutable plans, mutable sessions, and typed sinks from the
-/// facade root. These adapters remain supported during the coordinated pre-1.0 migration.
-pub mod compat {
-    pub use crate::dem_sampler::{
-        CompiledDemSampler, DetectionConversionOutput, DetectionEventRecord,
-    };
-}

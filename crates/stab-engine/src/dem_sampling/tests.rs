@@ -12,11 +12,11 @@ use stab_records::{DemSampleBatchView, DemSampleSink};
 use super::plan::DemSamplingPlanInner;
 use super::program::{DemSampleBlock, DemSampleError, DemSampleOperation, odd_parity_probability};
 use super::*;
-use crate::{DetectionEventRecord, RandomPolicy, Seed, ShotCount};
+use crate::{DetectionRecordBuffer, RandomPolicy, Seed, ShotCount};
 
 #[derive(Default)]
 struct CollectingSink {
-    records: Vec<DetectionEventRecord>,
+    records: Vec<DetectionRecordBuffer>,
     error_records: Vec<Vec<bool>>,
     writes: usize,
     finishes: usize,
@@ -45,7 +45,7 @@ impl DemSampleSink for CollectingSink {
                         .expect("observable bit")
                 })
                 .collect();
-            self.records.push(DetectionEventRecord {
+            self.records.push(DetectionRecordBuffer {
                 detectors,
                 observables,
             });

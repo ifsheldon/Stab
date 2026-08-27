@@ -1014,8 +1014,7 @@ fn dem_resource_context(error: &DemResourceLimitError) -> Value {
     let resource = match error.kind() {
         DemResourceKind::SampledErrorApplications => "sampled-error-applications",
         DemResourceKind::ReplayWorkUnits => "replay-work-units",
-        DemResourceKind::MaterializedUnits => "materialized-units",
-        DemResourceKind::MaterializedBytes => "materialized-bytes",
+        DemResourceKind::ActiveBatchBytes => "active-batch-bytes",
     };
     json!({
         "operation": "detector-error-model-sampling",

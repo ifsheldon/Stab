@@ -3,9 +3,10 @@
     reason = "integration tests use direct assertions for compact parity diagnostics"
 )]
 
+use std::convert::Infallible;
+
 use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use stab_core::advanced::compat::CompiledDemSampler;
 use stab_core::{
     Circuit, DemDetectorId, DemRepeatBlock, DemRepeatCount, DetectorErrorModel,
     analysis::{
@@ -15,6 +16,81 @@ use stab_core::{
     explain_errors_from_circuit, find_undetectable_logical_error, likeliest_error_sat_problem,
     shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
+use stab_engine::{DemSamplingCompiler, DemSamplingPlan, RandomPolicy, Seed, ShotCount};
+use stab_records::{DemSampleBatchView, DemSampleSink};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SampleRecord {
+    detectors: Vec<bool>,
+    observables: Vec<bool>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SampleOutput {
+    records: Vec<SampleRecord>,
+}
+
+#[derive(Default)]
+struct CollectSamples {
+    records: Vec<SampleRecord>,
+}
+
+impl DemSampleSink for CollectSamples {
+    type Error = Infallible;
+
+    fn write_batch(&mut self, batch: DemSampleBatchView<'_>) -> Result<(), Self::Error> {
+        let detection = batch.detection();
+        for shot in 0..detection.shot_count() {
+            self.records.push(SampleRecord {
+                detectors: (0..detection.detector_width().get())
+                    .map(|bit| {
+                        detection
+                            .detectors()
+                            .get(shot, bit)
+                            .expect("validated detector coordinate")
+                    })
+                    .collect(),
+                observables: (0..detection.observable_width().get())
+                    .map(|bit| {
+                        detection
+                            .observables()
+                            .get(shot, bit)
+                            .expect("validated observable coordinate")
+                    })
+                    .collect(),
+            });
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+fn compile_dem_sampling(model: &DetectorErrorModel) -> Result<DemSamplingPlan, String> {
+    DemSamplingCompiler::new()
+        .compile(model)
+        .map_err(|error| error.to_string())
+}
+
+fn collect_dem_samples(
+    plan: &DemSamplingPlan,
+    shots: usize,
+    seed: u64,
+) -> Result<SampleOutput, String> {
+    let shots = u64::try_from(shots).map_err(|_| "shot count does not fit u64".to_owned())?;
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .map_err(|error| error.to_string())?;
+    let mut sink = CollectSamples::default();
+    session
+        .run(ShotCount::new(shots), &mut sink)
+        .map_err(|error| error.to_string())?;
+    Ok(SampleOutput {
+        records: sink.records,
+    })
+}
 
 trait DemTransformTestExt {
     fn flattened(&self) -> stab_core::CircuitResult<DetectorErrorModel>;
@@ -325,15 +401,15 @@ fn run_generated_folded_differential_corpus() {
                 })?;
             prop_assert_eq!(compact_without_tags, materialized_without_tags);
 
-            let compact_samples = CompiledDemSampler::compile(&compact)
-                .and_then(|sampler| sampler.sample_detection_events_with_seed(8, Some(0xB3)))
+            let compact_samples = compile_dem_sampling(&compact)
+                .and_then(|plan| collect_dem_samples(&plan, 8, 0xB3))
                 .map_err(|error| {
                     TestCaseError::fail(format!(
                         "generated compact deterministic sampling failed: {error}\n{text}"
                     ))
                 })?;
-            let materialized_samples = CompiledDemSampler::compile(&materialized)
-                .and_then(|sampler| sampler.sample_detection_events_with_seed(8, Some(0xB3)))
+            let materialized_samples = compile_dem_sampling(&materialized)
+                .and_then(|plan| collect_dem_samples(&plan, 8, 0xB3))
                 .map_err(|error| {
                     TestCaseError::fail(format!(
                         "generated materialized deterministic sampling failed: {error}\n{text}"
@@ -604,11 +680,9 @@ fn pfm_b3_folded_traversal_sampler() {
              error(0.1) D0 L0\n\
              shift_detectors 0\n\
          }\n");
-    let sampler = CompiledDemSampler::compile(&stochastic).expect("folded sampler compilation");
-    assert_eq!(sampler.error_count(), 1_000_001);
-    let output = sampler
-        .sample_detection_events_with_seed(SHOTS, Some(12_648_437))
-        .expect("seeded folded sampling");
+    let plan = compile_dem_sampling(&stochastic).expect("folded sampler compilation");
+    assert_eq!(plan.error_count(), 1_000_001);
+    let output = collect_dem_samples(&plan, SHOTS, 12_648_437).expect("seeded folded sampling");
     assert_eq!(output.records.len(), SHOTS, "folded statistical shots");
     let mut all_zero = 0_usize;
     let mut joint_nonzero = 0_usize;
@@ -622,13 +696,12 @@ fn pfm_b3_folded_traversal_sampler() {
     }
     assert_eq!(unexpected, 0, "unexpected joint detector-observable bucket");
 
-    let combinations = CompiledDemSampler::compile(&dem(
+    let combinations = compile_dem_sampling(&dem(
         "error(0.1) D0 D1\nerror(0.2) D1 D2\nerror(0.3) D2 D0\n",
     ))
     .expect("pinned combination sampler");
-    let combination_output = combinations
-        .sample_detection_events_with_seed(SHOTS, Some(12_648_437))
-        .expect("seeded combination sampling");
+    let combination_output =
+        collect_dem_samples(&combinations, SHOTS, 12_648_437).expect("seeded combination sampling");
     assert_eq!(
         combination_output.records.len(),
         SHOTS,
@@ -663,14 +736,13 @@ fn pfm_b3_folded_traversal_sampler() {
     assert_probability(detector_hits[1], SHOTS, 0.26);
     assert_probability(detector_hits[2], SHOTS, 0.38);
 
-    let deterministic = CompiledDemSampler::compile(&dem("repeat 1000000000 {\n\
+    let deterministic = compile_dem_sampling(&dem("repeat 1000000000 {\n\
              repeat 3 {\n\
                  error(1) D1 L1\n\
              }\n\
          }\n"))
     .expect("deterministic folded sampler compilation");
-    let record = deterministic
-        .sample_detection_events_with_seed(1, Some(12_648_437))
+    let record = collect_dem_samples(&deterministic, 1, 12_648_437)
         .expect("deterministic folded sample")
         .records
         .into_iter()

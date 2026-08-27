@@ -8,10 +8,16 @@ use std::fmt;
 
 use stab_engine::{
     DemError, DemResourceKind, DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError,
-    DemSamplingPlan, DemSamplingRunError, DetectionEventRecord, RandomPolicy, Seed, ShotCount,
+    DemSamplingPlan, DemSamplingRunError, RandomPolicy, Seed, ShotCount,
 };
 use stab_model::DetectorErrorModel;
 use stab_records::{DemSampleBatchView, DemSampleSink, PackedShotBatchView};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct TestDetectionRecord {
+    detectors: Vec<bool>,
+    observables: Vec<bool>,
+}
 
 #[derive(Clone)]
 struct TestSampler {
@@ -20,7 +26,7 @@ struct TestSampler {
 
 #[derive(Debug)]
 struct TestDetectionOutput {
-    records: Vec<DetectionEventRecord>,
+    records: Vec<TestDetectionRecord>,
 }
 
 fn compile_dem(text: &str) -> TestSampler {
@@ -51,7 +57,7 @@ impl TestSampler {
         self.plan.session_with_limits(random_policy, limits)
     }
 
-    fn sample_detection_events_with_seed(
+    fn collect_samples(
         &self,
         shots: usize,
         seed: Option<u64>,
@@ -66,7 +72,7 @@ impl TestSampler {
                 .detectors
                 .into_iter()
                 .zip(sink.observables)
-                .map(|(detectors, observables)| DetectionEventRecord {
+                .map(|(detectors, observables)| TestDetectionRecord {
                     detectors,
                     observables,
                 })
@@ -74,7 +80,7 @@ impl TestSampler {
         })
     }
 
-    fn sample_detection_events_and_errors_with_seed(
+    fn collect_samples_with_errors(
         &self,
         shots: usize,
         seed: Option<u64>,
@@ -88,7 +94,7 @@ impl TestSampler {
             .detectors
             .into_iter()
             .zip(sink.observables)
-            .map(|(detectors, observables)| DetectionEventRecord {
+            .map(|(detectors, observables)| TestDetectionRecord {
                 detectors,
                 observables,
             })
@@ -101,7 +107,7 @@ impl TestSampler {
         Ok((TestDetectionOutput { records }, error_records))
     }
 
-    fn sample_detection_events_from_error_records(
+    fn replay_samples(
         &self,
         error_records: &[Vec<bool>],
     ) -> Result<TestDetectionOutput, DemSamplingExecutionError> {
@@ -115,7 +121,7 @@ impl TestSampler {
                 .detectors
                 .into_iter()
                 .zip(sink.observables)
-                .map(|(detectors, observables)| DetectionEventRecord {
+                .map(|(detectors, observables)| TestDetectionRecord {
                     detectors,
                     observables,
                 })
@@ -331,7 +337,7 @@ fn streamed_sessions_match_materialized_sampling_across_dem_families() {
         assert_plan_traits(&plan);
 
         let materialized = sampler
-            .sample_detection_events_with_seed(65, Some(7))
+            .collect_samples(65, Some(7))
             .expect("materialized detector-only samples");
         let mut session = sampler
             .session(RandomPolicy::Seeded(Seed::new(7)))
@@ -361,7 +367,7 @@ fn streamed_sessions_match_materialized_sampling_across_dem_families() {
         assert!(streamed.sampled_errors.iter().all(Option::is_none));
 
         let (materialized, materialized_errors) = sampler
-            .sample_detection_events_and_errors_with_seed(65, Some(7))
+            .collect_samples_with_errors(65, Some(7))
             .expect("materialized samples with errors");
         let mut session = sampler
             .session(RandomPolicy::Seeded(Seed::new(7)))
@@ -449,10 +455,10 @@ fn seeded_sessions_partition_exactly_for_both_sampling_algorithms() {
 fn incremental_replay_owns_one_sink_lifecycle_and_does_not_advance_rng() {
     let sampler = compile_dem("error(0.25) D0 L0\nerror(0.6) D1\n");
     let (_, error_records) = sampler
-        .sample_detection_events_and_errors_with_seed(65, Some(13))
+        .collect_samples_with_errors(65, Some(13))
         .expect("sample replay records");
     let expected = sampler
-        .sample_detection_events_from_error_records(&error_records)
+        .replay_samples(&error_records)
         .expect("materialized replay");
 
     let mut session = sampler
@@ -688,9 +694,9 @@ fn cancellation_commits_only_complete_batches_and_session_resumes() {
 #[test]
 fn session_batch_capacity_obeys_the_caller_active_byte_budget() {
     let sampler = compile_dem("error(1) D0\n");
-    let detector_record_bytes = std::mem::size_of::<DetectionEventRecord>() + 1;
+    let detector_record_bytes = std::mem::size_of::<TestDetectionRecord>() + 1;
     let limits =
-        DemSamplerLimits::default().with_max_materialized_bytes(detector_record_bytes + 16);
+        DemSamplerLimits::default().with_max_active_batch_bytes(detector_record_bytes + 16);
     let mut session = sampler
         .session_with_limits(RandomPolicy::Seeded(Seed::new(3)), limits)
         .expect("two-shot detector-only batch fits the active byte budget");
@@ -702,7 +708,7 @@ fn session_batch_capacity_obeys_the_caller_active_byte_budget() {
     assert_eq!(sink.finish_calls, 1);
 
     let rejected =
-        DemSamplerLimits::default().with_max_materialized_bytes(detector_record_bytes + 7);
+        DemSamplerLimits::default().with_max_active_batch_bytes(detector_record_bytes + 7);
     let error = sampler
         .session_with_limits(RandomPolicy::Seeded(Seed::new(3)), rejected)
         .expect_err("one record plus one packed shot exceeds the active byte budget");
@@ -710,7 +716,7 @@ fn session_batch_capacity_obeys_the_caller_active_byte_budget() {
         error
             .into_dem_error()
             .to_string()
-            .contains("materialized bytes"),
+            .contains("active batch bytes"),
         "caller active-byte rejection should retain typed DEM resource context"
     );
 }

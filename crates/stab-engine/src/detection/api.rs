@@ -15,7 +15,7 @@ use stab_records::{
 use super::error::DetectionError as CircuitError;
 use super::frame::{DirectDetectorFramePlan, DirectDetectorFrameState};
 use super::{
-    DetectionConversionLimits, DetectionEventRecord, PreparedDetectionSampling,
+    DetectionConversionLimits, DetectionRecordBuffer, PreparedDetectionSampling,
     PreparedMeasurementToDetection, try_false_vec,
 };
 use crate::{
@@ -170,7 +170,7 @@ pub struct MeasurementToDetectionSession {
     reference_scratch: Option<crate::sampling::ReferenceSampleScratch>,
     measurement_record: Vec<bool>,
     sweep_record: Vec<bool>,
-    detection_record: DetectionEventRecord,
+    detection_record: DetectionRecordBuffer,
     batch: DetectionBatchBuffers,
     cancellation: OnceLock<SamplingCancellation>,
     total_committed_shots: u64,
