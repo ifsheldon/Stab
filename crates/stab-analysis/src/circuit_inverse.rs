@@ -253,7 +253,8 @@ enum FlowValidation {
 
 impl FlowValidation {
     fn for_circuit(circuit: &Circuit) -> AnalysisResult<Self> {
-        let within_tableau_budget = circuit.count_qubits() <= MAX_TIME_REVERSE_TABLEAU_QUBITS
+        let within_tableau_budget = stab_model::advanced::circuit_simulated_qubit_count(circuit)
+            <= MAX_TIME_REVERSE_TABLEAU_QUBITS
             && expanded_instruction_count(circuit)
                 .is_some_and(|count| count <= MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS);
         let has_repeat = circuit

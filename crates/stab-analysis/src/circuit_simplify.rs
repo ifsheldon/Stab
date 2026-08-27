@@ -38,10 +38,10 @@ pub fn decomposed_single_instruction(instruction: &CircuitInstruction) -> Analys
 /// The visitor receives each lowered instruction as soon as it is produced. Returning
 /// [`ControlFlow::Break`] stops lowering before later instructions are materialized.
 #[doc(hidden)]
-pub fn visit_decomposed_spp_instructions(
+pub fn visit_decomposed_spp_instructions<Break>(
     instruction: &CircuitInstruction,
-    mut visitor: impl FnMut(CircuitInstruction) -> ControlFlow<()>,
-) -> AnalysisResult<ControlFlow<()>> {
+    mut visitor: impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
+) -> AnalysisResult<ControlFlow<Break>> {
     let dagger = match instruction.gate().canonical_name() {
         "SPP" => false,
         "SPP_DAG" => true,
@@ -316,7 +316,7 @@ fn append_decomposed_spp(
     result: &mut Circuit,
     dagger: bool,
 ) -> AnalysisResult<()> {
-    let completed = visit_decomposed_spp(instruction, dagger, &mut |lowered| {
+    let completed: ControlFlow<()> = visit_decomposed_spp(instruction, dagger, &mut |lowered| {
         result.append_instruction(lowered);
         ControlFlow::Continue(())
     })?;
@@ -328,29 +328,31 @@ fn append_decomposed_spp(
     Ok(())
 }
 
-fn visit_decomposed_spp(
+fn visit_decomposed_spp<Break>(
     instruction: &CircuitInstruction,
     dagger: bool,
-    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
-) -> AnalysisResult<ControlFlow<()>> {
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
+) -> AnalysisResult<ControlFlow<Break>> {
     for group in instruction.target_groups() {
         let product = reduce_pauli_product(group)?;
         if product.terms.is_empty() {
             continue;
         }
-        if visit_product_basis_change(visitor, &product.terms, instruction.tag_bytes())?.is_break()
-        {
-            return Ok(ControlFlow::Break(()));
+        let completion =
+            visit_product_basis_change(visitor, &product.terms, instruction.tag_bytes())?;
+        if completion.is_break() {
+            return Ok(completion);
         }
-        if visit_product_cx_fanout(visitor, &product.terms, instruction.tag_bytes())?.is_break() {
-            return Ok(ControlFlow::Break(()));
+        let completion = visit_product_cx_fanout(visitor, &product.terms, instruction.tag_bytes())?;
+        if completion.is_break() {
+            return Ok(completion);
         }
         let phase_gate = if product.negative ^ dagger {
             Gate::from_name("S_DAG")?
         } else {
             Gate::from_name("S")?
         };
-        if visit_single_target_sequence(
+        let completion = visit_single_target_sequence(
             visitor,
             &shortest_single_qubit_base_sequence(
                 crate::single_qubit_clifford_for_gate(phase_gate)
@@ -365,54 +367,56 @@ fn visit_decomposed_spp(
                 false,
             ),
             instruction.tag_bytes(),
-        )?
-        .is_break()
-        {
-            return Ok(ControlFlow::Break(()));
+        )?;
+        if completion.is_break() {
+            return Ok(completion);
         }
-        if visit_product_cx_fanout(visitor, &product.terms, instruction.tag_bytes())?.is_break() {
-            return Ok(ControlFlow::Break(()));
+        let completion = visit_product_cx_fanout(visitor, &product.terms, instruction.tag_bytes())?;
+        if completion.is_break() {
+            return Ok(completion);
         }
-        if visit_product_basis_change_reversed(visitor, &product.terms, instruction.tag_bytes())?
-            .is_break()
-        {
-            return Ok(ControlFlow::Break(()));
+        let completion =
+            visit_product_basis_change_reversed(visitor, &product.terms, instruction.tag_bytes())?;
+        if completion.is_break() {
+            return Ok(completion);
         }
     }
     Ok(ControlFlow::Continue(()))
 }
 
-fn visit_product_basis_change(
-    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+fn visit_product_basis_change<Break>(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
     terms: &[ProductTerm],
     tag: Option<&[u8]>,
-) -> AnalysisResult<ControlFlow<()>> {
+) -> AnalysisResult<ControlFlow<Break>> {
     for term in terms {
-        if visit_basis_change(visitor, *term, tag)?.is_break() {
-            return Ok(ControlFlow::Break(()));
+        let completion = visit_basis_change(visitor, *term, tag)?;
+        if completion.is_break() {
+            return Ok(completion);
         }
     }
     Ok(ControlFlow::Continue(()))
 }
 
-fn visit_product_basis_change_reversed(
-    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+fn visit_product_basis_change_reversed<Break>(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
     terms: &[ProductTerm],
     tag: Option<&[u8]>,
-) -> AnalysisResult<ControlFlow<()>> {
+) -> AnalysisResult<ControlFlow<Break>> {
     for term in terms.iter().rev() {
-        if visit_basis_change(visitor, *term, tag)?.is_break() {
-            return Ok(ControlFlow::Break(()));
+        let completion = visit_basis_change(visitor, *term, tag)?;
+        if completion.is_break() {
+            return Ok(completion);
         }
     }
     Ok(ControlFlow::Continue(()))
 }
 
-fn visit_basis_change(
-    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+fn visit_basis_change<Break>(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
     term: ProductTerm,
     tag: Option<&[u8]>,
-) -> AnalysisResult<ControlFlow<()>> {
+) -> AnalysisResult<ControlFlow<Break>> {
     match term.pauli {
         Pauli::X => visit_gate_targets(
             visitor,
@@ -433,17 +437,17 @@ fn visit_basis_change(
     }
 }
 
-fn visit_product_cx_fanout(
-    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+fn visit_product_cx_fanout<Break>(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
     terms: &[ProductTerm],
     tag: Option<&[u8]>,
-) -> AnalysisResult<ControlFlow<()>> {
+) -> AnalysisResult<ControlFlow<Break>> {
     let Some(accumulator) = terms.first().map(|term| term.qubit) else {
         return Ok(ControlFlow::Continue(()));
     };
     let cx = Gate::from_name("CX")?;
     for term in terms.iter().skip(1) {
-        if visit_gate_targets(
+        let completion = visit_gate_targets(
             visitor,
             cx,
             vec![
@@ -451,35 +455,35 @@ fn visit_product_cx_fanout(
                 Target::qubit(accumulator, false),
             ],
             tag,
-        )?
-        .is_break()
-        {
-            return Ok(ControlFlow::Break(()));
+        )?;
+        if completion.is_break() {
+            return Ok(completion);
         }
     }
     Ok(ControlFlow::Continue(()))
 }
 
-fn visit_single_target_sequence(
-    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+fn visit_single_target_sequence<Break>(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
     sequence: &[Gate],
     target: Target,
     tag: Option<&[u8]>,
-) -> AnalysisResult<ControlFlow<()>> {
+) -> AnalysisResult<ControlFlow<Break>> {
     for gate in sequence {
-        if visit_gate_targets(visitor, *gate, vec![target.clone()], tag)?.is_break() {
-            return Ok(ControlFlow::Break(()));
+        let completion = visit_gate_targets(visitor, *gate, vec![target.clone()], tag)?;
+        if completion.is_break() {
+            return Ok(completion);
         }
     }
     Ok(ControlFlow::Continue(()))
 }
 
-fn visit_gate_targets(
-    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+fn visit_gate_targets<Break>(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
     gate: Gate,
     targets: Vec<Target>,
     tag: Option<&[u8]>,
-) -> AnalysisResult<ControlFlow<()>> {
+) -> AnalysisResult<ControlFlow<Break>> {
     if targets.is_empty() {
         return Ok(ControlFlow::Continue(()));
     }

@@ -12,7 +12,7 @@ pub fn circuit_to_tableau(
     ignore_measurement: bool,
     ignore_reset: bool,
 ) -> AnalysisResult<Tableau> {
-    let num_qubits = circuit.count_qubits();
+    let num_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     StabilizerResource::TableauQubits
         .ensure(num_qubits)
         .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string()))?;

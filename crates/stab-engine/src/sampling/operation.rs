@@ -155,6 +155,10 @@ impl SampleProgram {
         &self.entries
     }
 
+    pub(super) fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
     pub(super) fn executable_operations(&self) -> impl Iterator<Item = &SampleOperation> {
         self.entries.iter().filter_map(|entry| match entry {
             SampleProgramEntry::Execute(operation) => Some(operation),

@@ -78,7 +78,7 @@ impl ReverseFoldAnalyzer {
         Ok(Self {
             options,
             tracker: SparseReverseFrameTracker::new_for_error_analysis(
-                circuit.count_qubits(),
+                stab_model::advanced::circuit_simulated_qubit_count(circuit),
                 measurement_count,
                 detector_count,
                 options.allow_gauge_detectors,

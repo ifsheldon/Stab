@@ -53,7 +53,7 @@ pub struct CompilationRequestFingerprint {
 
 impl CompilationRequestFingerprint {
     pub const SCHEMA_VERSION: u16 = 1;
-    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 4;
+    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 5;
     pub const ALGORITHM: &'static str = "sha256";
 
     pub fn for_sampling(circuit: &Circuit) -> Self {
@@ -156,7 +156,7 @@ REPEAT[loop] 3 {\n\
             CompilationRequestFingerprint::for_sampling(&changed)
         );
         assert_eq!(fingerprint.schema_version(), 1);
-        assert_eq!(fingerprint.compiler_schema_version(), 4);
+        assert_eq!(fingerprint.compiler_schema_version(), 5);
         assert_eq!(fingerprint.operation(), CompilationOperation::Sampling);
         assert_eq!(fingerprint.operation().as_str(), "sample");
         assert_eq!(fingerprint.model_fingerprint(), canonical.fingerprint());
@@ -168,7 +168,7 @@ REPEAT[loop] 3 {\n\
         );
         assert_eq!(
             frozen.digest_hex(),
-            "4e38611888c0d06d505f1074b22f12bb7d1c1dd1a7ee86ca31ac5fa2ec2c3695"
+            "baeb18b2253a82defa506cf7cbd43d2ea6e1d5c51cbb0c4b8de88adca16cdde5"
         );
     }
 

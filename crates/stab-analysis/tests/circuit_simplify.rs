@@ -143,7 +143,7 @@ fn streamed_spp_lowering_matches_decomposition_and_stops_before_later_work() {
         })
         .expect("SPP fixture must contain one instruction");
     let mut streamed = Circuit::new();
-    let completion =
+    let completion: ControlFlow<()> =
         stab_analysis::advanced::visit_decomposed_spp_instructions(instruction, |lowered| {
             streamed.append_instruction(lowered);
             ControlFlow::Continue(())

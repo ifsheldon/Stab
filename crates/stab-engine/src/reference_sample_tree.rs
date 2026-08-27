@@ -470,12 +470,11 @@ mod tests {
     fn reference_sample_tree_construction_preserves_storage_admission() {
         let circuit = Circuit::from_stim_str(
             "
-            REPEAT 300000000 {
-                M 0
-            }
+            H 10000
+            M 10000
             ",
         )
-        .expect("parse compact circuit");
+        .expect("parse wide circuit");
         assert!(matches!(
             ReferenceSampleTree::from_circuit_reference_sample(&circuit),
             Err(ReferenceSampleTreeError::SamplingExecution(

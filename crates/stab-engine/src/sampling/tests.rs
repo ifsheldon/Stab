@@ -3,7 +3,10 @@
     reason = "sampling unit tests use direct fixture parsing assertions for compact diagnostics"
 )]
 
-use super::execute::{ReferenceExecutionStats, execute_reference_operations};
+use super::execute::{
+    ReferenceExecutionStats, execute_reference_operations, reset_reference_execution_stats,
+    take_reference_execution_stats,
+};
 use super::small_frame::SmallStabilizerFrame;
 use super::stabilizer_frame::StabilizerStateSnapshot;
 use super::*;
@@ -113,7 +116,8 @@ fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionSt
         output: &mut output,
         correlated_error_occurred: &mut correlated_error_occurred,
     };
-    let stats = execute_reference_operations(
+    reset_reference_execution_stats();
+    execute_reference_operations(
         &plan.inner.operations,
         &mut buffers,
         &mut rng,
@@ -122,6 +126,7 @@ fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionSt
         Some(&mut snapshot),
     )
     .expect("execute reference program");
+    let stats = take_reference_execution_stats();
     (output, stats)
 }
 
@@ -270,6 +275,70 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
     assert_eq!(
         fallback_folded.estimated_reference_work_storage_bytes(),
         fallback_iterated.estimated_reference_work_storage_bytes()
+    );
+}
+
+#[test]
+fn expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work() {
+    let exact = Circuit::from_stim_str("REPEAT 999999 {\n    H 0\n}\nM 0\n")
+        .expect("parse exact expanded-work boundary");
+    SamplingCompiler::new()
+        .compile(&exact)
+        .expect("accept exact expanded-work boundary");
+
+    let first_excess = Circuit::from_stim_str("REPEAT 1000000 {\n    H 0\n}\nM 0\n")
+        .expect("parse first expanded-work excess");
+    assert_eq!(
+        SamplingCompiler::new().compile(&first_excess),
+        Err(SamplingCompileError::ExpandedOperationLimit {
+            actual: 1_000_001,
+            limit: 1_000_000,
+        })
+    );
+    assert_eq!(
+        SamplingCompiler::new()
+            .compile(&first_excess)
+            .expect_err("expanded work must be rejected")
+            .code(),
+        SamplingCompileErrorCode::ResourceLimit
+    );
+    let detection_error = crate::DetectionError::from(
+        SamplingCompiler::new()
+            .compile(&first_excess)
+            .expect_err("detection sampling must preserve the resource failure"),
+    );
+    assert!(matches!(
+        detection_error,
+        crate::DetectionError::ResourceLimit(_)
+    ));
+    if let crate::DetectionError::ResourceLimit(detection_limit) = detection_error {
+        assert_eq!(
+            detection_limit.kind(),
+            crate::DetectionResourceKind::SamplingExpandedOperations
+        );
+        assert_eq!(detection_limit.actual(), 1_000_001);
+        assert_eq!(detection_limit.limit(), 1_000_000);
+    }
+
+    let zero_width = Circuit::from_stim_str("REPEAT 1000000000000 {\n    H 0\n    H 0\n}\n")
+        .expect("parse zero-width huge repeat");
+    let sampler = TestSampler::compile(&zero_width).expect("compile zero-width huge repeat");
+    assert_eq!(
+        sampler.sample_zero_one_with_seed(3, Some(17)),
+        vec![Vec::<bool>::new(); 3]
+    );
+    assert!(sampler.reference_sample().is_empty());
+
+    let nested = Circuit::from_stim_str(
+        "REPEAT 64 {\n    REPEAT 1000000000000 {\n        H 0\n        H 0\n    }\n    M 0\n    R 0\n}\n",
+    )
+    .expect("parse nested excessive work");
+    assert_eq!(
+        SamplingCompiler::new().compile(&nested),
+        Err(SamplingCompileError::ExpandedOperationLimit {
+            actual: 128_000_000_000_128,
+            limit: 1_000_000,
+        })
     );
 }
 
@@ -453,6 +522,60 @@ fn measurement_record_feedback_applies_local_paulis() {
         samples("H 1\nX 0\nM 0\nCZ rec[-1] 1\nMX 1\n", 1),
         vec![vec![true, true]]
     );
+}
+
+#[test]
+fn active_feedback_crosses_inner_and_outer_repeat_boundaries() {
+    let sweep_source = "R 0\nREPEAT 2 {\n    REPEAT 2 {\n        CX sweep[0] 0\n        M 0\n        R 0\n    }\n}\n";
+    let sweep_folded = Circuit::from_stim_str(sweep_source).expect("parse nested sweep feedback");
+    let sweep_unrolled =
+        stab_analysis::flattened_circuit(&sweep_folded).expect("unroll nested sweep feedback");
+    for (sweep, expected) in [([false], vec![false; 4]), ([true], vec![true; 4])] {
+        let mut folded_record = Vec::new();
+        SamplingCompiler::new()
+            .compile(&sweep_folded)
+            .expect("compile folded sweep feedback")
+            .reference_measurement_record_with_sweep_into(&sweep, &mut folded_record)
+            .expect("execute folded sweep feedback");
+        let mut unrolled_record = Vec::new();
+        SamplingCompiler::new()
+            .compile(&sweep_unrolled)
+            .expect("compile unrolled sweep feedback")
+            .reference_measurement_record_with_sweep_into(&sweep, &mut unrolled_record)
+            .expect("execute unrolled sweep feedback");
+        assert_eq!(folded_record, expected);
+        assert_eq!(folded_record, unrolled_record);
+    }
+
+    let record_source = "X 0\nM 0\nREPEAT 2 {\n    REPEAT 2 {\n        R 1\n        CX rec[-1] 1\n        M 1\n    }\n}\n";
+    let record_folded =
+        Circuit::from_stim_str(record_source).expect("parse nested record feedback");
+    let record_unrolled =
+        stab_analysis::flattened_circuit(&record_folded).expect("unroll nested record feedback");
+    let expected = vec![vec![true; 5]];
+    assert_eq!(samples(record_source, 1), expected);
+    assert_eq!(
+        TestSampler::compile(&record_unrolled)
+            .expect("compile unrolled record feedback")
+            .sample_zero_one_with_seed(1, None),
+        expected
+    );
+
+    for (source, missing) in [
+        (
+            "M 0\nREPEAT 2 {\n    REPEAT 2 {\n        CX rec[-2] 1\n        M 1\n    }\n}\n",
+            "rec[-2]",
+        ),
+        (
+            "M 0\nREPEAT 2 {\n    REPEAT 2 {\n        M 1\n    }\n    CX rec[-4] 2\n}\n",
+            "rec[-4]",
+        ),
+    ] {
+        let error = SamplingCompiler::new()
+            .compile(&Circuit::from_stim_str(source).expect("parse invalid nested feedback"))
+            .expect_err("first unavailable nested lookback must fail");
+        assert!(error.to_string().contains(missing), "{error}");
+    }
 }
 
 #[test]

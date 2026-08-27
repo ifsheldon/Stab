@@ -15,6 +15,7 @@ pub(crate) struct ReferenceSampleScratch(ReferenceSampleScratchKind);
     reason = "reference scratch stays inline so fallible frame admission is not followed by an infallible box allocation"
 )]
 enum ReferenceSampleScratchKind {
+    Empty,
     DirectZ,
     General {
         rng: SmallRng,
@@ -41,6 +42,9 @@ impl SamplingPlan {
     pub(crate) fn try_reusable_reference_sample_scratch(
         &self,
     ) -> Result<ReferenceSampleScratch, SamplingExecutionError> {
+        if self.inner.measurement_count == 0 {
+            return Ok(ReferenceSampleScratch(ReferenceSampleScratchKind::Empty));
+        }
         if matches!(self.inner.kind, SamplingPlanKind::DirectZ(_)) {
             return Ok(ReferenceSampleScratch(ReferenceSampleScratchKind::DirectZ));
         }
@@ -103,6 +107,9 @@ impl SamplingPlan {
                 })?;
         }
         match (&self.inner.kind, &mut scratch.0) {
+            (_, ReferenceSampleScratchKind::Empty) if self.inner.measurement_count == 0 => {
+                record.clear();
+            }
             (SamplingPlanKind::DirectZ(direct), ReferenceSampleScratchKind::DirectZ) => {
                 record.clear();
                 record.push(direct.reference_bit());

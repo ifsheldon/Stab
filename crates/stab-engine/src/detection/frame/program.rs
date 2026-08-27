@@ -358,24 +358,16 @@ fn visit_lowered_frame_instructions(
     if !matches!(instruction.gate().canonical_name(), "SPP" | "SPP_DAG") {
         return visitor(instruction);
     }
-    let mut visitor_error = None;
     let completion =
         stab_analysis::advanced::visit_decomposed_spp_instructions(instruction, |lowered| {
-            if visitor_error.is_some() {
-                return ControlFlow::Break(());
-            }
             if matches!(lowered.gate().canonical_name(), "SPP" | "SPP_DAG") {
-                visitor_error = Some(DetectionError::invalid_sampler_compilation(
+                return ControlFlow::Break(DetectionError::invalid_sampler_compilation(
                     "single-instruction frame lowering retained its source instruction",
                 ));
-                return ControlFlow::Break(());
             }
             match visitor(&lowered) {
                 Ok(()) => ControlFlow::Continue(()),
-                Err(error) => {
-                    visitor_error = Some(error);
-                    ControlFlow::Break(())
-                }
+                Err(error) => ControlFlow::Break(error),
             }
         })
         .map_err(|error| {
@@ -384,13 +376,8 @@ fn visit_lowered_frame_instructions(
                 instruction.gate().canonical_name()
             ))
         })?;
-    if let Some(error) = visitor_error {
+    if let ControlFlow::Break(error) = completion {
         return Err(error);
-    }
-    if completion.is_break() {
-        return Err(DetectionError::invalid_sampler_compilation(
-            "single-instruction frame lowering stopped without an execution error",
-        ));
     }
     Ok(())
 }

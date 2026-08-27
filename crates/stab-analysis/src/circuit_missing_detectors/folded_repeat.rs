@@ -25,7 +25,10 @@ pub(super) fn try_missing_detectors_folded_final_repeat(
         return Ok(None);
     }
 
-    let mut finder = MissingDetectorFinder::new(circuit.count_qubits(), options)?;
+    let mut finder = MissingDetectorFinder::new(
+        stab_model::advanced::circuit_simulated_qubit_count(circuit),
+        options,
+    )?;
     if finder.process_circuit(&prefix).is_err() {
         return Ok(None);
     }

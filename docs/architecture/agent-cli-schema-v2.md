@@ -4,7 +4,7 @@ This document defines the current `inspect` machine-output contract and preserve
 
 These commands are additive Stab extensions and do not claim matching Stim v1.16.0 command names or output bytes.
 
-Schema version 2 supersedes [schema version 1](agent-cli-schema-v1.md). It remains current for `stab inspect`; its `plan sample` section is historical because planning now emits [schema version 3](agent-cli-plan-schema-v3.md).
+Schema version 2 supersedes [schema version 1](agent-cli-schema-v1.md). It remains current for `stab inspect`; its `plan sample` section is historical because planning now emits [schema version 4](agent-cli-plan-schema-v4.md).
 
 `stab capabilities` now emits [capabilities schema version 5](agent-cli-capabilities-schema-v5.md).
 
@@ -14,7 +14,7 @@ Each command uses `--format=human|json`.
 
 Human output is the default.
 
-JSON mode writes one complete document followed by LF to stdout. `inspect` emits schema version 2; `plan sample` now emits [schema version 3](agent-cli-plan-schema-v3.md).
+JSON mode writes one complete document followed by LF to stdout. `inspect` emits schema version 2; `plan sample` now emits [schema version 4](agent-cli-plan-schema-v4.md).
 
 The historical schema-version-2 `capabilities` command used the same framing.
 
@@ -208,6 +208,6 @@ Changes to any fingerprint digest bytes require the corresponding fingerprint sc
 
 Adding a genuinely registered backend changes capability values but not the JSON shape. It must also produce a distinct plan fingerprint under the plan-fingerprint contract.
 
-Capabilities schema version 3 changed `request_fingerprint_schema_version` from an unsigned integer to an unsigned integer or `null` and added three compiler families. Version 4 removed fictitious backend selection, version 5 exposed the complete default parser policy, and planning moved to version 3. `inspect` remains on schema version 2.
+Capabilities schema version 3 changed `request_fingerprint_schema_version` from an unsigned integer to an unsigned integer or `null` and added three compiler families. Version 4 removed fictitious backend selection, version 5 exposed the complete default parser policy, and planning moved to version 4. `inspect` remains on schema version 2.
 
 Human output is structural documentation, not a byte-stable compatibility format.

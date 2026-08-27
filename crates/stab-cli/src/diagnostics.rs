@@ -458,6 +458,7 @@ fn sampling_compile_error_code(error: &SamplingCompileError) -> &'static str {
         SamplingCompileError::Model(error) => model_error_code(error),
         SamplingCompileError::Analysis(error) => analysis_error_code(error),
         SamplingCompileError::InvalidCircuit { .. } => "invalid-sampler-compilation",
+        SamplingCompileError::ExpandedOperationLimit { .. } => "resource-limit-exceeded",
     }
 }
 
@@ -651,7 +652,8 @@ fn model_error(error: &CliError) -> Option<&ModelError> {
         CliError::SamplingCompile(error) => match error {
             SamplingCompileError::Model(error) => Some(error),
             SamplingCompileError::Analysis(error) => model_error_from_analysis(error),
-            SamplingCompileError::InvalidCircuit { .. } => None,
+            SamplingCompileError::InvalidCircuit { .. }
+            | SamplingCompileError::ExpandedOperationLimit { .. } => None,
         },
         CliError::Detection(error) => model_error_from_detection(error),
         CliError::DetectionCompile(DetectionCompileError::InvalidCircuit(error)) => {
@@ -772,6 +774,11 @@ fn sampling_compile_error_context(error: &SamplingCompileError) -> Value {
         SamplingCompileError::Model(error) => model_error_context(error),
         SamplingCompileError::Analysis(error) => analysis_error_context(error),
         SamplingCompileError::InvalidCircuit { .. } => json!({}),
+        SamplingCompileError::ExpandedOperationLimit { actual, limit } => json!({
+            "resource": "expanded-operations-per-shot",
+            "actual": actual.to_string(),
+            "limit": limit.to_string(),
+        }),
     }
 }
 
@@ -986,6 +993,7 @@ fn analysis_resource_context(error: &AnalysisResourceLimitError) -> Value {
 fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
     let resource = match error.kind() {
         DetectionResourceKind::RecordBits(_) => "record-bits",
+        DetectionResourceKind::SamplingExpandedOperations => "expanded-operations-per-shot",
         DetectionResourceKind::RepeatNesting => "repeat-nesting",
         DetectionResourceKind::ExpandedInstructions => "expanded-operations",
         DetectionResourceKind::RepeatIterations => "repeat-iterations",
@@ -1007,8 +1015,16 @@ fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
         }
         _ => None,
     };
+    let operation = if matches!(
+        error.kind(),
+        DetectionResourceKind::SamplingExpandedOperations
+    ) {
+        "detection-sampling"
+    } else {
+        "detection-conversion"
+    };
     json!({
-        "operation": "detection-conversion",
+        "operation": operation,
         "resource": resource,
         "subject": subject,
         "actual": error.actual(),

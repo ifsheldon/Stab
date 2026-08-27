@@ -74,18 +74,26 @@ Compiler schema version `2` changed only sweep admission:
 - no compile resource budget is caller-configurable;
 - backend preference and selection remain excluded.
 
-Current compiler schema version `3` keeps that sweep admission and additionally:
+Compiler schema version `3` kept that sweep admission and additionally:
 
 - represents record and sweep controls with one private typed operation;
 - recognizes classical-bit/classical-bit `CZ` groups as unconditional no-ops before validating record history, matching Stim;
 - permits the small-frame executable to retain omitted all-false sweep controls instead of selecting the general frame solely because a sweep target exists.
+
+Compiler schema version `4` kept those semantics and additionally:
+
+- retains compact repeat blocks in one validated flat operation tape instead of a recursively owned operation tree;
+- compiles nested repeats with a fixed-depth iterative traversal so accepted nesting does not depend on the host thread stack;
+- leaves the reference-repeat execution policy out of the semantic request identity because `fold` and `iterate` accept and lower the same circuit.
+
+Current compiler schema version `5` retains schema `4` lowering and additionally admits at most one million expanded operation dispatches for a measurement-bearing shot. Zero-width circuits bypass represented execution work because no result can observe it. This is one aggregate execution-work boundary, not a repeat-count syntax cap.
 
 All sampling compiler schemas encode:
 
 - normalized option count `0`;
 - effective configurable-limit count `0`.
 
-Changing classical-control admission or lowering again, adding a caller-selectable lowering option, or adding a configurable compile limit requires a new sampling compiler schema and a corresponding request-fingerprint schema review.
+Changing classical-control admission or semantic lowering again, adding a caller-selectable semantic lowering option, or adding a configurable compile limit requires a new sampling compiler schema and a corresponding request-fingerprint schema review. An execution-strategy option that preserves the lowered semantic program belongs to the plan's executable identity instead.
 
 Adding or changing a backend registration does not by itself change this request schema. It changes the separate backend-bearing plan identity.
 
@@ -113,7 +121,7 @@ Its model fingerprint is:
 Its sampling compilation request fingerprint is:
 
 ```text
-156cd4ed97e9f1da74a8d13d7e39d39731a90844da22316c614c379b8e0cce3d
+baeb18b2253a82defa506cf7cbd43d2ea6e1d5c51cbb0c4b8de88adca16cdde5
 ```
 
 The request digest was independently reconstructed from the table above with Perl `Digest::SHA` and binary `pack`, rather than copied from the Rust implementation.

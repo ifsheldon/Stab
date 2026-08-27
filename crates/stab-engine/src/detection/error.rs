@@ -19,6 +19,7 @@ pub enum DetectionRecordLimitSubject {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DetectionResourceKind {
     RecordBits(DetectionRecordLimitSubject),
+    SamplingExpandedOperations,
     RepeatNesting,
     ExpandedInstructions,
     RepeatIterations,
@@ -35,6 +36,14 @@ pub struct DetectionResourceLimitError {
 }
 
 impl DetectionResourceLimitError {
+    pub(crate) const fn sampling_expanded_operations(actual: u64, limit: u64) -> Self {
+        Self {
+            kind: DetectionResourceKind::SamplingExpandedOperations,
+            actual,
+            limit,
+        }
+    }
+
     pub(crate) const fn detection_record_bits(
         subject: DetectionRecordLimitSubject,
         actual: u64,
@@ -154,6 +163,11 @@ impl Display for DetectionResourceLimitError {
                     self.limit
                 ),
             },
+            DetectionResourceKind::SamplingExpandedOperations => write!(
+                formatter,
+                "cannot compile circuit sampler: expanded operation work {} exceeds per-shot limit {}",
+                self.actual, self.limit
+            ),
             DetectionResourceKind::RepeatNesting => write!(
                 formatter,
                 "cannot compile circuit sampler: detection conversion repeat nesting {} exceeds fixed safety limit {}",
@@ -226,6 +240,9 @@ impl From<SamplingCompileError> for DetectionError {
             SamplingCompileError::InvalidCircuit { message } => {
                 Self::invalid_sampler_compilation(message)
             }
+            SamplingCompileError::ExpandedOperationLimit { actual, limit } => Self::ResourceLimit(
+                DetectionResourceLimitError::sampling_expanded_operations(actual, limit),
+            ),
         }
     }
 }

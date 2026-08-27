@@ -51,6 +51,9 @@ impl SamplingPlan {
         &self,
         unknown_input: bool,
     ) -> Result<u64, SamplingExecutionError> {
+        if self.inner.measurement_count == 0 {
+            return Ok(0);
+        }
         if let api::SamplingPlanKind::DirectZ(direct) = self.inner.kind {
             return Ok(direct.determined_measurement_count(unknown_input));
         }
@@ -85,6 +88,9 @@ impl SamplingPlan {
     }
 
     pub(crate) fn estimated_reference_work_storage_bytes(&self) -> u128 {
+        if self.inner.measurement_count == 0 {
+            return 0;
+        }
         if matches!(self.inner.kind, api::SamplingPlanKind::DirectZ(_)) {
             return 1;
         }
@@ -246,12 +252,14 @@ fn sampler_rng(seed: Option<u64>) -> SmallRng {
 struct CompileState {
     measurement_count: u64,
     sweep_bit_count: u64,
+    expanded_operations: u128,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct CompiledCounts {
     measurements: usize,
     sweep_bits: usize,
+    expanded_operations: u128,
 }
 
 impl CompileState {
@@ -259,6 +267,7 @@ impl CompileState {
         Self {
             measurement_count: 0,
             sweep_bit_count: 0,
+            expanded_operations: 0,
         }
     }
 
@@ -292,6 +301,16 @@ impl CompileState {
             )
         })?;
         Ok(())
+    }
+
+    fn add_operations(&mut self, count: usize) {
+        self.expanded_operations = self.expanded_operations.saturating_add(count as u128);
+    }
+
+    fn add_repeated_operations(&mut self, per_body: u128, repeat_count: u64) {
+        self.expanded_operations = self
+            .expanded_operations
+            .saturating_add(per_body.saturating_mul(u128::from(repeat_count)));
     }
 
     fn validate_record_offset(
@@ -351,6 +370,7 @@ fn compile_circuit(
     Ok(CompiledCounts {
         measurements,
         sweep_bits,
+        expanded_operations: state.expanded_operations,
     })
 }
 
@@ -374,7 +394,11 @@ fn compile_circuit_with_state(
                         "sampler compilation lost its active circuit frame",
                     ));
                 };
+                let operations_before = program.entry_count();
                 compile_instruction(instruction, program, &mut frame.state)?;
+                frame
+                    .state
+                    .add_operations(program.entry_count().saturating_sub(operations_before));
             }
             Some(CircuitItem::RepeatBlock(repeat)) => {
                 let Some(parent) = frames.last() else {
@@ -423,6 +447,13 @@ fn compile_circuit_with_state(
                 parent
                     .state
                     .add_repeated_measurements(body_measurements, repeat.count)?;
+                let body_operations = completed
+                    .state
+                    .expanded_operations
+                    .saturating_sub(repeat.operations_before_body);
+                parent
+                    .state
+                    .add_repeated_operations(body_operations, repeat.count);
                 parent.state.sweep_bit_count = parent
                     .state
                     .sweep_bit_count
@@ -455,6 +486,7 @@ impl<'a> CompileFrame<'a> {
                 marker,
                 count,
                 measurements_before_body: state.measurement_count,
+                operations_before_body: state.expanded_operations,
             }),
         }
     }
@@ -465,6 +497,7 @@ struct RepeatCompile {
     marker: usize,
     count: u64,
     measurements_before_body: u64,
+    operations_before_body: u128,
 }
 
 fn compile_instruction(

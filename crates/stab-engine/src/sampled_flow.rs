@@ -149,8 +149,7 @@ fn augmented_flow_test_circuit(
     flow: &Flow,
     measurement_count: usize,
 ) -> SampledFlowResult<Circuit> {
-    let qubit_count = circuit
-        .count_qubits()
+    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit)
         .max(flow.input().len())
         .max(flow.output().len());
     let ancilla = qubit_id_from_index(qubit_count, "sampled flow ancilla qubit")?;

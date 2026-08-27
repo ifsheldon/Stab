@@ -21,7 +21,12 @@ use super::stabilizer_frame::{StabilizerFrame, StabilizerStateSnapshot};
 use super::{ExecutionMode, compile_circuit, direct_z_measurement, sampler_rng, small_frame};
 use crate::CompilationRequestFingerprint;
 
+mod compile_error;
+
+pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
+
 const MAX_BATCH_SHOTS: usize = 64;
+const MAX_EXPANDED_OPERATIONS_PER_SHOT: u64 = 1_000_000;
 pub(super) const MAX_SAMPLING_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
 const PLAN_FINGERPRINT_DOMAIN: &[u8] = b"stab:plan-fingerprint\0";
 const EXECUTABLE_CONTRACT_DOMAIN: &[u8] = b"stab:sampling-executable-contract\0";
@@ -44,46 +49,6 @@ impl SamplingBackend {
         match self {
             Self::Scalar => 1,
         }
-    }
-}
-
-/// Stable code classifying a sampling compilation failure.
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum SamplingCompileErrorCode {
-    InvalidCircuit,
-}
-
-impl SamplingCompileErrorCode {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::InvalidCircuit => "invalid-circuit",
-        }
-    }
-}
-
-/// Failure to compile an immutable sampling plan.
-#[derive(Clone, Debug, Error, Eq, PartialEq)]
-pub enum SamplingCompileError {
-    #[error(transparent)]
-    Model(#[from] stab_model::ModelError),
-
-    #[error(transparent)]
-    Analysis(#[from] stab_analysis::AnalysisError),
-
-    #[error("cannot compile circuit sampler: {message}")]
-    InvalidCircuit { message: String },
-}
-
-impl SamplingCompileError {
-    pub(crate) fn invalid_circuit(message: impl Into<String>) -> Self {
-        Self::InvalidCircuit {
-            message: message.into(),
-        }
-    }
-
-    pub const fn code(&self) -> SamplingCompileErrorCode {
-        SamplingCompileErrorCode::InvalidCircuit
     }
 }
 
@@ -204,7 +169,15 @@ impl SamplingCompiler {
         let request_fingerprint = CompilationRequestFingerprint::for_sampling(circuit);
         let mut operations = SampleProgram::new();
         let counts = compile_circuit(circuit, &mut operations)?;
-        let qubit_count = circuit.count_qubits();
+        if counts.measurements > 0
+            && counts.expanded_operations > u128::from(MAX_EXPANDED_OPERATIONS_PER_SHOT)
+        {
+            return Err(SamplingCompileError::ExpandedOperationLimit {
+                actual: u64::try_from(counts.expanded_operations).unwrap_or(u64::MAX),
+                limit: MAX_EXPANDED_OPERATIONS_PER_SHOT,
+            });
+        }
+        let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
         let kind = select_plan_kind(qubit_count, counts.measurements, &operations);
         let fingerprint = PlanFingerprint::for_sampling(
             request_fingerprint,
@@ -370,7 +343,7 @@ impl fmt::Debug for SamplingPlan {
 }
 
 impl SamplingPlan {
-    pub const EXECUTABLE_CONTRACT_SCHEMA_VERSION: u16 = 3;
+    pub const EXECUTABLE_CONTRACT_SCHEMA_VERSION: u16 = 4;
 
     pub fn backend(&self) -> SamplingBackend {
         self.inner.backend
@@ -471,6 +444,7 @@ impl SamplingPlanKind {
 
 #[derive(Debug)]
 enum SessionFrame {
+    Empty,
     DirectZ,
     Small(Vec<SmallStabilizerFrame>),
     General(Vec<StabilizerFrame>),
@@ -716,7 +690,9 @@ impl SamplingSession {
                 Some(compute_reference_sample(&plan.inner)?)
             }
         };
-        let frame =
+        let frame = if plan.inner.measurement_count == 0 {
+            SessionFrame::Empty
+        } else {
             match plan.inner.kind {
                 SamplingPlanKind::DirectZ(_) => SessionFrame::DirectZ,
                 SamplingPlanKind::SmallFrame => {
@@ -749,7 +725,8 @@ impl SamplingSession {
                     )?);
                     SessionFrame::General(frames)
                 }
-            };
+            }
+        };
         let batch = if matches!(plan.inner.kind, SamplingPlanKind::DirectZ(_)) {
             SessionBatch::DirectZ([0])
         } else {
@@ -910,6 +887,9 @@ impl SamplingSession {
     }
 
     fn fill_batch(&mut self, shot_count: usize) -> Result<(), SamplingExecutionError> {
+        if self.plan.inner.measurement_count == 0 {
+            return Ok(());
+        }
         if let SamplingPlanKind::DirectZ(plan) = self.plan.inner.kind {
             let reference_bit = self
                 .reference_sample
@@ -979,6 +959,11 @@ impl SamplingSession {
         let operations = &self.plan.inner.operations;
         let reference = self.reference_sample.as_deref();
         match (&self.plan.inner.kind, &mut self.frame) {
+            (_, SessionFrame::Empty) if self.plan.inner.measurement_count == 0 => {
+                self.record.clear();
+                self.output.clear();
+                Ok(())
+            }
             (SamplingPlanKind::DirectZ(plan), SessionFrame::DirectZ) => {
                 self.record.clear();
                 self.output.clear();
@@ -1058,6 +1043,9 @@ fn validate_session_storage(
 }
 
 fn session_storage_bytes(plan: &SamplingPlanInner, reference_mode: ReferenceSampleMode) -> u128 {
+    if plan.measurement_count == 0 {
+        return 0;
+    }
     let measurements = plan.measurement_count as u128;
     let mut estimated_bytes = measurements.saturating_mul(size_of::<u64>() as u128);
     if !matches!(plan.kind, SamplingPlanKind::DirectZ(_)) {
@@ -1094,6 +1082,9 @@ pub(super) fn try_bool_buffer(
 pub(super) fn compute_reference_sample(
     plan: &SamplingPlanInner,
 ) -> Result<Vec<bool>, SamplingExecutionError> {
+    if plan.measurement_count == 0 {
+        return Ok(Vec::new());
+    }
     if let SamplingPlanKind::DirectZ(direct) = plan.kind {
         let mut output = try_bool_buffer(1, "direct reference sample")?;
         output.push(direct.reference_bit());

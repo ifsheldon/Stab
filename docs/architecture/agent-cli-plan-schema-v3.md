@@ -1,5 +1,7 @@
 # Agent CLI Plan Schema Version 3
 
+This historical document records the schema-version-3 contract. Stab now emits [plan schema version 4](agent-cli-plan-schema-v4.md) and does not provide a version-3 compatibility view.
+
 This document defines the successful machine-output contract for `stab plan sample --format=json`.
 
 The command parses a circuit, validates output grouping, compiles the sole scalar sampling plan, reports identities and honest resource estimates, and exits without executing a shot.

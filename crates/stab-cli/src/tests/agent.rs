@@ -323,7 +323,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             {
                 "operation": "sample",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 4,
+                "compiler_schema_version": 5,
                 "request_fingerprint_schema_version": 1,
                 "configurable_limits": false
             },
@@ -716,7 +716,7 @@ fn plan_sample_matches_one_shot_herald_filtering_output_width() {
 
 #[test]
 fn plan_sample_counts_heralded_repeat_width_without_expanding_the_repeat() {
-    let circuit = b"REPEAT 10000000000 {\nHERALDED_ERASE(0) 0\nM 0\n}\n";
+    let circuit = b"REPEAT 100000 {\nHERALDED_ERASE(0) 0\nM 0\n}\n";
     let (status, stdout, stderr) = run_cli(["stab", "plan", "sample", "--format=json"], circuit);
 
     assert_eq!(status, 0);
@@ -724,7 +724,7 @@ fn plan_sample_counts_heralded_repeat_width_without_expanding_the_repeat() {
     let report = json_stdout(&stdout);
     assert_eq!(
         pointer(&report, "/estimates/output_bytes/value"),
-        10_000_000_001u64
+        100_001u64
     );
 }
 

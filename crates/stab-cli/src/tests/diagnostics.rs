@@ -202,6 +202,34 @@ fn json_resource_limit_diagnostic_preserves_typed_parse_context() {
 }
 
 #[test]
+fn json_sampling_work_limit_preserves_typed_resource_context() {
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "sample", "--shots=1", "--error-format=json"],
+        b"REPEAT 1000000 {\n    H 0\n}\nM 0\n",
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert_eq!(
+        only_json_line(&stderr),
+        serde_json::json!({
+            "schema_version": 1,
+            "code": "resource-limit-exceeded",
+            "severity": "error",
+            "message": "cannot compile circuit sampler: expanded operation work 1000001 exceeds per-shot limit 1000000",
+            "span": null,
+            "labels": [],
+            "help": null,
+            "context": {
+                "resource": "expanded-operations-per-shot",
+                "actual": "1000001",
+                "limit": "1000000",
+            },
+        })
+    );
+}
+
+#[test]
 fn json_warnings_and_errors_are_ordered_json_lines() {
     let (status, stdout, stderr) = run_cli(
         &["stab", "sample", "--frame0", "--error-format=json"],

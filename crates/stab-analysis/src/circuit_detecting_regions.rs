@@ -76,7 +76,7 @@ pub fn circuit_detecting_regions_for_targets(
         .collect::<DetectingRegionTargetMap>();
 
     let mut tracker = SparseReverseFrameTracker::new(
-        circuit.count_qubits(),
+        stab_model::advanced::circuit_simulated_qubit_count(circuit),
         detecting_region_measurement_count(circuit)?,
         detector_count,
         fail_on_anticommute,

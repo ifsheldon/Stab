@@ -149,11 +149,47 @@ struct ReferenceRepeatFrame {
     remaining: u64,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(super) struct ReferenceExecutionStats {
     pub(super) folded_repeats: u64,
     pub(super) reused_iterations: u64,
     pub(super) reused_operation_dispatches: u128,
+}
+
+#[cfg(test)]
+thread_local! {
+    static REFERENCE_EXECUTION_STATS: std::cell::Cell<ReferenceExecutionStats> =
+        const { std::cell::Cell::new(ReferenceExecutionStats {
+            folded_repeats: 0,
+            reused_iterations: 0,
+            reused_operation_dispatches: 0,
+        }) };
+}
+
+#[cfg(test)]
+pub(super) fn reset_reference_execution_stats() {
+    REFERENCE_EXECUTION_STATS.set(ReferenceExecutionStats::default());
+}
+
+#[cfg(test)]
+pub(super) fn take_reference_execution_stats() -> ReferenceExecutionStats {
+    REFERENCE_EXECUTION_STATS.replace(ReferenceExecutionStats::default())
+}
+
+fn record_reference_fold(reused_iterations: u64, reused_operation_dispatches: u128) {
+    #[cfg(test)]
+    REFERENCE_EXECUTION_STATS.with(|cell| {
+        let mut stats = cell.get();
+        stats.folded_repeats = stats.folded_repeats.saturating_add(1);
+        stats.reused_iterations = stats.reused_iterations.saturating_add(reused_iterations);
+        stats.reused_operation_dispatches = stats
+            .reused_operation_dispatches
+            .saturating_add(reused_operation_dispatches);
+        cell.set(stats);
+    });
+    #[cfg(not(test))]
+    let _ = (reused_iterations, reused_operation_dispatches);
 }
 
 pub(super) fn execute_reference_operations(
@@ -163,7 +199,7 @@ pub(super) fn execute_reference_operations(
     sweep_record: &[bool],
     loop_policy: ReferenceSampleLoopPolicy,
     snapshot: Option<&mut StabilizerStateSnapshot>,
-) -> Result<ReferenceExecutionStats, SamplingExecutionError> {
+) -> Result<(), SamplingExecutionError> {
     let Some(snapshot) = snapshot else {
         execute_operations(
             program,
@@ -172,7 +208,7 @@ pub(super) fn execute_reference_operations(
             ExecutionMode::ReferenceSample,
             sweep_record,
         )?;
-        return Ok(ReferenceExecutionStats::default());
+        return Ok(());
     };
     if loop_policy == ReferenceSampleLoopPolicy::Iterate {
         execute_operations(
@@ -182,10 +218,9 @@ pub(super) fn execute_reference_operations(
             ExecutionMode::ReferenceSample,
             sweep_record,
         )?;
-        return Ok(ReferenceExecutionStats::default());
+        return Ok(());
     }
 
-    let mut stats = ReferenceExecutionStats::default();
     let entries = program.entries();
     let mut repeats =
         arrayvec::ArrayVec::<ReferenceRepeatFrame, { RepeatNestingLimit::HARD_MAX }>::new();
@@ -249,14 +284,11 @@ pub(super) fn execute_reference_operations(
                             count.saturating_sub(1),
                         )?;
                         let reused_iterations = count.saturating_sub(1);
-                        stats.folded_repeats = stats.folded_repeats.saturating_add(1);
-                        stats.reused_iterations =
-                            stats.reused_iterations.saturating_add(reused_iterations);
-                        stats.reused_operation_dispatches =
-                            stats.reused_operation_dispatches.saturating_add(
-                                (program.compact_operation_count(body_start, *body_end) as u128)
-                                    .saturating_mul(u128::from(reused_iterations)),
-                            );
+                        record_reference_fold(
+                            reused_iterations,
+                            (program.compact_operation_count(body_start, *body_end) as u128)
+                                .saturating_mul(u128::from(reused_iterations)),
+                        );
                         index = body_end.checked_add(1).ok_or_else(|| {
                             SamplingExecutionError::InternalInvariant {
                                 message: "reference sampling repeat-end index overflowed"
@@ -332,7 +364,7 @@ pub(super) fn execute_reference_operations(
         }
     }
     if repeats.is_empty() {
-        Ok(stats)
+        Ok(())
     } else {
         Err(SamplingExecutionError::InternalInvariant {
             message: "reference sampling ended inside a repeat".to_owned(),
@@ -362,6 +394,9 @@ fn append_repeated_reference_bits(
     repetitions: u64,
 ) -> Result<(), SamplingExecutionError> {
     let pattern_len = buffers.output.len().saturating_sub(output_start);
+    if pattern_len == 0 {
+        return Ok(());
+    }
     for _ in 0..repetitions {
         for offset in 0..pattern_len {
             let index = output_start.checked_add(offset).ok_or_else(|| {

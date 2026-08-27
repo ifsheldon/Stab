@@ -28,7 +28,10 @@ pub fn missing_detectors(
         return Ok(folded);
     }
     validate_repeat_budget(circuit)?;
-    let mut finder = MissingDetectorFinder::new(circuit.count_qubits(), options)?;
+    let mut finder = MissingDetectorFinder::new(
+        stab_model::advanced::circuit_simulated_qubit_count(circuit),
+        options,
+    )?;
     finder.process_circuit(circuit)?;
     finder.build_output()
 }

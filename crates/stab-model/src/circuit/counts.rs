@@ -3,6 +3,14 @@ use crate::Target;
 
 impl Circuit {
     pub fn count_qubits(&self) -> usize {
+        self.count_qubits_with(|_| true)
+    }
+
+    pub(crate) fn simulated_qubit_count(&self) -> usize {
+        self.count_qubits_with(|instruction| !instruction.gate.targets_are_pad_values())
+    }
+
+    fn count_qubits_with(&self, include: impl Fn(&CircuitInstruction) -> bool) -> usize {
         let mut count = 0;
         let mut pending = Vec::new();
         let mut items = self.items.iter();
@@ -10,7 +18,9 @@ impl Circuit {
         loop {
             match items.next() {
                 Some(CircuitItem::Instruction(instruction)) => {
-                    count = count.max(instruction.count_qubits());
+                    if include(instruction) {
+                        count = count.max(instruction.count_qubits());
+                    }
                 }
                 Some(CircuitItem::RepeatBlock(repeat)) => {
                     pending.push(items);
@@ -37,10 +47,6 @@ impl CircuitInstruction {
     }
 
     fn count_qubits(&self) -> usize {
-        // Pad targets are metadata-only values, not qubits; see Gate::targets_are_pad_values.
-        if self.gate.targets_are_pad_values() {
-            return 0;
-        }
         self.targets
             .iter()
             .filter_map(Target::qubit_id)

@@ -56,7 +56,7 @@ fn check_unsigned_flows_with_tableau(
 }
 
 fn should_use_batch_flow_tableau(circuit: &Circuit, flows: &[Flow]) -> bool {
-    let circuit_qubits = circuit.count_qubits();
+    let circuit_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     flows.iter().all(|flow| {
         flow.input().len() == circuit_qubits
             && flow.output().len() == circuit_qubits
@@ -202,7 +202,8 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
         .flat_map(|flow| [flow.input().len(), flow.output().len()])
         .max()
         .unwrap_or(0);
-    let qubit_count = circuit.count_qubits().max(flow_qubit_count);
+    let qubit_count =
+        stab_model::advanced::circuit_simulated_qubit_count(circuit).max(flow_qubit_count);
     let mut tracker =
         SparseReverseFrameTracker::new(qubit_count, measurement_count, detector_count, false);
 

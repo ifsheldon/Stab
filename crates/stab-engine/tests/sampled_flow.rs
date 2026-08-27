@@ -208,13 +208,7 @@ fn sampled_flow_rejects_malformed_measurement_references() {
 
 #[test]
 fn sampled_flow_preserves_sampling_storage_admission() {
-    let circuit = circuit(
-        "
-        REPEAT 300000000 {
-            M 0
-        }
-        ",
-    );
+    let circuit = circuit("H 10000\nM 10000\n");
     assert!(matches!(
         sample_if_circuit_has_stabilizer_flows(
             &circuit,

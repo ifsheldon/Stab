@@ -90,6 +90,23 @@ int main() {
 
 #[test]
 #[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_count_qubits_includes_mpad_values() {
+    run_pinned_stim_circuit_probe(
+        "count-qubits-mpad",
+        br#"
+#include "stim/circuit/circuit.h"
+
+int main() {
+    stim::Circuit mixed("H 0\nMPAD 1\n");
+    stim::Circuit pads("MPAD 0 1 0\n");
+    return mixed.count_qubits() == 2 && pads.count_qubits() == 2 ? 0 : 1;
+}
+"#,
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
 fn pinned_stim_reference_signs_cover_repeats_paulis_and_zero_sweeps() {
     run_pinned_stim_circuit_probe(
         "reference-signs",
@@ -275,6 +292,16 @@ fn pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit() {
         );
         assert_eq!(output.stdout.bytes, b"0\n", "{source:?}");
     }
+
+    let nested_record = run_process(
+        &stim,
+        &sample_args,
+        b"X 0\nM 0\nREPEAT 2 {\n    REPEAT 2 {\n        R 1\n        CX rec[-1] 1\n        M 1\n    }\n}\n",
+        Some(&root.path),
+    )
+    .expect("execute pinned Stim nested record feedback");
+    assert!(nested_record.success());
+    assert_eq!(nested_record.stdout.bytes, b"11111\n");
 
     let directory = tempfile::tempdir().expect("probe directory");
     let circuit = directory.path().join("mixed-classical-cz.stim");

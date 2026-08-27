@@ -140,12 +140,12 @@ pub mod advanced {
         instruction.without_tag()
     }
 
-    /// Returns the qubit width required to simulate a circuit.
+    /// Returns the qubit width required to simulate a circuit, excluding `MPAD` values.
     ///
-    /// This equals [`Circuit::count_qubits`]: MPAD pad values are excluded from both counts,
-    /// matching Stim v1.16.0.
+    /// Stim-compatible [`Circuit::count_qubits`] remains target-based and therefore counts an
+    /// `MPAD 1` value as width two. Execution owners use this narrower semantic width instead.
     pub fn circuit_simulated_qubit_count(circuit: &Circuit) -> usize {
-        circuit.count_qubits()
+        circuit.simulated_qubit_count()
     }
 
     /// Returns the number of measurement results produced by one instruction.

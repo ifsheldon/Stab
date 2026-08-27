@@ -25,7 +25,7 @@ pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> AnalysisResult<Circui
     let mut helper = WithoutFeedbackHelper {
         reversed_output: Vec::new(),
         tracker: SparseReverseFrameTracker::new(
-            circuit.count_qubits(),
+            stab_model::advanced::circuit_simulated_qubit_count(circuit),
             measurement_count,
             detector_count,
             false,
