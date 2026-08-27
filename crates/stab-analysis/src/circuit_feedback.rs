@@ -2,7 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, GateCategory, MeasureRecordOffset,
-    Pauli, RepeatBlock, RepeatCount, Target, advanced::CircuitBuilder,
+    Pauli, QubitId, RepeatBlock, RepeatCount, Target,
+    advanced::{
+        CircuitBuilder, ClassicalControl, ControlledPauliTargetPair,
+        classify_controlled_pauli_target_pair,
+    },
 };
 
 use crate::{AnalysisError, AnalysisResult, sparse_rev_frame_tracker::SparseReverseFrameTracker};
@@ -124,42 +128,38 @@ impl WithoutFeedbackHelper {
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<()> {
         for group in instruction.target_groups().into_iter().rev() {
-            let [first, second] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "{} expected paired targets during feedback inlining",
-                    instruction.gate().canonical_name()
-                )));
-            };
-            if first.qubit_id().is_none() && second.qubit_id().is_none() {
-                let gate_name = instruction.gate().canonical_name();
-                if gate_name != "CZ"
-                    || first.is_measurement_record_target()
-                    || second.is_measurement_record_target()
-                {
+            let piece = instruction_with_targets(instruction, group.to_vec())?;
+            match classify_controlled_pauli_target_pair(instruction.gate(), group) {
+                ControlledPauliTargetPair::Quantum { .. } => {
+                    self.reversed_output
+                        .push(CircuitItem::Instruction(piece.clone()));
+                    self.tracker.undo_instruction(&piece)?;
+                }
+                ControlledPauliTargetPair::Classical { control, target } => {
+                    match control {
+                        ClassicalControl::Record(record) => {
+                            self.inline_feedback(instruction, record, target)?;
+                        }
+                        ClassicalControl::Sweep(_) => self
+                            .reversed_output
+                            .push(CircuitItem::Instruction(piece.clone())),
+                    }
+                    self.tracker.undo_instruction(&piece)?;
+                }
+                ControlledPauliTargetPair::ClassicalNoop { first, second } => {
+                    if !first.is_record() && !second.is_record() {
+                        self.reversed_output
+                            .push(CircuitItem::Instruction(piece.clone()));
+                        self.tracker.undo_instruction(&piece)?;
+                    }
+                }
+                ControlledPauliTargetPair::Unsupported => {
                     return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "{gate_name} feedback target {second} is not a qubit"
+                        "{} has an unsupported controlled-Pauli target orientation during feedback inlining",
+                        instruction.gate().canonical_name()
                     )));
                 }
             }
-            let piece = instruction_with_targets(instruction, group.to_vec())?;
-            match (
-                first.measurement_record_offset(),
-                second.measurement_record_offset(),
-            ) {
-                (Some(record), None) => {
-                    validate_feedback_record_position(instruction.gate(), true)?;
-                    self.inline_feedback(instruction, record, second)?;
-                }
-                (None, Some(record)) => {
-                    validate_feedback_record_position(instruction.gate(), false)?;
-                    self.inline_feedback(instruction, record, first)?;
-                }
-                (Some(_), Some(_)) => {}
-                (None, None) => self
-                    .reversed_output
-                    .push(CircuitItem::Instruction(piece.clone())),
-            }
-            self.tracker.undo_instruction(&piece)?;
         }
         self.flush_observable_changes(instruction)?;
         Ok(())
@@ -169,14 +169,8 @@ impl WithoutFeedbackHelper {
         &mut self,
         instruction: &CircuitInstruction,
         record: MeasureRecordOffset,
-        target: &Target,
+        qubit: QubitId,
     ) -> AnalysisResult<()> {
-        let qubit = target.qubit_id().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} feedback target {target} is not a qubit",
-                instruction.gate().canonical_name()
-            ))
-        })?;
         let feedback = feedback_pauli(instruction.gate())?;
         let sensitivity = self.tracker.feedback_sensitivity(qubit, feedback)?;
         let absolute_record = self
@@ -554,23 +548,6 @@ fn feedback_pauli(gate: Gate) -> AnalysisResult<Pauli> {
     }
 }
 
-fn validate_feedback_record_position(gate: Gate, record_is_first: bool) -> AnalysisResult<()> {
-    let valid = match gate.canonical_name() {
-        "CX" | "CY" => record_is_first,
-        "XCZ" | "YCZ" => !record_is_first,
-        "CZ" => true,
-        _ => false,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(AnalysisError::invalid_detector_error_model(format!(
-            "{} does not support a measurement-record feedback target in this position",
-            gate.canonical_name()
-        )))
-    }
-}
-
 fn absolute_record_index(
     measurements_in_past: usize,
     offset: MeasureRecordOffset,
@@ -870,22 +847,22 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("measurement-record feedback target in this position")
+                .contains("unsupported controlled-Pauli target orientation")
         );
     }
 
     #[test]
-    fn circuit_with_inlined_feedback_keeps_cz_record_only_groups_unsupported() {
-        for text in [
-            "M 0\n\
-             CZ rec[-1] sweep[0]\n",
-            "M 0 1\n\
-             CZ rec[-1] rec[-2]\n",
+    fn circuit_with_inlined_feedback_drops_classical_cz_noops_with_record_targets() {
+        for (text, expected) in [
+            ("M 0\nCZ rec[-1] sweep[0]\n", "M 0\n"),
+            ("M 0\nCZ sweep[0] rec[-1]\n", "M 0\n"),
+            ("M 0 1\nCZ rec[-1] rec[-2]\n", "M 0 1\n"),
         ] {
             let circuit = Circuit::from_stim_str(text).unwrap();
-            let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
-
-            assert!(error.to_string().contains("not a qubit"), "{error}");
+            assert_eq!(
+                circuit_with_inlined_feedback(&circuit).unwrap(),
+                Circuit::from_stim_str(expected).unwrap()
+            );
         }
     }
 
@@ -902,7 +879,7 @@ mod tests {
             let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
             let message = error.to_string();
             assert!(
-                message.contains("not a qubit") || message.contains("sweep-conditioned"),
+                message.contains("unsupported controlled-Pauli target orientation"),
                 "{gate}: {error}"
             );
         }

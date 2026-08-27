@@ -368,6 +368,65 @@ int main() {
     );
 }
 
+#[test]
+#[ignore = "builds and executes the pinned Stim CLI"]
+fn pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit() {
+    let root = RepoRoot::resolve(
+        &Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("workspace root"),
+    )
+    .expect("repository root");
+    let stim = ensure_stim_binary(&root, false).expect("pinned Stim binary");
+    let sample_args = [
+        OsString::from("sample"),
+        OsString::from("--shots=1"),
+        OsString::from("--out_format=01"),
+    ];
+    for source in [
+        "CZ rec[-1] rec[-2]\nM 0\n",
+        "CZ rec[-1] sweep[0]\nM 0\n",
+        "CZ sweep[0] rec[-1]\nM 0\n",
+        "CZ sweep[0] sweep[1]\nM 0\n",
+    ] {
+        let output = run_process(&stim, &sample_args, source.as_bytes(), Some(&root.path))
+            .expect("execute pinned Stim no-op sample");
+        assert!(
+            output.success(),
+            "pinned Stim rejected {source:?}: {}",
+            output.stderr.render_for_diagnostics()
+        );
+        assert_eq!(output.stdout.bytes, b"0\n", "{source:?}");
+    }
+
+    let directory = tempfile::tempdir().expect("probe directory");
+    let circuit = directory.path().join("mixed-classical-cz.stim");
+    std::fs::write(
+        &circuit,
+        "M 0\nCZ rec[-1] sweep[1]\nMX 1\nDETECTOR rec[-1]\n",
+    )
+    .expect("write probe circuit");
+    let common = [
+        OsString::from("m2d"),
+        OsString::from("--in_format=01"),
+        OsString::from("--out_format=dets"),
+        OsString::from("--circuit"),
+        circuit.into_os_string(),
+    ];
+    let ordinary = run_process(&stim, &common, b"10\n", Some(&root.path))
+        .expect("execute ordinary pinned conversion");
+    assert!(ordinary.success());
+    assert_eq!(ordinary.stdout.bytes, b"shot\n");
+
+    let mut transformed = common.to_vec();
+    transformed.push(OsString::from("--ran_without_feedback"));
+    let transformed = run_process(&stim, &transformed, b"10\n", Some(&root.path))
+        .expect("execute transformed pinned conversion");
+    assert!(transformed.success());
+    assert_eq!(transformed.stdout.bytes, b"shot D0\n");
+}
+
 fn run_pinned_stim_circuit_probe(name: &str, source: &[u8]) {
     let root = RepoRoot::resolve(
         &Path::new(env!("CARGO_MANIFEST_DIR"))

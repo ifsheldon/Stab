@@ -1,7 +1,5 @@
-use stab_model::Circuit;
-
 use crate::sampling::ReferenceSampleScratch;
-use crate::{SamplingCompiler, SamplingExecutionError, SamplingPlan};
+use crate::{SamplingExecutionError, SamplingPlan};
 
 use super::buffers::try_vec_with_capacity;
 use super::error::{DetectionError, DetectionResult};
@@ -61,11 +59,10 @@ impl ReferenceSampleSource {
 }
 
 pub(super) fn static_reference_sample(
-    circuit: &Circuit,
+    sampling: &SamplingPlan,
     measurement_count: usize,
 ) -> DetectionResult<Vec<bool>> {
-    let sampling = SamplingCompiler::new().compile(circuit)?;
-    validate_reference_scratch_storage(&sampling)?;
+    validate_reference_scratch_storage(sampling)?;
     let mut reference_sample =
         try_vec_with_capacity(measurement_count, "detection conversion reference sample")?;
     sampling.reference_measurement_record_with_sweep_into(&[], &mut reference_sample)?;

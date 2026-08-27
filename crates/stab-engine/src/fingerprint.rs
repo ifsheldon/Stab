@@ -53,7 +53,7 @@ pub struct CompilationRequestFingerprint {
 
 impl CompilationRequestFingerprint {
     pub const SCHEMA_VERSION: u16 = 1;
-    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 2;
+    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 3;
     pub const ALGORITHM: &'static str = "sha256";
 
     pub fn for_sampling(circuit: &Circuit) -> Self {
@@ -70,7 +70,7 @@ impl CompilationRequestFingerprint {
         ]);
         hasher.update(model.digest());
 
-        // Sweep rejection is fixed compiler behavior in schema one, not a caller option.
+        // Classical-control lowering is fixed compiler behavior, not a caller option.
         encode_len(&mut hasher, 0);
 
         // The current compiler has representability checks but no configurable compile limits.
@@ -156,7 +156,7 @@ REPEAT[loop] 3 {\n\
             CompilationRequestFingerprint::for_sampling(&changed)
         );
         assert_eq!(fingerprint.schema_version(), 1);
-        assert_eq!(fingerprint.compiler_schema_version(), 2);
+        assert_eq!(fingerprint.compiler_schema_version(), 3);
         assert_eq!(fingerprint.operation(), CompilationOperation::Sampling);
         assert_eq!(fingerprint.operation().as_str(), "sample");
         assert_eq!(fingerprint.model_fingerprint(), canonical.fingerprint());
@@ -168,7 +168,7 @@ REPEAT[loop] 3 {\n\
         );
         assert_eq!(
             frozen.digest_hex(),
-            "415e1325fa707cec735f26140635e825e379a81a62205f681b8d03cad5901afb"
+            "156cd4ed97e9f1da74a8d13d7e39d39731a90844da22316c614c379b8e0cce3d"
         );
     }
 

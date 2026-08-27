@@ -11,14 +11,6 @@ pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> DetectionRes
         for item in current.items() {
             match item {
                 CircuitItem::Instruction(instruction)
-                    if matches!(
-                        instruction.gate().canonical_name(),
-                        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-                    ) =>
-                {
-                    requires_detector_frame = true;
-                }
-                CircuitItem::Instruction(instruction)
                     if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE"
                         && instruction.targets().iter().any(Target::is_pauli_target) =>
                 {

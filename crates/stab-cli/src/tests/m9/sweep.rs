@@ -1,4 +1,5 @@
 use super::{ptb64_words, run_from};
+use std::ffi::OsString;
 use tempfile::tempdir;
 
 #[test]
@@ -35,6 +36,38 @@ fn m2d_ran_without_feedback_preserves_sweep_controls() {
     assert_eq!(status, 0);
     assert_eq!(String::from_utf8(stdout).unwrap(), "shot\nshot\n");
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn m2d_ran_without_feedback_drops_mixed_classical_cz_noops() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(
+        &circuit_path,
+        "M 0\nCZ rec[-1] sweep[1]\nMX 1\nDETECTOR rec[-1]\n",
+    )
+    .expect("write circuit");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=dets",
+            "--ran_without_feedback",
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        b"10\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(stdout, b"shot\n");
+    assert!(stderr.is_empty());
 }
 
 #[test]
@@ -426,29 +459,30 @@ fn m2d_rejects_invalid_sampler_sweep_target_order() {
         let circuit_path = temp_dir.path().join(format!("invalid-{gate}.stim"));
         std::fs::write(&circuit_path, circuit_text).expect("write circuit");
 
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "m2d",
-                "--in_format=01",
-                "--out_format=dets",
-                "--sweep",
-                sweep_path.to_str().expect("utf-8 path"),
-                "--sweep_format=01",
-                "--circuit",
-                circuit_path.to_str().expect("utf-8 path"),
-            ],
-            b"0\n".as_slice(),
-            &mut stdout,
-            &mut stderr,
-        );
+        for skip_reference in [false, true] {
+            let mut args = vec![
+                OsString::from("stab"),
+                OsString::from("m2d"),
+                OsString::from("--in_format=01"),
+                OsString::from("--out_format=dets"),
+                OsString::from("--sweep"),
+                sweep_path.as_os_str().to_os_string(),
+                OsString::from("--sweep_format=01"),
+                OsString::from("--circuit"),
+                circuit_path.as_os_str().to_os_string(),
+            ];
+            if skip_reference {
+                args.push(OsString::from("--skip_reference_sample"));
+            }
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_from(args, b"0\n".as_slice(), &mut stdout, &mut stderr);
 
-        assert_eq!(status, 1, "{gate}");
-        assert_eq!(stdout, b"", "{gate}");
-        let stderr = String::from_utf8(stderr).expect("stderr is UTF-8");
-        assert!(stderr.contains("does not support"), "{stderr}");
+            assert_eq!(status, 1, "{gate} skip_reference={skip_reference}");
+            assert_eq!(stdout, b"", "{gate} skip_reference={skip_reference}");
+            let stderr = String::from_utf8(stderr).expect("stderr is UTF-8");
+            assert!(stderr.contains("target shape"), "{stderr}");
+        }
     }
 }
 

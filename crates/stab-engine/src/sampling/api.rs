@@ -323,7 +323,7 @@ impl fmt::Debug for SamplingPlan {
 }
 
 impl SamplingPlan {
-    pub const EXECUTABLE_CONTRACT_SCHEMA_VERSION: u16 = 1;
+    pub const EXECUTABLE_CONTRACT_SCHEMA_VERSION: u16 = 2;
 
     pub fn backend(&self) -> SamplingBackend {
         self.inner.backend

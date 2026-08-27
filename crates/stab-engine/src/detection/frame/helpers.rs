@@ -1,7 +1,7 @@
 use rand::{Rng, RngExt as _};
 use stab_algebra::PauliBasis;
 use stab_model::{
-    CircuitInstruction, GateCategory, MeasureRecordOffset, Pauli, Probability, Target,
+    CircuitInstruction, GateCategory, MeasureRecordOffset, Pauli, Probability, QubitId, Target,
 };
 
 use super::super::error::{DetectionError, DetectionResult};
@@ -53,14 +53,6 @@ pub(super) fn measurement_record_bit(
             offset.stim_text()
         ))
     })
-}
-
-pub(super) fn is_frame_bit_target(target: &Target) -> bool {
-    target.measurement_record_offset().is_some() || target.is_sweep_bit_target()
-}
-
-pub(super) fn is_frame_qubit_or_bit_target(target: &Target) -> bool {
-    target.qubit_id().is_some() || is_frame_bit_target(target)
 }
 
 pub(super) fn sample_flip(probability: f64, rng: &mut impl Rng) -> bool {
@@ -118,6 +110,10 @@ pub(super) fn qubit_index(
     let Some(qubit) = target.qubit_id() else {
         return Err(unsupported_frame_instruction(instruction));
     };
+    qubit_id_index(qubit)
+}
+
+pub(super) fn qubit_id_index(qubit: QubitId) -> DetectionResult<usize> {
     usize::try_from(qubit.get()).map_err(|_| {
         DetectionError::invalid_sampler_compilation(format!(
             "qubit target {} cannot fit in this platform's usize",

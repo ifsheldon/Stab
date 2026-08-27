@@ -1,14 +1,12 @@
-use std::borrow::Cow;
-
 use rand::Rng;
-use stab_model::advanced::CircuitBuilder as CircuitAssembler;
+use stab_model::advanced::{
+    CircuitBuilder as CircuitAssembler, ControlledPauliTargetPair,
+    classify_controlled_pauli_target_pair,
+};
 use stab_model::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock, Target};
 
 use super::ScalarDetectionFrame;
-use super::helpers::{
-    is_frame_bit_target, is_frame_qubit_or_bit_target, unsupported_frame_instruction,
-    zero_probability_noise,
-};
+use super::helpers::{unsupported_frame_instruction, zero_probability_noise};
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
@@ -53,13 +51,6 @@ impl AdmittedFrameConversion {
 struct FrameExecutionStorage {
     root_items: usize,
     retained_bytes: u64,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FrameExecutionInstructionDisposition {
-    Borrowed,
-    Filtered { retained_targets: usize },
-    Omitted,
 }
 
 #[derive(Clone, Debug)]
@@ -177,17 +168,8 @@ fn append_frame_conversion_plan(
                 append_frame_conversion_plan(&decomposed, plan)?;
             }
             CircuitItem::Instruction(instruction) => {
-                match frame_execution_instruction_disposition(instruction)? {
-                    FrameExecutionInstructionDisposition::Borrowed => {
-                        validate_frame_detection_instruction(instruction)?;
-                        plan.visit_instruction(instruction)?;
-                    }
-                    FrameExecutionInstructionDisposition::Filtered { .. } => {
-                        validate_frame_detection_instruction(instruction)?;
-                        plan.visit_frame_instruction_without_sweep(instruction)?;
-                    }
-                    FrameExecutionInstructionDisposition::Omitted => continue,
-                }
+                validate_frame_detection_instruction(instruction)?;
+                plan.visit_instruction(instruction)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
                 plan.visit_repeated_body(repeat.repeat_count().get(), |plan| {
@@ -231,9 +213,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Det
         "SPP" | "SPP_DAG" => Err(DetectionError::invalid_sampler_compilation(
             "frame detection must decompose SPP instructions before validation",
         )),
-        "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
-        "CZ" => validate_frame_cz_targets(instruction),
-        "XCZ" | "YCZ" => validate_frame_x_or_y_controlled_z_targets(instruction),
+        "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => validate_frame_controlled_pauli_targets(instruction),
         _ if stab_analysis::gate_has_tableau(instruction.gate()) => Ok(()),
         _ if zero_probability_noise(instruction)? => Ok(()),
         name => Err(DetectionError::invalid_sampler_compilation(format!(
@@ -257,49 +237,12 @@ fn validate_frame_controlled_pauli_targets(
     instruction: &CircuitInstruction,
 ) -> DetectionResult<()> {
     for target_group in instruction.targets().chunks(2) {
-        let [control, target] = target_group else {
+        if matches!(
+            classify_controlled_pauli_target_pair(instruction.gate(), target_group),
+            ControlledPauliTargetPair::Unsupported
+        ) {
             return Err(unsupported_frame_instruction(instruction));
-        };
-        if (control.qubit_id().is_some() || is_frame_bit_target(control))
-            && target.qubit_id().is_some()
-        {
-            continue;
         }
-        return Err(unsupported_frame_instruction(instruction));
-    }
-    Ok(())
-}
-
-fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> DetectionResult<()> {
-    for target_group in instruction.targets().chunks(2) {
-        let [left, right] = target_group else {
-            return Err(unsupported_frame_instruction(instruction));
-        };
-        if is_frame_qubit_or_bit_target(left) && is_frame_qubit_or_bit_target(right) {
-            continue;
-        }
-        return Err(unsupported_frame_instruction(instruction));
-    }
-    Ok(())
-}
-
-fn validate_frame_x_or_y_controlled_z_targets(
-    instruction: &CircuitInstruction,
-) -> DetectionResult<()> {
-    for target_group in instruction.targets().chunks(2) {
-        let [left, right] = target_group else {
-            return Err(unsupported_frame_instruction(instruction));
-        };
-        if left.qubit_id().is_some() && right.qubit_id().is_some() {
-            continue;
-        }
-        if left.qubit_id().is_some() && right.measurement_record_offset().is_some() {
-            continue;
-        }
-        if left.qubit_id().is_some() && right.is_sweep_bit_target() {
-            continue;
-        }
-        return Err(unsupported_frame_instruction(instruction));
     }
     Ok(())
 }
@@ -315,20 +258,16 @@ fn frame_execution_storage(circuit: &Circuit) -> DetectionResult<FrameExecutionS
                 storage = checked_add_storage(storage, frame_execution_storage(&decomposed)?)?;
             }
             CircuitItem::Instruction(instruction) => {
-                let target_count = match frame_execution_instruction_disposition(instruction)? {
-                    FrameExecutionInstructionDisposition::Borrowed => instruction.targets().len(),
-                    FrameExecutionInstructionDisposition::Filtered { retained_targets } => {
-                        retained_targets
-                    }
-                    FrameExecutionInstructionDisposition::Omitted => continue,
-                };
                 storage.root_items = storage
                     .root_items
                     .checked_add(1)
                     .ok_or_else(storage_overflow)?;
                 storage.retained_bytes = checked_add_bytes(
                     storage.retained_bytes,
-                    instruction_retained_bytes(instruction.args().len(), target_count)?,
+                    instruction_retained_bytes(
+                        instruction.args().len(),
+                        instruction.targets().len(),
+                    )?,
                 )?;
             }
             CircuitItem::RepeatBlock(repeat) => {
@@ -420,11 +359,7 @@ fn append_frame_execution_items(
                 append_frame_execution_items(&decomposed, result)?;
             }
             CircuitItem::Instruction(instruction) => {
-                if let Some(instruction) = frame_execution_instruction(instruction)? {
-                    result.try_append_instruction(try_clone_execution_instruction(
-                        instruction.as_ref(),
-                    )?)?;
-                }
+                result.try_append_instruction(try_clone_execution_instruction(instruction)?)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let shape = frame_execution_storage(repeat.body())?;
@@ -470,82 +405,4 @@ fn try_clone_execution_instruction(
         None,
     )
     .map_err(Into::into)
-}
-
-fn frame_execution_instruction<'a>(
-    instruction: &'a CircuitInstruction,
-) -> DetectionResult<Option<Cow<'a, CircuitInstruction>>> {
-    let retained_targets = match frame_execution_instruction_disposition(instruction)? {
-        FrameExecutionInstructionDisposition::Borrowed => {
-            return Ok(Some(Cow::Borrowed(instruction)));
-        }
-        FrameExecutionInstructionDisposition::Filtered { retained_targets } => retained_targets,
-        FrameExecutionInstructionDisposition::Omitted => return Ok(None),
-    };
-
-    let mut targets = Vec::new();
-    targets
-        .try_reserve_exact(retained_targets)
-        .map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "unable to reserve {retained_targets} filtered direct-frame targets: {error}"
-            ))
-        })?;
-    for target_group in instruction.targets().chunks(2) {
-        let [left, right] = target_group else {
-            return Err(unsupported_frame_instruction(instruction));
-        };
-        if left.qubit_id().is_some() && right.is_sweep_bit_target() {
-            continue;
-        }
-        targets.extend(target_group.iter().cloned());
-    }
-    debug_assert_eq!(targets.len(), retained_targets);
-    let mut args = Vec::new();
-    args.try_reserve_exact(instruction.args().len())
-        .map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "unable to reserve {} filtered direct-frame arguments: {error}",
-                instruction.args().len()
-            ))
-        })?;
-    args.extend_from_slice(instruction.args());
-    Ok(Some(Cow::Owned(
-        stab_model::advanced::circuit_instruction_with_tag_bytes(
-            instruction.gate(),
-            args,
-            targets,
-            None,
-        )?,
-    )))
-}
-
-fn frame_execution_instruction_disposition(
-    instruction: &CircuitInstruction,
-) -> DetectionResult<FrameExecutionInstructionDisposition> {
-    if !matches!(instruction.gate().canonical_name(), "XCZ" | "YCZ") {
-        return Ok(FrameExecutionInstructionDisposition::Borrowed);
-    }
-
-    let mut retained_targets = 0_usize;
-    let mut removed_sweep_target = false;
-    for target_group in instruction.targets().chunks(2) {
-        let [left, right] = target_group else {
-            return Ok(FrameExecutionInstructionDisposition::Borrowed);
-        };
-        if left.qubit_id().is_some() && right.is_sweep_bit_target() {
-            removed_sweep_target = true;
-            continue;
-        }
-        retained_targets = retained_targets
-            .checked_add(target_group.len())
-            .ok_or_else(storage_overflow)?;
-    }
-    if !removed_sweep_target {
-        return Ok(FrameExecutionInstructionDisposition::Borrowed);
-    }
-    if retained_targets == 0 {
-        return Ok(FrameExecutionInstructionDisposition::Omitted);
-    }
-    Ok(FrameExecutionInstructionDisposition::Filtered { retained_targets })
 }

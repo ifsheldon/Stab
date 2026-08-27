@@ -696,6 +696,25 @@ fn gate_surface_contract_classical_controls() {
         assert_sweep_reference(text, &false_reference, &true_reference);
     }
 
+    for text in [
+        "CZ rec[-1] rec[-2]\nM 0\n",
+        "CZ rec[-1] sweep[0]\nM 0\n",
+        "CZ sweep[0] rec[-1]\nM 0\n",
+        "CZ sweep[0] sweep[1]\nM 0\n",
+    ] {
+        for surface in [
+            GateSurface::MeasurementSampler,
+            GateSurface::ReferenceSampler,
+            GateSurface::DetectionConverter,
+            GateSurface::DetectorFrame,
+            GateSurface::DetectionSampler,
+        ] {
+            surface_executes(text, surface).unwrap_or_else(|error| {
+                panic!("classical-bit CZ no-op {text:?} on {surface:?}: {error}")
+            });
+        }
+    }
+
     let nested_sweep =
         "REPEAT 2 {\n    REPEAT 3 {\n        CX sweep[5] 0\n        X 0\n        M 0\n    }\n}\n";
     let nested_baseline = "REPEAT 2 {\n    REPEAT 3 {\n        X 0\n        M 0\n    }\n}\n";
@@ -837,6 +856,10 @@ fn run_surface(text: &str, surface: GateSurface) -> TestResult<SurfaceFingerprin
             &circuit,
         )?)),
     }
+}
+
+pub(super) fn surface_executes(text: &str, surface: GateSurface) -> TestResult<()> {
+    run_surface(text, surface).map(drop)
 }
 
 fn assert_all_semantic_surfaces_execute(text: &str) {

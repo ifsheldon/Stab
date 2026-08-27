@@ -2,6 +2,7 @@
 
 mod approximate;
 mod circuit;
+mod controlled_pauli;
 mod dem;
 mod diagnostics;
 mod dialect;
@@ -60,6 +61,9 @@ pub mod advanced {
         DemTarget, DetectorErrorModel, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
         ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability, RepeatBlock,
         RepeatCount, Target,
+    };
+    pub use crate::controlled_pauli::{
+        ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
     };
     pub use crate::dem::MAX_DEM_REPEAT_NESTING;
     pub use crate::dem::advanced::{

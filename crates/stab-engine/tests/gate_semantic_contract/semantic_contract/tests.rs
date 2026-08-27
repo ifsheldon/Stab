@@ -185,21 +185,29 @@ fn gate_surface_contract_target_patterns_are_accepted_and_classified() {
 }
 
 #[test]
-fn measurement_sampler_executes_every_declared_legal_gate_shape() {
+fn sampling_and_detection_execute_every_declared_legal_gate_shape() {
+    const EXECUTION_SURFACES: [GateSurface; 4] = [
+        GateSurface::MeasurementSampler,
+        GateSurface::DetectionConverter,
+        GateSurface::DetectorFrame,
+        GateSurface::DetectionSampler,
+    ];
     let measurement_gate = Gate::from_name("M").expect("measurement gate");
     for gate in Gate::all() {
         let contract = gate.surface_contract();
         for &pattern in contract.target_patterns() {
-            let decision = contract
-                .decision(GateSurface::MeasurementSampler, pattern)
-                .expect("declared measurement-sampler decision");
-            if matches!(
-                decision.behavior,
-                GateSurfaceBehavior::UnsupportedShape | GateSurfaceBehavior::NotApplicable
-            ) {
+            let has_executable_surface = EXECUTION_SURFACES.iter().copied().any(|surface| {
+                !matches!(
+                    contract
+                        .decision(surface, pattern)
+                        .expect("declared execution-surface decision")
+                        .behavior,
+                    GateSurfaceBehavior::UnsupportedShape | GateSurfaceBehavior::NotApplicable
+                )
+            });
+            if !has_executable_surface {
                 continue;
             }
-
             let targets = representative_targets(pattern);
             let mut circuit = Circuit::new();
             if targets.iter().any(Target::is_measurement_record_target) {
@@ -220,10 +228,20 @@ fn measurement_sampler_executes_every_declared_legal_gate_shape() {
                 CircuitInstruction::new(gate, representative_args(gate), targets, None)
                     .unwrap_or_else(|error| panic!("{gate:?} {pattern:?}: {error}")),
             );
-
-            let fixture = SamplingFixture::compile(&circuit)
-                .unwrap_or_else(|error| panic!("{gate:?} {pattern:?}: {error}"));
-            fixture.sample_zero_one_with_seed(1, Some(17));
+            let text = circuit.to_stim_string();
+            for surface in EXECUTION_SURFACES {
+                let decision = contract
+                    .decision(surface, pattern)
+                    .expect("declared execution-surface decision");
+                if matches!(
+                    decision.behavior,
+                    GateSurfaceBehavior::UnsupportedShape | GateSurfaceBehavior::NotApplicable
+                ) {
+                    continue;
+                }
+                execution::surface_executes(&text, surface)
+                    .unwrap_or_else(|error| panic!("{gate:?} {pattern:?} {surface:?}: {error}"));
+            }
         }
     }
 
@@ -231,12 +249,10 @@ fn measurement_sampler_executes_every_declared_legal_gate_shape() {
         "REPEAT 2 {\n    REPEAT 3 {\n        H 0\n        H 0\n        M 0\n    }\n}\n",
     )
     .expect("nested repeat fixture");
-    assert_eq!(
-        SamplingFixture::compile(&nested)
-            .expect("compile nested repeat")
-            .sample_zero_one_with_seed(1, Some(17)),
-        vec![vec![false; 6]],
-    );
+    for surface in EXECUTION_SURFACES {
+        execution::surface_executes(&nested.to_stim_string(), surface)
+            .unwrap_or_else(|error| panic!("nested repeat {surface:?}: {error}"));
+    }
 }
 
 #[test]

@@ -685,7 +685,7 @@ status = "verified"
 package = "stab-engine"
 kind = "test"
 target = "gate_semantic_contract"
-name = "gate::semantic_contract::tests::measurement_sampler_executes_every_declared_legal_gate_shape"
+name = "gate::semantic_contract::tests::sampling_and_detection_execute_every_declared_legal_gate_shape"
 minimum_tier = "pr"
 
 [[families]]

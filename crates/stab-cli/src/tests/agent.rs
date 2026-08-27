@@ -323,21 +323,21 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             {
                 "operation": "sample",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 2,
+                "compiler_schema_version": 3,
                 "request_fingerprint_schema_version": 1,
                 "configurable_limits": false
             },
             {
                 "operation": "m2d",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 1,
+                "compiler_schema_version": 2,
                 "request_fingerprint_schema_version": null,
                 "configurable_limits": true
             },
             {
                 "operation": "detect",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 1,
+                "compiler_schema_version": 2,
                 "request_fingerprint_schema_version": null,
                 "configurable_limits": true
             },

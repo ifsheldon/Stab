@@ -786,9 +786,16 @@ area = "detection"
 contract = "Detection sampling and conversion support every legal gate and target shape beyond the separately owned common frame, reference-correction, and feedback contracts without selected-subset exits."
 stim_refs = ["src/stim/simulators/frame_simulator_util.test.cc", "src/stim/simulators/measurements_to_detection_events.test.cc"]
 coverage = ["consumer:detection"]
-status = "missing"
+status = "done"
 owner = "stab-engine"
-milestone = "P4"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "gate_semantic_contract"
+name = "gate::semantic_contract::tests::sampling_and_detection_execute_every_declared_legal_gate_shape"
+minimum_tier = "pr"
 
 [[families]]
 id = "detection.sweep-and-feedback-common"

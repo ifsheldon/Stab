@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P3 are complete; P4 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P3 are complete; P4 is in progress; P5 through P9 have not started.
 
 ## Summary
 
@@ -298,9 +298,9 @@ Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `
 6. Cover heralded and correlated errors, inversion, `MPAD`, `MPP`, pair measurements, resets, and noisy measure-reset families.
 7. Keep exact Stim random streams out of scope while requiring deterministic semantic and statistical equivalence under Stab-owned seeds.
 
-Execution checkpoint: ordinary sampling now uses the sole public sampling compiler for sweep-conditioned and non-sweep circuits. Legal `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` sweep target orientations lower into the existing typed `SweepPauli` IR, omitted sweep data is all false through nested repeats, and compiler schema version 2 plus derived fingerprints identify the admission change. The generated classical-control semantic matrix owns the row across every accepted target pattern and real execution surface. No per-control benchmark was added because the existing release CLI sampling workflows already measure this lowering and execution architecture without creating a distinct user hot path.
+Classical-control checkpoint: one model-owned typed classifier now distinguishes quantum pairs, active record or sweep controls, classical `CZ` no-ops, and unsupported orientations. Sampling lowers record and sweep controls into one private `ClassicallyControlledPauli` operation, and both the general and small-frame executors consume it. Detection validation and direct-frame execution use the same classifier instead of maintaining filtered instruction copies or separate `CX`, `CZ`, `XCZ`, and `YCZ` shape tables. Classical `CZ` no-ops are recognized before record-history validation, matching pinned Stim sampling; omitted sweep data remains all false through nested repeats. Sampling compiler schema version 3 and executable-contract schema version 2 plus their derived fingerprints identify these admission and execution changes.
 
-Gate-surface checkpoint: a metadata-driven owner constructs and executes every declared legal canonical gate/target pattern through the public sampling plan and session, then executes a nested folded repeat. The owner deliberately proves admission and dispatch only; existing common, fixed-tableau, sweep, noise, and statistical owners retain value-level semantics. The audit found no missing legal sampler kernel, so no production branch or per-gate benchmark was added merely to close the aggregate ledger row.
+Gate-surface checkpoint: a metadata-driven owner constructs every declared legal canonical gate/target pattern and executes it through measurement sampling, measurement-to-detection conversion, direct detector-frame sampling, and automatic detection sampling, then repeats the same admission exercise inside a nested folded circuit. The owner deliberately proves admission and dispatch only; existing common, fixed-tableau, sweep, noise, and statistical owners retain value-level semantics. Detection compilation now always validates the sole sampling plan before selecting zero, static, or sweep-aware reference state, so `m2d --skip_reference_sample` cannot bypass sampler target validation or truncate an output before that validation fails. The audit found no missing legal sampling or detection kernel. Remaining P4 work is folded conversion of measurement records through compact repeats and meaningful loop-aware execution selection, not another per-gate implementation table.
 
 ### Tests
 

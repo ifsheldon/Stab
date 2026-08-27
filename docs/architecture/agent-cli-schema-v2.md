@@ -74,7 +74,7 @@ A plan fingerprint contains:
   "schema_version": 1,
   "algorithm": "sha256",
   "backend": "scalar",
-  "executable_contract_schema_version": 1,
+  "executable_contract_schema_version": 2,
   "executable_contract_digest": "64 lowercase hexadecimal characters",
   "digest": "64 lowercase hexadecimal characters"
 }

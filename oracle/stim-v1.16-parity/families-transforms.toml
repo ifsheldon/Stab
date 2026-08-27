@@ -142,6 +142,30 @@ name = "circuit_feedback::tests::feedback_inlining_common_semantic_matrix_matche
 minimum_tier = "pr"
 
 [[families]]
+id = "transforms.feedback-inlining-mixed-classical-cz"
+area = "transforms"
+contract = "Feedback inlining removes mixed measurement-record and sweep-bit CZ no-ops instead of interpreting the sweep id as a qubit."
+stim_refs = ["src/stim/util_top/transform_without_feedback.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim tests only whether one CZ target is a measurement record and then calls qubit_value on the other target; a sweep id can therefore become a spurious qubit sensitivity. Stab classifies both targets as classical and removes the semantic no-op."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_feedback::tests::circuit_with_inlined_feedback_drops_classical_cz_noops_with_record_targets"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit"
+minimum_tier = "pr"
+
+[[families]]
 id = "transforms.feedback-inlining-remaining"
 area = "transforms"
 contract = "Feedback inlining supports every remaining legal measurement-record control and compact repeat shape without selected-control or bounded-expansion gaps."

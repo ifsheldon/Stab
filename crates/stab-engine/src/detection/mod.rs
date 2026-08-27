@@ -48,7 +48,7 @@ pub const MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR: CompilationDescriptor
     CompilationDescriptor::new(
         CompilationOperation::MeasurementToDetection,
         stab_model::ModelDialect::StimCircuit,
-        1,
+        2,
         None,
         true,
     );
@@ -58,7 +58,7 @@ pub const DETECTION_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor =
     CompilationDescriptor::new(
         CompilationOperation::DetectionSampling,
         stab_model::ModelDialect::StimCircuit,
-        1,
+        2,
         None,
         true,
     );
@@ -82,24 +82,31 @@ impl PreparedMeasurementToDetection {
         limits: DetectionConversionLimits,
     ) -> DetectionResult<Self> {
         let plan = ConversionPlan::from_circuit_with_limits(circuit, limits)?;
+        let sampling = SamplingCompiler::new().compile(circuit)?;
+        if sampling.measurement_width().get() != plan.measurement_count {
+            return Err(DetectionError::invalid_result_format(format!(
+                "reference sampler has {} measurements but detection conversion expected {}",
+                sampling.measurement_width().get(),
+                plan.measurement_count
+            )));
+        }
+        if sampling.sweep_bit_count() != plan.sweep_bit_count {
+            return Err(DetectionError::invalid_result_format(format!(
+                "reference sampler has {} sweep bits but detection conversion expected {}",
+                sampling.sweep_bit_count(),
+                plan.sweep_bit_count
+            )));
+        }
         let reference_sample = if matches!(
             reference_mode,
             crate::ReferenceSampleMode::SkipReferenceSample
         ) {
             ReferenceSampleSource::Zero
         } else if plan.sweep_bit_count > 0 {
-            let sampling = SamplingCompiler::new().compile(circuit)?;
-            if sampling.sweep_bit_count() != plan.sweep_bit_count {
-                return Err(DetectionError::invalid_result_format(format!(
-                    "sweep reference sampler has {} sweep bits but detection conversion expected {}",
-                    sampling.sweep_bit_count(),
-                    plan.sweep_bit_count
-                )));
-            }
             ReferenceSampleSource::Sweep(sampling)
         } else {
             ReferenceSampleSource::Static(reference::static_reference_sample(
-                circuit,
+                &sampling,
                 plan.measurement_count,
             )?)
         };
@@ -406,14 +413,6 @@ impl ConversionPlan {
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
         self.record_expanded_instruction()?;
         self.record_sweep_bits(instruction)?;
-        self.visit_instruction_semantics(instruction)
-    }
-
-    fn visit_frame_instruction_without_sweep(
-        &mut self,
-        instruction: &CircuitInstruction,
-    ) -> DetectionResult<()> {
-        self.record_expanded_instruction()?;
         self.visit_instruction_semantics(instruction)
     }
 

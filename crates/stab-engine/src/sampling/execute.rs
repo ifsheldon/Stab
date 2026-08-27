@@ -1,4 +1,5 @@
 use rand::Rng;
+use stab_model::advanced::ClassicalControl;
 
 use super::api::SamplingExecutionError;
 use super::operation::SampleOperation;
@@ -87,16 +88,16 @@ where
                     SamplingExecutionError::UnsupportedDeterminedMeasurementGate { gate: "MPAD" },
                 );
             }
-            SampleOperation::FeedbackPauli {
-                offset,
+            SampleOperation::ClassicallyControlledPauli {
+                control,
                 qubit,
                 basis,
             } => {
-                if record_lookback(record, *offset) {
+                if matches!(control, ClassicalControl::Record(offset) if record_lookback(record, *offset))
+                {
                     frame.apply_pauli(*qubit, *basis);
                 }
             }
-            SampleOperation::SweepPauli { .. } => {}
             SampleOperation::Repeat { count: reps, body } => {
                 for _ in 0..*reps {
                     count += count_determined_operations(body, frame, record, rng)?;
@@ -259,21 +260,22 @@ pub(super) fn execute_operations(
                 buffers.record.push(herald);
                 buffers.output.push(herald);
             }
-            SampleOperation::FeedbackPauli {
-                offset,
+            SampleOperation::ClassicallyControlledPauli {
+                control,
                 qubit,
                 basis,
             } => {
-                if measurement_record_bit(buffers.record, *offset) {
-                    buffers.frame.apply_pauli(*qubit, *basis);
-                }
-            }
-            SampleOperation::SweepPauli {
-                sweep_id,
-                qubit,
-                basis,
-            } => {
-                if sweep_record.get(*sweep_id).copied().unwrap_or(false) {
+                let active = match control {
+                    ClassicalControl::Record(offset) => {
+                        measurement_record_bit(buffers.record, *offset)
+                    }
+                    ClassicalControl::Sweep(sweep_id) => usize::try_from(*sweep_id)
+                        .ok()
+                        .and_then(|index| sweep_record.get(index))
+                        .copied()
+                        .unwrap_or(false),
+                };
+                if active {
                     buffers.frame.apply_pauli(*qubit, *basis);
                 }
             }

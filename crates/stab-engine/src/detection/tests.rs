@@ -354,9 +354,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
     )
     .expect_err("reject unsupported sweep target role");
     assert!(
-        unsupported_error
-            .to_string()
-            .contains("does not support XCZ"),
+        unsupported_error.to_string().contains("XCZ target shape"),
         "{unsupported_error}"
     );
     let unsupported_shape = Circuit::from_stim_str("CX sweep[0] sweep[1]\nM 0\nDETECTOR rec[-1]\n")
@@ -371,7 +369,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
     assert!(
         unsupported_shape_error
             .to_string()
-            .contains("does not support CX"),
+            .contains("CX target shape"),
         "{unsupported_shape_error}"
     );
 
@@ -405,7 +403,33 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
             sampling_error.to_string().contains("does not support"),
             "{source}\n{sampling_error}"
         );
+
+        let skip_reference_error = convert_measurements_to_detection_events_with_sweep(
+            &invalid_sweep_order,
+            &[vec![false]],
+            &[vec![false]],
+            ReferenceSampleMode::SkipReferenceSample,
+        )
+        .expect_err("skip-reference conversion must validate sampler target order");
+        assert!(
+            skip_reference_error.to_string().contains("target shape"),
+            "{source}\n{skip_reference_error}"
+        );
     }
+
+    let invalid_feedback = Circuit::from_stim_str("M 0\nCX 1 rec[-1]\nDETECTOR rec[-1]\n")
+        .expect("parse invalid feedback order");
+    let skip_reference_error = convert_measurements_to_detection_events_with_sweep(
+        &invalid_feedback,
+        &[vec![false]],
+        &[Vec::new()],
+        ReferenceSampleMode::SkipReferenceSample,
+    )
+    .expect_err("skip-reference conversion must validate feedback target order");
+    assert!(
+        skip_reference_error.to_string().contains("target shape"),
+        "{skip_reference_error}"
+    );
 
     for (source, gate) in [
         ("RX 0\nCX 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n", "CX"),

@@ -1,5 +1,5 @@
 use stab_algebra::PauliBasis;
-use stab_model::MeasureRecordOffset;
+use stab_model::advanced::ClassicalControl;
 
 use super::stabilizer_frame::LocalTableauTransform;
 
@@ -56,13 +56,8 @@ pub(super) enum SampleOperation {
         qubit: usize,
         probabilities: [f64; 4],
     },
-    FeedbackPauli {
-        offset: MeasureRecordOffset,
-        qubit: usize,
-        basis: PauliBasis,
-    },
-    SweepPauli {
-        sweep_id: usize,
+    ClassicallyControlledPauli {
+        control: ClassicalControl,
         qubit: usize,
         basis: PauliBasis,
     },

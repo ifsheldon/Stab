@@ -3,7 +3,10 @@ use rand::{Rng, SeedableRng as _};
 use stab_algebra::PauliBasis;
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, GateCategory, MeasureRecordOffset, ModelDialect,
-    Pauli, Probability, Target,
+    Pauli, Probability, QubitId, Target,
+    advanced::{
+        ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
+    },
 };
 
 use self::execute::{ExecutionBuffers, count_determined_operations, execute_operations};
@@ -649,166 +652,58 @@ fn compile_controlled_or_feedback(
     feedback_basis: PauliBasis,
 ) -> Result<(), SamplingCompileError> {
     for target_group in instruction.target_groups() {
-        if target_group
-            .iter()
-            .any(|target| target.is_sweep_bit_target())
-        {
-            compile_sweep_pauli_group(
-                instruction,
-                operations,
-                state,
-                feedback_basis,
-                target_group,
-            )?;
-        } else if target_group
-            .iter()
-            .any(|target| target.is_measurement_record_target())
-        {
-            compile_feedback_pauli_group(
-                instruction,
-                operations,
-                state,
-                feedback_basis,
-                target_group,
-            )?;
-        } else {
-            compile_unitary_tableau_group(instruction, operations, target_group)?;
+        match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
+            ControlledPauliTargetPair::Quantum { .. } => {
+                compile_unitary_tableau_group(instruction, operations, target_group)?;
+            }
+            ControlledPauliTargetPair::Classical { control, target } => {
+                let basis = if instruction.gate().canonical_name() == "CZ" {
+                    PauliBasis::Z
+                } else {
+                    feedback_basis
+                };
+                operations.push(SampleOperation::ClassicallyControlledPauli {
+                    control: admit_classical_control(instruction, state, control)?,
+                    qubit: qubit_id_index(target)?,
+                    basis,
+                });
+            }
+            ControlledPauliTargetPair::ClassicalNoop { first, second } => {
+                register_noop_control(state, first)?;
+                register_noop_control(state, second)?;
+            }
+            ControlledPauliTargetPair::Unsupported => {
+                return Err(unsupported_sampler_instruction(instruction));
+            }
         }
     }
     Ok(())
 }
 
-fn compile_sweep_pauli_group(
+fn admit_classical_control(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
     state: &mut CompileState,
-    basis: PauliBasis,
-    target_group: &[Target],
-) -> Result<(), SamplingCompileError> {
-    let [first, second] = target_group else {
-        return Err(unsupported_sampler_instruction(instruction));
-    };
-    let first_sweep = first
-        .sweep_bit_id()
-        .map(|sweep_id| state.add_sweep_bit(sweep_id))
-        .transpose()?;
-    let second_sweep = second
-        .sweep_bit_id()
-        .map(|sweep_id| state.add_sweep_bit(sweep_id))
-        .transpose()?;
-    validate_record_target_if_present(instruction, state, first)?;
-    validate_record_target_if_present(instruction, state, second)?;
-
-    match (
-        instruction.gate().canonical_name(),
-        first_sweep,
-        second_sweep,
-    ) {
-        ("CX" | "CY", Some(sweep_id), None) if second.qubit_id().is_some() => {
-            operations.push(SampleOperation::SweepPauli {
-                sweep_id,
-                qubit: qubit_index(instruction, second)?,
-                basis,
-            });
-            Ok(())
+    control: ClassicalControl,
+) -> Result<ClassicalControl, SamplingCompileError> {
+    match control {
+        ClassicalControl::Record(offset) => {
+            state.validate_record_offset(instruction, offset)?;
         }
-        ("CZ", Some(sweep_id), None) if second.qubit_id().is_some() => {
-            operations.push(SampleOperation::SweepPauli {
-                sweep_id,
-                qubit: qubit_index(instruction, second)?,
-                basis: PauliBasis::Z,
-            });
-            Ok(())
+        ClassicalControl::Sweep(sweep_id) => {
+            state.add_sweep_bit(sweep_id)?;
         }
-        ("CZ", None, Some(sweep_id)) if first.qubit_id().is_some() => {
-            operations.push(SampleOperation::SweepPauli {
-                sweep_id,
-                qubit: qubit_index(instruction, first)?,
-                basis: PauliBasis::Z,
-            });
-            Ok(())
-        }
-        ("XCZ" | "YCZ", None, Some(sweep_id)) if first.qubit_id().is_some() => {
-            operations.push(SampleOperation::SweepPauli {
-                sweep_id,
-                qubit: qubit_index(instruction, first)?,
-                basis,
-            });
-            Ok(())
-        }
-        ("CZ", _, _) if is_classical_bit_target(first) && is_classical_bit_target(second) => Ok(()),
-        (_, Some(_), Some(_)) | (_, Some(_), None) | (_, None, Some(_)) => {
-            Err(unsupported_sampler_instruction(instruction))
-        }
-        _ => Err(unsupported_sampler_instruction(instruction)),
     }
+    Ok(control)
 }
 
-fn compile_feedback_pauli_group(
-    instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+fn register_noop_control(
     state: &mut CompileState,
-    basis: PauliBasis,
-    target_group: &[Target],
+    control: ClassicalControl,
 ) -> Result<(), SamplingCompileError> {
-    let [first, second] = target_group else {
-        return Err(unsupported_sampler_instruction(instruction));
-    };
-    validate_record_target_if_present(instruction, state, first)?;
-    validate_record_target_if_present(instruction, state, second)?;
-    match instruction.gate().canonical_name() {
-        "CX" | "CY"
-            if first.measurement_record_offset().is_some() && second.qubit_id().is_some() =>
-        {
-            push_feedback_pauli(instruction, operations, first, second, basis)
-        }
-        "CZ" if first.measurement_record_offset().is_some() && second.qubit_id().is_some() => {
-            push_feedback_pauli(instruction, operations, first, second, PauliBasis::Z)
-        }
-        "CZ" if first.qubit_id().is_some() && second.measurement_record_offset().is_some() => {
-            push_feedback_pauli(instruction, operations, second, first, PauliBasis::Z)
-        }
-        "CZ" if is_classical_bit_target(first) && is_classical_bit_target(second) => Ok(()),
-        "XCZ" | "YCZ"
-            if first.qubit_id().is_some() && second.measurement_record_offset().is_some() =>
-        {
-            push_feedback_pauli(instruction, operations, second, first, basis)
-        }
-        _ => Err(unsupported_sampler_instruction(instruction)),
-    }
-}
-
-fn push_feedback_pauli(
-    instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
-    record: &Target,
-    target: &Target,
-    basis: PauliBasis,
-) -> Result<(), SamplingCompileError> {
-    let Some(offset) = record.measurement_record_offset() else {
-        return Err(unsupported_sampler_instruction(instruction));
-    };
-    operations.push(SampleOperation::FeedbackPauli {
-        offset,
-        qubit: qubit_index(instruction, target)?,
-        basis,
-    });
-    Ok(())
-}
-
-fn validate_record_target_if_present(
-    instruction: &CircuitInstruction,
-    state: &CompileState,
-    target: &Target,
-) -> Result<(), SamplingCompileError> {
-    if let Some(offset) = target.measurement_record_offset() {
-        state.validate_record_offset(instruction, offset)?;
+    if let ClassicalControl::Sweep(sweep_id) = control {
+        state.add_sweep_bit(sweep_id)?;
     }
     Ok(())
-}
-
-fn is_classical_bit_target(target: &Target) -> bool {
-    target.is_measurement_record_target() || target.is_sweep_bit_target()
 }
 
 fn compile_single_qubit_clifford(
@@ -996,6 +891,10 @@ fn qubit_index(
     let Some(qubit) = target.qubit_id() else {
         return Err(unsupported_sampler_instruction(instruction));
     };
+    qubit_id_index(qubit)
+}
+
+fn qubit_id_index(qubit: QubitId) -> Result<usize, SamplingCompileError> {
     usize::try_from(qubit.get()).map_err(|_| {
         SamplingCompileError::invalid_circuit(format!(
             "qubit target {} cannot fit in this platform's usize",

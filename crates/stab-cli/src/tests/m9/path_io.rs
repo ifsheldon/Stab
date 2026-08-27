@@ -341,3 +341,56 @@ fn m2d_converter_admission_precedes_output_truncation() {
         "observable sentinel\n"
     );
 }
+
+#[test]
+fn m2d_skip_reference_still_validates_before_output_truncation() {
+    let dir = tempdir().expect("temp dir");
+    let circuit_path = dir.path().join("invalid-control.stim");
+    let measurement_path = dir.path().join("measurements.01");
+    let output_path = dir.path().join("output.dets");
+    let obs_path = dir.path().join("observables.01");
+    std::fs::write(&circuit_path, "CX 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n").expect("write circuit");
+    std::fs::write(&measurement_path, "0\n").expect("write measurements");
+    std::fs::write(&output_path, "primary sentinel\n").expect("seed primary output");
+    std::fs::write(&obs_path, "observable sentinel\n").expect("seed observable output");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        vec![
+            OsString::from("stab"),
+            OsString::from("m2d"),
+            OsString::from("--in_format=01"),
+            OsString::from("--out_format=dets"),
+            OsString::from("--skip_reference_sample"),
+            OsString::from("--in"),
+            measurement_path.into_os_string(),
+            OsString::from("--out"),
+            output_path.clone().into_os_string(),
+            OsString::from("--obs_out"),
+            obs_path.clone().into_os_string(),
+            OsString::from("--obs_out_format=01"),
+            OsString::from("--circuit"),
+            circuit_path.into_os_string(),
+        ],
+        b"not-used".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert!(stdout.is_empty());
+    assert!(
+        String::from_utf8(stderr)
+            .expect("UTF-8 diagnostic")
+            .contains("CX target shape")
+    );
+    assert_eq!(
+        std::fs::read_to_string(output_path).unwrap(),
+        "primary sentinel\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(obs_path).unwrap(),
+        "observable sentinel\n"
+    );
+}

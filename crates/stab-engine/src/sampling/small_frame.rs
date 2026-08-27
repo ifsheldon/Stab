@@ -1,14 +1,13 @@
 use rand::{Rng, RngExt as _};
 
-use stab_algebra::PauliBasis;
-use stab_model::MeasureRecordOffset;
-
 use super::execute::record_lookback;
 use super::measurement_flip;
 use super::operation::{
     SINGLE_QUBIT_PAULI_CHANNEL_BASES, SampleOperation, TWO_QUBIT_PAULI_CHANNEL_BASES,
 };
 use super::stabilizer_frame::{FrameStorageError, reset_correction};
+use stab_algebra::PauliBasis;
+use stab_model::advanced::ClassicalControl;
 
 const SMALL_FRAME_MAX_QUBITS: usize = u64::BITS as usize;
 const SMALL_FRAME_MAX_SYMPLECTIC_WIDTH: usize = SMALL_FRAME_MAX_QUBITS * 2;
@@ -25,9 +24,9 @@ pub(super) fn supports_operations(operations: &[SampleOperation]) -> bool {
         | SampleOperation::TwoQubitPauliChannel { .. }
         | SampleOperation::CorrelatedError { .. }
         | SampleOperation::HeraldedPauliChannel { .. }
-        | SampleOperation::FeedbackPauli { .. } => true,
+        | SampleOperation::ClassicallyControlledPauli { .. } => true,
         SampleOperation::Repeat { body, .. } => supports_operations(body),
-        SampleOperation::ApplyTableau { .. } | SampleOperation::SweepPauli { .. } => false,
+        SampleOperation::ApplyTableau { .. } => false,
     })
 }
 
@@ -173,16 +172,16 @@ fn execute_operations<R>(
                 record.push(herald);
                 output.push(herald);
             }
-            SampleOperation::FeedbackPauli {
-                offset,
+            SampleOperation::ClassicallyControlledPauli {
+                control,
                 qubit,
                 basis,
             } => {
-                if measurement_record_bit(record, *offset) {
+                if matches!(control, ClassicalControl::Record(offset) if record_lookback(record, *offset))
+                {
                     frame.apply_pauli(*qubit, *basis);
                 }
             }
-            SampleOperation::SweepPauli { .. } => return,
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
                     execute_operations(body, frame, record, output, correlated_error_occurred, rng);
@@ -190,10 +189,6 @@ fn execute_operations<R>(
             }
         }
     }
-}
-
-fn measurement_record_bit(record: &[bool], offset: MeasureRecordOffset) -> bool {
-    record_lookback(record, offset)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

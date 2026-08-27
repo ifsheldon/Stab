@@ -1,6 +1,11 @@
 use rand::{Rng, RngExt as _};
 use stab_algebra::{PauliBasis, PauliSign};
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, Pauli, Target};
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, Gate, Pauli, Target,
+    advanced::{
+        ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
+    },
+};
 
 use super::error::{DetectionError, DetectionResult};
 use super::{try_false_vec, try_vec_with_capacity};
@@ -9,10 +14,10 @@ mod helpers;
 mod plan;
 
 use helpers::{
-    frame_bit, is_frame_bit_target, measurement_flip_probability, measurement_record_bit,
-    pauli_basis, probability_list, qubit_index, sample_flip, sample_single_pauli,
-    sample_two_qubit_pauli, set_frame_bit, single_probability_argument,
-    unsupported_frame_instruction, unsupported_frame_target, xor_frame_bit, zero_probability_noise,
+    frame_bit, measurement_flip_probability, measurement_record_bit, pauli_basis, probability_list,
+    qubit_id_index, qubit_index, sample_flip, sample_single_pauli, sample_two_qubit_pauli,
+    set_frame_bit, single_probability_argument, unsupported_frame_instruction,
+    unsupported_frame_target, xor_frame_bit, zero_probability_noise,
 };
 
 use plan::decomposed_frame_instruction;
@@ -112,10 +117,7 @@ impl ScalarDetectionFrame {
             "MZZ" => self.measure_pair_products(instruction, PauliBasis::Z, rng),
             "MPP" => self.measure_pauli_products(instruction, rng),
             "MPAD" => self.measure_pads(instruction, rng),
-            "CX" => self.apply_controlled_or_feedback(instruction, PauliBasis::X),
-            "CY" => self.apply_controlled_or_feedback(instruction, PauliBasis::Y),
-            "CZ" => self.apply_cz_or_feedback(instruction),
-            "XCZ" | "YCZ" => self.apply_x_or_y_controlled_z(instruction),
+            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => self.apply_controlled_pauli(instruction),
             "X_ERROR" => self.apply_single_pauli_noise(
                 instruction,
                 [single_probability_argument(instruction)?.get(), 0.0, 0.0],
@@ -366,101 +368,34 @@ impl ScalarDetectionFrame {
         Ok(())
     }
 
-    fn apply_controlled_or_feedback(
-        &mut self,
-        instruction: &CircuitInstruction,
-        basis: PauliBasis,
-    ) -> DetectionResult<()> {
-        for target_group in instruction.target_groups() {
-            let [control, target] = target_group else {
-                return Err(unsupported_frame_instruction(instruction));
-            };
-            if control.is_sweep_bit_target() {
-                if target.qubit_id().is_some() {
-                    // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
-                    continue;
-                }
-                return Err(unsupported_frame_instruction(instruction));
-            }
-            if target.measurement_record_offset().is_some() || target.is_sweep_bit_target() {
-                return Err(unsupported_frame_instruction(instruction));
-            }
-            if let Some(offset) = control.measurement_record_offset() {
-                if measurement_record_bit(&self.measurements, offset)? {
-                    self.apply_pauli(qubit_index(instruction, target)?, basis)?;
-                }
-            } else {
-                self.apply_tableau_targets(instruction.gate(), target_group)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn apply_cz_or_feedback(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
-        for target_group in instruction.target_groups() {
-            let [left, right] = target_group else {
-                return Err(unsupported_frame_instruction(instruction));
-            };
-            if is_frame_bit_target(left) && is_frame_bit_target(right) {
-                continue;
-            }
-            if left.is_sweep_bit_target() && right.qubit_id().is_some() {
-                // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
-                continue;
-            }
-            if right.is_sweep_bit_target() && left.qubit_id().is_some() {
-                // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
-                continue;
-            }
-            match (
-                left.measurement_record_offset(),
-                right.measurement_record_offset(),
-            ) {
-                (Some(left_offset), None) => {
-                    if measurement_record_bit(&self.measurements, left_offset)? {
-                        self.apply_pauli(qubit_index(instruction, right)?, PauliBasis::Z)?;
-                    }
-                }
-                (None, Some(right_offset)) => {
-                    if measurement_record_bit(&self.measurements, right_offset)? {
-                        self.apply_pauli(qubit_index(instruction, left)?, PauliBasis::Z)?;
-                    }
-                }
-                (Some(_), Some(_)) => {}
-                (None, None) => self.apply_tableau_targets(instruction.gate(), target_group)?,
-            }
-        }
-        Ok(())
-    }
-
-    fn apply_x_or_y_controlled_z(
-        &mut self,
-        instruction: &CircuitInstruction,
-    ) -> DetectionResult<()> {
-        let feedback_basis = match instruction.gate().canonical_name() {
-            "XCZ" => PauliBasis::X,
-            "YCZ" => PauliBasis::Y,
+    fn apply_controlled_pauli(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
+        let basis = match instruction.gate().canonical_name() {
+            "CX" | "XCZ" => PauliBasis::X,
+            "CY" | "YCZ" => PauliBasis::Y,
+            "CZ" => PauliBasis::Z,
             _ => return Err(unsupported_frame_instruction(instruction)),
         };
         for target_group in instruction.target_groups() {
-            let [left, right] = target_group else {
-                return Err(unsupported_frame_instruction(instruction));
-            };
-            if left.qubit_id().is_some() && right.is_sweep_bit_target() {
-                // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
-                continue;
-            }
-            if let (Some(_), Some(offset)) = (left.qubit_id(), right.measurement_record_offset()) {
-                if measurement_record_bit(&self.measurements, offset)? {
-                    self.apply_pauli(qubit_index(instruction, left)?, feedback_basis)?;
+            match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
+                ControlledPauliTargetPair::Quantum { .. } => {
+                    self.apply_tableau_targets(instruction.gate(), target_group)?;
                 }
-                continue;
+                ControlledPauliTargetPair::Classical { control, target } => {
+                    let active = match control {
+                        ClassicalControl::Record(offset) => {
+                            measurement_record_bit(&self.measurements, offset)?
+                        }
+                        ClassicalControl::Sweep(_) => false,
+                    };
+                    if active {
+                        self.apply_pauli(qubit_id_index(target)?, basis)?;
+                    }
+                }
+                ControlledPauliTargetPair::ClassicalNoop { .. } => {}
+                ControlledPauliTargetPair::Unsupported => {
+                    return Err(unsupported_frame_instruction(instruction));
+                }
             }
-            if left.qubit_id().is_some() && right.qubit_id().is_some() {
-                self.apply_tableau_targets(instruction.gate(), target_group)?;
-                continue;
-            }
-            return Err(unsupported_frame_instruction(instruction));
         }
         Ok(())
     }

@@ -33,7 +33,7 @@ Schema version 1 first calculates an executable-contract SHA-256 digest from:
 | Order | Field | Encoding |
 | --- | --- | --- |
 | 1 | domain | exact bytes `stab:sampling-executable-contract\0` |
-| 2 | executable-contract schema | big-endian `u16`, value `1` |
+| 2 | executable-contract schema | big-endian `u16`, current value `2` |
 | 3 | backend | one discriminator byte |
 | 4 | private executable variant | one discriminator byte |
 
@@ -55,6 +55,12 @@ Private executable-variant discriminators are:
 The variant remains private even though its discriminator participates in identity.
 
 Changing executable selection or semantics without changing one of these bound identities is forbidden.
+
+### Executable-Contract Schema History
+
+Historical executable-contract schema version `1` used separate record-feedback and sweep-control operations. Omitted sweep controls selected the general frame because the small-frame executor did not own their all-false semantics.
+
+Current executable-contract schema version `2` uses one classically controlled Pauli operation for record and sweep controls, recognizes all-classical `CZ` pairs as unconditional no-ops, and permits the small-frame executor to retain omitted all-false sweeps. These changes alter executable lowering, variant selection, and execution semantics, so the executable-contract identity changed even though the outer plan-fingerprint byte grammar remains schema version `1`.
 
 ## Plan Fingerprint Encoding
 
@@ -83,7 +89,7 @@ M 0
 Its sampling compilation request fingerprint is:
 
 ```text
-5bc21c6c2e62180747536ee72f3c28895ee2402ca0bf3672d1f4c4a4feba925f
+cf4bb1dd338d9239ca34b7a2874ef93b0af1eccdd8a65f2ebee4c6812fd676f0
 ```
 
 Scalar compilation selects the direct Z measurement variant.
@@ -91,13 +97,13 @@ Scalar compilation selects the direct Z measurement variant.
 The executable-contract digest is:
 
 ```text
-825e33849503cf5a731547f393d47bb8405cc4d103ae4501db080ff8523fb47a
+8389188834cda96b43925a34dffdef22bbb0d3c3c3949c526d360590b12ee626
 ```
 
 The final plan fingerprint is:
 
 ```text
-ef6a395691925e222a43896dbd0a988491c80cf93bb1bd85d914386c0ada9844
+82b7cf8908779670b40e4e1711edf3129639007b73fe4fa72d66781934818628
 ```
 
 The test reconstructs both digests independently from the tables above instead of calling the production fingerprint constructor.

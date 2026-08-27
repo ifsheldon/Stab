@@ -127,14 +127,14 @@ fn a6_compilation_descriptors_are_complete_and_executable() {
             (
                 CompilationOperation::MeasurementToDetection,
                 ModelDialect::StimCircuit,
-                1,
+                2,
                 None,
                 true,
             ),
             (
                 CompilationOperation::DetectionSampling,
                 ModelDialect::StimCircuit,
-                1,
+                2,
                 None,
                 true,
             ),
@@ -560,7 +560,7 @@ fn a4_sampling_plan_fingerprint_contract() {
 
     let mut executable = Sha256::new();
     executable.update(b"stab:sampling-executable-contract\0");
-    executable.update(1_u16.to_be_bytes());
+    executable.update(2_u16.to_be_bytes());
     executable.update([1_u8, 1_u8]);
     let executable_digest: [u8; 32] = executable.finalize().into();
 
@@ -576,13 +576,13 @@ fn a4_sampling_plan_fingerprint_contract() {
 
     assert_eq!(
         plan.request_fingerprint().digest_hex(),
-        "5bc21c6c2e62180747536ee72f3c28895ee2402ca0bf3672d1f4c4a4feba925f"
+        "cf4bb1dd338d9239ca34b7a2874ef93b0af1eccdd8a65f2ebee4c6812fd676f0"
     );
     assert_eq!(fingerprint.executable_contract_digest(), executable_digest);
     assert_eq!(fingerprint.digest(), reconstructed_digest);
     assert_eq!(
         fingerprint.digest_hex(),
-        "ef6a395691925e222a43896dbd0a988491c80cf93bb1bd85d914386c0ada9844"
+        "82b7cf8908779670b40e4e1711edf3129639007b73fe4fa72d66781934818628"
     );
 }
 
