@@ -718,7 +718,6 @@ mod tests {
             "m10-dem-parse-contract",
             "m10-dem-print-contract",
             "pf1-circuit-coordinate-query",
-            "pf7-cli-legacy-dispatch-startup",
         ] {
             assert!(
                 primary.iter().all(|row| row.id != non_primary),
@@ -728,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    fn a6_continuity_matrix_freezes_165_runtime_rows_and_one_metadata_anchor() {
+    fn a6_continuity_matrix_freezes_164_runtime_rows_and_one_metadata_anchor() {
         let mut reader = csv::ReaderBuilder::new()
             .trim(csv::Trim::All)
             .from_reader(MANIFEST_CSV.as_bytes());
@@ -741,7 +740,7 @@ mod tests {
             .filter(|row| row.milestone != Milestone::M12)
             .collect::<Vec<_>>();
 
-        assert_eq!(selected.len(), 166);
+        assert_eq!(selected.len(), 165);
         let metadata = selected
             .iter()
             .filter(|row| row.threshold_class == ThresholdClass::BaselineMetadata)
@@ -753,7 +752,7 @@ mod tests {
                 .iter()
                 .filter(|row| row.threshold_class != ThresholdClass::BaselineMetadata)
                 .count(),
-            165
+            164
         );
     }
 

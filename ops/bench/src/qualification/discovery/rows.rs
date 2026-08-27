@@ -10,10 +10,7 @@ pub(super) fn classify_manifest_row(row: &BenchmarkRow) -> Result<&'static str, 
     let id = row.id.as_str();
     let feature = if id == "m12-primary-performance-matrix" {
         "PERF-RESOURCE-BOUNDARIES"
-    } else if matches!(
-        id,
-        "m7-perf-harness" | "m7-cli-dispatch" | "pf7-cli-legacy-dispatch-startup"
-    ) {
+    } else if matches!(id, "m7-perf-harness" | "m7-cli-dispatch") {
         "PERF-CLI-STARTUP-AND-ERRORS"
     } else if id.starts_with("m8-measure-reader-") || id.starts_with("m8-record-") {
         "PERF-RESULT-IO"
@@ -232,12 +229,11 @@ pub(super) fn row_classifications(
 }
 
 fn scale_complete_or_inapplicable(row: &BenchmarkRow) -> bool {
-    const INAPPLICABLE: [&str; 6] = [
+    const INAPPLICABLE: [&str; 5] = [
         "m4-gate-lookup",
         "pf1-gate-metadata-lookup",
         "m10-error-decomp",
         "m7-cli-dispatch",
-        "pf7-cli-legacy-dispatch-startup",
         "pf3-gate-semantic-wide",
     ];
     let id = row.id.as_str();

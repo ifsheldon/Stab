@@ -827,11 +827,6 @@ fn pf7_cli_benchmark_rows_have_stab_compare_runners() {
             "stab_pf7_cli_analyze_errors_generated",
             "cli-analyze-errors-generated",
         ),
-        (
-            "pf7-cli-legacy-dispatch-startup",
-            "stab_pf7_cli_legacy_gen_d3_r3",
-            "cli-legacy-dispatch",
-        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

@@ -31,23 +31,13 @@ const CLI_DISPATCH_ARGS: &[&str] = &[
     "--rounds",
     "3",
 ];
-const LEGACY_DISPATCH_ARGS: &[&str] = &[
-    "stab",
-    "--gen=repetition_code",
-    "--task",
-    "memory",
-    "--distance",
-    "3",
-    "--rounds",
-    "3",
-];
 const CONVERT_STIM_ARGS: &[&str] = &["stab", "convert", "--in_format=stim", "--out_format=stim"];
 const CONVERT_STIM_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/parser_basic.stim");
 const CONVERT_STIM_CANONICAL_EXPECTED: &[u8] =
     b"H 0\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-// Frozen from pinned Stim v1.16.0 for the exact LEGACY_DISPATCH_ARGS command.
-const LEGACY_DISPATCH_EXPECTED: OutputWitness = OutputWitness::new(757, 0xbd1f_30bb_8b3b_aa5d);
+// Frozen from pinned Stim v1.16.0 for the exact CLI_DISPATCH_ARGS command.
+const CLI_DISPATCH_EXPECTED: OutputWitness = OutputWitness::new(757, 0xbd1f_30bb_8b3b_aa5d);
 
 pub(super) fn run_cli_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let preflight = run_dispatch_once(row, CLI_DISPATCH_ARGS, "stab-cli dispatch")?;
@@ -80,21 +70,6 @@ pub(super) fn run_cli_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement
     })?])
 }
 
-pub(super) fn run_legacy_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let preflight = run_legacy_dispatch_once(row)?;
-    ensure_legacy_dispatch_witness(&row.id, OutputWitness::from_bytes(&preflight))?;
-    black_box(preflight);
-    Ok(vec![measure_stab("stab_pf7_cli_legacy_gen_d3_r3", || {
-        let stdout = run_legacy_dispatch_once(row)?;
-        black_box(stdout.len());
-        Ok(())
-    })?])
-}
-
-fn run_legacy_dispatch_once(row: &BenchmarkRow) -> Result<Vec<u8>, BenchError> {
-    run_dispatch_once(row, LEGACY_DISPATCH_ARGS, "stab-cli legacy dispatch")
-}
-
 fn run_dispatch_once(
     row: &BenchmarkRow,
     args: &[&str],
@@ -115,22 +90,18 @@ fn run_dispatch_once(
     Ok(stdout)
 }
 
-fn ensure_legacy_dispatch_witness(row_id: &str, actual: OutputWitness) -> Result<(), BenchError> {
-    ensure_dispatch_witness(row_id, "legacy dispatch", actual)
-}
-
 fn ensure_dispatch_witness(
     row_id: &str,
     label: &str,
     actual: OutputWitness,
 ) -> Result<(), BenchError> {
-    if actual == LEGACY_DISPATCH_EXPECTED {
+    if actual == CLI_DISPATCH_EXPECTED {
         return Ok(());
     }
     Err(BenchError::StabRunner {
         row_id: row_id.to_string(),
         message: format!(
-            "{label} output changed from pinned Stim v1.16.0: expected {LEGACY_DISPATCH_EXPECTED:?}, got {actual:?}"
+            "{label} output changed from pinned Stim v1.16.0: expected {CLI_DISPATCH_EXPECTED:?}, got {actual:?}"
         ),
     })
 }
@@ -217,9 +188,6 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     }
     match (row_id, name) {
         ("m7-cli-dispatch", "stab_cli_dispatch_gen_d3_r3") => Some((1.0, "dispatches/s")),
-        ("pf7-cli-legacy-dispatch-startup", "stab_pf7_cli_legacy_gen_d3_r3") => {
-            Some((1.0, "dispatches/s"))
-        }
         ("m7-convert-stim-canonical", "stab_convert_stim_canonical") => {
             Some((CONVERT_STIM_FIXTURE.len() as f64, "bytes/s"))
         }
@@ -234,9 +202,6 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m7-cli-dispatch" => Some(
             "report-only: Stab measures in-process gen dispatch; upstream baseline is sample-heavy main dispatch",
-        ),
-        "pf7-cli-legacy-dispatch-startup" => Some(
-            "report-only: Stab measures accepted legacy --gen dispatch through the public CLI parser for PF7 visible CLI parity",
         ),
         "m7-convert-stim-canonical" => Some(
             "contract-only: Stab measures in-process canonical .stim conversion; pinned Stim has no matching circuit-convert CLI",

@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "15ec1cc1175feae34049810a2c60e36cf81a8b0fbdac6b3dec98ec4878d96d66",
-  "semantic_digest": "3c617c70d66be3a3ff17366b1ebc71069624373d414ccc0ed309f3af57319852",
+  "semantic_digest": "95eeee9719320cbbd793a7f1c26105c6f4f11c9fa75c0a79a42f34821660c90c",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -3959,29 +3959,6 @@
       "waiver_refs": []
     },
     {
-      "id": "pf7-cli-legacy-dispatch-startup",
-      "performance_feature": "PERF-CLI-STARTUP-AND-ERRORS",
-      "supporting_performance_features": [],
-      "disposition": "future-candidate",
-      "decision": "reworked",
-      "classifications": [
-        "diagnostic",
-        "missing-correctness-preflight",
-        "missing-output-digest",
-        "missing-comparator",
-        "adapter-candidate"
-      ],
-      "stim_mapping": {
-        "kind": "planned-adapter",
-        "symbol": "stim_adapter::pf7_cli_legacy_dispatch_startup",
-        "source": "src/stim/main_namespaced.perf.cc"
-      },
-      "threshold_refs": [],
-      "threshold_max_relative_ratio": null,
-      "threshold_measurement_pairs": [],
-      "waiver_refs": []
-    },
-    {
       "id": "pf7-cli-m2d-feedback-inline",
       "performance_feature": "PERF-DETECTION",
       "supporting_performance_features": [
@@ -4459,8 +4436,7 @@
         "main_sample256_pauliframe_b8_rep_d1000_r1000_stream"
       ],
       "manifest_rows": [
-        "m7-cli-dispatch",
-        "pf7-cli-legacy-dispatch-startup"
+        "m7-cli-dispatch"
       ]
     },
     {

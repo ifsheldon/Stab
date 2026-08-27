@@ -230,7 +230,6 @@ pub(crate) fn run_stab_compare_row_with_root(
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
         "m7-cli-dispatch" => Ok(Some(m7::run_cli_dispatch_row(row)?)),
-        "pf7-cli-legacy-dispatch-startup" => Ok(Some(m7::run_legacy_dispatch_row(row)?)),
         "m7-convert-stim-canonical" => Ok(Some(m7::run_convert_stim_row(row)?)),
         "m4-circuit-parse" => {
             let sparse_fixture = m4_stim_parse_sparse_fixture();
