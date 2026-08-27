@@ -1,12 +1,13 @@
+use std::convert::Infallible;
 use std::hint::black_box;
 
 use sha2::{Digest as _, Sha256};
-use stab_core::{
-    RecordFormat,
-    advanced::records::{
-        for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record,
-        write_ptb64_records_checked, write_records,
-    },
+use stab_core::RecordFormat;
+use stab_records::{
+    try_for_each_packed_record as for_each_packed_record,
+    try_for_each_ptb64_record_all as for_each_ptb64_record_all,
+    try_for_each_sparse_record as for_each_sparse_record, write_ptb64_records_checked,
+    write_records,
 };
 
 use super::super::{
@@ -46,13 +47,13 @@ pub(super) fn run_measure_reader_format_row(
                     MeasureReaderMode::Packed => {
                         for_each_packed_record(&input, format, MEASURE_READER_BITS, |record| {
                             set_bits += record.popcount();
-                            Ok(())
+                            Ok::<(), Infallible>(())
                         })
                     }
                     MeasureReaderMode::Sparse => {
                         for_each_sparse_record(&input, format, MEASURE_READER_BITS, |hits| {
                             set_bits += hits.len();
-                            Ok(())
+                            Ok::<(), Infallible>(())
                         })
                     }
                 }
@@ -84,7 +85,7 @@ pub(super) fn run_measure_reader_ptb64_row(
             let mut set_bits = 0usize;
             for_each_ptb64_record_all(&ptb64_input, MEASURE_READER_BITS, |record| {
                 set_bits += record.iter().filter(|bit| **bit).count();
-                Ok(())
+                Ok::<(), Infallible>(())
             })
             .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(set_bits);
@@ -164,7 +165,7 @@ pub(super) fn validate_measure_reader_preflight(
                         .iter()
                         .enumerate()
                         .all(|(index, bit)| record.get(index) == Some(*bit));
-                Ok(())
+                Ok::<(), Infallible>(())
             })
             .map_err(|error| stab_runner_error(row_id, error))?;
             require_exact(
@@ -183,7 +184,7 @@ pub(super) fn validate_measure_reader_preflight(
             let mut records = Vec::new();
             for_each_sparse_record(input, format, MEASURE_READER_BITS, |hits| {
                 records.push(hits.to_vec());
-                Ok(())
+                Ok::<(), Infallible>(())
             })
             .map_err(|error| stab_runner_error(row_id, error))?;
             require_exact(
@@ -210,7 +211,7 @@ pub(super) fn validate_ptb64_reader_preflight(
                 .iter()
                 .zip(expected)
                 .all(|(actual, expected)| actual == expected);
-        Ok(())
+        Ok::<(), Infallible>(())
     })
     .map_err(|error| stab_runner_error(row_id, error))?;
     require_exact(

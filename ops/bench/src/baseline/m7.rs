@@ -2,10 +2,10 @@ use std::ffi::OsString;
 use std::hint::black_box;
 use std::path::Path;
 
-use stab_core::{
-    CodeDistance, ColorCodeParams, ColorCodeTask, RepetitionCodeParams, RepetitionCodeTask,
-    RoundCount, SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
-    generate_repetition_code_circuit, generate_surface_code_circuit,
+use stab_analysis::{
+    AnalysisResult, CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit,
+    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 
 use crate::error::BenchError;
@@ -343,7 +343,7 @@ impl GeneratorWorkload {
         ensure_exact_bytes(&row.id, "generator CLI output", &pinned, &stab)
     }
 
-    fn generate(self) -> Result<stab_core::GeneratedCircuit, stab_core::CircuitError> {
+    fn generate(self) -> AnalysisResult<GeneratedCircuit> {
         let rounds = RoundCount::try_new(self.rounds)?;
         let distance = CodeDistance::try_new(self.distance)?;
         match self.family {

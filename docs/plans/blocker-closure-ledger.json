@@ -227,7 +227,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec_pfm_b1",
               "pfm_b1_python_inverse_empty",
@@ -273,7 +273,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec_pfm_b1",
               "pfm_b1_python_reset_h_mx_detector",
@@ -461,7 +461,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec_pfm_b1",
               "pfm_b1_python_noisy_measure_reset",
@@ -508,7 +508,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec_pfm_b1",
               "pfm_b1_surface_code_reversal",
@@ -523,7 +523,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec_pfm_b1|pfm_b1_surface_code_reversal|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec_pfm_b1|pfm_b1_surface_code_reversal|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
@@ -727,7 +727,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec_pfm_b1",
               "pfm_b1_feedback_rejection",
@@ -742,7 +742,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec_pfm_b1",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec_pfm_b1",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
@@ -769,7 +769,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec_pfm_b1",
               "pfm_b1_observable_paulis",
@@ -816,7 +816,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "circuit_inverse_qec_pfm_b1",
               "pfm_b1_mpad_flow_matrix",
@@ -950,7 +950,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau",
               "--quiet",
               "--exact"
@@ -963,7 +965,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -1009,7 +1011,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset",
               "--quiet",
               "--exact"
@@ -1022,7 +1026,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -1066,7 +1070,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement",
               "--quiet",
               "--exact"
@@ -1079,7 +1085,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -1123,7 +1129,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_mpp_deterministic",
               "--quiet",
               "--exact"
@@ -1136,7 +1144,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_mpp_deterministic|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_mpp_deterministic|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -1180,7 +1188,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_mpp_anti_hermitian_rejection",
               "--quiet",
               "--exact"
@@ -1193,7 +1203,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_mpp_anti_hermitian_rejection|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_mpp_anti_hermitian_rejection|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
             }
           },
@@ -1236,7 +1246,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_mpad_deterministic",
               "--quiet",
               "--exact"
@@ -1249,7 +1261,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_mpad_deterministic|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_mpad_deterministic|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -1312,7 +1324,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpp_stochastic",
               "--quiet",
               "--exact"
@@ -1325,7 +1339,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpp_stochastic|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpp_stochastic|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
             }
           },
@@ -1385,7 +1399,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpad_stochastic",
               "--quiet",
               "--exact"
@@ -1398,7 +1414,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpad_stochastic|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpad_stochastic|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.inl"
             }
           },
@@ -1442,7 +1458,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_spp",
               "--quiet",
               "--exact"
@@ -1455,7 +1473,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_spp|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_spp|--quiet|--|--exact",
               "upstream_source": "src/stim/circuit/gate_decomposition.test.cc"
             }
           },
@@ -1526,7 +1544,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise",
               "--quiet",
               "--exact"
@@ -1539,7 +1559,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
             }
           },
@@ -1673,7 +1693,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels",
               "--quiet",
               "--exact"
@@ -1686,7 +1708,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -1726,7 +1748,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_identity_noise",
               "--quiet",
               "--exact"
@@ -1739,7 +1763,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_identity_noise|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_identity_noise|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.inl"
             }
           },
@@ -1817,7 +1841,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization",
               "--quiet",
               "--exact"
@@ -1830,7 +1856,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -1900,7 +1926,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors",
               "--quiet",
               "--exact"
@@ -1913,7 +1941,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -1987,7 +2015,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_noise",
               "--quiet",
               "--exact"
@@ -2000,7 +2030,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_noise|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_noise|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2043,7 +2073,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_annotations",
               "--quiet",
               "--exact"
@@ -2056,7 +2088,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_annotations|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_annotations|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -2101,7 +2133,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls",
               "--quiet",
               "--exact"
@@ -2114,7 +2148,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2158,7 +2192,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_control_flow",
               "--quiet",
               "--exact"
@@ -2171,7 +2207,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_control_flow|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_control_flow|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2211,7 +2247,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau_general_circuit",
               "--quiet",
               "--exact"
@@ -2224,7 +2262,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau_general_circuit|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau_general_circuit|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2288,7 +2326,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_x",
               "--quiet",
               "--exact"
@@ -2301,7 +2341,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_x|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_x|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2365,7 +2405,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_y",
               "--quiet",
               "--exact"
@@ -2378,7 +2420,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_y|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_y|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2442,7 +2484,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_z",
               "--quiet",
               "--exact"
@@ -2455,7 +2499,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_z|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_z|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2499,7 +2543,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement_inversion",
               "--quiet",
               "--exact"
@@ -2512,7 +2558,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement_inversion|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement_inversion|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2556,7 +2602,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_spp_multiple",
               "--quiet",
               "--exact"
@@ -2569,7 +2617,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_spp_multiple|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_spp_multiple|--quiet|--|--exact",
               "upstream_source": "src/stim/circuit/gate_decomposition.test.cc"
             }
           },
@@ -2613,7 +2661,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_spp_rejection",
               "--quiet",
               "--exact"
@@ -2626,7 +2676,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_spp_rejection|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_spp_rejection|--quiet|--|--exact",
               "upstream_source": "src/stim/circuit/gate_decomposition.test.cc"
             }
           },
@@ -2670,7 +2720,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise_general_circuit",
               "--quiet",
               "--exact"
@@ -2683,7 +2735,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise_general_circuit|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise_general_circuit|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
             }
           },
@@ -2727,7 +2779,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels_general_circuit",
               "--quiet",
               "--exact"
@@ -2740,7 +2794,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels_general_circuit|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels_general_circuit|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -2784,7 +2838,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization_general_circuit",
               "--quiet",
               "--exact"
@@ -2797,7 +2853,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization_general_circuit|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization_general_circuit|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -2841,7 +2897,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors_general_circuit",
               "--quiet",
               "--exact"
@@ -2854,7 +2912,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors_general_circuit|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors_general_circuit|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -2929,7 +2987,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel",
               "--quiet",
               "--exact"
@@ -2942,7 +3002,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -3017,7 +3077,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_erase_offset",
               "--quiet",
               "--exact"
@@ -3030,7 +3092,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_erase_offset|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_erase_offset|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -3105,7 +3167,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel_offset",
               "--quiet",
               "--exact"
@@ -3118,7 +3182,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel_offset|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel_offset|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -3162,7 +3226,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_annotation_coordinates",
               "--quiet",
               "--exact"
@@ -3175,7 +3241,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_annotation_coordinates|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_annotation_coordinates|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -3219,7 +3285,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_annotation_tags",
               "--quiet",
               "--exact"
@@ -3232,7 +3300,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_annotation_tags|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_annotation_tags|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -3277,7 +3345,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_rejection",
               "--quiet",
               "--exact"
@@ -3290,7 +3360,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_rejection|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_rejection|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -3335,7 +3405,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_feedback",
               "--quiet",
               "--exact"
@@ -3348,7 +3420,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_feedback|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_feedback|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -3392,7 +3464,9 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
+              "--test",
+              "gate_semantic_contract",
               "gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_no_sweep_data",
               "--quiet",
               "--exact"
@@ -3405,7 +3479,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_no_sweep_data|--quiet|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|gate_semantic_contract|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_no_sweep_data|--quiet|--|--exact",
               "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
             }
           },
@@ -3443,7 +3517,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-model",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_counts",
@@ -3458,7 +3532,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_counts|--|--exact",
+              "argv": "cargo-test|-p|stab-model|--test|dem_folded_traversal|pfm_b3_folded_traversal_counts|--|--exact",
               "upstream_source": "src/stim/dem/detector_error_model.test.cc"
             }
           },
@@ -3486,7 +3560,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-model",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_coordinates",
@@ -3501,7 +3575,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_coordinates|--|--exact",
+              "argv": "cargo-test|-p|stab-model|--test|dem_folded_traversal|pfm_b3_folded_traversal_coordinates|--|--exact",
               "upstream_source": "src/stim/dem/detector_error_model.test.cc"
             }
           },
@@ -3557,7 +3631,7 @@
         },
         {
           "id": "pfm4-traversal-sampler",
-          "surface": "CompiledDemSampler",
+          "surface": "DemSamplingPlan and DemSamplingSession",
           "upstream": {
             "path": "src/stim/simulators/dem_sampler.test.cc",
             "kind": "gtest-case",
@@ -3607,7 +3681,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-engine",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_sampler",
@@ -3622,7 +3696,7 @@
             "signature": {
               "parity_mode": "statistical",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sampler|--|--exact",
+              "argv": "cargo-test|-p|stab-engine|--test|dem_folded_traversal|pfm_b3_folded_traversal_sampler|--|--exact",
               "upstream_source": "src/stim/simulators/dem_sampler.test.cc"
             }
           },
@@ -3650,7 +3724,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_search",
@@ -3665,7 +3739,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_search|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_folded_traversal|pfm_b3_folded_traversal_search|--|--exact",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -3693,7 +3767,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_sat",
@@ -3708,7 +3782,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sat|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_folded_traversal|pfm_b3_folded_traversal_sat|--|--exact",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -3985,7 +4059,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_clifford",
+            "argv": "cargo-test|-p|stab-analysis|--test|missing_detectors|pf5_missing_detectors_clifford",
             "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
           }
         },
@@ -3995,7 +4069,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_spp",
+            "argv": "cargo-test|-p|stab-analysis|--test|missing_detectors|pf5_missing_detectors_spp",
             "upstream_source": "src/stim/circuit/gate_decomposition.test.cc"
           }
         },
@@ -4005,7 +4079,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_mpad_measurement_pads_match_pinned_stim|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|--test|missing_detectors|pf5_missing_detectors_mpad_measurement_pads_match_pinned_stim|--|--exact",
             "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
           }
         },
@@ -4015,7 +4089,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_repeat",
+            "argv": "cargo-test|-p|stab-analysis|--test|missing_detectors|pf5_missing_detectors_repeat",
             "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
           }
         },
@@ -4025,7 +4099,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_nested_final_repeat",
+            "argv": "cargo-test|-p|stab-analysis|--test|missing_detectors|pf5_missing_detectors_nested_final_repeat",
             "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
           }
         },
@@ -4035,7 +4109,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_observable_neutral_final_repeat",
+            "argv": "cargo-test|-p|stab-analysis|--test|missing_detectors|pf5_missing_detectors_observable_neutral_final_repeat",
             "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
           }
         }
@@ -4064,7 +4138,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_empty",
@@ -4079,7 +4153,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4107,7 +4181,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_covered",
@@ -4122,7 +4196,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4150,7 +4224,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_duplicate_covered",
@@ -4165,7 +4239,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4193,7 +4267,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_reset_measurement",
@@ -4208,7 +4282,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4236,7 +4310,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_nondeterministic_known",
@@ -4251,7 +4325,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4279,7 +4353,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_nondeterministic_ignored",
@@ -4294,7 +4368,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4322,7 +4396,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_partial_multitarget",
@@ -4337,7 +4411,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4365,7 +4439,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_mpp_independent_product",
@@ -4380,7 +4454,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4408,7 +4482,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_mpp_dependent_row",
@@ -4423,7 +4497,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4451,7 +4525,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_mpp_unknown_input",
@@ -4466,7 +4540,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4494,7 +4568,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_record_observable",
@@ -4509,7 +4583,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4537,7 +4611,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_circuit_pauli_observable",
@@ -4552,7 +4626,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4580,7 +4654,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_honeycomb",
@@ -4595,7 +4669,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_honeycomb|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_honeycomb|--|--exact",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4623,7 +4697,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_missing_detector_evidence",
               "pfm_b4_missing_toric",
@@ -4638,7 +4712,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_toric|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_toric|--|--exact",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4663,7 +4737,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|check_if_circuit_has_unsigned_stabilizer_flows_supports",
+            "argv": "cargo-test|-p|stab-analysis|--test|circuit_flows|check_if_circuit_has_unsigned_stabilizer_flows_supports",
             "upstream_source": "src/stim/util_top/has_flow.test.cc"
           }
         },
@@ -4673,7 +4747,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|circuit_has_unsigned_stabilizer_flow_helpers",
+            "argv": "cargo-test|-p|stab-analysis|--test|circuit_flows|circuit_has_unsigned_stabilizer_flow_helpers",
             "upstream_source": "src/stim/circuit/circuit2.pybind.cc"
           }
         },
@@ -4683,7 +4757,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|unsigned_stabilizer_flow_diagnostics",
+            "argv": "cargo-test|-p|stab-analysis|--test|circuit_flows|unsigned_stabilizer_flow_diagnostics",
             "upstream_source": "src/stim/util_top/has_flow.test.cc"
           }
         },
@@ -4808,7 +4882,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "pfm_b4_flow_solver",
               "pfm_b4_flow_solve_over_sixteen",
@@ -4823,7 +4897,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_solver",
+              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_solver",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.inl"
             }
           },
@@ -4918,7 +4992,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+            "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
             "upstream_source": "src/stim/search/graphlike/algo.test.cc"
           }
         },
@@ -4928,7 +5002,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+            "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
             "upstream_source": "src/stim/search/hyper/algo.test.cc"
           }
         },
@@ -4938,7 +5012,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+            "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
             "upstream_source": "src/stim/search/sat/wcnf.test.cc"
           }
         }
@@ -5358,7 +5432,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_no_error",
@@ -5373,7 +5447,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5400,7 +5474,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_zero_probability_diagnostics_match_stim",
@@ -5415,7 +5489,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5442,7 +5516,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_distance_one",
@@ -5457,7 +5531,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5485,7 +5559,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_distance_two",
@@ -5500,7 +5574,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5528,7 +5602,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_distance_three",
@@ -5543,7 +5617,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5571,7 +5645,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_surface_code",
@@ -5586,7 +5660,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5614,7 +5688,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_repetition_code",
@@ -5629,7 +5703,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5657,7 +5731,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_graphlike_many_observables",
@@ -5672,7 +5746,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5700,7 +5774,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_no_error",
@@ -5715,7 +5789,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5742,7 +5816,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_zero_probability_diagnostics_match_stim",
@@ -5757,7 +5831,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5784,7 +5858,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_distance_one",
@@ -5799,7 +5873,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5827,7 +5901,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_distance_two",
@@ -5842,7 +5916,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5870,7 +5944,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_distance_three",
@@ -5885,7 +5959,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5913,7 +5987,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_hyper_error",
@@ -5928,7 +6002,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5956,7 +6030,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_surface_code",
@@ -5971,7 +6045,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5999,7 +6073,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_repetition_code",
@@ -6014,7 +6088,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -6042,7 +6116,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_hypergraph_many_observables",
@@ -6057,7 +6131,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -6085,7 +6159,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_no_error",
@@ -6100,7 +6174,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6128,7 +6202,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_observable_only",
@@ -6143,7 +6217,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6171,7 +6245,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_detector_only",
@@ -6186,7 +6260,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6214,7 +6288,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_large_detector_only_is_unsat",
@@ -6229,7 +6303,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6256,7 +6330,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_no_targets",
@@ -6271,7 +6345,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6299,7 +6373,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_empty_model",
@@ -6314,7 +6388,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6341,7 +6415,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_detector_observable",
@@ -6356,7 +6430,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6384,7 +6458,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_no_error",
@@ -6399,7 +6473,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6427,7 +6501,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_detector_observable",
@@ -6442,7 +6516,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6470,7 +6544,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_large_probability",
@@ -6485,7 +6559,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6513,7 +6587,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_half_probability",
@@ -6528,7 +6602,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -6556,7 +6630,7 @@
               "cargo",
               "test",
               "-p",
-              "stab-core",
+              "stab-analysis",
               "--test",
               "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_low_quantization_header_matches_stim",
@@ -6571,7 +6645,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "argv": "cargo-test|-p|stab-analysis|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },

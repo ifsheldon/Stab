@@ -1,12 +1,13 @@
 use std::hint::black_box;
 
-use stab_core::{
-    CodeDistance, DemDetectorId, DemTarget, DetectingRegionOptions, DetectingRegionTargetOptions,
-    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+use stab_analysis::{
+    CodeDistance, DetectingRegionOptions, DetectingRegionTargetOptions, RepetitionCodeParams,
+    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     all_detecting_region_targets, all_detecting_region_ticks, circuit_detecting_regions,
     circuit_detecting_regions_for_targets, generate_repetition_code_circuit,
     generate_surface_code_circuit,
 };
+use stab_core::{CircuitTick, DemDetectorId, DemTarget};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -117,7 +118,11 @@ pub(super) fn run_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Ben
                     &circuit,
                     DetectingRegionOptions {
                         detectors: vec![detector],
-                        ticks: vec![0, 1, 2],
+                        ticks: vec![
+                            CircuitTick::new(0),
+                            CircuitTick::new(1),
+                            CircuitTick::new(2),
+                        ],
                         ignore_anticommutation_errors: false,
                     },
                 )
@@ -313,7 +318,7 @@ pub(super) fn run_generated_surface_row(
         DemTarget::relative_detector(4).map_err(|error| stab_runner_error(&row.id, error))?,
         DemTarget::logical_observable(0).map_err(|error| stab_runner_error(&row.id, error))?,
     ];
-    let ticks = vec![0, 1, 2, 3, 4, 5];
+    let ticks = (0..=5).map(CircuitTick::new).collect::<Vec<_>>();
     Ok(vec![super::measure_stab_iterations(
         "stab_pf5_detecting_regions_generated_surface",
         super::super::STAB_COMPARE_ITERATIONS,
@@ -415,7 +420,7 @@ fn measure_basic(
                     &circuit,
                     DetectingRegionOptions {
                         detectors: vec![detector],
-                        ticks: vec![0, 1],
+                        ticks: vec![CircuitTick::new(0), CircuitTick::new(1)],
                         ignore_anticommutation_errors: false,
                     },
                 )

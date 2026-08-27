@@ -468,6 +468,66 @@ fn stale_identity_and_unknown_owner_are_rejected() {
 }
 
 #[test]
+fn facade_cannot_own_a_semantic_parity_family() {
+    let (_directory, root) = test_root();
+    let mut ledger = valid_ledger();
+    ledger.families.first_mut().expect("family").disposition = Disposition::Missing {
+        owner: "stab-core".to_string(),
+        milestone: Milestone::P1,
+    };
+
+    let message = validation_message(
+        validate(&root, &ledger, &route_only_expected()).expect_err("facade semantic owner"),
+    );
+    assert!(message.contains("unknown product owner stab-core"));
+}
+
+#[test]
+fn canonical_semantic_tests_run_in_the_product_owner_package() {
+    let (_directory, root) = test_root();
+    let mut ledger = valid_ledger();
+    ledger
+        .families
+        .push(done_family("zz.owner-package", Tier::Pr));
+    ledger
+        .families
+        .sort_by(|left, right| left.id.cmp(&right.id));
+    let family = ledger
+        .families
+        .iter_mut()
+        .find(|family| family.id == "zz.owner-package")
+        .expect("added family");
+    match &mut family.disposition {
+        Disposition::Done {
+            evidence: Evidence::Verified { test, .. },
+            ..
+        } => test.package = "stab-core".to_string(),
+        disposition => assert!(
+            matches!(
+                disposition,
+                Disposition::Done {
+                    evidence: Evidence::Verified { .. },
+                    ..
+                }
+            ),
+            "valid ledger starts with verified done evidence"
+        ),
+    }
+
+    let message = validation_message(
+        validate(&root, &ledger, &route_only_expected()).expect_err("mismatched test owner"),
+    );
+    assert!(message.contains("is owned by stab-model but its canonical test runs in stab-core"));
+}
+
+#[test]
+fn pinned_oracle_evidence_may_live_outside_the_product_owner_package() {
+    let (_directory, root) = test_root();
+    validate(&root, &valid_ledger(), &route_only_expected())
+        .expect("independent oracle evidence remains valid");
+}
+
+#[test]
 fn duplicate_ids_and_coverage_are_rejected() {
     let (_directory, root) = test_root();
     let mut ledger = valid_ledger();

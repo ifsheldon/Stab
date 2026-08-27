@@ -67,7 +67,9 @@ mod allocations {
     use std::hint::black_box;
     use std::str::FromStr;
 
-    use stab_core::{Circuit, Flow, circuit_time_reversed_for_flows};
+    use stab_algebra::Flow;
+    use stab_analysis::circuit_time_reversed_for_flows;
+    use stab_model::Circuit;
 
     fn reverse(circuit: &Circuit, flows: &[Flow]) {
         let reversed = circuit_time_reversed_for_flows(circuit, flows)

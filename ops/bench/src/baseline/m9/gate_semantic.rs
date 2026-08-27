@@ -1,12 +1,13 @@
 use std::hint::black_box;
 
-use stab_core::{
-    Circuit, ErrorAnalyzerOptions, Gate, Probability, ReferenceSampleMode,
-    analysis::{gate_has_tableau, gate_tableau},
-    circuit_flow_generators, circuit_to_detector_error_model,
+use stab_analysis::{
+    ErrorAnalyzerOptions, circuit_flow_generators, circuit_to_detector_error_model,
+    gate_has_tableau, gate_tableau,
 };
+use stab_core::{Circuit, Gate, Probability};
 use stab_engine::{
-    MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, SamplingPlan, Seed, ShotCount,
+    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, SamplingCompiler,
+    SamplingPlan, Seed, ShotCount,
 };
 use stab_records::{MeasurementBatchView, MeasurementSink};
 

@@ -31,7 +31,6 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
         &[
             "stab-algebra",
             "stab-analysis",
-            "stab-bits",
             "stab-decoder",
             "stab-engine",
             "stab-model",
@@ -765,6 +764,31 @@ mod tests {
                 "{kind:?} reference edge to {target}"
             );
         }
+    }
+
+    #[test]
+    fn facade_cannot_depend_directly_on_low_level_bits() {
+        let graph = WorkspaceGraph {
+            packages: vec![
+                package("stab-core", "crates"),
+                package("stab-bits", "crates"),
+            ],
+            edges: vec![WorkspaceEdge {
+                from: "stab-core".to_owned(),
+                to: "stab-bits".to_owned(),
+                kind: DependencyKind::Normal,
+                optional: false,
+            }],
+            declared_path_dependencies: Vec::new(),
+            resolved_dependencies: Vec::new(),
+        };
+
+        let violations = validate_graph(&graph).violations;
+        assert_eq!(violations.len(), 1, "{violations:?}");
+        assert_eq!(
+            violations.first().expect("one forbidden facade edge").code,
+            "forbidden-product-edge"
+        );
     }
 
     #[test]

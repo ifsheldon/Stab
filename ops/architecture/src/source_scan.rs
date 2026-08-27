@@ -1,31 +1,21 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use syn::punctuated::Punctuated;
-use syn::{Item, Meta, Token, UseTree, Visibility};
+use syn::{Item, UseTree, Visibility};
 
 use crate::policy::is_stable_source_package;
 use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
 
 const SIMD_PACKAGE: &str = "stab-kernels-simd";
 const FACADE_ROOT_REEXPORTS: &str = "ops/architecture/facade-root-reexports.txt";
-const FACADE_ROOT_MODULES: [&str; 4] = ["advanced", "analysis", "execution", "experimental"];
-const FACADE_EXPERIMENTAL_REEXPORTS: [&str; 13] = [
-    "CircuitPass",
-    "CircuitPassContext",
-    "CircuitPassError",
-    "CircuitPassInput",
-    "CircuitPassLimits",
-    "CircuitPassOutput",
-    "CircuitPassProjectionError",
-    "CircuitPassResources",
-    "CircuitPassStage",
-    "WithoutNoiseOptions",
-    "WithoutNoisePass",
-    "WithoutNoiseReport",
-    "run_circuit_pass",
+const FACADE_COMPONENT_CRATES: &[&str] = &[
+    "stab_algebra",
+    "stab_analysis",
+    "stab_decoder",
+    "stab_engine",
+    "stab_model",
+    "stab_records",
 ];
-const FACADE_ADVANCED_MODULES: [&str; 4] = ["storage", "algebra", "records", "traversal"];
 
 mod rust_source;
 
@@ -52,7 +42,7 @@ pub(super) fn scan_workspace_sources(
     rust_sources.sort();
     rust_sources.dedup();
 
-    validate_facade_tiers(root, &mut violations)?;
+    validate_facade_surface(root, &mut violations)?;
 
     for source_path in &rust_sources {
         let source = std::fs::read_to_string(root.join(source_path)).map_err(|source| {
@@ -120,19 +110,13 @@ pub(super) fn scan_workspace_sources(
     })
 }
 
-fn validate_facade_tiers(root: &Path, violations: &mut Vec<Violation>) -> Result<(), CheckError> {
+fn validate_facade_surface(root: &Path, violations: &mut Vec<Violation>) -> Result<(), CheckError> {
     let facade_root = Path::new("crates/stab-core/src/lib.rs");
-    let facade_advanced = Path::new("crates/stab-core/src/advanced.rs");
-    let facade_experimental = Path::new("crates/stab-core/src/experimental.rs");
     let root_reexports = Path::new(FACADE_ROOT_REEXPORTS);
     let root_source = read_source(root, facade_root)?;
-    let advanced_source = read_source(root, facade_advanced)?;
-    let experimental_source = read_source(root, facade_experimental)?;
     let root_reexport_inventory = read_source(root, root_reexports)?;
-    violations.extend(facade_tier_violations(
+    violations.extend(facade_surface_violations(
         FacadeSource::new(facade_root, &root_source),
-        FacadeSource::new(facade_advanced, &advanced_source),
-        FacadeSource::new(facade_experimental, &experimental_source),
         FacadeSource::new(root_reexports, &root_reexport_inventory),
     ));
     Ok(())
@@ -150,197 +134,59 @@ impl<'a> FacadeSource<'a> {
     }
 }
 
-fn facade_tier_violations(
+fn facade_surface_violations(
     root: FacadeSource<'_>,
-    advanced: FacadeSource<'_>,
-    experimental: FacadeSource<'_>,
     root_reexports: FacadeSource<'_>,
 ) -> Vec<Violation> {
     let mut violations = Vec::new();
-    let root_surface =
-        parse_facade_surface(root.path, root.source, FacadeTier::Root, &mut violations);
-    let expected_root_modules = FACADE_ROOT_MODULES
-        .into_iter()
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-    for missing in expected_root_modules.difference(&root_surface.modules) {
-        violations.push(Violation::new(
-            "facade-tier-missing",
-            format!(
-                "{} must publicly declare module `{missing}`",
-                root.path.display()
-            ),
-        ));
-    }
-    for unexpected in root_surface.modules.difference(&expected_root_modules) {
-        violations.push(Violation::new(
-            "facade-root-module-unassigned",
-            format!(
-                "{} publicly declares unassigned root module `{unexpected}`",
-                root.path.display()
-            ),
-        ));
-    }
-
+    let root_surface = parse_facade_surface(root.path, root.source, &mut violations);
     let expected_root_reexports =
         parse_root_reexport_inventory(root_reexports.path, root_reexports.source, &mut violations);
-    for missing in expected_root_reexports.difference(&root_surface.reexports) {
-        violations.push(Violation::new(
-            "facade-root-reexport-missing",
-            format!(
-                "{} assigns `{missing}` to the facade root, but {} does not reexport it",
-                root_reexports.path.display(),
-                root.path.display()
-            ),
-        ));
+    for (exported, expected_source) in &expected_root_reexports {
+        match root_surface.reexports.get(exported) {
+            Some(actual_source) if actual_source == expected_source => {}
+            Some(actual_source) => violations.push(Violation::new(
+                "facade-root-reexport-wrong-owner",
+                format!(
+                    "{} requires root item `{exported}` to reexport `{expected_source}`, but {} reexports `{actual_source}`",
+                    root_reexports.path.display(),
+                    root.path.display()
+                ),
+            )),
+            None => violations.push(Violation::new(
+                "facade-root-reexport-missing",
+                format!(
+                    "{} assigns `{exported}` from `{expected_source}` to the facade root, but {} does not reexport it",
+                    root_reexports.path.display(),
+                    root.path.display()
+                ),
+            )),
+        }
     }
-    for unexpected in root_surface.reexports.difference(&expected_root_reexports) {
-        violations.push(Violation::new(
-            "facade-root-reexport-unassigned",
-            format!(
-                "{} publicly reexports unassigned root item `{unexpected}`; assign it in {} or move it under `advanced`",
-                root.path.display(),
-                root_reexports.path.display()
-            ),
-        ));
-    }
-
-    let advanced_surface = parse_facade_surface(
-        advanced.path,
-        advanced.source,
-        FacadeTier::Advanced,
-        &mut violations,
-    );
-    let required_advanced_modules = FACADE_ADVANCED_MODULES
-        .into_iter()
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-    for required in required_advanced_modules.difference(&advanced_surface.modules) {
-        violations.push(Violation::new(
-            "facade-advanced-module-missing",
-            format!(
-                "{} must publicly declare module `{required}`",
-                advanced.path.display()
-            ),
-        ));
-    }
-    for unexpected in advanced_surface
-        .modules
-        .difference(&required_advanced_modules)
-    {
-        violations.push(Violation::new(
-            "facade-advanced-module-unassigned",
-            format!(
-                "{} publicly declares unassigned advanced module `{unexpected}`",
-                advanced.path.display()
-            ),
-        ));
-    }
-    for reexport in &advanced_surface.reexports {
-        violations.push(Violation::new(
-            "facade-advanced-reexport",
-            format!(
-                "{} publicly reexports top-level item `{reexport}`; advanced items must live under an assigned module",
-                advanced.path.display()
-            ),
-        ));
-    }
-
-    let experimental_surface = parse_facade_surface(
-        experimental.path,
-        experimental.source,
-        FacadeTier::Experimental,
-        &mut violations,
-    );
-    for module in &experimental_surface.modules {
-        violations.push(Violation::new(
-            "facade-experimental-module",
-            format!(
-                "{} publicly declares unassigned experimental module `{module}`",
-                experimental.path.display()
-            ),
-        ));
-    }
-    let expected_experimental_reexports = FACADE_EXPERIMENTAL_REEXPORTS
-        .into_iter()
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-    for missing in expected_experimental_reexports.difference(&experimental_surface.reexports) {
-        violations.push(Violation::new(
-            "facade-experimental-reexport-missing",
-            format!(
-                "{} must publicly reexport assigned experimental item `{missing}`",
-                experimental.path.display()
-            ),
-        ));
-    }
-    for unexpected in experimental_surface
-        .reexports
-        .difference(&expected_experimental_reexports)
-    {
-        violations.push(Violation::new(
-            "facade-experimental-reexport-unassigned",
-            format!(
-                "{} publicly reexports unassigned experimental item `{unexpected}`",
-                experimental.path.display()
-            ),
-        ));
+    for (unexpected, source) in &root_surface.reexports {
+        if !expected_root_reexports.contains_key(unexpected) {
+            violations.push(Violation::new(
+                "facade-root-reexport-unassigned",
+                format!(
+                    "{} publicly reexports unassigned root item `{unexpected}` from `{source}`; assign its canonical owner in {} or use a component crate directly",
+                    root.path.display(),
+                    root_reexports.path.display()
+                ),
+            ));
+        }
     }
 
     violations
 }
 
-#[derive(Clone, Copy)]
-enum FacadeTier {
-    Root,
-    Advanced,
-    Experimental,
-}
-
-impl FacadeTier {
-    fn direct_item_code(self) -> &'static str {
-        match self {
-            Self::Root => "facade-root-direct-item",
-            Self::Advanced => "facade-advanced-direct-item",
-            Self::Experimental => "facade-experimental-direct-item",
-        }
-    }
-
-    fn anonymous_reexport_code(self) -> &'static str {
-        match self {
-            Self::Root => "facade-root-anonymous-reexport",
-            Self::Advanced => "facade-advanced-anonymous-reexport",
-            Self::Experimental => "facade-experimental-anonymous-reexport",
-        }
-    }
-
-    fn glob_reexport_code(self) -> &'static str {
-        match self {
-            Self::Root => "facade-root-glob-reexport",
-            Self::Advanced => "facade-advanced-glob-reexport",
-            Self::Experimental => "facade-experimental-glob-reexport",
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Self::Root => "facade root",
-            Self::Advanced => "advanced facade",
-            Self::Experimental => "experimental facade",
-        }
-    }
-}
-
 #[derive(Default)]
 struct FacadeSurface {
-    modules: BTreeSet<String>,
-    reexports: BTreeSet<String>,
+    reexports: BTreeMap<String, String>,
 }
 
 fn parse_facade_surface(
     path: &Path,
     source: &str,
-    tier: FacadeTier,
     violations: &mut Vec<Violation>,
 ) -> FacadeSurface {
     let syntax = match syn::parse_file(source) {
@@ -349,7 +195,7 @@ fn parse_facade_surface(
             violations.push(Violation::new(
                 "facade-source-parse",
                 format!(
-                    "failed to parse {} while checking facade tiers: {error}",
+                    "failed to parse {} while checking the facade surface: {error}",
                     path.display()
                 ),
             ));
@@ -357,217 +203,178 @@ fn parse_facade_surface(
         }
     };
 
+    for attribute in &syntax.attrs {
+        if !attribute.path().is_ident("doc") {
+            violations.push(Violation::new(
+                "facade-root-crate-attribute",
+                format!(
+                    "{} attaches a non-documentation crate attribute to the facade root; its export surface must remain unconditional and source-auditable",
+                    path.display()
+                ),
+            ));
+        }
+    }
+
     let mut surface = FacadeSurface::default();
     for item in syntax.items {
         match item {
-            Item::Mod(item) => {
-                let pathless = match module_has_path_override(&item.attrs) {
-                    Ok(false) => true,
-                    Ok(true) => {
-                        violations.push(Violation::new(
-                            "facade-module-path-override",
-                            format!(
-                                "{} declares module `{}` through a path override; facade tier modules must use canonical pathless declarations",
-                                path.display(),
-                                item.ident
-                            ),
-                        ));
-                        false
-                    }
-                    Err(error) => {
-                        violations.push(Violation::new(
-                            "facade-module-attribute-parse",
-                            format!(
-                                "failed to validate attributes on module `{}` in {}: {error}",
-                                item.ident,
-                                path.display()
-                            ),
-                        ));
-                        false
-                    }
-                };
-                if is_public(&item.vis) && pathless {
-                    if matches!(tier, FacadeTier::Root) && item.content.is_some() {
-                        violations.push(Violation::new(
-                            "facade-root-inline-module",
-                            format!(
-                                "{} defines public root module `{}` inline; root facade tiers must be canonical out-of-line modules",
-                                path.display(),
-                                item.ident
-                            ),
-                        ));
-                    }
-                    surface.modules.insert(item.ident.to_string());
-                }
-            }
             Item::Use(item) if is_public(&item.vis) => {
-                collect_public_use_names(path, &item.tree, None, tier, &mut surface, violations);
-            }
-            Item::Const(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "constant", &item.ident, violations);
-            }
-            Item::Enum(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "enum", &item.ident, violations);
-            }
-            Item::ExternCrate(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "extern crate", &item.ident, violations);
-            }
-            Item::ForeignMod(_) => {
-                violations.push(Violation::new(
-                    tier.direct_item_code(),
-                    format!(
-                        "{} contains a foreign module directly in the {}; foreign declarations cannot bypass its tier policy",
-                        path.display(),
-                        tier.label()
-                    ),
-                ));
-            }
-            Item::Fn(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "function", &item.sig.ident, violations);
-            }
-            Item::Static(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "static", &item.ident, violations);
-            }
-            Item::Struct(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "struct", &item.ident, violations);
-            }
-            Item::Trait(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "trait", &item.ident, violations);
-            }
-            Item::TraitAlias(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "trait alias", &item.ident, violations);
-            }
-            Item::Type(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "type alias", &item.ident, violations);
-            }
-            Item::Union(item) if is_public(&item.vis) => {
-                report_direct_item(path, tier, "union", &item.ident, violations);
-            }
-            Item::Macro(item) => {
-                let macro_name = item.mac.path.segments.last().map_or_else(
-                    || "<anonymous>".to_owned(),
-                    |segment| segment.ident.to_string(),
+                if !item.attrs.is_empty() {
+                    violations.push(Violation::new(
+                        "facade-root-conditional-reexport",
+                        format!(
+                            "{} attaches attributes to a public reexport; the facade root must expose one unconditional source-auditable surface",
+                            path.display()
+                        ),
+                    ));
+                }
+                collect_public_reexports(
+                    path,
+                    &item.tree,
+                    &mut Vec::new(),
+                    &mut surface,
+                    violations,
                 );
-                violations.push(Violation::new(
-                    tier.direct_item_code(),
-                    format!(
-                        "{} invokes or defines item macro `{}` directly in the {}; generated items cannot bypass its tier policy",
-                        path.display(),
-                        macro_name,
-                        tier.label()
-                    ),
-                ));
             }
-            _ => {}
+            item => report_local_facade_item(path, &item, violations),
         }
     }
 
     surface
 }
 
-fn module_has_path_override(attributes: &[syn::Attribute]) -> syn::Result<bool> {
-    for attribute in attributes {
-        if meta_sets_module_path(&attribute.meta)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn meta_sets_module_path(meta: &Meta) -> syn::Result<bool> {
-    if matches!(meta, Meta::NameValue(value) if value.path.is_ident("path")) {
-        return Ok(true);
-    }
-    let Meta::List(list) = meta else {
-        return Ok(false);
-    };
-    if !list.path.is_ident("cfg_attr") {
-        return Ok(false);
-    }
-    let nested = list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
-    for meta in nested {
-        if meta_sets_module_path(&meta)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 fn is_public(visibility: &Visibility) -> bool {
     matches!(visibility, Visibility::Public(_))
 }
 
-fn report_direct_item(
-    path: &Path,
-    tier: FacadeTier,
-    kind: &str,
-    name: &syn::Ident,
-    violations: &mut Vec<Violation>,
-) {
+fn report_local_facade_item(path: &Path, item: &Item, violations: &mut Vec<Violation>) {
+    let kind = match item {
+        Item::Const(_) => "constant",
+        Item::Enum(_) => "enum",
+        Item::ExternCrate(_) => "extern crate",
+        Item::Fn(_) => "function",
+        Item::ForeignMod(_) => "foreign module",
+        Item::Impl(_) => "implementation",
+        Item::Macro(_) => "item macro",
+        Item::Mod(_) => "module",
+        Item::Static(_) => "static",
+        Item::Struct(_) => "struct",
+        Item::Trait(_) => "trait",
+        Item::TraitAlias(_) => "trait alias",
+        Item::Type(_) => "type alias",
+        Item::Union(_) => "union",
+        Item::Use(_) => "private use",
+        _ => "item",
+    };
     violations.push(Violation::new(
-        tier.direct_item_code(),
+        "facade-root-direct-item",
         format!(
-            "{} defines public {kind} `{name}` directly in the {}; exported items must follow its tier policy",
-            path.display(),
-            tier.label()
+            "{} contains a local {kind}; stab-core/src/lib.rs may contain only documentation and unconditional direct public component reexports",
+            path.display()
         ),
     ));
 }
 
-fn collect_public_use_names(
+fn collect_public_reexports(
     path: &Path,
     tree: &UseTree,
-    parent: Option<&syn::Ident>,
-    tier: FacadeTier,
+    prefix: &mut Vec<String>,
     surface: &mut FacadeSurface,
     violations: &mut Vec<Violation>,
 ) {
     match tree {
-        UseTree::Path(path_tree) => collect_public_use_names(
-            path,
-            &path_tree.tree,
-            Some(&path_tree.ident),
-            tier,
-            surface,
-            violations,
-        ),
+        UseTree::Path(path_tree) => {
+            prefix.push(path_tree.ident.to_string());
+            collect_public_reexports(path, &path_tree.tree, prefix, surface, violations);
+            prefix.pop();
+        }
         UseTree::Name(name) => {
-            let exported = if name.ident == "self" {
-                parent.unwrap_or(&name.ident)
+            let (exported, source) = if name.ident == "self" {
+                let Some(exported) = prefix.last().cloned() else {
+                    violations.push(Violation::new(
+                        "facade-root-reexport-invalid",
+                        format!(
+                            "{} contains a root `self` reexport without a source path",
+                            path.display()
+                        ),
+                    ));
+                    return;
+                };
+                (exported, prefix.join("::"))
             } else {
-                &name.ident
+                let exported = name.ident.to_string();
+                prefix.push(exported.clone());
+                let source = prefix.join("::");
+                prefix.pop();
+                (exported, source)
             };
-            surface.reexports.insert(exported.to_string());
+            insert_facade_reexport(path, exported, source, surface, violations);
         }
         UseTree::Rename(rename) => {
             if rename.rename == "_" {
                 violations.push(Violation::new(
-                    tier.anonymous_reexport_code(),
+                    "facade-root-anonymous-reexport",
                     format!(
-                        "{} contains anonymous public reexport `{}` as `_` in the {}",
+                        "{} contains anonymous public reexport `{}` as `_` in the facade root",
                         path.display(),
-                        rename.ident,
-                        tier.label()
+                        rename.ident
                     ),
                 ));
             } else {
-                surface.reexports.insert(rename.rename.to_string());
+                prefix.push(rename.ident.to_string());
+                let source = prefix.join("::");
+                prefix.pop();
+                insert_facade_reexport(
+                    path,
+                    rename.rename.to_string(),
+                    source,
+                    surface,
+                    violations,
+                );
             }
         }
         UseTree::Glob(_) => {
             violations.push(Violation::new(
-                tier.glob_reexport_code(),
+                "facade-root-glob-reexport",
                 format!(
-                    "{} contains a public glob reexport in the {}; facade tiers require explicit item names",
-                    path.display(), tier.label()
+                    "{} contains a public glob reexport; the facade root requires explicit inventory-owned names",
+                    path.display()
                 ),
             ));
         }
         UseTree::Group(group) => {
             for item in &group.items {
-                collect_public_use_names(path, item, parent, tier, surface, violations);
+                collect_public_reexports(path, item, prefix, surface, violations);
             }
         }
+    }
+}
+
+fn insert_facade_reexport(
+    path: &Path,
+    exported: String,
+    source: String,
+    surface: &mut FacadeSurface,
+    violations: &mut Vec<Violation>,
+) {
+    let owner = source.split("::").next().unwrap_or_default();
+    if !FACADE_COMPONENT_CRATES.contains(&owner) {
+        violations.push(Violation::new(
+            "facade-root-reexport-local-source",
+            format!(
+                "{} reexports root item `{exported}` through `{source}`; facade sources must begin with an approved component crate",
+                path.display()
+            ),
+        ));
+    }
+    if let Some(previous) = surface.reexports.insert(exported.clone(), source.clone()) {
+        violations.push(Violation::new(
+            "facade-root-reexport-duplicate",
+            format!(
+                "{} reexports root item `{exported}` from both `{previous}` and `{source}`",
+                path.display()
+            ),
+        ));
     }
 }
 
@@ -575,29 +382,69 @@ fn parse_root_reexport_inventory(
     path: &Path,
     source: &str,
     violations: &mut Vec<Violation>,
-) -> BTreeSet<String> {
-    let mut entries = BTreeSet::new();
+) -> BTreeMap<String, String> {
+    let mut entries = BTreeMap::new();
+    let mut previous_exported: Option<String> = None;
     for (line_index, line) in source.lines().enumerate() {
         let entry = line.trim();
         if entry.is_empty() || entry.starts_with('#') {
             continue;
         }
-        if syn::parse_str::<syn::Ident>(entry).is_err() {
+        let use_item = match syn::parse_str::<syn::ItemUse>(&format!("pub use {entry};")) {
+            Ok(use_item) => use_item,
+            Err(_) => {
+                violations.push(Violation::new(
+                    "facade-root-inventory-invalid",
+                    format!(
+                        "{}:{} contains invalid Rust reexport `{entry}`",
+                        path.display(),
+                        line_index + 1
+                    ),
+                ));
+                continue;
+            }
+        };
+        let mut parsed = FacadeSurface::default();
+        collect_public_reexports(
+            path,
+            &use_item.tree,
+            &mut Vec::new(),
+            &mut parsed,
+            violations,
+        );
+        if parsed.reexports.len() != 1 {
             violations.push(Violation::new(
                 "facade-root-inventory-invalid",
                 format!(
-                    "{}:{} contains invalid Rust identifier `{entry}`",
+                    "{}:{} must contain exactly one named Rust reexport",
                     path.display(),
                     line_index + 1
                 ),
             ));
             continue;
         }
-        if !entries.insert(entry.to_owned()) {
+        let Some((exported, owner)) = parsed.reexports.into_iter().next() else {
+            continue;
+        };
+        if previous_exported
+            .as_ref()
+            .is_some_and(|previous| previous >= &exported)
+        {
+            violations.push(Violation::new(
+                "facade-root-inventory-order",
+                format!(
+                    "{}:{} root item `{exported}` is not in ascending ASCII order",
+                    path.display(),
+                    line_index + 1
+                ),
+            ));
+        }
+        previous_exported = Some(exported.clone());
+        if let Some(previous_owner) = entries.insert(exported.clone(), owner.clone()) {
             violations.push(Violation::new(
                 "facade-root-inventory-duplicate",
                 format!(
-                    "{}:{} repeats root item `{entry}`",
+                    "{}:{} repeats root item `{exported}` from `{previous_owner}` and `{owner}`",
                     path.display(),
                     line_index + 1
                 ),
@@ -605,19 +452,6 @@ fn parse_root_reexport_inventory(
         }
     }
     entries
-}
-
-#[cfg(test)]
-fn public_module_names(source: &str) -> BTreeSet<String> {
-    let mut violations = Vec::new();
-    let surface = parse_facade_surface(
-        Path::new("fixture.rs"),
-        source,
-        FacadeTier::Root,
-        &mut violations,
-    );
-    assert!(violations.is_empty(), "{violations:?}");
-    surface.modules
 }
 
 fn read_source(root: &Path, relative_path: &Path) -> Result<String, CheckError> {
@@ -702,12 +536,17 @@ fn package_for_source<'a>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
 
-    fn assigned_experimental_surface() -> FacadeSource<'static> {
-        FacadeSource::new(
-            Path::new("experimental.rs"),
-            include_str!("../../../crates/stab-core/src/experimental.rs"),
+    fn namespaces() -> &'static str {
+        "pub use stab_analysis as analysis;\npub use stab_decoder as decoder;\npub use stab_engine as execution;\n"
+    }
+
+    fn inventory(prefix: &str) -> String {
+        format!(
+            "{prefix}stab_analysis as analysis\nstab_decoder as decoder\nstab_engine as execution\n"
         )
     }
 
@@ -756,175 +595,125 @@ mod tests {
     }
 
     #[test]
-    fn facade_tier_contract_reports_missing_and_owner_shaped_surfaces() {
-        let violations = facade_tier_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                "pub mod advanced;\npub mod analysis;\npub mod bits;\npub mod execution;\npub mod experimental;\n",
-            ),
-            FacadeSource::new(
-                Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            ),
-            assigned_experimental_surface(),
-            FacadeSource::new(Path::new("root-reexports.txt"), ""),
+    fn facade_contract_rejects_modules_regardless_of_visibility() {
+        let source = format!(
+            "{}mod private_bits;\npub mod public_bits {{}}\n",
+            namespaces()
+        );
+        let inventory = inventory("");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), &source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
+        );
+
+        assert_eq!(violations.len(), 2, "{violations:?}");
+        assert!(
+            violations
+                .iter()
+                .all(|violation| violation.code == "facade-root-direct-item")
+        );
+    }
+
+    #[test]
+    fn facade_contract_rejects_private_uses_direct_items_and_macros() {
+        let source = format!(
+            "{}use stab_model as local_model;\nstruct Escape;\ninclude!(\"exports.rs\");\n",
+            namespaces()
+        );
+        let inventory = inventory("");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), &source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
+        );
+        let codes = violations
+            .iter()
+            .map(|violation| violation.code)
+            .collect::<Vec<_>>();
+
+        assert_eq!(codes, vec!["facade-root-direct-item"; 3]);
+    }
+
+    #[test]
+    fn facade_contract_accepts_grouped_and_aliased_component_reexports() {
+        let source = format!(
+            "{}pub use stab_model::{{Circuit, DetectorErrorModel as Dem}};\n",
+            namespaces()
+        );
+        let inventory = inventory("stab_model::Circuit\nstab_model::DetectorErrorModel as Dem\n");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), &source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
+        );
+
+        assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
+    fn facade_contract_rejects_private_alias_indirection() {
+        let source = format!(
+            "{}use stab_model as local_model;\npub use local_model::Circuit;\n",
+            namespaces()
+        );
+        let inventory = inventory("stab_model::Circuit\n");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), &source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
+        );
+        let codes = violations
+            .iter()
+            .map(|violation| violation.code)
+            .collect::<BTreeSet<_>>();
+
+        assert!(codes.contains("facade-root-direct-item"));
+        assert!(codes.contains("facade-root-reexport-local-source"));
+        assert!(codes.contains("facade-root-reexport-wrong-owner"));
+    }
+
+    #[test]
+    fn facade_contract_rejects_conditional_reexports() {
+        let source = format!(
+            "{}#[cfg(feature = \"conditional\")] pub use stab_model::Circuit;\n",
+            namespaces()
+        );
+        let inventory = inventory("stab_model::Circuit\n");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), &source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
         );
 
         let [violation] = violations.as_slice() else {
-            panic!("expected one unassigned module violation: {violations:?}");
+            panic!("expected one conditional reexport violation: {violations:?}");
         };
-        assert_eq!(violation.code, "facade-root-module-unassigned");
-        assert!(violation.message.contains("`bits`"));
+        assert_eq!(violation.code, "facade-root-conditional-reexport");
     }
 
     #[test]
-    fn facade_tiers_reject_path_overrides_and_item_macros() {
-        let violations = facade_tier_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                "#[path = \"alternate.rs\"] pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\ninclude!(\"exports.rs\");\n",
-            ),
-            FacadeSource::new(
-                Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            ),
-            assigned_experimental_surface(),
-            FacadeSource::new(Path::new("root-reexports.txt"), ""),
+    fn facade_contract_accepts_crate_docs_and_rejects_crate_conditions() {
+        let source = format!(
+            "#![cfg(feature = \"conditional\")]\n#![cfg_attr(doc, allow(dead_code))]\n//! Facade documentation.\n{}",
+            namespaces()
         );
-        let codes = violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect::<BTreeSet<_>>();
+        let inventory = inventory("");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), &source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
+        );
 
-        assert!(codes.contains("facade-module-path-override"));
-        assert!(codes.contains("facade-root-direct-item"));
-        assert!(codes.contains("facade-tier-missing"));
-    }
-
-    #[test]
-    fn facade_tiers_reject_inline_root_modules_and_private_path_overrides() {
-        let violations = facade_tier_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                "pub mod advanced {}\npub mod analysis;\npub mod execution;\npub mod experimental { pub struct UnreviewedExtension; }\n#[path = \"../../outside.rs\"] mod hidden;\n#[cfg_attr(all(), cfg_attr(any(), path = \"../../alternate.rs\"))] mod nested_hidden;\nunsafe extern \"C\" { pub fn unreviewed_foreign_export(); }\n",
-            ),
-            FacadeSource::new(
-                Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            ),
-            assigned_experimental_surface(),
-            FacadeSource::new(Path::new("root-reexports.txt"), ""),
-        );
-        let codes = violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            codes
-                .iter()
-                .filter(|code| **code == "facade-root-inline-module")
-                .count(),
-            2
-        );
-        assert_eq!(
-            codes
-                .iter()
-                .filter(|code| **code == "facade-module-path-override")
-                .count(),
-            2
-        );
-        assert!(codes.contains(&"facade-root-direct-item"));
-    }
-
-    #[test]
-    fn facade_tier_parser_ignores_comments_strings_and_restricted_modules() {
-        let modules = public_module_names(
-            "pub mod advanced;\n// pub mod bits;\nconst TEXT: &str = \"pub mod stabilizers;\";\npub(crate) mod result_formats;\npub mod experimental;\n",
-        );
-        assert_eq!(
-            modules,
-            ["advanced", "experimental"]
-                .into_iter()
-                .map(str::to_owned)
-                .collect()
-        );
-    }
-
-    #[test]
-    fn facade_tier_contract_parses_grouped_multiline_and_aliased_reexports() {
-        let violations = facade_tier_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::Circuit;\npub use stab_bits::{\n    BitVec,\n    BitMatrix as Matrix,\n};\n",
-            ),
-            FacadeSource::new(
-                Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            ),
-            assigned_experimental_surface(),
-            FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
-        );
-        let unexpected = violations
-            .iter()
-            .filter(|violation| violation.code == "facade-root-reexport-unassigned")
-            .map(|violation| violation.message.as_str())
-            .collect::<Vec<_>>();
-
-        assert_eq!(unexpected.len(), 2);
+        assert_eq!(violations.len(), 2, "{violations:?}");
         assert!(
-            unexpected
+            violations
                 .iter()
-                .any(|message| message.contains("`BitVec`"))
-        );
-        assert!(
-            unexpected
-                .iter()
-                .any(|message| message.contains("`Matrix`"))
+                .all(|violation| violation.code == "facade-root-crate-attribute")
         );
     }
 
     #[test]
-    fn facade_tier_contract_rejects_globs_and_missing_assignments() {
-        let violations = facade_tier_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::*;\n",
-            ),
-            FacadeSource::new(
-                Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            ),
-            assigned_experimental_surface(),
-            FacadeSource::new(Path::new("root-reexports.txt"), "Circuit\n"),
-        );
-        let codes = violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect::<BTreeSet<_>>();
-
-        assert_eq!(
-            codes,
-            BTreeSet::from(["facade-root-glob-reexport", "facade-root-reexport-missing"])
-        );
-    }
-
-    #[test]
-    fn facade_tier_inventory_rejects_invalid_and_duplicate_entries() {
-        let violations = facade_tier_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\npub use crate::circuit::Circuit;\n",
-            ),
-            FacadeSource::new(
-                Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\n",
-            ),
-            assigned_experimental_surface(),
-            FacadeSource::new(
-                Path::new("root-reexports.txt"),
-                "Circuit\nCircuit\nnot-valid\n",
-            ),
+    fn facade_contract_rejects_globs_missing_items_and_bad_inventory() {
+        let source = format!("{}pub use stab_model::*;\n", namespaces());
+        let inventory = inventory("stab_model::Circuit\nstab_analysis::Circuit\nnot-valid\n");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), &source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
         );
         let codes = violations
             .iter()
@@ -935,61 +724,54 @@ mod tests {
             codes,
             BTreeSet::from([
                 "facade-root-inventory-duplicate",
-                "facade-root-inventory-invalid"
+                "facade-root-inventory-invalid",
+                "facade-root-inventory-order",
+                "facade-root-glob-reexport",
+                "facade-root-reexport-missing",
             ])
         );
     }
 
     #[test]
-    fn facade_tier_contract_accepts_current_advanced_and_experimental_shape() {
-        let violations = facade_tier_violations(
+    fn facade_contract_rejects_wrong_item_and_namespace_owners() {
+        let source = "pub use stab_model as analysis;\npub use stab_decoder as decoder;\npub use stab_engine as execution;\npub use stab_analysis::Circuit;\n";
+        let inventory = inventory("stab_model::Circuit\n");
+        let violations = facade_surface_violations(
+            FacadeSource::new(Path::new("lib.rs"), source),
+            FacadeSource::new(Path::new("root-reexports.txt"), &inventory),
+        );
+        let wrong_owners = violations
+            .iter()
+            .filter(|violation| violation.code == "facade-root-reexport-wrong-owner")
+            .map(|violation| violation.message.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(wrong_owners.len(), 2, "{violations:?}");
+        assert!(
+            wrong_owners
+                .iter()
+                .any(|message| message.contains("`analysis`"))
+        );
+        assert!(
+            wrong_owners
+                .iter()
+                .any(|message| message.contains("`Circuit`"))
+        );
+    }
+
+    #[test]
+    fn facade_contract_accepts_current_surface() {
+        let violations = facade_surface_violations(
             FacadeSource::new(
                 Path::new("lib.rs"),
-                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\n",
+                include_str!("../../../crates/stab-core/src/lib.rs"),
             ),
             FacadeSource::new(
-                Path::new("advanced.rs"),
-                include_str!("../../../crates/stab-core/src/advanced.rs"),
+                Path::new("root-reexports.txt"),
+                include_str!("../facade-root-reexports.txt"),
             ),
-            assigned_experimental_surface(),
-            FacadeSource::new(Path::new("root-reexports.txt"), ""),
         );
 
         assert!(violations.is_empty(), "{violations:?}");
-    }
-
-    #[test]
-    fn facade_tier_contract_rejects_unassigned_advanced_and_experimental_exports() {
-        let violations = facade_tier_violations(
-            FacadeSource::new(
-                Path::new("lib.rs"),
-                "pub mod advanced;\npub mod analysis;\npub mod execution;\npub mod experimental;\n",
-            ),
-            FacadeSource::new(
-                Path::new("advanced.rs"),
-                "pub mod algebra {}\npub mod records {}\npub mod storage {}\npub mod traversal {}\npub use crate::Circuit;\npub struct Escape;\n",
-            ),
-            FacadeSource::new(
-                Path::new("experimental.rs"),
-                "pub mod decoder {}\npub use crate::Circuit;\npub fn escape() {}\n",
-            ),
-            FacadeSource::new(Path::new("root-reexports.txt"), ""),
-        );
-        let codes = violations
-            .iter()
-            .map(|violation| violation.code)
-            .collect::<BTreeSet<_>>();
-
-        assert_eq!(
-            codes,
-            BTreeSet::from([
-                "facade-advanced-direct-item",
-                "facade-advanced-reexport",
-                "facade-experimental-direct-item",
-                "facade-experimental-module",
-                "facade-experimental-reexport-missing",
-                "facade-experimental-reexport-unassigned",
-            ])
-        );
     }
 }

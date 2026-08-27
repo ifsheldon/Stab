@@ -31,12 +31,11 @@ const STIM_GATE_DOC_PATH: &str = "doc/gates.md";
 const LEDGER_SCHEMA_VERSION: u32 = 1;
 const MAX_LEDGER_BYTES: usize = 2 * 1024 * 1024;
 const MAX_GENERATED_DOC_BYTES: usize = 4 * 1024 * 1024;
-const PRODUCT_OWNERS: [&str; 10] = [
+const PRODUCT_OWNERS: [&str; 9] = [
     "stab-algebra",
     "stab-analysis",
     "stab-bits",
     "stab-cli",
-    "stab-core",
     "stab-decoder",
     "stab-engine",
     "stab-kernels-simd",
@@ -875,7 +874,7 @@ fn validate_family(root: &RepoRoot, family: &Family, errors: &mut Vec<String>) {
                     test,
                     stim_reproduction,
                 } => {
-                    validate_test_owner(&family.id, test, errors);
+                    validate_canonical_test_owner(&family.id, owner, test, errors);
                     if stim_reproduction.is_some() {
                         errors.push(format!(
                             "done family {} cannot carry a Stim-bug reproduction",
@@ -912,7 +911,7 @@ fn validate_family(root: &RepoRoot, family: &Family, errors: &mut Vec<String>) {
                     test,
                     stim_reproduction,
                 } => {
-                    validate_test_owner(&family.id, test, errors);
+                    validate_canonical_test_owner(&family.id, owner, test, errors);
                     match (divergence_kind, stim_reproduction) {
                         (DivergenceKind::StimBug, Some(reproduction)) => {
                             validate_test_owner(&family.id, reproduction, errors);
@@ -984,6 +983,21 @@ fn validate_test_owner(family_id: &str, test: &TestOwner, errors: &mut Vec<Strin
     {
         errors.push(format!(
             "family {family_id} has invalid integration-test target {target}"
+        ));
+    }
+}
+
+fn validate_canonical_test_owner(
+    family_id: &str,
+    owner: &str,
+    test: &TestOwner,
+    errors: &mut Vec<String>,
+) {
+    validate_test_owner(family_id, test, errors);
+    if test.package != owner && test.package != "stab-oracle" {
+        errors.push(format!(
+            "family {family_id} is owned by {owner} but its canonical test runs in {}",
+            test.package
         ));
     }
 }

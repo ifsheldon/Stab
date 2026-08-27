@@ -1,7 +1,8 @@
 use std::hint::black_box;
 use std::str::FromStr;
 
-use stab_core::{Circuit, Flow, circuit_flow_generators, solve_for_flow_measurements};
+use stab_analysis::{circuit_flow_generators, solve_for_flow_measurements};
+use stab_core::{Circuit, Flow};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

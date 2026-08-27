@@ -1,82 +1,69 @@
-//! Nightly facade fixture with portable SIMD explicitly disabled.
+//! Scalar external-consumer fixture for the Stab facade.
 
+use std::convert::Infallible;
 use std::error::Error;
 
-pub use stab_core::experimental;
-
-use stab_core::advanced::{
-    records::{
-        DetsLayout, FormatError as RecordFormatError, MeasurementCodecSink, RecordResult,
-        RecordStreamReader,
-    },
-    storage::BitVec,
-    traversal::CircuitFlattenedInstructionIter,
-};
+use stab_core::execution::{RandomPolicy, SamplingCompiler, Seed, ShotCount};
 use stab_core::{
-    Circuit, MeasurementBatchView, MeasurementSink, MeasurementWidth, PackedShotBatch,
-    RandomPolicy, RecordFormat, SamplingCompiler, Seed, ShotCount,
+    Circuit, DecoderLayout, DetectorWidth, MeasurementBatchView, MeasurementSink, ObservableWidth,
 };
 
-pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>> {
-    let mut left = BitVec::from_words_truncated(257, vec![0x55aa; 5]);
-    let right = BitVec::from_words_truncated(257, vec![0xaa55; 5]);
-    left.xor_assign(&right.as_bitslice())?;
+#[derive(Default)]
+struct CountingSink {
+    shots: usize,
+    set_bits: usize,
+}
 
-    let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n")?;
-    let _: CircuitFlattenedInstructionIter<'_> = circuit.iter_flattened_instructions();
-    let layout = DetsLayout::try_new(1, 1, 0)?;
+impl MeasurementSink for CountingSink {
+    type Error = Infallible;
+
+    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
+        self.shots += batch.shot_count();
+        for shot in 0..batch.shot_count() {
+            for bit in 0..batch.width().get() {
+                self.set_bits += usize::from(batch.get(shot, bit) == Some(true));
+            }
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+pub fn exercise_scalar_facade() -> Result<(usize, usize, usize, usize), Box<dyn Error>> {
+    let circuit = Circuit::from_stim_str("M 0 1\nDETECTOR rec[-1]\n")?;
+    let unchanged = stab_core::analysis::circuit_with_inlined_feedback(&circuit)?;
+    if unchanged != circuit {
+        return Err(std::io::Error::other("feedback-free circuit changed").into());
+    }
+
+    let decoder_layout = stab_core::decoder::DecoderLayout::new(
+        DetectorWidth::new(1),
+        ObservableWidth::new(0),
+    );
+    let _: DecoderLayout = decoder_layout;
+
     let plan = SamplingCompiler::new().compile(&circuit)?;
     let mut session = plan.session(RandomPolicy::Seeded(Seed::new(7)))?;
-    let mut sample_sink =
-        MeasurementCodecSink::try_new(RecordFormat::ZeroOne, plan.measurement_width())?;
-    session.run(ShotCount::new(1), &mut sample_sink)?;
-    let sampled = sample_sink.into_bytes()?;
-    if sampled != b"0\n" {
-        return Err(std::io::Error::other("facade sampling changed bytes").into());
-    }
-
-    let encoded = encode_streamed_records(b"10\n01\n")?;
-    if encoded != [0x01, 0x02] {
-        return Err(std::io::Error::other("facade-encoded records changed bytes").into());
-    }
+    let mut sink = CountingSink::default();
+    session.run(ShotCount::new(3), &mut sink)?;
 
     Ok((
-        left.len(),
-        layout.total_bits(),
-        plan.measurement_width().get() + sampled.len(),
+        plan.measurement_width().get(),
+        decoder_layout.detector_width().get(),
+        sink.shots,
+        sink.set_bits,
     ))
 }
 
-/// Names the component sink and stream-reader error identity through stab-core paths only: the
-/// sink's associated `Error` type is the facade-re-exported `stab_core::advanced::records`
-/// `FormatError`, without any direct `stab-records` dependency.
-fn encode_streamed_records(input: &[u8]) -> RecordResult<Vec<u8>> {
-    let mut reader = RecordStreamReader::measurements(input, RecordFormat::ZeroOne, 2, 1024);
-    let mut records = Vec::new();
-    loop {
-        match reader.next_record() {
-            Ok(Some(record)) => records.push(record.to_vec()),
-            Ok(None) => break,
-            Err(error) => return Err(stream_error_to_sink_error(error)),
-        }
-    }
-    let mut sink = MeasurementCodecSink::try_new(RecordFormat::B8, MeasurementWidth::new(2))?;
-    let batch = PackedShotBatch::from_records(&records, 2)?;
-    let sink_error_names_the_component_type: Result<(), RecordFormatError> =
-        sink.write_batch(MeasurementBatchView::new(batch.view()));
-    sink_error_names_the_component_type?;
-    sink.into_bytes()
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn stream_error_to_sink_error(
-    error: stab_core::advanced::records::RecordStreamReadError,
-) -> RecordFormatError {
-    match error {
-        stab_core::advanced::records::RecordStreamReadError::Format(error) => error,
-        stab_core::advanced::records::RecordStreamReadError::Io(error) => RecordFormatError::new(
-            stab_core::advanced::records::FormatErrorCode::UnexpectedEndOfInput,
-            error.to_string(),
-            None,
-        ),
+    #[test]
+    fn facade_composes_analysis_decoder_and_execution_namespaces() {
+        assert_eq!(exercise_scalar_facade().unwrap(), (2, 1, 3, 0));
     }
 }

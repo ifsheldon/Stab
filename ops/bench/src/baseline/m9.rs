@@ -4,14 +4,18 @@ use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use stab_analysis::{
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_has_all_unsigned_stabilizer_flows,
+    circuit_with_inlined_feedback,
+};
 use stab_core::{
-    Circuit, DetectionSink, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy,
-    RecordFormat, Seed, ShotCount, advanced::records::read_records,
-    advanced::records::write_ptb64_records_checked, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_has_all_unsigned_stabilizer_flows, circuit_with_inlined_feedback,
+    Circuit, DetectionSink, Flow, MeasurementBatchView, PackedShotBatch, RecordFormat,
+};
+use stab_engine::{
+    DetectionSamplingCompiler, MeasurementToDetectionCompiler, RandomPolicy, Seed, ShotCount,
     measurement_record_count,
 };
-use stab_engine::{DetectionSamplingCompiler, MeasurementToDetectionCompiler};
+use stab_records::{read_records, write_ptb64_records_checked};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

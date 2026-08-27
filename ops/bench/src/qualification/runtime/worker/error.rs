@@ -1,4 +1,4 @@
-use stab_core::advanced::storage::BitError;
+use stab_bits::BitError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -8,11 +8,11 @@ pub(crate) enum WorkerError {
     #[error(transparent)]
     Protocol(#[from] super::super::protocol::ProtocolError),
     #[error(transparent)]
-    Circuit(#[from] stab_core::CircuitError),
+    Analysis(#[from] stab_analysis::AnalysisError),
     #[error(transparent)]
     Model(#[from] stab_model::ModelError),
     #[error(transparent)]
-    SamplingCompile(#[from] stab_core::SamplingCompileError),
+    SamplingCompile(#[from] stab_engine::SamplingCompileError),
     #[error(transparent)]
     NoisePass(
         #[from]
@@ -169,7 +169,7 @@ pub(crate) enum WorkerError {
     #[error("allocating bit-matrix transpose modified its source matrix")]
     TransposeSourceChanged,
     #[error(transparent)]
-    Stabilizer(#[from] stab_core::StabilizerError),
+    Stabilizer(#[from] stab_algebra::StabilizerError),
     #[error("Pauli multiplication width {actual} is below the minimum {minimum}")]
     PauliWidthMinimum { actual: u64, minimum: u64 },
     #[error("Pauli multiplication width {actual} exceeds maximum {maximum}")]

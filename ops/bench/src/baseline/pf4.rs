@@ -1,13 +1,13 @@
 use std::hint::black_box;
 
 use stab_analysis::{
-    explain_errors_from_circuit, find_undetectable_logical_error, flattened_detector_error_model,
-    likeliest_error_sat_problem, rounded_detector_error_model, shortest_error_sat_problem,
+    ErrorAnalyzerOptions, circuit_to_detector_error_model, explain_errors_from_circuit,
+    find_undetectable_logical_error, flattened_detector_error_model, likeliest_error_sat_problem,
+    rounded_detector_error_model, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 use stab_core::{
     Circuit, DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
-    ErrorAnalyzerOptions, circuit_to_detector_error_model,
 };
 
 use crate::error::BenchError;

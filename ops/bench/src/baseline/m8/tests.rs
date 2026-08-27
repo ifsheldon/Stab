@@ -17,8 +17,8 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::Probability;
 use stab_core::RecordFormat;
-use stab_core::advanced::records::{write_ptb64_records_checked, write_records};
 use stab_engine::biased_randomize_bits;
+use stab_records::{write_ptb64_records_checked, write_records};
 
 #[test]
 fn probability_preflight_rejects_same_width_wrong_content() {

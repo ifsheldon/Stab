@@ -1,4 +1,4 @@
-use stab_core::advanced::storage::BitVec;
+use stab_bits::BitVec;
 
 use super::{WORD_BITS, semantic_preflight, stab_runner_error};
 use crate::error::BenchError;

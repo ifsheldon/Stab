@@ -148,16 +148,16 @@ rationale = "Stab bounds inherently expanded full coordinate maps while retainin
 [families.evidence]
 status = "verified"
 [families.evidence.test]
-package = "stab-core"
+package = "stab-model"
 kind = "test"
-target = "dem_api"
+target = "dem_coordinate_resources"
 name = "pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries"
 minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.dem-sampling-work-limits"
 area = "resource-safety"
-contract = "DEM sampling sessions reject detector, sampled-error, and replay work above typed limits before RNG advancement or sink mutation and remain reusable after preflight rejection."
+contract = "DEM sampling rejects detector and sampled-error work above typed limits before RNG advancement or sink mutation and leaves the sampling session reusable; replay work rejects owned-session construction before record traversal or sink mutation."
 stim_refs = ["src/stim/simulators/dem_sampler.test.cc"]
 status = "divergence"
 owner = "stab-engine"
@@ -618,7 +618,7 @@ owner = "stab-engine"
 [families.evidence]
 status = "verified"
 [families.evidence.test]
-package = "stab-core"
+package = "stab-engine"
 kind = "test"
 target = "gate_semantic_execution"
 name = "fixed_tableau_gates_execute_across_current_public_surfaces"
@@ -702,7 +702,7 @@ owner = "stab-analysis"
 [families.evidence]
 status = "verified"
 [families.evidence.test]
-package = "stab-core"
+package = "stab-analysis"
 kind = "test"
 target = "dem_search"
 name = "pf6_direct_dem_graphlike_search_matches_upstream_distance_cases"
@@ -718,7 +718,7 @@ owner = "stab-analysis"
 [families.evidence]
 status = "verified"
 [families.evidence.test]
-package = "stab-core"
+package = "stab-analysis"
 kind = "test"
 target = "dem_search"
 name = "pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases"

@@ -6,14 +6,13 @@ use std::time::{Duration, Instant};
 
 use sha2::{Digest, Sha256};
 use stab_analysis::{
-    ErrorAnalyzerOptions, circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,
-    shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
+    CodeDistance, ErrorAnalyzerOptions, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    circuit_to_detector_error_model, generate_surface_code_circuit,
+    independent_to_disjoint_xyz_errors, shortest_graphlike_undetectable_logical_error,
+    try_disjoint_to_independent_xyz_errors,
 };
-use stab_core::{
-    Circuit, CodeDistance, DetectorErrorModel, Flow, PauliBasis, PauliString, Probability,
-    RoundCount, SurfaceCodeParams, SurfaceCodeTask, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_flow_generators, generate_surface_code_circuit,
-};
+use stab_core::{Circuit, DetectorErrorModel, Flow, PauliBasis, PauliString, Probability};
 
 use crate::allocations::measure_tracked_memory;
 use crate::error::BenchError;

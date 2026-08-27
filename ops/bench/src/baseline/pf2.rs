@@ -1,16 +1,13 @@
 use std::hint::black_box;
 use std::str::FromStr;
 
-use stab_core::{
-    Circuit, CircuitInstruction, CircuitItem, CodeDistance, Flow, RoundCount, SurfaceCodeParams,
-    SurfaceCodeTask, Target, TimeReversedForFlowsOptions,
-    analysis::{
-        circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
-        circuit_with_inlined_feedback, circuit_without_noise, decomposed_circuit,
-        flattened_circuit,
-    },
+use stab_analysis::{
+    CodeDistance, RoundCount, SurfaceCodeParams, SurfaceCodeTask, TimeReversedForFlowsOptions,
+    circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
+    circuit_with_inlined_feedback, circuit_without_noise, decomposed_circuit, flattened_circuit,
     generate_surface_code_circuit,
 };
+use stab_core::{Circuit, CircuitInstruction, CircuitItem, Flow, Target};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

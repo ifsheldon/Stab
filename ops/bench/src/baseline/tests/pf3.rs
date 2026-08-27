@@ -86,7 +86,8 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
 fn pf3_analyzer_sweep_allocation_is_index_magnitude_independent() {
     use std::hint::black_box;
 
-    use stab_core::{Circuit, ErrorAnalyzerOptions, circuit_to_detector_error_model};
+    use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+    use stab_model::Circuit;
 
     fn analyze(circuit: &Circuit) {
         let model = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())

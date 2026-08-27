@@ -1,6 +1,7 @@
 use std::hint::black_box;
 
-use stab_core::{Circuit, MissingDetectorOptions, missing_detectors};
+use stab_analysis::{MissingDetectorOptions, missing_detectors};
+use stab_core::Circuit;
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -25,7 +26,7 @@ const MPAD_SUGGESTIONS: usize = 8;
 const GENERATED_CASES: usize = 2;
 const GENERATED_SUGGESTIONS: usize = 2;
 const HONEYCOMB_MISSING_DETECTOR: &str = include_str!(
-    "../../../../../crates/stab-core/tests/fixtures/missing_detectors_honeycomb_missing_detector.stim"
+    "../../../../../crates/stab-analysis/tests/fixtures/missing_detectors_honeycomb_missing_detector.stim"
 );
 
 pub(super) fn run_basic_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {

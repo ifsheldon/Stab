@@ -4,7 +4,8 @@ use std::path::Path;
 use std::str::FromStr;
 
 use serde::Deserialize;
-use stab_core::{Flow, TimeReversedForFlowsOptions, circuit_time_reversed_for_flows_with_options};
+use stab_analysis::{TimeReversedForFlowsOptions, circuit_time_reversed_for_flows_with_options};
+use stab_core::Flow;
 
 use super::{FixtureError, FixtureRow, parse_core_circuit};
 use crate::{OracleError, RepoRoot};

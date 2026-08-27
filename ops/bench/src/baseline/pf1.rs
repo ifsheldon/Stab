@@ -1,14 +1,13 @@
 use std::hint::black_box;
 
-use stab_analysis::detector_error_model_without_tags;
+use stab_analysis::{
+    GateUnitaryMatrix, detector_error_model_without_tags, gate_decomposition_to_circuit,
+    gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows, gate_has_h_s_cx_m_r_decomposition,
+    gate_has_tableau, gate_has_unitary_matrix, gate_tableau, gate_unitary_matrix,
+};
 use stab_core::{
     Circuit, CircuitDetectorId, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
-    DetectorErrorModel, Flow, Gate, GateArgumentRule, GateUnitaryMatrix, PauliString, Tableau,
-    analysis::{
-        gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows,
-        gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix, gate_tableau,
-        gate_unitary_matrix,
-    },
+    DetectorErrorModel, Flow, Gate, GateArgumentRule, PauliString, Tableau,
 };
 
 use crate::error::BenchError;

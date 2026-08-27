@@ -21,7 +21,7 @@ const FEATURE_CONTRACTS: [FeatureContract; 6] = [
     FeatureContract {
         package: "stab-core",
         default: &[],
-        portable: &["stab-algebra/portable-simd", "stab-bits/portable-simd"],
+        portable: &["stab-algebra/portable-simd"],
     },
     FeatureContract {
         package: "stab-cli",
@@ -36,7 +36,12 @@ const FEATURE_CONTRACTS: [FeatureContract; 6] = [
     FeatureContract {
         package: "stab-bench",
         default: &[],
-        portable: &["stab-cli/portable-simd", "stab-core/portable-simd"],
+        portable: &[
+            "stab-algebra/portable-simd",
+            "stab-bits/portable-simd",
+            "stab-cli/portable-simd",
+            "stab-core/portable-simd",
+        ],
     },
 ];
 
@@ -45,7 +50,6 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "stable",
         relative_manifest: "test-support/consumers/stable/Cargo.toml",
         toolchain: Some(STABLE_TOOLCHAIN),
-        cargo_subcommand: "test",
         portable: false,
         requires_core: false,
     },
@@ -53,7 +57,6 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "scalar-facade",
         relative_manifest: "test-support/consumers/scalar-facade/Cargo.toml",
         toolchain: None,
-        cargo_subcommand: "check",
         portable: false,
         requires_core: true,
     },
@@ -61,7 +64,6 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "nightly-facade",
         relative_manifest: "test-support/consumers/nightly-facade/Cargo.toml",
         toolchain: None,
-        cargo_subcommand: "check",
         portable: true,
         requires_core: true,
     },
@@ -69,7 +71,6 @@ const FIXTURES: [ConsumerFixture; 4] = [
         id: "mixed",
         relative_manifest: "test-support/consumers/mixed/Cargo.toml",
         toolchain: None,
-        cargo_subcommand: "check",
         portable: true,
         requires_core: true,
     },
@@ -80,7 +81,6 @@ struct ConsumerFixture {
     id: &'static str,
     relative_manifest: &'static str,
     toolchain: Option<&'static str>,
-    cargo_subcommand: &'static str,
     portable: bool,
     requires_core: bool,
 }
@@ -268,7 +268,7 @@ fn validate_fixture_execution(
         command.arg(toolchain);
     }
     let status = command
-        .arg(fixture.cargo_subcommand)
+        .arg("test")
         .args(["--locked", "--manifest-path"])
         .arg(manifest)
         .arg("--target-dir")

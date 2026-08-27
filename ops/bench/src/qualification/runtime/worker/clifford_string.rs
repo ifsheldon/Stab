@@ -4,10 +4,9 @@ use std::str::FromStr;
 use std::sync::atomic::{Ordering, compiler_fence};
 
 use sha2::{Digest as _, Sha256};
-use stab_core::{
-    CircuitError, CliffordString, Gate, SingleQubitClifford, StabilizerResource, Tableau,
-    analysis::gate_unitary_matrix, unitary_to_tableau,
-};
+use stab_algebra::unitary_to_tableau;
+use stab_analysis::gate_unitary_matrix;
+use stab_core::{CliffordString, Gate, SingleQubitClifford, StabilizerResource, Tableau};
 
 use super::WorkerError;
 
@@ -548,7 +547,7 @@ fn scalar_multiplication_table() -> Result<[[u8; 24]; 24], WorkerError> {
     let tableaus = STIM_GATE_ORDER
         .iter()
         .map(|gate| {
-            let gate = Gate::from_name(gate.canonical_name()).map_err(CircuitError::from)?;
+            let gate = Gate::from_name(gate.canonical_name())?;
             let matrix = gate_unitary_matrix(gate)?.to_vecs();
             unitary_to_tableau(&matrix, true).map_err(WorkerError::from)
         })

@@ -11,7 +11,12 @@ publish = false
 [features]
 default = []
 count-allocations = ["dep:allocation-counter"]
-portable-simd = ["stab-cli/portable-simd", "stab-core/portable-simd"]
+portable-simd = [
+    "stab-algebra/portable-simd",
+    "stab-bits/portable-simd",
+    "stab-cli/portable-simd",
+    "stab-core/portable-simd",
+]
 
 [lints]
 workspace = true
@@ -28,7 +33,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 signal-hook = { workspace = true }
+stab-algebra = { workspace = true }
 stab-analysis = { workspace = true }
+stab-bits = { workspace = true }
 stab-cli = { path = "../../crates/stab-cli", default-features = false }
 stab-core = { path = "../../crates/stab-core", default-features = false }
 stab-decoder = { workspace = true }

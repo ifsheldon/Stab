@@ -164,7 +164,7 @@ fn sparse_fixture() -> String {
     )
 }
 
-fn wide_coordinate_fixture() -> Result<DetectorErrorModel, stab_core::CircuitError> {
+fn wide_coordinate_fixture() -> stab_model::ModelResult<DetectorErrorModel> {
     let coordinates = std::iter::repeat_n("1", WIDE_COORDINATE_DIMENSIONS)
         .collect::<Vec<_>>()
         .join(",");

@@ -1,7 +1,7 @@
 {
   "schema_version": 11,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "bbc9b05773d211c7bbb59cfd2ce30d1f3c8caa0a9a6ff25ab76f549b41442727",
+  "performance_inventory_sha256": "3c617c70d66be3a3ff17366b1ebc71069624373d414ccc0ed309f3af57319852",
   "product_diagnostic_suite_timeout_seconds": 600,
   "product_diagnostic_policies": [
     {
@@ -380,7 +380,7 @@
       "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
-      "owner": "stab-core/resource-estimation",
+      "owner": "stab-engine/resource-estimation",
       "profiler_note": null,
       "comparator_sources": []
     },

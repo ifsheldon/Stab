@@ -6,7 +6,10 @@
 use stab_analysis::{
     detector_error_model_without_tags, flattened_detector_error_model, rounded_detector_error_model,
 };
-use stab_model::{DemItem, DemRepeatBlock, DemRepeatCount, DetectorErrorModel, ModelResult};
+use stab_model::{
+    DemInstruction, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
+    ModelResult, Probability,
+};
 
 fn dem(text: &str) -> DetectorErrorModel {
     DetectorErrorModel::from_dem_str(text).expect("valid test DEM")
@@ -33,6 +36,17 @@ fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
     assert_eq!(
         flattened_detector_error_model(&empty).expect("flatten empty"),
         empty
+    );
+
+    let zero_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 0 {\n    error(1) D9 L7\n    shift_detectors(2) 10\n}\n",
+    )
+    .expect("parse zero-count repeat");
+    assert_eq!(
+        flattened_detector_error_model(&zero_repeat)
+            .expect("flatten zero-count repeat")
+            .to_dem_string(),
+        ""
     );
 
     let shifted = DetectorErrorModel::from_dem_str(
@@ -92,6 +106,84 @@ fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
             "detector(25, 20, 30, 40) D10\n",
         )
     );
+}
+
+fn deep_tagged_dem(depth: usize) -> DetectorErrorModel {
+    let mut model = DetectorErrorModel::new();
+    model.push_instruction(
+        DemInstruction::error(
+            Probability::try_new(0.125).expect("valid probability"),
+            vec![DemTarget::relative_detector(0).expect("D0")],
+            Some("leaf".to_string()),
+        )
+        .expect("valid error instruction"),
+    );
+    for _ in 0..depth {
+        let mut outer = DetectorErrorModel::new();
+        outer.push_repeat_block(DemRepeatBlock::new(
+            DemRepeatCount::new(1),
+            model,
+            Some("repeat".to_string()),
+        ));
+        model = outer;
+    }
+    model
+}
+
+fn deep_transform_matches(
+    model: &DetectorErrorModel,
+    depth: usize,
+    expected_repeat_tag: Option<&[u8]>,
+    expected_leaf_tag: Option<&[u8]>,
+    expected_probability: f64,
+) -> bool {
+    let mut current = model;
+    for _ in 0..depth {
+        let Some(DemItem::RepeatBlock(repeat)) = current.items().first() else {
+            return false;
+        };
+        if repeat.tag_bytes() != expected_repeat_tag {
+            return false;
+        }
+        current = repeat.body();
+    }
+    let Some(DemItem::Instruction(instruction)) = current.items().first() else {
+        return false;
+    };
+    instruction.tag_bytes() == expected_leaf_tag
+        && instruction
+            .args()
+            .first()
+            .is_some_and(|value| (*value - expected_probability).abs() < f64::EPSILON)
+}
+
+#[test]
+fn deep_folded_dem_transforms_use_bounded_stack() {
+    const DEPTH: usize = 10_000;
+    let model = deep_tagged_dem(DEPTH);
+    let handle = std::thread::Builder::new()
+        .stack_size(64 * 1024)
+        .spawn(move || {
+            let rounded =
+                rounded_detector_error_model(&model, 2).map_err(|error| error.to_string())?;
+            let stripped = detector_error_model_without_tags(&model);
+            let result = (
+                deep_transform_matches(&rounded, DEPTH, Some(b"repeat"), Some(b"leaf"), 0.13),
+                deep_transform_matches(&stripped, DEPTH, None, None, 0.125),
+            );
+            drop(stripped);
+            drop(rounded);
+            drop(model);
+            Ok::<_, String>(result)
+        })
+        .expect("spawn constrained-stack transform regression");
+
+    let (rounded, stripped) = handle
+        .join()
+        .expect("constrained-stack transform should not panic")
+        .expect("deep transforms should succeed");
+    assert!(rounded);
+    assert!(stripped);
 }
 
 #[test]

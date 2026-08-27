@@ -2521,6 +2521,7 @@ dependencies = [
  "allocation-counter",
  "hashbrown 0.17.1",
  "num-complex",
+ "proptest",
  "stab-algebra",
  "stab-model",
  "thiserror",
@@ -2559,7 +2560,9 @@ dependencies = [
  "serde_json",
  "sha2",
  "signal-hook",
+ "stab-algebra",
  "stab-analysis",
+ "stab-bits",
  "stab-cli",
  "stab-core",
  "stab-decoder",
@@ -2615,20 +2618,12 @@ dependencies = [
 name = "stab-core"
 version = "0.2.0"
 dependencies = [
- "allocation-counter",
- "arrayvec",
- "num-complex",
- "proptest",
- "rand 0.10.1",
- "sha2",
  "stab-algebra",
  "stab-analysis",
- "stab-bits",
  "stab-decoder",
  "stab-engine",
  "stab-model",
  "stab-records",
- "thiserror",
 ]
 
 [[package]]
@@ -2645,6 +2640,7 @@ name = "stab-engine"
 version = "0.2.0"
 dependencies = [
  "allocation-counter",
+ "arrayvec",
  "hex",
  "rand 0.10.1",
  "sha2",
@@ -2666,6 +2662,7 @@ dependencies = [
  "allocation-counter",
  "arrayvec",
  "hex",
+ "proptest",
  "sha2",
  "smallvec",
  "thiserror",
@@ -2682,6 +2679,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "signal-hook",
+ "stab-analysis",
  "stab-cli",
  "stab-compat-corpus",
  "stab-core",

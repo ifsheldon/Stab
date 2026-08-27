@@ -9,7 +9,6 @@ use std::path::{Component, Path, PathBuf};
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
-use stab_core::advanced::records::MeasurementCodecSink;
 use stab_core::{
     BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementSink, Probability, RecordFormat,
 };
@@ -17,6 +16,7 @@ use stab_engine::{
     RandomPolicy, ReferenceSampleTree, SamplingCompiler, SamplingPlan, SamplingSession, Seed,
     ShotCount, biased_randomize_bits,
 };
+use stab_records::MeasurementCodecSink;
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

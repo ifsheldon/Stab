@@ -1,9 +1,10 @@
 use std::{collections::BTreeSet, hint::black_box};
 
-use stab_core::{
-    Circuit, CircuitItem, Flow, PauliBasis, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_flow_generators, solve_for_flow_measurements,
+use stab_analysis::{
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    solve_for_flow_measurements,
 };
+use stab_core::{Circuit, CircuitItem, Flow, PauliBasis};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;

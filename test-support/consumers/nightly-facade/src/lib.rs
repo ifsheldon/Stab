@@ -2,19 +2,23 @@
 
 use std::error::Error;
 
-use stab_core::advanced::storage::BitVec;
 use stab_core::{CliffordString, SingleQubitClifford};
 
-pub fn exercise_portable_facade() -> Result<(usize, usize), Box<dyn Error>> {
-    let mut left = BitVec::from_words_truncated(257, vec![0x5555_aaaa; 5]);
-    let right = BitVec::from_words_truncated(257, vec![0xaaaa_5555; 5]);
-    left.xor_assign(&right.as_bitslice())?;
-
+pub fn exercise_portable_facade() -> Result<usize, Box<dyn Error>> {
     let mut clifford =
         CliffordString::from_gates(std::iter::repeat_n(SingleQubitClifford::H, 257))?;
     let phase =
         CliffordString::from_gates(std::iter::repeat_n(SingleQubitClifford::S, 257))?;
     clifford.right_multiply_in_place(&phase)?;
+    Ok(clifford.len())
+}
 
-    Ok((left.len(), clifford.len()))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn portable_facade_executes_clifford_work() {
+        assert_eq!(exercise_portable_facade().unwrap(), 257);
+    }
 }

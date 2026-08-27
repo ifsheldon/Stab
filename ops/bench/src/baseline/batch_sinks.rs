@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use sha2::{Digest, Sha256};
 use stab_core::{
     DemSampleBatchView, DemSampleSink, DetectionBatchView, DetectionSink, FormatError,
-    PackedShotBatchView,
+    FormatErrorCode, PackedShotBatchView,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -114,7 +114,13 @@ impl DetectionDigestSink {
         self.shots = self
             .shots
             .checked_add(batch.shot_count() as u64)
-            .ok_or_else(|| FormatError::invalid_data("benchmark shot count overflowed"))?;
+            .ok_or_else(|| {
+                FormatError::new(
+                    FormatErrorCode::ArithmeticOverflow,
+                    "benchmark shot count overflowed",
+                    None,
+                )
+            })?;
         Ok(())
     }
 }

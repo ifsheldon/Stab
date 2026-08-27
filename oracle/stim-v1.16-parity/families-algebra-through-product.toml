@@ -363,7 +363,7 @@ owner = "stab-engine"
 [families.evidence]
 status = "verified"
 [families.evidence.test]
-package = "stab-core"
+package = "stab-engine"
 kind = "test"
 target = "circuit_api"
 name = "pf1_circuit_reference_determined_count_determined_measurements_matches_public_helper_subset"
@@ -396,7 +396,7 @@ owner = "stab-engine"
 [families.evidence]
 status = "verified"
 [families.evidence.test]
-package = "stab-core"
+package = "stab-engine"
 kind = "test"
 target = "circuit_api"
 name = "pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler"
@@ -705,7 +705,7 @@ owner = "stab-engine"
 [families.evidence]
 status = "verified"
 [families.evidence.test]
-package = "stab-core"
+package = "stab-engine"
 kind = "test"
 target = "reference_flip_semantics"
 name = "certain_measurement_flips_convert_like_pinned_stim_through_m2d"

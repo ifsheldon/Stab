@@ -24,6 +24,7 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 signal-hook = { workspace = true }
 stab-compat-corpus = { path = "../../test-support/compat-corpus" }
+stab-analysis = { workspace = true }
 stab-core = { path = "../../crates/stab-core", default-features = false }
 stab-cli = { path = "../../crates/stab-cli" }
 stab-model = { path = "../../crates/stab-model" }

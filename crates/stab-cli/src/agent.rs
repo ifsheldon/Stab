@@ -5,9 +5,10 @@ use clap::{Args, CommandFactory, Subcommand, ValueEnum};
 use serde::Serialize;
 use stab_engine::{
     COMPILATION_DESCRIPTORS, CompilationRequestFingerprint, PlanFingerprint, SamplingCompiler,
+    estimate_sampling_request,
 };
 use stab_model::{
-    Circuit, CircuitItem, DetectorErrorModel, Estimate, Gate, GateArgumentRule, GateCategory,
+    Circuit, DetectorErrorModel, Estimate, Gate, GateArgumentRule, GateCategory,
     GateTargetGroupKind, GateTargetRule, ModelDialect, ModelFingerprint, ParseLimits,
     ResourceEstimate,
 };
@@ -680,56 +681,6 @@ impl From<ResourceEstimate> for ResourceEstimateReport {
             work_units: EstimateReport::from(estimate.work_units()),
         }
     }
-}
-
-fn estimate_sampling_request(
-    circuit: &Circuit,
-    shots: usize,
-    output_format: RecordFormat,
-) -> ResourceEstimate {
-    let (input_items, expanded_operations) = sampling_operation_counts(circuit);
-    let output_bytes = circuit
-        .count_measurements()
-        .ok()
-        .and_then(|measurements| usize::try_from(measurements).ok())
-        .map_or(Estimate::Unknown, |measurements| {
-            match output_format.estimate_output_bytes(shots, measurements) {
-                EncodedSizeEstimate::Exact(value) => Estimate::Exact(value),
-                EncodedSizeEstimate::Unknown => Estimate::Unknown,
-            }
-        });
-
-    ResourceEstimate::builder()
-        .input_items(input_items.map_or(Estimate::Unknown, Estimate::Exact))
-        .expanded_operations(expanded_operations.map_or(Estimate::Unknown, Estimate::Exact))
-        .folded_traversal(input_items.map_or(Estimate::Unknown, Estimate::Exact))
-        .output_bytes(output_bytes)
-        .build()
-}
-
-fn sampling_operation_counts(circuit: &Circuit) -> (Option<usize>, Option<usize>) {
-    let mut represented = Some(circuit.items().len());
-    let mut expanded = Some(0usize);
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(_) => {
-                expanded = expanded.and_then(|count| count.checked_add(1));
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let (body_represented, body_expanded) = sampling_operation_counts(repeat.body());
-                represented = represented
-                    .zip(body_represented)
-                    .and_then(|(count, body)| count.checked_add(body));
-                expanded = expanded.zip(body_expanded).and_then(|(count, body)| {
-                    usize::try_from(repeat.repeat_count().get())
-                        .ok()
-                        .and_then(|repetitions| body.checked_mul(repetitions))
-                        .and_then(|body| count.checked_add(body))
-                });
-            }
-        }
-    }
-    (represented, expanded)
 }
 
 #[derive(Serialize)]

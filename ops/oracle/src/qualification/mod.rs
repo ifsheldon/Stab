@@ -24,7 +24,7 @@ mod tier;
 mod validation;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "16f40c7c03f62a4552c45feb3d8d360a7f8d3fe289a671eb42758d227b6bd919";
+    "15ec1cc1175feae34049810a2c60e36cf81a8b0fbdac6b3dec98ec4878d96d66";
 const MAX_MANIFEST_BYTES: usize = 32 << 20;
 const PROVENANCE_PROBE_CASE_ID: &str = "cq-evidence-qualification-e16abe30d8c7992c";
 const PROVENANCE_PROBE_OUTPUT_DIR: &str = "target/qualification/correctness/provenance-probe";
