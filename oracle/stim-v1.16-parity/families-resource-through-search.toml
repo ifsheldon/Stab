@@ -373,6 +373,23 @@ name = "sparse_and_token_streaming_allocations_follow_largest_record_not_record_
 minimum_tier = "pr"
 
 [[families]]
+id = "resource-safety.sampling-expanded-work-limit"
+area = "resource-safety"
+contract = "Circuit sampling admits at most one million expanded operation dispatches per measurement-bearing shot, rejects the first excess before session construction, and executes arbitrarily repeated zero-width circuits without traversing their represented work."
+stim_refs = ["src/stim/simulators/frame_simulator.test.cc"]
+status = "divergence"
+owner = "stab-engine"
+divergence_kind = "resource-limit"
+rationale = "Stab gives one-shot sampling work an explicit aggregate bound so a compact hostile repeat cannot monopolize an uncancellable batch; the limit counts represented operation work instead of imposing a repeat-count syntax cap."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "lib"
+name = "sampling::tests::expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work"
+minimum_tier = "pr"
+
+[[families]]
 id = "resource-safety.sat-materialization-limits"
 area = "resource-safety"
 contract = "Shortest and likeliest SAT generation admit exact model-expansion, variable, clause, literal, and encoded-output boundaries, reject the first excess with typed context, and leave source models unchanged."

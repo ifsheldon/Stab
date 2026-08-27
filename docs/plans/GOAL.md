@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P3 are complete. P4 is in progress; P5 through P9 have not started.
+Status: Active. P0 through P4 are complete. P5 is in progress; P6 through P9 have not started.
 
 ## Objective
 
@@ -28,25 +28,26 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - Parser admission has no benchmark row because rejection is not a release E2E workflow and no profile attributes at least 10% of one workflow to these checks. Existing circuit and DEM parsing workflows remain the diagnostic performance owners.
 - Source-current diagnostics after removing input-derived reservation passed: `m4-circuit-parse` measured `0.554x` and `0.503x` Stim for its dense and sparse pairs, while serial sealed-worker probes measured `0.922499x` for circuit parse and `0.915128x` for DEM parse. These dirty-tree diagnostics make no promotable timing claim.
 - P3 has no missing nondeferred parity rows. Exact parser boundaries, optimization-independent accounting, and rejected-source allocation are explicit resource-limit divergences because Stim v1.16.0 exposes no comparable configurable policy.
-- P4 now has one model-owned classical-control classifier and one private engine operation for active record or sweep controls. Sampling and direct detection consume the same target-shape truth; classical `CZ` no-ops bypass irrelevant record-history validation; omitted sweeps remain false; and the small-frame executor no longer falls back solely because a sweep target exists. Sampling compiler schema 3 and executable-contract schema 2 bind the change.
+- P4 has one model-owned classical-control classifier and one private engine operation for active record or sweep controls. Sampling and direct detection consume the same target-shape truth; classical `CZ` no-ops bypass irrelevant record-history validation; omitted sweeps remain false; and the small-frame executor no longer falls back solely because a sweep target exists.
 - One metadata-driven owner executes every declared legal gate shape through measurement sampling, measurement conversion, direct detector-frame sampling, and automatic detection sampling, including nested repeats. Common semantic and statistical owners retain value-level coverage instead of being duplicated into this admission matrix.
 - Detection compilation validates the sole sampling plan before choosing zero, static, or sweep reference state. `m2d --skip_reference_sample` therefore cannot bypass sampler validation or truncate outputs first. Feedback inlining shares the classifier, drops legal all-classical `CZ` no-ops, and records pinned Stim's mixed record/sweep transform bug as an explicit divergence.
-- The sampling and detection aggregate gate rows are complete. Remaining P4 work is compact repeat-aware detection conversion, remaining sweep/feedback conversion semantics, and meaningful loop-aware execution selection.
+- Sampling, measurement-to-detection conversion, and direct detector-frame execution retain compact repeats in validated flat operation tapes and use fixed-depth compile and execution stacks. Structural validation never executes repeat counts. Detection conversion computes expanded work arithmetically during allocation-free admission and executes cross-iteration lookbacks without materializing repeated terms. Direct-frame SPP operations are lowered during plan compilation rather than per shot, while detector and record-observable extraction use the same compact `ConversionPlan` as fused conversion. Frame preflight charges minimum retained payloads, materialization measures actual vector capacities, and no plan escapes when the actual aggregate exceeds its byte limit. The fixed 100,000-repeat syntax cap is gone; record shape, expanded instructions, aggregate repeat iterations, compact terms, and compact bytes are independent typed budgets.
+- One semantic owner now covers every legal sweep-controlled and measurement-record-controlled Pauli orientation, classical `CZ` no-ops, omitted and explicit sweeps, and feedback crossing compact nested repeats. Sweep conversion combines a static all-zero-sweep reference with frame-derived per-record corrections, including Pauli observables in both reference modes. Real CLI tests compare folded and unrolled `m2d` output, appended and side-output Pauli corrections, and `detect` PTB64 grouping; explicit pinned-Stim probes reproduce the sweep semantics.
+- Reference-sample repeat folding now requires at least 64 units of reusable work, enough estimated saved stabilizer work to pay for snapshot capture and comparison, no record or sweep controls, and exact recurrence of stabilizer and correlated-error state. Snapshot storage exists only for profitable folded work that fits the existing session ceiling; unprofitable and storage-ineligible candidates fall back to iteration without changing output. Ordinary circuits, `Iterate`, and determined-measurement analysis retain the prior boundary. `ReferenceSampleLoopPolicy::Iterate` and `--skip_loop_folding` disable reuse; sampling compiler schema 5, executable-contract schema 4, and agent plan schema 4 bind the current admission and execution policy.
+- P4 is complete. Public qubit counting preserves pinned Stim's `MPAD` behavior while execution uses a separate pad-free width; shallow repeat breadth is independent of nesting; measurement-bearing shots admit one million expanded operation dispatches while zero-width repeats execute in constant work; active record and sweep feedback crosses two folded boundaries; SPP lowering carries typed visitor failures directly; and reference-fold counters are test-only.
+- P4 makes no performance conclusion from dirty-tree diagnostics. Its sampling and detection workflows are fixed P7 release-matrix members, where reproducible E2E parity and self-regression evidence belong.
 - The historical correctness inventory is only a generated bridge for active benchmark prerequisites. Add no semantic ownership to it; P7 deletes it with the inherited benchmark system.
 - Historical timing remains historical. Formal evidence waits for the final clean architecture and benchmark contracts.
 - Development occurs directly on `main`; do not create a branch or linked worktree.
 
 ## Immediate Work
 
-1. Replace measurement-to-detection repeat expansion with one compact conversion IR that preserves record offsets, detector order, observables, sweep controls, and configurable work admission without the fixed 100,000-repeat rejection.
-2. Prove folded-versus-unrolled conversion through materialized and streaming `detect` and `m2d` paths, including PTB64 grouping, observable side output, cancellation, malformed sweep records, and resource boundaries.
-3. Finish remaining sweep/feedback conversion parity, then make loop-aware sampling selection depend on measured reusable work rather than syntax alone.
-4. Add or retain an E2E benchmark only when the workflow is user-visible and the changed path is measured. Do not create per-gate timing rows.
-5. Run the focused tests, parity PR owners, workspace and architecture checks, oracle contracts, benchmark smoke, `milestone-audit`, and `full-code-review`; fix confirmed findings and commit each bounded P4 slice before continuing.
+1. Inventory each P5 `missing` family against current implementation and pinned Stim behavior; promote only direct executable owners.
+2. Close analysis and transform gaps at their existing reverse-tracker, tableau, search, and transform owners without adding parallel representations.
+3. Run focused pinned comparisons, workspace checks, milestone audit, and full code review for each bounded P5 slice before promotion.
 
 ## Remaining Milestones
 
-- P4: sampling and detection parity.
 - P5: analysis, transform, search, and algebra parity.
 - P6: CLI and Rust workflow parity.
 - P7: one user-visible E2E performance suite.

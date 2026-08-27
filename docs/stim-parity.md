@@ -11,13 +11,13 @@ Pinned target: `v1.16.0` at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 | done | 83 |
 | missing | 15 |
 | deferred | 12 |
-| divergence | 38 |
+| divergence | 39 |
 
 Status describes implementation only. A `done` row may still need a lean canonical owner before it is qualification-ready; `missing` means the behavior contract itself is incomplete. A `deferred` or `divergence` row states why it is outside exact parity.
 
 | Evidence | Families |
 | --- | ---: |
-| verified | 121 |
+| verified | 122 |
 | needs-owner | 0 |
 | not-applicable | 27 |
 
@@ -192,6 +192,7 @@ Status describes implementation only. A `done` row may still need a lean canonic
 | `resource-safety.model-remaining-parse-limits` | divergence | verified | `stab-model` | Circuit and DEM parsing enforce typed original-byte, compact-declaration, and retained-target admission at exact inclusive boundaries through string and byte entry points. | resource limit: Stim v1.16.0 has no equivalent configurable byte, compact-declaration, or retained-target parser policy; Stab rejects hostile model growth at typed caller-selected boundaries. `cargo test -p stab-model --test parse_resources -- parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit --exact --include-ignored`. | [`src/stim/circuit/circuit.test.cc`](../vendor/stim/src/stim/circuit/circuit.test.cc), [`src/stim/dem/detector_error_model.test.cc`](../vendor/stim/src/stim/dem/detector_error_model.test.cc) |
 | `resource-safety.record-streaming-dense-packed-bounds` | divergence | verified | `stab-records` | Dense and packed streaming readers keep allocation bounded by record width or PTB64 group size, independent of record count and duplicate sparse tokens. | resource limit: Stab exposes and tests an explicit bounded DETS streaming-storage guarantee beyond Stim's compatibility contract. `cargo test -p stab-records --test resource_contracts -- dense_and_packed_streaming_allocations_follow_width_not_record_count --exact --include-ignored`. | [`src/stim/io/measure_record_reader.test.cc`](../vendor/stim/src/stim/io/measure_record_reader.test.cc) |
 | `resource-safety.record-streaming-sparse-token-bounds` | divergence | verified | `stab-records` | Sparse and typed-token streaming readers reuse storage across records while bounding allocation by the largest record's token shape instead of total record count. | resource limit: Stab exposes and tests an explicit largest-record streaming-storage guarantee beyond Stim's compatibility contract. `cargo test -p stab-records --test resource_contracts -- sparse_and_token_streaming_allocations_follow_largest_record_not_record_count --exact --include-ignored`. | [`src/stim/io/measure_record_reader.test.cc`](../vendor/stim/src/stim/io/measure_record_reader.test.cc) |
+| `resource-safety.sampling-expanded-work-limit` | divergence | verified | `stab-engine` | Circuit sampling admits at most one million expanded operation dispatches per measurement-bearing shot, rejects the first excess before session construction, and executes arbitrarily repeated zero-width circuits without traversing their represented work. | resource limit: Stab gives one-shot sampling work an explicit aggregate bound so a compact hostile repeat cannot monopolize an uncancellable batch; the limit counts represented operation work instead of imposing a repeat-count syntax cap. `cargo test -p stab-engine --lib -- sampling::tests::expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work --exact --include-ignored`. | [`src/stim/simulators/frame_simulator.test.cc`](../vendor/stim/src/stim/simulators/frame_simulator.test.cc) |
 | `resource-safety.sat-materialization-limits` | divergence | verified | `stab-analysis` | Shortest and likeliest SAT generation admit exact model-expansion, variable, clause, literal, and encoded-output boundaries, reject the first excess with typed context, and leave source models unchanged. | resource limit: Stab exposes typed SAT admission and output boundaries in addition to the separately owned clause and literal shape limits. `cargo test -p stab-analysis --test sat_materialization_limits -- sat_materialization_limits_admit_exact_boundaries_and_preserve_source --exact --include-ignored`. | [`src/stim/search/sat/wcnf.test.cc`](../vendor/stim/src/stim/search/sat/wcnf.test.cc) |
 
 ## Result Formats

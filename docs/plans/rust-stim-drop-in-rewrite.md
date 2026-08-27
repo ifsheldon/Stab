@@ -337,7 +337,7 @@ Tasks:
 - Add regression tests for result-format padding, endian conventions, text output, and bit-packed output.
 
 For M8, `--skip_loop_folding` is required to be accepted and output-compatible on repeat circuits, but it is not required to force an alternate optimized reference-sample-tree implementation.
-Optimized loop-folded reference-sample construction and performance parity stay in M12 unless a later plan amendment promotes them earlier.
+Compact repeat-preserving `ReferenceSampleTree` construction and its performance parity stay in M12 unless a later plan amendment promotes them earlier. The later P4 program in [stim-core-parity-and-lean-evidence-plan.md](stim-core-parity-and-lean-evidence-plan.md) separately promotes execution-time reference-repeat reuse and makes `--skip_loop_folding` select the iterative execution policy.
 
 Linked tests and benchmarks:
 
