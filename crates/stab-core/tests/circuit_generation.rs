@@ -3,13 +3,15 @@
     reason = "generation integration checks use direct assertions for compact diagnostics"
 )]
 
-use stab_core::advanced::compat::{DetectionConversionOutput, sample_detection_events};
+mod support;
+
 use stab_core::{
     CircuitError, CodeDistance, ColorCodeParams, ColorCodeTask, ErrorAnalyzerOptions,
     GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
     SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
+use support::{DetectionOutput, sample_detections};
 
 #[test]
 fn generation_facade_preserves_resource_rejection_contract() {
@@ -174,7 +176,7 @@ fn cq2_generation_no_noise_matrix_has_no_detection_or_observable_events() {
     .expect("surface parameters");
     let generated =
         generate_surface_code_circuit(&python_reference).expect("generate Python reference case");
-    let output = sample_detection_events(generated.circuit(), 5, Some(0xC0DE))
+    let output = sample_detections(generated.circuit(), 5, Some(0xC0DE))
         .expect("sample Python reference case");
     assert_eq!(output.detector_count, 24 * 10);
     assert_eq!(output.observable_count, 1);
@@ -344,7 +346,7 @@ fn surface_measurement_counts(distance: u32, rotated: bool) -> (u64, u64) {
 }
 
 fn assert_generated_samples_are_zero(generated: &GeneratedCircuit, shots: usize, context: &str) {
-    let output = sample_detection_events(generated.circuit(), shots, Some(0x5EED));
+    let output = sample_detections(generated.circuit(), shots, Some(0x5EED));
     assert!(
         output.is_ok(),
         "{context}: failed to sample: {:?}",
@@ -354,11 +356,7 @@ fn assert_generated_samples_are_zero(generated: &GeneratedCircuit, shots: usize,
     assert_detection_output_is_zero(&output, shots, context);
 }
 
-fn assert_detection_output_is_zero(
-    output: &DetectionConversionOutput,
-    shots: usize,
-    context: &str,
-) {
+fn assert_detection_output_is_zero(output: &DetectionOutput, shots: usize, context: &str) {
     assert_eq!(output.records.len(), shots, "{context}: shot count");
     for record in &output.records {
         assert!(

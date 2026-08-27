@@ -17,11 +17,10 @@ pub use dem_sampling::{
 };
 pub use descriptor::CompilationDescriptor;
 pub use detection::{
-    CompiledDetectionConverter, DETECTION_SAMPLING_COMPILATION_DESCRIPTOR, DetectionCompileError,
-    DetectionConversionLimits, DetectionConversionOptions, DetectionError, DetectionEventRecord,
-    DetectionExecutionError, DetectionRecordLimitSubject, DetectionResourceKind,
-    DetectionResourceLimitError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
+    DETECTION_SAMPLING_COMPILATION_DESCRIPTOR, DetectionCompileError, DetectionConversionLimits,
+    DetectionError, DetectionEventRecord, DetectionExecutionError, DetectionRecordLimitSubject,
+    DetectionResourceKind, DetectionResourceLimitError, DetectionRunError, DetectionRunProgress,
+    DetectionRunStatus, DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
     DetectionSamplingSession, MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR,
     MeasurementToDetectionCompiler, MeasurementToDetectionPlan, MeasurementToDetectionSession,
     MeasurementToDetectionSinkAdapter, detection_record_width, detection_record_width_with_limits,

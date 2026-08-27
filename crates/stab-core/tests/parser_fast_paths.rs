@@ -3,12 +3,16 @@
     reason = "parser fast-path tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::advanced::compat::{CompiledDetectionConverter, sample_detection_events};
+mod support;
+
 use stab_core::{
-    Circuit, CircuitError, CircuitItem, DetectionConversionOptions, ErrorAnalyzerOptions,
-    MeasureRecordOffset, Target, circuit_to_detector_error_model,
+    Circuit, CircuitItem, ErrorAnalyzerOptions, MeasureRecordOffset, ReferenceSampleMode, Target,
+    circuit_to_detector_error_model,
 };
-use stab_engine::SamplingCompiler;
+use stab_engine::{
+    DetectionCompileError, DetectionError, MeasurementToDetectionCompiler, SamplingCompiler,
+};
+use support::sample_detections;
 
 #[test]
 fn common_phase_and_annotation_paths_preserve_public_semantics() {
@@ -113,16 +117,13 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
     assert_eq!(exact, generic);
     assert_eq!(exact.to_stim_string(), "M 0\nDETECTOR rec[-0]\n");
 
-    let conversion_error = CompiledDetectionConverter::compile(
-        &exact,
-        DetectionConversionOptions {
-            skip_reference_sample: true,
-        },
-    )
-    .expect_err("zero lookback must not compile for detection conversion");
+    let conversion_error = MeasurementToDetectionCompiler::new()
+        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
+        .compile(&exact)
+        .expect_err("zero lookback must not compile for detection conversion");
     assert!(matches!(
         conversion_error,
-        CircuitError::InvalidResultFormat(_)
+        DetectionCompileError::InvalidCircuit(DetectionError::InvalidResultFormat { .. })
     ));
     assert!(conversion_error.to_string().contains("rec[-0]"));
 
@@ -154,14 +155,7 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
 
     let detection_feedback = Circuit::from_stim_str("M 0\nCX rec[-0] 1\nM 1\nDETECTOR rec[-1]\n")
         .expect("parse negative-zero frame-detection feedback");
-    let detection_sampling_error = sample_detection_events(&detection_feedback, 1, Some(5))
+    let detection_sampling_error = sample_detections(&detection_feedback, 1, Some(5))
         .expect_err("zero lookback must fail frame detection through a controlled error");
-    assert!(
-        matches!(
-            detection_sampling_error,
-            CircuitError::InvalidSamplerCompilation { .. }
-        ),
-        "{detection_sampling_error:?}"
-    );
     assert!(detection_sampling_error.to_string().contains("rec[-0]"));
 }

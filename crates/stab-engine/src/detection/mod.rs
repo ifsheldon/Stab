@@ -61,11 +61,6 @@ pub const DETECTION_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor =
         true,
     );
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct DetectionConversionOptions {
-    pub skip_reference_sample: bool,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetectionEventRecord {
     pub detectors: Vec<bool>,
@@ -73,23 +68,22 @@ pub struct DetectionEventRecord {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct CompiledDetectionConverter {
+struct PreparedMeasurementToDetection {
     plan: ConversionPlan,
     reference_sample: ReferenceSampleSource,
 }
 
-impl CompiledDetectionConverter {
-    pub fn compile(circuit: &Circuit, options: DetectionConversionOptions) -> CircuitResult<Self> {
-        Self::compile_with_limits(circuit, options, DetectionConversionLimits::default())
-    }
-
-    pub fn compile_with_limits(
+impl PreparedMeasurementToDetection {
+    fn compile_with_limits(
         circuit: &Circuit,
-        options: DetectionConversionOptions,
+        reference_mode: crate::ReferenceSampleMode,
         limits: DetectionConversionLimits,
     ) -> CircuitResult<Self> {
         let plan = ConversionPlan::from_circuit_with_limits(circuit, limits)?;
-        let reference_sample = if options.skip_reference_sample {
+        let reference_sample = if matches!(
+            reference_mode,
+            crate::ReferenceSampleMode::SkipReferenceSample
+        ) {
             ReferenceSampleSource::Zero
         } else if plan.sweep_bit_count > 0 {
             let sampling = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
@@ -110,125 +104,23 @@ impl CompiledDetectionConverter {
         Self::from_plan_and_reference_sample(plan, reference_sample)
     }
 
-    pub fn measurement_count(&self) -> usize {
+    fn measurement_count(&self) -> usize {
         self.plan.measurement_count
     }
 
-    pub fn sweep_bit_count(&self) -> usize {
+    fn sweep_bit_count(&self) -> usize {
         self.plan.sweep_bit_count
     }
 
-    pub fn detector_count(&self) -> usize {
+    fn detector_count(&self) -> usize {
         self.plan.detector_terms.len()
     }
 
-    pub fn observable_count(&self) -> usize {
+    fn observable_count(&self) -> usize {
         self.plan.observable_terms.len()
     }
 
-    pub fn convert_record(
-        &self,
-        measurement_record: &[bool],
-    ) -> CircuitResult<DetectionEventRecord> {
-        let mut record = self.try_reusable_detection_record()?;
-        let mut reference_sample = self.try_reusable_reference_sample()?;
-        let sweep_record =
-            try_false_vec(self.sweep_bit_count(), "detection conversion sweep record")?;
-        self.convert_record_with_sweep_into(
-            measurement_record,
-            &sweep_record,
-            &mut reference_sample,
-            &mut record,
-        )?;
-        Ok(record)
-    }
-
-    pub fn try_for_each_detection_event<'a, E, I, F>(
-        &self,
-        measurements: I,
-        mut visit: F,
-    ) -> Result<(), E>
-    where
-        E: From<CircuitError>,
-        I: IntoIterator<Item = &'a [bool]>,
-        F: FnMut(&DetectionEventRecord) -> Result<(), E>,
-    {
-        let mut record = self.try_reusable_detection_record()?;
-        let mut reference_sample = self.try_reusable_reference_sample()?;
-        let mut reference_scratch = self
-            .reference_sample
-            .reusable_scratch()
-            .map_err(|error| E::from(CircuitError::from(error)))?;
-        let sweep_record =
-            try_false_vec(self.sweep_bit_count(), "detection conversion sweep record")?;
-        for (shot_index, measurement_record) in measurements.into_iter().enumerate() {
-            self.validate_measurement_record_width(measurement_record, Some(shot_index))?;
-            self.convert_record_with_sweep_and_scratch_into(
-                measurement_record,
-                &sweep_record,
-                &mut reference_sample,
-                &mut record,
-                reference_scratch.as_mut(),
-            )?;
-            visit(&record)?;
-        }
-        Ok(())
-    }
-
-    pub fn try_for_each_detection_event_with_sweep<'a, 'b, E, M, S, F>(
-        &self,
-        measurements: M,
-        sweeps: S,
-        mut visit: F,
-    ) -> Result<(), E>
-    where
-        E: From<CircuitError>,
-        M: IntoIterator<Item = &'a [bool]>,
-        S: IntoIterator<Item = &'b [bool]>,
-        F: FnMut(&DetectionEventRecord) -> Result<(), E>,
-    {
-        let mut measurement_iter = measurements.into_iter();
-        let mut sweep_iter = sweeps.into_iter();
-        let mut record = self.try_reusable_detection_record()?;
-        let mut reference_sample = self.try_reusable_reference_sample()?;
-        let mut reference_scratch = self
-            .reference_sample
-            .reusable_scratch()
-            .map_err(|error| E::from(CircuitError::from(error)))?;
-        let mut shot_index = 0usize;
-        loop {
-            match (measurement_iter.next(), sweep_iter.next()) {
-                (Some(measurement_record), Some(sweep_record)) => {
-                    self.validate_measurement_record_width(measurement_record, Some(shot_index))?;
-                    self.validate_sweep_record_width(sweep_record, Some(shot_index))?;
-                    self.convert_record_with_sweep_and_scratch_into(
-                        measurement_record,
-                        sweep_record,
-                        &mut reference_sample,
-                        &mut record,
-                        reference_scratch.as_mut(),
-                    )?;
-                    visit(&record)?;
-                    shot_index += 1;
-                }
-                (None, None) => return Ok(()),
-                (Some(_), None) => {
-                    return Err(CircuitError::invalid_result_format(
-                        "measurement records have more shots than sweep records",
-                    )
-                    .into());
-                }
-                (None, Some(_)) => {
-                    return Err(CircuitError::invalid_result_format(
-                        "sweep records have more shots than measurement records",
-                    )
-                    .into());
-                }
-            }
-        }
-    }
-
-    pub fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
+    fn try_reusable_detection_record(&self) -> CircuitResult<DetectionEventRecord> {
         Ok(DetectionEventRecord {
             detectors: try_false_vec(
                 self.detector_count(),
@@ -241,30 +133,10 @@ impl CompiledDetectionConverter {
         })
     }
 
-    pub fn try_reusable_reference_sample(&self) -> CircuitResult<Vec<bool>> {
+    fn try_reusable_reference_sample(&self) -> CircuitResult<Vec<bool>> {
         try_false_vec(
             self.measurement_count(),
             "detection conversion reference sample",
-        )
-    }
-
-    pub fn convert_record_with_sweep_into(
-        &self,
-        measurement_record: &[bool],
-        sweep_record: &[bool],
-        reference_sample: &mut Vec<bool>,
-        record: &mut DetectionEventRecord,
-    ) -> CircuitResult<()> {
-        let mut reference_scratch = self
-            .reference_sample
-            .reusable_scratch()
-            .map_err(CircuitError::from)?;
-        self.convert_record_with_sweep_and_scratch_into(
-            measurement_record,
-            sweep_record,
-            reference_sample,
-            record,
-            reference_scratch.as_mut(),
         )
     }
 
@@ -276,8 +148,8 @@ impl CompiledDetectionConverter {
         record: &mut DetectionEventRecord,
         reference_scratch: Option<&mut ReferenceSampleScratch>,
     ) -> CircuitResult<()> {
-        self.validate_measurement_record_width(measurement_record, None)?;
-        self.validate_sweep_record_width(sweep_record, None)?;
+        self.validate_measurement_record_width(measurement_record)?;
+        self.validate_sweep_record_width(sweep_record)?;
         self.reference_sample.fill(
             sweep_record,
             self.measurement_count(),
@@ -301,20 +173,9 @@ impl CompiledDetectionConverter {
         })
     }
 
-    fn validate_measurement_record_width(
-        &self,
-        measurement_record: &[bool],
-        shot_index: Option<usize>,
-    ) -> CircuitResult<()> {
+    fn validate_measurement_record_width(&self, measurement_record: &[bool]) -> CircuitResult<()> {
         if measurement_record.len() == self.plan.measurement_count {
             return Ok(());
-        }
-        if let Some(shot_index) = shot_index {
-            return Err(CircuitError::invalid_result_format(format!(
-                "measurement record {shot_index} expected {} bits, got {}",
-                self.plan.measurement_count,
-                measurement_record.len()
-            )));
         }
         Err(CircuitError::invalid_result_format(format!(
             "measurement record expected {} bits, got {}",
@@ -323,20 +184,9 @@ impl CompiledDetectionConverter {
         )))
     }
 
-    fn validate_sweep_record_width(
-        &self,
-        sweep_record: &[bool],
-        shot_index: Option<usize>,
-    ) -> CircuitResult<()> {
+    fn validate_sweep_record_width(&self, sweep_record: &[bool]) -> CircuitResult<()> {
         if sweep_record.len() == self.plan.sweep_bit_count {
             return Ok(());
-        }
-        if let Some(shot_index) = shot_index {
-            return Err(CircuitError::invalid_result_format(format!(
-                "sweep record {shot_index} expected {} bits, got {}",
-                self.plan.sweep_bit_count,
-                sweep_record.len()
-            )));
         }
         Err(CircuitError::invalid_result_format(format!(
             "sweep record expected {} bits, got {}",

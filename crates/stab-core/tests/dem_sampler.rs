@@ -3,11 +3,8 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::advanced::compat::{
-    CompiledDemSampler, DetectionEventRecord, DetectionObservableOutputMode,
-    write_detection_records,
-};
-use stab_core::{CircuitError, DemRepeatBlock, DemRepeatCount, DetectorErrorModel, RecordFormat};
+use stab_core::advanced::compat::{CompiledDemSampler, DetectionEventRecord};
+use stab_core::{CircuitError, DemRepeatBlock, DemRepeatCount, DetectorErrorModel};
 
 fn compile_dem(text: &str) -> CompiledDemSampler {
     let model = DetectorErrorModel::from_dem_str(text).expect("parse DEM");
@@ -114,14 +111,6 @@ fn dem_sampler_samples_deterministic_detector_error_each_shot() {
             .iter()
             .all(|record| record.observables.is_empty())
     );
-
-    let bytes = write_detection_records(
-        &output,
-        DetectionObservableOutputMode::DetectorsOnly,
-        RecordFormat::ZeroOne,
-    )
-    .expect("write output");
-    assert_eq!(bytes, b"1\n1\n1\n");
 }
 
 #[test]
@@ -195,30 +184,6 @@ fn dem_sampler_records_sampled_errors_and_replays_them() {
         .sample_detection_events_from_error_records(&[vec![true]])
         .expect_err("reject wrong replay width");
     assert!(error.to_string().contains("expected 3 bits"), "{error}");
-}
-
-#[test]
-fn dem_sampler_writes_dense_bit_packed_detector_and_observable_output() {
-    let sampler = compile_dem("error(1) D0 D1 D2 D3 D4 D5 D6 D7 D8 L0\n");
-    let output = sampler
-        .sample_detection_events_with_seed(2, Some(5))
-        .expect("sample");
-
-    assert_eq!(output.detector_count, 9);
-    assert_eq!(output.observable_count, 1);
-    assert!(output.records.iter().all(|record| {
-        record.detectors.len() == 9
-            && record.detectors.iter().all(|bit| *bit)
-            && record.observables == [true]
-    }));
-
-    let bytes = write_detection_records(
-        &output,
-        DetectionObservableOutputMode::Append,
-        RecordFormat::B8,
-    )
-    .expect("write bit-packed output");
-    assert_eq!(bytes, [0xff, 0x03, 0xff, 0x03]);
 }
 
 #[test]

@@ -1,20 +1,14 @@
 const DEFAULT_MAX_RECORD_BITS: usize = 1_000_000;
-const DEFAULT_MAX_MATERIALIZED_BITS: usize = 64_000_000;
 const DEFAULT_MAX_REPEAT_UNROLL: u64 = 100_000;
 const DEFAULT_MAX_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 const DEFAULT_MAX_REPEAT_ITERATIONS: u64 = 1_000_000;
 const DEFAULT_MAX_COMPILED_TERMS: u64 = 16_000_000;
 const DEFAULT_MAX_COMPILED_BYTES: u64 = 256 * 1024 * 1024;
 
-/// Admission limits for compiling and materializing detection conversion.
-///
-/// Streaming conversion is subject to per-record and compilation-work limits but not the
-/// materialized-buffer limit. Materialized non-empty records charge their bit width; a zero-width
-/// record charges one unit so its owned outer container cannot bypass admission.
+/// Admission limits for compiling detection conversion.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DetectionConversionLimits {
     pub(super) max_record_bits: usize,
-    pub(super) max_materialized_bits: usize,
     pub(super) max_repeat_unroll: u64,
     pub(super) max_expanded_instructions: u64,
     pub(super) max_repeat_iterations: u64,
@@ -25,10 +19,6 @@ pub struct DetectionConversionLimits {
 impl DetectionConversionLimits {
     pub const fn max_record_bits(self) -> usize {
         self.max_record_bits
-    }
-
-    pub const fn max_materialized_bits(self) -> usize {
-        self.max_materialized_bits
     }
 
     pub const fn max_repeat_unroll(self) -> u64 {
@@ -54,12 +44,6 @@ impl DetectionConversionLimits {
     #[must_use]
     pub const fn with_max_record_bits(mut self, limit: usize) -> Self {
         self.max_record_bits = limit;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_max_materialized_bits(mut self, limit: usize) -> Self {
-        self.max_materialized_bits = limit;
         self
     }
 
@@ -98,7 +82,6 @@ impl Default for DetectionConversionLimits {
     fn default() -> Self {
         Self {
             max_record_bits: DEFAULT_MAX_RECORD_BITS,
-            max_materialized_bits: DEFAULT_MAX_MATERIALIZED_BITS,
             max_repeat_unroll: DEFAULT_MAX_REPEAT_UNROLL,
             max_expanded_instructions: DEFAULT_MAX_EXPANDED_INSTRUCTIONS,
             max_repeat_iterations: DEFAULT_MAX_REPEAT_ITERATIONS,

@@ -1,12 +1,12 @@
 use std::ffi::OsString;
+use std::fmt::Display;
 use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use stab_core::advanced::compat::try_for_each_sampled_detection_event;
 use stab_core::{
-    Circuit, CircuitError, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy, RecordFormat,
-    Seed, ShotCount, advanced::records::read_records,
+    Circuit, DetectionSink, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy,
+    RecordFormat, Seed, ShotCount, advanced::records::read_records,
     advanced::records::write_ptb64_records_checked, check_if_circuit_has_unsigned_stabilizer_flows,
     circuit_has_all_unsigned_stabilizer_flows, circuit_with_inlined_feedback,
     measurement_record_count,
@@ -530,20 +530,37 @@ fn measure_detect_sweep_sampling(
     name: &str,
 ) -> Result<Measurement, BenchError> {
     measure_stab_iterations(name, super::STAB_COMPARE_ITERATIONS, || {
-        let mut bits = 0usize;
-        try_for_each_sampled_detection_event::<CircuitError, _>(
-            circuit,
-            DETECT_SHOTS,
-            Some(17),
-            |record| {
-                bits += record.detectors.len() + record.observables.len();
-                Ok(())
-            },
-        )
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box(bits);
+        let mut sink = DetectionDigestSink::default();
+        run_detection_sampling(&row.id, circuit, DETECT_SHOTS, 17, &mut sink)?;
+        black_box(sink.witness());
         Ok(())
     })
+}
+
+fn run_detection_sampling<Sink>(
+    row_id: &str,
+    circuit: &Circuit,
+    shots: usize,
+    seed: u64,
+    sink: &mut Sink,
+) -> Result<(), BenchError>
+where
+    Sink: DetectionSink,
+    Sink::Error: Display,
+{
+    let plan = DetectionSamplingCompiler::new()
+        .compile(circuit)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    let shots = u64::try_from(shots)
+        .map(ShotCount::new)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    session
+        .run(shots, sink)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    Ok(())
 }
 
 fn run_m2d_cli_row(

@@ -13,15 +13,19 @@ use super::super::{
 };
 use super::SamplingFixture;
 use crate::{
-    Circuit, CircuitResult, CompiledDetectionConverter, DetectionConversionOptions,
-    ErrorAnalyzerOptions, Gate, PauliBasis, PauliSign, PauliString, Probability,
+    Circuit, CircuitError, CircuitResult, ErrorAnalyzerOptions, Gate, PauliBasis, PauliSign,
+    PauliString, Probability, ReferenceSampleMode,
     analysis::{decomposed_circuit, gate_tableau},
     circuit_flow_generators, circuit_to_detector_error_model,
     execution::circuit_reference_sample,
-    sample_detection_events,
 };
 
+mod detection;
 mod statistical;
+
+use detection::{
+    DetectionOutput, DetectionRecord, collect_detection_samples, convert_detection_records,
+};
 
 const MAX_STATISTICAL_BUCKETS: usize = 20;
 
@@ -343,26 +347,22 @@ fn gate_surface_contract_pair_measurement_inversion() {
         assert_eq!(*zz_left, !*zz);
         assert_eq!(*zz_both, *zz);
     }
-    let converter = CompiledDetectionConverter::compile(
+    let converted = convert_detection_records(
         &grouped_circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &samples,
+        None,
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile grouped pair converter");
-    for record in &samples {
-        assert!(
-            converter
-                .convert_record(record)
-                .expect("convert grouped pair record")
-                .detectors
-                .iter()
-                .all(|bit| !bit),
-            "pair inversion identities must produce no detection events"
-        );
-    }
+    .expect("convert grouped pair records");
     assert!(
-        sample_detection_events(&grouped_circuit, 128, Some(43))
+        converted
+            .records
+            .iter()
+            .all(|record| record.detectors.iter().all(|bit| !bit)),
+        "pair inversion identities must produce no detection events"
+    );
+    assert!(
+        collect_detection_samples(&grouped_circuit, 128, Some(43))
             .expect("sample grouped pair detections")
             .records
             .iter()
@@ -403,25 +403,22 @@ fn gate_surface_contract_mpp_deterministic() {
         assert_eq!(*x2345, *x2 ^ *x3 ^ *x4 ^ *x5);
         assert_eq!(*y0145 ^ *z0145, *x0123 ^ *x2345);
     }
-    let converter = CompiledDetectionConverter::compile(
+    let measurements = four_body_sampler.sample_zero_one_with_seed(128, Some(43));
+    let converted = convert_detection_records(
         &four_body_circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &measurements,
+        None,
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile four-body MPP converter");
-    for record in four_body_sampler.sample_zero_one_with_seed(128, Some(43)) {
-        assert!(
-            converter
-                .convert_record(&record)
-                .expect("convert four-body MPP record")
-                .detectors
-                .iter()
-                .all(|bit| !bit),
-            "four-body parity detectors must stay silent"
-        );
-    }
-    let detections = sample_detection_events(&four_body_circuit, 128, Some(47))
+    .expect("convert four-body MPP records");
+    assert!(
+        converted
+            .records
+            .iter()
+            .all(|record| record.detectors.iter().all(|bit| !bit)),
+        "four-body parity detectors must stay silent"
+    );
+    let detections = collect_detection_samples(&four_body_circuit, 128, Some(47))
         .expect("sample four-body MPP detections");
     assert!(
         detections
@@ -756,8 +753,8 @@ enum SurfaceFingerprint {
     Parsed(String),
     Samples(Vec<Vec<bool>>),
     Reference(Vec<bool>),
-    Converted(crate::DetectionEventRecord),
-    Detected(crate::DetectionConversionOutput),
+    Converted(DetectionRecord),
+    Detected(DetectionOutput),
     Analyzed(String),
     Flows(Vec<crate::Flow>),
 }
@@ -776,27 +773,22 @@ fn run_surface(text: &str, surface: GateSurface) -> CircuitResult<SurfaceFingerp
             &circuit,
         )?)),
         GateSurface::DetectionConverter => {
-            let converter = CompiledDetectionConverter::compile(
-                &circuit,
-                DetectionConversionOptions {
-                    skip_reference_sample: false,
-                },
-            )?;
-            let sweep_record = vec![false; converter.sweep_bit_count()];
+            let sweep_width = usize::try_from(circuit.count_sweep_bits()?).map_err(|_| {
+                CircuitError::invalid_result_format("sweep width does not fit this platform")
+            })?;
+            let sweep_record = vec![false; sweep_width];
             let reference = test_reference_sample(&circuit)?;
-            let record = if converter.sweep_bit_count() == 0 {
-                converter.convert_record(&reference)?
-            } else {
-                let mut output = converter.try_reusable_detection_record()?;
-                let mut reference_sample = converter.try_reusable_reference_sample()?;
-                converter.convert_record_with_sweep_into(
-                    &reference,
-                    &sweep_record,
-                    &mut reference_sample,
-                    &mut output,
-                )?;
-                output
-            };
+            let measurements = [reference];
+            let sweeps = [sweep_record];
+            let output = convert_detection_records(
+                &circuit,
+                &measurements,
+                (sweep_width != 0).then_some(sweeps.as_slice()),
+                ReferenceSampleMode::UseReferenceSample,
+            )?;
+            let record = output.records.into_iter().next().ok_or_else(|| {
+                CircuitError::invalid_result_format("conversion fixture produced no record")
+            })?;
             Ok(SurfaceFingerprint::Converted(record))
         }
         GateSurface::DetectorFrame => {
@@ -804,17 +796,15 @@ fn run_surface(text: &str, surface: GateSurface) -> CircuitResult<SurfaceFingerp
                 "{}OBSERVABLE_INCLUDE(100) Z0\n",
                 circuit.to_stim_string()
             ))?;
-            Ok(SurfaceFingerprint::Detected(sample_detection_events(
+            Ok(SurfaceFingerprint::Detected(collect_detection_samples(
                 &frame,
                 4,
                 Some(7),
             )?))
         }
-        GateSurface::DetectionSampler => Ok(SurfaceFingerprint::Detected(sample_detection_events(
-            &circuit,
-            4,
-            Some(7),
-        )?)),
+        GateSurface::DetectionSampler => Ok(SurfaceFingerprint::Detected(
+            collect_detection_samples(&circuit, 4, Some(7))?,
+        )),
         GateSurface::ErrorAnalyzer => Ok(SurfaceFingerprint::Analyzed(
             circuit_to_detector_error_model(
                 &circuit,
@@ -964,8 +954,8 @@ fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &
         "detection converter: {label}"
     );
     assert_eq!(
-        sample_detection_events(actual, 16, Some(31)).expect("actual detection samples"),
-        sample_detection_events(expected, 16, Some(31)).expect("expected detection samples"),
+        collect_detection_samples(actual, 16, Some(31)).expect("actual detection samples"),
+        collect_detection_samples(expected, 16, Some(31)).expect("expected detection samples"),
         "detection sampler: {label}"
     );
     let actual_frame = circuit(&format!(
@@ -977,8 +967,8 @@ fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &
         expected.to_stim_string()
     ));
     assert_eq!(
-        sample_detection_events(&actual_frame, 16, Some(37)).expect("actual frame samples"),
-        sample_detection_events(&expected_frame, 16, Some(37)).expect("expected frame samples"),
+        collect_detection_samples(&actual_frame, 16, Some(37)).expect("actual frame samples"),
+        collect_detection_samples(&expected_frame, 16, Some(37)).expect("expected frame samples"),
         "detector frame: {label}"
     );
     // Pinned Stim requires `approximate_disjoint_errors` before it analyzes
@@ -1046,22 +1036,17 @@ fn assert_sweep_reference(text: &str, expected_false: &[bool], expected_true: &[
         "false sweep: {text}"
     );
 
-    let converter = CompiledDetectionConverter::compile(
+    let converted = convert_detection_records(
         &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &[expected_true.to_vec()],
+        Some(&[vec![true]]),
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile sweep converter");
-    let mut converted = converter
-        .try_reusable_detection_record()
-        .expect("allocate reusable detection record");
-    let mut reference = converter
-        .try_reusable_reference_sample()
-        .expect("allocate reusable reference sample");
-    converter
-        .convert_record_with_sweep_into(expected_true, &[true], &mut reference, &mut converted)
-        .expect("convert true sweep reference");
+    .expect("convert true sweep reference")
+    .records
+    .into_iter()
+    .next()
+    .expect("one converted sweep record");
     assert!(converted.detectors.iter().all(|bit| !bit));
     assert!(converted.observables.iter().all(|bit| !bit));
 }

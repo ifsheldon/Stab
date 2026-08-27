@@ -14,12 +14,9 @@
 
 mod support;
 
-use stab_core::advanced::compat::{
-    convert_measurements_to_detection_events, sample_detection_events,
-};
-use stab_core::{Circuit, DetectionConversionOptions};
+use stab_core::{Circuit, ReferenceSampleMode};
 
-use support::SamplingFixture;
+use support::{SamplingFixture, convert_detection_records, sample_detections};
 
 fn parse(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("test circuit should parse")
@@ -56,7 +53,7 @@ fn certain_measurement_flips_fire_detect_detectors_on_every_shot() {
     // MR keeps this off the direct-Z fast path, whose reference bit was already noiseless, so
     // this pin discriminates the general-path regression; M covers the fast path itself.
     for text in ["M(1) 0\nDETECTOR rec[-1]\n", "MR(1) 0\nDETECTOR rec[-1]\n"] {
-        let output = sample_detection_events(&parse(text), 64, Some(3)).expect("detect");
+        let output = sample_detections(&parse(text), 64, Some(3)).expect("detect");
         assert_eq!(output.records.len(), 64);
         assert!(
             output
@@ -75,24 +72,22 @@ fn certain_measurement_flips_convert_like_pinned_stim_through_m2d() {
 
         // A sampled shot of this circuit always records 1; against the noiseless reference (0)
         // the converted detector fires. A hypothetical 0 measurement must not fire it.
-        let converted = convert_measurements_to_detection_events(
+        let converted = convert_detection_records(
             &circuit,
             &[vec![true], vec![false]],
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
+            None,
+            ReferenceSampleMode::UseReferenceSample,
         )
         .expect("convert measurements");
         assert_eq!(converted.records[0].detectors, vec![true], "{text:?}");
         assert_eq!(converted.records[1].detectors, vec![false], "{text:?}");
 
         // Skipping the reference treats it as all-false and must agree here.
-        let skipped = convert_measurements_to_detection_events(
+        let skipped = convert_detection_records(
             &circuit,
             &[vec![true]],
-            DetectionConversionOptions {
-                skip_reference_sample: true,
-            },
+            None,
+            ReferenceSampleMode::SkipReferenceSample,
         )
         .expect("convert measurements without reference");
         assert_eq!(skipped.records[0].detectors, vec![true], "{text:?}");

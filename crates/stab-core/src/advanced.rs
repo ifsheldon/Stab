@@ -58,15 +58,7 @@ pub mod traversal {
 /// New code should prefer compilers, immutable plans, mutable sessions, and typed sinks from the
 /// facade root. These adapters remain supported during the coordinated pre-1.0 migration.
 pub mod compat {
-    pub use crate::dem_sampler::CompiledDemSampler;
-    pub use crate::detection::{
-        CompiledDetectionConverter, DetectionConversionOutput, DetectionEventRecord,
-        DetectionObservableOutputMode, convert_measurements_to_detection_events,
-        convert_measurements_to_detection_events_with_limits,
-        convert_measurements_to_detection_events_with_sweep,
-        convert_measurements_to_detection_events_with_sweep_and_limits, sample_detection_events,
-        sample_detection_events_with_limits, try_for_each_sampled_detection_event,
-        try_for_each_sampled_detection_event_with_limits, write_detection_records,
-        write_observable_records, write_ptb64_detection_records, write_ptb64_observable_records,
+    pub use crate::dem_sampler::{
+        CompiledDemSampler, DetectionConversionOutput, DetectionEventRecord,
     };
 }

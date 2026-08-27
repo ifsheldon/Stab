@@ -1,12 +1,13 @@
 use super::error::DetectionResult;
 use super::{
-    CompiledDetectionConverter, ConversionPlan, DetectionConversionLimits, ReferenceSampleSource,
+    ConversionPlan, DetectionConversionLimits, PreparedMeasurementToDetection,
+    ReferenceSampleSource,
 };
 use crate::{SamplingCompiler, SamplingPlan};
 use stab_model::Circuit;
 
 pub(super) struct PreparedDetectionSampling {
-    pub(super) converter: CompiledDetectionConverter,
+    pub(super) converter: PreparedMeasurementToDetection,
     pub(super) sampling: SamplingPlan,
 }
 
@@ -18,7 +19,7 @@ impl PreparedDetectionSampling {
         let plan = ConversionPlan::from_circuit_with_limits(circuit, limits)?;
         let sampling = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
         let reference_sample = sampling.try_reference_sample()?;
-        let converter = CompiledDetectionConverter::from_plan_and_reference_sample(
+        let converter = PreparedMeasurementToDetection::from_plan_and_reference_sample(
             plan,
             ReferenceSampleSource::Static(reference_sample),
         )?;

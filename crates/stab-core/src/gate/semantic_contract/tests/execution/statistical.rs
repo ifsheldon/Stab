@@ -12,7 +12,7 @@ fn gate_surface_contract_mpp_stochastic() {
     );
 
     let detection_circuit = circuit("MPP(0.25) Z0\nDETECTOR rec[-1]\n");
-    let detections = sample_detection_events(
+    let detections = collect_detection_samples(
         &detection_circuit,
         statistical_shot_count(plan),
         Some(plan.seed),
@@ -32,7 +32,7 @@ fn gate_surface_contract_mpp_stochastic() {
 
     let frame_circuit =
         circuit("MPP(0.25) Z0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) X1\n");
-    let frames = sample_detection_events(
+    let frames = collect_detection_samples(
         &frame_circuit,
         statistical_shot_count(plan),
         Some(plan.seed),
@@ -71,7 +71,7 @@ fn gate_surface_contract_mpad_stochastic() {
     );
 
     let detection_circuit = circuit("MPAD(0.25) 0\nDETECTOR rec[-1]\n");
-    let detections = sample_detection_events(
+    let detections = collect_detection_samples(
         &detection_circuit,
         statistical_shot_count(plan),
         Some(plan.seed),
@@ -91,7 +91,7 @@ fn gate_surface_contract_mpad_stochastic() {
 
     let frame_circuit =
         circuit("MPAD(0.25) 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) X0\n");
-    let frames = sample_detection_events(
+    let frames = collect_detection_samples(
         &frame_circuit,
         statistical_shot_count(plan),
         Some(plan.seed),
@@ -472,8 +472,8 @@ fn sample_records(
 fn sample_detections(
     text: &str,
     plan: &super::super::super::GateContractStatisticalPlan,
-) -> crate::DetectionConversionOutput {
-    sample_detection_events(
+) -> super::DetectionOutput {
+    collect_detection_samples(
         &circuit(text),
         statistical_shot_count(plan),
         Some(plan.seed),
@@ -558,7 +558,7 @@ fn count_single_pauli_samples(records: &[Vec<bool>], prefix: &str) -> Statistica
 }
 
 fn count_single_pauli_detection(
-    output: &crate::DetectionConversionOutput,
+    output: &super::DetectionOutput,
     prefix: &str,
 ) -> StatisticalCounts {
     count_single_paulis(
@@ -570,10 +570,7 @@ fn count_single_pauli_detection(
     )
 }
 
-fn count_single_pauli_frame(
-    output: &crate::DetectionConversionOutput,
-    prefix: &str,
-) -> StatisticalCounts {
+fn count_single_pauli_frame(output: &super::DetectionOutput, prefix: &str) -> StatisticalCounts {
     count_single_paulis(
         output
             .records
@@ -634,10 +631,7 @@ fn count_two_pauli_samples(records: &[Vec<bool>], prefix: &str) -> StatisticalCo
     count_two_paulis(records.iter().map(Vec::as_slice), prefix)
 }
 
-fn count_two_pauli_detection(
-    output: &crate::DetectionConversionOutput,
-    prefix: &str,
-) -> StatisticalCounts {
+fn count_two_pauli_detection(output: &super::DetectionOutput, prefix: &str) -> StatisticalCounts {
     count_two_paulis(
         output
             .records
@@ -647,10 +641,7 @@ fn count_two_pauli_detection(
     )
 }
 
-fn count_two_pauli_frame(
-    output: &crate::DetectionConversionOutput,
-    prefix: &str,
-) -> StatisticalCounts {
+fn count_two_pauli_frame(output: &super::DetectionOutput, prefix: &str) -> StatisticalCounts {
     count_two_paulis(
         output
             .records
@@ -703,7 +694,7 @@ fn count_identity_vs_nonidentity_samples(
 }
 
 fn count_identity_vs_nonidentity_detection(
-    output: &crate::DetectionConversionOutput,
+    output: &super::DetectionOutput,
     identity: &'static str,
     nonidentity: &'static str,
 ) -> StatisticalCounts {
@@ -718,7 +709,7 @@ fn count_identity_vs_nonidentity_detection(
 }
 
 fn count_identity_vs_nonidentity_frame(
-    output: &crate::DetectionConversionOutput,
+    output: &super::DetectionOutput,
     identity: &'static str,
     nonidentity: &'static str,
 ) -> StatisticalCounts {
@@ -753,10 +744,7 @@ fn count_heralded_samples(records: &[Vec<bool>], erase: bool) -> StatisticalCoun
     count_heralded(records.iter().map(Vec::as_slice), erase)
 }
 
-fn count_heralded_detection(
-    output: &crate::DetectionConversionOutput,
-    erase: bool,
-) -> StatisticalCounts {
+fn count_heralded_detection(output: &super::DetectionOutput, erase: bool) -> StatisticalCounts {
     count_heralded(
         output.records.iter().map(|record| {
             let [herald] = record.detectors.as_slice() else {
@@ -771,10 +759,7 @@ fn count_heralded_detection(
     )
 }
 
-fn count_heralded_frame(
-    output: &crate::DetectionConversionOutput,
-    erase: bool,
-) -> StatisticalCounts {
+fn count_heralded_frame(output: &super::DetectionOutput, erase: bool) -> StatisticalCounts {
     count_heralded(
         output.records.iter().map(|record| {
             let [first, second, herald] = record.observables.as_slice() else {

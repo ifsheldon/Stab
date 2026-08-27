@@ -1,20 +1,24 @@
 use std::hint::black_box;
 
-use stab_core::advanced::compat::{CompiledDetectionConverter, sample_detection_events};
 use stab_core::{
-    Circuit, DetectionConversionOptions, ErrorAnalyzerOptions, Gate, Probability,
+    Circuit, ErrorAnalyzerOptions, Gate, Probability, ReferenceSampleMode,
     analysis::{gate_has_tableau, gate_tableau},
     circuit_flow_generators, circuit_to_detector_error_model,
 };
-use stab_engine::{RandomPolicy, SamplingCompiler, SamplingPlan, Seed, ShotCount};
+use stab_engine::{
+    MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, SamplingPlan, Seed, ShotCount,
+};
 use stab_records::{MeasurementBatchView, MeasurementSink};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 
-use super::super::{STAB_COMPARE_ITERATIONS, measure_stab_iterations, stab_runner_error};
-use super::parse_circuit;
+use super::super::{
+    STAB_COMPARE_ITERATIONS, batch_sinks::DetectionDigestSink, measure_stab_iterations,
+    stab_runner_error,
+};
+use super::{parse_circuit, run_detection_sampling};
 
 const SPP_EXECUTION_CASES: [&str; 4] = [
     "SPP X0\nM 0\nDETECTOR rec[-1]\n",
@@ -159,15 +163,12 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
             || {
                 let mut detectors = 0usize;
                 for circuit in corpus.execution_circuits() {
-                    let converter = CompiledDetectionConverter::compile(
-                        circuit,
-                        DetectionConversionOptions {
-                            skip_reference_sample: false,
-                        },
-                    )
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                    let plan = MeasurementToDetectionCompiler::new()
+                        .reference_sample_mode(ReferenceSampleMode::UseReferenceSample)
+                        .compile(circuit)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
                     detectors = detectors
-                        .checked_add(converter.detector_count())
+                        .checked_add(plan.detector_width().get())
                         .ok_or_else(|| {
                             gate_semantic_count_overflow_error(row, "converter detector count")
                         })?;
@@ -182,12 +183,12 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
             || {
                 let mut records = 0usize;
                 for circuit in corpus.ordinary_detection_circuits() {
+                    let mut sink = DetectionDigestSink::default();
+                    run_detection_sampling(&row.id, circuit, 1, 31, &mut sink)?;
                     records = records
                         .checked_add(
-                            sample_detection_events(circuit, 1, Some(31))
-                                .map_err(|error| stab_runner_error(&row.id, error))?
-                                .records
-                                .len(),
+                            usize::try_from(sink.witness().1)
+                                .map_err(|error| stab_runner_error(&row.id, error))?,
                         )
                         .ok_or_else(|| {
                             gate_semantic_count_overflow_error(row, "detection record count")
@@ -203,12 +204,12 @@ pub(super) fn run(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
             || {
                 let mut records = 0usize;
                 for circuit in corpus.forced_frame_circuits() {
+                    let mut sink = DetectionDigestSink::default();
+                    run_detection_sampling(&row.id, circuit, 1, 31, &mut sink)?;
                     records = records
                         .checked_add(
-                            sample_detection_events(circuit, 1, Some(31))
-                                .map_err(|error| stab_runner_error(&row.id, error))?
-                                .records
-                                .len(),
+                            usize::try_from(sink.witness().1)
+                                .map_err(|error| stab_runner_error(&row.id, error))?,
                         )
                         .ok_or_else(|| {
                             gate_semantic_count_overflow_error(row, "detector-frame record count")

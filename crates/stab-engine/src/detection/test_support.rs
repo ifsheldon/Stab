@@ -7,13 +7,10 @@ use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 
 use stab_model::Circuit;
-use stab_records::{DetectionBatchView, DetectionSink};
+use stab_records::{DetectionBatchView, DetectionSink, MeasurementBatchView, PackedShotBatch};
 
-use super::{
-    CompiledDetectionConverter, DetectionConversionOptions, DetectionEventRecord,
-    DetectionSamplingCompiler,
-};
-use crate::{RandomPolicy, Seed, ShotCount};
+use super::{DetectionEventRecord, DetectionSamplingCompiler, MeasurementToDetectionCompiler};
+use crate::{RandomPolicy, ReferenceSampleMode, Seed, ShotCount};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct DetectionConversionOutput {
@@ -42,55 +39,52 @@ impl From<TestDetectionError> for super::DetectionError {
 pub(super) fn convert_measurements_to_detection_events(
     circuit: &Circuit,
     measurements: &[Vec<bool>],
-    options: DetectionConversionOptions,
+    reference_mode: ReferenceSampleMode,
 ) -> Result<DetectionConversionOutput, TestDetectionError> {
-    let converter = CompiledDetectionConverter::compile(circuit, options).map_err(display_error)?;
-    let mut records = Vec::with_capacity(measurements.len());
-    converter
-        .try_for_each_detection_event::<super::DetectionError, _, _>(
-            measurements.iter().map(Vec::as_slice),
-            |record| {
-                records.push(record.clone());
-                Ok(())
-            },
-        )
-        .map_err(display_error)?;
-    Ok(DetectionConversionOutput {
-        records,
-        detector_count: converter.detector_count(),
-        observable_count: converter.observable_count(),
-    })
+    convert(circuit, measurements, None, reference_mode)
 }
 
 pub(super) fn convert_measurements_to_detection_events_with_sweep(
     circuit: &Circuit,
     measurements: &[Vec<bool>],
     sweeps: &[Vec<bool>],
-    options: DetectionConversionOptions,
+    reference_mode: ReferenceSampleMode,
 ) -> Result<DetectionConversionOutput, TestDetectionError> {
-    if measurements.len() != sweeps.len() {
-        return Err(TestDetectionError(format!(
-            "invalid result format data: measurement records have {} shots but sweep records have {} shots",
-            measurements.len(),
-            sweeps.len()
-        )));
-    }
-    let converter = CompiledDetectionConverter::compile(circuit, options).map_err(display_error)?;
-    let mut records = Vec::with_capacity(measurements.len());
-    converter
-        .try_for_each_detection_event_with_sweep::<super::DetectionError, _, _, _>(
-            measurements.iter().map(Vec::as_slice),
-            sweeps.iter().map(Vec::as_slice),
-            |record| {
-                records.push(record.clone());
-                Ok(())
-            },
+    convert(circuit, measurements, Some(sweeps), reference_mode)
+}
+
+fn convert(
+    circuit: &Circuit,
+    measurements: &[Vec<bool>],
+    sweeps: Option<&[Vec<bool>]>,
+    reference_mode: ReferenceSampleMode,
+) -> Result<DetectionConversionOutput, TestDetectionError> {
+    let plan = MeasurementToDetectionCompiler::new()
+        .reference_sample_mode(reference_mode)
+        .compile(circuit)
+        .map_err(display_error)?;
+    let measurement_batch =
+        PackedShotBatch::from_records(measurements, plan.measurement_width().get())
+            .map_err(display_error)?;
+    let sweep_batch = sweeps
+        .map(|records| PackedShotBatch::from_records(records, plan.sweep_width().get()))
+        .transpose()
+        .map_err(display_error)?;
+    let mut session = plan.session().map_err(display_error)?;
+    let mut sink = CollectSink::default();
+    session
+        .run(
+            MeasurementBatchView::new(measurement_batch.view()),
+            sweep_batch
+                .as_ref()
+                .map(|batch| MeasurementBatchView::new(batch.view())),
+            &mut sink,
         )
         .map_err(display_error)?;
     Ok(DetectionConversionOutput {
-        records,
-        detector_count: converter.detector_count(),
-        observable_count: converter.observable_count(),
+        records: sink.records,
+        detector_count: plan.detector_width().get(),
+        observable_count: plan.observable_width().get(),
     })
 }
 
@@ -121,22 +115,6 @@ pub(super) fn sample_detection_events(
         detector_count: plan.detector_width().get(),
         observable_count: plan.observable_width().get(),
     })
-}
-
-pub(super) fn try_for_each_sampled_detection_event<E>(
-    circuit: &Circuit,
-    shots: usize,
-    seed: Option<u64>,
-    mut visit: impl FnMut(&DetectionEventRecord) -> Result<(), E>,
-) -> Result<(), E>
-where
-    E: From<TestDetectionError>,
-{
-    let output = sample_detection_events(circuit, shots, seed).map_err(E::from)?;
-    for record in &output.records {
-        visit(record)?;
-    }
-    Ok(())
 }
 
 #[derive(Default)]

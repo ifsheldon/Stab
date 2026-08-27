@@ -4,7 +4,7 @@
 )]
 
 use stab_engine::{
-    CompiledDetectionConverter, DetectionConversionOptions, DetectionSamplingCompiler,
+    DetectionSamplingCompiler, MeasurementToDetectionCompiler, ReferenceSampleMode,
     ReferenceSampleTree, SamplingCompiler, SamplingExecutionError,
 };
 use stab_model::Circuit;
@@ -53,55 +53,18 @@ fn maximum_id_direct_z_reference_operations_use_the_scalar_plan() {
 #[test]
 fn maximum_id_direct_z_detection_compilation_stays_constant_storage() {
     let circuit = sparse_direct_z_circuit();
-    let converter = CompiledDetectionConverter::compile(
-        &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
-    )
-    .expect("compile sparse Direct-Z converter");
-    assert_eq!(
-        converter
-            .convert_record(&[false])
-            .expect("convert reference measurement")
-            .detectors,
-        vec![false]
-    );
+    let conversion = MeasurementToDetectionCompiler::new()
+        .reference_sample_mode(ReferenceSampleMode::UseReferenceSample)
+        .compile(&circuit)
+        .expect("compile sparse Direct-Z converter");
+    assert_eq!(conversion.measurement_width().get(), 1);
+    assert_eq!(conversion.detector_width().get(), 1);
 
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit)
         .expect("compile sparse Direct-Z detector sampler");
     assert_eq!(plan.measurement_width().get(), 1);
     assert_eq!(plan.detector_width().get(), 1);
-}
-
-#[test]
-fn detection_reusable_buffers_have_fallible_constructors() {
-    let circuit = Circuit::from_stim_str(
-        "M 0\n\
-         DETECTOR rec[-1]\n\
-         OBSERVABLE_INCLUDE(0) rec[-1]\n",
-    )
-    .expect("parse detector circuit");
-    let converter = CompiledDetectionConverter::compile(
-        &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
-    )
-    .expect("compile detector converter");
-
-    let record = converter
-        .try_reusable_detection_record()
-        .expect("allocate reusable detector record");
-    assert_eq!(record.detectors, vec![false]);
-    assert_eq!(record.observables, vec![false]);
-    assert_eq!(
-        converter
-            .try_reusable_reference_sample()
-            .expect("allocate reusable reference record"),
-        vec![false]
-    );
 }
 
 #[test]

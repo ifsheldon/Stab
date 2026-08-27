@@ -9,23 +9,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_complex::Complex32;
-use stab_core::advanced::compat::{
-    CompiledDetectionConverter, convert_measurements_to_detection_events,
-};
 use stab_core::{
-    Circuit, CircuitItem, DetectionConversionOptions, ErrorAnalyzerOptions, Gate, GateArgumentRule,
-    GateTargetGroupKind, GateTargetRule, Probability,
+    Circuit, CircuitItem, ErrorAnalyzerOptions, Gate, GateArgumentRule, GateTargetGroupKind,
+    GateTargetRule, Probability, ReferenceSampleMode,
     analysis::{
         circuit_to_tableau, gate_decomposition_to_circuit, gate_flows,
         gate_h_s_cx_m_r_decomposition, gate_has_flows, gate_has_h_s_cx_m_r_decomposition,
         gate_has_tableau, gate_has_unitary_matrix, gate_tableau, gate_unitary_matrix,
     },
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
+    execution::MeasurementToDetectionCompiler,
     unitary_to_tableau,
 };
 
 mod support;
-use support::SamplingFixture;
+use support::{SamplingFixture, convert_detection_records};
 
 #[test]
 fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
@@ -611,23 +609,22 @@ fn gate_execution_contract_accepts_supported_spp_execution_paths() {
         let sampler =
             SamplingFixture::compile(&circuit).expect("sampler should accept supported SPP");
         assert_eq!(sampler.sample_zero_one(1), vec![vec![false]]);
-        for skip_reference_sample in [false, true] {
-            CompiledDetectionConverter::compile(
-                &circuit,
-                DetectionConversionOptions {
-                    skip_reference_sample,
-                },
-            )
-            .expect("detection conversion should accept supported SPP");
+        for reference_mode in [
+            ReferenceSampleMode::UseReferenceSample,
+            ReferenceSampleMode::SkipReferenceSample,
+        ] {
+            MeasurementToDetectionCompiler::new()
+                .reference_sample_mode(reference_mode)
+                .compile(&circuit)
+                .expect("detection conversion should accept supported SPP");
         }
-        convert_measurements_to_detection_events(
+        convert_detection_records(
             &circuit,
             &[vec![false]],
-            DetectionConversionOptions {
-                skip_reference_sample: true,
-            },
+            None,
+            ReferenceSampleMode::SkipReferenceSample,
         )
-        .expect("public conversion helper should accept supported SPP");
+        .expect("plan conversion should accept supported SPP");
         circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
             .expect("analyzer should accept supported SPP");
     }

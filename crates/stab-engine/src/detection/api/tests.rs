@@ -171,9 +171,7 @@ fn plans_are_shareable_and_streamed_conversion_matches_materialized_output() {
     let expected = convert_measurements_to_detection_events(
         &circuit,
         &measurements,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        ReferenceSampleMode::UseReferenceSample,
     )
     .expect("materialize detection conversion");
     let plan = MeasurementToDetectionCompiler::new()
@@ -208,9 +206,7 @@ fn measurement_sink_adapter_preserves_sweep_semantics_and_sink_lifecycle() {
         &circuit,
         &measurements,
         &sweeps,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        ReferenceSampleMode::UseReferenceSample,
     )
     .expect("materialize adapter oracle");
     let plan = MeasurementToDetectionCompiler::new()
@@ -286,8 +282,10 @@ fn sweep_batches_and_reference_modes_match_materialized_conversion() {
             &circuit,
             &measurements,
             &sweeps,
-            DetectionConversionOptions {
-                skip_reference_sample,
+            if skip_reference_sample {
+                ReferenceSampleMode::SkipReferenceSample
+            } else {
+                ReferenceSampleMode::UseReferenceSample
             },
         )
         .expect("materialized sweep conversion");

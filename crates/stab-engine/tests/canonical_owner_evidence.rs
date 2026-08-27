@@ -11,18 +11,21 @@ use std::thread;
 use sha2::{Digest as _, Sha256};
 use stab_engine::{
     COMPILATION_DESCRIPTOR, COMPILATION_DESCRIPTORS, CompilationOperation,
-    CompilationRequestFingerprint, CompiledDetectionConverter, DemError, DemResourceKind,
-    DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError, DemSamplingRunError,
-    DetectionCompileError, DetectionConversionLimits, DetectionConversionOptions, DetectionError,
-    DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
-    DetectionSamplingCompiler, MeasurementToDetectionCompiler, PlanFingerprint, RandomPolicy,
-    ReferenceSampleMode, RunError, SamplingBackend, SamplingCompileError, SamplingCompileErrorCode,
-    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunStatus, Seed, ShotCount,
-    SinkFailurePhase, detection_record_width_with_limits, measurement_record_count_with_limits,
+    CompilationRequestFingerprint, DemError, DemResourceKind, DemSamplerLimits,
+    DemSamplingCompiler, DemSamplingExecutionError, DemSamplingRunError, DetectionCompileError,
+    DetectionConversionLimits, DetectionError, DetectionRecordLimitSubject, DetectionResourceKind,
+    DetectionResourceLimitError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
+    MeasurementToDetectionPlan, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
+    SamplingBackend, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
+    SamplingExecutionError, SamplingPlan, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
+    detection_record_width_with_limits, measurement_record_count_with_limits,
     validate_detection_sampling_circuit_with_limits,
 };
 use stab_model::{Circuit, DetectorErrorModel, ModelDialect};
-use stab_records::{DemSampleBatchView, DemSampleSink, MeasurementBatchView, MeasurementSink};
+use stab_records::{
+    DemSampleBatchView, DemSampleSink, DetectionBatchView, DetectionSink, MeasurementBatchView,
+    MeasurementSink, PackedShotBatch,
+};
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit fixture")
@@ -35,9 +38,42 @@ fn dem_plan(text: &str) -> stab_engine::DemSamplingPlan {
         .expect("compile DEM sampling plan")
 }
 
-fn skip_reference_sample() -> DetectionConversionOptions {
-    DetectionConversionOptions {
-        skip_reference_sample: true,
+fn compile_detection(
+    circuit: &Circuit,
+    limits: DetectionConversionLimits,
+) -> Result<MeasurementToDetectionPlan, DetectionCompileError> {
+    MeasurementToDetectionCompiler::new()
+        .limits(limits)
+        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
+        .compile(circuit)
+}
+
+#[derive(Default)]
+struct DetectionWitnessSink {
+    detectors: Vec<Vec<bool>>,
+}
+
+impl DetectionSink for DetectionWitnessSink {
+    type Error = Infallible;
+
+    fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
+        for shot in 0..batch.shot_count() {
+            self.detectors.push(
+                (0..batch.detector_width().get())
+                    .map(|bit| {
+                        batch
+                            .detectors()
+                            .get(shot, bit)
+                            .expect("validated detection coordinate")
+                    })
+                    .collect(),
+            );
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 
@@ -411,10 +447,9 @@ fn a2_detection_compiled_plan_policy() {
         .with_max_expanded_instructions(4)
         .with_max_compiled_terms(6)
         .with_max_compiled_bytes(exact_bytes);
-    let converter =
-        CompiledDetectionConverter::compile_with_limits(&circuit, skip_reference_sample(), exact)
-            .expect("exact compiled-plan boundaries must be admitted");
-    assert_eq!(converter.detector_count(), 3);
+    let plan = compile_detection(&circuit, exact)
+        .expect("exact compiled-plan boundaries must be admitted");
+    assert_eq!(plan.detector_width().get(), 3);
 
     for (limits, expected_kind, actual, limit) in [
         (
@@ -430,13 +465,9 @@ fn a2_detection_compiled_plan_policy() {
             exact_bytes - 1,
         ),
     ] {
-        let resource = expect_detection_resource(
-            CompiledDetectionConverter::compile_with_limits(
-                &circuit,
-                skip_reference_sample(),
-                limits,
-            )
-            .expect_err("the first compiled-plan unit above its limit must reject"),
+        let resource = expect_detection_compile_resource(
+            compile_detection(&circuit, limits)
+                .expect_err("the first compiled-plan unit above its limit must reject"),
         );
         assert_eq!(resource.kind(), expected_kind);
         assert_eq!((resource.actual(), resource.limit()), (actual, limit));
@@ -500,21 +531,24 @@ fn a2_detection_frame_policy_propagation() {
 fn a2_detection_record_policy_admission() {
     let circuit = circuit("M 0 1\nDETECTOR rec[-1]\n");
     let exact = DetectionConversionLimits::default().with_max_record_bits(2);
-    let converter =
-        CompiledDetectionConverter::compile_with_limits(&circuit, skip_reference_sample(), exact)
-            .expect("two measurement bits reach the exact record-width limit");
-    let output = converter
-        .convert_record(&[false, true])
-        .expect("execute exact-width conversion");
-    assert_eq!(output.detectors, vec![true]);
-
-    let resource = expect_detection_resource(
-        CompiledDetectionConverter::compile_with_limits(
-            &circuit,
-            skip_reference_sample(),
-            exact.with_max_record_bits(1),
+    let plan = compile_detection(&circuit, exact)
+        .expect("two measurement bits reach the exact record-width limit");
+    let measurements = PackedShotBatch::from_records(&[vec![false, true]], 2)
+        .expect("pack exact-width measurement record");
+    let mut session = plan.session().expect("create conversion session");
+    let mut sink = DetectionWitnessSink::default();
+    session
+        .run(
+            MeasurementBatchView::new(measurements.view()),
+            None,
+            &mut sink,
         )
-        .expect_err("the second measurement bit must exceed the record-width limit"),
+        .expect("execute exact-width conversion");
+    assert_eq!(sink.detectors, vec![vec![true]]);
+
+    let resource = expect_detection_compile_resource(
+        compile_detection(&circuit, exact.with_max_record_bits(1))
+            .expect_err("the second measurement bit must exceed the record-width limit"),
     );
     assert_eq!(
         resource.kind(),
@@ -536,16 +570,12 @@ fn a2_detection_repeat_policy_admission() {
         .with_max_repeat_unroll(2)
         .with_max_repeat_iterations(6)
         .with_max_expanded_instructions(100);
-    CompiledDetectionConverter::compile_with_limits(&circuit, skip_reference_sample(), exact)
+    compile_detection(&circuit, exact)
         .expect("the exact aggregate repeat-iteration budget must be admitted");
 
-    let resource = expect_detection_resource(
-        CompiledDetectionConverter::compile_with_limits(
-            &circuit,
-            skip_reference_sample(),
-            exact.with_max_repeat_iterations(5),
-        )
-        .expect_err("nested repeats must share one aggregate iteration budget"),
+    let resource = expect_detection_compile_resource(
+        compile_detection(&circuit, exact.with_max_repeat_iterations(5))
+            .expect_err("nested repeats must share one aggregate iteration budget"),
     );
     assert_eq!(resource.kind(), DetectionResourceKind::RepeatIterations);
     assert_eq!((resource.actual(), resource.limit()), (6, 5));
@@ -558,27 +588,19 @@ fn a2_detection_work_policy_admission() {
         .with_max_repeat_unroll(3)
         .with_max_repeat_iterations(3)
         .with_max_expanded_instructions(3);
-    CompiledDetectionConverter::compile_with_limits(&circuit, skip_reference_sample(), exact)
+    compile_detection(&circuit, exact)
         .expect("exact repeat and expanded-work maxima must be admitted");
 
-    let repeat_resource = expect_detection_resource(
-        CompiledDetectionConverter::compile_with_limits(
-            &circuit,
-            skip_reference_sample(),
-            exact.with_max_repeat_unroll(2),
-        )
-        .expect_err("per-repeat work must have an independent limit"),
+    let repeat_resource = expect_detection_compile_resource(
+        compile_detection(&circuit, exact.with_max_repeat_unroll(2))
+            .expect_err("per-repeat work must have an independent limit"),
     );
     assert_eq!(repeat_resource.kind(), DetectionResourceKind::RepeatCount);
     assert_eq!((repeat_resource.actual(), repeat_resource.limit()), (3, 2));
 
-    let expanded_resource = expect_detection_resource(
-        CompiledDetectionConverter::compile_with_limits(
-            &circuit,
-            skip_reference_sample(),
-            exact.with_max_expanded_instructions(2),
-        )
-        .expect_err("expanded instruction work must have an independent limit"),
+    let expanded_resource = expect_detection_compile_resource(
+        compile_detection(&circuit, exact.with_max_expanded_instructions(2))
+            .expect_err("expanded instruction work must have an independent limit"),
     );
     assert_eq!(
         expanded_resource.kind(),

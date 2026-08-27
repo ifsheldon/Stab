@@ -58,8 +58,6 @@ DetectingRegionTargetMap
 DetectingRegionTargetOptions
 DetectionBatchView
 DetectionConversionLimits
-DetectionConversionOptions
-DetectionObservableOutputMode
 DetectionSink
 DetectorErrorModel
 DetectorWidth

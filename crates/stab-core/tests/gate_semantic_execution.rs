@@ -6,16 +6,14 @@
 
 mod support;
 
-use stab_core::advanced::compat::{
-    CompiledDetectionConverter, DetectionEventRecord, sample_detection_events,
-};
 use stab_core::{
-    Circuit, CircuitError, DetectionConversionOptions, ErrorAnalyzerOptions, Gate,
+    Circuit, ErrorAnalyzerOptions, Gate, ReferenceSampleMode,
     analysis::{decomposed_circuit, gate_has_tableau, gate_tableau},
     circuit_to_detector_error_model,
+    execution::{DetectionCompileError, MeasurementToDetectionCompiler},
 };
 
-use support::SamplingFixture;
+use support::{DetectionRecord, SamplingFixture, convert_detection_records, sample_detections};
 
 #[test]
 fn fixed_tableau_gates_execute_across_current_public_surfaces() {
@@ -32,14 +30,13 @@ fn fixed_tableau_gates_execute_across_current_public_surfaces() {
             case.gate_name
         );
 
-        let converter = CompiledDetectionConverter::compile(
-            &case.circuit,
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
-        )
-        .unwrap_or_else(|error| panic!("detection converter rejected {}: {error}", case.gate_name));
-        assert_eq!(converter.detector_count(), 1, "{}", case.gate_name);
+        let plan = MeasurementToDetectionCompiler::new()
+            .reference_sample_mode(ReferenceSampleMode::UseReferenceSample)
+            .compile(&case.circuit)
+            .unwrap_or_else(|error| {
+                panic!("detection converter rejected {}: {error}", case.gate_name)
+            });
+        assert_eq!(plan.detector_width().get(), 1, "{}", case.gate_name);
 
         circuit_to_detector_error_model(&case.circuit, ErrorAnalyzerOptions::default())
             .unwrap_or_else(|error| panic!("analyzer rejected {}: {error}", case.gate_name));
@@ -59,51 +56,46 @@ fn mpad_executes_across_current_public_surfaces() {
         vec![vec![false, true], vec![false, true]]
     );
 
-    let converter = CompiledDetectionConverter::compile(
+    let converted = convert_detection_records(
         &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &[vec![false, true]],
+        None,
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile MPAD detection converter");
-    assert_eq!(converter.measurement_count(), 2);
-    assert_eq!(converter.detector_count(), 2);
-    assert_eq!(converter.observable_count(), 1);
+    .expect("convert MPAD reference record");
+    assert_eq!(converted.detector_count, 2);
+    assert_eq!(converted.observable_count, 1);
     assert_eq!(
-        converter
-            .convert_record(&[false, true])
-            .expect("convert MPAD reference record"),
-        DetectionEventRecord {
+        converted.records,
+        vec![DetectionRecord {
             detectors: vec![false, false],
             observables: vec![false],
-        }
+        }]
     );
 
-    let skip_reference_converter = CompiledDetectionConverter::compile(
+    let skipped = convert_detection_records(
         &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: true,
-        },
+        &[vec![false, true]],
+        None,
+        ReferenceSampleMode::SkipReferenceSample,
     )
-    .expect("compile skip-reference MPAD detection converter");
+    .expect("convert skip-reference MPAD record");
     assert_eq!(
-        skip_reference_converter
-            .convert_record(&[false, true])
-            .expect("convert skip-reference MPAD record"),
-        DetectionEventRecord {
+        skipped.records,
+        vec![DetectionRecord {
             detectors: vec![false, true],
             observables: vec![true],
-        }
+        }]
     );
 
     let detection_output =
-        sample_detection_events(&circuit, 2, Some(3)).expect("sample MPAD detection events");
+        sample_detections(&circuit, 2, Some(3)).expect("sample MPAD detection events");
     assert_eq!(detection_output.detector_count, 2);
     assert_eq!(detection_output.observable_count, 1);
     assert_eq!(
         detection_output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecord {
                 detectors: vec![false, false],
                 observables: vec![false],
             };
@@ -115,14 +107,14 @@ fn mpad_executes_across_current_public_surfaces() {
         "MPAD 0 1\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z0\n",
     )
     .expect("parse frame-path MPAD circuit");
-    let frame_output = sample_detection_events(&frame_circuit, 2, Some(5))
+    let frame_output = sample_detections(&frame_circuit, 2, Some(5))
         .expect("sample frame-path MPAD detection events");
     assert_eq!(frame_output.detector_count, 0);
     assert_eq!(frame_output.observable_count, 2);
     assert_eq!(
         frame_output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecord {
                 detectors: vec![],
                 observables: vec![false, false],
             };
@@ -175,33 +167,28 @@ fn stochastic_mpad_executes_across_sampler_and_detection_surfaces() {
     let converter_circuit =
         Circuit::from_stim_str("MPAD(0.25) 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
             .expect("parse stochastic MPAD converter circuit");
-    let converter = CompiledDetectionConverter::compile(
+    let converted = convert_detection_records(
         &converter_circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &[vec![false], vec![true]],
+        None,
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile stochastic MPAD detection converter");
+    .expect("convert stochastic MPAD records");
     assert_eq!(
-        converter
-            .convert_record(&[false])
-            .expect("convert unflipped stochastic MPAD record"),
-        DetectionEventRecord {
-            detectors: vec![false],
-            observables: vec![false],
-        }
-    );
-    assert_eq!(
-        converter
-            .convert_record(&[true])
-            .expect("convert flipped stochastic MPAD record"),
-        DetectionEventRecord {
-            detectors: vec![true],
-            observables: vec![true],
-        }
+        converted.records,
+        vec![
+            DetectionRecord {
+                detectors: vec![false],
+                observables: vec![false],
+            },
+            DetectionRecord {
+                detectors: vec![true],
+                observables: vec![true],
+            },
+        ]
     );
 
-    let detection_output = sample_detection_events(&converter_circuit, SHOTS, Some(23))
+    let detection_output = sample_detections(&converter_circuit, SHOTS, Some(23))
         .expect("sample stochastic MPAD detection events");
     let detector_flips = detection_output
         .records
@@ -228,7 +215,7 @@ fn stochastic_mpad_executes_across_sampler_and_detection_surfaces() {
         "MPAD(0.25) 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z0\n",
     )
     .expect("parse frame-path stochastic MPAD circuit");
-    let frame_output = sample_detection_events(&frame_circuit, SHOTS, Some(29))
+    let frame_output = sample_detections(&frame_circuit, SHOTS, Some(29))
         .expect("sample frame-path stochastic MPAD detection events");
     let frame_record_flips = frame_output
         .records
@@ -265,51 +252,46 @@ fn mpp_executes_across_current_public_surfaces() {
         vec![vec![false, true], vec![false, true]]
     );
 
-    let converter = CompiledDetectionConverter::compile(
+    let converted = convert_detection_records(
         &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &[vec![false, true]],
+        None,
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile MPP detection converter");
-    assert_eq!(converter.measurement_count(), 2);
-    assert_eq!(converter.detector_count(), 2);
-    assert_eq!(converter.observable_count(), 1);
+    .expect("convert MPP reference record");
+    assert_eq!(converted.detector_count, 2);
+    assert_eq!(converted.observable_count, 1);
     assert_eq!(
-        converter
-            .convert_record(&[false, true])
-            .expect("convert MPP reference record"),
-        DetectionEventRecord {
+        converted.records,
+        vec![DetectionRecord {
             detectors: vec![false, false],
             observables: vec![false],
-        }
+        }]
     );
 
-    let skip_reference_converter = CompiledDetectionConverter::compile(
+    let skipped = convert_detection_records(
         &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: true,
-        },
+        &[vec![false, true]],
+        None,
+        ReferenceSampleMode::SkipReferenceSample,
     )
-    .expect("compile skip-reference MPP detection converter");
+    .expect("convert skip-reference MPP record");
     assert_eq!(
-        skip_reference_converter
-            .convert_record(&[false, true])
-            .expect("convert skip-reference MPP record"),
-        DetectionEventRecord {
+        skipped.records,
+        vec![DetectionRecord {
             detectors: vec![false, true],
             observables: vec![true],
-        }
+        }]
     );
 
     let detection_output =
-        sample_detection_events(&circuit, 2, Some(3)).expect("sample MPP detection events");
+        sample_detections(&circuit, 2, Some(3)).expect("sample MPP detection events");
     assert_eq!(detection_output.detector_count, 2);
     assert_eq!(detection_output.observable_count, 1);
     assert_eq!(
         detection_output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecord {
                 detectors: vec![false, false],
                 observables: vec![false],
             };
@@ -321,14 +303,14 @@ fn mpp_executes_across_current_public_surfaces() {
         "MPP !Z0 Z0\nOBSERVABLE_INCLUDE(0) rec[-2]\nOBSERVABLE_INCLUDE(1) Z0\n",
     )
     .expect("parse frame-path MPP circuit");
-    let frame_output = sample_detection_events(&frame_circuit, 2, Some(5))
+    let frame_output = sample_detections(&frame_circuit, 2, Some(5))
         .expect("sample frame-path MPP detection events");
     assert_eq!(frame_output.detector_count, 0);
     assert_eq!(frame_output.observable_count, 2);
     assert_eq!(
         frame_output.records,
         vec![
-            DetectionEventRecord {
+            DetectionRecord {
                 detectors: vec![],
                 observables: vec![false, false],
             };
@@ -381,33 +363,28 @@ fn stochastic_mpp_executes_across_sampler_and_detection_surfaces() {
     let converter_circuit =
         Circuit::from_stim_str("MPP(0.25) Z0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
             .expect("parse stochastic MPP converter circuit");
-    let converter = CompiledDetectionConverter::compile(
+    let converted = convert_detection_records(
         &converter_circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &[vec![false], vec![true]],
+        None,
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile stochastic MPP detection converter");
+    .expect("convert stochastic MPP records");
     assert_eq!(
-        converter
-            .convert_record(&[false])
-            .expect("convert unflipped stochastic MPP record"),
-        DetectionEventRecord {
-            detectors: vec![false],
-            observables: vec![false],
-        }
-    );
-    assert_eq!(
-        converter
-            .convert_record(&[true])
-            .expect("convert flipped stochastic MPP record"),
-        DetectionEventRecord {
-            detectors: vec![true],
-            observables: vec![true],
-        }
+        converted.records,
+        vec![
+            DetectionRecord {
+                detectors: vec![false],
+                observables: vec![false],
+            },
+            DetectionRecord {
+                detectors: vec![true],
+                observables: vec![true],
+            },
+        ]
     );
 
-    let detection_output = sample_detection_events(&converter_circuit, SHOTS, Some(37))
+    let detection_output = sample_detections(&converter_circuit, SHOTS, Some(37))
         .expect("sample stochastic MPP detection events");
     assert_eq!(detection_output.detector_count, 1);
     assert_eq!(detection_output.observable_count, 1);
@@ -434,7 +411,7 @@ fn stochastic_mpp_executes_across_sampler_and_detection_surfaces() {
         "MPP(0.25) Z0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z1\n",
     )
     .expect("parse frame-path stochastic MPP circuit");
-    let frame_output = sample_detection_events(&frame_circuit, SHOTS, Some(41))
+    let frame_output = sample_detections(&frame_circuit, SHOTS, Some(41))
         .expect("sample frame-path stochastic MPP detection events");
     assert_eq!(frame_output.detector_count, 0);
     assert_eq!(frame_output.observable_count, 2);
@@ -487,31 +464,25 @@ fn variable_target_spp_execution_matches_decomposed_circuit() {
             "{circuit_text} should sample like its decomposed form"
         );
 
-        let converter = CompiledDetectionConverter::compile(
-            &circuit,
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
-        )
-        .unwrap_or_else(|error| panic!("detection converter rejected {circuit_text}: {error}"));
-        let decomposed_converter = CompiledDetectionConverter::compile(
-            &decomposed,
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
-        )
-        .expect("compile decomposed detector conversion");
+        let plan = MeasurementToDetectionCompiler::new()
+            .reference_sample_mode(ReferenceSampleMode::UseReferenceSample)
+            .compile(&circuit)
+            .unwrap_or_else(|error| panic!("detection converter rejected {circuit_text}: {error}"));
+        let decomposed_plan = MeasurementToDetectionCompiler::new()
+            .reference_sample_mode(ReferenceSampleMode::UseReferenceSample)
+            .compile(&decomposed)
+            .expect("compile decomposed detector conversion");
         assert_eq!(
-            converter.detector_count(),
-            decomposed_converter.detector_count(),
+            plan.detector_width(),
+            decomposed_plan.detector_width(),
             "{circuit_text} should keep the decomposed detector count"
         );
 
         assert_eq!(
-            sample_detection_events(&circuit, 16, Some(7)).unwrap_or_else(|error| panic!(
+            sample_detections(&circuit, 16, Some(7)).unwrap_or_else(|error| panic!(
                 "detection sampling rejected {circuit_text}: {error}"
             )),
-            sample_detection_events(&decomposed, 16, Some(7))
+            sample_detections(&decomposed, 16, Some(7))
                 .expect("sample decomposed detection events"),
             "{circuit_text} should detect like its decomposed form"
         );
@@ -533,9 +504,8 @@ fn variable_target_spp_matches_hard_coded_phase_product_decompositions() {
         explicit_sampler.sample_zero_one_with_seed(32, Some(11))
     );
     assert_eq!(
-        sample_detection_events(&spp_x, 32, Some(13)).expect("sample SPP X detection"),
-        sample_detection_events(&explicit_x, 32, Some(13))
-            .expect("sample explicit SPP X detection")
+        sample_detections(&spp_x, 32, Some(13)).expect("sample SPP X detection"),
+        sample_detections(&explicit_x, 32, Some(13)).expect("sample explicit SPP X detection")
     );
 
     let spp_xx = Circuit::from_stim_str("SPP X0*X1\nOBSERVABLE_INCLUDE(0) X0\n")
@@ -545,9 +515,8 @@ fn variable_target_spp_matches_hard_coded_phase_product_decompositions() {
     )
     .expect("parse explicit frame-path SPP XX decomposition");
     assert_eq!(
-        sample_detection_events(&spp_xx, 32, Some(17)).expect("sample frame-path SPP XX"),
-        sample_detection_events(&explicit_xx, 32, Some(17))
-            .expect("sample explicit frame-path SPP XX")
+        sample_detections(&spp_xx, 32, Some(17)).expect("sample frame-path SPP XX"),
+        sample_detections(&explicit_xx, 32, Some(17)).expect("sample explicit frame-path SPP XX")
     );
 }
 
@@ -558,7 +527,7 @@ fn variable_target_spp_executes_in_frame_detection_path() {
             Circuit::from_stim_str(&format!("{gate_name} X0*X1\nOBSERVABLE_INCLUDE(0) X0\n"))
                 .expect("parse frame-detection SPP circuit");
 
-        let output = sample_detection_events(&circuit, 4, Some(0)).unwrap_or_else(|error| {
+        let output = sample_detections(&circuit, 4, Some(0)).unwrap_or_else(|error| {
             panic!("frame detector sampling rejected {gate_name}: {error}")
         });
         assert_eq!(output.detector_count, 0, "{gate_name}");
@@ -589,19 +558,16 @@ fn anti_hermitian_spp_execution_is_rejected_by_sampler_and_detection_conversion(
             "{gate_name}: {sampler_error}"
         );
 
-        for skip_reference_sample in [false, true] {
-            let converter_error = CompiledDetectionConverter::compile(
-                &circuit,
-                DetectionConversionOptions {
-                    skip_reference_sample,
-                },
-            )
-            .expect_err("detection conversion should reject anti-Hermitian SPP");
+        for reference_mode in [
+            ReferenceSampleMode::UseReferenceSample,
+            ReferenceSampleMode::SkipReferenceSample,
+        ] {
+            let converter_error = MeasurementToDetectionCompiler::new()
+                .reference_sample_mode(reference_mode)
+                .compile(&circuit)
+                .expect_err("detection conversion should reject anti-Hermitian SPP");
             assert!(
-                matches!(
-                    converter_error,
-                    CircuitError::InvalidSamplerCompilation { .. }
-                ),
+                matches!(converter_error, DetectionCompileError::InvalidCircuit(_)),
                 "{gate_name}: {converter_error}"
             );
             let converter_error = converter_error.to_string();
@@ -614,12 +580,8 @@ fn anti_hermitian_spp_execution_is_rejected_by_sampler_and_detection_conversion(
         let frame_circuit =
             Circuit::from_stim_str(&format!("{gate_name} X0*Z0\nOBSERVABLE_INCLUDE(0) X0\n"))
                 .expect("parse anti-Hermitian frame SPP circuit");
-        let frame_error = sample_detection_events(&frame_circuit, 1, Some(19))
+        let frame_error = sample_detections(&frame_circuit, 1, Some(19))
             .expect_err("frame detection should reject anti-Hermitian SPP");
-        assert!(
-            matches!(frame_error, CircuitError::InvalidSamplerCompilation { .. }),
-            "{gate_name}: {frame_error}"
-        );
         let frame_error = frame_error.to_string();
         assert!(
             frame_error.contains("anti-Hermitian"),

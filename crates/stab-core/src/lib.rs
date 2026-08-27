@@ -14,7 +14,6 @@ mod circuit_tableau;
 mod circuit_transforms;
 mod dem;
 mod dem_sampler;
-mod detection;
 mod diagnostics;
 mod error;
 mod error_matcher;
@@ -68,12 +67,6 @@ pub use dem::{
     try_disjoint_to_independent_xyz_errors,
 };
 pub use dem_sampler::DemSamplerLimits;
-pub use detection::{
-    DetectionConversionLimits, DetectionConversionOptions, DetectionObservableOutputMode,
-    detection_record_width, detection_record_width_with_limits, measurement_record_count,
-    measurement_record_count_with_limits, validate_detection_sampling_circuit,
-    validate_detection_sampling_circuit_with_limits,
-};
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext, ParseError,
     ParseErrorCode, ParseErrorContext,
@@ -84,12 +77,14 @@ pub use error::{
 pub use error_matcher::explain_errors_from_circuit;
 pub use execution::{CircuitReferenceSampleError, CountDeterminedMeasurementsError};
 pub use execution::{
-    PlanFingerprint, RandomPolicy, ReferenceSampleMode, ReferenceSampleTree,
-    ReferenceSampleTreeError, RunError, SamplingCancellation, SamplingCompileError,
-    SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError, SamplingPlan,
-    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
-    SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
-    sample_if_circuit_has_stabilizer_flows,
+    DetectionConversionLimits, PlanFingerprint, RandomPolicy, ReferenceSampleMode,
+    ReferenceSampleTree, ReferenceSampleTreeError, RunError, SamplingCancellation,
+    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
+    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
+    Seed, ShotCount, SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
+    detection_record_width, detection_record_width_with_limits, measurement_record_count,
+    measurement_record_count_with_limits, sample_if_circuit_has_stabilizer_flows,
+    validate_detection_sampling_circuit, validate_detection_sampling_circuit_with_limits,
 };
 pub use matched_error::{
     CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,
@@ -127,9 +122,6 @@ pub use stab_model::{
     RepeatNestingLimitError, SourceLineLimit, Target,
 };
 
-pub(crate) use detection::{DetectionConversionOutput, DetectionEventRecord};
+pub(crate) use dem_sampler::DetectionEventRecord;
 pub(crate) use result_formats::{DetsLayout, DetsToken};
 pub(crate) use stab_bits::BitSlice;
-
-#[cfg(test)]
-pub(crate) use detection::{CompiledDetectionConverter, sample_detection_events};

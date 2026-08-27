@@ -1,6 +1,6 @@
 use crate::{
-    CircuitError, CircuitResult, DetectionConversionOutput, DetectionEventRecord,
-    DetectorErrorModel, RandomPolicy, ResourceLimitError, Seed, ShotCount,
+    CircuitError, CircuitResult, DetectorErrorModel, RandomPolicy, ResourceLimitError, Seed,
+    ShotCount,
 };
 
 mod buffers;
@@ -9,9 +9,17 @@ mod compat_sink;
 use buffers::{try_clone_bool_slice, try_clone_detection_record, try_vec_with_capacity};
 use compat_sink::{DetectionAndErrorVisitorSink, DetectionVisitorSink, map_run_error};
 pub use stab_engine::DemSamplerLimits;
+pub use stab_engine::DetectionEventRecord;
 use stab_engine::{
     DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan, DemSamplingSession,
 };
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DetectionConversionOutput {
+    pub records: Vec<DetectionEventRecord>,
+    pub detector_count: usize,
+    pub observable_count: usize,
+}
 
 /// Compatibility materializer over the engine-owned DEM sampling plan and sessions.
 #[derive(Clone, Debug, PartialEq)]

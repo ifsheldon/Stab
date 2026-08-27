@@ -119,22 +119,12 @@ pub(crate) enum DetectionRecordLimitSubject {
     ObservableCount,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum DetectionBufferLimitSubject {
-    MeasurementSamples,
-    DetectionRecords,
-    SweepRecords,
-}
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum ResourceLimitCause {
     Analysis(stab_analysis::ResourceLimitError),
     ModelParse(stab_model::ResourceLimitError),
     DetectionRecordBits {
         subject: DetectionRecordLimitSubject,
-    },
-    DetectionMaterializedBits {
-        subject: DetectionBufferLimitSubject,
     },
     DetectionRepeatNesting,
     DetectionRepeatCount,
@@ -183,19 +173,6 @@ impl ResourceLimitError {
     ) -> Self {
         Self {
             cause: ResourceLimitCause::DetectionRecordBits { subject },
-            actual,
-            limit,
-            span: None,
-        }
-    }
-
-    pub(crate) const fn detection_materialized_bits(
-        subject: DetectionBufferLimitSubject,
-        actual: u64,
-        limit: u64,
-    ) -> Self {
-        Self {
-            cause: ResourceLimitCause::DetectionMaterializedBits { subject },
             actual,
             limit,
             span: None,
@@ -324,7 +301,6 @@ impl ResourceLimitError {
                 }
             },
             ResourceLimitCause::DetectionRecordBits { .. }
-            | ResourceLimitCause::DetectionMaterializedBits { .. }
             | ResourceLimitCause::DetectionRepeatNesting
             | ResourceLimitCause::DetectionRepeatCount
             | ResourceLimitCause::DetectionExpandedInstructions
@@ -395,7 +371,6 @@ impl ResourceLimitError {
             ResourceLimitCause::DetectionRepeatNesting => ResourceKind::RepeatNesting,
             ResourceLimitCause::DetectionExpandedInstructions => ResourceKind::ExpandedOperations,
             ResourceLimitCause::DetectionRecordBits { .. } => ResourceKind::RecordBits,
-            ResourceLimitCause::DetectionMaterializedBits { .. } => ResourceKind::MaterializedBits,
             ResourceLimitCause::DetectionRepeatCount => ResourceKind::RepeatCount,
             ResourceLimitCause::DetectionRepeatIterations => ResourceKind::RepeatIterations,
             ResourceLimitCause::DetectionCompiledTerms => ResourceKind::CompiledTerms,
@@ -522,18 +497,6 @@ impl Display for ResourceLimitError {
                     self.limit
                 ),
             },
-            ResourceLimitCause::DetectionMaterializedBits { subject } => {
-                let subject = match subject {
-                    DetectionBufferLimitSubject::MeasurementSamples => "measurement samples",
-                    DetectionBufferLimitSubject::DetectionRecords => "detection records",
-                    DetectionBufferLimitSubject::SweepRecords => "sweep records",
-                };
-                write!(
-                    formatter,
-                    "invalid result format data: {subject} would require {} buffered bits; current limit is {}",
-                    self.actual, self.limit
-                )
-            }
             ResourceLimitCause::DetectionRepeatNesting => write!(
                 formatter,
                 "cannot compile circuit sampler: detection conversion repeat nesting {} exceeds fixed safety limit {}",

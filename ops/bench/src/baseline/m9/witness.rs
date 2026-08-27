@@ -1,14 +1,14 @@
+use std::convert::Infallible;
 use std::ffi::OsString;
 use std::path::Path;
 
-use stab_core::advanced::compat::try_for_each_sampled_detection_event;
-use stab_core::{Circuit, CircuitError};
+use stab_core::{Circuit, DetectionBatchView, DetectionSink};
 
 use crate::error::BenchError;
 
 use super::{
     DETECT_SHOTS, M2D_SWEEP_B8_MEASUREMENTS, M2D_SWEEP_B8_SWEEP, SWEEP_PTB64_SHOTS,
-    SWEEP_PTB64_WIDTH,
+    SWEEP_PTB64_WIDTH, run_detection_sampling,
 };
 use crate::baseline::{
     batch_sinks::{ByteDigestWriter, OutputWitness},
@@ -34,22 +34,39 @@ pub(super) fn sample_detect_sweep_witness(
     row_id: &str,
     circuit: &Circuit,
 ) -> Result<DetectSweepWitness, BenchError> {
-    let mut witness = DetectSweepWitness::default();
-    try_for_each_sampled_detection_event::<CircuitError, _>(
-        circuit,
-        DETECT_SHOTS,
-        Some(17),
-        |record| {
-            witness.shots += 1;
-            witness.detector_bits += record.detectors.len();
-            witness.detector_ones += record.detectors.iter().filter(|bit| **bit).count();
-            witness.observable_bits += record.observables.len();
-            witness.observable_ones += record.observables.iter().filter(|bit| **bit).count();
-            Ok(())
-        },
-    )
-    .map_err(|error| stab_runner_error(row_id, error))?;
-    Ok(witness)
+    let mut sink = DetectWitnessSink::default();
+    run_detection_sampling(row_id, circuit, DETECT_SHOTS, 17, &mut sink)?;
+    Ok(sink.witness)
+}
+
+#[derive(Default)]
+struct DetectWitnessSink {
+    witness: DetectSweepWitness,
+}
+
+impl DetectionSink for DetectWitnessSink {
+    type Error = Infallible;
+
+    fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
+        self.witness.shots += batch.shot_count();
+        self.witness.detector_bits += batch.shot_count() * batch.detector_width().get();
+        self.witness.observable_bits += batch.shot_count() * batch.observable_width().get();
+        for shot in 0..batch.shot_count() {
+            for bit in 0..batch.detector_width().get() {
+                self.witness.detector_ones +=
+                    usize::from(batch.detectors().get(shot, bit) == Some(true));
+            }
+            for bit in 0..batch.observable_width().get() {
+                self.witness.observable_ones +=
+                    usize::from(batch.observables().get(shot, bit) == Some(true));
+            }
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 pub(super) fn ensure_detect_sweep_witness(

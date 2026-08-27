@@ -15,8 +15,8 @@ use stab_records::{
 use super::error::DetectionError as CircuitError;
 use super::frame::{DirectDetectorFramePlan, DirectDetectorFrameState};
 use super::{
-    CompiledDetectionConverter, DetectionConversionLimits, DetectionConversionOptions,
-    DetectionEventRecord, PreparedDetectionSampling, try_false_vec,
+    DetectionConversionLimits, DetectionEventRecord, PreparedDetectionSampling,
+    PreparedMeasurementToDetection, try_false_vec,
 };
 use crate::{
     RandomPolicy, ReferenceSampleMode, RunError, SamplingCancellation, SamplingRunStatus,
@@ -66,14 +66,9 @@ impl MeasurementToDetectionCompiler {
         self,
         circuit: &Circuit,
     ) -> Result<MeasurementToDetectionPlan, DetectionCompileError> {
-        let converter = CompiledDetectionConverter::compile_with_limits(
+        let converter = PreparedMeasurementToDetection::compile_with_limits(
             circuit,
-            DetectionConversionOptions {
-                skip_reference_sample: matches!(
-                    self.reference_mode,
-                    ReferenceSampleMode::SkipReferenceSample
-                ),
-            },
+            self.reference_mode,
             self.limits,
         )?;
         Ok(MeasurementToDetectionPlan::from_converter(converter))
@@ -94,7 +89,7 @@ pub struct MeasurementToDetectionPlan {
 
 #[derive(Clone)]
 struct MeasurementToDetectionPlanInner {
-    converter: CompiledDetectionConverter,
+    converter: PreparedMeasurementToDetection,
 }
 
 impl fmt::Debug for MeasurementToDetectionPlan {
@@ -110,7 +105,7 @@ impl fmt::Debug for MeasurementToDetectionPlan {
 }
 
 impl MeasurementToDetectionPlan {
-    fn from_converter(converter: CompiledDetectionConverter) -> Self {
+    fn from_converter(converter: PreparedMeasurementToDetection) -> Self {
         Self {
             inner: Arc::new(MeasurementToDetectionPlanInner { converter }),
         }

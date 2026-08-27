@@ -4,13 +4,13 @@
     reason = "PF3 sampler sweep target-order tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::advanced::compat::{
-    convert_measurements_to_detection_events_with_sweep, sample_detection_events,
-};
+mod support;
+
 use stab_core::{
-    Circuit, DetectionConversionOptions, execution::circuit_reference_sample,
+    Circuit, ReferenceSampleMode, execution::circuit_reference_sample,
     validate_detection_sampling_circuit,
 };
+use support::{convert_detection_records, sample_detections};
 
 #[test]
 fn pf3_sampler_sweep_target_order_rejects_cx_cy_second_sweep() {
@@ -28,13 +28,11 @@ fn pf3_sampler_sweep_target_order_rejects_cx_cy_second_sweep() {
             "{reference_error}"
         );
 
-        let conversion_error = convert_measurements_to_detection_events_with_sweep(
+        let conversion_error = convert_detection_records(
             &circuit,
             &[vec![false]],
-            &[vec![true]],
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
+            Some(&[vec![true]]),
+            ReferenceSampleMode::UseReferenceSample,
         )
         .expect_err("reject detection conversion")
         .to_string();
@@ -51,7 +49,7 @@ fn pf3_sampler_sweep_target_order_rejects_cx_cy_second_sweep() {
             "{validation_error}"
         );
 
-        let sampling_error = sample_detection_events(&circuit, 1, Some(5))
+        let sampling_error = sample_detections(&circuit, 1, Some(5))
             .expect_err("reject detection sampling")
             .to_string();
         assert!(
@@ -72,13 +70,11 @@ fn pf3_sampler_sweep_target_order_keeps_accepted_orders() {
         let circuit = Circuit::from_stim_str(source).expect("parse accepted sweep order");
         circuit_reference_sample(&circuit).expect("reference sample accepted order");
         validate_detection_sampling_circuit(&circuit).expect("validate accepted order");
-        convert_measurements_to_detection_events_with_sweep(
+        convert_detection_records(
             &circuit,
             &[vec![false]],
-            &[vec![false]],
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
+            Some(&[vec![false]]),
+            ReferenceSampleMode::UseReferenceSample,
         )
         .expect("convert accepted order");
     }

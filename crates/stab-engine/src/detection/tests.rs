@@ -8,11 +8,10 @@
 use super::test_support::{
     DetectionConversionOutput, convert_measurements_to_detection_events,
     convert_measurements_to_detection_events_with_sweep, sample_detection_events,
-    try_for_each_sampled_detection_event,
 };
 use super::*;
 
-use std::hint::black_box;
+use crate::ReferenceSampleMode;
 
 #[test]
 fn conversion_admission_does_not_allocate_detector_term_storage() {
@@ -63,9 +62,7 @@ fn convert(
     convert_measurements_to_detection_events(
         &circuit,
         &measurements,
-        DetectionConversionOptions {
-            skip_reference_sample,
-        },
+        reference_mode(skip_reference_sample),
     )
     .expect("convert measurements")
 }
@@ -89,187 +86,16 @@ fn convert_with_sweep(
         &circuit,
         &measurements,
         &sweeps,
-        DetectionConversionOptions {
-            skip_reference_sample,
-        },
+        reference_mode(skip_reference_sample),
     )
     .expect("convert measurements with sweep")
 }
 
-#[test]
-fn streamed_sweep_conversion_adds_no_per_shot_scratch_allocations() {
-    let circuit_text = "H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
-    let circuit = Circuit::from_stim_str(circuit_text).expect("parse sweep conversion circuit");
-    let converter = CompiledDetectionConverter::compile(
-        &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
-    )
-    .expect("compile sweep conversion circuit");
-    let measurement = [false];
-    let sweep = [true];
-    assert_eq!(converter.sweep_bit_count(), 1);
-    let mut reusable_reference = converter
-        .try_reusable_reference_sample()
-        .expect("allocate reusable reference sample");
-    let mut reusable_record = converter
-        .try_reusable_detection_record()
-        .expect("allocate reusable detection record");
-    converter
-        .convert_record_with_sweep_into(
-            &measurement,
-            &sweep,
-            &mut reusable_reference,
-            &mut reusable_record,
-        )
-        .expect("convert one sweep-conditioned record into reusable storage");
-    let expected = convert_with_sweep(circuit_text, &[&measurement], &[&sweep], false);
-    assert_eq!(reusable_record, expected.records[0]);
-
-    let reference_sampling = SamplingCompiler::new()
-        .compile_allowing_sweep(&circuit)
-        .expect("compile sweep reference sampler");
-    let mut reference_scratch = reference_sampling
-        .try_reusable_reference_sample_scratch()
-        .expect("allocate reusable reference scratch");
-    let mut reference_record = Vec::with_capacity(converter.measurement_count());
-    let mut sample_reference = |shots| {
-        for _ in 0..shots {
-            reference_sampling
-                .reference_measurement_record_with_sweep_and_scratch_into(
-                    &sweep,
-                    &mut reference_scratch,
-                    &mut reference_record,
-                )
-                .expect("sample sweep reference");
-            black_box(reference_record.as_slice());
-        }
-    };
-    sample_reference(1);
-    sample_reference(256);
-    let reference_one = allocation_counter::measure(|| sample_reference(1));
-    let reference_many = allocation_counter::measure(|| sample_reference(256));
-
-    let convert = |shots| {
-        converter
-            .try_for_each_detection_event_with_sweep(
-                std::iter::repeat_n(measurement.as_slice(), shots),
-                std::iter::repeat_n(sweep.as_slice(), shots),
-                |record| {
-                    black_box(record.detectors.first());
-                    black_box(record.observables.first());
-                    Ok::<(), CircuitError>(())
-                },
-            )
-            .expect("stream sweep conversion");
-    };
-    convert(1);
-    convert(256);
-
-    let one = allocation_counter::measure(|| convert(1));
-    let many = allocation_counter::measure(|| convert(256));
-
-    assert_eq!(
-        many.count_total.saturating_sub(one.count_total),
-        reference_many
-            .count_total
-            .saturating_sub(reference_one.count_total),
-        "conversion added per-shot allocations beyond reference sampling: reference_one={reference_one:?}, reference_many={reference_many:?}, one={one:?}, many={many:?}"
-    );
-    assert_eq!(
-        many.bytes_total.saturating_sub(one.bytes_total),
-        reference_many
-            .bytes_total
-            .saturating_sub(reference_one.bytes_total),
-        "conversion added per-shot allocation bytes beyond reference sampling: reference_one={reference_one:?}, reference_many={reference_many:?}, one={one:?}, many={many:?}"
-    );
-    assert!(
-        many.bytes_max <= one.bytes_max,
-        "conversion peak allocation grew with shot count: one={one:?}, many={many:?}"
-    );
-}
-
-#[test]
-fn compiled_detection_converter_streams_like_materialized_conversion() {
-    let circuit = Circuit::from_stim_str(
-        "X 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
-    )
-    .expect("parse circuit");
-    let measurements = vec![
-        vec![false, false],
-        vec![false, true],
-        vec![true, false],
-        vec![true, true],
-    ];
-    let materialized = convert_measurements_to_detection_events(
-        &circuit,
-        &measurements,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
-    )
-    .expect("materialized conversion");
-    let converter = CompiledDetectionConverter::compile(
-        &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
-    )
-    .expect("compile converter");
-    assert_eq!(converter.measurement_count(), 2);
-    assert_eq!(converter.sweep_bit_count(), 0);
-    assert_eq!(converter.detector_count(), 2);
-    assert_eq!(converter.observable_count(), 3);
-    assert_eq!(
-        converter
-            .try_reusable_reference_sample()
-            .expect("allocate reusable reference sample"),
-        vec![false; 2]
-    );
-    assert_eq!(
-        converter
-            .try_reusable_detection_record()
-            .expect("allocate reusable detection record"),
-        DetectionEventRecord {
-            detectors: vec![false; 2],
-            observables: vec![false; 3],
-        }
-    );
-    let direct = measurements
-        .iter()
-        .map(|record| converter.convert_record(record))
-        .collect::<Result<Vec<_>, _>>()
-        .expect("convert records directly");
-    let mut streamed = Vec::new();
-    converter
-        .try_for_each_detection_event(measurements.iter().map(Vec::as_slice), |record| {
-            streamed.push(record.clone());
-            Ok::<(), CircuitError>(())
-        })
-        .expect("stream conversion");
-
-    assert_eq!(direct, materialized.records);
-    assert_eq!(streamed, materialized.records);
-}
-
-#[test]
-fn sampled_detection_streams_like_materialized_sampling() {
-    for circuit_text in [
-        "X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n",
-        "RX 0\nZ_ERROR(0.25) 0\nOBSERVABLE_INCLUDE(0) X0\n",
-    ] {
-        let circuit = Circuit::from_stim_str(circuit_text).expect("parse circuit");
-        let materialized =
-            sample_detection_events(&circuit, 32, Some(11)).expect("materialized sampling");
-        let mut streamed = Vec::new();
-        try_for_each_sampled_detection_event(&circuit, 32, Some(11), |record| {
-            streamed.push(record.clone());
-            Ok::<(), CircuitError>(())
-        })
-        .expect("stream sampling");
-
-        assert_eq!(streamed, materialized.records);
+fn reference_mode(skip_reference_sample: bool) -> ReferenceSampleMode {
+    if skip_reference_sample {
+        ReferenceSampleMode::SkipReferenceSample
+    } else {
+        ReferenceSampleMode::UseReferenceSample
     }
 }
 
@@ -287,15 +113,6 @@ fn detection_sampling_uses_all_false_default_sweep_bits() {
         .expect("sample explicit false circuit");
 
     assert_eq!(sweep_output.records, explicit_false_output.records);
-
-    let mut streamed = Vec::new();
-    try_for_each_sampled_detection_event(&sweep_circuit, 32, Some(17), |record| {
-        streamed.push(record.clone());
-        Ok::<(), CircuitError>(())
-    })
-    .expect("stream sweep sampling");
-
-    assert_eq!(streamed, sweep_output.records);
 }
 
 #[test]
@@ -415,9 +232,7 @@ fn detection_conversion_rejects_invalid_measurement_references() {
     let result = convert_measurements_to_detection_events(
         &circuit,
         &[Vec::new()],
-        DetectionConversionOptions {
-            skip_reference_sample: true,
-        },
+        ReferenceSampleMode::SkipReferenceSample,
     );
 
     assert!(result.is_err());
@@ -488,37 +303,30 @@ fn detection_conversion_supports_sweep_controlled_error_propagation_and_repeats(
 fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfaces() {
     let circuit =
         Circuit::from_stim_str("CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("parse circuit");
-    let converter = CompiledDetectionConverter::compile(
+    let short_sweeps = convert_measurements_to_detection_events_with_sweep(
         &circuit,
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        &[vec![false], vec![true]],
+        &[vec![false]],
+        ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("compile converter");
-    let short_sweeps = converter
-        .try_for_each_detection_event_with_sweep(
-            [vec![false], vec![true]].iter().map(Vec::as_slice),
-            [vec![false]].iter().map(Vec::as_slice),
-            |_| Ok::<(), CircuitError>(()),
-        )
-        .expect_err("reject short sweep iterator");
+    .expect_err("reject short sweep batch");
     assert!(
         short_sweeps
             .to_string()
-            .contains("measurement records have more shots than sweep records"),
+            .contains("measurement batch has 2 shots but sweep batch has 1"),
         "{short_sweeps}"
     );
-    let long_sweeps = converter
-        .try_for_each_detection_event_with_sweep(
-            [vec![false]].iter().map(Vec::as_slice),
-            [vec![false], vec![true]].iter().map(Vec::as_slice),
-            |_| Ok::<(), CircuitError>(()),
-        )
-        .expect_err("reject long sweep iterator");
+    let long_sweeps = convert_measurements_to_detection_events_with_sweep(
+        &circuit,
+        &[vec![false]],
+        &[vec![false], vec![true]],
+        ReferenceSampleMode::UseReferenceSample,
+    )
+    .expect_err("reject long sweep batch");
     assert!(
         long_sweeps
             .to_string()
-            .contains("sweep records have more shots than measurement records"),
+            .contains("measurement batch has 1 shots but sweep batch has 2"),
         "{long_sweeps}"
     );
 
@@ -526,13 +334,13 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         &circuit,
         &[vec![false]],
         &[Vec::new()],
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        ReferenceSampleMode::UseReferenceSample,
     )
     .expect_err("reject wrong sweep width");
     assert!(
-        error.to_string().contains("sweep record 0 expected 1 bits"),
+        error
+            .to_string()
+            .contains("record 0 has 0 bits but 1 were expected"),
         "{error}"
     );
 
@@ -542,9 +350,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         &unsupported,
         &[vec![false]],
         &[vec![true]],
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        ReferenceSampleMode::UseReferenceSample,
     )
     .expect_err("reject unsupported sweep target role");
     assert!(
@@ -559,9 +365,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         &unsupported_shape,
         &[vec![false]],
         &[vec![true, true]],
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
+        ReferenceSampleMode::UseReferenceSample,
     )
     .expect_err("reject unsupported sweep target shape");
     assert!(
@@ -581,9 +385,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
             &invalid_sweep_order,
             &[vec![false]],
             &[vec![true]],
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
+            ReferenceSampleMode::UseReferenceSample,
         )
         .expect_err("reject invalid sampler sweep target order");
         assert!(
@@ -680,14 +482,6 @@ fn detection_sampling_uses_all_false_default_sweep_bits_frame_path() {
     let explicit_false_output = sample_detection_events(&explicit_false_circuit, 32, Some(5))
         .expect("sample explicit false frame circuit");
     assert_eq!(sweep_output.records, explicit_false_output.records);
-
-    let mut streamed = Vec::new();
-    try_for_each_sampled_detection_event(&sweep_circuit, 32, Some(5), |record| {
-        streamed.push(record.clone());
-        Ok::<(), CircuitError>(())
-    })
-    .expect("stream frame sweep sampling");
-    assert_eq!(streamed, sweep_output.records);
 }
 
 #[test]
@@ -726,14 +520,6 @@ fn detection_sampling_supports_xcz_ycz_measurement_feedback_frame_path() {
         let explicit_output = sample_detection_events(&explicit_circuit, 16, Some(7))
             .expect("sample equivalent feedback");
         assert_eq!(feedback_output.records, explicit_output.records);
-
-        let mut streamed = Vec::new();
-        try_for_each_sampled_detection_event(&feedback_circuit, 16, Some(7), |record| {
-            streamed.push(record.clone());
-            Ok::<(), CircuitError>(())
-        })
-        .expect("stream feedback circuit");
-        assert_eq!(streamed, feedback_output.records);
     }
 }
 
@@ -890,9 +676,7 @@ fn detection_conversion_rejects_unbounded_record_shapes() {
         convert_measurements_to_detection_events(
             &huge_observable,
             &[vec![false]],
-            DetectionConversionOptions {
-                skip_reference_sample: true,
-            },
+            ReferenceSampleMode::SkipReferenceSample,
         )
         .is_err()
     );
