@@ -1,70 +1,66 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 is complete; P1 lean correctness ownership is the current milestone; P2 through P9 have not started.
+Status: Active. P0 and P1 are complete. P2 through P9 have not started.
 
 ## Objective
 
-Complete every nondeferred Stim v1.16.0 core Rust and CLI behavior through the existing component architecture, then prove correctness, user-visible performance, memory use, and Stab self-regression with one concise evidence system.
+Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI product, then prove it with a concise behavior-oriented correctness suite and one end-to-end performance system. Prefer one production owner, one semantic test owner, and one generated status source over compatibility layers or mirrored ledgers.
 
 ## Scope
 
-- In scope: both model dialects, all 81 canonical instructions and 12 aliases, all legal target shapes, six result formats and their applicable CLI routes, generators, sampling, detection, conversion, analysis, search, transforms, algebra capabilities, seven computational commands, and the Stim help discovery surface.
-- Deferred: Python object bindings, JS/WASM, ecosystem integrations, `diagram`, `explain_errors`, full `ErrorMatcher` provenance, `repl`, public `TableauSimulator` and `FlipSimulator` products, QASM/Quirk exports, GPU execution, and exact Stim random streams.
-- Agent inspection commands, JSON Lines diagnostics, decoder sessions, external circuit passes, `.stim -> .stim` conversion, and concise Stab-native help are tested Stab extensions or explicit divergences; they do not close Stim parity rows.
-- Stable Python capabilities define relevant behavior for idiomatic Rust APIs. Python object shape and unstable C++ source/header compatibility are not goals.
-- Safe typed resource limits may differ from Stim when the divergence is documented and tested.
-- Deprecated Stim behavior is removed. Confirmed Stim bugs require an explicit divergence entry and independent regression test.
-- Obsolete pre-1.0 Stab APIs receive migration notes, not compatibility shims.
+- In scope: both model dialects, 81 canonical instructions, 12 aliases, legal targets and arguments, six result formats and applicable CLI routes, generators, sampling, detection, conversion, analysis, search, transforms, algebra, seven computational commands, and help discovery.
+- Deferred: Python and JS/WASM bindings, ecosystem integrations, `diagram`, `explain_errors`, full `ErrorMatcher` provenance, `repl`, public interactive simulators, QASM/Quirk, GPU execution, and exact Stim random streams.
+- Deprecated Stim behavior is omitted. Confirmed Stim bugs and deliberate typed resource limits require explicit divergence rows and focused tests.
+- Agent inspection, JSON Lines diagnostics, decoder sessions, external circuit passes, `.stim -> .stim` conversion, and concise Stab-native help remain tested Stab extensions rather than Stim parity claims.
+- Obsolete pre-1.0 Stab APIs receive no compatibility shims.
 
-## Current State
+## Current Truth
 
-- The component-crate split is retained; no new product crate is planned.
-- The current correctness and benchmark systems remain operational only until their lean replacements pass.
-- P0 completed in `07ebf4c8`; the CLI ownership slice in `75485342` raised the validated ledger to 63 verified families, 58 unique executable canonical owners, and 33 explicit P1 owner debts. [stim-parity.md](../stim-parity.md) is the generated current status view.
-- Existing feature and qualification documents are historical or transitional inputs, not parallel status sources.
-- Historical timing remains historical. No intermediate refactor revision may produce promotable evidence.
+- `oracle/stim-v1.16-parity.toml` and its family fragments are the sole feature and evidence ledger. [stim-parity.md](../stim-parity.md) is generated from it.
+- Current family, implementation, divergence, and canonical-owner totals are generated in [stim-parity.md](../stim-parity.md); active prose does not duplicate those volatile counts.
+- P1 removed or consolidated per-export, structural-only, duplicate, exhaustive, and representation-specific tests while preserving compatibility, data-loss, process, statistical, and resource-boundary coverage.
+- The historical correctness inventory remains only as a mechanically generated benchmark-prerequisite bridge. Add no semantic ownership to it; delete it when P7 replaces the inherited benchmark system.
+- New model-wide parse byte, instruction-count, and target-count policies belong to P3, not P1.
+- Historical timing remains historical. Formal evidence must wait for the final clean architecture and benchmark contracts.
 - Development occurs directly on `main`; do not create a branch or linked worktree.
 
-## Execution Order
+## P1 Closure Evidence
 
-1. P0: freeze scope and replace status ledgers.
-2. P1: build the lean behavior-oriented correctness suite.
-3. P2: finish the breaking public architecture reset.
-4. P3: close model, gate, and record-format parity.
-5. P4: close sampling and detection parity.
-6. P5: close analysis, transform, search, and algebra parity; keep decoder conformance separate as a Stab extension.
-7. P6: close CLI and Rust workflow parity.
-8. P7: replace performance machinery with one E2E suite.
-9. P8: profile and optimize user-visible regressions.
-10. P9: produce one controlled AArch64 evidence bundle and retire superseded history.
+- The behavior-oriented parity suite resolves and passes every canonical owner reported by the generated parity ledger, including pinned-Stim differentials, strict result formats, file-identity safety, statistical semantics, fixed-seed properties, and exact resource boundaries.
+- `oracle/qualification-cases.json` now generates the finite benchmark prerequisite bridge directly. It rejects retired ownership fields, and benchmark validation proves exact bidirectional equality with runtime prerequisite IDs.
+- Workspace formatting, warnings-denied Clippy, all workspace tests, the live result-format corpus, the implemented oracle suite, parity PR owners, compatibility matrix, correctness PR and full tiers, benchmark contracts, generated status, benchmark smoke, pre-commit, and diff checks pass.
+- Milestone audit and full code review found no remaining P1 blocker after exact logical-search boundaries, retained-state-term ordering, deterministic property coverage, and bridge enforcement were repaired.
+
+Canonical family owners use concise table-driven or generated matrices when cases share one public contract. They split at different public semantics, failure classes, cancellation behavior, or resource boundaries, not once per upstream test case.
+
+## Remaining Order
+
+1. P2: finish the breaking public architecture reset.
+2. P3: close model, gate, and result-format parity.
+3. P4: close sampling and detection parity.
+4. P5: close analysis, transform, search, and algebra parity.
+5. P6: close CLI and Rust workflow parity.
+6. P7: replace performance machinery with one user-visible E2E suite.
+7. P8: profile and optimize user-visible regressions.
+8. P9: produce one controlled AArch64 evidence bundle and retire superseded history.
 
 ## Non-Negotiable Gates
 
-- Preserve strict text grammars, typed DETS behavior, path-alias data-loss prevention, bounded process supervision, pinned-Stim comparison, resource limits, paired timing, complete output validation, and peak-RSS evidence.
-- Every surviving test must protect a semantic, statistical, safety, resource, or user-visible contract.
+- Preserve strict grammars, typed DETS behavior, path-alias data-loss prevention, bounded process supervision, pinned-Stim comparison, meaningful resource limits, paired timing, output validation, and peak-RSS evidence.
+- Every surviving test must protect semantic, statistical, safety, resource, or user-visible behavior.
 - Release E2E Stim parity remains median and confidence upper bound `<= 1.25x`.
-- Seeded Stab self-regression remains median and confidence upper bound `<= 1.15x`.
-- Missing baselines are `unseeded`; do not add waivers, weaken work, or relax thresholds.
-- Formal evidence requires one clean committed revision and a unique immutable output bundle.
+- Seeded Stab self-regression remains median and confidence upper bound `<= 1.15x`; missing baselines are `unseeded`.
+- Do not add waivers, weaken work, or relax thresholds to obtain a pass.
+- Formal evidence requires one clean committed revision and one unique immutable output bundle.
 
-## Current Milestone: P1
+## Sources
 
-1. Organize canonical tests by parity behavior family and product owner instead of per-export qualification inventory.
-2. Preserve the pinned result-format corpus, path-alias data-loss matrix, bounded process-supervisor tests, decoder conformance, and external circuit-pass proof.
-3. Consolidate shared corpus schema and decoding support without moving semantic assertions out of their owning crates.
-4. Give every implemented `needs-owner` row one meaningful semantic test and a real-process assertion when the contract is CLI-visible.
-5. Delete derive, type-name, re-export, constant, marker, static-label, private-pointer-identity, and duplicate tests only after stronger semantic ownership is in place.
-6. Use fixed-seed properties for parser/printer, algebra, folded-repeat, chunking, and codec invariants; test allocation bounds instead of storage identity.
-7. Run `milestone-audit` and `full-code-review`, fix confirmed findings, regenerate the parity view, and commit P1 in focused slices.
-
-## Active Sources
-
-- [Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md)
-- [Agent-native component architecture](agent-native-modular-qec-architecture-plan.md)
+- [Active plan](stim-core-parity-and-lean-evidence-plan.md)
+- [Agent-native architecture](agent-native-modular-qec-architecture-plan.md)
 - [Architecture rules](../architecture/README.md)
-- Current source of parity truth: `oracle/stim-v1.16-parity.toml`
-- Future source of performance truth: `benchmarks/suite.toml`
+- Current parity source: `oracle/stim-v1.16-parity.toml`
+- Future performance source: `benchmarks/suite.toml`
 
-## Done
+## Completion
 
-This goal is complete when the frozen parity ledger has no nondeferred `missing` row, the clean public architecture has one owner and one route per capability, the lean suite proves every completed behavior, the single E2E system passes its unchanged correctness, parity, memory, and seeded regression gates on controlled AArch64, one evidence bundle replays offline, superseded machinery and plans are deleted, CI passes the exact source commit, and the worktree is clean.
+This goal is complete when no nondeferred parity row is `missing`, every completed behavior has one meaningful owner, the public architecture has one route per capability, the single E2E suite passes correctness, Stim parity, memory, and seeded self-regression gates on controlled AArch64, its evidence replays offline, superseded machinery is deleted, CI passes the exact source commit, and the worktree is clean.

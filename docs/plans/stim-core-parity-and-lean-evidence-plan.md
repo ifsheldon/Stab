@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 is the current milestone; P2 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 is complete; P2 through P9 have not started.
 
 ## Summary
 
@@ -151,11 +151,13 @@ P0 completed in `07ebf4c8` with 132 atomic families, 50 independently executable
 3. Replace manually mirrored gate expectation tables with canonical model metadata plus pinned-Stim differential checks.
 4. Move shared corpus schema and decoding support into one internal test-support owner; leave semantic assertions in the crate and CLI that own the behavior.
 5. Delete per-export qualification cases, structural-only fixtures, duplicate compatibility rows, and tests whose only claim is a derive, type name, re-export, constant, marker inequality, static label, or private pointer identity.
-6. Keep old machinery running until its semantic replacement passes, then delete it in the same focused change rather than maintaining adapters.
+6. Remove semantic ownership from the old qualification machinery once the parity-ledger owners pass. Keep a finite source-owned catalog containing only the 48 exact correctness prerequisites consumed by active runtime groups, plus its mechanically generated IDs and digest. It must contain no upstream, public-API, checklist, or oracle-fixture ownership and must be deleted with the inherited benchmark system in P7.
+7. Leave new model-wide parse byte, instruction-count, and target-count limits to P3, where their public policy, exact boundaries, Stim divergence, and hostile-input behavior can be specified together. P1 may consolidate tests for existing limits but must not invent new product behavior to make a resource row appear complete.
 
 ### Tests
 
 - Every parity row has exactly one canonical owner test and, when the boundary is public CLI behavior, one real-process CLI assertion.
+- A canonical owner may be one concise table-driven or generated matrix when all cases exercise one cohesive public contract. Split tests at distinct semantic, failure, cancellation, or resource boundaries, not once per upstream test case.
 - Gate-family tests cover all legal target and argument shapes from canonical metadata, plus representative invalid shapes.
 - Property tests use fixed seeds and persisted minimal regressions for parser/printer round trips, tableau identities, folded versus unrolled repeats, chunking invariance, and codec equivalence.
 - Resource tests assert bounded allocations, bounded retained capacity, prompt cancellation, and no record-count growth instead of allocator pointer identity.
@@ -171,6 +173,16 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 - No test-support representation mirrors a production model unnecessarily.
 - Each defect has one minimal owner regression and only the additional boundary test needed to prove propagation.
 - The lean suite covers every `done` parity row without depending on historical qualification selectors.
+
+### Implementation Checkpoint
+
+- Current family, status, divergence, and canonical-owner totals are generated in `docs/stim-parity.md`; this plan does not duplicate those volatile counts.
+- The old per-export and structural-only test owners have been removed or consolidated. Strict result-format grammar, path-alias, bounded process, decoder-session, external-pass, statistical, and resource-boundary evidence remains intact.
+- The finite correctness bridge is generated directly from its 48 standalone benchmark prerequisites, rejects retired ownership state, and must exactly equal the runtime prerequisite union in both directions.
+- Fixed-seed algebra and codec properties, a bounded deterministic parser corpus, exact logical-search admission and first-excess checks, and retained-state-term ordering close the final audit findings.
+- Formatting, warnings-denied workspace Clippy, all workspace tests, live and checked oracle contracts, parity owners, correctness PR and full tiers, benchmark contracts, status generation, benchmark smoke, and diff checks pass. The post-fix milestone audit and full code review report no remaining P1 blocker.
+- The historical correctness inventory remains only as a generated compatibility bridge for inherited benchmark prerequisites. It is not a feature-status or semantic-ownership source.
+- P1 is complete only after generated-contract checks, workspace formatting, Clippy, all tests, benchmark smoke, pre-commit, milestone audit, and full code review pass on the final diff.
 
 ## Milestone P2: Finish The Public Architecture Reset
 
@@ -349,7 +361,7 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 | `sample-folded-ptb64` | Sample compact repeated circuits to PTB64 | 2 | Stim CLI | `circuit-model.syntax-and-canonical-text`, `sampling.loop-folding-selection`, `result-formats.routes-sample`, `cli.sample` |
 | `detect-observables` | Sample detections and observables from noisy circuits | 3 | Stim CLI | `detection.common-frame-gate-surface`, `detection.reference-correction`, `result-formats.routes-detect`, `cli.detect` |
 | `m2d-packed-sweep` | Convert packed measurements and sweep data to detections | 3 | Stim CLI | `detection.reference-correction`, `detection.sweep-and-feedback-common`, `result-formats.routes-m2d`, `cli.m2d` |
-| `analyze-folded` | Convert folded circuits to detector error models | 3 | Stim CLI | `analysis.circuit-to-dem-selected-gate-surface`, `analysis.loop-folding-feedback-common`, `cli.analyze-errors` |
+| `analyze-folded` | Convert folded circuits to detector error models | 3 | Stim CLI | `analysis.circuit-to-dem-selected-gate-surface`, `analysis.loop-folding-common`, `cli.analyze-errors` |
 | `sample-dem` | Sample repeated and sparse detector error models | 3 | Stim CLI | `dem-model.syntax-and-canonical-text`, `sampling.dem-sampling-and-replay`, `result-formats.routes-sample-dem`, `result-formats.routes-sample-dem-replay`, `cli.sample-dem` |
 | `qec-cli-pipeline` | Generate, analyze, then sample a detector error model | 2 | Stim CLI pipeline | `generation.surface-code-memory`, `analysis.circuit-to-dem-selected-gate-surface`, `sampling.dem-sampling-and-replay`, `cli.gen`, `cli.analyze-errors`, `cli.sample-dem` |
 | `qec-rust-pipeline` | Reuse compiled sample, detect, and decode sessions | 2 | Stab self-regression only | `sampling.circuit-common-measurement-and-reset`, `sampling.circuit-core-gates`, `detection.common-frame-gate-surface`; decoder session is a separately tested Stab extension |
