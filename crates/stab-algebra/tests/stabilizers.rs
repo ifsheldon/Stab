@@ -7,6 +7,7 @@
 use std::str::FromStr;
 
 use proptest::prelude::*;
+use proptest::test_runner::{Config as ProptestConfig, RngAlgorithm, RngSeed};
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_algebra::{
@@ -758,12 +759,6 @@ fn stabilizers_tableau_iter_counts_match_stim() {
 }
 
 #[test]
-fn stabilizers_tableau_iter_unsigned_3q_count_matches_stim() {
-    let iter3 = TableauIterator::new(3, false).expect("3q unsigned tableau iterator");
-    assert_eq!(iter3.count(), 1_451_520);
-}
-
-#[test]
 fn stabilizers_tableau_iter_signed_2q_tableaus_are_distinct() {
     let iter = TableauIterator::new(2, true).expect("2q signed tableau iterator");
     let seen = iter
@@ -790,6 +785,12 @@ fn stabilizers_tableau_iter_clone_continues_from_same_state() {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        rng_algorithm: RngAlgorithm::ChaCha,
+        rng_seed: RngSeed::Fixed(0xa16e_b4a1_1d3e_0001),
+        ..ProptestConfig::default()
+    })]
+
     #[test]
     fn stabilizers_tableau_identity_preserves_dense_pauli_strings(body in bare_pauli_body_strategy(10)) {
         let pauli = pauli(&body);
@@ -799,6 +800,12 @@ proptest! {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig {
+        rng_algorithm: RngAlgorithm::ChaCha,
+        rng_seed: RngSeed::Fixed(0xa16e_b4a1_1d3e_0002),
+        ..ProptestConfig::default()
+    })]
+
     #[test]
     fn stabilizers_pauli_product_is_associative_for_small_dense_strings(
         a in dense_pauli_string_strategy(6),

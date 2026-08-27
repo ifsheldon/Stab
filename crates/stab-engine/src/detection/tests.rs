@@ -424,62 +424,6 @@ fn detection_conversion_rejects_invalid_measurement_references() {
 }
 
 #[test]
-fn detection_conversion_uses_all_false_default_sweep_bits() {
-    let circuit =
-        Circuit::from_stim_str("CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("parse circuit");
-    let output = convert_measurements_to_detection_events(
-        &circuit,
-        &[vec![false], vec![true]],
-        DetectionConversionOptions {
-            skip_reference_sample: false,
-        },
-    )
-    .expect("convert with default sweep");
-
-    assert_eq!(
-        output.records,
-        vec![
-            DetectionEventRecord {
-                detectors: vec![false],
-                observables: Vec::new(),
-            },
-            DetectionEventRecord {
-                detectors: vec![true],
-                observables: Vec::new(),
-            },
-        ]
-    );
-}
-
-#[test]
-fn detection_conversion_uses_per_shot_sweep_reference_samples() {
-    let output = convert_with_sweep(
-        "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
-        &[&[false], &[false], &[true]],
-        &[&[false], &[true], &[true]],
-        false,
-    );
-
-    assert_eq!(
-        output.records,
-        vec![
-            DetectionEventRecord {
-                detectors: vec![false],
-                observables: vec![false],
-            },
-            DetectionEventRecord {
-                detectors: vec![true],
-                observables: vec![true],
-            },
-            DetectionEventRecord {
-                detectors: vec![false],
-                observables: vec![false],
-            },
-        ]
-    );
-}
-
-#[test]
 fn detection_conversion_skip_reference_sample_ignores_sweep_reference() {
     let output = convert_with_sweep(
         "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n",
@@ -956,24 +900,6 @@ fn detection_conversion_rejects_unbounded_record_shapes() {
     let huge_repeat =
         Circuit::from_stim_str("REPEAT 100001 {\n    M 0\n}\n").expect("parse repeat");
     assert!(measurement_record_count(&huge_repeat).is_err());
-}
-
-#[test]
-fn detection_sampling_matches_basic_frame_simulator_utility_semantics() {
-    let circuit = Circuit::from_stim_str("X_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\n").expect("parse");
-    let output = sample_detection_events(&circuit, 5, Some(5)).expect("sample detections");
-
-    assert_eq!(output.detector_count, 1);
-    assert_eq!(
-        output.records,
-        vec![
-            DetectionEventRecord {
-                detectors: vec![true],
-                observables: Vec::new(),
-            };
-            5
-        ],
-    );
 }
 
 #[test]

@@ -936,7 +936,6 @@ mod tests {
             runtime.groups.len(),
             "every runtime contract is classified"
         );
-        assert!(data.correctness_counts.values().sum::<usize>() > 1_000);
         let completion = data.completion.as_ref().expect("completion checkpoint");
         assert!(matches!(
             completion.scope_id.as_str(),

@@ -20,7 +20,6 @@ mod registry;
 #[cfg(test)]
 pub(crate) use registry::{LARGE_FAILURE_TARGET_ID, TIMEOUT_TARGET_ID};
 pub(crate) use registry::{
-    PASS_TARGET_ID, execution_plan as registered_execution_plan,
     execution_plan_digest as registered_execution_plan_digest,
     execution_plan_matches as registered_execution_plan_matches, is_registered_target,
     replay_registered_failure, run_registered_worker,

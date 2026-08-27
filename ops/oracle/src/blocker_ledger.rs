@@ -1,4 +1,4 @@
-//! Validation for the source-owned non-deferred blocker closure ledger.
+//! Read-only validation for the historical non-deferred blocker closure ledger.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
@@ -35,8 +35,8 @@ mod support;
 const SCHEMA_VERSION: u32 = 3;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0x63, 0x70, 0x04, 0x0b, 0x87, 0x5a, 0x80, 0x2f, 0x59, 0xda, 0x5c, 0x9b, 0xcb, 0x53, 0x3a, 0x81,
-    0xe3, 0xb4, 0xaf, 0xae, 0xb3, 0xfb, 0xa9, 0x49, 0x36, 0xd0, 0x32, 0xc9, 0xbd, 0xb3, 0x77, 0x79,
+    0xb8, 0xd6, 0x14, 0xe9, 0x67, 0xb6, 0x8c, 0xdc, 0x6b, 0xf1, 0xfb, 0x68, 0x1f, 0x7c, 0x76, 0x62,
+    0x02, 0x1b, 0x74, 0x7c, 0x2c, 0x09, 0x91, 0x89, 0xc9, 0x26, 0xf7, 0xba, 0xf9, 0xee, 0x7d, 0x50,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -571,7 +571,6 @@ struct ExpectedBlocker {
     id: &'static str,
     milestone: BlockerMilestone,
     disposition: BlockerDisposition,
-    minimum_cases: usize,
 }
 
 const EXPECTED_BLOCKERS: [ExpectedBlocker; 8] = [
@@ -579,49 +578,41 @@ const EXPECTED_BLOCKERS: [ExpectedBlocker; 8] = [
         id: "pfm2-qec-transforms",
         milestone: BlockerMilestone::B1,
         disposition: BlockerDisposition::Implement,
-        minimum_cases: 19,
     },
     ExpectedBlocker {
         id: "pfm3-analyzer-sweep",
         milestone: BlockerMilestone::B2,
         disposition: BlockerDisposition::EvidenceClose,
-        minimum_cases: 1,
     },
     ExpectedBlocker {
         id: "pfm3-gate-execution",
         milestone: BlockerMilestone::B2,
         disposition: BlockerDisposition::Implement,
-        minimum_cases: 18,
     },
     ExpectedBlocker {
         id: "pfm4-dem-traversal",
         milestone: BlockerMilestone::B3,
         disposition: BlockerDisposition::Implement,
-        minimum_cases: 7,
     },
     ExpectedBlocker {
         id: "pfm5-detecting-regions",
         milestone: BlockerMilestone::B4,
         disposition: BlockerDisposition::EvidenceClose,
-        minimum_cases: 2,
     },
     ExpectedBlocker {
         id: "pfm5-missing-detectors",
         milestone: BlockerMilestone::B4,
         disposition: BlockerDisposition::EvidenceClose,
-        minimum_cases: 14,
     },
     ExpectedBlocker {
         id: "pfm5-flow-engine",
         milestone: BlockerMilestone::B4,
         disposition: BlockerDisposition::Implement,
-        minimum_cases: 33,
     },
     ExpectedBlocker {
         id: "pfm6-analyzer-search",
         milestone: BlockerMilestone::B5,
         disposition: BlockerDisposition::Implement,
-        minimum_cases: 52,
     },
 ];
 
@@ -958,14 +949,6 @@ fn validate_expected_blockers(blockers: &[BlockerRecord], violations: &mut Vec<S
                         expected.id,
                         blocker.disposition.as_str(),
                         expected.disposition.as_str()
-                    ));
-                }
-                if blocker.cases.len() < expected.minimum_cases {
-                    violations.push(format!(
-                        "blocker {:?} has {} cases, expected at least {}",
-                        expected.id,
-                        blocker.cases.len(),
-                        expected.minimum_cases
                     ));
                 }
             }

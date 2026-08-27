@@ -33,6 +33,41 @@ fn regions(text: &str, detectors: Vec<DemDetectorId>, ticks: Vec<u64>) -> Detect
 }
 
 #[test]
+fn detecting_regions_common_semantics_match_stim() {
+    detecting_regions_simple_h_cx_mxx();
+    detecting_regions_target_api_matches_mx_python_example();
+    detecting_regions_target_api_supports_mzz_example();
+    detecting_regions_target_api_ignores_tags_and_ordinary_noise_like_upstream();
+    detecting_regions_target_shape_ignores_non_record_noise_instructions();
+    detecting_regions_target_shape_supports_inverted_measurement_targets();
+    detecting_regions_target_shape_supports_pauli_product_measurements();
+    detecting_regions_target_shape_supports_spp_unitary_products();
+    detecting_regions_target_api_supports_logical_observable_targets();
+    detecting_regions_target_shape_supports_measurement_pads();
+    detecting_regions_target_shape_supports_heralded_record_noise();
+    detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped();
+    detecting_regions_clifford_supports_promoted_single_qubit_gates();
+    detecting_regions_clifford_supports_controlled_pauli_propagation();
+    detecting_regions_deduplicates_requested_ids();
+    detecting_regions_anticommutation_supports_ignored_mode();
+    detecting_regions_omits_identity_snapshots();
+    detecting_regions_repeat_supports_bounded_ticks();
+    detecting_regions_clifford_supports_swap_gate();
+    detecting_regions_clifford_supports_promoted_controlled_pauli_gate();
+    assert_common_measurement_record_feedback();
+    assert_common_sweep_controlled_pauli_noops();
+    generated::assert_generated_code_regions();
+}
+
+#[test]
+fn detecting_regions_common_rejections_match_stim() {
+    detecting_regions_target_shape_rejects_anti_hermitian_pauli_products();
+    detecting_regions_target_shape_keeps_reset_and_unitaries_plain();
+    detecting_regions_target_api_rejects_invalid_targets();
+    detecting_regions_rejects_unknown_detector();
+    detecting_regions_rejects_out_of_range_tick();
+}
+
 fn detecting_regions_simple_h_cx_mxx() {
     let actual = regions(
         "H 0\n\
@@ -49,7 +84,6 @@ fn detecting_regions_simple_h_cx_mxx() {
     assert_eq!(actual[&detector(0)][&tick(1)].to_string(), "+XX");
 }
 
-#[test]
 fn detecting_regions_target_api_matches_mx_python_example() {
     let circuit = Circuit::from_stim_str(
         "R 0\n\
@@ -78,7 +112,6 @@ fn detecting_regions_target_api_matches_mx_python_example() {
     assert_eq!(actual[&detector][&tick(2)].to_string(), "+XX");
 }
 
-#[test]
 fn detecting_regions_target_api_supports_mzz_example() {
     let circuit = Circuit::from_stim_str(
         "TICK\n\
@@ -103,7 +136,6 @@ fn detecting_regions_target_api_supports_mzz_example() {
     assert_eq!(actual[&detector][&tick(1)].to_string(), "+__Z");
 }
 
-#[test]
 fn detecting_regions_target_api_ignores_tags_and_ordinary_noise_like_upstream() {
     let circuit = Circuit::from_stim_str(
         "R[test1] 0\n\
@@ -127,7 +159,6 @@ fn detecting_regions_target_api_ignores_tags_and_ordinary_noise_like_upstream() 
     assert_eq!(actual[&detector][&tick(0)].to_string(), "+Z");
 }
 
-#[test]
 fn detecting_regions_target_shape_ignores_non_record_noise_instructions() {
     let actual = regions(
         "R 0 1\n\
@@ -152,7 +183,6 @@ fn detecting_regions_target_shape_ignores_non_record_noise_instructions() {
     assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+ZZ");
 }
 
-#[test]
 fn detecting_regions_target_shape_supports_inverted_measurement_targets() {
     let single_cases = [
         ("R 0\nTICK\nM !0\nDETECTOR rec[-1]\n", "+Z"),
@@ -186,7 +216,6 @@ fn detecting_regions_target_shape_supports_inverted_measurement_targets() {
     }
 }
 
-#[test]
 fn detecting_regions_target_shape_supports_pauli_product_measurements() {
     let circuit = Circuit::from_stim_str(
         "RX 0\n\
@@ -217,7 +246,6 @@ fn detecting_regions_target_shape_supports_pauli_product_measurements() {
     assert_eq!(actual[&observable][&tick(0)].to_string(), "+XYZZ");
 }
 
-#[test]
 fn detecting_regions_target_shape_supports_spp_unitary_products() {
     for gate_name in ["SPP", "SPP_DAG"] {
         let circuit = Circuit::from_stim_str(&format!(
@@ -253,7 +281,6 @@ fn detecting_regions_target_shape_supports_spp_unitary_products() {
     }
 }
 
-#[test]
 fn detecting_regions_target_shape_rejects_anti_hermitian_pauli_products() {
     for text in [
         "TICK\nMPP X0*Z0\nDETECTOR rec[-1]\n",
@@ -275,7 +302,6 @@ fn detecting_regions_target_shape_rejects_anti_hermitian_pauli_products() {
     }
 }
 
-#[test]
 fn detecting_regions_target_shape_keeps_reset_and_unitaries_plain() {
     for text in [
         "R !0\nTICK\nM 0\nDETECTOR rec[-1]\n",
@@ -311,7 +337,6 @@ fn detecting_regions_target_shape_keeps_reset_and_unitaries_plain() {
     }
 }
 
-#[test]
 fn detecting_regions_target_api_supports_logical_observable_targets() {
     let circuit = Circuit::from_stim_str(
         "TICK\n\
@@ -347,7 +372,6 @@ fn detecting_regions_target_api_supports_logical_observable_targets() {
     assert_eq!(actual.len(), 2);
 }
 
-#[test]
 fn detecting_regions_target_api_rejects_invalid_targets() {
     let circuit = Circuit::from_stim_str("TICK\nM 0\nDETECTOR rec[-1]\n").unwrap();
     for (target, message) in [
@@ -375,7 +399,6 @@ fn detecting_regions_target_api_rejects_invalid_targets() {
     }
 }
 
-#[test]
 fn detecting_regions_target_shape_supports_measurement_pads() {
     let circuit = Circuit::from_stim_str(
         "R 0\n\
@@ -420,7 +443,6 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
     assert!(all_pad_regions[&detector(1)].is_empty());
 }
 
-#[test]
 fn detecting_regions_target_shape_supports_heralded_record_noise() {
     for text in [
         "R 0\nTICK\nHERALDED_ERASE(0.125) 0\nM 0\nDETECTOR rec[-2] rec[-1]\n",
@@ -458,7 +480,6 @@ fn detecting_regions_target_shape_supports_heralded_record_noise() {
     }
 }
 
-#[test]
 fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
     for text in [
         "TICK\nHERALDED_ERASE(0.125) !0\nDETECTOR rec[-1]\n",
@@ -503,7 +524,6 @@ fn detecting_regions_target_api_rejects_dense_helper_expansion() {
     assert!(error.to_string().contains("materialized target"));
 }
 
-#[test]
 fn detecting_regions_clifford_supports_promoted_single_qubit_gates() {
     let cases = [
         (
@@ -570,7 +590,6 @@ fn detecting_regions_clifford_supports_single_qubit_clifford_gate_set() {
     }
 }
 
-#[test]
 fn detecting_regions_clifford_supports_controlled_pauli_propagation() {
     let cases = [
         (
@@ -603,7 +622,6 @@ fn detecting_regions_clifford_supports_controlled_pauli_propagation() {
     }
 }
 
-#[test]
 fn detecting_regions_deduplicates_requested_ids() {
     let actual = regions(
         "H 0\n\
@@ -620,7 +638,6 @@ fn detecting_regions_deduplicates_requested_ids() {
     assert_eq!(actual[&detector(0)].len(), 2);
 }
 
-#[test]
 fn detecting_regions_rejects_unknown_detector() {
     let circuit = Circuit::from_stim_str("MXX 0 1\nDETECTOR rec[-1]\n").unwrap();
     let error = circuit_detecting_regions(
@@ -636,7 +653,6 @@ fn detecting_regions_rejects_unknown_detector() {
     assert!(error.to_string().contains("requested detector D1"));
 }
 
-#[test]
 fn detecting_regions_rejects_out_of_range_tick() {
     let circuit = Circuit::from_stim_str("TICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
     let error = circuit_detecting_regions(
@@ -652,7 +668,6 @@ fn detecting_regions_rejects_out_of_range_tick() {
     assert!(error.to_string().contains("requested tick 1"));
 }
 
-#[test]
 fn detecting_regions_anticommutation_supports_ignored_mode() {
     let circuit = Circuit::from_stim_str("TICK\nR 0\nTICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
     let actual = circuit_detecting_regions(
@@ -827,7 +842,6 @@ fn detecting_regions_gauge_allows_product_measurement_cancellation() {
     assert_eq!(actual[&detector(0)][&tick(1)].to_string(), "+XX");
 }
 
-#[test]
 fn detecting_regions_omits_identity_snapshots() {
     let actual = regions(
         "H 0\n\
@@ -844,7 +858,6 @@ fn detecting_regions_omits_identity_snapshots() {
     assert!(actual[&detector(0)].is_empty());
 }
 
-#[test]
 fn detecting_regions_repeat_supports_bounded_ticks() {
     let actual = regions(
         "H 0\n\
@@ -864,7 +877,6 @@ fn detecting_regions_repeat_supports_bounded_ticks() {
     assert_eq!(actual[&detector(0)][&tick(2)].to_string(), "+XX");
 }
 
-#[test]
 fn detecting_regions_clifford_supports_swap_gate() {
     let circuit = Circuit::from_stim_str("R 0 1\nTICK\nSWAP 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
     let actual = circuit_detecting_regions(
@@ -880,7 +892,6 @@ fn detecting_regions_clifford_supports_swap_gate() {
     assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+_Z");
 }
 
-#[test]
 fn detecting_regions_clifford_supports_promoted_controlled_pauli_gate() {
     let circuit =
         Circuit::from_stim_str("R 0\nRX 1\nTICK\nXCX 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
@@ -897,8 +908,7 @@ fn detecting_regions_clifford_supports_promoted_controlled_pauli_gate() {
     assert_eq!(actual[&detector(0)][&tick(0)].to_string(), "+ZX");
 }
 
-#[test]
-fn detecting_regions_target_shape_supports_measurement_record_feedback() {
+fn assert_common_measurement_record_feedback() {
     let cases = [
         (
             "CX record-first",
@@ -973,8 +983,7 @@ fn detecting_regions_target_shape_supports_measurement_record_feedback() {
     }
 }
 
-#[test]
-fn detecting_regions_target_shape_supports_sweep_controlled_pauli_noops() {
+fn assert_common_sweep_controlled_pauli_noops() {
     let cases = [
         ("CX sweep-first", "R 0", "CX sweep[0] 0", "M 0", "+Z"),
         ("CY sweep-first", "R 0", "CY sweep[0] 0", "M 0", "+Z"),

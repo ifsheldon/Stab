@@ -652,9 +652,15 @@ mod tests {
     }
 
     #[test]
-    fn circuit_with_inlined_feedback_basic() {
-        assert_eq!(
-            transform(
+    fn feedback_inlining_common_semantic_matrix_matches_stim() {
+        let controlled_pauli_expected = "R 0 1 2\n\
+             X_ERROR(0.125) 0\n\
+             M 0 1 2\n\
+             DETECTOR rec[-3] rec[-2]\n\
+             DETECTOR rec[-3] rec[-1]\n";
+        let cases = [
+            (
+                "mixed controls and observable propagation",
                 "MR 0\n\
                  H 0\n\
                  CX sweep[5] 0\n\
@@ -662,129 +668,178 @@ mod tests {
                  H 0\n\
                  M 0\n\
                  DETECTOR rec[-1]\n\
-                 OBSERVABLE_INCLUDE(2) rec[-1]\n"
+                 OBSERVABLE_INCLUDE(2) rec[-1]\n",
+                "MR 0\n\
+                 H 0\n\
+                 CX sweep[5] 0\n\
+                 OBSERVABLE_INCLUDE(2) rec[-1]\n\
+                 CY 2 3\n\
+                 H 0\n\
+                 M 0\n\
+                 DETECTOR rec[-2] rec[-1]\n\
+                 OBSERVABLE_INCLUDE(2) rec[-1]\n",
             ),
-            "MR 0\n\
-             H 0\n\
-             CX sweep[5] 0\n\
-             OBSERVABLE_INCLUDE(2) rec[-1]\n\
-             CY 2 3\n\
-             H 0\n\
-             M 0\n\
-             DETECTOR rec[-2] rec[-1]\n\
-             OBSERVABLE_INCLUDE(2) rec[-1]\n"
-        );
-    }
-
-    #[test]
-    fn circuit_with_inlined_feedback_demolition_feedback() {
-        assert_eq!(
-            transform(
+            (
+                "demolition feedback",
                 "CX 0 1\n\
                  M 1\n\
                  CX rec[-1] 1\n\
                  CX 0 1\n\
                  M 1\n\
                  DETECTOR rec[-1] rec[-2]\n\
-                 OBSERVABLE_INCLUDE(0) rec[-1]\n"
+                 OBSERVABLE_INCLUDE(0) rec[-1]\n",
+                "CX 0 1\n\
+                 M 1\n\
+                 OBSERVABLE_INCLUDE(0) rec[-1]\n\
+                 CX 0 1\n\
+                 M 1\n\
+                 DETECTOR rec[-1]\n\
+                 OBSERVABLE_INCLUDE(0) rec[-1]\n",
             ),
-            "CX 0 1\n\
-             M 1\n\
-             OBSERVABLE_INCLUDE(0) rec[-1]\n\
-             CX 0 1\n\
-             M 1\n\
-             DETECTOR rec[-1]\n\
-             OBSERVABLE_INCLUDE(0) rec[-1]\n"
-        );
-    }
-
-    #[test]
-    fn circuit_with_inlined_feedback_interleaved_order() {
-        assert_eq!(transform("H 0\nCZ\nH 1\n"), "H 0 1\n");
-        assert_eq!(transform("M 0\nCX\nM 1\n"), "M 0 1\n");
-        assert_eq!(
-            transform(
+            (
+                "interleaved unitary operations",
+                "H 0\nCZ\nH 1\n",
+                "H 0 1\n",
+            ),
+            (
+                "interleaved measurements",
                 "M 0 1\n\
                  CX\n\
                  M 2\n\
                  CX rec[-1] 3\n\
                  M 3\n\
-                 DETECTOR rec[-1]\n"
+                 DETECTOR rec[-1]\n",
+                "M 0 1 2 3\nDETECTOR rec[-2] rec[-1]\n",
             ),
-            "M 0 1 2 3\n\
-             DETECTOR rec[-2] rec[-1]\n"
-        );
-    }
-
-    #[test]
-    fn circuit_with_inlined_feedback_mpp() {
-        let input = Circuit::from_stim_str(
-            "RX 0\n\
-             RY 1\n\
-             RZ 2\n\
-             MPP X0*Y1*Z2 Z5\n\
-             CX rec[-2] 3\n\
-             M 3\n\
-             DETECTOR rec[-1]\n",
-        )
-        .unwrap();
-        let actual = circuit_with_inlined_feedback(&input).unwrap();
-
-        assert_eq!(
-            actual.to_stim_string(),
-            "RX 0\n\
-             RY 1\n\
-             R 2\n\
-             MPP X0*Y1*Z2 Z5\n\
-             M 3\n\
-             DETECTOR rec[-3] rec[-1]\n"
-        );
-    }
-
-    #[test]
-    fn circuit_with_inlined_feedback_loop_matches_upstream() {
-        let input = Circuit::from_stim_str(
-            "R 0 1\n\
-             X_ERROR(0.125) 0 1\n\
-             CX 0 1\n\
-             M 1\n\
-             CX rec[-1] 1\n\
-             DETECTOR rec[-1]\n\
-             REPEAT 30 {\n\
+            (
+                "MPP feedback",
+                "RX 0\n\
+                 RY 1\n\
+                 RZ 2\n\
+                 MPP X0*Y1*Z2 Z5\n\
+                 CX rec[-2] 3\n\
+                 M 3\n\
+                 DETECTOR rec[-1]\n",
+                "RX 0\n\
+                 RY 1\n\
+                 R 2\n\
+                 MPP X0*Y1*Z2 Z5\n\
+                 M 3\n\
+                 DETECTOR rec[-3] rec[-1]\n",
+            ),
+            (
+                "refolded repeat",
+                "R 0 1\n\
                  X_ERROR(0.125) 0 1\n\
                  CX 0 1\n\
                  M 1\n\
                  CX rec[-1] 1\n\
-                 DETECTOR rec[-1] rec[-2]\n\
-             }\n\
-             M 0\n\
-             DETECTOR rec[-1] rec[-2]\n",
-        )
-        .unwrap();
-        let actual = circuit_with_inlined_feedback(&input).unwrap();
+                 DETECTOR rec[-1]\n\
+                 REPEAT 30 {\n\
+                     X_ERROR(0.125) 0 1\n\
+                     CX 0 1\n\
+                     M 1\n\
+                     CX rec[-1] 1\n\
+                     DETECTOR rec[-1] rec[-2]\n\
+                 }\n\
+                 M 0\n\
+                 DETECTOR rec[-1] rec[-2]\n",
+                concat!(
+                    "R 0 1\n",
+                    "X_ERROR(0.125) 0 1\n",
+                    "CX 0 1\n",
+                    "M 1\n",
+                    "DETECTOR rec[-1]\n",
+                    "X_ERROR(0.125) 0 1\n",
+                    "CX 0 1\n",
+                    "M 1\n",
+                    "DETECTOR rec[-1]\n",
+                    "REPEAT 29 {\n",
+                    "    X_ERROR(0.125) 0 1\n",
+                    "    CX 0 1\n",
+                    "    M 1\n",
+                    "    DETECTOR rec[-3] rec[-1]\n",
+                    "}\n",
+                    "M 0\n",
+                    "DETECTOR rec[-3] rec[-2] rec[-1]\n",
+                ),
+            ),
+            (
+                "nested bounded repeats",
+                "R 0 1 2\n\
+                 REPEAT 2 {\n\
+                     X_ERROR(0.125) 0\n\
+                     M 0\n\
+                     CY rec[-1] 1\n\
+                     REPEAT 2 {\n\
+                         X_ERROR(0.25) 1\n\
+                         M 1\n\
+                         DETECTOR rec[-1] rec[-2]\n\
+                         CZ rec[-1] 2\n\
+                         M 2\n\
+                         DETECTOR rec[-1] rec[-2]\n\
+                         R 1 2\n\
+                     }\n\
+                     R 0\n\
+                 }\n",
+                concat!(
+                    "R 0 1 2\n",
+                    "REPEAT 2 {\n",
+                    "    X_ERROR(0.125) 0\n",
+                    "    M 0\n",
+                    "    X_ERROR(0.25) 1\n",
+                    "    M 1\n",
+                    "    DETECTOR rec[-1]\n",
+                    "    M 2\n",
+                    "    DETECTOR rec[-3] rec[-2] rec[-1]\n",
+                    "    R 1 2\n",
+                    "    X_ERROR(0.25) 1\n",
+                    "    M 1\n",
+                    "    DETECTOR rec[-1] rec[-2]\n",
+                    "    M 2\n",
+                    "    DETECTOR rec[-1] rec[-2]\n",
+                    "    R 1 2 0\n",
+                    "}\n",
+                ),
+            ),
+            (
+                "CX and CY record controls",
+                "R 0 1 2\n\
+                 X_ERROR(0.125) 0\n\
+                 M 0\n\
+                 CX rec[-1] 1\n\
+                 CY rec[-1] 2\n\
+                 M 1 2\n\
+                 DETECTOR rec[-2]\n\
+                DETECTOR rec[-1]\n",
+                controlled_pauli_expected,
+            ),
+        ];
 
-        assert_eq!(
-            actual.to_stim_string(),
-            "\
-R 0 1
-X_ERROR(0.125) 0 1
-CX 0 1
-M 1
-DETECTOR rec[-1]
-X_ERROR(0.125) 0 1
-CX 0 1
-M 1
-DETECTOR rec[-1]
-REPEAT 29 {
-    X_ERROR(0.125) 0 1
-    CX 0 1
-    M 1
-    DETECTOR rec[-3] rec[-1]
-}
-M 0
-DETECTOR rec[-3] rec[-2] rec[-1]
-"
-        );
+        for (name, input, expected) in cases {
+            assert_eq!(transform(input), expected, "{name}");
+        }
+    }
+
+    #[test]
+    fn feedback_inlining_xcz_ycz_extension_matches_equivalent_controls() {
+        let input = "R 0 1 2\n\
+             X_ERROR(0.125) 0\n\
+             M 0\n\
+             XCZ 1 rec[-1]\n\
+             YCZ 2 rec[-1]\n\
+             M 1 2\n\
+             DETECTOR rec[-2]\n\
+             DETECTOR rec[-1]\n";
+        let expected = "R 0 1 2\n\
+             X_ERROR(0.125) 0\n\
+             M 0 1 2\n\
+             DETECTOR rec[-3] rec[-2]\n\
+             DETECTOR rec[-3] rec[-1]\n";
+
+        // Pinned Stim rejects these direct spellings in this transform. Stab's
+        // extension must stay equivalent to accepted CX/CY record controls.
+        assert_eq!(transform(input), expected);
     }
 
     #[test]

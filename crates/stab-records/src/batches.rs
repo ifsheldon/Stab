@@ -631,6 +631,7 @@ mod tests {
     )]
 
     use proptest::prelude::*;
+    use proptest::test_runner::{Config as ProptestConfig, RngAlgorithm, RngSeed};
 
     use super::*;
 
@@ -894,6 +895,12 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig {
+            rng_algorithm: RngAlgorithm::ChaCha,
+            rng_seed: RngSeed::Fixed(0xba7c_4e5c_0dec_0001),
+            ..ProptestConfig::default()
+        })]
+
         #[test]
         fn shot_major_and_bit_plane_round_trip(
             shot_count in 0usize..=64,

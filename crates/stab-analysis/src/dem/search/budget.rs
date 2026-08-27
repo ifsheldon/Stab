@@ -259,18 +259,6 @@ impl GraphConstructionBudget {
         self.limits
     }
 
-    #[cfg(test)]
-    pub(super) fn admit_unique_edge(
-        &mut self,
-        edge_terms: usize,
-        edge_stored_copies: usize,
-        adjacency_stored_terms: usize,
-    ) -> AnalysisResult<()> {
-        let admission =
-            self.preflight_unique_edge(edge_terms, edge_stored_copies, adjacency_stored_terms)?;
-        self.commit_unique_edge(admission)
-    }
-
     pub(super) fn preflight_unique_edge(
         &self,
         edge_terms: usize,
@@ -475,148 +463,9 @@ mod tests {
         reason = "unit tests use direct assertions for compact boundary diagnostics"
     )]
 
+    use crate::ResourceKind;
+
     use super::*;
-
-    #[test]
-    fn logical_error_search_defaults_are_production_identical() {
-        let limits = LogicalErrorSearchLimits::default();
-        assert_eq!(limits.max_repeat_unroll(), 100_000);
-        assert_eq!(limits.max_repeat_iterations(), 1_000_000);
-        assert_eq!(limits.max_expanded_error_mechanisms(), 5_000_000);
-        assert_eq!(limits.max_error_target_occurrences_per_mechanism(), 65_536);
-        assert_eq!(limits.max_total_error_target_occurrences(), 20_000_000);
-        assert_eq!(limits.max_effective_detector_nodes(), 1_000_000);
-        assert_eq!(limits.max_unique_graph_edges(), 5_000_000);
-        assert_eq!(limits.max_stored_graph_terms(), 20_000_000);
-        assert_eq!(limits.max_hyperedge_degree(), 4_096);
-        assert_eq!(limits.max_hyperedge_incidences(), 5_000_000);
-        assert_eq!(limits.max_search_states(), 1_000_000);
-        assert_eq!(limits.max_search_transitions(), 20_000_000);
-        assert_eq!(limits.max_search_state_terms(), 65_536);
-        assert_eq!(limits.max_stored_search_state_terms(), 5_000_000);
-    }
-
-    #[test]
-    fn logical_error_search_builders_change_independent_dimensions() {
-        let defaults = LogicalErrorSearchLimits::default();
-        let changed = defaults.with_max_search_states(7);
-        assert_eq!(changed.max_search_states(), 7);
-        assert_eq!(
-            changed.max_search_transitions(),
-            defaults.max_search_transitions()
-        );
-        assert_eq!(
-            changed.max_expanded_error_mechanisms(),
-            defaults.max_expanded_error_mechanisms()
-        );
-        assert_eq!(
-            changed.max_stored_graph_terms(),
-            defaults.max_stored_graph_terms()
-        );
-    }
-
-    #[test]
-    fn search_budget_enforces_state_and_transition_limits() {
-        let state_limits = LogicalErrorSearchLimits::default().with_max_search_states(64);
-        let mut state_budget = SearchBudget::new("test", state_limits);
-        for _ in 0..state_limits.max_search_states() {
-            state_budget
-                .admit_state(0, 0, false)
-                .expect("state within limit");
-        }
-        assert!(
-            state_budget
-                .admit_state(0, 0, false)
-                .expect_err("state beyond limit")
-                .to_string()
-                .contains("at most 64 search states")
-        );
-
-        let transition_limits =
-            LogicalErrorSearchLimits::default().with_max_search_transitions(4_096);
-        let mut transition_budget = SearchBudget::new("test", transition_limits);
-        for _ in 0..transition_limits.max_search_transitions() {
-            transition_budget
-                .record_transition()
-                .expect("transition within limit");
-        }
-        assert!(
-            transition_budget
-                .record_transition()
-                .expect_err("transition beyond limit")
-                .to_string()
-                .contains("at most 4096 search transitions")
-        );
-    }
-
-    #[test]
-    fn search_budget_enforces_per_state_and_aggregate_payload_limits() {
-        let limits = LogicalErrorSearchLimits::default()
-            .with_max_search_state_terms(64)
-            .with_max_stored_search_state_terms(256);
-        let mut budget = SearchBudget::new("test", limits);
-        assert!(
-            budget
-                .preflight_state_terms(limits.max_search_state_terms())
-                .is_ok()
-        );
-        assert!(
-            budget
-                .preflight_state_terms(limits.max_search_state_terms() + 1)
-                .expect_err("state payload beyond limit")
-                .to_string()
-                .contains("at most 64 detector and observable terms per search state")
-        );
-
-        budget
-            .admit_state(
-                limits.max_search_state_terms(),
-                limits.max_search_state_terms(),
-                true,
-            )
-            .expect("three bounded payload copies fit the aggregate limit");
-        budget
-            .admit_state(limits.max_search_state_terms(), 0, false)
-            .expect("aggregate boundary is inclusive");
-        assert!(
-            budget
-                .admit_state(1, 0, false)
-                .expect_err("aggregate state payload beyond limit")
-                .to_string()
-                .contains("at most 256 stored detector and observable search-state terms")
-        );
-    }
-
-    #[test]
-    fn graph_construction_budget_enforces_edge_and_payload_limits() {
-        let edge_limits = LogicalErrorSearchLimits::default().with_max_unique_graph_edges(64);
-        let mut edge_budget = GraphConstructionBudget::new("test graph", edge_limits);
-        for _ in 0..edge_limits.max_unique_graph_edges() {
-            edge_budget
-                .admit_unique_edge(1, 1, 0)
-                .expect("edge within limit");
-        }
-        assert!(
-            edge_budget
-                .admit_unique_edge(1, 1, 0)
-                .expect_err("edge beyond limit")
-                .to_string()
-                .contains("at most 64 unique graph edges")
-        );
-
-        let payload_limits = LogicalErrorSearchLimits::default().with_max_stored_graph_terms(2_048);
-        let mut payload_budget = GraphConstructionBudget::new("test graph", payload_limits);
-        payload_budget
-            .admit_unique_edge(payload_limits.max_stored_graph_terms() / 2, 2, 0)
-            .expect("payload boundary is inclusive");
-        assert!(
-            payload_budget
-                .admit_adjacency(1)
-                .expect_err("payload beyond limit")
-                .to_string()
-                .contains("at most 2048 stored graph payload terms")
-        );
-    }
 
     #[test]
     fn graph_construction_preflight_does_not_consume_budget_until_commit() {
@@ -655,6 +504,97 @@ mod tests {
         assert!(error.to_string().contains("admission became stale"));
         assert_eq!(budget.edges, 1);
         assert_eq!(budget.stored_terms, 1);
+    }
+
+    #[test]
+    fn graph_and_search_budgets_accept_exact_limits_and_reject_first_excess() {
+        let limits = LogicalErrorSearchLimits::default()
+            .with_max_unique_graph_edges(1)
+            .with_max_stored_graph_terms(3)
+            .with_max_search_states(1)
+            .with_max_search_transitions(1)
+            .with_max_search_state_terms(2)
+            .with_max_stored_search_state_terms(5);
+
+        let mut graph = GraphConstructionBudget::new("test graph", limits);
+        let exact_edge = graph
+            .preflight_unique_edge(2, 1, 1)
+            .expect("exact edge and stored-term limits are inclusive");
+        graph
+            .commit_unique_edge(exact_edge)
+            .expect("exact graph admission commits");
+        assert_resource(
+            graph
+                .preflight_unique_edge(0, 0, 0)
+                .expect_err("first excess edge is rejected"),
+            ResourceKind::UniqueGraphEdges,
+            2,
+            1,
+        );
+        assert_resource(
+            graph
+                .admit_adjacency(1)
+                .expect_err("first excess stored graph term is rejected"),
+            ResourceKind::StoredGraphTerms,
+            4,
+            3,
+        );
+
+        let mut search = SearchBudget::new("test search", limits);
+        search
+            .preflight_state_terms(2)
+            .expect("exact per-state term limit is inclusive");
+        assert_resource(
+            search
+                .preflight_state_terms(3)
+                .expect_err("first excess per-state term is rejected"),
+            ResourceKind::SearchStateTerms,
+            3,
+            2,
+        );
+        search
+            .admit_state(2, 1, true)
+            .expect("exact state and retained-term limits are inclusive");
+        assert_resource(
+            search
+                .admit_state(0, 0, false)
+                .expect_err("first excess state is rejected"),
+            ResourceKind::SearchStates,
+            2,
+            1,
+        );
+        let mut retained_terms = SearchBudget::new("test search", limits.with_max_search_states(2));
+        retained_terms
+            .admit_state(2, 1, true)
+            .expect("exact retained-term limit is inclusive");
+        assert_resource(
+            retained_terms
+                .admit_state(1, 0, false)
+                .expect_err("first excess retained term is rejected"),
+            ResourceKind::StoredSearchStateTerms,
+            6,
+            5,
+        );
+        search
+            .record_transition()
+            .expect("exact transition limit is inclusive");
+        assert_resource(
+            search
+                .record_transition()
+                .expect_err("first excess transition is rejected"),
+            ResourceKind::SearchTransitions,
+            2,
+            1,
+        );
+    }
+
+    fn assert_resource(error: AnalysisError, expected: ResourceKind, actual: u64, limit: u64) {
+        let resource = error
+            .resource_limit_error()
+            .expect("resource rejection retains typed context");
+        assert_eq!(resource.resource(), expected);
+        assert_eq!(resource.actual(), actual);
+        assert_eq!(resource.limit(), limit);
     }
 
     #[test]

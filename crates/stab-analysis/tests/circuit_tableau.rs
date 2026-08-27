@@ -28,7 +28,10 @@ impl CircuitTableauTestExt for Circuit {
 }
 
 #[test]
-fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
+fn circuit_to_tableau_common_semantic_matrix_matches_stim() {
+    assert_circuit_to_tableau_basic_examples();
+    assert_circuit_to_tableau_repeat_folding();
+
     // Adapted from Stim v1.16.0 src/stim/util_top/circuit_vs_tableau.test.cc.
     let unitary = circuit(
         "
@@ -209,8 +212,7 @@ fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
     );
 }
 
-#[test]
-fn circuit_to_tableau_matches_stim_basic_examples() {
+fn assert_circuit_to_tableau_basic_examples() {
     assert_eq!(
         circuit("").to_tableau(false, false, false).expect("empty"),
         Tableau::identity(0).expect("Tableau identity")
@@ -323,8 +325,7 @@ fn circuit_to_tableau_matches_stim_basic_examples() {
     );
 }
 
-#[test]
-fn circuit_to_tableau_folds_huge_and_nested_repeats_exactly() {
+fn assert_circuit_to_tableau_repeat_folding() {
     let identity = Tableau::identity(1).expect("Tableau identity");
     let hadamard = circuit("H 0")
         .to_tableau(false, false, false)

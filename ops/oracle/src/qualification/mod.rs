@@ -4,36 +4,29 @@ use std::path::PathBuf;
 use clap::Subcommand;
 use thiserror::Error;
 
-use self::model::{EvidenceStatus, FeatureId, QualificationManifest, UpstreamDisposition};
+use self::model::{EvidenceStatus, FeatureId, QualificationManifest};
 use crate::RepoRoot;
 use crate::blocker_ledger::selector::{CargoTestSelector, test_listing_match_count};
 
 pub(crate) mod artifact;
 mod artifact_locator;
-mod classification;
 mod comparator;
 pub(crate) mod executables;
 mod execution_contract;
-mod extract;
 mod inventory;
 mod model;
 mod property;
-mod property_validation;
-mod public_api;
-mod public_api_validation;
 mod receipt;
 mod report;
-mod resource;
 mod runner;
-mod statistical_validation;
 mod statistics;
 mod tier;
 mod validation;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "4db5a19a74d7ec6f875415e0c6fecb5c62767128d8feb3af12da749207d37603";
+    "9608ad9adf3392317efc0056e1e2633c84627e0576da9c7d66b73dd7380da54a";
 const MAX_MANIFEST_BYTES: usize = 32 << 20;
-const PROVENANCE_PROBE_CASE_ID: &str = "cq-evidence-oracle-d4836033794f54f7";
+const PROVENANCE_PROBE_CASE_ID: &str = "cq-evidence-qualification-e16abe30d8c7992c";
 const PROVENANCE_PROBE_OUTPUT_DIR: &str = "target/qualification/correctness/provenance-probe";
 
 #[derive(Debug, Subcommand)]
@@ -183,9 +176,6 @@ pub(crate) enum QualificationError {
     #[error(transparent)]
     Artifact(#[from] artifact::ArtifactError),
 
-    #[error("qualification statistics are invalid: {0}")]
-    Statistics(Box<str>),
-
     #[error("qualification worker failed: {0}")]
     Worker(Box<str>),
 
@@ -242,9 +232,7 @@ pub(crate) fn run(root: &RepoRoot, command: Command) -> Result<(), Qualification
             ensure_frozen()?;
             let checked = read_manifest(root)?;
             validation::validate(&checked, EXPECTED_FROZEN_DIGEST)?;
-            validate_source_statistics(root)?;
             check_existing_cargo_selectors(root, &checked)?;
-            crate::blocker_ledger::validate_and_print(root, false, true)?;
             let generated = inventory::generate(root)?;
             validation::validate(&generated, EXPECTED_FROZEN_DIGEST)?;
             if checked != generated {
@@ -271,9 +259,7 @@ pub(crate) fn run(root: &RepoRoot, command: Command) -> Result<(), Qualification
                 }
             })?;
             println!(
-                "[stab-oracle] wrote {} upstream cases, {} public API items, and {} evidence cases to {}",
-                generated.upstream_cases.len(),
-                generated.public_api_items.len(),
+                "[stab-oracle] wrote {} benchmark correctness prerequisite cases to {}",
                 generated.evidence_cases.len(),
                 path.display()
             );
@@ -546,14 +532,6 @@ fn run_worker(root: &RepoRoot, command: WorkerCommand) -> Result<(), Qualificati
     Ok(())
 }
 
-fn validate_source_statistics(root: &RepoRoot) -> Result<(), QualificationError> {
-    let plans = statistics::source_plan_summaries(root)
-        .map_err(|source| QualificationError::Statistics(source.to_string().into_boxed_str()))?;
-    statistics::validate_selected_suite(&plans)
-        .map_err(|source| QualificationError::Statistics(source.to_string().into_boxed_str()))?;
-    Ok(())
-}
-
 fn read_manifest(root: &RepoRoot) -> Result<QualificationManifest, QualificationError> {
     let path = root.qualification_manifest();
     let bytes = read_manifest_bytes(root)?;
@@ -650,25 +628,11 @@ fn check_existing_cargo_selectors(
 }
 
 fn print_summary(manifest: &QualificationManifest, selected: Option<FeatureId>) {
-    let upstream = manifest
-        .upstream_cases
-        .iter()
-        .filter(|case| selected.is_none_or(|feature| case.domain_ids.contains(&feature)))
-        .collect::<Vec<_>>();
-    let api = manifest
-        .public_api_items
-        .iter()
-        .filter(|item| selected.is_none_or(|feature| item.feature_id == feature))
-        .collect::<Vec<_>>();
     let evidence = manifest
         .evidence_cases
         .iter()
         .filter(|case| selected.is_none_or(|feature| case.feature_id == feature))
         .collect::<Vec<_>>();
-    let mut dispositions = BTreeMap::<UpstreamDisposition, usize>::new();
-    for case in &upstream {
-        *dispositions.entry(case.disposition).or_default() += 1;
-    }
     let mut statuses = BTreeMap::<EvidenceStatus, usize>::new();
     for case in &evidence {
         *statuses.entry(case.status).or_default() += 1;
@@ -681,20 +645,9 @@ fn print_summary(manifest: &QualificationManifest, selected: Option<FeatureId>) 
         manifest.semantic_digest
     );
     println!(
-        "[stab-oracle] selection={} upstream={} public-api={} evidence={}",
+        "[stab-oracle] selection={} benchmark-prerequisites={}",
         selected.map_or("all", FeatureId::as_str),
-        upstream.len(),
-        api.len(),
         evidence.len()
-    );
-    println!(
-        "[stab-oracle] upstream exact-oracle={} ported-rust={} semantic-mining={} deferred-product={} not-applicable={} superseded={}",
-        count_disposition(&dispositions, UpstreamDisposition::ExactOracle),
-        count_disposition(&dispositions, UpstreamDisposition::PortedRust),
-        count_disposition(&dispositions, UpstreamDisposition::SemanticMining),
-        count_disposition(&dispositions, UpstreamDisposition::DeferredProduct),
-        count_disposition(&dispositions, UpstreamDisposition::NotApplicable),
-        count_disposition(&dispositions, UpstreamDisposition::Superseded)
     );
     println!(
         "[stab-oracle] evidence planned={} implemented={} evidence-close={} deferred={}",
@@ -705,16 +658,6 @@ fn print_summary(manifest: &QualificationManifest, selected: Option<FeatureId>) 
     );
     if selected.is_none() {
         for feature in FeatureId::ALL {
-            let feature_upstream = manifest
-                .upstream_cases
-                .iter()
-                .filter(|case| case.domain_ids.contains(&feature))
-                .count();
-            let feature_api = manifest
-                .public_api_items
-                .iter()
-                .filter(|item| item.feature_id == feature)
-                .count();
             let feature_evidence = manifest
                 .evidence_cases
                 .iter()
@@ -732,23 +675,14 @@ fn print_summary(manifest: &QualificationManifest, selected: Option<FeatureId>) 
                 })
                 .count();
             println!(
-                "[stab-oracle] feature={} upstream={} public-api={} evidence={} implemented-or-closed={}",
+                "[stab-oracle] feature={} benchmark-prerequisites={} executable={}",
                 feature.as_str(),
-                feature_upstream,
-                feature_api,
                 feature_evidence,
                 feature_implemented
             );
         }
     }
     println!("Status: OK");
-}
-
-fn count_disposition(
-    counts: &BTreeMap<UpstreamDisposition, usize>,
-    disposition: UpstreamDisposition,
-) -> usize {
-    counts.get(&disposition).copied().unwrap_or(0)
 }
 
 fn count_status(counts: &BTreeMap<EvidenceStatus, usize>, status: EvidenceStatus) -> usize {

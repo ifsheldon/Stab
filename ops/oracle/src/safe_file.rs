@@ -30,6 +30,7 @@ pub(crate) struct SafeFileLocation {
 
 #[derive(Clone, Debug)]
 enum SafeFileLocationKind {
+    #[cfg(any(test, not(target_os = "linux")))]
     Path,
     #[cfg(target_os = "linux")]
     DirectoryEntry {
@@ -39,6 +40,7 @@ enum SafeFileLocationKind {
 }
 
 impl SafeFileLocation {
+    #[cfg(any(test, not(target_os = "linux")))]
     pub(crate) fn path(path: PathBuf) -> Self {
         Self {
             display_path: path,
@@ -64,6 +66,7 @@ impl SafeFileLocation {
 
     pub(crate) fn open_regular_file(&self) -> Result<std::fs::File, SafeFileError> {
         match &self.kind {
+            #[cfg(any(test, not(target_os = "linux")))]
             SafeFileLocationKind::Path => open_regular_file(&self.display_path),
             #[cfg(target_os = "linux")]
             SafeFileLocationKind::DirectoryEntry { directory, name } => {

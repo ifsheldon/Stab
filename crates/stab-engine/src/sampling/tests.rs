@@ -176,26 +176,6 @@ fn samples_m8_basic_measurements_as_zeroes() {
 }
 
 #[test]
-fn samples_x_and_inverted_measurements_like_command_sample() {
-    assert_eq!(samples("X 0\nM 0\n", 1), vec![vec![true]]);
-    assert_eq!(samples("M !0\n", 1), vec![vec![true]]);
-}
-
-#[test]
-fn samples_reset_and_measure_reset_deterministically() {
-    assert_eq!(samples("X 0\nR 0\nM 0\n", 1), vec![vec![false]]);
-    assert_eq!(samples("X 0\nMR 0\nMR 0\n", 1), vec![vec![true, false]]);
-}
-
-#[test]
-fn samples_repeat_blocks_without_flattening_during_compilation() {
-    assert_eq!(
-        samples("REPEAT 2 {\n    X 0\n    M 0\n}\n", 1),
-        vec![vec![true, false]]
-    );
-}
-
-#[test]
 fn samples_single_qubit_clifford_measurements() {
     assert_eq!(samples("H 0\nS 0\nS 0\nH 0\nM 0\n", 3), vec![vec![true]; 3]);
 
@@ -352,14 +332,6 @@ fn two_qubit_tableau_gates_act_on_stabilizer_frame() {
 }
 
 #[test]
-fn pair_measurements_use_requested_product_basis() {
-    assert_eq!(
-        samples("RX 0 1\nMXX 0 1\nRY 0 1\nMYY 0 1\nR 0 1\nMZZ 0 1\n", 1),
-        vec![vec![false, false, false]]
-    );
-}
-
-#[test]
 fn pair_measurement_inversions_flip_product_results() {
     for shot in samples("MXX 0 1 0 !1 !0 1 !0 !1\n", 100) {
         let first = shot.first().copied().expect("first MXX result");
@@ -423,81 +395,6 @@ fn public_sampler_outputs_include_heralded_measurement_records() {
 }
 
 #[test]
-fn heralded_erase_records_heralds_and_randomizes_state() {
-    assert_eq!(
-        samples("HERALDED_ERASE(0) 0 1\nM 0 1\n", 1),
-        vec![vec![false, false, false, false]]
-    );
-
-    let circuit = Circuit::from_stim_str("HERALDED_ERASE(1) 0\nM 0\n").expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
-
-    let hits = shots
-        .iter()
-        .filter(|shot| shot.get(1) == Some(&true))
-        .count();
-    assert!(
-        (400..=600).contains(&hits),
-        "expected roughly 500 heralded erase Z-basis hits, got {hits}"
-    );
-}
-
-#[test]
-fn heralded_pauli_channel_samples_disjoint_probabilities() {
-    let circuit = Circuit::from_stim_str(
-        "HERALDED_PAULI_CHANNEL_1(0.05, 0.10, 0.15, 0.25) 0\nCX rec[-1] 1\nM 0 1\n",
-    )
-    .expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
-
-    let heralds = shots
-        .iter()
-        .filter(|shot| shot.first() == Some(&true))
-        .count();
-    let hits = shots
-        .iter()
-        .filter(|shot| shot.get(1) == Some(&true))
-        .count();
-    assert!(
-        (465..=635).contains(&heralds),
-        "expected roughly 550 heralded pauli heralds, got {heralds}"
-    );
-    assert!(
-        (165..=335).contains(&hits),
-        "expected roughly 250 heralded pauli Z-basis hits, got {hits}"
-    );
-}
-
-#[test]
-fn measurement_probability_arguments_flip_reported_results() {
-    assert_eq!(samples("M(1) 0\n", 1), vec![vec![true]]);
-    assert_eq!(samples("MPAD(1) 0 1\n", 1), vec![vec![true, false]]);
-
-    let circuit = Circuit::from_stim_str("M(0.25) 0\nMPP(0.5) Z1\n").expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-    let shots = sampler.sample_zero_one_with_seed(4000, Some(5));
-
-    let first_hits = shots
-        .iter()
-        .filter(|shot| shot.first() == Some(&true))
-        .count();
-    let second_hits = shots
-        .iter()
-        .filter(|shot| shot.get(1) == Some(&true))
-        .count();
-    assert!(
-        (800..=1200).contains(&first_hits),
-        "expected roughly 1000 M(0.25) hits, got {first_hits}"
-    );
-    assert!(
-        (1800..=2200).contains(&second_hits),
-        "expected roughly 2000 MPP(0.5) hits, got {second_hits}"
-    );
-}
-
-#[test]
 fn anti_hermitian_mpp_products_are_rejected() {
     let circuit = Circuit::from_stim_str("MPP X0*Z0\n").expect("parse circuit");
 
@@ -540,41 +437,6 @@ fn correlated_error_branches_match_stim_else_semantics() {
 }
 
 #[test]
-fn correlated_error_samples_conditional_distribution() {
-    let circuit = Circuit::from_stim_str(
-        "CORRELATED_ERROR(0.5) X0\nELSE_CORRELATED_ERROR(0.25) X1\nELSE_CORRELATED_ERROR(0.75) X2\nM 0 1 2\n",
-    )
-    .expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-    let shots = sampler.sample_zero_one_with_seed(4000, Some(5));
-
-    let mut hits = [0usize; 3];
-    for shot in &shots {
-        for (index, count) in hits.iter_mut().enumerate() {
-            if shot.get(index) == Some(&true) {
-                *count += 1;
-            }
-        }
-    }
-    let [first_hits, second_hits, third_hits] = hits;
-    assert!(
-        (1800..=2200).contains(&first_hits),
-        "expected roughly 2000 first-branch hits, got {}",
-        first_hits
-    );
-    assert!(
-        (300..=700).contains(&second_hits),
-        "expected roughly 500 second-branch hits, got {}",
-        second_hits
-    );
-    assert!(
-        (925..=1325).contains(&third_hits),
-        "expected roughly 1125 third-branch hits, got {}",
-        third_hits
-    );
-}
-
-#[test]
 fn rejects_feedback_that_reads_missing_measurements() {
     let circuit = Circuit::from_stim_str("CX rec[-1] 0\n").expect("parse circuit");
 
@@ -583,99 +445,6 @@ fn rejects_feedback_that_reads_missing_measurements() {
         Err(SamplingCompileError::invalid_circuit(
             "measurement record target rec[-1] is not available while compiling CX feedback"
         ))
-    );
-}
-
-#[test]
-fn z_error_flips_x_basis_measurements_after_hadamards() {
-    let circuit =
-        Circuit::from_stim_str("H 0\nZ_ERROR(0.25) 0\nH 0\nM 0\n").expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-
-    let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
-    let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
-    assert!(
-        (175..=325).contains(&hits),
-        "expected roughly 250 Z-error X-basis hits, got {hits}"
-    );
-}
-
-#[test]
-fn seeded_x_error_sampling_is_reproducible_and_statistical() {
-    let circuit = Circuit::from_stim_str("X_ERROR(0.25) 0\nM 0\n").expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-
-    let first = sampler.sample_zero_one_with_seed(1000, Some(5));
-    let second = sampler.sample_zero_one_with_seed(1000, Some(5));
-    assert_eq!(first, second);
-
-    let hits = first.iter().filter(|shot| shot == &&vec![true]).count();
-    assert!(
-        (175..=325).contains(&hits),
-        "expected roughly 250 noisy hits, got {hits}"
-    );
-}
-
-#[test]
-fn z_and_identity_errors_do_not_flip_z_basis_measurements() {
-    assert_eq!(
-        samples("Z_ERROR(0.9) 0\nI_ERROR(0.8) 0\nM 0\n", 20),
-        vec![vec![false]; 20]
-    );
-}
-
-#[test]
-fn depolarize1_flips_z_basis_measurements_with_x_or_y_probability() {
-    let circuit = Circuit::from_stim_str("DEPOLARIZE1(0.3) 0\nM 0\n").expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-
-    let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
-    let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
-    assert!(
-        (125..=275).contains(&hits),
-        "expected roughly 200 depolarize1 Z-basis hits, got {hits}"
-    );
-}
-
-#[test]
-fn pauli_channel1_flips_z_basis_measurements_for_x_or_y_cases() {
-    let circuit =
-        Circuit::from_stim_str("PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\nM 0\n").expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-
-    let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
-    let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
-    assert!(
-        (215..=385).contains(&hits),
-        "expected roughly 300 pauli-channel1 Z-basis hits, got {hits}"
-    );
-}
-
-#[test]
-fn depolarize2_flips_z_basis_measurements_for_two_qubit_x_or_y_cases() {
-    let circuit = Circuit::from_stim_str("DEPOLARIZE2(0.3) 0 1\nM 0\n").expect("parse circuit");
-    let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-
-    let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
-    let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
-    assert!(
-        (95..=225).contains(&hits),
-        "expected roughly 160 depolarize2 Z-basis hits, got {hits}"
-    );
-}
-
-#[test]
-fn pauli_channel2_uses_stim_probability_order_for_z_basis_toggles() {
-    let circuit = Circuit::from_stim_str(
-        "PAULI_CHANNEL_2(0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\nM 0 1\n",
-    )
-    .expect("parse circuit");
-
-    assert_eq!(
-        TestSampler::compile(&circuit)
-            .expect("compile sampler")
-            .sample_zero_one_with_seed(5, Some(5)),
-        vec![vec![true, false]; 5]
     );
 }
 

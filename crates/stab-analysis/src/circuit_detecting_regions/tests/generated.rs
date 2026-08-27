@@ -4,8 +4,14 @@ use crate::{
     SurfaceCodeTask, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 
-#[test]
-fn detecting_regions_generated_repetition_code_filters_and_regions() {
+pub(super) fn assert_generated_code_regions() {
+    assert_generated_repetition_code_filters_and_regions();
+    assert_generated_rotated_surface_code_filters_and_regions();
+    assert_generated_unrotated_surface_code_filters_and_regions();
+    assert_generated_surface_code_memory_x_basis_regions();
+}
+
+fn assert_generated_repetition_code_filters_and_regions() {
     let params = RepetitionCodeParams::new(
         RoundCount::try_new(3).unwrap(),
         CodeDistance::try_new(3).unwrap(),
@@ -49,8 +55,7 @@ fn detecting_regions_generated_repetition_code_filters_and_regions() {
     }
 }
 
-#[test]
-fn detecting_regions_generated_rotated_surface_code_filters_and_regions() {
+fn assert_generated_rotated_surface_code_filters_and_regions() {
     let params = SurfaceCodeParams::new(
         RoundCount::try_new(3).unwrap(),
         CodeDistance::try_new(3).unwrap(),
@@ -147,8 +152,7 @@ fn detecting_regions_generated_rotated_surface_code_filters_and_regions() {
     }
 }
 
-#[test]
-fn detecting_regions_generated_unrotated_surface_code_filters_and_regions() {
+fn assert_generated_unrotated_surface_code_filters_and_regions() {
     let params = SurfaceCodeParams::new(
         RoundCount::try_new(3).unwrap(),
         CodeDistance::try_new(3).unwrap(),
@@ -245,8 +249,7 @@ fn detecting_regions_generated_unrotated_surface_code_filters_and_regions() {
     }
 }
 
-#[test]
-fn detecting_regions_generated_surface_code_memory_x_basis_regions() {
+fn assert_generated_surface_code_memory_x_basis_regions() {
     assert_surface_code_regions(
         SurfaceCodeTask::RotatedMemoryX,
         25,

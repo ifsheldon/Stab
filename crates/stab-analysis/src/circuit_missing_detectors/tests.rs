@@ -4,6 +4,10 @@
 )]
 
 use super::*;
+use crate::{
+    CodeDistance, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+    generate_repetition_code_circuit,
+};
 
 fn missing(text: &str, ignore_non_deterministic_measurements: bool) -> String {
     let circuit = Circuit::from_stim_str(text).unwrap();
@@ -18,7 +22,15 @@ fn missing(text: &str, ignore_non_deterministic_measurements: bool) -> String {
 }
 
 #[test]
-fn missing_detectors_basic() {
+fn missing_detectors_common_semantic_matrix_matches_stim() {
+    assert_mpp_stabilizer_products();
+    assert_reset_and_measurement_aliases();
+    assert_multi_record_detector_reduction();
+    assert_observable_interactions();
+    assert_toric_global_stabilizer_product();
+    assert_bounded_repeat_blocks();
+    assert_generated_code_suffix();
+
     assert_eq!(missing("", false), "");
     assert_eq!(missing("R 0\nM 0\nDETECTOR rec[-1]\n", false), "");
     assert_eq!(
@@ -39,8 +51,7 @@ fn missing_detectors_basic() {
     assert_eq!(missing("MX 0\n", false), "");
 }
 
-#[test]
-fn missing_detectors_supports_mpp_stabilizer_products() {
+fn assert_mpp_stabilizer_products() {
     // Adapted from Stim v1.16.0 src/stim/util_top/missing_detectors.test.cc.
     assert_eq!(
         missing(
@@ -78,8 +89,7 @@ fn missing_detectors_supports_mpp_stabilizer_products() {
     );
 }
 
-#[test]
-fn missing_detectors_basic_reset_and_measurement_aliases() {
+fn assert_reset_and_measurement_aliases() {
     assert_eq!(missing("RX 0\nMX 0\n", false), "DETECTOR rec[-1]\n");
     assert_eq!(missing("RY 0\nMY 0\n", false), "DETECTOR rec[-1]\n");
     assert_eq!(missing("RX 0\nMY 0\n", false), "");
@@ -88,16 +98,14 @@ fn missing_detectors_basic_reset_and_measurement_aliases() {
     assert_eq!(missing("MR 0\n", true), "");
 }
 
-#[test]
-fn missing_detectors_reduces_multi_record_detector_rows() {
+fn assert_multi_record_detector_reduction() {
     assert_eq!(
         missing("R 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n", false),
         "DETECTOR rec[-2]\n"
     );
 }
 
-#[test]
-fn missing_detectors_supports_observable_interactions() {
+fn assert_observable_interactions() {
     // Adapted from Stim v1.16.0 src/stim/util_top/missing_detectors.test.cc.
     assert_eq!(
         missing(
@@ -127,8 +135,7 @@ fn missing_detectors_supports_observable_interactions() {
     );
 }
 
-#[test]
-fn missing_detectors_supports_toric_global_stabilizer_product() {
+fn assert_toric_global_stabilizer_product() {
     // Adapted from Stim v1.16.0 src/stim/util_top/missing_detectors.test.cc.
     assert_eq!(
         missing(
@@ -155,8 +162,7 @@ fn missing_detectors_supports_toric_global_stabilizer_product() {
     );
 }
 
-#[test]
-fn missing_detectors_handles_bounded_repeat_blocks() {
+fn assert_bounded_repeat_blocks() {
     let repeat = Circuit::from_stim_str("REPEAT 2 {\n    M 0\n}\n").unwrap();
     let repeat_output = missing_detectors(
         &repeat,
@@ -192,4 +198,23 @@ fn missing_detectors_handles_bounded_repeat_blocks() {
     .unwrap()
     .to_stim_string();
     assert_eq!(clifford_output, "");
+}
+
+fn assert_generated_code_suffix() {
+    let params = RepetitionCodeParams::new(
+        RoundCount::try_new(1).unwrap(),
+        CodeDistance::try_new(3).unwrap(),
+        RepetitionCodeTask::Memory,
+    )
+    .unwrap();
+    let generated = generate_repetition_code_circuit(&params).unwrap();
+    let suffix = missing_detectors(
+        generated.circuit(),
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: false,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(suffix.to_stim_string(), "");
 }

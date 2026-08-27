@@ -9,10 +9,24 @@ use std::str::FromStr;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_algebra::{
-    PauliBasis, PauliSign, PauliString, Tableau, TableauIterator, stabilizers_to_tableau,
+    PauliBasis, PauliSign, PauliString, StabilizerError, Tableau, TableauIterator,
+    stabilizers_to_tableau,
 };
 
 #[test]
+fn stabilizers_to_tableau_common_semantic_matrix_matches_stim() {
+    stabilizers_to_tableau_bell_pair_matches_stim();
+    stabilizers_to_tableau_detects_anticommutation();
+    stabilizers_to_tableau_reports_typed_errors_across_word_boundaries();
+    stabilizers_to_tableau_preserves_overconstrained_generator_order();
+    stabilizers_to_tableau_handles_size_affecting_redundancy();
+    stabilizers_to_tableau_underconstrained_requires_opt_in_and_can_invert();
+    stabilizers_to_tableau_preserves_z_outputs_from_valid_tableaus();
+    stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus();
+    stabilizers_to_tableau_empty_input_is_empty_identity();
+    stabilizers_to_tableau_accepts_inputs_past_iterator_limit();
+}
+
 fn stabilizers_to_tableau_bell_pair_matches_stim() {
     // Adapted from Stim v1.16.0 src/stim/util_top/stabilizers_to_tableau.test.cc.
     let mut input = vec![pauli("XX"), pauli("ZZ")];
@@ -36,13 +50,105 @@ fn stabilizers_to_tableau_bell_pair_matches_stim() {
     assert!(stabilizers_to_tableau(&input, true, true, false).is_err());
 }
 
-#[test]
 fn stabilizers_to_tableau_detects_anticommutation() {
     let input = vec![pauli("YY"), pauli("YX")];
     assert!(stabilizers_to_tableau(&input, false, false, false).is_err());
 }
 
-#[test]
+fn stabilizers_to_tableau_reports_typed_errors_across_word_boundaries() {
+    assert_eq!(
+        stabilizers_to_tableau(&[pauli("+X"), pauli("+Z")], false, false, false),
+        Err(StabilizerError::AntiCommutingStabilizer {
+            stabilizer: "+Z".to_owned(),
+            conflict: "+X".to_owned(),
+        })
+    );
+    assert_eq!(
+        stabilizers_to_tableau(&[pauli("+Z"), pauli("+Z")], false, false, false),
+        Err(StabilizerError::RedundantStabilizer {
+            stabilizer: "+Z".to_owned(),
+        })
+    );
+    assert_eq!(
+        stabilizers_to_tableau(&[pauli("+Z"), pauli("-Z")], true, false, false),
+        Err(StabilizerError::InconsistentStabilizer {
+            stabilizer: "-Z".to_owned(),
+        })
+    );
+    assert_eq!(
+        stabilizers_to_tableau(&[pauli("+Z_")], false, false, false),
+        Err(StabilizerError::UnderconstrainedStabilizers {
+            independent: 1,
+            num_qubits: 2,
+        })
+    );
+
+    let distant_x = pauli(&format!("+X{}", "_".repeat(500)));
+    assert!(matches!(
+        stabilizers_to_tableau(&[pauli("+Z"), distant_x], false, false, false),
+        Err(StabilizerError::AntiCommutingStabilizer { .. })
+    ));
+    let distant_zx = pauli(&format!("+Z{}X", "_".repeat(500)));
+    assert!(matches!(
+        stabilizers_to_tableau(
+            &[pauli("+Z_"), pauli("-_Z"), distant_zx.clone(), pauli("+ZZ")],
+            false,
+            false,
+            false,
+        ),
+        Err(StabilizerError::InconsistentStabilizer { .. })
+    ));
+    assert!(matches!(
+        stabilizers_to_tableau(
+            &[
+                pauli("-Z_"),
+                distant_zx,
+                pauli("-__Z"),
+                pauli("+_Z_"),
+                pauli("+Z_Z"),
+            ],
+            false,
+            false,
+            false,
+        ),
+        Err(StabilizerError::RedundantStabilizer { .. })
+    ));
+}
+
+fn stabilizers_to_tableau_preserves_overconstrained_generator_order() {
+    let mut rng = SmallRng::seed_from_u64(0x0a11_ce55);
+    for num_qubits in 4..10 {
+        let source = Tableau::random(num_qubits, &mut rng).expect("source Tableau");
+        let dependent = source
+            .z_output(1)
+            .expect("Z1")
+            .multiply_real(source.z_output(3).expect("Z3"))
+            .expect("dependent stabilizer");
+        let mut stabilizers = vec![
+            PauliString::identity(num_qubits).expect("identity stabilizer"),
+            dependent,
+        ];
+        for index in 0..num_qubits {
+            stabilizers.push(source.z_output(index).expect("source stabilizer").clone());
+        }
+
+        assert!(matches!(
+            stabilizers_to_tableau(&stabilizers, false, false, false),
+            Err(StabilizerError::RedundantStabilizer { .. })
+        ));
+        let actual = stabilizers_to_tableau(&stabilizers, true, false, false)
+            .expect("ignore dependent stabilizers");
+        for index in 0..num_qubits {
+            let expected_index = index + 1 + usize::from(index > 3);
+            assert_eq!(
+                actual.z_output(index).expect("actual stabilizer"),
+                &stabilizers[expected_index]
+            );
+        }
+        assert!(actual.satisfies_invariants().expect("solver invariants"));
+    }
+}
+
 fn stabilizers_to_tableau_handles_size_affecting_redundancy() {
     let mut input = vec![pauli("X_"), pauli("_X")];
     for _ in 0..150 {
@@ -57,7 +163,6 @@ fn stabilizers_to_tableau_handles_size_affecting_redundancy() {
     assert!(tableau.satisfies_invariants().expect("invariants"));
 }
 
-#[test]
 fn stabilizers_to_tableau_underconstrained_requires_opt_in_and_can_invert() {
     let input = vec![pauli("Z_")];
     assert!(stabilizers_to_tableau(&input, false, false, false).is_err());
@@ -70,7 +175,6 @@ fn stabilizers_to_tableau_underconstrained_requires_opt_in_and_can_invert() {
     assert_eq!(actual.inverse().expect("actual inverse"), inverted);
 }
 
-#[test]
 fn stabilizers_to_tableau_preserves_z_outputs_from_valid_tableaus() {
     // Deterministic miniature of Stim's stabilizers_to_tableau_fuzz coverage.
     for source in TableauIterator::new(2, true)
@@ -93,7 +197,6 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_valid_tableaus() {
     }
 }
 
-#[test]
 fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
     // Adapted from Stim v1.16.0 src/stim/util_top/stabilizers_to_tableau.test.cc fuzz coverage.
     let mut rng = SmallRng::seed_from_u64(0x57ab_1ea7);
@@ -135,13 +238,11 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
     }
 }
 
-#[test]
 fn stabilizers_to_tableau_empty_input_is_empty_identity() {
     let actual = stabilizers_to_tableau(&[], false, false, false).expect("empty conversion");
     assert_eq!(actual, Tableau::identity(0).expect("Tableau identity"));
 }
 
-#[test]
 fn stabilizers_to_tableau_accepts_inputs_past_iterator_limit() {
     let input = (0..70)
         .map(|index| single_pauli(70, index, PauliBasis::Z))

@@ -111,6 +111,24 @@ fn detector_records(records: &[Vec<bool>]) -> PackedShotBatch {
     PackedShotBatch::from_records(records, width).expect("detector records")
 }
 
+fn filled_predictions(
+    shot_capacity: usize,
+    correction_width: usize,
+    value: bool,
+) -> ObservablePredictionBatch {
+    let mut predictions =
+        ObservablePredictionBatch::zeros(shot_capacity, CorrectionWidth::new(correction_width))
+            .expect("prediction batch");
+    let record = vec![value; correction_width];
+    for shot in 0..shot_capacity {
+        predictions
+            .records_mut()
+            .copy_shot_from_bools(shot, &record)
+            .expect("prediction sentinel");
+    }
+    predictions
+}
+
 fn prediction_bits(predictions: &ObservablePredictionBatch) -> Vec<Vec<bool>> {
     predictions
         .records()
@@ -118,55 +136,64 @@ fn prediction_bits(predictions: &ObservablePredictionBatch) -> Vec<Vec<bool>> {
         .expect("prediction records")
 }
 
+fn decode_fixture(session: &mut FixtureSession, records: &[Vec<bool>]) -> Vec<Vec<bool>> {
+    let detectors = detector_records(records);
+    let mut predictions = filled_predictions(records.len(), 1, false);
+    decode_batch(
+        session,
+        DecoderInputBatchView::from_detectors(detectors.view()),
+        &mut predictions,
+        &DecodeCancellation::new(),
+    )
+    .expect("fixture decode");
+    prediction_bits(&predictions)
+}
+
 #[test]
-fn model_view_derives_exact_layout_and_fingerprint() {
+fn decoder_session_layout_projection_reuse_and_partitioning() {
     let model = DetectorErrorModel::from_dem_str(
         "error(0.125) D0 D2 L1\nshift_detectors 4\nerror(0.25) D0 L0\n",
     )
     .expect("model");
-    let view = DecoderModelView::try_new(&model).expect("decoder model view");
+    let model_view = DecoderModelView::try_new(&model).expect("decoder model view");
+    assert_eq!(model_view.layout(), layout(5, 2));
+    assert_eq!(model_view.fingerprint(), model.fingerprint());
 
-    assert_eq!(view.model().to_dem_string(), model.to_dem_string());
-    assert_eq!(view.layout(), layout(5, 2));
-    assert_eq!(view.fingerprint(), model.fingerprint());
-    assert_eq!(view.layout().correction_width(), CorrectionWidth::new(2));
-}
-
-#[test]
-fn detection_input_drops_observable_truth() {
-    let detectors = detector_records(&[vec![true, false], vec![false, true]]);
-    let observables = detector_records(&[vec![true], vec![false]]);
+    let detection_detectors = detector_records(&[vec![true, false], vec![false, true]]);
+    let observable_truth = detector_records(&[vec![true], vec![false]]);
     let detection =
-        DetectionBatchView::try_new(detectors.view(), observables.view()).expect("detection");
+        DetectionBatchView::try_new(detection_detectors.view(), observable_truth.view())
+            .expect("detection view");
+    let decoder_input = DecoderInputBatchView::from_detection(detection);
+    assert_eq!(decoder_input.detector_width(), DetectorWidth::new(2));
+    assert_eq!(decoder_input.shot_count(), 2);
+    assert_eq!(decoder_input.detector(0, 0), Some(true));
+    assert_eq!(decoder_input.detector(1, 1), Some(true));
 
-    let input = DecoderInputBatchView::from_detection(detection);
-
-    assert_eq!(input.detector_width(), DetectorWidth::new(2));
-    assert_eq!(input.shot_count(), 2);
-    assert_eq!(input.detector(0, 0), Some(true));
-    assert_eq!(input.detector(1, 1), Some(true));
-    assert_eq!(input.detectors().bits_per_shot(), 2);
+    let all = vec![vec![false], vec![true], vec![true], vec![false]];
+    let mut whole_session = FixtureSession::new(layout(1, 1));
+    let whole = decode_fixture(&mut whole_session, &all);
+    let mut reused_session = FixtureSession::new(layout(1, 1));
+    let mut partitioned = decode_fixture(&mut reused_session, &all[..2]);
+    partitioned.extend(decode_fixture(&mut reused_session, &all[2..]));
+    assert_eq!(partitioned, whole);
+    assert_eq!(whole_session.calls, 1);
+    assert_eq!(reused_session.calls, 2);
+    assert_eq!(reused_session.layout(), layout(1, 1));
 }
 
 #[test]
-fn dimensional_failures_precede_dispatch_and_prediction_mutation() {
+fn decoder_session_preflight_is_atomic() {
     let one_detector = detector_records(&[vec![true], vec![false]]);
     let two_detectors = detector_records(&[vec![true, false], vec![false, true]]);
-    let mut session = FixtureSession::new(layout(1, 1));
-    let cancellation = DecodeCancellation::new();
-
-    let mut detector_mismatch =
-        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("predictions");
-    detector_mismatch
-        .records_mut()
-        .copy_shot_from_bools(0, &[true])
-        .expect("sentinel");
-    let before = detector_mismatch.clone();
+    let mut preflight_session = FixtureSession::new(layout(1, 1));
+    let mut predictions = filled_predictions(2, 1, true);
+    let before = predictions.clone();
     let error = decode_batch(
-        &mut session,
+        &mut preflight_session,
         DecoderInputBatchView::from_detectors(two_detectors.view()),
-        &mut detector_mismatch,
-        &cancellation,
+        &mut predictions,
+        &DecodeCancellation::new(),
     )
     .expect_err("detector width mismatch");
     assert!(matches!(
@@ -176,16 +203,15 @@ fn dimensional_failures_precede_dispatch_and_prediction_mutation() {
             actual
         }) if expected == DetectorWidth::new(1) && actual == DetectorWidth::new(2)
     ));
-    assert_eq!(detector_mismatch, before);
+    assert_eq!(predictions, before);
 
-    let mut correction_mismatch =
-        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(2)).expect("predictions");
-    let before = correction_mismatch.clone();
+    let mut wrong_correction_width = filled_predictions(2, 2, true);
+    let before = wrong_correction_width.clone();
     let error = decode_batch(
-        &mut session,
+        &mut preflight_session,
         DecoderInputBatchView::from_detectors(one_detector.view()),
-        &mut correction_mismatch,
-        &cancellation,
+        &mut wrong_correction_width,
+        &DecodeCancellation::new(),
     )
     .expect_err("correction width mismatch");
     assert!(matches!(
@@ -195,22 +221,17 @@ fn dimensional_failures_precede_dispatch_and_prediction_mutation() {
             actual
         }) if expected == CorrectionWidth::new(1) && actual == CorrectionWidth::new(2)
     ));
-    assert_eq!(correction_mismatch, before);
+    assert_eq!(wrong_correction_width, before);
 
-    let mut too_short =
-        ObservablePredictionBatch::zeros(1, CorrectionWidth::new(1)).expect("predictions");
-    too_short
-        .records_mut()
-        .copy_shot_from_bools(0, &[true])
-        .expect("sentinel");
+    let mut too_short = filled_predictions(1, 1, true);
     let before = too_short.clone();
     let error = decode_batch(
-        &mut session,
+        &mut preflight_session,
         DecoderInputBatchView::from_detectors(one_detector.view()),
         &mut too_short,
-        &cancellation,
+        &DecodeCancellation::new(),
     )
-    .expect_err("prediction shot capacity mismatch");
+    .expect_err("prediction capacity mismatch");
     assert!(matches!(
         error,
         DecodeBatchError::Preflight(DecodePreflightError::PredictionShotCapacity {
@@ -219,66 +240,47 @@ fn dimensional_failures_precede_dispatch_and_prediction_mutation() {
         })
     ));
     assert_eq!(too_short, before);
-    assert_eq!(session.calls, 0);
+    assert_eq!(preflight_session.calls, 0);
 }
 
 #[test]
-fn pre_cancelled_batch_returns_without_dispatch_or_mutation() {
-    let detectors = detector_records(&[vec![true], vec![false]]);
-    let mut predictions =
-        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("predictions");
-    predictions
-        .records_mut()
-        .copy_shot_from_bools(0, &[true])
-        .expect("sentinel");
-    let before = predictions.clone();
-    let mut session = FixtureSession::new(layout(1, 1));
+fn decoder_session_cancellation_and_failure_preserve_progress() {
+    let one_detector = detector_records(&[vec![true], vec![false]]);
+    let mut pre_cancelled_session = FixtureSession::new(layout(1, 1));
     let cancellation = DecodeCancellation::new();
     cancellation.cancel();
-
+    let mut pre_cancelled_predictions = filled_predictions(2, 1, true);
+    let before = pre_cancelled_predictions.clone();
     let summary = decode_batch(
-        &mut session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
+        &mut pre_cancelled_session,
+        DecoderInputBatchView::from_detectors(one_detector.view()),
+        &mut pre_cancelled_predictions,
         &cancellation,
     )
-    .expect("cancelled summary");
-
+    .expect("pre-cancelled summary");
     assert_eq!(summary.status(), DecodeBatchStatus::Cancelled);
     assert_eq!(summary.requested_shots(), 2);
     assert_eq!(summary.completed_shots(), 0);
-    assert_eq!(predictions, before);
-    assert_eq!(session.calls, 0);
-}
+    assert_eq!(pre_cancelled_predictions, before);
+    assert_eq!(pre_cancelled_session.calls, 0);
 
-#[test]
-fn cancellation_commits_only_the_completed_prefix() {
-    let detectors = detector_records(&[vec![true], vec![false], vec![true], vec![false]]);
-    let mut predictions =
-        ObservablePredictionBatch::zeros(6, CorrectionWidth::new(1)).expect("predictions");
-    for shot in 0..6 {
-        predictions
-            .records_mut()
-            .copy_shot_from_bools(shot, &[true])
-            .expect("sentinel");
-    }
-    let mut session = FixtureSession::new(layout(1, 1));
-    session.cancel_after = Some(2);
-    let cancellation = DecodeCancellation::new();
-
+    let cancellation_records =
+        detector_records(&[vec![true], vec![false], vec![true], vec![false]]);
+    let mut cancellation_predictions = filled_predictions(6, 1, true);
+    let mut cancellation_session = FixtureSession::new(layout(1, 1));
+    cancellation_session.cancel_after = Some(2);
     let summary = decode_batch(
-        &mut session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
-        &cancellation,
+        &mut cancellation_session,
+        DecoderInputBatchView::from_detectors(cancellation_records.view()),
+        &mut cancellation_predictions,
+        &DecodeCancellation::new(),
     )
-    .expect("cancelled summary");
-
+    .expect("mid-batch cancellation");
     assert_eq!(summary.status(), DecodeBatchStatus::Cancelled);
     assert_eq!(summary.requested_shots(), 4);
     assert_eq!(summary.completed_shots(), 2);
     assert_eq!(
-        prediction_bits(&predictions),
+        prediction_bits(&cancellation_predictions),
         vec![
             vec![true],
             vec![false],
@@ -288,90 +290,42 @@ fn cancellation_commits_only_the_completed_prefix() {
             vec![true],
         ]
     );
-}
 
-#[test]
-fn fixture_session_is_partition_equivalent() {
-    let whole_records = detector_records(&[vec![false], vec![true], vec![true], vec![false]]);
-    let mut whole_predictions =
-        ObservablePredictionBatch::zeros(4, CorrectionWidth::new(1)).expect("whole predictions");
-    let mut whole_session = FixtureSession::new(layout(1, 1));
-    decode_batch(
-        &mut whole_session,
-        DecoderInputBatchView::from_detectors(whole_records.view()),
-        &mut whole_predictions,
-        &DecodeCancellation::new(),
-    )
-    .expect("whole decode");
-
-    let left_records = detector_records(&[vec![false], vec![true]]);
-    let right_records = detector_records(&[vec![true], vec![false]]);
-    let mut left_predictions =
-        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("left predictions");
-    let mut right_predictions =
-        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("right predictions");
-    let mut partitioned_session = FixtureSession::new(layout(1, 1));
-    decode_batch(
-        &mut partitioned_session,
-        DecoderInputBatchView::from_detectors(left_records.view()),
-        &mut left_predictions,
-        &DecodeCancellation::new(),
-    )
-    .expect("left decode");
-    decode_batch(
-        &mut partitioned_session,
-        DecoderInputBatchView::from_detectors(right_records.view()),
-        &mut right_predictions,
-        &DecodeCancellation::new(),
-    )
-    .expect("right decode");
-
-    let mut partitioned = prediction_bits(&left_predictions);
-    partitioned.extend(prediction_bits(&right_predictions));
-    assert_eq!(partitioned, prediction_bits(&whole_predictions));
-}
-
-#[test]
-fn implementation_failure_preserves_exact_completed_progress() {
-    let detectors = detector_records(&[vec![false], vec![true], vec![false]]);
-    let mut predictions =
-        ObservablePredictionBatch::zeros(3, CorrectionWidth::new(1)).expect("predictions");
-    for shot in 0..3 {
-        predictions
-            .records_mut()
-            .copy_shot_from_bools(shot, &[true])
-            .expect("sentinel");
-    }
-    let mut session = FixtureSession::new(layout(1, 1));
-    session.fail_after = Some(1);
-
+    let failure_records = detector_records(&[vec![false], vec![true], vec![false]]);
+    let mut failure_predictions = filled_predictions(3, 1, true);
+    let mut failure_session = FixtureSession::new(layout(1, 1));
+    failure_session.fail_after = Some(1);
     let error = decode_batch(
-        &mut session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
+        &mut failure_session,
+        DecoderInputBatchView::from_detectors(failure_records.view()),
+        &mut failure_predictions,
         &DecodeCancellation::new(),
     )
-    .expect_err("fixture failure");
-
+    .expect_err("session failure");
     assert!(matches!(&error, DecodeBatchError::Session(_)));
     if let DecodeBatchError::Session(failure) = error {
         assert_eq!(failure.completed_shots(), 1);
         assert_eq!(failure.source_ref(), &FixtureError);
     }
     assert_eq!(
-        prediction_bits(&predictions),
+        prediction_bits(&failure_predictions),
         vec![vec![false], vec![true], vec![true]]
     );
+}
 
-    let mut malformed_session = FixtureSession::new(layout(1, 1));
-    malformed_session.reported_failure_progress = Some(4);
+#[test]
+fn decoder_session_protocol_and_zero_shot_contracts() {
+    let failure_records = detector_records(&[vec![false], vec![true], vec![false]]);
+    let mut failure_predictions = filled_predictions(3, 1, true);
+    let mut invalid_failure_session = FixtureSession::new(layout(1, 1));
+    invalid_failure_session.reported_failure_progress = Some(4);
     let error = decode_batch(
-        &mut malformed_session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
+        &mut invalid_failure_session,
+        DecoderInputBatchView::from_detectors(failure_records.view()),
+        &mut failure_predictions,
         &DecodeCancellation::new(),
     )
-    .expect_err("failure progress beyond the requested prefix");
+    .expect_err("failure progress beyond request");
     assert!(matches!(
         error,
         DecodeBatchError::Contract(DecodeContractError::FailureProgress {
@@ -379,20 +333,15 @@ fn implementation_failure_preserves_exact_completed_progress() {
             actual: 4
         })
     ));
-}
 
-#[test]
-fn malformed_session_progress_and_layout_changes_are_rejected() {
-    let detectors = detector_records(&[vec![true], vec![false]]);
-    let mut predictions =
-        ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("predictions");
-    let mut summary_session = FixtureSession::new(layout(1, 1));
-    summary_session.returned_summary = Some(DecodeBatchSummary::cancelled(3, 1));
-
+    let one_detector = detector_records(&[vec![true], vec![false]]);
+    let mut invalid_summary_session = FixtureSession::new(layout(1, 1));
+    invalid_summary_session.returned_summary = Some(DecodeBatchSummary::cancelled(3, 1));
+    let mut two_predictions = filled_predictions(2, 1, false);
     let error = decode_batch(
-        &mut summary_session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
+        &mut invalid_summary_session,
+        DecoderInputBatchView::from_detectors(one_detector.view()),
+        &mut two_predictions,
         &DecodeCancellation::new(),
     )
     .expect_err("wrong requested shot count");
@@ -404,15 +353,15 @@ fn malformed_session_progress_and_layout_changes_are_rejected() {
         })
     ));
 
-    let mut completed_overflow_session = FixtureSession::new(layout(1, 1));
-    completed_overflow_session.returned_summary = Some(DecodeBatchSummary::cancelled(2, 3));
+    let mut overflow_summary_session = FixtureSession::new(layout(1, 1));
+    overflow_summary_session.returned_summary = Some(DecodeBatchSummary::cancelled(2, 3));
     let error = decode_batch(
-        &mut completed_overflow_session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
+        &mut overflow_summary_session,
+        DecoderInputBatchView::from_detectors(one_detector.view()),
+        &mut two_predictions,
         &DecodeCancellation::new(),
     )
-    .expect_err("completed progress beyond the requested prefix");
+    .expect_err("completed progress beyond request");
     assert!(matches!(
         error,
         DecodeBatchError::Contract(DecodeContractError::CompletedShotCount {
@@ -421,12 +370,12 @@ fn malformed_session_progress_and_layout_changes_are_rejected() {
         })
     ));
 
-    let mut layout_session = FixtureSession::new(layout(1, 1));
-    layout_session.replacement_layout = Some(layout(2, 1));
+    let mut changing_layout_session = FixtureSession::new(layout(1, 1));
+    changing_layout_session.replacement_layout = Some(layout(2, 1));
     let error = decode_batch(
-        &mut layout_session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
+        &mut changing_layout_session,
+        DecoderInputBatchView::from_detectors(one_detector.view()),
+        &mut two_predictions,
         &DecodeCancellation::new(),
     )
     .expect_err("layout changed during dispatch");
@@ -434,33 +383,21 @@ fn malformed_session_progress_and_layout_changes_are_rejected() {
         error,
         DecodeBatchError::Contract(DecodeContractError::SessionLayoutChanged { .. })
     ));
-}
 
-#[test]
-fn zero_shot_batches_complete_without_touching_reusable_storage() {
-    let detectors = PackedShotBatch::zeros(0, 1).expect("detectors");
-    let mut predictions =
-        ObservablePredictionBatch::zeros(3, CorrectionWidth::new(1)).expect("predictions");
-    for shot in 0..3 {
-        predictions
-            .records_mut()
-            .copy_shot_from_bools(shot, &[true])
-            .expect("sentinel");
-    }
-    let before = predictions.clone();
-    let mut session = FixtureSession::new(layout(1, 1));
-
+    let empty_detectors = PackedShotBatch::zeros(0, 1).expect("empty detectors");
+    let mut reusable_predictions = filled_predictions(3, 1, true);
+    let before = reusable_predictions.clone();
+    let mut empty_session = FixtureSession::new(layout(1, 1));
     let summary = decode_batch(
-        &mut session,
-        DecoderInputBatchView::from_detectors(detectors.view()),
-        &mut predictions,
+        &mut empty_session,
+        DecoderInputBatchView::from_detectors(empty_detectors.view()),
+        &mut reusable_predictions,
         &DecodeCancellation::new(),
     )
-    .expect("zero-shot decode");
-
+    .expect("zero-shot batch");
     assert_eq!(summary.status(), DecodeBatchStatus::Completed);
     assert_eq!(summary.requested_shots(), 0);
     assert_eq!(summary.completed_shots(), 0);
-    assert_eq!(predictions, before);
-    assert_eq!(session.calls, 1);
+    assert_eq!(reusable_predictions, before);
+    assert_eq!(empty_session.calls, 1);
 }

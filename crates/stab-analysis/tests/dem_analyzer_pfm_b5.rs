@@ -42,25 +42,46 @@ const FOLDED_MPAD_CIRCUIT: &str =
     include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_folded_mpad.stim");
 const FOLDED_MPAD_EXPECTED: &str =
     include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_folded_mpad.stdout");
+const PERIOD127_CIRCUIT: &str =
+    include_str!("../../../oracle/fixtures/inputs/analyze_errors_period127_observable.stim");
+const PERIOD127_EXPECTED: &str = include_str!(
+    "../../../oracle/fixtures/expected/pf6_analyze_errors_period127_observable.stdout"
+);
+const FEEDBACK_CIRCUIT: &str = include_str!("consolidation_matrix/feedback_cx_record.stim");
+const FEEDBACK_EXPECTED: &str = include_str!("consolidation_matrix/feedback_cx_record.fold.dem");
+const SWEEP_CIRCUIT: &str = include_str!("consolidation_matrix/sweep_control.stim");
+const SWEEP_EXPECTED: &str = include_str!("consolidation_matrix/sweep_control.fold.dem");
 
 #[test]
-fn pfm_b5_nested_loop_folding() {
+fn loop_folding_feedback_common_semantic_matrix_matches_stim() {
+    assert_nested_loop_folding();
+    assert_coordinate_loop();
+    assert_gauge_loop();
+    assert_nested_gauge_loop();
+    assert_saturating_repeat_accounting();
+    assert_folded_noisy_mpad();
+    assert_repetition_code_loop();
+    assert_generated_clifford_measurement_loops();
+    assert_generated_nested_coordinate_loop();
+    assert_long_period_observable_loop();
+    assert_feedback_and_sweep_loops();
+}
+
+fn assert_nested_loop_folding() {
     assert_eq!(
         analyze(NESTED_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
         NESTED_EXPECTED
     );
 }
 
-#[test]
-fn pfm_b5_coordinate_loop() {
+fn assert_coordinate_loop() {
     assert_eq!(
         analyze(COORDINATE_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
         COORDINATE_EXPECTED
     );
 }
 
-#[test]
-fn pfm_b5_gauge_loop_bounded() {
+fn assert_gauge_loop() {
     assert_eq!(
         analyze(
             GAUGE_CIRCUIT,
@@ -74,8 +95,7 @@ fn pfm_b5_gauge_loop_bounded() {
     );
 }
 
-#[test]
-fn pfm_b5_nested_gauge_probe_consumes_transient_output() {
+fn assert_nested_gauge_loop() {
     assert_eq!(
         analyze(
             NESTED_GAUGE_CIRCUIT,
@@ -89,8 +109,7 @@ fn pfm_b5_nested_gauge_probe_consumes_transient_output() {
     );
 }
 
-#[test]
-fn pfm_b5_saturating_repeat_accounting_never_rejects_valid_analysis() {
+fn assert_saturating_repeat_accounting() {
     assert_eq!(
         analyze(
             DIAGNOSTIC_SATURATION_CIRCUIT,
@@ -136,16 +155,14 @@ fn pfm_b5_local_decomposition_rejects_seventeen_like_stim() {
     assert!(error.to_string().contains("exceeded 16 detector symptoms"));
 }
 
-#[test]
-fn pfm_b5_folded_noisy_mpad_matches_stim() {
+fn assert_folded_noisy_mpad() {
     assert_eq!(
         analyze(FOLDED_MPAD_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
         FOLDED_MPAD_EXPECTED
     );
 }
 
-#[test]
-fn pfm_b5_repetition_code_loop() {
+fn assert_repetition_code_loop() {
     let actual = analyze(
         REPETITION_CIRCUIT,
         ErrorAnalyzerOptions {
@@ -158,8 +175,7 @@ fn pfm_b5_repetition_code_loop() {
     assert_models_match_with_probability_tolerance(&actual, &expected, 1e-15);
 }
 
-#[test]
-fn pfm_b5_generated_folded_matches_unrolled_clifford_measurement_loops() {
+fn assert_generated_clifford_measurement_loops() {
     let gates = [
         "I 0",
         "S 0",
@@ -189,8 +205,7 @@ fn pfm_b5_generated_folded_matches_unrolled_clifford_measurement_loops() {
     }
 }
 
-#[test]
-fn pfm_b5_generated_folded_matches_unrolled_nested_coordinate_loop() {
+fn assert_generated_nested_coordinate_loop() {
     let circuit = "\
 R 0
 REPEAT 7 {
@@ -205,6 +220,49 @@ REPEAT 7 {
 }
 ";
     assert_folded_matches_unrolled(circuit, ErrorAnalyzerOptions::default());
+}
+
+fn assert_long_period_observable_loop() {
+    assert_eq!(
+        analyze(PERIOD127_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
+        PERIOD127_EXPECTED
+    );
+}
+
+fn assert_feedback_and_sweep_loops() {
+    assert_eq!(
+        analyze(FEEDBACK_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
+        FEEDBACK_EXPECTED
+    );
+    assert_eq!(
+        analyze(SWEEP_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
+        SWEEP_EXPECTED
+    );
+
+    assert_folded_matches_unrolled(
+        "R 0 1\n\
+         REPEAT 5 {\n\
+             X_ERROR(0.125) 0\n\
+             M 0\n\
+             CX rec[-1] 1\n\
+             X_ERROR(0.125) 1\n\
+             M 1\n\
+             DETECTOR rec[-1] rec[-2]\n\
+             R 0 1\n\
+         }\n",
+        ErrorAnalyzerOptions::default(),
+    );
+    assert_folded_matches_unrolled(
+        "R 0\n\
+         REPEAT 5 {\n\
+             CX sweep[0] 0\n\
+             X_ERROR(0.125) 0\n\
+             M 0\n\
+             DETECTOR rec[-1]\n\
+             R 0\n\
+         }\n",
+        ErrorAnalyzerOptions::default(),
+    );
 }
 
 fn analyze(text: &str, options: ErrorAnalyzerOptions) -> DetectorErrorModel {

@@ -89,7 +89,7 @@
               "stab-analysis",
               "--test",
               "circuit_inverse_qec",
-              "time_reversed_for_flows_measurement_rich_subset_reverses_single_measurement",
+              "time_reversal_for_flows_common_semantic_matrix_matches_stim",
               "--quiet",
               "--exact"
             ]
@@ -396,53 +396,6 @@
             "classification": "contract-only"
           },
           "resource_contract": "Rewrite reset state in one pass with bounded flow-state memory."
-        },
-        {
-          "id": "pfm2-python-measurement-kept-by-flow",
-          "surface": "Circuit::time_reversed_for_flows",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_inverse_qec_test.py",
-            "kind": "pytest-case",
-            "test": "test_inv_circuit",
-            "subcase": "M with output Pauli and record dependency remains M"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "circuit_inverse_qec",
-              "pfm_b1_python_measurement_kept_by_flow",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "pinned-golden",
-            "value": "pfm-b1-exact-python-measurement-kept-by-flow",
-            "signature": {
-              "parity_mode": "exact-output",
-              "comparator": "exact-output",
-              "argv": "core-time-reverse-flows|pfm2-python-measurement-kept-by-flow",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
-              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
-              "expected_stdout_path": "expected/pfm_b1_python_measurement_kept_by_flow.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
-              "expected_stdout_sha256": "5c89183d6dc8fd746e6c7c6276dca9f10b575434f435e9cca78cc24e39e2f0c7"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf2-time-reverse-flow-measurement",
-            "classification": "contract-only"
-          },
-          "resource_contract": "Track record parity once without duplicating measurement buffers."
         },
         {
           "id": "pfm2-python-dont-turn-measurement",
@@ -1044,7 +997,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.resets_vs_measurements",
             "subcase": "M, MX, MY, R, RX, RY, MR, MRX, and MRY deterministic target roles",
-            "gate_markers": ["MRX"]
+            "gate_markers": [
+              "MRX"
+            ]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -1099,7 +1054,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.mxxyyzz_basis",
             "subcase": "MXX, MYY, and MZZ deterministic basis behavior",
-            "gate_markers": ["MXX"]
+            "gate_markers": [
+              "MXX"
+            ]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -1154,7 +1111,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.measure_pauli_product_4body",
             "subcase": "four-body Pauli-product measurement parity invariants",
-            "gate_markers": ["MPP"]
+            "gate_markers": [
+              "MPP"
+            ]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -1209,7 +1168,9 @@
             "kind": "gtest-case",
             "test": "TableauSimulator.measure_pauli_product_bad",
             "subcase": "anti-Hermitian same-qubit Pauli products reject during semantic execution",
-            "gate_markers": ["MPP"]
+            "gate_markers": [
+              "MPP"
+            ]
           },
           "comparator": "error-class",
           "status": "implemented",
@@ -1263,7 +1224,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.mpad",
             "subcase": "deterministic zero and one measurement-pad records",
-            "gate_markers": ["MPAD"]
+            "gate_markers": [
+              "MPAD"
+            ]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -1318,7 +1281,9 @@
             "kind": "gtest-case",
             "test": "TableauSimulator.measure_pauli_product_noisy",
             "subcase": "MPP(p) flips deterministic Pauli-product measurement records at the declared probability",
-            "gate_markers": ["MPP"]
+            "gate_markers": [
+              "MPP"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1465,7 +1430,9 @@
             "kind": "gtest-case",
             "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_inverted3",
             "subcase": "simple Hermitian SPP_DAG decomposition semantics",
-            "gate_markers": ["SPP_DAG"]
+            "gate_markers": [
+              "SPP_DAG"
+            ]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -1520,7 +1487,9 @@
             "kind": "gtest-case",
             "test": "TableauSimulator.certain_errors_consistent_with_gates",
             "subcase": "X_ERROR, Y_ERROR, and Z_ERROR probability and target roles",
-            "gate_markers": ["X_ERROR"]
+            "gate_markers": [
+              "X_ERROR"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1601,7 +1570,9 @@
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.pauli_channel_threshold",
             "subcase": "PAULI_CHANNEL_1 and PAULI_CHANNEL_2 probability tuples",
-            "gate_markers": ["PAULI_CHANNEL_1"]
+            "gate_markers": [
+              "PAULI_CHANNEL_1"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1799,7 +1770,9 @@
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.composite_error_analysis",
             "subcase": "DEPOLARIZE1 and DEPOLARIZE2 probability and target roles",
-            "gate_markers": ["DEPOLARIZE1"]
+            "gate_markers": [
+              "DEPOLARIZE1"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1888,7 +1861,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.correlated_error",
             "subcase": "CORRELATED_ERROR and ELSE_CORRELATED_ERROR conditional branch semantics",
-            "gate_markers": ["CORRELATED_ERROR"]
+            "gate_markers": [
+              "CORRELATED_ERROR"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1969,7 +1944,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_erase_detect_statistics",
             "subcase": "HERALDED_ERASE detector and Pauli bucket statistics",
-            "gate_markers": ["HERALDED_ERASE"]
+            "gate_markers": [
+              "HERALDED_ERASE"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2054,7 +2031,9 @@
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.omit_vacuous_detector_observable_instructions",
             "subcase": "vacuous detector and observable declarations are omitted without losing error targets",
-            "gate_markers": ["DETECTOR"]
+            "gate_markers": [
+              "DETECTOR"
+            ]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2110,7 +2089,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.classical_controls",
             "subcase": "record and sweep target-role matrix for controlled Pauli gates",
-            "gate_markers": ["CX"]
+            "gate_markers": [
+              "CX"
+            ]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -2165,7 +2146,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.stream_huge_case",
             "subcase": "REPEAT is parser-owned control flow and executes through circuit structure instead of regular instruction dispatch",
-            "gate_markers": ["REPEAT"]
+            "gate_markers": [
+              "REPEAT"
+            ]
           },
           "comparator": "structural",
           "status": "implemented",
@@ -2274,7 +2257,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_x",
             "subcase": "MX and MRX noise rates plus the X-basis reset postcondition",
-            "gate_markers": ["MRX"]
+            "gate_markers": [
+              "MRX"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2349,7 +2334,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_y",
             "subcase": "MY and MRY noise rates plus the Y-basis reset postcondition",
-            "gate_markers": ["MRY"]
+            "gate_markers": [
+              "MRY"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2424,7 +2411,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_z",
             "subcase": "M and MR noise rates plus the Z-basis reset postcondition",
-            "gate_markers": ["MRZ"]
+            "gate_markers": [
+              "MRZ"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2498,7 +2487,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.mxxyyzz_inversion",
             "subcase": "MXX, MYY, and MZZ inverted targets and probability-one record flips",
-            "gate_markers": ["MXX"]
+            "gate_markers": [
+              "MXX"
+            ]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -2553,7 +2544,9 @@
             "kind": "gtest-case",
             "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_multiple",
             "subcase": "multiple Hermitian SPP product groups match explicit decomposition",
-            "gate_markers": ["SPP"]
+            "gate_markers": [
+              "SPP"
+            ]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -2608,7 +2601,9 @@
             "kind": "gtest-case",
             "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_bad",
             "subcase": "anti-Hermitian SPP products fail closed on semantic surfaces",
-            "gate_markers": ["SPP"]
+            "gate_markers": [
+              "SPP"
+            ]
           },
           "comparator": "error-class",
           "status": "implemented",
@@ -2663,7 +2658,9 @@
             "kind": "gtest-case",
             "test": "TableauSimulator.certain_errors_consistent_with_gates",
             "subcase": "general-circuit X_ERROR, Y_ERROR, and Z_ERROR dispatch",
-            "gate_markers": ["X_ERROR"]
+            "gate_markers": [
+              "X_ERROR"
+            ]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2718,7 +2715,9 @@
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.pauli_channel_threshold",
             "subcase": "general-circuit PAULI_CHANNEL_1 and PAULI_CHANNEL_2 dispatch",
-            "gate_markers": ["PAULI_CHANNEL_1"]
+            "gate_markers": [
+              "PAULI_CHANNEL_1"
+            ]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2773,7 +2772,9 @@
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.composite_error_analysis",
             "subcase": "general-circuit DEPOLARIZE1 and DEPOLARIZE2 dispatch",
-            "gate_markers": ["DEPOLARIZE1"]
+            "gate_markers": [
+              "DEPOLARIZE1"
+            ]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2828,7 +2829,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.correlated_error",
             "subcase": "general-circuit correlated and else-correlated dispatch",
-            "gate_markers": ["CORRELATED_ERROR"]
+            "gate_markers": [
+              "CORRELATED_ERROR"
+            ]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2883,7 +2886,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_pauli_channel_1_statistics",
             "subcase": "HERALDED_PAULI_CHANNEL_1 herald and Pauli bucket statistics",
-            "gate_markers": ["HERALDED_PAULI_CHANNEL_1"]
+            "gate_markers": [
+              "HERALDED_PAULI_CHANNEL_1"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2969,7 +2974,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_erase_statistics_offset_by_2",
             "subcase": "HERALDED_ERASE statistics are invariant under a two-qubit index offset",
-            "gate_markers": ["HERALDED_ERASE"]
+            "gate_markers": [
+              "HERALDED_ERASE"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -3055,7 +3062,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_pauli_channel_1_statistics_offset_by_2",
             "subcase": "HERALDED_PAULI_CHANNEL_1 statistics are invariant under a two-qubit index offset",
-            "gate_markers": ["HERALDED_PAULI_CHANNEL_1"]
+            "gate_markers": [
+              "HERALDED_PAULI_CHANNEL_1"
+            ]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -3141,7 +3150,9 @@
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.coordinate_tracking",
             "subcase": "detector coordinates and coordinate shifts preserve exact DEM ordering",
-            "gate_markers": ["DETECTOR"]
+            "gate_markers": [
+              "DETECTOR"
+            ]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -3196,7 +3207,9 @@
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.tagged_noise",
             "subcase": "error, detector, observable, and shift tags survive analyzer conversion",
-            "gate_markers": ["X_ERROR"]
+            "gate_markers": [
+              "X_ERROR"
+            ]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -3252,7 +3265,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.quantum_cannot_control_classical",
             "subcase": "quantum controls targeting record bits fail closed in frame-style sampling",
-            "gate_markers": ["CNOT"]
+            "gate_markers": [
+              "CNOT"
+            ]
           },
           "comparator": "error-class",
           "status": "implemented",
@@ -3308,7 +3323,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.classical_can_control_quantum",
             "subcase": "measurement records control CX, CY, XCZ, and YCZ in both target directions",
-            "gate_markers": ["CX"]
+            "gate_markers": [
+              "CX"
+            ]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -3363,7 +3380,9 @@
             "kind": "gtest-case",
             "test": "FrameSimulator.ignores_sweep_controls_when_given_no_sweep_data",
             "subcase": "omitted sweep data is interpreted as all-false for forward sweep controls",
-            "gate_markers": ["CNOT"]
+            "gate_markers": [
+              "CNOT"
+            ]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -3817,7 +3836,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_repetition_code_filters_and_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "src/stim/circuit/circuit_pybind_test.py"
           }
         },
@@ -3827,7 +3846,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_rotated_surface_code_filters_and_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         },
@@ -3837,7 +3856,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_unrotated_surface_code_filters_and_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         },
@@ -3847,7 +3866,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::generated::detecting_regions_generated_surface_code_memory_x_basis_regions|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         }
@@ -3889,7 +3908,7 @@
               "test",
               "-p",
               "stab-analysis",
-              "circuit_detecting_regions::tests::detecting_regions_simple_h_cx_mxx",
+              "circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim",
               "--quiet",
               "--exact"
             ]
@@ -3901,7 +3920,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_simple_h_cx_mxx|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_to_detecting_regions.test.cc"
             }
           },
@@ -4687,1038 +4706,6 @@
       ],
       "cases": [
         {
-          "id": "pfm5-flow-various-empty",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "empty circuit"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_empty",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Return no rows without allocating tableau or measurement state."
-        },
-        {
-          "id": "pfm5-flow-various-x",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "single X gate signed generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_x",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Use fixed tableau transitions with memory linear in touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-h",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "single H gate generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_h",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Use fixed tableau transitions with memory linear in touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-measurement",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "single M gate generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_measurement",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate measurement rows in one pass with bounded record state."
-        },
-        {
-          "id": "pfm5-flow-various-duplicate-measurement",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "duplicate M target parity"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_duplicate_measurement",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Canonicalize duplicate targets without enumerating target subsets."
-        },
-        {
-          "id": "pfm5-flow-various-mxx",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "MXX pair generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_mxx",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate pair rows with scratch proportional to touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-myy",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "multi-pair MYY generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_myy",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate pair rows with scratch proportional to touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-mzz",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "multi-pair MZZ generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_mzz",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate pair rows with scratch proportional to touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-iswap",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "multi-pair ISWAP canonical order"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_iswap",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Apply fixed two-qubit tableau transitions without decomposed circuit allocation."
-        },
-        {
-          "id": "pfm5-flow-various-s",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "single S gate generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_s",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Use fixed tableau transitions with memory linear in touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-s-dag",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "single S_DAG gate generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_s_dag",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Use fixed tableau transitions with memory linear in touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-spp-z",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "SPP Z matches S"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_spp_z",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Apply Pauli-product transitions without full decomposition materialization."
-        },
-        {
-          "id": "pfm5-flow-various-composed-unitary",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "SQRT_X followed by S"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_composed_unitary",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Compose transitions in one tableau without intermediate circuits."
-        },
-        {
-          "id": "pfm5-flow-various-spp-multigroup",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "SPP X and Z target groups"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_spp_multigroup",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Process product groups independently with reusable scratch."
-        },
-        {
-          "id": "pfm5-flow-various-spp-two-qubit",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "SPP X0*X1 generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_spp_two_qubit",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Track only qubits touched by the Pauli product."
-        },
-        {
-          "id": "pfm5-flow-various-spp-dag",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "SPP_DAG Z matches S_DAG"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_spp_dag",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Apply inverse product transitions without full decomposition materialization."
-        },
-        {
-          "id": "pfm5-flow-various-cx-feedback",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "M followed by CX record feedback"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_cx_feedback",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Resolve feedback from bounded record lookback without retaining shot data."
-        },
-        {
-          "id": "pfm5-flow-various-reset",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "single R generator"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_reset",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate reset rows with memory linear in touched qubits."
-        },
-        {
-          "id": "pfm5-flow-various-measure-reset",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "single MR generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_measure_reset",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate measurement-reset rows in one pass with bounded record state."
-        },
-        {
-          "id": "pfm5-flow-various-xcz-feedback",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "M followed by XCZ record feedback"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_xcz_feedback",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Resolve feedback from bounded record lookback without retaining shot data."
-        },
-        {
-          "id": "pfm5-flow-various-mpad",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "MPAD 0,1,1,0 signed record generators"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_mpad",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate one constant row per pad target with no qubit state."
-        },
-        {
-          "id": "pfm5-flow-various-cy-feedback",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "M followed by CY record feedback"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_cy_feedback",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Resolve feedback from bounded record lookback without retaining shot data."
-        },
-        {
-          "id": "pfm5-flow-various-heralded-mpp",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "heralded erase, heralded channel, and two MPP products"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_heralded_mpp",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate herald and product rows with memory linear in targets and records."
-        },
-        {
-          "id": "pfm5-flow-various-mpp-yy",
-          "surface": "circuit_flow_generators",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "circuit_flow_generators.various",
-            "subcase": "two YY MPP products"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_various_mpp_yy",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-generators-various-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-generators-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Generate product rows without expanding products into primitive gates."
-        },
-        {
           "id": "pfm5-flow-all-operations",
           "surface": "circuit_flow_generators and unsigned checker",
           "upstream": {
@@ -5762,178 +4749,6 @@
           "resource_contract": "Bound generator rows by configured cap and circuit qubit plus measurement dimensions."
         },
         {
-          "id": "pfm5-flow-solve-empty",
-          "surface": "solve_for_flow_measurements",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "solve_for_flow_measurements.empty",
-            "subcase": "empty circuit and query list"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_solve_empty",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-solver-cpp-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-solve-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Return empty results without constructing a matrix."
-        },
-        {
-          "id": "pfm5-flow-solve-simple",
-          "surface": "solve_for_flow_measurements",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "solve_for_flow_measurements.simple",
-            "subcase": "MX solved, unsolved, identity, and invalid empty-Pauli queries"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_solve_simple",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-solver-cpp-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-solve-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Solve by GF(2) rows bounded by qubit and measurement dimensions."
-        },
-        {
-          "id": "pfm5-flow-solve-repetition-code",
-          "surface": "solve_for_flow_measurements",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "gtest-case",
-            "test": "solve_for_flow_measurements.rep_code",
-            "subcase": "ten repetition-code flow queries"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_solve_repetition_code",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-solver-cpp-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-solve-measurement-rich",
-            "classification": "report-only"
-          },
-          "resource_contract": "Solve the generator matrix polynomially without enumerating record subsets."
-        },
-        {
-          "id": "pfm5-flow-python-measurement-solve",
-          "surface": "solve_for_flow_measurements",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators_test.py",
-            "kind": "pytest-case",
-            "test": "test_solve_flow_measurements",
-            "subcase": "measured-idle and MXX query batches"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_python_measurement_solve",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-solver-python-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-solve-measurement-python",
-            "classification": "report-only"
-          },
-          "resource_contract": "Use sparse Pauli columns for idle high-index qubits and product measurements."
-        },
-        {
           "id": "pfm5-flow-python-multitarget-generators",
           "surface": "circuit_flow_generators",
           "upstream": {
@@ -5975,92 +4790,6 @@
             "classification": "report-only"
           },
           "resource_contract": "Generate rows in memory proportional to qubits and measurement products."
-        },
-        {
-          "id": "pfm5-flow-python-multitarget-solve",
-          "surface": "solve_for_flow_measurements",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators_test.py",
-            "kind": "pytest-case",
-            "test": "test_solve_flow_measurements_multi_target",
-            "subcase": "M, MX, MYY, and MPP multi-target solutions"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_python_multitarget_solve",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-solver-python-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-solve-measurement-python",
-            "classification": "report-only"
-          },
-          "resource_contract": "Solve product rows polynomially in generator matrix dimensions."
-        },
-        {
-          "id": "pfm5-flow-python-fewer-measurements",
-          "surface": "solve_for_flow_measurements",
-          "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators_test.py",
-            "kind": "pytest-case",
-            "test": "test_solve_flow_measurements_fewer_measurements_heuristic",
-            "subcase": "prefer one product measurement over nine singles in either order"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "pfm_b4_flow_evidence",
-              "pfm_b4_flow_python_fewer_measurements",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b4-flow-solver-python-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
-              "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pf5-flow-solve-measurement-python",
-            "classification": "report-only"
-          },
-          "resource_contract": "Choose deterministic low-weight solutions without enumerating all measurement subsets."
         },
         {
           "id": "pfm5-flow-solve-over-sixteen",
@@ -6179,7 +4908,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop|--|--exact",
+            "argv": "cargo-test|-p|stab-analysis|--test|dem_analyzer_pfm_b5|loop_folding_feedback_common_semantic_matrix_matches_stim|--|--exact",
             "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
           }
         },
@@ -6195,62 +4924,12 @@
         },
         {
           "classification": "rust-test-proxy",
-          "value": "pfm-b5-graphlike-state-payload-rust",
-          "signature": {
-            "parity_mode": "structural",
-            "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
-            "upstream_source": "src/stim/search/graphlike/search_state.test.cc"
-          }
-        },
-        {
-          "classification": "rust-test-proxy",
-          "value": "pfm-b5-search-aggregate-target-work-rust",
-          "signature": {
-            "parity_mode": "structural",
-            "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|dem::search::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
-            "upstream_source": "src/stim/search/graphlike/graph.test.cc"
-          }
-        },
-        {
-          "classification": "rust-test-proxy",
-          "value": "pfm-b5-graphlike-construction-budget-rust",
-          "signature": {
-            "parity_mode": "structural",
-            "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
-            "upstream_source": "src/stim/search/graphlike/graph.test.cc"
-          }
-        },
-        {
-          "classification": "rust-test-proxy",
           "value": "pfm-b5-hypergraph-finite-corpus-rust",
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
             "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
             "upstream_source": "src/stim/search/hyper/algo.test.cc"
-          }
-        },
-        {
-          "classification": "rust-test-proxy",
-          "value": "pfm-b5-hypergraph-state-payload-rust",
-          "signature": {
-            "parity_mode": "structural",
-            "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
-            "upstream_source": "src/stim/search/hyper/search_state.test.cc"
-          }
-        },
-        {
-          "classification": "rust-test-proxy",
-          "value": "pfm-b5-hypergraph-construction-budget-rust",
-          "signature": {
-            "parity_mode": "structural",
-            "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
-            "upstream_source": "src/stim/search/hyper/graph.test.cc"
           }
         },
         {
@@ -6425,7 +5104,7 @@
               "stab-analysis",
               "--test",
               "dem_analyzer_loop_folding",
-              "pf6_dem_analyzer_period127_observable_folds_like_upstream",
+              "pf6_dem_analyzer_period127_observable_folds_minimum_compact_shape_like_upstream",
               "--quiet",
               "--exact"
             ]
@@ -6451,235 +5130,6 @@
             "classification": "report-only"
           },
           "resource_contract": "Discover the period-127 recurrence from canonical state without expanding the giant repeat count."
-        },
-        {
-          "id": "pfm6-analyzer-nested-loop",
-          "surface": "circuit_to_detector_error_model fold_loops",
-          "upstream": {
-            "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "gtest-case",
-            "test": "ErrorAnalyzer.loop_folding_nested_loop",
-            "subcase": "nested repeat folding and detector shifts"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "dem_analyzer_pfm_b5",
-              "pfm_b5_nested_loop_folding",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "direct",
-            "value": "pfm-b5-analyzer-nested-loop",
-            "signature": {
-              "parity_mode": "exact-output",
-              "comparator": "exact-output",
-              "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
-              "stdin_path": "inputs/pfm_b5_analyzer_nested_loop.stim",
-              "expected_stdout_path": "expected/pfm_b5_analyzer_nested_loop.stdout",
-              "stdin_sha256": "80ccda85814cb6c0c16ab5db73425cb3595709775554bbf2e743a296ed8dc1d3",
-              "expected_stdout_sha256": "69d2eafade091213f95e1c8dd35f23de313ca91b978931635f4c71d581bbb2c5"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pfm-b5-analyzer-cycle-folding",
-            "classification": "report-only"
-          },
-          "resource_contract": "Compose nested summaries without multiplying repeat counts into traversal work."
-        },
-        {
-          "id": "pfm6-analyzer-repetition-code-loop",
-          "surface": "circuit_to_detector_error_model fold_loops",
-          "upstream": {
-            "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "gtest-case",
-            "test": "ErrorAnalyzer.loop_folding_rep_code_circuit",
-            "subcase": "generated repetition-code compact folded DEM"
-          },
-          "comparator": "semantic-invariant",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "dem_analyzer_pfm_b5",
-              "pfm_b5_repetition_code_loop",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b5-analyzer-repetition-code-loop-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop|--|--exact",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pfm-b5-analyzer-generated-qec",
-            "classification": "report-only"
-          },
-          "resource_contract": "Fold generated rounds with state bounded by one round and recurrence state."
-        },
-        {
-          "id": "pfm6-analyzer-gauge-loop",
-          "surface": "circuit_to_detector_error_model fold_loops",
-          "upstream": {
-            "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "gtest-case",
-            "test": "ErrorAnalyzer.multi_round_gauge_detectors_dont_grow",
-            "subcase": "gauge detector state remains bounded across rounds"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "dem_analyzer_pfm_b5",
-              "pfm_b5_gauge_loop_bounded",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "direct",
-            "value": "pfm-b5-analyzer-gauge-loop",
-            "signature": {
-              "parity_mode": "exact-output",
-              "comparator": "exact-output",
-              "argv": "analyze_errors|--fold_loops|--allow_gauge_detectors",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
-              "stdin_path": "inputs/pfm_b5_analyzer_gauge_loop.stim",
-              "expected_stdout_path": "expected/pfm_b5_analyzer_gauge_loop.stdout",
-              "stdin_sha256": "84a3145d6e0be39044382cd43bc8ac0e0c39b73009c546de9167321f5a6be9a8",
-              "expected_stdout_sha256": "e017a7d26b34059254d6073ea7adf994cee5a21919e6520d6465b56ae1619a77"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pfm-b5-analyzer-cycle-folding",
-            "classification": "report-only"
-          },
-          "resource_contract": "Canonical gauge state must stop growing after reaching its recurrence."
-        },
-        {
-          "id": "pfm6-analyzer-nested-gauge-loop",
-          "surface": "circuit_to_detector_error_model nested gauge recurrence",
-          "upstream": {
-            "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "gtest-case",
-            "test": "ErrorAnalyzer.multi_round_gauge_detectors_dont_grow",
-            "subcase": "billion-round gauge-producing repeat nested inside an outer repeat"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "dem_analyzer_pfm_b5",
-              "pfm_b5_nested_gauge_probe_consumes_transient_output",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "direct",
-            "value": "pfm-b5-analyzer-nested-gauge-loop",
-            "signature": {
-              "parity_mode": "exact-output",
-              "comparator": "exact-output",
-              "argv": "analyze_errors|--fold_loops|--allow_gauge_detectors",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
-              "stdin_path": "inputs/pfm_b5_analyzer_nested_gauge_loop.stim",
-              "expected_stdout_path": "expected/pfm_b5_analyzer_nested_gauge_loop.stdout",
-              "stdin_sha256": "2e878ec341e7be66adf65fad3ce2d5b68b14a452a9d036248b18be1efe1652ad",
-              "expected_stdout_sha256": "0821b23a7930b9914ed8114badc6d98ac7ae2196946fef0fe7856c114f6e35f0"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "The existing analyzer cycle-folding benchmark covers recurrence throughput; this case is a bounded-output regression."
-          },
-          "resource_contract": "Analyzer recurrence probes must consume gauge outputs at instruction boundaries and remain bounded across nested repeats."
-        },
-        {
-          "id": "pfm6-analyzer-diagnostic-saturation",
-          "surface": "circuit_to_detector_error_model saturating repeat accounting",
-          "upstream": {
-            "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "gtest-case",
-            "test": "ErrorAnalyzer.loop_folding",
-            "subcase": "multiple maximum-count repeats whose aggregate represented work exceeds u64"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "dem_analyzer_pfm_b5",
-              "pfm_b5_saturating_repeat_accounting_never_rejects_valid_analysis",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "direct",
-            "value": "pfm-b5-analyzer-diagnostic-saturation",
-            "signature": {
-              "parity_mode": "exact-output",
-              "comparator": "exact-output",
-              "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
-              "stdin_path": "inputs/pfm_b5_analyzer_diagnostic_saturation.stim",
-              "expected_stdout_path": "expected/pfm_b5_analyzer_diagnostic_saturation.stdout",
-              "stdin_sha256": "7694e06e797891dfb2146909fad8e9514d903f33c38e2f5f985eb0c7c9ddb1c3",
-              "expected_stdout_sha256": "31cf9c24ff9c7e069f8e23a31d1a4b111fbef865bb52ff66a6a13c2bcd5cca2c"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "Saturating repeat accounting is a constant-time correctness contract rather than a distinct throughput workload."
-          },
-          "resource_contract": "Aggregate represented-work accounting cannot overflow or change analyzer success or exact output."
         },
         {
           "id": "pfm6-analyzer-local-decomposition-boundary",
@@ -6770,52 +5220,6 @@
           "resource_contract": "Reject the seventeenth detector symptom before allocating exponential local-decomposition combinations."
         },
         {
-          "id": "pfm6-analyzer-folded-noisy-mpad",
-          "surface": "circuit_to_detector_error_model fold_loops and stab analyze_errors",
-          "upstream": {
-            "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "gtest-case",
-            "test": "ErrorAnalyzer.mpad",
-            "subcase": "noisy MPAD detector effect with an inert repeat"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "dem_analyzer_pfm_b5",
-              "pfm_b5_folded_noisy_mpad_matches_stim",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "direct",
-            "value": "pfm-b5-analyzer-folded-mpad",
-            "signature": {
-              "parity_mode": "exact-output",
-              "comparator": "exact-output",
-              "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
-              "stdin_path": "inputs/pfm_b5_analyzer_folded_mpad.stim",
-              "expected_stdout_path": "expected/pfm_b5_analyzer_folded_mpad.stdout",
-              "stdin_sha256": "44f03a87b9bf7b47a44810c37abf36ed6be98dcc84df0858e4bbab96c65a090b",
-              "expected_stdout_sha256": "9d7a075fc6bdc5edd26212c2c10cdd0b9ee7a4d530c07e21f4884fd4302d6b42"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "The folded MPAD fix adds one existing per-record error lookup and is covered by analyzer workloads."
-          },
-          "resource_contract": "Record each noisy MPAD measurement error before reverse tracking consumes its measurement record."
-        },
-        {
           "id": "pfm6-analyzer-nested-probe-budget",
           "surface": "circuit_to_detector_error_model folded recurrence probing",
           "upstream": {
@@ -6894,53 +5298,6 @@
             "value": "The nested supported-unitary case is a hostile-input admission boundary and must terminate with a domain error instead of becoming a timing workload."
           },
           "resource_contract": "Route analyzer probes through the shared recurrence budget even when the nested repeat is eligible for the normal supported-unitary fast path."
-        },
-        {
-          "id": "pfm6-analyzer-coordinate-loop",
-          "surface": "circuit_to_detector_error_model fold_loops",
-          "upstream": {
-            "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "gtest-case",
-            "test": "ErrorAnalyzer.coordinate_tracking",
-            "subcase": "detector and coordinate shifts across folded loops"
-          },
-          "comparator": "exact",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "--test",
-              "dem_analyzer_pfm_b5",
-              "pfm_b5_coordinate_loop",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "direct",
-            "value": "pfm-b5-analyzer-coordinate-loop",
-            "signature": {
-              "parity_mode": "exact-output",
-              "comparator": "exact-output",
-              "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
-              "stdin_path": "inputs/pfm_b5_analyzer_coordinate_loop.stim",
-              "expected_stdout_path": "expected/pfm_b5_analyzer_coordinate_loop.stdout",
-              "stdin_sha256": "09092a4651282b2d510e8017fb6e40aacf4dab76faa062834c49d97f6bacf2b5",
-              "expected_stdout_sha256": "06520c056a5650bbaf592c40c434b21e589f35a2e9834ef647647c14bed3fef4"
-            }
-          },
-          "benchmark": {
-            "state": "existing",
-            "value": "pfm-b5-analyzer-cycle-folding",
-            "classification": "report-only"
-          },
-          "resource_contract": "Compose coordinate shifts with checked arithmetic and constant state per coordinate dimension."
         },
         {
           "id": "pfm6-analyzer-cross-iteration-guard",
@@ -7067,126 +5424,6 @@
             "value": "Failure-message classification is not a throughput workload."
           },
           "resource_contract": "Count source error instructions for diagnostics while excluding zero-probability mechanisms from graph construction."
-        },
-        {
-          "id": "pfm6-graphlike-state-payload-budget",
-          "surface": "shortest_graphlike_error search frontier",
-          "upstream": {
-            "path": "src/stim/search/graphlike/search_state.test.cc",
-            "kind": "gtest-case",
-            "test": "search_graphlike.DemAdjGraphSearchState_construct",
-            "subcase": "variable observable-mask payload admission"
-          },
-          "comparator": "error-class",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "dem::search::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b5-graphlike-state-payload-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
-              "upstream_source": "src/stim/search/graphlike/search_state.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "The payload admission boundary protects hostile models and is not a successful search workload."
-          },
-          "resource_contract": "Preflight at most 65,536 terms per state before cloning and at most 5,000,000 stored terms across map keys predecessors and queued copies."
-        },
-        {
-          "id": "pfm6-search-aggregate-target-work-budget",
-          "surface": "shared graphlike and hypergraph DEM error traversal",
-          "upstream": {
-            "path": "src/stim/search/graphlike/graph.test.cc",
-            "kind": "gtest-case",
-            "test": "search_graphlike.DemAdjGraph_from_dem",
-            "subcase": "aggregate source-target work across individually bounded nonzero errors"
-          },
-          "comparator": "error-class",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "dem::search::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b5-search-aggregate-target-work-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|dem::search::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
-              "upstream_source": "src/stim/search/graphlike/graph.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "Aggregate hostile-input traversal admission is a rejection boundary instead of a successful throughput workload."
-          },
-          "resource_contract": "Charge at most 20,000,000 source target occurrences across all expanded nonzero error mechanisms before graph construction."
-        },
-        {
-          "id": "pfm6-graphlike-construction-budget",
-          "surface": "shortest_graphlike_error graph construction",
-          "upstream": {
-            "path": "src/stim/search/graphlike/graph.test.cc",
-            "kind": "gtest-case",
-            "test": "search_graphlike.DemAdjGraph_add_outward_edge",
-            "subcase": "indexed unique-edge and persistent observable-mask admission"
-          },
-          "comparator": "error-class",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "dem::search::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b5-graphlike-construction-budget-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|dem::search::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
-              "upstream_source": "src/stim/search/graphlike/graph.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "Unique-edge and persistent-mask admission protects hostile graph construction and is not a successful search workload."
-          },
-          "resource_contract": "Use a collision-checked randomized arena index for edge deduplication and admit at most 5,000,000 unique outward edges and 20,000,000 persistent edge-payload or compact-index terms before installation."
         },
         {
           "id": "pfm6-graphlike-distance-one",
@@ -7529,86 +5766,6 @@
             "value": "Failure-message classification is not a throughput workload."
           },
           "resource_contract": "Count source error instructions for diagnostics while excluding zero-probability mechanisms from graph construction."
-        },
-        {
-          "id": "pfm6-hypergraph-state-payload-budget",
-          "surface": "search_hypergraph_logical_error search frontier",
-          "upstream": {
-            "path": "src/stim/search/hyper/search_state.test.cc",
-            "kind": "gtest-case",
-            "test": "search_hyper_search_state.equality",
-            "subcase": "variable detector and observable set payload admission"
-          },
-          "comparator": "error-class",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "dem::search::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b5-hypergraph-state-payload-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
-              "upstream_source": "src/stim/search/hyper/search_state.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "The payload admission boundary protects hostile models and is not a successful search workload."
-          },
-          "resource_contract": "Preflight symmetric-difference cardinality before cloning with at most 65,536 terms per state and 5,000,000 stored terms overall; cap each source error at 65,536 targets before normalization."
-        },
-        {
-          "id": "pfm6-hypergraph-construction-budget",
-          "surface": "search_hypergraph_logical_error graph construction",
-          "upstream": {
-            "path": "src/stim/search/hyper/graph.test.cc",
-            "kind": "gtest-case",
-            "test": "search_hyper_graph.add_edge_from_dem_targets",
-            "subcase": "indexed unique-edge incidence and persistent observable-mask admission"
-          },
-          "comparator": "error-class",
-          "status": "implemented",
-          "test": {
-            "state": "existing",
-            "selector": [
-              "cargo",
-              "test",
-              "-p",
-              "stab-analysis",
-              "dem::search::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload",
-              "--quiet",
-              "--exact"
-            ]
-          },
-          "oracle": {
-            "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pfm-b5-hypergraph-construction-budget-rust",
-            "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|dem::search::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
-              "upstream_source": "src/stim/search/hyper/graph.test.cc"
-            }
-          },
-          "benchmark": {
-            "state": "not-applicable",
-            "value": "Unique-edge and persistent-mask admission protects hostile graph construction and is not a successful search workload."
-          },
-          "resource_contract": "Use collision-checked randomized arena indexing plus indexed incidence deduplication and transactionally admit at most 5,000,000 unique edges and 20,000,000 persistent edge-payload, compact-index, or adjacency terms before installation."
         },
         {
           "id": "pfm6-hypergraph-distance-one",

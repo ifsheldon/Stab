@@ -26,8 +26,8 @@ status = "verified"
 [families.evidence.test]
 package = "stab-algebra"
 kind = "test"
-target = "cq2_algebra_values"
-name = "cq2_algebra_flow_value_contract_canonicalizes_and_reports_typed_errors"
+target = "stabilizer_flows"
+name = "flows_preserve_values_text_multiplication_and_typed_failures"
 minimum_tier = "pr"
 
 [[families]]
@@ -46,19 +46,29 @@ stim_refs = ["src/stim/stabilizers/pauli_string.test.cc"]
 status = "done"
 owner = "stab-algebra"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-algebra"
+kind = "test"
+target = "lean_parity_contracts"
+name = "pauli_values_preserve_text_indexing_and_scalar_algebra"
+minimum_tier = "pr"
 
 [[families]]
 id = "algebra.representation-neutral-conversions-common"
 area = "algebra"
-contract = "The implemented Pauli, Clifford, tableau, stabilizer, unitary, and circuit conversions preserve value semantics across the representations used by current Rust workflows."
+contract = "The implemented Pauli, Clifford, tableau, stabilizer, and unitary conversions preserve value semantics across the representations owned by stab-algebra."
 stim_refs = ["src/stim/stabilizers/tableau.test.cc", "src/stim/stabilizers/pauli_string.test.cc"]
 status = "done"
 owner = "stab-algebra"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-algebra"
+kind = "test"
+target = "lean_parity_contracts"
+name = "algebra_owned_representation_conversions_preserve_values"
+minimum_tier = "pr"
 
 [[families]]
 id = "algebra.representation-neutral-conversions-remaining"
@@ -77,8 +87,13 @@ stim_refs = ["src/stim/stabilizers/tableau.test.cc"]
 status = "done"
 owner = "stab-algebra"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-algebra"
+kind = "test"
+target = "lean_parity_contracts"
+name = "tableaux_preserve_generators_composition_inversion_and_actions"
+minimum_tier = "pr"
 
 [[families]]
 id = "analysis.circuit-to-dem-common-generated-qec"
@@ -97,6 +112,22 @@ name = "generated_qec_dem_rotated_surface_code_semantics_match_pinned_stim"
 minimum_tier = "pr"
 
 [[families]]
+id = "analysis.circuit-to-dem-error-decomposition"
+area = "analysis"
+contract = "Circuit-to-DEM graphlike decomposition matches selected exact, greedy-remnant, and blocked-remnant Stim behavior."
+stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/util_top/circuit_to_dem.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "consolidation_matrix"
+name = "circuit_to_dem_error_decomposition_contract_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
 id = "analysis.circuit-to-dem-remaining-gate-surface"
 area = "analysis"
 contract = "Circuit-to-DEM analysis accepts every legal in-scope instruction and target shape beyond the separately owned generated and selected gate surfaces and rejects only Stim-invalid inputs."
@@ -109,24 +140,66 @@ milestone = "P5"
 [[families]]
 id = "analysis.circuit-to-dem-selected-gate-surface"
 area = "analysis"
-contract = "Circuit-to-DEM analysis implements the selected Pauli, Clifford, noise, measurement, product, heralded, feedback, decomposition, gauge, coordinate, and folded-repeat surface recorded by current Rust workflows."
+contract = "Circuit-to-DEM analysis implements the selected Pauli, Clifford, noise, measurement, product, heralded, feedback, gauge, coordinate, and folded-repeat equivalence matrix recorded by current Rust workflows."
 stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/util_top/circuit_to_dem.test.cc"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "consolidation_matrix"
+name = "circuit_to_dem_selected_gate_surface_semantic_matrix_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "analysis.circuit-to-tableau-conversion-common"
+area = "analysis"
+contract = "Circuit-to-tableau conversion preserves the implemented unitary circuit semantics while rejecting nonunitary instructions."
+stim_refs = ["src/stim/util_top/circuit_vs_tableau.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_tableau"
+name = "circuit_to_tableau_common_semantic_matrix_matches_stim"
+minimum_tier = "pr"
 
 [[families]]
 id = "analysis.detecting-regions-common"
 area = "analysis"
-contract = "Detecting-region analysis handles the implemented Clifford, product-measurement, annotation, noise, bounded-repeat, selected feedback, generated-code, target-filter, and ignored-anticommutation workflows."
+contract = "Detecting-region analysis handles the implemented Clifford, product-measurement, annotation, noise, bounded-repeat, selected feedback, generated-code, target-filter, and ignored-anticommutation success workflows."
 stim_refs = ["src/stim/util_top/circuit_to_detecting_regions.test.cc"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "analysis.detecting-regions-common-rejections"
+area = "analysis"
+contract = "Detecting-region analysis rejects anti-Hermitian products, invalid target roles, unknown detectors, and out-of-range ticks with the selected Stim-compatible failure classes."
+stim_refs = ["src/stim/util_top/circuit_to_detecting_regions.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_detecting_regions::tests::detecting_regions_common_rejections_match_stim"
+minimum_tier = "pr"
 
 [[families]]
 id = "analysis.detecting-regions-remaining"
@@ -146,16 +219,20 @@ status = "deferred"
 rationale = "The explain_errors product and full ErrorMatcher provenance are explicitly deferred."
 
 [[families]]
-id = "analysis.flow-generation-and-checking-common"
+id = "analysis.flow-checking-common"
 area = "analysis"
-contract = "Flow generation, unsigned and selected signed checking, diagnostics, and GF(2) measurement solving work for the implemented unitary, measurement, reset, product, feedback, noise, and bounded-repeat circuit subset."
+contract = "Unsigned flow checking preserves bounded-repeat equivalence and reports typed mismatch diagnostics for the selected Stim-compatible subset."
 stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc", "src/stim/util_top/has_flow.test.cc"]
-coverage = ["consumer:flow"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "pfm_b4_flow_evidence"
+name = "flow_checking_repeats_and_diagnostics_match_stim"
+minimum_tier = "pr"
 
 [[families]]
 id = "analysis.flow-generation-and-checking-remaining"
@@ -167,10 +244,11 @@ owner = "stab-analysis"
 milestone = "P5"
 
 [[families]]
-id = "analysis.loop-folding-common"
+id = "analysis.flow-generation-common"
 area = "analysis"
-contract = "Circuit-to-DEM loop folding preserves the pinned simple nested-repeat detector, observable, and error regression shape."
-stim_refs = ["src/stim/simulators/error_analyzer.test.cc"]
+contract = "Exact signed flow generation works for the implemented unitary, measurement, reset, product, feedback, heralded, and noise circuit subset."
+stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc", "src/stim/util_top/has_flow.test.cc"]
+coverage = ["consumer:flow"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
@@ -178,20 +256,41 @@ status = "verified"
 [families.evidence.test]
 package = "stab-analysis"
 kind = "test"
-target = "dem_analyzer_loop_folding"
-name = "dem_analyzer_fold_loops_preserves_simple_nested_repeat_like_stim"
+target = "pfm_b4_flow_evidence"
+name = "flow_generation_common_semantic_matrix_matches_stim"
 minimum_tier = "pr"
 
 [[families]]
-id = "analysis.loop-folding-feedback-common"
+id = "analysis.flow-measurement-solving-common"
 area = "analysis"
-contract = "Loop folding preserves the implemented selected measurement-feedback, sweep-control, long-period, gauge, coordinate, nested-repeat, and generated-code analysis cases."
+contract = "GF(2) measurement solving matches the selected empty, single-measurement, repetition-code, product-measurement, and fewer-measurement Stim examples."
+stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc", "src/stim/util_top/has_flow.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "pfm_b4_flow_evidence"
+name = "flow_measurement_solving_common_matrix_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "analysis.loop-folding-common"
+area = "analysis"
+contract = "Circuit-to-DEM loop folding preserves the implemented nested detector, observable, error, feedback, sweep-control, long-period, gauge, coordinate, and generated-code cases."
 stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/simulators/sparse_rev_frame_tracker.test.cc"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_analyzer_pfm_b5"
+name = "loop_folding_feedback_common_semantic_matrix_matches_stim"
+minimum_tier = "pr"
 
 [[families]]
 id = "analysis.loop-folding-feedback-remaining"
@@ -210,8 +309,13 @@ stim_refs = ["src/stim/util_top/missing_detectors.test.cc"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_missing_detectors::tests::missing_detectors_common_semantic_matrix_matches_stim"
+minimum_tier = "pr"
 
 [[families]]
 id = "analysis.missing-detectors-remaining"
@@ -240,8 +344,13 @@ stim_refs = ["src/stim/circuit/circuit.test.cc"]
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "lean_parity_contracts"
+name = "circuit_coordinates_and_repeat_aware_counts_match_stim"
+minimum_tier = "pr"
 
 [[families]]
 id = "circuit-model.determined-measurements"
@@ -268,8 +377,13 @@ stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/circuit/circuit_instr
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "lean_parity_contracts"
+name = "circuit_mutation_and_value_lifecycle_preserves_semantics"
+minimum_tier = "pr"
 
 [[families]]
 id = "circuit-model.reference-sample"
@@ -307,8 +421,13 @@ coverage = ["dialect:stim"]
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "lean_parity_contracts"
+name = "circuit_syntax_round_trips_to_canonical_stim_text"
+minimum_tier = "pr"
 
 [[families]]
 id = "circuit-model.target-grammar-and-validation"
@@ -319,8 +438,13 @@ coverage = ["target:combiner", "target:inverted-pauli", "target:inverted-qubit",
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "lean_parity_contracts"
+name = "circuit_target_grammar_and_gate_roles_are_enforced"
+minimum_tier = "pr"
 
 [[families]]
 id = "cli.analyze-errors"
@@ -514,8 +638,13 @@ stim_refs = ["src/stim/dem/detector_error_model.test.cc", "src/stim/dem/dem_inst
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "lean_parity_contracts"
+name = "dem_counts_coordinates_and_value_lifecycle_preserves_semantics"
+minimum_tier = "pr"
 
 [[families]]
 id = "dem-model.syntax-and-canonical-text"
@@ -526,8 +655,13 @@ coverage = ["dialect:dem"]
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "lean_parity_contracts"
+name = "dem_syntax_round_trips_to_canonical_text"
+minimum_tier = "pr"
 
 [[families]]
 id = "dem-model.transforms"
@@ -548,13 +682,18 @@ minimum_tier = "pr"
 [[families]]
 id = "detection.common-frame-gate-surface"
 area = "detection"
-contract = "Detection sampling and conversion implement the selected Clifford, measurement, reset, pair-product, MPP, MPAD, Pauli-observable, noise, feedback, and bounded-repeat frame paths."
-stim_refs = ["src/stim/simulators/frame_simulator_util.test.cc", "src/stim/simulators/measurements_to_detection_events.test.cc"]
+contract = "Detection sampling implements the selected Clifford, measurement, reset, pair-product, MPP, MPAD, Pauli-observable, noise, feedback, and bounded-repeat frame paths."
+stim_refs = ["src/stim/simulators/frame_simulator_util.test.cc"]
 status = "done"
 owner = "stab-engine"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "lean_parity_contracts"
+name = "detection_common_frame_gate_surface_contract"
+minimum_tier = "pr"
 
 [[families]]
 id = "detection.reference-correction"
@@ -585,13 +724,18 @@ milestone = "P4"
 [[families]]
 id = "detection.sweep-and-feedback-common"
 area = "detection"
-contract = "Measurement conversion accepts omitted all-false and six-format explicit sweep records and honors the implemented selected feedback and ran_without_feedback transformations."
+contract = "In-memory measurement conversion accepts omitted all-false or explicit sweep records and preserves the implemented selected feedback semantics."
 stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc", "src/stim/cmd/command_m2d.test.cc"]
 status = "done"
 owner = "stab-engine"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "lean_parity_contracts"
+name = "detection_sweep_and_feedback_common_contract"
+minimum_tier = "pr"
 
 [[families]]
 id = "detection.sweep-and-feedback-remaining"
@@ -618,8 +762,13 @@ coverage = [
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "gate_catalog::tests::pinned_stim_catalog_matches_model_metadata"
+minimum_tier = "pr"
 
 [[families]]
 id = "gate-catalog.flow-metadata"
@@ -662,8 +811,13 @@ stim_refs = ["doc/gates.md", "src/stim/gates/gates.test.cc"]
 status = "done"
 owner = "stab-model"
 [families.evidence]
-status = "needs-owner"
-milestone = "P1"
+status = "verified"
+[families.evidence.test]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "gate_catalog::tests::pinned_stim_catalog_matches_model_metadata"
+minimum_tier = "pr"
 
 [[families]]
 id = "gate-catalog.selected-metadata"

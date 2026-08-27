@@ -125,7 +125,7 @@ enum Command {
         milestone: Option<String>,
     },
 
-    /// Validate and inspect the non-deferred blocker closure ledger.
+    /// Validate and inspect the historical non-deferred blocker closure ledger.
     Blockers {
         /// Print every owned subcase after validation.
         #[arg(long)]

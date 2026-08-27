@@ -1,345 +1,180 @@
 #![allow(
+    clippy::expect_used,
     clippy::panic_in_result_fn,
-    reason = "integration tests use direct assertions for compact diagnostics"
+    reason = "Stim parity fixtures use direct assertions for compact diagnostics"
 )]
 
 use stab_analysis::{AnalysisResult, likeliest_error_sat_problem, shortest_error_sat_problem};
 use stab_model::DetectorErrorModel;
+
+const UNSAT: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
+const SINGLE_OBSERVABLE_SHORTEST: &str = "p wcnf 1 2 3\n1 -1 0\n3 1 0\n";
+const TWO_ERROR_SHORTEST: &str = "\
+p wcnf 3 8 9
+1 -1 0
+9 1 2 -3 0
+9 1 -2 3 0
+9 -1 2 3 0
+9 -1 -2 -3 0
+1 -2 0
+9 -3 0
+9 1 0
+";
+const TWO_ERROR_LIKELIEST: &str = "\
+p wcnf 3 8 81
+10 -1 0
+81 1 2 -3 0
+81 1 -2 3 0
+81 -1 2 3 0
+81 -1 -2 -3 0
+10 -2 0
+81 -3 0
+81 1 0
+";
+const HIGH_PROBABILITY_LIKELIEST: &str = "\
+p wcnf 3 8 81
+10 -1 0
+81 1 2 -3 0
+81 1 -2 3 0
+81 -1 2 3 0
+81 -1 -2 -3 0
+10 2 0
+81 -3 0
+81 1 0
+";
+const HALF_PROBABILITY_LIKELIEST: &str = "\
+p wcnf 3 7 71
+10 -1 0
+71 1 2 -3 0
+71 1 -2 3 0
+71 -1 2 3 0
+71 -1 -2 -3 0
+71 -3 0
+71 1 0
+";
 
 fn dem(input: &str) -> AnalysisResult<DetectorErrorModel> {
     DetectorErrorModel::from_dem_str(input).map_err(Into::into)
 }
 
 #[test]
-fn sat_problem_shortest_folds_large_flat_zero_shift_repeats() -> AnalysisResult<()> {
-    let model = dem("\
-repeat 100001 {
-    error(0.1) D0 L0
-    error(0.2) D0
-}
-")?;
-    let expected = shortest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.2) D0\n")?)?;
-    assert_eq!(shortest_error_sat_problem(&model)?, expected);
-    Ok(())
-}
-
-#[test]
-fn sat_problem_shortest_folds_large_flat_zero_shift_zero_probability_repeats() -> AnalysisResult<()>
-{
-    let model = dem("\
-repeat 100001 {
-    error(0) D0 L0
-    error(0) D0
-}
-")?;
-    let expected = shortest_error_sat_problem(&dem("error(0) D0 L0\nerror(0) D0\n")?)?;
-    assert_eq!(shortest_error_sat_problem(&model)?, expected);
-    Ok(())
-}
-
-#[test]
-fn sat_problem_shortest_folds_large_nested_zero_shift_repeats() -> AnalysisResult<()> {
-    let model = dem("\
-repeat 100001 {
-    detector(1, 2) D0
-    repeat 100001 {
-        error(0.1) D0 L0
-        shift_detectors 0
-        error(0.2) D0
+fn shortest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
+    for source in ["", "error(0.1) D0\n", "error(0.1)\n"] {
+        assert_eq!(
+            shortest_error_sat_problem(&dem(source)?)?,
+            UNSAT,
+            "{source}"
+        );
     }
-}
-")?;
-    let expected = shortest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.2) D0\n")?)?;
-    assert_eq!(shortest_error_sat_problem(&model)?, expected);
-
-    let zero_probability = dem("\
-repeat 100001 {
-    repeat 100001 {
-        error(0) D0 L0
-        shift_detectors 0
-        error(0) D0
-    }
-}
-")?;
-    let expected_zero = shortest_error_sat_problem(&dem("error(0) D0 L0\nerror(0) D0\n")?)?;
     assert_eq!(
-        shortest_error_sat_problem(&zero_probability)?,
-        expected_zero
+        shortest_error_sat_problem(&dem("error(0.1) L0\n")?)?,
+        SINGLE_OBSERVABLE_SHORTEST
     );
 
-    let no_target = dem("\
-repeat 100001 {
-    repeat 100001 {
-        error(0.1)
-        shift_detectors 0
+    for source in [
+        "error(0.1) D0 L0\nerror(0.1) D0\n",
+        "error(1) D0 L0\nerror(0) D0\n",
+        "error(0.001) D0 L0\nerror(0.999) D0\n",
+        "error(0.1) D1000001 L1000001\nerror(0.2) D1000001\n",
+        "repeat 100001 {\nerror(0.1) D0 L0\nerror(0.2) D0\n}\n",
+        "repeat 100001 {\nrepeat 100001 {\nerror(0.1) D0 L0\nshift_detectors 0\nerror(0.2) D0\n}\n}\n",
+    ] {
+        assert_eq!(
+            shortest_error_sat_problem(&dem(source)?)?,
+            TWO_ERROR_SHORTEST,
+            "{source}"
+        );
     }
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let expected_no_target =
-        shortest_error_sat_problem(&dem("error(0.1)\nerror(0.1) D0\nerror(0.1) D0 L0\n")?)?;
-    assert_eq!(shortest_error_sat_problem(&no_target)?, expected_no_target);
 
-    let shifted = dem("\
-repeat 100001 {
-    repeat 100001 {
-        error(0.1) D0 L0
-        shift_detectors 1
-    }
-}
-")?;
-    let error = match shortest_error_sat_problem(&shifted) {
-        Ok(output) => {
-            format!("nested shifted SAT repeats unexpectedly bypassed the cap: {output}")
-        }
-        Err(error) => error.to_string(),
-    };
-    assert!(
-        error.contains("DEM SAT problem generation currently supports repeat counts up to"),
-        "{error}"
+    assert_eq!(
+        shortest_error_sat_problem(&dem("repeat 100001 {\nerror(0) L1000001\n}\n")?)?,
+        SINGLE_OBSERVABLE_SHORTEST
+    );
+    assert_eq!(
+        shortest_error_sat_problem(&dem(
+            "repeat 2 {\nerror(0.1) D0\nshift_detectors 1\n}\nerror(0.1) D0 L0\n"
+        )?)?,
+        "p wcnf 3 7 8\n1 -1 0\n1 -2 0\n1 -3 0\n8 -1 0\n8 -2 0\n8 -3 0\n8 3 0\n"
     );
     Ok(())
 }
 
 #[test]
-fn sat_problem_shortest_compresses_large_flat_zero_shift_high_observable_repeat()
--> AnalysisResult<()> {
-    let model = dem("\
-repeat 100001 {
-    error(0) L1000001
-}
-")?;
+fn likeliest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
     assert_eq!(
-        shortest_error_sat_problem(&model)?,
-        shortest_error_sat_problem(&dem("error(0) L0\n")?)?
+        likeliest_error_sat_problem(&DetectorErrorModel::new(), 10)?,
+        UNSAT
     );
-    Ok(())
-}
-
-#[test]
-fn sat_problem_likeliest_folds_large_flat_zero_shift_repeats_by_map_cost() -> AnalysisResult<()> {
-    let model = dem("\
-repeat 100001 {
-    error(0.000001) D0 L0
-    error(0.25) D1 L1
-}
-error(0.1) D0
-error(0.1) D0 L0
-error(0.1) D1 L1
-")?;
-    let expected = likeliest_error_sat_problem(
-        &dem("\
-error(0.000001) D0 L0
-error(0.25) D1 L1
-error(0.1) D0
-error(0.1) D0 L0
-error(0.1) D1 L1
-")?,
-        100,
-    )?;
-    assert_eq!(likeliest_error_sat_problem(&model, 100)?, expected);
-
-    let small_probability_counterexample = dem("\
-repeat 100001 {
-    error(0.000001) L0
-}
-error(0.01) L0
-")?;
-    let compact_counterexample =
-        likeliest_error_sat_problem(&dem("error(0.000001) L0\nerror(0.01) L0\n")?, 100)?;
+    for (source, expected) in [
+        ("error(0.1) D0 L0\nerror(0.1) D0\n", TWO_ERROR_LIKELIEST),
+        (
+            "error(0.1) D0 L0\nerror(0.9) D0\n",
+            HIGH_PROBABILITY_LIKELIEST,
+        ),
+        (
+            "error(0.1) D0 L0\nerror(0.5) D0\n",
+            HALF_PROBABILITY_LIKELIEST,
+        ),
+    ] {
+        assert_eq!(
+            likeliest_error_sat_problem(&dem(source)?, 10)?,
+            expected,
+            "{source}"
+        );
+    }
     assert_eq!(
-        likeliest_error_sat_problem(&small_probability_counterexample, 100)?,
-        compact_counterexample
+        likeliest_error_sat_problem(&dem("error(1) L0\n")?, 10)?,
+        "p wcnf 1 2 21\n21 1 0\n21 1 0\n"
     );
+    assert_eq!(
+        likeliest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.49) D0\n")?, 1,)?,
+        "p wcnf 3 8 9\n1 -1 0\n9 1 2 -3 0\n9 1 -2 3 0\n9 -1 2 3 0\n9 -1 -2 -3 0\n9 -3 0\n9 1 0\n"
+    );
+    assert!(likeliest_error_sat_problem(&dem("error(0.1) L0\n")?, 0).is_err());
 
-    let even_high_probability = dem("\
-repeat 100002 {
-    error(0.9) D0 L0
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let even_high_probability_compact = likeliest_error_sat_problem(
-        &dem("error(0.1) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?,
-        100,
-    )?;
+    for source in [
+        "error(0) D9 L3\nerror(0.1) D0 L0\nerror(0.1) D0\n",
+        "error(0.1) D1000001 L1000001\nerror(0.1) D1000001\n",
+        "repeat 100001 {\nerror(0.1) D0 L0\n}\nerror(0.1) D0\n",
+        "repeat 100001 {\nrepeat 100001 {\nerror(0.1) D0 L0\nshift_detectors 0\n}\n}\nerror(0.1) D0\n",
+        "repeat 1000001 {\nerror(0) D0 L1000001\nshift_detectors 1\n}\nerror(0.1) D0 L0\nerror(0.1) D0\n",
+    ] {
+        assert_eq!(
+            likeliest_error_sat_problem(&dem(source)?, 10)?,
+            TWO_ERROR_LIKELIEST,
+            "{source}"
+        );
+    }
+
+    let even_high_probability =
+        dem("repeat 100002 {\nerror(0.9) D0 L0\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
+    let reduced_even_high_probability = dem("error(0.1) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
     assert_eq!(
         likeliest_error_sat_problem(&even_high_probability, 100)?,
-        even_high_probability_compact
+        likeliest_error_sat_problem(&reduced_even_high_probability, 100)?
     );
 
-    let odd_high_probability = dem("\
-repeat 100001 {
-    error(0.9) D0 L0
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let odd_high_probability_compact = likeliest_error_sat_problem(
-        &dem("error(0.9) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?,
-        100,
-    )?;
+    let odd_high_probability =
+        dem("repeat 100001 {\nerror(0.9) D0 L0\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
+    let reduced_odd_high_probability = dem("error(0.9) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
     assert_eq!(
         likeliest_error_sat_problem(&odd_high_probability, 100)?,
-        odd_high_probability_compact
+        likeliest_error_sat_problem(&reduced_odd_high_probability, 100)?
     );
 
-    let even_deterministic = dem("\
-repeat 100002 {
-    error(1) D0 L0
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let without_even_deterministic =
-        likeliest_error_sat_problem(&dem("error(0.1) D0\nerror(0.1) D0 L0\n")?, 100)?;
+    let even_deterministic =
+        dem("repeat 100002 {\nerror(1) D0 L0\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
+    let reduced_even_deterministic = dem("error(0.1) D0\nerror(0.1) D0 L0\n")?;
     assert_eq!(
         likeliest_error_sat_problem(&even_deterministic, 100)?,
-        without_even_deterministic
+        likeliest_error_sat_problem(&reduced_even_deterministic, 100)?
     );
 
-    let odd_deterministic = dem("\
-repeat 100001 {
-    error(1) D0 L0
-}
-")?;
-    let one_deterministic = likeliest_error_sat_problem(&dem("error(1) D0 L0\n")?, 100)?;
+    let odd_deterministic =
+        dem("repeat 100001 {\nrepeat 100001 {\nerror(1) D0 L0\nshift_detectors 0\n}\n}\n")?;
     assert_eq!(
         likeliest_error_sat_problem(&odd_deterministic, 100)?,
-        one_deterministic
-    );
-    Ok(())
-}
-
-#[test]
-fn sat_problem_likeliest_folds_large_nested_zero_shift_repeats_by_map_cost() -> AnalysisResult<()> {
-    let model = dem("\
-repeat 100001 {
-    detector(1, 2) D0
-    repeat 100001 {
-        error(0.000001) D0 L0
-        shift_detectors 0
-        error(0.25) D1 L1
-    }
-}
-error(0.1) D0
-error(0.1) D0 L0
-error(0.1) D1 L1
-")?;
-    let expected = likeliest_error_sat_problem(
-        &dem("\
-error(0.000001) D0 L0
-error(0.25) D1 L1
-error(0.1) D0
-error(0.1) D0 L0
-error(0.1) D1 L1
-")?,
-        100,
-    )?;
-    assert_eq!(likeliest_error_sat_problem(&model, 100)?, expected);
-
-    let even_high_probability = dem("\
-repeat 100001 {
-    repeat 100002 {
-        error(0.9) D0 L0
-        shift_detectors 0
-    }
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let even_high_probability_compact = likeliest_error_sat_problem(
-        &dem("error(0.1) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?,
-        100,
-    )?;
-    assert_eq!(
-        likeliest_error_sat_problem(&even_high_probability, 100)?,
-        even_high_probability_compact
-    );
-
-    let even_deterministic = dem("\
-repeat 100001 {
-    repeat 100002 {
-        error(1) D0 L0
-        shift_detectors 0
-    }
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let without_even_deterministic =
-        likeliest_error_sat_problem(&dem("error(0.1) D0\nerror(0.1) D0 L0\n")?, 100)?;
-    assert_eq!(
-        likeliest_error_sat_problem(&even_deterministic, 100)?,
-        without_even_deterministic
-    );
-
-    let odd_deterministic = dem("\
-repeat 100001 {
-    repeat 100001 {
-        error(1) D0 L0
-        shift_detectors 0
-    }
-}
-")?;
-    let one_deterministic = likeliest_error_sat_problem(&dem("error(1) D0 L0\n")?, 100)?;
-    assert_eq!(
-        likeliest_error_sat_problem(&odd_deterministic, 100)?,
-        one_deterministic
-    );
-
-    let zero_probability = dem("\
-repeat 100001 {
-    repeat 100001 {
-        error(0) D1000000 L1000
-        shift_detectors 0
-    }
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let expected_zero =
-        likeliest_error_sat_problem(&dem("error(0.1) D0\nerror(0.1) D0 L0\n")?, 100)?;
-    assert_eq!(
-        likeliest_error_sat_problem(&zero_probability, 100)?,
-        expected_zero
-    );
-
-    let no_target = dem("\
-repeat 100001 {
-    repeat 100001 {
-        error(0.1)
-        shift_detectors 0
-    }
-}
-error(0.1) D0
-error(0.1) D0 L0
-")?;
-    let expected_no_target =
-        likeliest_error_sat_problem(&dem("error(0.1)\nerror(0.1) D0\nerror(0.1) D0 L0\n")?, 100)?;
-    assert_eq!(
-        likeliest_error_sat_problem(&no_target, 100)?,
-        expected_no_target
-    );
-
-    let shifted = dem("\
-repeat 100001 {
-    repeat 100001 {
-        error(0.1) D0 L0
-        shift_detectors 1
-    }
-}
-")?;
-    let error = match likeliest_error_sat_problem(&shifted, 100) {
-        Ok(output) => {
-            format!("nested shifted weighted SAT repeats unexpectedly bypassed the cap: {output}")
-        }
-        Err(error) => error.to_string(),
-    };
-    assert!(
-        error.contains("DEM SAT problem generation currently supports repeat counts up to"),
-        "{error}"
+        likeliest_error_sat_problem(&dem("error(1) D0 L0\n")?, 100)?
     );
     Ok(())
 }

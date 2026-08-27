@@ -307,6 +307,24 @@ fn validate_inventory_contracts(
         .iter()
         .map(|group| group.id.to_string())
         .collect::<BTreeSet<_>>();
+    let runtime_correctness_cases = file
+        .groups
+        .iter()
+        .flat_map(|group| group.correctness_case_ids.iter().cloned())
+        .collect::<BTreeSet<_>>();
+    if runtime_correctness_cases != references.correctness_cases {
+        return Err(GroupError::CorrectnessPrerequisiteCoverage {
+            bridge_only: references
+                .correctness_cases
+                .difference(&runtime_correctness_cases)
+                .cloned()
+                .collect(),
+            runtime_only: runtime_correctness_cases
+                .difference(&references.correctness_cases)
+                .cloned()
+                .collect(),
+        });
+    }
     let mut inherited_links = BTreeSet::new();
     let mut public_api_owners = BTreeSet::new();
     let mut checklist_item_owners = BTreeSet::new();
@@ -330,13 +348,6 @@ fn validate_inventory_contracts(
             }
             (RowOrigin::Planned, None) => {}
             _ => return Err(GroupError::InvalidOrigin(group_id)),
-        }
-        if contract
-            .correctness_case_ids
-            .iter()
-            .any(|case| !references.correctness_cases.contains(case))
-        {
-            return Err(GroupError::UnknownCorrectnessCase(group_id));
         }
         validate_public_api_ownership(contract, references, &mut public_api_owners)?;
         validate_checklist_ownership(
@@ -782,8 +793,13 @@ pub(super) enum GroupError {
     InvalidOrigin(String),
     #[error("runtime inherited groups do not exactly cover compact manifest parent links")]
     InheritedCoverage,
-    #[error("runtime group {0} references an unknown correctness case")]
-    UnknownCorrectnessCase(String),
+    #[error(
+        "runtime prerequisites do not exactly match the correctness bridge: bridge-only={bridge_only:?}, runtime-only={runtime_only:?}"
+    )]
+    CorrectnessPrerequisiteCoverage {
+        bridge_only: Vec<String>,
+        runtime_only: Vec<String>,
+    },
     #[error("runtime group {group} references unknown public API item {item}")]
     UnknownPublicApi { group: String, item: String },
     #[error("runtime group {0} has invalid or duplicate public API ownership")]

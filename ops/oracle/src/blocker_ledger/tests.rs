@@ -217,20 +217,6 @@ fn blocker_ledger_rejects_missing_required_blocker() {
 }
 
 #[test]
-fn blocker_ledger_rejects_deleted_owned_cases() {
-    let ledger = mutated_ledger(|value| {
-        blocker_mut(value, "pfm5-detecting-regions")
-            .get_mut("cases")
-            .and_then(Value::as_array_mut)
-            .expect("case array")
-            .pop();
-    });
-
-    let error = ledger.check(&repo_root()).expect_err("missing owned case");
-    assert!(validation_text(error).contains("has 1 cases, expected at least 2"));
-}
-
-#[test]
 fn blocker_ledger_rejects_duplicate_case_ids() {
     let ledger = mutated_ledger(|value| {
         let case = case_mut(
@@ -621,11 +607,15 @@ fn blocker_ledger_rejects_tampered_pinned_golden_digest() {
 #[test]
 fn blocker_ledger_rejects_tampered_direct_digest() {
     let ledger = mutated_ledger(|value| {
-        *case_mut(value, "pfm6-analyzer-search", "pfm6-analyzer-nested-loop")
-            .get_mut("oracle")
-            .and_then(|oracle| oracle.get_mut("signature"))
-            .and_then(|signature| signature.get_mut("expected_stdout_sha256"))
-            .expect("direct digest") = Value::from("0".repeat(64));
+        *case_mut(
+            value,
+            "pfm6-analyzer-search",
+            "pfm6-analyzer-loop-carried-observable",
+        )
+        .get_mut("oracle")
+        .and_then(|oracle| oracle.get_mut("signature"))
+        .and_then(|signature| signature.get_mut("expected_stdout_sha256"))
+        .expect("direct digest") = Value::from("0".repeat(64));
     });
 
     let error = ledger

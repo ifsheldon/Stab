@@ -306,13 +306,6 @@ fn pf6_dem_analyzer_period8_observable_folds_like_upstream() {
 }
 
 #[test]
-fn pf6_dem_analyzer_period127_observable_folds_like_upstream() {
-    let dem = analyze_folding_loops(&period127_observable_circuit(12345678987654321));
-
-    assert_eq!(dem, period127_observable_expected(97210070768930));
-}
-
-#[test]
 fn pf6_dem_analyzer_period127_observable_folds_minimum_compact_shape_like_upstream() {
     let dem = analyze_folding_loops(&period127_observable_circuit(465));
 

@@ -1,6 +1,4 @@
 mod algo;
-#[cfg(test)]
-mod resource_tests;
 
 pub use algo::{
     shortest_graphlike_undetectable_logical_error,

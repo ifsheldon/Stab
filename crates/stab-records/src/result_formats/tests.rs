@@ -140,125 +140,90 @@ fn fallible_reservation_constructor_reserves_and_encodes_like_the_plain_writer()
 }
 
 #[test]
-fn measure_record_reader_loads_all_supported_record_formats() {
-    let expected = [
-        false, false, false, true, true, true, true, true, false, false, false, false, true, true,
-        true, true, true, true,
-    ]
-    .to_vec();
-
-    for (format, input) in [
-        (SampleFormat::ZeroOne, b"000111110000111111\n".as_slice()),
-        (SampleFormat::B8, &[0xF8, 0xF0, 0x03]),
+fn codecs_and_strict_grammars_contract() {
+    let records = vec![
+        vec![true, false, true, false, true, false, true, false, true],
+        vec![false, true, false, true, false, true, false, true, false],
+    ];
+    for (format, expected) in [
+        (SampleFormat::ZeroOne, b"101010101\n010101010\n".as_slice()),
+        (SampleFormat::B8, &[0x55, 0x01, 0xAA, 0x00]),
+        (SampleFormat::R8, &[0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1]),
+        (SampleFormat::Hits, b"0,2,4,6,8\n1,3,5,7\n".as_slice()),
         (
-            SampleFormat::Hits,
-            b"3,4,5,6,7,12,13,14,15,16,17\n".as_slice(),
+            SampleFormat::Dets,
+            b"shot M0 M2 M4 M6 M8\nshot M1 M3 M5 M7\n".as_slice(),
         ),
-        (SampleFormat::R8, &[3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]),
     ] {
+        let encoded = write_records(&records, format);
+        assert_eq!(encoded, expected, "{format:?} byte contract");
         assert_eq!(
-            read_records(input, format, 18).unwrap(),
-            vec![expected.clone()]
+            read_records(&encoded, format, 9).unwrap(),
+            records,
+            "{format:?} decode contract"
         );
     }
 
-    assert!(read_records(&[], SampleFormat::B8, 0).is_err());
-}
-
-#[test]
-fn measure_record_reader_round_trips_writer_output() {
-    let source = [0, 1, 2, 3, 4, 0xFF, 0xBF, 0xFE, 80, 0, 0, 1, 20];
-    let bits = unpack_b8_chunk(&source, source.len() * 8);
-    for format in [
-        SampleFormat::ZeroOne,
-        SampleFormat::B8,
-        SampleFormat::R8,
-        SampleFormat::Hits,
-        SampleFormat::Dets,
-    ] {
-        let encoded = write_records(std::slice::from_ref(&bits), format);
-        let width = if matches!(format, SampleFormat::Hits | SampleFormat::Dets) {
-            bits.len() - 1
-        } else {
-            bits.len()
-        };
-        assert_eq!(
-            read_records(&encoded, format, width).unwrap(),
-            vec![bits[..width].to_vec()]
-        );
-    }
-}
-
-#[test]
-fn ptb64_reader_round_trips_writer_output() {
-    let records = (0..64)
-        .map(|shot_index| {
-            (0..17)
-                .map(|bit_index| (shot_index * 7 + bit_index * 11) % 13 == 0)
-                .collect::<Vec<_>>()
-        })
+    let ptb64_records = (0usize..64)
+        .map(|shot| vec![shot.is_multiple_of(2), shot < 5, shot == 63, false])
         .collect::<Vec<_>>();
-
-    let encoded = write_ptb64_records_checked(&records).unwrap();
-
-    assert_eq!(read_ptb64_records(&encoded, 17, 64).unwrap(), records);
-    assert_eq!(read_ptb64_records_all(&encoded, 17).unwrap(), records);
-    assert_eq!(ptb64_record_count(&encoded, 17).unwrap(), 64);
-}
-
-#[test]
-fn measure_record_reader_handles_multiple_records() {
-    let records = read_records(
-        b"111011001\n010000000\n101100011\n",
-        SampleFormat::ZeroOne,
-        9,
-    )
-    .unwrap();
-    assert_eq!(records.len(), 3);
+    let ptb64 = write_ptb64_records_checked(&ptb64_records).unwrap();
     assert_eq!(
-        read_records(b"shot M0\nshot M1\nshot M0\nshot\n", SampleFormat::Dets, 2).unwrap(),
-        vec![
-            vec![true, false],
-            vec![false, true],
-            vec![true, false],
-            vec![false, false],
+        ptb64,
+        [
+            0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x1F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0x80, 0, 0, 0, 0, 0, 0, 0, 0,
         ]
     );
-    assert_eq!(
-        read_measurement_records(b"shot M0\nshot\n", SampleFormat::Dets, 2).unwrap(),
-        vec![vec![true, false], vec![false, false]]
-    );
-    assert!(read_measurement_records(b"shot D0\n", SampleFormat::Dets, 2).is_err());
-    assert!(read_measurement_records(b"shot L0\n", SampleFormat::Dets, 2).is_err());
-}
+    assert_eq!(read_ptb64_records(&ptb64, 4, 64).unwrap(), ptb64_records);
+    assert_eq!(read_ptb64_records_all(&ptb64, 4).unwrap(), ptb64_records);
+    assert_eq!(ptb64_record_count(&ptb64, 4).unwrap(), 64);
 
-#[test]
-fn measure_record_reader_accepts_stim_windows_newline_text_records() {
     assert_eq!(
-        read_records(b"01\r\n01\r\n", SampleFormat::ZeroOne, 2).unwrap(),
-        vec![vec![false, true], vec![false, true]]
+        read_records(b"01\r\n10\r\n", SampleFormat::ZeroOne, 2).unwrap(),
+        vec![vec![false, true], vec![true, false]]
     );
     assert_eq!(
-        read_records(b"3\r\n1\r\n", SampleFormat::Hits, 4).unwrap(),
-        vec![
-            vec![false, false, false, true],
-            vec![false, true, false, false],
-        ]
+        read_records(b"1,1\r\n2\r\n", SampleFormat::Hits, 3).unwrap(),
+        vec![vec![false, false, false], vec![false, false, true]]
     );
     assert_eq!(
-        read_measurement_records(b"shot M3\r\n\r\n\n   shot M1\r\n\n", SampleFormat::Dets, 4,)
-            .unwrap(),
-        vec![
-            vec![false, false, false, true],
-            vec![false, true, false, false],
-        ]
+        read_measurement_records(b"   shot M1\r\nshot\r\n", SampleFormat::Dets, 2).unwrap(),
+        vec![vec![false, true], vec![false, false]]
     );
-}
+    assert_eq!(
+        read_measurement_records(b"shot M0 M0\n", SampleFormat::Dets, 1).unwrap(),
+        vec![vec![true]],
+        "duplicate DETS tokens set dense bits instead of toggling them"
+    );
 
-#[test]
-fn measure_record_reader_rejects_unterminated_01_records_and_non_bits() {
-    assert!(read_records(b"10", SampleFormat::ZeroOne, 2).is_err());
-    assert!(read_records(&[b'0', 0xFF], SampleFormat::ZeroOne, 2).is_err());
+    for (format, input, width) in [
+        (SampleFormat::ZeroOne, b"10".as_slice(), 2),
+        (SampleFormat::ZeroOne, b"0x\n".as_slice(), 2),
+        (SampleFormat::ZeroOne, b"0\n".as_slice(), 2),
+        (SampleFormat::B8, &[0x01], 9),
+        (SampleFormat::B8, &[], 0),
+        (SampleFormat::R8, &[3], 2),
+        (SampleFormat::Hits, b"1,,2\n".as_slice(), 3),
+        (SampleFormat::Hits, b"1,\n".as_slice(), 3),
+        (SampleFormat::Hits, b",1\n".as_slice(), 3),
+        (SampleFormat::Hits, b"1,2".as_slice(), 3),
+        (SampleFormat::Dets, b"shot  M0\n".as_slice(), 1),
+        (SampleFormat::Dets, b"shot M0 \n".as_slice(), 1),
+        (SampleFormat::Dets, b"shot\tM0\n".as_slice(), 1),
+        (SampleFormat::Dets, b"shot D0\n".as_slice(), 1),
+        (SampleFormat::Dets, b"shot L0\n".as_slice(), 1),
+    ] {
+        assert!(
+            read_records(input, format, width).is_err(),
+            "{format:?} accepted malformed fixture {input:?}"
+        );
+    }
+
+    assert!(write_ptb64_records_checked(&ptb64_records[..63]).is_err());
+    assert!(read_ptb64_records(&ptb64[..31], 4, 64).is_err());
+    assert!(read_ptb64_records_all(&ptb64[..31], 4).is_err());
+    assert!(read_ptb64_records_all(&ptb64, 0).is_err());
 }
 
 #[test]
@@ -334,36 +299,4 @@ fn sparse_shot_matches_upstream_equality_string_and_mask_behavior() {
     wide_mask[1] = true;
     wide_mask[64] = true;
     assert_eq!(SparseShot::new(Vec::new(), wide_mask).obs_mask_as_u64(), 2);
-}
-
-#[test]
-fn ptb64_records_are_measurement_major_over_64_shot_groups() {
-    let mut records = vec![vec![false, false, false, false]; 64];
-    for record in records.iter_mut().take(5) {
-        record[1] = true;
-    }
-    assert_eq!(
-        write_ptb64_records(&records),
-        [
-            0, 0, 0, 0, 0, 0, 0, 0, 0x1F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ]
-    );
-    let encoded = write_ptb64_records_checked(&records).unwrap();
-    assert_eq!(read_ptb64_records(&encoded, 4, 64).unwrap(), records);
-
-    let mut encoded_with_extra_group = encoded.clone();
-    encoded_with_extra_group.extend_from_slice(&encoded);
-    assert_eq!(
-        read_ptb64_records(&encoded_with_extra_group, 4, 64).unwrap(),
-        records
-    );
-    assert!(write_ptb64_records_checked(&records[..63]).is_err());
-    assert!(read_ptb64_records(&encoded[..31], 4, 64).is_err());
-    assert!(read_ptb64_records(&encoded, 0, 64).is_err());
-    assert_eq!(read_ptb64_records_all(&encoded, 4).unwrap(), records);
-    assert!(read_ptb64_records_all(&encoded[..31], 4).is_err());
-    assert!(read_ptb64_records_all(&encoded, 0).is_err());
-    assert!(read_ptb64_records_all(&[], 0).is_err());
-    assert_eq!(ptb64_record_count(&encoded, 4).unwrap(), 64);
 }

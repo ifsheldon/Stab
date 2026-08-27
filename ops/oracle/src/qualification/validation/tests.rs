@@ -1,510 +1,191 @@
+use std::path::Path;
 use std::sync::OnceLock;
 
 use serde_json::{Value, json};
 
 use super::*;
-use crate::qualification::model::{
-    ApiPath, CanonicalOwnerException, CaseId, DeferredProduct, PropertyExecutionMode,
-    SemanticDigest,
-};
+use crate::qualification::model::{DeferredProduct, EvidenceProvenance, SemanticDigest};
 
 static REPOSITORY_MANIFEST: OnceLock<QualificationManifest> = OnceLock::new();
 
 #[test]
-fn repository_manifest_passes_structural_validation() {
+fn repository_bridge_passes_structural_validation() {
     let manifest = repository_manifest();
     validate(&manifest, super::super::EXPECTED_FROZEN_DIGEST)
-        .expect("repository manifest must validate");
+        .expect("repository bridge must validate");
+    assert_eq!(manifest.evidence_cases.len(), 48);
+    assert!(manifest.upstream_cases.is_empty());
+    assert!(manifest.public_api_items.is_empty());
+    assert!(manifest.public_api_aliases.is_empty());
+    assert!(manifest.canonical_owner_exceptions.is_empty());
 }
 
 #[test]
-fn validation_requires_exact_deferred_evidence_product_ownership() {
-    let mut non_deferred = repository_manifest();
-    non_deferred
+fn bridge_rejects_non_prerequisite_qualification_state() {
+    let mut manifest = repository_manifest();
+    let case = manifest
         .evidence_cases
         .first_mut()
-        .expect("first evidence case")
-        .deferred_product = Some(DeferredProduct::Diagrams);
-    refresh_digest(&mut non_deferred);
-    let error = validate(&non_deferred, "UNFROZEN")
-        .expect_err("non-deferred evidence cannot name a deferred product");
-    assert!(error.to_string().contains("non-deferred evidence case"));
+        .expect("benchmark prerequisite");
+    case.provenance = EvidenceProvenance::OracleFixture;
+    case.supporting_selectors
+        .push(case.primary_selector.clone());
+    refresh_digest(&mut manifest);
 
-    let mut deferred = repository_manifest();
-    let case = deferred
-        .evidence_cases
-        .first_mut()
-        .expect("first evidence case");
-    case.status = EvidenceStatus::Deferred;
-    case.primary_selector.state = EvidenceState::NotApplicable;
-    case.execution = super::super::execution_contract::for_status(EvidenceStatus::Deferred);
-    case.deferred_product = None;
-    refresh_digest(&mut deferred);
-    let error = validate(&deferred, "UNFROZEN")
-        .expect_err("deferred evidence must name its deferred product");
+    let error = validate(&manifest, "UNFROZEN").expect_err("semantic ownership must fail");
     assert!(
         error
             .to_string()
-            .contains("does not name its deferred product")
+            .contains("non-prerequisite qualification state")
     );
 }
 
 #[test]
-fn validation_rejects_shared_primary_selectors() {
-    let mut manifest = repository_manifest();
-    let selector = manifest
+fn bridge_rejects_shared_primary_selectors_and_duplicate_ids() {
+    let mut shared = repository_manifest();
+    let selector = shared
         .evidence_cases
         .first()
-        .expect("first evidence case")
+        .expect("first benchmark prerequisite")
         .primary_selector
         .clone();
-    manifest
+    shared
         .evidence_cases
         .get_mut(1)
-        .expect("second evidence case")
+        .expect("second benchmark prerequisite")
         .primary_selector = selector;
-    refresh_digest(&mut manifest);
-    let error = validate(&manifest, "UNFROZEN").expect_err("shared selector must fail");
+    refresh_digest(&mut shared);
+    let error = validate(&shared, "UNFROZEN").expect_err("shared selector must fail");
     assert!(error.to_string().contains("share primary selector"));
-}
 
-#[test]
-fn validation_rejects_duplicate_ids() {
-    let mut manifest = repository_manifest();
-    let id = manifest
+    let mut duplicate = repository_manifest();
+    let duplicate_id = duplicate
         .evidence_cases
         .first()
-        .expect("first evidence case")
+        .expect("first benchmark prerequisite")
         .id
         .clone();
-    manifest.evidence_cases.get_mut(1).expect("second case").id = id;
-    refresh_digest(&mut manifest);
-    let error = validate(&manifest, "UNFROZEN").expect_err("duplicate id must fail");
+    duplicate
+        .evidence_cases
+        .get_mut(1)
+        .expect("second benchmark prerequisite")
+        .id = duplicate_id;
+    refresh_digest(&mut duplicate);
+    let error = validate(&duplicate, "UNFROZEN").expect_err("duplicate id must fail");
     assert!(error.to_string().contains("duplicate evidence case id"));
 }
 
 #[test]
-fn validation_rejects_duplicate_upstream_anchors() {
+fn bridge_rejects_deferred_or_named_product_state() {
     let mut manifest = repository_manifest();
-    let first = manifest
-        .upstream_cases
-        .first()
-        .expect("first upstream case")
-        .clone();
-    let second = manifest
-        .upstream_cases
-        .get_mut(1)
-        .expect("second upstream case");
-    second.path = first.path;
-    second.symbol = first.symbol;
-    second.subcase = first.subcase;
-    refresh_digest(&mut manifest);
-    let error =
-        validate(&manifest, "UNFROZEN").expect_err("duplicate upstream source anchor must fail");
-    assert!(error.to_string().contains("duplicate upstream source case"));
-}
-
-#[test]
-fn validation_rejects_unsafe_upstream_path() {
-    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    let path = value
-        .get_mut("upstream_cases")
-        .and_then(Value::as_array_mut)
-        .and_then(|cases| cases.first_mut())
-        .and_then(Value::as_object_mut)
-        .and_then(|case| case.get_mut("path"))
-        .expect("upstream path");
-    *path = json!("../escape.test.cc");
-    let error = serde_json::from_value::<QualificationManifest>(value)
-        .expect_err("unsafe path must fail during deserialization");
-    assert!(error.to_string().contains("source path must be"));
-}
-
-#[test]
-fn validation_rejects_stale_public_api_owner() {
-    let mut manifest = repository_manifest();
-    manifest
-        .public_api_items
-        .first_mut()
-        .expect("public API item")
-        .owner_case_id = CaseId::try_new("missing-owner".to_string()).expect("valid test id");
-    refresh_digest(&mut manifest);
-    let error = validate(&manifest, "UNFROZEN").expect_err("stale owner must fail");
-    assert!(error.to_string().contains("references missing owner"));
-}
-
-#[test]
-fn validation_enforces_every_canonical_package_and_narrow_exceptions() {
-    const PACKAGES: [(&str, &str); 6] = [
-        ("stab_bits", "stab-bits"),
-        ("stab_records", "stab-records"),
-        ("stab_algebra", "stab-algebra"),
-        ("stab_model", "stab-model"),
-        ("stab_analysis", "stab-analysis"),
-        ("stab_engine", "stab-engine"),
-    ];
-
-    for (crate_name, expected_package) in PACKAGES {
-        let mut manifest = repository_manifest();
-        let owner_id = manifest
-            .public_api_items
-            .iter()
-            .filter(|item| item.crate_name == crate_name)
-            .find_map(|item| {
-                let owner = manifest
-                    .evidence_cases
-                    .iter()
-                    .find(|case| case.id == item.owner_case_id)?;
-                (owner.status == EvidenceStatus::Implemented
-                    && owner.primary_selector.value.get(3).map(String::as_str)
-                        == Some(expected_package)
-                    && !manifest.canonical_owner_exceptions.iter().any(|exception| {
-                        exception.crate_name == crate_name
-                            && exception.owner_source_id == owner.source_id
-                    }))
-                .then(|| owner.id.clone())
-            })
-            .expect("each canonical package has direct implemented evidence");
-        let owner = manifest
-            .evidence_cases
-            .iter_mut()
-            .find(|case| case.id == owner_id)
-            .expect("selected owner remains present");
-        *owner
-            .primary_selector
-            .value
-            .get_mut(3)
-            .expect("Cargo selector has a package") = "stab-core".to_string();
-        refresh_digest(&mut manifest);
-        let error = validate(&manifest, "UNFROZEN")
-            .expect_err("facade evidence cannot replace a canonical package selector");
-        assert!(
-            error.to_string().contains(expected_package),
-            "{crate_name} did not report its expected package: {error}"
-        );
-    }
-
-    let mut allowed = repository_manifest();
-    let (owner_id, owner_source_id) = allowed
-        .public_api_items
-        .iter()
-        .filter(|item| item.crate_name == "stab_model")
-        .find_map(|item| {
-            let owner = allowed
-                .evidence_cases
-                .iter()
-                .find(|case| case.id == item.owner_case_id)?;
-            (owner.status == EvidenceStatus::Implemented
-                && owner.primary_selector.value.get(3).map(String::as_str) == Some("stab-model")
-                && !allowed.canonical_owner_exceptions.iter().any(|exception| {
-                    exception.crate_name == "stab_model"
-                        && exception.owner_source_id == owner.source_id
-                }))
-            .then(|| (owner.id.clone(), owner.source_id.to_string()))
-        })
-        .expect("model package has unexcepted direct evidence");
-    let owner = allowed
+    let case = manifest
         .evidence_cases
-        .iter_mut()
-        .find(|case| case.id == owner_id)
-        .expect("selected owner remains present");
-    *owner
-        .primary_selector
-        .value
-        .get_mut(3)
-        .expect("Cargo selector has a package") = "stab-core".to_string();
-    allowed
-        .canonical_owner_exceptions
-        .push(CanonicalOwnerException {
-            crate_name: "stab_model".to_string(),
-            owner_source_id,
-            evidence_package: "stab-core".to_string(),
-            reason:
-                "The test fixture deliberately exercises a reviewed cross-component facade adapter."
-                    .to_string(),
-        });
-    allowed.canonical_owner_exceptions.sort();
-    refresh_digest(&mut allowed);
-    validate(&allowed, "UNFROZEN").expect("an exact source-owned exception is admitted");
-
-    let mut stale = repository_manifest();
-    stale
-        .canonical_owner_exceptions
-        .push(CanonicalOwnerException {
-        crate_name: "stab_model".to_string(),
-        owner_source_id: "unused-owner".to_string(),
-        evidence_package: "stab-core".to_string(),
-        reason:
-            "A stale exception must not survive merely because its prose is sufficiently detailed."
-                .to_string(),
-    });
-    stale.canonical_owner_exceptions.sort();
-    refresh_digest(&mut stale);
-    let error = validate(&stale, "UNFROZEN").expect_err("unused exception must fail");
-    assert!(error.to_string().contains("stale or owns no implemented"));
-}
-
-#[test]
-fn validation_requires_exact_public_api_alias_ownership() {
-    let mut missing = repository_manifest();
-    let removed_index =
-        missing
-            .public_api_aliases
-            .iter()
-            .position(|alias| {
-                let Some(item) = missing.public_api_items.iter().find(|item| {
-                    item.crate_name == alias.crate_name && item.path == alias.alias_path
-                }) else {
-                    return false;
-                };
-                missing.evidence_cases.iter().any(|case| {
-                    case.id == item.owner_case_id
-                        && case.provenance == EvidenceProvenance::PublicRustApi
-                        && api_path_is_owned_by(&case.source_id, alias.canonical_path.as_str())
-                        && !api_path_is_owned_by(&case.source_id, alias.alias_path.as_str())
-                })
-            })
-            .expect("repository alias required for exact public API ownership");
-    let removed = missing
-        .public_api_aliases
-        .get(removed_index)
-        .expect("selected repository alias")
-        .alias_path
-        .clone();
-    missing.public_api_aliases.remove(removed_index);
-    refresh_digest(&mut missing);
-    let error = validate(&missing, "UNFROZEN").expect_err("missing alias must fail");
-    assert!(error.to_string().contains(removed.as_str()), "{error}");
-
-    let mut self_referential = repository_manifest();
-    let alias = self_referential
-        .public_api_aliases
         .first_mut()
-        .expect("repository alias");
-    alias.canonical_crate_name = None;
-    alias.canonical_path = alias.alias_path.clone();
-    refresh_digest(&mut self_referential);
-    let error =
-        validate(&self_referential, "UNFROZEN").expect_err("self-referential alias must fail");
-    assert!(error.to_string().contains("self-referential"), "{error}");
-}
-
-#[test]
-fn validation_requires_declared_cross_crate_reexport_ownership() {
-    let mut manifest = repository_manifest();
-    let alias_index = manifest
-        .public_api_aliases
-        .iter()
-        .position(|alias| {
-            alias.crate_name == "stab_core"
-                && alias.alias_path.as_str() == "stab_core::PauliString"
-                && alias.canonical_crate_name() == "stab_algebra"
-                && alias.canonical_path.as_str() == "stab_algebra::PauliString"
-        })
-        .expect("algebra facade alias");
-    manifest.public_api_aliases.remove(alias_index);
+        .expect("benchmark prerequisite");
+    case.status = EvidenceStatus::Deferred;
+    case.primary_selector.state = EvidenceState::NotApplicable;
+    case.execution = super::super::execution_contract::for_status(EvidenceStatus::Deferred);
+    case.deferred_product = None;
     refresh_digest(&mut manifest);
 
-    let error =
-        validate(&manifest, "UNFROZEN").expect_err("undeclared cross-crate ownership must fail");
-    assert!(
-        error.to_string().contains("stab_core::PauliString"),
-        "{error}"
-    );
-}
-
-#[test]
-fn validation_rejects_wrong_cross_crate_reexport_target() {
-    let mut manifest = repository_manifest();
-    let alias = manifest
-        .public_api_aliases
-        .iter_mut()
-        .find(|alias| {
-            alias.crate_name == "stab_core" && alias.alias_path.as_str() == "stab_core::PauliString"
-        })
-        .expect("algebra facade alias");
-    alias.canonical_crate_name = Some("stab_records".to_string());
-    refresh_digest(&mut manifest);
-
-    let error = validate(&manifest, "UNFROZEN").expect_err("wrong dependency owner must fail");
-    assert!(
-        error.to_string().contains("resolves no mapped API items"),
-        "{error}"
-    );
-}
-
-#[test]
-fn parent_public_api_alias_cannot_authorize_an_undeclared_child_owner() {
-    let mut manifest = repository_manifest();
-    let (child_index, parent_index) = manifest
-        .public_api_aliases
-        .iter()
-        .enumerate()
-        .find_map(|(child_index, child)| {
-            manifest
-                .public_api_aliases
-                .iter()
-                .enumerate()
-                .find(|(_, parent)| {
-                    child.crate_name == parent.crate_name
-                        && child
-                            .alias_path
-                            .as_str()
-                            .strip_prefix(parent.alias_path.as_str())
-                            .is_some_and(|suffix| suffix.starts_with("::"))
-                })
-                .map(|(parent_index, _)| (child_index, parent_index))
-        })
-        .expect("repository parent and child aliases");
-    let child = manifest
-        .public_api_aliases
-        .get(child_index)
-        .expect("selected child alias")
-        .clone();
-    let parent = manifest
-        .public_api_aliases
-        .get(parent_index)
-        .expect("selected parent alias")
-        .clone();
-    let parent_owner = manifest
-        .public_api_items
-        .iter()
-        .find(|item| item.crate_name == parent.crate_name && item.path == parent.alias_path)
-        .expect("parent alias item")
-        .owner_case_id
-        .clone();
-    let mut alias_owner = manifest
-        .evidence_cases
-        .iter()
-        .find(|case| case.id == parent_owner)
-        .expect("parent semantic owner")
-        .clone();
-    alias_owner.id =
-        CaseId::try_new("cq-evidence-api-test-parent-alias".to_string()).expect("valid test id");
-    alias_owner.provenance = EvidenceProvenance::PublicRustApi;
-    alias_owner.source_id = parent.canonical_path.to_string();
-    let alias_owner_id = alias_owner.id.clone();
-    manifest.evidence_cases.push(alias_owner);
-    manifest
-        .public_api_items
-        .iter_mut()
-        .find(|item| item.crate_name == parent.crate_name && item.path == parent.alias_path)
-        .expect("parent alias item")
-        .owner_case_id = alias_owner_id.clone();
-    manifest
-        .public_api_items
-        .iter_mut()
-        .find(|item| item.crate_name == child.crate_name && item.path == child.alias_path)
-        .expect("child alias item")
-        .owner_case_id = alias_owner_id;
-    manifest.public_api_aliases.remove(child_index);
-    refresh_digest(&mut manifest);
-
-    let error =
-        validate(&manifest, "UNFROZEN").expect_err("undeclared child alias ownership must fail");
-    assert!(
-        error.to_string().contains(child.alias_path.as_str()),
-        "{error}"
-    );
-}
-
-#[test]
-fn public_api_ownership_is_component_delimited() {
-    assert!(api_path_is_owned_by(
-        "stab_core::Foo",
-        "stab_core::Foo::new"
-    ));
-    assert!(api_path_is_owned_by(
-        "stab_core::Foo",
-        "stab_core::Foo as Clone for@0123456789ab"
-    ));
-    assert!(!api_path_is_owned_by("stab_core::Foo", "stab_core::Foobar"));
-}
-
-#[test]
-fn validation_rejects_evidence_only_public_api_leak() {
-    let mut manifest = repository_manifest();
-    let item = manifest
-        .public_api_items
-        .first_mut()
-        .expect("public API item");
-    item.path =
-        ApiPath::try_new(format!("{}::__ops_contract", item.path)).expect("valid test API path");
-    refresh_digest(&mut manifest);
-    let error = validate(&manifest, "UNFROZEN").expect_err("API leak must fail");
-    assert!(error.to_string().contains("evidence-only export"));
-}
-
-#[test]
-fn manifest_schema_denies_unknown_fields() {
-    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    value
-        .as_object_mut()
-        .expect("manifest object")
-        .insert("unexpected".to_string(), json!(true));
-    let error = serde_json::from_value::<QualificationManifest>(value)
-        .expect_err("unknown field must fail");
-    assert!(error.to_string().contains("unknown field"));
-}
-
-#[test]
-fn manifest_schema_rejects_missing_required_fields() {
-    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    value
-        .as_object_mut()
-        .expect("manifest object")
-        .remove("upstream_cases");
-    let error = serde_json::from_value::<QualificationManifest>(value)
-        .expect_err("missing required field must fail");
-    assert!(error.to_string().contains("missing field `upstream_cases`"));
-
-    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    value
-        .as_object_mut()
-        .expect("manifest object")
-        .remove("public_api_aliases");
-    let error = serde_json::from_value::<QualificationManifest>(value)
-        .expect_err("missing aliases must fail");
+    let error = validate(&manifest, "UNFROZEN").expect_err("deferral must fail");
     assert!(
         error
             .to_string()
-            .contains("missing field `public_api_aliases`")
+            .contains("non-prerequisite qualification state")
+    );
+
+    let mut manifest = repository_manifest();
+    manifest
+        .evidence_cases
+        .first_mut()
+        .expect("benchmark prerequisite")
+        .deferred_product = Some(DeferredProduct::Diagrams);
+    refresh_digest(&mut manifest);
+    let error = validate(&manifest, "UNFROZEN").expect_err("spurious deferral must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("non-prerequisite qualification state")
     );
 }
 
 #[test]
-fn manifest_schema_rejects_unknown_upstream_disposition() {
-    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    let disposition = value
-        .get_mut("upstream_cases")
-        .and_then(Value::as_array_mut)
-        .and_then(|cases| cases.first_mut())
-        .and_then(Value::as_object_mut)
-        .and_then(|case| case.get_mut("disposition"))
-        .expect("upstream disposition");
-    *disposition = json!("invented-disposition");
-    let error = serde_json::from_value::<QualificationManifest>(value)
-        .expect_err("unknown disposition must fail");
-    assert!(error.to_string().contains("unknown variant"));
-}
-
-#[test]
-fn validation_rejects_deferred_case_without_named_product() {
+fn bridge_rejects_stale_execution_bounds() {
     let mut manifest = repository_manifest();
     let case = manifest
-        .upstream_cases
-        .iter_mut()
-        .find(|case| case.disposition == UpstreamDisposition::DeferredProduct)
-        .expect("deferred upstream case");
-    case.deferred_product = None;
+        .evidence_cases
+        .first_mut()
+        .expect("benchmark prerequisite");
+    case.execution
+        .tiers
+        .push(super::super::model::ExecutionTier::Pr);
+    case.execution.timeout_ms = 0;
+    case.execution.stdout_limit_bytes = crate::process::OUTPUT_LIMIT_BYTES + 1;
+    case.execution.artifact_limit_bytes = 1;
     refresh_digest(&mut manifest);
-    let error =
-        validate(&manifest, "UNFROZEN").expect_err("deferred case without product must fail");
-    assert!(error.to_string().contains("does not name its product"));
+
+    let error = validate(&manifest, "UNFROZEN").expect_err("stale execution must fail");
+    let message = error.to_string();
+    assert!(message.contains("repeats an execution tier"));
+    assert!(message.contains("timeout is outside"));
+    assert!(message.contains("stdout limit"));
+    assert!(message.contains("cannot retain bounded stdout and stderr"));
 }
 
 #[test]
-fn manifest_schema_rejects_invalid_typed_ids_and_api_paths() {
+fn bridge_rejects_behavioral_and_resource_overclaims() {
+    let mut surface = repository_manifest();
+    surface
+        .evidence_cases
+        .first_mut()
+        .expect("benchmark prerequisite")
+        .behavioral_surface = BehavioralSurface::Cli;
+    refresh_digest(&mut surface);
+    let error = validate(&surface, "UNFROZEN").expect_err("wrong surface must fail");
+    assert!(error.to_string().contains("behavioral surface"));
+
+    let mut resource = repository_manifest();
+    let case = resource
+        .evidence_cases
+        .iter_mut()
+        .find(|case| {
+            case.resource_contract.kind == super::super::model::ResourceKind::NotApplicable
+        })
+        .expect("semantic-only prerequisite");
+    case.negative_axes.push("unowned-overflow".to_string());
+    refresh_digest(&mut resource);
+    let error = validate(&resource, "UNFROZEN").expect_err("resource overclaim must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("negative axes without a resource contract")
+    );
+}
+
+#[test]
+fn manifest_schema_denies_unknown_and_missing_fields() {
+    let mut unknown = serde_json::to_value(repository_manifest()).expect("serialize manifest");
+    unknown
+        .as_object_mut()
+        .expect("manifest object")
+        .insert("unexpected".to_string(), json!(true));
+    let error = serde_json::from_value::<QualificationManifest>(unknown)
+        .expect_err("unknown field must fail");
+    assert!(error.to_string().contains("unknown field"));
+
+    let mut missing = serde_json::to_value(repository_manifest()).expect("serialize manifest");
+    missing
+        .as_object_mut()
+        .expect("manifest object")
+        .remove("evidence_cases");
+    let error = serde_json::from_value::<QualificationManifest>(missing)
+        .expect_err("missing field must fail");
+    assert!(error.to_string().contains("missing field `evidence_cases`"));
+}
+
+#[test]
+fn manifest_schema_rejects_invalid_typed_ids_and_features() {
     let mut invalid_id = serde_json::to_value(repository_manifest()).expect("serialize manifest");
     *invalid_id
         .get_mut("evidence_cases")
@@ -514,20 +195,21 @@ fn manifest_schema_rejects_invalid_typed_ids_and_api_paths() {
         .and_then(|case| case.get_mut("id"))
         .expect("evidence id") = json!("Not Valid");
     let error = serde_json::from_value::<QualificationManifest>(invalid_id)
-        .expect_err("invalid typed case id must fail");
+        .expect_err("invalid case id must fail");
     assert!(error.to_string().contains("lowercase kebab-case"));
 
-    let mut invalid_path = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    *invalid_path
-        .get_mut("public_api_items")
+    let mut invalid_feature =
+        serde_json::to_value(repository_manifest()).expect("serialize manifest");
+    *invalid_feature
+        .get_mut("features")
         .and_then(Value::as_array_mut)
-        .and_then(|items| items.first_mut())
+        .and_then(|features| features.first_mut())
         .and_then(Value::as_object_mut)
-        .and_then(|item| item.get_mut("path"))
-        .expect("public API path") = json!("");
-    let error = serde_json::from_value::<QualificationManifest>(invalid_path)
-        .expect_err("invalid typed API path must fail");
-    assert!(error.to_string().contains("API path must be nonempty"));
+        .and_then(|feature| feature.get_mut("id"))
+        .expect("feature id") = json!("CQ-UNKNOWN");
+    let error = serde_json::from_value::<QualificationManifest>(invalid_feature)
+        .expect_err("unknown feature must fail");
+    assert!(error.to_string().contains("unknown variant"));
 }
 
 #[test]
@@ -537,34 +219,38 @@ fn manifest_schema_rejects_oversized_sequences_and_invalid_digest_shape() {
         .get_mut("features")
         .and_then(Value::as_array_mut)
         .expect("feature rows");
-    let first_feature = features.first().expect("feature row").clone();
-    features.push(first_feature);
+    features.push(features.first().expect("feature row").clone());
     let error = serde_json::from_value::<QualificationManifest>(oversized)
-        .expect_err("oversized bounded sequence must fail during deserialization");
+        .expect_err("oversized sequence must fail");
     assert!(error.to_string().contains("more than 16 entries"));
 
     let mut bad_digest = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    *bad_digest
-        .get_mut("semantic_digest")
-        .expect("semantic digest") = json!("A".repeat(64));
+    *bad_digest.get_mut("semantic_digest").expect("digest") = json!("A".repeat(64));
     let error = serde_json::from_value::<QualificationManifest>(bad_digest)
-        .expect_err("uppercase digest must fail during deserialization");
+        .expect_err("uppercase digest must fail");
     assert!(error.to_string().contains("lowercase hexadecimal"));
 }
 
 #[test]
-fn manifest_schema_rejects_oversized_text() {
-    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    *value
-        .get_mut("upstream_cases")
-        .and_then(Value::as_array_mut)
-        .and_then(|cases| cases.first_mut())
-        .and_then(Value::as_object_mut)
-        .and_then(|case| case.get_mut("reason"))
-        .expect("upstream reason") = json!("x".repeat(2_049));
-    let error = serde_json::from_value::<QualificationManifest>(value)
-        .expect_err("oversized bounded text must fail during deserialization");
-    assert!(error.to_string().contains("2048-byte"));
+fn bridge_rejects_oversized_text_and_semantic_digest_drift() {
+    let mut oversized = repository_manifest();
+    oversized
+        .evidence_cases
+        .first_mut()
+        .expect("benchmark prerequisite")
+        .source_id = "x".repeat(MAX_TEXT_BYTES + 1);
+    refresh_digest(&mut oversized);
+    let error = validate(&oversized, "UNFROZEN").expect_err("oversized text must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("evidence source id is 2049 bytes")
+    );
+
+    let mut stale = repository_manifest();
+    stale.semantic_digest = SemanticDigest::ZERO;
+    let error = validate(&stale, "UNFROZEN").expect_err("digest drift must fail");
+    assert!(error.to_string().contains("computed"));
 }
 
 #[test]
@@ -576,195 +262,6 @@ fn validation_issue_rendering_is_bounded() {
     let rendered = issues.render();
     assert_eq!(rendered.lines().count(), MAX_VALIDATION_ISSUES + 1);
     assert!(rendered.ends_with("44 additional validation issues omitted"));
-}
-
-#[test]
-fn validation_requires_owned_statistical_plans() {
-    let mut manifest = repository_manifest();
-    let case = manifest
-        .evidence_cases
-        .iter_mut()
-        .find(|case| case.comparator == Comparator::Statistical)
-        .expect("statistical evidence case");
-    case.statistical_plan = None;
-    refresh_digest(&mut manifest);
-    let error =
-        validate(&manifest, "UNFROZEN").expect_err("statistical case without plan must fail");
-    assert!(error.to_string().contains("has no statistical plan owner"));
-}
-
-#[test]
-fn validation_requires_typed_property_plans_and_matching_execution_modes() {
-    let mut missing = repository_manifest();
-    let case = implemented_property_case(&mut missing);
-    case.property_plan = None;
-    refresh_digest(&mut missing);
-    let error = validate(&missing, "UNFROZEN")
-        .expect_err("implemented property case without a plan must fail");
-    assert!(error.to_string().contains("has no property plan"));
-
-    let mut wrong_mode = repository_manifest();
-    let case = implemented_property_case(&mut wrong_mode);
-    case.property_plan
-        .as_mut()
-        .and_then(|reference| reference.plan.as_mut())
-        .expect("executable property plan")
-        .execution_mode = PropertyExecutionMode::QualificationWorkerSubprocess;
-    refresh_digest(&mut wrong_mode);
-    let error = validate(&wrong_mode, "UNFROZEN")
-        .expect_err("static property corpus assigned to worker mode must fail");
-    assert!(
-        error
-            .to_string()
-            .contains("static corpus plan is incomplete")
-    );
-}
-
-#[test]
-fn validation_rejects_stale_execution_tiers_and_limits() {
-    let mut manifest = repository_manifest();
-    let case = manifest
-        .evidence_cases
-        .iter_mut()
-        .find(|case| case.status == EvidenceStatus::Implemented)
-        .expect("implemented evidence case");
-    case.execution
-        .tiers
-        .push(super::super::model::ExecutionTier::Pr);
-    case.execution.timeout_ms = 0;
-    case.execution.stdout_limit_bytes = crate::process::OUTPUT_LIMIT_BYTES + 1;
-    case.execution.artifact_limit_bytes = 1;
-    refresh_digest(&mut manifest);
-
-    let error = validate(&manifest, "UNFROZEN").expect_err("stale execution contract must fail");
-    let message = error.to_string();
-    assert!(message.contains("repeats an execution tier"));
-    assert!(message.contains("timeout is outside"));
-    assert!(message.contains("stdout limit"));
-    assert!(message.contains("cannot retain bounded stdout and stderr"));
-}
-
-#[test]
-fn validation_requires_the_complete_resource_case_inventory() {
-    let mut manifest = repository_manifest();
-    let index = manifest
-        .evidence_cases
-        .iter()
-        .position(|case| case.source_id == "resource-streaming-writer-failure")
-        .expect("planned resource case");
-    manifest.evidence_cases.remove(index);
-    refresh_digest(&mut manifest);
-    let error =
-        validate(&manifest, "UNFROZEN").expect_err("missing resource boundary family must fail");
-    assert!(
-        error
-            .to_string()
-            .contains("CQ-RESOURCE source-owned case inventory")
-    );
-}
-
-#[test]
-fn validation_rejects_behavioral_surface_and_resource_overclaims() {
-    let mut manifest = repository_manifest();
-    let case = manifest
-        .evidence_cases
-        .iter_mut()
-        .find(|case| case.provenance == EvidenceProvenance::PublicRustApi)
-        .expect("public API evidence case");
-    case.behavioral_surface = BehavioralSurface::Engine;
-    case.negative_axes.push("unowned-overflow".to_string());
-    refresh_digest(&mut manifest);
-    let error =
-        validate(&manifest, "UNFROZEN").expect_err("surface and resource overclaims must fail");
-    let message = error.to_string();
-    assert!(message.contains("behavioral surface"));
-    assert!(message.contains("negative axes without a resource contract"));
-}
-
-#[test]
-fn manifest_schema_rejects_unknown_feature_id() {
-    let mut value = serde_json::to_value(repository_manifest()).expect("serialize manifest");
-    let feature_id = value
-        .get_mut("features")
-        .and_then(Value::as_array_mut)
-        .and_then(|features| features.first_mut())
-        .and_then(Value::as_object_mut)
-        .and_then(|feature| feature.get_mut("id"))
-        .expect("feature id");
-    *feature_id = json!("CQ-UNKNOWN");
-    let error = serde_json::from_value::<QualificationManifest>(value)
-        .expect_err("unknown feature must fail");
-    assert!(error.to_string().contains("unknown variant"));
-}
-
-#[test]
-fn validation_rejects_duplicate_public_api_paths() {
-    let mut manifest = repository_manifest();
-    let first = manifest
-        .public_api_items
-        .first()
-        .expect("first public API item")
-        .clone();
-    let second = manifest
-        .public_api_items
-        .get_mut(1)
-        .expect("second public API item");
-    second.crate_name = first.crate_name;
-    second.path = first.path;
-    second.kind = first.kind;
-    refresh_digest(&mut manifest);
-    let error = validate(&manifest, "UNFROZEN").expect_err("duplicate API path must fail");
-    assert!(error.to_string().contains("duplicate public API path"));
-}
-
-#[test]
-fn validation_rejects_stale_upstream_owner() {
-    let mut manifest = repository_manifest();
-    let upstream = manifest
-        .upstream_cases
-        .iter_mut()
-        .find(|case| !case.ownerships.is_empty())
-        .expect("owned upstream case");
-    upstream
-        .ownerships
-        .first_mut()
-        .expect("upstream ownership")
-        .owner_case_id = CaseId::try_new("missing-owner".to_string()).expect("valid test id");
-    refresh_digest(&mut manifest);
-    let error = validate(&manifest, "UNFROZEN").expect_err("stale owner must fail");
-    assert!(error.to_string().contains("references missing owner"));
-}
-
-#[test]
-fn validation_rejects_feature_without_closed_primary_case() {
-    let mut manifest = repository_manifest();
-    for case in &mut manifest.evidence_cases {
-        if case.feature_id == FeatureId::StimFormat
-            && matches!(
-                case.status,
-                EvidenceStatus::Implemented | EvidenceStatus::EvidenceClose
-            )
-        {
-            case.status = EvidenceStatus::Planned;
-            case.primary_selector.state = EvidenceState::Planned;
-        }
-    }
-    refresh_digest(&mut manifest);
-    let error = validate(&manifest, "UNFROZEN")
-        .expect_err("feature without closed primary evidence must fail");
-    assert!(
-        error
-            .to_string()
-            .contains("CQ-STIM-FORMAT has no implemented or evidence-close primary case")
-    );
-}
-
-#[test]
-fn validation_rejects_semantic_digest_drift() {
-    let mut manifest = repository_manifest();
-    manifest.semantic_digest = SemanticDigest::ZERO;
-    let error = validate(&manifest, "UNFROZEN").expect_err("digest drift must fail");
-    assert!(error.to_string().contains("computed"));
 }
 
 fn repository_manifest() -> QualificationManifest {
@@ -779,16 +276,6 @@ fn repository_manifest() -> QualificationManifest {
             serde_json::from_slice(&bytes).expect("parse repository qualification manifest")
         })
         .clone()
-}
-
-fn implemented_property_case(manifest: &mut QualificationManifest) -> &mut EvidenceCase {
-    manifest
-        .evidence_cases
-        .iter_mut()
-        .find(|case| {
-            case.comparator == Comparator::Property && case.status == EvidenceStatus::Implemented
-        })
-        .expect("implemented property case")
 }
 
 fn refresh_digest(manifest: &mut QualificationManifest) {

@@ -5,10 +5,19 @@
 
 use std::str::FromStr;
 
-use stab_algebra::{Flow, PauliString};
+use stab_algebra::{Flow, PauliString, StabilizerError};
 
 #[test]
-fn stabilizers_flow_from_str_canonicalizes_duplicate_terms() {
+fn flows_preserve_values_text_multiplication_and_typed_failures() {
+    flow_from_str_canonicalizes_duplicate_terms();
+    flow_from_str_matches_stim_examples();
+    flow_observable_terms_match_stim();
+    flow_display_and_sparse_round_trip_match_stim();
+    flow_ordering_matches_stim_examples();
+    flow_multiplication_matches_stim_examples();
+}
+
+fn flow_from_str_canonicalizes_duplicate_terms() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/flow.test.cc.
     assert_eq!(
         flow(
@@ -18,8 +27,7 @@ fn stabilizers_flow_from_str_canonicalizes_duplicate_terms() {
     );
 }
 
-#[test]
-fn stabilizers_flow_from_str_matches_stim_examples() {
+fn flow_from_str_matches_stim_examples() {
     for text in [
         "",
         "X",
@@ -40,8 +48,19 @@ fn stabilizers_flow_from_str_matches_stim_examples() {
         "X -> obs[ 5]",
         "X -> rec[]",
     ] {
-        assert!(Flow::from_str(text).is_err(), "{text:?}");
+        assert_eq!(
+            Flow::from_str(text),
+            Err(StabilizerError::InvalidFlowText {
+                text: text.to_owned(),
+            }),
+            "{text:?}"
+        );
     }
+
+    assert_eq!(
+        Flow::from_str("iX -> X"),
+        Err(StabilizerError::AntiHermitianFlow)
+    );
 
     assert_eq!(flow("1 -> 1"), new_flow(pauli(""), pauli(""), [], []));
     assert_eq!(
@@ -87,8 +106,7 @@ fn stabilizers_flow_from_str_matches_stim_examples() {
     );
 }
 
-#[test]
-fn stabilizers_flow_observable_terms_match_stim() {
+fn flow_observable_terms_match_stim() {
     assert_eq!(
         flow("X9 -> obs[5]"),
         new_flow(pauli("_________X"), pauli(""), [], [5])
@@ -103,8 +121,7 @@ fn stabilizers_flow_observable_terms_match_stim() {
     );
 }
 
-#[test]
-fn stabilizers_flow_display_and_sparse_round_trip_match_stim() {
+fn flow_display_and_sparse_round_trip_match_stim() {
     let value = new_flow(pauli("XY"), pauli("_Z"), [-3], []);
     assert_eq!(value.to_string(), "XY -> _Z xor rec[-3]");
     assert_eq!(flow("X0*Y1 -> Z1 xor rec[-3]"), value);
@@ -136,8 +153,7 @@ fn stabilizers_flow_display_and_sparse_round_trip_match_stim() {
     );
 }
 
-#[test]
-fn stabilizers_flow_ordering_matches_stim_examples() {
+fn flow_ordering_matches_stim_examples() {
     assert!(!(flow("1 -> 1") < flow("1 -> 1")));
     assert!(!(flow("X -> 1") < flow("1 -> 1")));
     assert!(!(flow("1 -> X") < flow("1 -> 1")));
@@ -149,8 +165,7 @@ fn stabilizers_flow_ordering_matches_stim_examples() {
     assert!(flow("1 -> Z") < flow("1 -> -Z"));
 }
 
-#[test]
-fn stabilizers_flow_multiplication_matches_stim_examples() {
+fn flow_multiplication_matches_stim_examples() {
     assert_eq!(
         flow("XYZ -> 1")
             .multiply(&flow("1 -> XYZ"))
@@ -203,8 +218,15 @@ fn stabilizers_flow_multiplication_matches_stim_examples() {
             .expect("multiply"),
         flow("1 -> 1")
     );
-    assert!(flow("1 -> X").multiply(&flow("1 -> Y")).is_err());
-    assert!(flow("1 -> Y").multiply(&flow("1 -> X")).is_err());
+    for (left, right) in [("1 -> X", "1 -> Y"), ("1 -> Y", "1 -> X")] {
+        assert_eq!(
+            flow(left).multiply(&flow(right)),
+            Err(StabilizerError::InvalidFlowProduct {
+                left: left.to_owned(),
+                right: right.to_owned(),
+            })
+        );
+    }
     assert_eq!(
         flow("-1 -> 1")
             .multiply(&flow("1 -> 1"))

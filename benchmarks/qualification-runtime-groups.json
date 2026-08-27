@@ -1,7 +1,7 @@
 {
   "schema_version": 11,
   "timing_boundary": "raw-work-v2",
-  "performance_inventory_sha256": "01e807f29f763d198698f9764d65f01431b87222656f1ba76d53c3b6f6fba2f2",
+  "performance_inventory_sha256": "5a258497cf31e236b7b5fb088a0b9c2703952952fe84e395aee11fca1fbaf424",
   "product_diagnostic_suite_timeout_seconds": 600,
   "product_diagnostic_policies": [
     {
@@ -283,9 +283,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-e16abe30d8c7992c"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-e25d6d4ff78e789a"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-model/model-fingerprint",
@@ -332,10 +330,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-d63aa8cd2dc62e63"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-4688083f377d44d9",
-        "cq-api-item-8a0d80ec3ee0c755"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-engine/compilation-request",
@@ -382,9 +377,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-d65b079751fe7119"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-1a7074d64feac0e2"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-core/resource-estimation",
@@ -431,12 +424,7 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-7bcf8fcdbbfa6d68"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-20b5453c1db83b51",
-        "cq-api-item-37fc5a3f546f5734",
-        "cq-api-item-7eb2e37d02d71b02",
-        "cq-api-item-fcb91bdb46f511ef"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-engine/sampling-compiler",
@@ -484,8 +472,8 @@
         "cq-evidence-qualification-160444d1041f2b2a",
         "cq-evidence-qualification-1686de935fd64494",
         "cq-evidence-qualification-278e629a855d3c41",
-        "cq-evidence-qualification-3a9a1dd7ddabd7b1",
         "cq-evidence-qualification-55748da764c91bf8",
+        "cq-evidence-qualification-57f6b4fe7e334a72",
         "cq-evidence-qualification-7179fce5697cce0d",
         "cq-evidence-qualification-7b17d9e5cca84df5",
         "cq-evidence-qualification-8cae8440e6c8c601",
@@ -540,22 +528,15 @@
       ],
       "correctness_case_ids": [
         "cq-evidence-qualification-0b8090f2ca9daf37",
-        "cq-evidence-qualification-0e2885667877d158",
         "cq-evidence-qualification-278e629a855d3c41",
-        "cq-evidence-qualification-36ae168d2b56fdbe",
-        "cq-evidence-qualification-3add8f2f8632a7fb",
+        "cq-evidence-qualification-57f6b4fe7e334a72",
         "cq-evidence-qualification-63678c8f7a576971",
         "cq-evidence-qualification-7b17d9e5cca84df5",
         "cq-evidence-qualification-889f3fecd9d3e6da",
         "cq-evidence-qualification-93951fde964ca94d",
-        "cq-evidence-qualification-9d8d2046dac8054b",
-        "cq-evidence-qualification-d1877c09db8c3c35",
         "cq-evidence-qualification-f7e633d78cd2e6c6"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-14f07e3df32c47bc",
-        "cq-api-item-5c9d29f0f9715f73"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-decoder/reused-batch-decode",
@@ -601,11 +582,11 @@
       ],
       "correctness_case_ids": [
         "cq-evidence-qualification-278e629a855d3c41",
+        "cq-evidence-qualification-57f6b4fe7e334a72",
         "cq-evidence-qualification-63678c8f7a576971",
         "cq-evidence-qualification-7b17d9e5cca84df5",
         "cq-evidence-qualification-7d5fce18cc43d73d",
-        "cq-evidence-qualification-93951fde964ca94d",
-        "cq-evidence-qualification-c61285e1ce0e88e8"
+        "cq-evidence-qualification-93951fde964ca94d"
       ],
       "public_api_item_ids": [],
       "checklist_item_ids": [],
@@ -654,18 +635,13 @@
       "correctness_case_ids": [
         "cq-evidence-qualification-0b7d994f36856b37",
         "cq-evidence-qualification-462e13db123d5041",
-        "cq-evidence-qualification-63d794137c5e40e8",
         "cq-evidence-qualification-7164c6c57e8187cf",
         "cq-evidence-qualification-7a01f0caf77063a0",
         "cq-evidence-qualification-8034f3ff6932ff5e",
-        "cq-evidence-qualification-88972b4df64c8539",
-        "cq-evidence-qualification-9271cf708f696d42",
-        "cq-evidence-qualification-da7f35283dd1c657"
+        "cq-evidence-qualification-ac6e19f7049ac922",
+        "cq-evidence-qualification-b4c958642897c16c"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-9d88075cecdfcd90",
-        "cq-api-item-b11de6e10a2ec41d"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-reference-noise-pass/x-error-transform",
@@ -710,7 +686,7 @@
         }
       ],
       "correctness_case_ids": [
-        "cq-evidence-qualification-e660819ae9a223c6",
+        "cq-evidence-qualification-2af6e8aeb3d91971",
         "cq-evidence-qualification-ef933925fb901877"
       ],
       "public_api_item_ids": [],
@@ -758,8 +734,8 @@
         }
       ],
       "correctness_case_ids": [
-        "cq-evidence-qualification-633fa529edf5f549",
-        "cq-evidence-qualification-e660819ae9a223c6"
+        "cq-evidence-qualification-2af6e8aeb3d91971",
+        "cq-evidence-qualification-633fa529edf5f549"
       ],
       "public_api_item_ids": [],
       "checklist_item_ids": [],
@@ -1260,10 +1236,7 @@
         "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-184350a6353655cd",
-        "cq-api-item-28fa331ea6460f3a"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-bits/bit-matrix",
@@ -1320,10 +1293,7 @@
         "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-36f42bb383dbc26b",
-        "cq-api-item-95117394f5764632"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-bits/bit-matrix",
@@ -1377,13 +1347,10 @@
         }
       ],
       "correctness_case_ids": [
-        "cq-evidence-qualification-3bab0f51237445f6",
-        "cq-evidence-qualification-489e6445120743c2"
+        "cq-evidence-qualification-141e447e1b547544",
+        "cq-evidence-qualification-3bab0f51237445f6"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-1a981c67ca870774",
-        "cq-api-item-309d5897f2b6f286"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-algebra/pauli-string",
@@ -1437,18 +1404,10 @@
         }
       ],
       "correctness_case_ids": [
-        "cq-evidence-qualification-0a4be178ce1c903b",
-        "cq-evidence-qualification-489e6445120743c2",
-        "cq-evidence-qualification-5331280b58fd49c7"
+        "cq-evidence-qualification-141e447e1b547544",
+        "cq-evidence-qualification-5540a0d3488b543c"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-0af2f068ea251f14",
-        "cq-api-item-497cc5bc024646a9",
-        "cq-api-item-54add4ab1bd128d1",
-        "cq-api-item-6c48bc00d6234849",
-        "cq-api-item-a0830bce4ec8c364",
-        "cq-api-item-e1b0decc22c2f31a"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-algebra/pauli-string",
@@ -1502,9 +1461,8 @@
         }
       ],
       "correctness_case_ids": [
-        "cq-evidence-qualification-0a4be178ce1c903b",
-        "cq-evidence-qualification-489e6445120743c2",
-        "cq-evidence-qualification-5331280b58fd49c7"
+        "cq-evidence-qualification-141e447e1b547544",
+        "cq-evidence-qualification-5540a0d3488b543c"
       ],
       "public_api_item_ids": [],
       "checklist_item_ids": [],
@@ -1625,10 +1583,7 @@
         "cq-evidence-qualification-510e746ec36e7d1c",
         "cq-evidence-qualification-ae9390dd6a207cb6"
       ],
-      "public_api_item_ids": [
-        "cq-api-item-385ae8c6f6fa3e19",
-        "cq-api-item-3b401b947a9e6fed"
-      ],
+      "public_api_item_ids": [],
       "checklist_item_ids": [],
       "checklist_child_ids": [],
       "owner": "stab-algebra/clifford-string",
@@ -1733,10 +1688,10 @@
         }
       ],
       "correctness_case_ids": [
-        "cq-evidence-qualification-0908c21b917526e3",
         "cq-evidence-qualification-2f6a06e3fffcf5c0",
         "cq-evidence-qualification-966ab53fd109b7b3",
-        "cq-evidence-qualification-ae2cf29058be84b0"
+        "cq-evidence-qualification-ae2cf29058be84b0",
+        "cq-evidence-qualification-bc3b27741beb41f7"
       ],
       "public_api_item_ids": [],
       "checklist_item_ids": [],
@@ -1843,10 +1798,10 @@
         }
       ],
       "correctness_case_ids": [
-        "cq-evidence-qualification-0908c21b917526e3",
         "cq-evidence-qualification-2f6a06e3fffcf5c0",
         "cq-evidence-qualification-966ab53fd109b7b3",
-        "cq-evidence-qualification-ae2cf29058be84b0"
+        "cq-evidence-qualification-ae2cf29058be84b0",
+        "cq-evidence-qualification-bc3b27741beb41f7"
       ],
       "public_api_item_ids": [],
       "checklist_item_ids": [],

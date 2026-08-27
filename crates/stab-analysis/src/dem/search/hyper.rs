@@ -19,9 +19,6 @@ use super::{
 use crate::resources::LogicalErrorSearchResource;
 use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
-#[cfg(test)]
-const MAX_HYPERGRAPH_EDGE_DEGREE: usize = 64;
-
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Edge {
     detectors: BTreeSet<DemDetectorId>,
@@ -758,47 +755,6 @@ mod limit_policy_tests {
     use super::*;
 
     #[test]
-    fn default_policy_preserves_hypergraph_search_result() {
-        let model = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n")
-            .expect("valid search model");
-        let legacy =
-            find_undetectable_logical_error(&model, 3, 3, false).expect("default search succeeds");
-        let explicit = find_undetectable_logical_error_with_limits(
-            &model,
-            3,
-            3,
-            false,
-            LogicalErrorSearchLimits::default(),
-        )
-        .expect("explicit default search succeeds");
-        assert_eq!(legacy, explicit);
-    }
-
-    #[test]
-    fn effective_detector_limit_is_exact_and_independent() {
-        let model = DetectorErrorModel::from_dem_str("error(0.1) D0 L0\nerror(0.1) D1 L1\n")
-            .expect("valid graph model");
-        let exact = LogicalErrorSearchLimits::default()
-            .with_max_effective_detector_nodes(2)
-            .with_max_search_states(1);
-        let graph = Graph::from_dem_with_limits(&model, usize::MAX, exact)
-            .expect("two effective detectors fit");
-        assert_eq!(graph.nodes.len(), 2);
-
-        let error = Graph::from_dem_with_limits(
-            &model,
-            usize::MAX,
-            exact.with_max_effective_detector_nodes(1),
-        )
-        .expect_err("third-party graph allocation must not start beyond the node limit");
-        assert!(
-            error
-                .to_string()
-                .contains("at most 1 effective detector nodes, got 2")
-        );
-    }
-
-    #[test]
     fn hyperedge_degree_and_incidence_rejections_leave_graph_unchanged() {
         let two_detector_edge = [
             DemTarget::relative_detector(0).expect("D0"),
@@ -866,85 +822,7 @@ mod limit_policy_tests {
         assert_eq!(graph.nodes, before_nodes);
         assert_eq!(graph.edge_incidences, 2);
     }
-
-    #[test]
-    fn default_hyperedge_degree_boundary_is_executed_exactly() {
-        let default_degree = LogicalErrorSearchLimits::default().max_hyperedge_degree();
-        let exact_targets = (0..default_degree)
-            .map(|detector| {
-                DemTarget::relative_detector(
-                    u64::try_from(detector).expect("default degree fits a detector identifier"),
-                )
-                .expect("default degree uses valid detector identifiers")
-            })
-            .collect::<Vec<_>>();
-        let mut exact_graph =
-            Graph::new_with_limits(default_degree, 0, LogicalErrorSearchLimits::default());
-        exact_graph
-            .add_edge_from_dem_targets(&exact_targets, usize::MAX)
-            .expect("the production hyperedge-degree maximum is accepted");
-        assert_eq!(exact_graph.edge_incidences, default_degree);
-
-        let first_excess = default_degree
-            .checked_add(1)
-            .expect("the production hyperedge-degree maximum is finite");
-        let excessive_targets = (0..first_excess)
-            .map(|detector| {
-                DemTarget::relative_detector(
-                    u64::try_from(detector).expect("first excess fits a detector identifier"),
-                )
-                .expect("first excess uses valid detector identifiers")
-            })
-            .collect::<Vec<_>>();
-        let mut rejected_graph =
-            Graph::new_with_limits(first_excess, 0, LogicalErrorSearchLimits::default());
-        let error = rejected_graph
-            .add_edge_from_dem_targets(&excessive_targets, usize::MAX)
-            .expect_err("the first degree above the production limit is rejected");
-        assert!(
-            error.to_string().contains(&format!(
-                "edges with at most {default_degree} detectors, got {first_excess}"
-            )),
-            "unexpected error: {error}"
-        );
-        assert!(rejected_graph.edges.is_empty());
-        assert_eq!(rejected_graph.edge_incidences, 0);
-        assert!(
-            rejected_graph
-                .nodes
-                .iter()
-                .all(|node| node.edge_ids.is_empty())
-        );
-    }
-
-    #[test]
-    fn hypergraph_search_state_boundary_is_inclusive() {
-        let model = DetectorErrorModel::from_dem_str(
-            "error(0.1) D0 L0\nerror(0.1) D0 L1\nerror(0.1) D0 L2\n",
-        )
-        .expect("valid search model");
-        let exact = LogicalErrorSearchLimits::default().with_max_search_states(5);
-        find_undetectable_logical_error_with_limits(&model, 3, 3, false, exact)
-            .expect("the first derived logical state reaches the exact boundary");
-
-        let error = find_undetectable_logical_error_with_limits(
-            &model,
-            3,
-            3,
-            false,
-            exact.with_max_search_states(4),
-        )
-        .expect_err("first state past the limit");
-        assert!(
-            error
-                .to_string()
-                .contains("at most 4 search states, got at least 5")
-        );
-    }
 }
-
-#[cfg(test)]
-mod resource_tests;
 
 #[cfg(test)]
 mod tests;

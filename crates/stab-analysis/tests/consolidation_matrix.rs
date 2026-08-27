@@ -10,6 +10,21 @@ use std::path::Path;
 use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
 use stab_model::{Circuit, Probability};
 
+const LOCAL_DECOMPOSITION_16_CIRCUIT: &str =
+    include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_local_decomposition_16.stim");
+const LOCAL_DECOMPOSITION_16_EXPECTED: &str =
+    include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_local_decomposition_16.stdout");
+const REMNANT_DECOMPOSITION_CIRCUIT: &str = "E(0.1) X0 X1\n\
+     E(0.1) X2 X3\n\
+     E(0.1) X0 X1 X2 X3 X4 X5\n\
+     M 0 1 2 3 4 5\n\
+     DETECTOR rec[-6]\n\
+     DETECTOR rec[-5]\n\
+     DETECTOR rec[-4]\n\
+     DETECTOR rec[-3]\n\
+     DETECTOR rec[-2]\n\
+     DETECTOR rec[-1]\n";
+
 /// WS2b Stage 1: every equivalence-matrix entry is a committed pinned-Stim
 /// byte-exact DEM capture (`<name>.stim` + `<name>.{nofold,fold}.dem`).
 /// Since the Stage 3 flip both fold modes run on the reverse engine and every
@@ -40,7 +55,7 @@ fn options_for(name: &str, fold_loops: bool) -> ErrorAnalyzerOptions {
 }
 
 #[test]
-fn consolidation_matrix_is_complete_and_classified() {
+fn circuit_to_dem_selected_gate_surface_semantic_matrix_matches_stim() {
     let dir = matrix_dir();
     let mut names = BTreeSet::new();
     for entry in std::fs::read_dir(&dir).expect("matrix directory exists") {
@@ -90,4 +105,91 @@ fn consolidation_matrix_is_complete_and_classified() {
         healed.is_empty(),
         "listed divergences now byte-match; remove them from the mode list: {healed:?}"
     );
+}
+
+#[test]
+fn circuit_to_dem_error_decomposition_contract_matches_stim() {
+    for (name, circuit_text, expected) in [
+        (
+            "exact pair and singleton decomposition",
+            "E(0.1) X0 X1\n\
+             X_ERROR(0.1) 2\n\
+             E(0.1) X0 X1 X2\n\
+             M 0 1 2\n\
+             DETECTOR rec[-3]\n\
+             DETECTOR rec[-2]\n\
+             DETECTOR rec[-1]\n",
+            concat!(
+                "error(0.1000000000000000055511151231257827) D0 D1\n",
+                "error(0.1000000000000000055511151231257827) D0 D1 ^ D2\n",
+                "error(0.1000000000000000055511151231257827) D2\n",
+            ),
+        ),
+        (
+            "greedy decomposition with one remnant edge",
+            REMNANT_DECOMPOSITION_CIRCUIT,
+            concat!(
+                "error(0.1000000000000000055511151231257827) D0 D1\n",
+                "error(0.1000000000000000055511151231257827) D0 D1 ^ D2 D3 ^ D4 D5\n",
+                "error(0.1000000000000000055511151231257827) D2 D3\n",
+            ),
+        ),
+    ] {
+        let circuit = Circuit::from_stim_str(circuit_text).expect("decomposition fixture parses");
+        let actual = circuit_to_detector_error_model(
+            &circuit,
+            ErrorAnalyzerOptions {
+                decompose_errors: true,
+                ..ErrorAnalyzerOptions::default()
+            },
+        )
+        .unwrap_or_else(|error| panic!("{name} analyzes: {error}"))
+        .to_dem_string();
+        assert_eq!(actual, expected, "{name}");
+    }
+
+    let remnant_circuit =
+        Circuit::from_stim_str(REMNANT_DECOMPOSITION_CIRCUIT).expect("remnant fixture parses");
+    let error = circuit_to_detector_error_model(
+        &remnant_circuit,
+        ErrorAnalyzerOptions {
+            decompose_errors: true,
+            block_decomposition_from_introducing_remnant_edges: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("blocking remnant edges rejects the pinned witness")
+    .to_string();
+    assert!(
+        error.contains("Failed to decompose errors into graphlike components")
+            && error.contains("block_decomposition_from_introducing_remnant_edges"),
+        "{error}"
+    );
+}
+
+#[test]
+fn circuit_to_dem_local_decomposition_symptom_boundary_matches_stim() {
+    let local_sixteen = Circuit::from_stim_str(LOCAL_DECOMPOSITION_16_CIRCUIT)
+        .expect("sixteen-detector local decomposition fixture parses");
+    let local_options = ErrorAnalyzerOptions {
+        fold_loops: true,
+        decompose_errors: true,
+        ignore_decomposition_failures: true,
+        ..ErrorAnalyzerOptions::default()
+    };
+    assert_eq!(
+        circuit_to_detector_error_model(&local_sixteen, local_options)
+            .expect("sixteen-detector local decomposition succeeds")
+            .to_dem_string(),
+        LOCAL_DECOMPOSITION_16_EXPECTED
+    );
+
+    let local_seventeen = Circuit::from_stim_str(&format!(
+        "{LOCAL_DECOMPOSITION_16_CIRCUIT}DETECTOR rec[-1]\n"
+    ))
+    .expect("seventeen-detector local decomposition fixture parses");
+    let error = circuit_to_detector_error_model(&local_seventeen, local_options)
+        .expect_err("seventeen detector symptoms exceed Stim's local mask")
+        .to_string();
+    assert!(error.contains("exceeded 16 detector symptoms"), "{error}");
 }

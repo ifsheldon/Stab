@@ -7,11 +7,10 @@
 use stab_model::Circuit;
 
 #[test]
-#[ignore = "local long-running M4 parser fuzz smoke"]
-fn parser_fuzz_smoke_round_trips_generated_circuits() {
+fn parser_generated_round_trips_use_a_fixed_bounded_corpus() {
     let mut rng = DeterministicRng::new(0x5a17_5eed_cafe_f00d);
 
-    for case_index in 0..10_000 {
+    for case_index in 0..512 {
         let input = generated_circuit(&mut rng);
         let circuit = Circuit::from_stim_str(&input)
             .unwrap_or_else(|error| panic!("case {case_index} failed to parse:\n{input}\n{error}"));

@@ -1,6 +1,6 @@
 use std::fmt::{self, Display};
 use std::marker::PhantomData;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, PathBuf};
 
 use clap::ValueEnum;
 use serde::de::{Error as _, SeqAccess, Visitor};
@@ -18,31 +18,13 @@ pub(super) struct CaseId(String);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum StableCaseDomain {
-    ApiItem,
-    EvidenceApi,
-    EvidenceBlocker,
-    EvidenceOracle,
     EvidenceQualification,
-    EvidenceResource,
-    EvidenceUpstream,
-    UpstreamBlocker,
-    UpstreamCpp,
-    UpstreamPython,
 }
 
 impl StableCaseDomain {
     const fn prefix(self) -> &'static str {
         match self {
-            Self::ApiItem => "cq-api-item",
-            Self::EvidenceApi => "cq-evidence-api",
-            Self::EvidenceBlocker => "cq-evidence-blocker",
-            Self::EvidenceOracle => "cq-evidence-oracle",
             Self::EvidenceQualification => "cq-evidence-qualification",
-            Self::EvidenceResource => "cq-evidence-resource",
-            Self::EvidenceUpstream => "cq-evidence-upstream",
-            Self::UpstreamBlocker => "cq-upstream-blocker",
-            Self::UpstreamCpp => "cq-upstream-cpp",
-            Self::UpstreamPython => "cq-upstream-py",
         }
     }
 }
@@ -101,10 +83,6 @@ impl ApiPath {
             Ok(Self(value))
         }
     }
-
-    pub(super) fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
 impl Display for ApiPath {
@@ -146,10 +124,6 @@ impl RelativeSourcePath {
         } else {
             Ok(Self(value))
         }
-    }
-
-    pub(super) fn as_path(&self) -> &Path {
-        &self.0
     }
 }
 
@@ -314,19 +288,6 @@ impl FeatureId {
             .find(|feature| feature.as_str() == value)
     }
 
-    pub(super) const fn default_comparator(self) -> Comparator {
-        match self {
-            Self::StimFormat | Self::DemFormat => Comparator::Canonical,
-            Self::ResultFormats | Self::Generation | Self::Cli => Comparator::ExactBytes,
-            Self::GateContract => Comparator::StateEquivalence,
-            Self::BitKernels | Self::CircuitApi | Self::Algebra => Comparator::Property,
-            Self::Sampling | Self::DemSampling => Comparator::Statistical,
-            Self::Detection | Self::Analyzer | Self::FlowUtils => Comparator::SemanticInvariant,
-            Self::Search => Comparator::Structural,
-            Self::Resource => Comparator::Resource,
-        }
-    }
-
     pub(super) const fn performance_groups(self) -> &'static [&'static str] {
         match self {
             Self::StimFormat => &["PERF-CIRCUIT-MODEL"],
@@ -407,14 +368,6 @@ pub(super) struct PublicApiAlias {
     )]
     pub(super) canonical_crate_name: Option<String>,
     pub(super) canonical_path: ApiPath,
-}
-
-impl PublicApiAlias {
-    pub(super) fn canonical_crate_name(&self) -> &str {
-        self.canonical_crate_name
-            .as_deref()
-            .unwrap_or(&self.crate_name)
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -519,13 +472,6 @@ pub(super) enum UpstreamDisposition {
 }
 
 impl UpstreamDisposition {
-    pub(super) const fn is_executable_scope(self) -> bool {
-        matches!(
-            self,
-            Self::ExactOracle | Self::PortedRust | Self::SemanticMining
-        )
-    }
-
     pub(super) const fn as_str(self) -> &'static str {
         match self {
             Self::ExactOracle => "exact-oracle",

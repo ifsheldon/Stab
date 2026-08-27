@@ -25,7 +25,15 @@ fn assert_resource_limit<T>(
 }
 
 #[test]
-fn cq2_algebra_pauli_materialization_has_a_typed_first_rejection() {
+fn algebra_size_limits_reject_before_materialization_or_rng_use() {
+    pauli_materialization_has_a_typed_first_rejection();
+    flow_terms_have_an_aggregate_typed_limit();
+    tableau_admission_precedes_materialization_and_rng_use();
+    iterators_and_stabilizer_solver_fail_at_owned_boundaries();
+    unitary_dimension_limit_precedes_shape_and_numeric_work();
+}
+
+fn pauli_materialization_has_a_typed_first_rejection() {
     let resource = StabilizerResource::PauliQubits;
     assert_eq!(
         PauliString::identity(65_536).as_ref().map(PauliString::len),
@@ -86,12 +94,11 @@ fn cq2_algebra_pauli_materialization_has_a_typed_first_rejection() {
     assert_eq!(actual_rng.next_u64(), expected_rng.next_u64());
 }
 
-#[test]
 #[allow(
     clippy::expect_used,
     reason = "the resource regression needs concrete accepted values before asserting boundaries"
 )]
-fn cq2_algebra_flow_terms_have_an_aggregate_typed_limit() {
+fn flow_terms_have_an_aggregate_typed_limit() {
     let resource = StabilizerResource::FlowClassicalTerms;
     let limit_i32 = i32::try_from(resource.limit()).expect("Flow term limit fits i32");
     let identity = PauliString::identity(0).expect("empty Pauli");
@@ -144,8 +151,7 @@ fn cq2_algebra_flow_terms_have_an_aggregate_typed_limit() {
     );
 }
 
-#[test]
-fn cq2_algebra_tableau_admission_precedes_materialization_and_rng_use() {
+fn tableau_admission_precedes_materialization_and_rng_use() {
     let tableau_resource = StabilizerResource::TableauQubits;
     assert_eq!(Tableau::identity(500).as_ref().map(Tableau::len), Ok(500));
     assert_eq!(
@@ -175,8 +181,7 @@ fn cq2_algebra_tableau_admission_precedes_materialization_and_rng_use() {
     assert_eq!(actual_rng.next_u64(), expected_rng.next_u64());
 }
 
-#[test]
-fn cq2_algebra_iterators_and_stabilizer_solver_fail_at_owned_boundaries() {
+fn iterators_and_stabilizer_solver_fail_at_owned_boundaries() {
     let pauli_resource = StabilizerResource::PauliQubits;
     assert_resource_limit(
         PauliStringIterator::new(pauli_resource.limit() + 1, 0, 0, true, true, true),
@@ -202,8 +207,7 @@ fn cq2_algebra_iterators_and_stabilizer_solver_fail_at_owned_boundaries() {
     assert_resource_limit(solve_result, solve_resource, solve_resource.limit() + 1);
 }
 
-#[test]
-fn cq2_algebra_unitary_dimension_limit_precedes_shape_and_numeric_work() {
+fn unitary_dimension_limit_precedes_shape_and_numeric_work() {
     let resource = StabilizerResource::UnitaryMatrixDimension;
     let oversized_malformed = vec![Vec::<Complex32>::new(); resource.limit() * 2];
     assert_resource_limit(

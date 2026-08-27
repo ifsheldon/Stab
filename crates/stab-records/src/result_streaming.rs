@@ -732,49 +732,21 @@ mod tests {
     )]
 
     use crate::result_formats::{
-        read_ptb64_records_all, read_records, write_ptb64_records_checked, write_records,
+        read_dets_records, read_ptb64_records_all, read_records, write_ptb64_records_checked,
+        write_records,
     };
 
     use super::*;
 
     #[test]
-    fn streaming_readers_match_materialized_readers() {
-        let records = vec![
-            vec![true, false, true, false, false, true, false, false, true],
-            vec![false, true, false, true, false, false, true, false, false],
-            vec![
-                false, false, false, false, false, false, false, false, false,
-            ],
-        ];
-
-        for format in [
-            SampleFormat::ZeroOne,
-            SampleFormat::B8,
-            SampleFormat::R8,
-            SampleFormat::Hits,
-            SampleFormat::Dets,
-        ] {
-            let input = write_records(&records, format);
-            let mut streamed = Vec::new();
-            for_each_record(&input, format, 9, |record| {
-                streamed.push(record.to_vec());
-                Ok(())
+    fn streaming_and_typed_dets_contract() {
+        let records = (0usize..64)
+            .map(|shot| {
+                (0usize..9)
+                    .map(|bit| (shot * 7 + bit * 11).is_multiple_of(13))
+                    .collect::<Vec<_>>()
             })
-            .unwrap();
-            assert_eq!(streamed, read_records(&input, format, 9).unwrap());
-        }
-    }
-
-    #[test]
-    fn packed_and_sparse_streaming_readers_match_materialized_readers() {
-        let records = vec![
-            vec![true, false, true, false, false, true, false, false, true],
-            vec![false, true, false, true, false, false, true, false, false],
-            vec![
-                false, false, false, false, false, false, false, false, false,
-            ],
-        ];
-
+            .collect::<Vec<_>>();
         for format in [
             SampleFormat::ZeroOne,
             SampleFormat::B8,
@@ -784,6 +756,14 @@ mod tests {
         ] {
             let input = write_records(&records, format);
             let expected = read_records(&input, format, 9).unwrap();
+            let mut dense = Vec::new();
+            for_each_record(&input, format, 9, |record| {
+                dense.push(record.to_vec());
+                Ok(())
+            })
+            .unwrap();
+            assert_eq!(dense, expected);
+
             let mut packed = Vec::new();
             for_each_packed_record(&input, format, 9, |record| {
                 packed.push(bitslice_to_vec(record));
@@ -800,35 +780,93 @@ mod tests {
             .unwrap();
             assert_eq!(sparse, expected);
         }
-    }
 
-    #[test]
-    fn streaming_ptb64_reader_matches_materialized_reader() {
-        let records = (0..64)
-            .map(|shot_index| {
-                (0..17)
-                    .map(|bit_index| (shot_index * 7 + bit_index * 11) % 13 == 0)
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-        let input = write_ptb64_records_checked(&records).expect("write ptb64");
-        let mut streamed = Vec::new();
-
-        for_each_ptb64_record_all(&input, 17, |record| {
-            streamed.push(record.to_vec());
+        let ptb64 = write_ptb64_records_checked(&records).expect("write ptb64");
+        let mut streamed_ptb64 = Vec::new();
+        for_each_ptb64_record_all(&ptb64, 9, |record| {
+            streamed_ptb64.push(record.to_vec());
             Ok(())
         })
         .unwrap();
-
-        assert_eq!(streamed, read_ptb64_records_all(&input, 17).unwrap());
-
-        let mut limited = Vec::new();
-        for_each_ptb64_record(&input, 17, 64, |record| {
-            limited.push(record.to_vec());
+        assert_eq!(streamed_ptb64, read_ptb64_records_all(&ptb64, 9).unwrap());
+        let mut prefix = Vec::new();
+        for_each_ptb64_record(&ptb64, 9, 64, |record| {
+            prefix.push(record.to_vec());
             Ok(())
         })
         .unwrap();
-        assert_eq!(limited, streamed);
+        assert_eq!(prefix, records);
+
+        let layout = DetsLayout::try_new(2, 2, 2).expect("typed DETS layout");
+        let dets = b"shot M0 M0 D0 D0 L0 L0 L1\nshot M1 D1 L0\n";
+        let expected_dense = vec![
+            vec![true, false, true, false, true, true],
+            vec![false, true, false, true, true, false],
+        ];
+        assert_eq!(
+            read_dets_records(dets, layout).expect("materialized typed DETS"),
+            expected_dense
+        );
+
+        let mut dense = Vec::new();
+        for_each_dets_record(dets, layout, |record| {
+            dense.push(record.to_vec());
+            Ok(())
+        })
+        .expect("dense typed DETS");
+        assert_eq!(dense, expected_dense);
+
+        let mut packed = Vec::new();
+        for_each_dets_packed_record(dets, layout, |record| {
+            packed.push(bitslice_to_vec(record));
+            Ok(())
+        })
+        .expect("packed typed DETS");
+        assert_eq!(packed, expected_dense);
+
+        let mut tokens = Vec::new();
+        for_each_dets_token_record(dets, layout, |record| {
+            tokens.push(record.to_vec());
+            Ok(())
+        })
+        .expect("token typed DETS");
+        assert_eq!(
+            tokens,
+            vec![
+                vec![
+                    DetsToken::new(DetsResultType::Measurement, 0),
+                    DetsToken::new(DetsResultType::Measurement, 0),
+                    DetsToken::new(DetsResultType::Detector, 0),
+                    DetsToken::new(DetsResultType::Detector, 0),
+                    DetsToken::new(DetsResultType::Observable, 0),
+                    DetsToken::new(DetsResultType::Observable, 0),
+                    DetsToken::new(DetsResultType::Observable, 1),
+                ],
+                vec![
+                    DetsToken::new(DetsResultType::Measurement, 1),
+                    DetsToken::new(DetsResultType::Detector, 1),
+                    DetsToken::new(DetsResultType::Observable, 0),
+                ],
+            ]
+        );
+
+        let mut sparse = Vec::new();
+        for_each_dets_sparse_shot(dets, layout, |shot| {
+            sparse.push(shot.clone());
+            Ok(())
+        })
+        .expect("sparse typed DETS");
+        assert_eq!(
+            sparse,
+            vec![
+                SparseShot::new(vec![0, 0, 2, 2], vec![false, true]),
+                SparseShot::new(vec![1, 3], vec![true, false]),
+            ]
+        );
+
+        assert!(for_each_record(dets, SampleFormat::Dets, 2, ignore_record).is_err());
+        assert!(for_each_packed_record(dets, SampleFormat::Dets, 2, ignore_packed).is_err());
+        assert!(for_each_sparse_record(dets, SampleFormat::Dets, 2, ignore_sparse).is_err());
     }
 
     #[test]
@@ -846,21 +884,6 @@ mod tests {
         );
         assert!(for_each_ptb64_record_all(&[0; 7], 1, ignore_record).is_err());
         assert!(for_each_ptb64_record(&[], 0, 64, ignore_record).is_err());
-    }
-
-    #[test]
-    fn streaming_readers_stop_on_visitor_error() {
-        let records = vec![vec![true, false], vec![false, true]];
-        let input = write_records(&records, SampleFormat::ZeroOne);
-        let mut visited = 0usize;
-
-        let result = for_each_record(&input, SampleFormat::ZeroOne, 2, |_| {
-            visited += 1;
-            Err(FormatError::invalid_result_format("visitor stopped"))
-        });
-
-        assert!(result.is_err());
-        assert_eq!(visited, 1);
     }
 
     #[test]

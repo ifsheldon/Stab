@@ -1,7 +1,7 @@
 #![allow(
     clippy::expect_used,
     clippy::panic_in_result_fn,
-    reason = "SAT materialization policy tests use direct fixture assertions"
+    reason = "resource-contract tests use direct assertions for compact diagnostics"
 )]
 
 use stab_analysis::{
@@ -11,256 +11,153 @@ use stab_analysis::{
 };
 use stab_model::DetectorErrorModel;
 
+type SatRunner = fn(&DetectorErrorModel, SatMaterializationLimits) -> AnalysisResult<String>;
+
 fn dem(text: &str) -> DetectorErrorModel {
-    DetectorErrorModel::from_dem_str(text).expect("parse DEM")
+    DetectorErrorModel::from_dem_str(text).expect("valid SAT resource fixture")
 }
 
-fn assert_rejected(result: AnalysisResult<String>, expected: &str) {
-    let error = result.expect_err("SAT materialization limit should reject the model");
-    assert!(
-        error.to_string().contains(expected),
-        "expected {expected:?} in {error}"
-    );
+fn shortest(
+    model: &DetectorErrorModel,
+    limits: SatMaterializationLimits,
+) -> AnalysisResult<String> {
+    shortest_error_sat_problem_with_limits(model, limits)
 }
 
-macro_rules! limits {
-    () => {
-        SatMaterializationLimits::default()
-    };
+fn likeliest(
+    model: &DetectorErrorModel,
+    limits: SatMaterializationLimits,
+) -> AnalysisResult<String> {
+    likeliest_error_sat_problem_with_limits(model, 100, limits)
 }
 
-#[test]
-fn default_policy_keeps_frozen_literals_and_existing_entry_points() -> AnalysisResult<()> {
-    let model = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
-    let limits = limits!();
-
-    assert_eq!(
-        shortest_error_sat_problem_with_limits(&model, limits)?,
-        shortest_error_sat_problem(&model)?
-    );
-    assert_eq!(
-        likeliest_error_sat_problem_with_limits(&model, 100, limits)?,
-        likeliest_error_sat_problem(&model, 100)?
-    );
-
-    assert_eq!(limits.max_repeat_unroll(), 100_000);
-    assert_eq!(limits.max_expanded_instructions(), 1_000_000);
-    assert_eq!(limits.max_repeat_iterations(), 1_000_000);
-    assert_eq!(limits.max_error_mechanisms(), 250_000);
-    assert_eq!(limits.max_target_occurrences(), 500_000);
-    assert_eq!(limits.max_variables(), 500_000);
-    assert_eq!(limits.max_clauses(), 500_000);
-    assert_eq!(limits.max_clause_literals(), 1_500_000);
-    assert_eq!(limits.max_output_bytes(), 128 * 1024 * 1024);
-
-    let excessive_repeat = dem("repeat 100001 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n");
-    let legacy_error = shortest_error_sat_problem(&excessive_repeat)
-        .expect_err("legacy entry point should enforce the default repeat limit")
-        .to_string();
-    let limited_error = shortest_error_sat_problem_with_limits(&excessive_repeat, limits)
-        .expect_err("explicit default policy should enforce the same repeat limit")
-        .to_string();
-    assert_eq!(limited_error, legacy_error);
-    assert_eq!(
-        limited_error,
-        "invalid detector error model: DEM SAT problem generation currently supports repeat counts up to 100000, got 100001"
-    );
-    Ok(())
-}
-
-#[test]
-fn traversal_limits_accept_exact_maxima_and_reject_first_excesses() -> AnalysisResult<()> {
-    let accepted = dem("repeat 3 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n");
-    shortest_error_sat_problem_with_limits(
-        &accepted,
-        limits!()
-            .with_max_repeat_unroll(3)
-            .with_max_repeat_iterations(3)
-            .with_max_expanded_instructions(6),
-    )?;
-
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(
-            &accepted,
-            limits!()
-                .with_max_repeat_unroll(2)
-                .with_max_repeat_iterations(100)
-                .with_max_expanded_instructions(100),
-        ),
-        "supports repeat counts up to 2, got 3",
-    );
-
-    let nested = dem("repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n");
-    let exact = limits!()
-        .with_max_repeat_unroll(2)
-        .with_max_repeat_iterations(6)
-        .with_max_expanded_instructions(8);
-    shortest_error_sat_problem_with_limits(&nested, exact)?;
-
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&nested, exact.with_max_repeat_iterations(5)),
-        "supports at most 5 expanded repeat iterations, got at least 6",
-    );
-
-    let model = dem("error(0.1) D0 L0\nshift_detectors 1\n");
-    shortest_error_sat_problem_with_limits(&model, limits!().with_max_expanded_instructions(2))?;
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&model, limits!().with_max_expanded_instructions(1)),
-        "supports at most 1 expanded instructions, got at least 2",
-    );
-    Ok(())
-}
-
-#[test]
-fn flattened_error_and_target_limits_are_admitted_before_collection() -> AnalysisResult<()> {
-    let two_errors = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
-    shortest_error_sat_problem_with_limits(&two_errors, limits!().with_max_error_mechanisms(2))?;
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&two_errors, limits!().with_max_error_mechanisms(1)),
-        "supports at most 1 error mechanisms, got at least 2",
-    );
-    let error =
-        shortest_error_sat_problem_with_limits(&two_errors, limits!().with_max_error_mechanisms(1))
-            .expect_err("error mechanism admission should be structured");
-    let resource = error
-        .resource_limit_error()
-        .expect("SAT limit should expose typed context");
-    assert_eq!(resource.operation(), ResourceOperation::SatMaterialization);
-    assert_eq!(resource.resource(), ResourceKind::ErrorMechanisms);
-    assert_eq!(resource.actual(), 2);
-    assert_eq!(resource.limit(), 1);
-
-    let two_targets = dem("error(0.1) D0 L0\n");
-    shortest_error_sat_problem_with_limits(&two_targets, limits!().with_max_target_occurrences(2))?;
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(
-            &two_targets,
-            limits!().with_max_target_occurrences(1),
-        ),
-        "supports at most 1 target occurrences, got at least 2",
-    );
-    Ok(())
-}
-
-#[test]
-fn cnf_shape_limits_accept_exact_maxima_and_reject_first_excess() -> AnalysisResult<()> {
-    let model = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
-
-    shortest_error_sat_problem_with_limits(&model, limits!().with_max_variables(3))?;
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&model, limits!().with_max_variables(2)),
-        "supports at most 2 variables, got at least 3",
-    );
-
-    shortest_error_sat_problem_with_limits(&model, limits!().with_max_clauses(8))?;
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&model, limits!().with_max_clauses(7)),
-        "supports at most 7 clauses, got at least 8",
-    );
-
-    shortest_error_sat_problem_with_limits(&model, limits!().with_max_clause_literals(16))?;
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&model, limits!().with_max_clause_literals(15)),
-        "supports at most 15 clause literals, got at least 16",
-    );
-    Ok(())
-}
-
-#[test]
-fn every_early_unsat_path_obeys_the_output_byte_limit() -> AnalysisResult<()> {
-    const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
-
-    let no_model_content = dem("");
-    let filtered_weighted_error = dem("error(0) D0 L0\n");
-    let no_logical_error_target = dem("logical_observable L0\nerror(0.1) D0\n");
-    let exact = limits!().with_max_output_bytes(UNSAT_WDIMACS.len());
-
-    for output in [
-        shortest_error_sat_problem_with_limits(&no_model_content, exact)?,
-        likeliest_error_sat_problem_with_limits(&filtered_weighted_error, 100, exact)?,
-        shortest_error_sat_problem_with_limits(&no_logical_error_target, exact)?,
+fn assert_first_excess(
+    source: &str,
+    accepted: SatMaterializationLimits,
+    rejected: SatMaterializationLimits,
+    expected_resource: ResourceKind,
+) -> AnalysisResult<()> {
+    let model = dem(source);
+    let original = model.clone();
+    for (name, run) in [
+        ("shortest", shortest as SatRunner),
+        ("likeliest", likeliest as SatRunner),
     ] {
-        assert_eq!(output, UNSAT_WDIMACS);
-    }
-
-    let rejected = exact.with_max_output_bytes(UNSAT_WDIMACS.len() - 1);
-    for result in [
-        shortest_error_sat_problem_with_limits(&no_model_content, rejected),
-        likeliest_error_sat_problem_with_limits(&filtered_weighted_error, 100, rejected),
-        shortest_error_sat_problem_with_limits(&no_logical_error_target, rejected),
-    ] {
-        let error = result.expect_err("the first byte above the UNSAT output limit should fail");
+        run(&model, accepted)?;
+        let error = run(&model, rejected).expect_err("first excess must be rejected");
         let resource = error
             .resource_limit_error()
-            .expect("early UNSAT output rejection should expose typed context");
-        assert_eq!(resource.operation(), ResourceOperation::SatMaterialization);
-        assert_eq!(resource.resource(), ResourceKind::OutputBytes);
-        assert_eq!(resource.actual(), UNSAT_WDIMACS.len() as u64);
-        assert_eq!(resource.limit(), (UNSAT_WDIMACS.len() - 1) as u64);
+            .expect("SAT rejection must retain typed resource context");
+        assert_eq!(
+            resource.operation(),
+            ResourceOperation::SatMaterialization,
+            "{name}"
+        );
+        assert_eq!(resource.resource(), expected_resource, "{name}");
+        assert_eq!(resource.actual(), resource.limit() + 1, "{name}: {error}");
+        assert_eq!(model, original, "{name} changed its source model");
     }
-
-    let ordinary = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
-    let ordinary_output = shortest_error_sat_problem(&ordinary)?;
-    let exact_ordinary = limits!().with_max_output_bytes(ordinary_output.len());
-    assert_eq!(
-        shortest_error_sat_problem_with_limits(&ordinary, exact_ordinary)?,
-        ordinary_output
-    );
-    let first_excess = ordinary_output.len() - 1;
-    let error = shortest_error_sat_problem_with_limits(
-        &ordinary,
-        exact_ordinary.with_max_output_bytes(first_excess),
-    )
-    .expect_err("ordinary WCNF must reject the first byte above its exact output size");
-    let resource = error
-        .resource_limit_error()
-        .expect("ordinary WCNF output rejection should expose typed context");
-    assert_eq!(resource.operation(), ResourceOperation::SatMaterialization);
-    assert_eq!(resource.resource(), ResourceKind::OutputBytes);
-    assert_eq!(resource.actual(), ordinary_output.len() as u64);
-    assert_eq!(resource.limit(), first_excess as u64);
     Ok(())
 }
 
 #[test]
-fn shifted_detector_targets_are_validated_during_sat_admission() {
-    const MAX_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
-    let model = dem(&format!(
-        "repeat 4 {{\nshift_detectors {MAX_TEXT_INTEGER}\n}}\n\
-         error(0.1) D{MAX_TEXT_INTEGER} L0\n"
-    ));
-    let original = model.clone();
-
-    let error = shortest_error_sat_problem_with_limits(&model, limits!())
-        .expect_err("shifted detector overflow must fail during the admission traversal");
-    assert!(
-        error.to_string().contains("detector"),
-        "unexpected shifted-target error: {error}"
+fn sat_materialization_limits_admit_exact_boundaries_and_preserve_source() -> AnalysisResult<()> {
+    let defaults = SatMaterializationLimits::default();
+    let ordinary = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
+    assert_eq!(
+        shortest_error_sat_problem_with_limits(&ordinary, defaults)?,
+        shortest_error_sat_problem(&ordinary)?
     );
-    assert_eq!(model, original);
-}
-
-#[test]
-fn arithmetic_overflow_is_rejected_without_mutating_the_source() {
-    let model =
-        dem("repeat 1152921504606846975 {\nrepeat 1152921504606846975 {\nerror(0.1) D0 L0\n}\n}\n");
-    let original = model.clone();
-
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&model, limits!()),
-        "repeat error count overflowed",
+    assert_eq!(
+        likeliest_error_sat_problem_with_limits(&ordinary, 100, defaults)?,
+        likeliest_error_sat_problem(&ordinary, 100)?
     );
-    assert_eq!(model, original);
-}
 
-#[test]
-fn rejection_leaves_the_source_model_unchanged() {
-    let model = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
-    let original = model.clone();
+    for (source, accepted, rejected, resource) in [
+        (
+            "repeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n",
+            defaults.with_max_repeat_unroll(2),
+            defaults.with_max_repeat_unroll(1),
+            ResourceKind::RepeatCount,
+        ),
+        (
+            "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
+            defaults.with_max_repeat_iterations(6),
+            defaults.with_max_repeat_iterations(5),
+            ResourceKind::RepeatIterations,
+        ),
+        (
+            "error(0.1) D0 L0\nshift_detectors 1\n",
+            defaults.with_max_expanded_instructions(2),
+            defaults.with_max_expanded_instructions(1),
+            ResourceKind::ExpandedOperations,
+        ),
+        (
+            "error(0.1) D0 L0\nerror(0.2) D0\n",
+            defaults.with_max_error_mechanisms(2),
+            defaults.with_max_error_mechanisms(1),
+            ResourceKind::ErrorMechanisms,
+        ),
+        (
+            "error(0.1) D0 L0\n",
+            defaults.with_max_target_occurrences(2),
+            defaults.with_max_target_occurrences(1),
+            ResourceKind::TargetOccurrences,
+        ),
+        (
+            "error(0.1) D0 L0\nerror(0.2) D0\n",
+            defaults.with_max_variables(3),
+            defaults.with_max_variables(2),
+            ResourceKind::Variables,
+        ),
+        (
+            "error(0.1) D0 L0\nerror(0.2) D0\n",
+            defaults.with_max_clauses(8),
+            defaults.with_max_clauses(7),
+            ResourceKind::Clauses,
+        ),
+        (
+            "error(0.1) D0 L0\nerror(0.2) D0\n",
+            defaults.with_max_clause_literals(16),
+            defaults.with_max_clause_literals(15),
+            ResourceKind::ClauseLiterals,
+        ),
+    ] {
+        assert_first_excess(source, accepted, rejected, resource)?;
+    }
 
-    assert_rejected(
-        shortest_error_sat_problem_with_limits(&model, limits!().with_max_error_mechanisms(1)),
-        "supports at most 1 error mechanisms",
-    );
-    assert_eq!(model, original);
+    for (name, run, model) in [
+        ("shortest", shortest as SatRunner, dem("")),
+        (
+            "likeliest",
+            likeliest as SatRunner,
+            dem("error(0) D1000001 L1000001\n"),
+        ),
+    ] {
+        let output = run(&model, defaults)?;
+        assert_eq!(
+            run(&model, defaults.with_max_output_bytes(output.len()))?,
+            output,
+            "{name} exact output boundary"
+        );
+        let error = run(&model, defaults.with_max_output_bytes(output.len() - 1))
+            .expect_err("first output byte beyond the limit must be rejected");
+        let resource = error
+            .resource_limit_error()
+            .expect("output rejection must retain typed resource context");
+        assert_eq!(resource.resource(), ResourceKind::OutputBytes, "{name}");
+        assert_eq!(resource.actual(), output.len() as u64, "{name}");
+        assert_eq!(resource.limit(), (output.len() - 1) as u64, "{name}");
+    }
+
+    for source in [
+        "repeat 1152921504606846975 {\nrepeat 1152921504606846975 {\nerror(0.1) D0 L0\n}\n}\n",
+        "repeat 4 {\nshift_detectors 1152921504606846975\n}\nerror(0.1) D1152921504606846975 L0\n",
+    ] {
+        let model = dem(source);
+        let original = model.clone();
+        shortest(&model, defaults).expect_err("overflowing SAT input must be rejected");
+        assert_eq!(model, original);
+    }
+    Ok(())
 }

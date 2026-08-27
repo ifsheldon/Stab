@@ -114,7 +114,7 @@ Statistical fixture rows default to `source=stdout`; `source=fixture_output` req
 On Linux oracle runs, fixture-output placeholders are rewritten to inherited `/proc/self/fd/...` paths backed by a fresh private directory under `/tmp`; the controller monitors and reads each side output relative to the retained directory descriptor with `NOFOLLOW`, performs bounded descriptor-relative cleanup, and compares exact-output row side-output bytes in addition to stdout.
 `just oracle::run --milestone Mx` scopes execution to implemented fixture rows for that milestone and reports pending red, ignored, or manifest-only rows in the same milestone.
 `just oracle::record --check-clean` checks runnable exact-output rows against pinned Stim; library-only parser/printer rows are run in-process by `stab-oracle` and are skipped by recording because they do not have a Stim CLI command.
-`just oracle::blockers` validates the schema-versioned blocker closure ledger against the pinned Stim tag and commit, tracked regular upstream source files, exact test and symbol anchors, planned test-family anchors, reproducible statistical plans, required PFM-B owners, test evidence state, implemented primary and supporting oracle rows, typed oracle and benchmark runners, benchmark comparability classes, resource contracts, resource limits, and the frozen SHA-256 semantic inventory.
+`just oracle::blockers` validates the historical blocker closure ledger for migration and audit work. It is read-only operational history, not a current feature-status or test-ownership source; use `just oracle::parity-check` and the generated parity view for current claims.
 `just oracle::blockers --check-selectors` additionally runs allowlisted `cargo test ... -- --list` commands through timed, bounded process capture and rejects claimed existing selectors that match no tests.
 The blocker-ledger validator currently requires Unix file-identity support and fails closed on other targets instead of accepting a symlink race.
 
@@ -139,8 +139,7 @@ just qualification::correctness-list --feature CQ-RESULT-FORMATS
 just qualification::correctness-check
 ```
 
-These commands validate or deterministically regenerate `oracle/qualification-manifest.json` from the pinned C++ and Python test tree, default-feature rustdoc JSON, current implemented oracle rows, and the reviewed exact-parent mappings in `oracle/qualification-cases.json`.
-The qualification-case ledger may bind several exact upstream or exported-API owners to one independently selectable test only when they share one feature and comparator and that test proves the complete parent contract; regeneration rejects stale, duplicate, cross-feature, comparator-mismatched, and shared-primary mappings.
+These commands validate or deterministically regenerate `oracle/qualification-manifest.json` directly from the finite benchmark prerequisite bridge in `oracle/qualification-cases.json`. The bridge contains only exact standalone Cargo tests required by active runtime groups; feature status and semantic evidence ownership live in `oracle/stim-v1.16-parity.toml`, and upstream-test, rustdoc, fixture, and public-API discovery are deliberately outside this transitional manifest. Regeneration rejects duplicate, nonexact, nonstandalone, wrong-pin, or retired ownership entries, and benchmark validation requires the runtime ledger and bridge to cover exactly the same prerequisite IDs.
 CQ1 correctness execution and report commands are implemented through:
 
 ```sh

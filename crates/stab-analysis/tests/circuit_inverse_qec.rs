@@ -13,24 +13,216 @@ use stab_analysis::{
 use stab_model::Circuit;
 
 #[test]
-fn circuit_inverse_qec_unitary_matches_stim() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_inverse_qec.test.cc.
-    let input = circuit(
-        "
-        H 0
-        ISWAP 0 1 1 2 3 2
-        S 0 3 4
-    ",
-    );
-    let expected = circuit(
-        "
-        S_DAG 4 3 0
-        ISWAP_DAG 3 2 1 2 0 1
-        H 0
-    ",
-    );
+fn inverse_qec_common_semantic_matrix_matches_stim() {
+    let cases = [
+        (
+            "unitary packet",
+            "H 0\nISWAP 0 1 1 2 3 2\nS 0 3 4\n",
+            "S_DAG 4 3 0\nISWAP_DAG 3 2 1 2 0 1\nH 0\n",
+        ),
+        (
+            "reset measurement detector packet",
+            "RX 1\nMX 1\nDETECTOR[tag](2, 3) rec[-1]\n",
+            "RX 1\nMX 1\nDETECTOR[tag](2, 3) rec[-1]\n",
+        ),
+        (
+            "two-to-one detector flow",
+            "R 0 1\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+            "R 1 0\nCX 0 1\nM 1 0\nDETECTOR rec[-2]\n",
+        ),
+        (
+            "tagged two-to-one detector flow",
+            "R[r] 0 1\nCX[c] 0 1\nM[m] 0 1\nDETECTOR[d](7) rec[-1] rec[-2]\n",
+            "R[m] 1 0\nCX[c] 0 1\nM[r] 1 0\nDETECTOR[d](7) rec[-2]\n",
+        ),
+        (
+            "noisy measurements",
+            "M(0.125) 0 1 2 0 2 4\nMX(0.25) 0\nMY(0.375) 0\n",
+            "MY(0.375) 0\nMX(0.25) 0\nM(0.125) 4 2 0 2 1 0\n",
+        ),
+        (
+            "noisy measure resets",
+            "MR(0.125) 0 1 2 0 2 4\nMRX(0.25) 0\nMRY(0.375) 0\n",
+            "MRY 0\nZ_ERROR(0.375) 0\nMRX 0\nZ_ERROR(0.25) 0\nMR 4 2 0\nX_ERROR(0.125) 4 2 0\nMR 2 1 0\nX_ERROR(0.125) 2 1 0\n",
+        ),
+        (
+            "noisy pair-product detector flow",
+            "MRY 0 1\nM 0\nTICK\nMZZ(0.125) 0 1 2 3\nTICK\nM 1\nMRY 0 1\nDETECTOR rec[-3] rec[-5] rec[-6]\n",
+            "MRY 1 0\nR 1\nTICK\nMZZ(0.125) 2 3 0 1\nTICK\nM 0\nDETECTOR rec[-2] rec[-1]\nMRY 1 0\n",
+        ),
+        (
+            "MPP detector flow",
+            "MPP !X0*X1 Y0*Y1 Z0*Z1\nDETECTOR rec[-1] rec[-2] rec[-3]\n",
+            "MPP Z1*Z0 Y1*Y0 X1*!X0\nDETECTOR rec[-3] rec[-2] rec[-1]\n",
+        ),
+        (
+            "MPAD detector and observable record tail",
+            "MPAD 0 1\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            "MPAD 1 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n",
+        ),
+        (
+            "observable Pauli packet",
+            "RX 1\nOBSERVABLE_INCLUDE[test](1) X1\n",
+            "OBSERVABLE_INCLUDE[test](1) X1\nMX 1\nOBSERVABLE_INCLUDE(1) rec[-1]\n",
+        ),
+    ];
 
-    assert_eq!(circuit_inverse_qec(&input).expect("inverse QEC"), expected);
+    for (name, input, expected) in cases {
+        assert_eq!(
+            circuit_inverse_qec(&circuit(input)).expect(name),
+            circuit(expected),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn time_reversal_for_flows_common_semantic_matrix_matches_stim() {
+    let empty_flow_cases = [
+        (
+            "unitary packet",
+            "H 0\nISWAP 0 1 1 2 3 2\nS 0 3 4\n",
+            "S_DAG 4 3 0\nISWAP_DAG 3 2 1 2 0 1\nH 0\n",
+        ),
+        (
+            "ordinary measurement noise",
+            "MR(0.125) 0\n",
+            "MR 0\nX_ERROR(0.125) 0\n",
+        ),
+        (
+            "product measurements",
+            "MPP X0*Y1 Z2*X3\n",
+            "MPP X3*Z2 Y1*X0\n",
+        ),
+        (
+            "MPAD record routing",
+            "MPAD 0 1\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            "MPAD 1 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n",
+        ),
+        (
+            "generated repetition code with detector coordinates",
+            include_str!("consolidation_matrix/repetition_code_memory_d3_none.stim"),
+            concat!(
+                "R 4 2 0\n",
+                "MR 3 1\n",
+                "TICK\n",
+                "CX 4 3 2 1\n",
+                "TICK\n",
+                "CX 2 3 0 1\n",
+                "TICK\n",
+                "MR 3 1\n",
+                "DETECTOR(1, 1) rec[-1]\n",
+                "DETECTOR(3, 1) rec[-2]\n",
+                "TICK\n",
+                "CX 4 3 2 1\n",
+                "TICK\n",
+                "CX 2 3 0 1\n",
+                "TICK\n",
+                "MR 3 1\n",
+                "DETECTOR(1, 0) rec[-3] rec[-1]\n",
+                "DETECTOR(3, 0) rec[-4] rec[-2]\n",
+                "TICK\n",
+                "CX 4 3 2 1\n",
+                "TICK\n",
+                "CX 2 3 0 1\n",
+                "TICK\n",
+                "M 4 3 2 1 0\n",
+                "DETECTOR(1, 2) rec[-3] rec[-2] rec[-1]\n",
+                "DETECTOR(3, 2) rec[-5] rec[-4] rec[-3]\n",
+                "DETECTOR(1, 1) rec[-6] rec[-2]\n",
+                "DETECTOR(3, 1) rec[-7] rec[-4]\n",
+                "OBSERVABLE_INCLUDE(0) rec[-5]\n",
+            ),
+        ),
+    ];
+    for (name, input, expected) in empty_flow_cases {
+        let (actual, flows) = circuit_time_reversed_for_flows(&circuit(input), &[]).expect(name);
+        assert_eq!(actual, circuit(expected), "{name}");
+        assert!(flows.is_empty(), "{name}");
+    }
+
+    type FlowCase = (
+        &'static str,
+        &'static str,
+        &'static [&'static str],
+        &'static str,
+        &'static [&'static str],
+    );
+    let flow_cases: &[FlowCase] = &[
+        (
+            "folded self-inverse unitary flow",
+            "REPEAT 1000001 {\n    H 0\n}\n",
+            &["X -> Z"],
+            "REPEAT 1000001 {\n    H 0\n}\n",
+            &["Z -> X"],
+        ),
+        (
+            "folded controlled unitary flow",
+            "REPEAT 1000001 {\n    CY 0 1\n}\n",
+            &["X0 -> X0*Y1"],
+            "REPEAT 1000001 {\n    CY 0 1\n}\n",
+            &["X0*Y1 -> X0"],
+        ),
+        (
+            "folded non-self-inverse unitary flow",
+            "REPEAT 1000001 {\n    SQRT_X 0\n}\n",
+            &["Y0 -> Z0"],
+            "REPEAT 1000001 {\n    SQRT_X_DAG 0\n}\n",
+            &["Z0 -> Y0"],
+        ),
+        (
+            "measurement becomes reset",
+            "M 0\n",
+            &["Z0 -> rec[-1]"],
+            "R 0\n",
+            &["1 -> Z0"],
+        ),
+        (
+            "measurement retained by a future Pauli",
+            "M 0\n",
+            &["1 -> Z0 xor rec[-1]"],
+            "M 0\n",
+            &["Z0 -> rec[-1]"],
+        ),
+        (
+            "pair measurement with unitary suffix",
+            "MZZ 0 1\nH 0\nCX 0 1\nS 1\n",
+            &["X0*X1 -> X0*Z1 xor rec[-1]", "Z0 -> Z0*Z1 xor rec[-1]"],
+            "S_DAG 1\nCX 0 1\nH 0\nMZZ 0 1\n",
+            &["X0*Z1 -> X0*X1 xor rec[-1]", "Z0*Z1 -> Z0 xor rec[-1]"],
+        ),
+        (
+            "observable-bearing reset",
+            "R 0\n",
+            &["1 -> Z0 xor obs[0]"],
+            "M 0\n",
+            &["Z0 -> rec[-1]"],
+        ),
+        (
+            "bounded measurement repeat",
+            "REPEAT 2 {\n    M 0\n}\n",
+            &[],
+            "M 0 0\n",
+            &[],
+        ),
+    ];
+    for (name, input, input_flows, expected, expected_flows) in flow_cases {
+        let input_flows = input_flows
+            .iter()
+            .map(|text| flow(text))
+            .collect::<Vec<_>>();
+        let (actual, actual_flows) =
+            circuit_time_reversed_for_flows(&circuit(input), &input_flows).expect(name);
+        assert_eq!(actual, circuit(expected), "{name}");
+        assert_eq!(
+            actual_flows,
+            expected_flows
+                .iter()
+                .map(|text| flow(text))
+                .collect::<Vec<_>>(),
+            "{name}"
+        );
+    }
 }
 
 #[test]
@@ -53,50 +245,6 @@ fn circuit_inverse_qec_matches_stim_negative_zero_measure_reset_packet() {
         circuit_inverse_qec(&input).expect("inverse negative-zero measure-reset packet"),
         expected
     );
-}
-
-#[test]
-fn circuit_inverse_qec_supports_selected_two_to_one_detector_flow() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec two_to_one behavior.
-    for (input_text, expected_text) in [
-        (
-            "
-            R 0 1
-            CX 0 1
-            M 0 1
-            DETECTOR rec[-1] rec[-2]
-            ",
-            "
-            R 1 0
-            CX 0 1
-            M 1 0
-            DETECTOR rec[-2]
-            ",
-        ),
-        (
-            "
-            R[r] 0 1
-            CX[c] 0 1
-            M[m] 0 1
-            DETECTOR[d](7) rec[-1] rec[-2]
-            ",
-            "
-            R[m] 1 0
-            CX[c] 0 1
-            M[r] 1 0
-            DETECTOR[d](7) rec[-2]
-            ",
-        ),
-    ] {
-        let input = circuit(input_text);
-        let expected = circuit(expected_text);
-
-        assert_eq!(
-            circuit_inverse_qec(&input).expect("inverse selected two_to_one flow"),
-            expected,
-            "{input_text}"
-        );
-    }
 }
 
 #[test]
@@ -381,30 +529,6 @@ fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
 }
 
 #[test]
-fn time_reversed_for_flows_unitary_subset_matches_qec_inverse() {
-    let input = circuit(
-        "
-        H 0
-        ISWAP 0 1 1 2 3 2
-        S 0 3 4
-    ",
-    );
-    let expected_circuit = circuit(
-        "
-        S_DAG 4 3 0
-        ISWAP_DAG 3 2 1 2 0 1
-        H 0
-    ",
-    );
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &[]).expect("time reverse empty-flow unitary");
-
-    assert_eq!(actual_circuit, expected_circuit);
-    assert_eq!(actual_flows, Vec::<Flow>::new());
-}
-
-#[test]
 fn time_reversed_for_flows_unitary_subset_supports_flow_past_end() {
     // Adapted from Stim v1.16.0 circuit_inverse_qec flow-past-end coverage.
     let input = circuit("H 0\n");
@@ -434,67 +558,6 @@ fn time_reversed_for_flows_unitary_subset_supports_extra_idle_qubits() {
 }
 
 #[test]
-fn time_reversed_for_flows_unitary_subset_folds_large_repeats() {
-    let input = circuit(
-        "
-        REPEAT 1000001 {
-            H 0
-        }
-    ",
-    );
-    let flows = [flow("X -> Z")];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse repeated unitary");
-
-    assert_eq!(actual_circuit, input);
-    assert_eq!(actual_flows, vec![flow("Z -> X")]);
-}
-
-#[test]
-fn time_reversed_for_flows_unitary_subset_folds_large_cy_repeats() {
-    let input = circuit(
-        "
-        REPEAT 1000001 {
-            CY 0 1
-        }
-    ",
-    );
-    let flows = [flow("X0 -> X0*Y1")];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse repeated CY");
-
-    assert_eq!(actual_circuit, input);
-    assert_eq!(actual_flows, vec![flow("X0*Y1 -> X0")]);
-}
-
-#[test]
-fn time_reversed_for_flows_unitary_subset_folds_large_sqrt_x_repeats() {
-    let input = circuit(
-        "
-        REPEAT 1000001 {
-            SQRT_X 0
-        }
-    ",
-    );
-    let expected_circuit = circuit(
-        "
-        REPEAT 1000001 {
-            SQRT_X_DAG 0
-        }
-    ",
-    );
-    let flows = [flow("Y0 -> Z0")];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse repeated SQRT_X");
-
-    assert_eq!(actual_circuit, expected_circuit);
-    assert_eq!(actual_flows, vec![flow("Z0 -> Y0")]);
-}
-
-#[test]
 fn time_reversed_for_flows_unitary_subset_validates_general_unitaries_with_tableau() {
     let swap = circuit("SWAP 0 1\n");
     let swap_flows = [flow("X0 -> X1"), flow("Z1 -> Z0")];
@@ -513,32 +576,6 @@ fn time_reversed_for_flows_unitary_subset_validates_general_unitaries_with_table
     let (_actual_circuit, actual_flows) =
         circuit_time_reversed_for_flows(&iswap, &iswap_flows).expect("time reverse iswap flows");
     assert_eq!(actual_flows, vec![flow("Z0*Y1 -> X0"), flow("Y0*Z1 -> X1")]);
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_reverses_single_measurement() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec flow_reverse coverage.
-    let input = circuit("M 0\n");
-    let flows = [flow("1 -> Z0 xor rec[-1]")];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse measurement flow");
-
-    assert_eq!(actual_circuit, input);
-    assert_eq!(actual_flows, vec![flow("Z0 -> rec[-1]")]);
-}
-
-#[test]
-fn pfm_b1_python_measurement_kept_by_flow() {
-    // Independently attributes Stim v1.16.0 Python test_inv_circuit's kept-measurement case.
-    let input = circuit("M 0\n");
-    let input_flow = flow("1 -> Z0 xor rec[-1]");
-
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[input_flow])
-        .expect("keep measurement required by future Pauli support");
-
-    assert_eq!(inverse, input);
-    assert_eq!(flows, vec![flow("Z0 -> rec[-1]")]);
 }
 
 #[test]

@@ -673,20 +673,6 @@ fn a8_external_pass_is_an_exact_stab_only_diagnostic_contract() {
             .collect::<Vec<_>>(),
         [64, 4_096, 65_536]
     );
-    assert_eq!(
-        contract.correctness_case_ids,
-        [
-            "cq-evidence-qualification-0b7d994f36856b37",
-            "cq-evidence-qualification-462e13db123d5041",
-            "cq-evidence-qualification-63d794137c5e40e8",
-            "cq-evidence-qualification-7164c6c57e8187cf",
-            "cq-evidence-qualification-7a01f0caf77063a0",
-            "cq-evidence-qualification-8034f3ff6932ff5e",
-            "cq-evidence-qualification-88972b4df64c8539",
-            "cq-evidence-qualification-9271cf708f696d42",
-            "cq-evidence-qualification-da7f35283dd1c657",
-        ]
-    );
     assert!(contract.comparator_sources.is_empty());
     assert!(contract.profiler_note.is_none());
     assert!(super::super::invocation::supports_group(contract));
@@ -940,7 +926,48 @@ fn runtime_contract_is_the_single_detailed_performance_owner() {
 }
 
 #[test]
-fn runtime_contract_rejects_unknown_and_duplicate_ownership() {
+fn runtime_contract_exactly_covers_the_correctness_bridge() {
+    let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .expect("repository root");
+    let suite = crate::qualification::read(&root).expect("checked performance inventory");
+    let references =
+        crate::qualification::discovery::load_source_references(&root).expect("source references");
+    let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+
+    let removed = file
+        .groups
+        .iter()
+        .flat_map(|group| &group.correctness_case_ids)
+        .next()
+        .expect("runtime prerequisite")
+        .clone();
+    let mut missing = file.clone();
+    for group in &mut missing.groups {
+        group.correctness_case_ids.retain(|case| case != &removed);
+    }
+    assert!(matches!(
+        validate_inventory_contracts(&missing, &suite, &references),
+        Err(GroupError::CorrectnessPrerequisiteCoverage { bridge_only, runtime_only })
+            if bridge_only == [removed] && runtime_only.is_empty()
+    ));
+
+    let extra = "cq-evidence-qualification-ffffffffffffffff".to_string();
+    let mut surplus = file;
+    surplus
+        .groups
+        .first_mut()
+        .expect("runtime group")
+        .correctness_case_ids
+        .push(extra.clone());
+    assert!(matches!(
+        validate_inventory_contracts(&surplus, &suite, &references),
+        Err(GroupError::CorrectnessPrerequisiteCoverage { bridge_only, runtime_only })
+            if bridge_only.is_empty() && runtime_only == [extra]
+    ));
+}
+
+#[test]
+fn runtime_contract_rejects_unknown_feature_and_checklist_ownership() {
     let root = RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .expect("repository root");
     let suite = crate::qualification::read(&root).expect("checked performance inventory");
@@ -957,24 +984,6 @@ fn runtime_contract_rejects_unknown_and_duplicate_ownership() {
     assert!(matches!(
         validate_inventory_contracts(&unknown_feature, &suite, &references),
         Err(GroupError::UnknownFeature { .. })
-    ));
-
-    let mut duplicate_api = file.clone();
-    let group = duplicate_api
-        .groups
-        .iter_mut()
-        .find(|group| !group.public_api_item_ids.is_empty())
-        .expect("runtime API owner");
-    let duplicate = group
-        .public_api_item_ids
-        .first()
-        .expect("owned API")
-        .clone();
-    group.public_api_item_ids.push(duplicate);
-    group.public_api_item_ids.sort();
-    assert!(matches!(
-        validate_inventory_contracts(&duplicate_api, &suite, &references),
-        Err(GroupError::InvalidPublicApiOwnership(_))
     ));
 
     let mut unknown_checklist = file;
