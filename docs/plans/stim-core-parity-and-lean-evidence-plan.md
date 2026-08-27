@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P5 are complete; P6 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P6 are complete; P7 through P9 have not started.
 
 ## Summary
 
@@ -410,6 +410,15 @@ These are P4 performance dispositions, not milestone-local timing gates. All fou
 - Every in-scope CLI ledger entry is implemented and tested through the real binary.
 - Help advertises only implemented or explicitly identified Stab-native behavior.
 - No deprecated dispatch or duplicate argument-normalization path remains.
+
+### Implementation Checkpoint
+
+- The seven computational commands and Stab-native help retain real-binary owners for every nondeprecated in-scope option, path route, side stream, format, and error class.
+- The whole-vector legacy pre-parser is deleted. Deprecated top-level command modes, `sample --frame0`, `detect --prepend_observables`, hidden `sample_dem` observable-order flags, `--detector_hypergraph`, and `--help=<topic>` are rejected by the actual parser instead of normalized.
+- One real-binary test owns the complete removed-route set and verifies that named help and Clap help do not advertise stale flags. Duplicate alias-success, warning-order, and selected-conflict tests and fixtures are deleted.
+- The legacy-dispatch startup benchmark row is retired rather than benchmarking a removed route; the transitional performance inventory is regenerated with 166 inherited rows. P6 makes no performance claim.
+- The generated parity ledger now reports 89 done, zero missing, 13 deferred, and 51 deliberate-divergence families with 138 canonical owners and no owner gaps.
+- P6 is complete after the CLI suite, parity run, implemented fixtures, path-alias matrix, workspace checks, benchmark smoke, milestone audit, and full code review passed on the integrated source.
 
 ## Milestone P7: Replace Performance Machinery With One E2E Suite
 

@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P5 are complete. P6 is next. P7 through P9 have not started.
+Status: Active. P0 through P6 are complete. P7 is next. P8 and P9 have not started.
 
 ## Objective
 
@@ -20,24 +20,23 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - `oracle/stim-v1.16-parity.toml` and its family fragments own feature and evidence status.
 - [Generated parity view](../stim-parity.md) owns volatile counts and must match the ledger.
 - [Architecture rules](../architecture/README.md) own durable component boundaries.
-- `benchmarks/suite.toml` will become the sole active performance source in P7.
+- P7 introduces `benchmarks/suite.toml` as the sole active performance source before deleting both superseded benchmark systems.
 
 Historical plans, progress reports, qualification inventories, and benchmark manifests are context only. They must not create parallel requirements or promote current claims.
 
-## Current Milestone: P6
+## Current Milestone: P7
 
-1. Close the seven computational commands and help for every nondeprecated in-scope argument and combination through the built release binary.
-2. Remove legacy top-level dispatch, deprecated frame and observable-order aliases, hidden `sample_dem` observable aliases, stale help advertising, and duplicate normalization routes instead of preserving compatibility shims.
-3. Keep `.stim -> .stim` conversion, concise Stab-native help, agent inspection, JSON Lines diagnostics, decoder sessions, and external circuit passes as explicitly tested Stab extensions rather than parity claims.
-4. Expose direct component-crate workflows and keep `stab-core` a thin convenience facade with no algorithm, duplicate model, or catch-all error ownership.
-5. Preserve command-wide typed file-role validation before truncation, strict result grammars, bounded streaming, broken-pipe propagation, and exact output routing.
-6. Promote the final missing parity family only after real-binary success and failure tests prove removed routes are absent and the generated ledger remains consistent.
+1. Create one `benchmarks/suite.toml` containing the fixed 12 workflow families and 29 family-scale cases from the active plan, with exact arguments, deterministic inputs, semantic work, output validation, memory policy, Stim parity policy, and Stab regression policy.
+2. Run CLI families process-to-process through release binaries and the Rust pipeline through its stable component APIs. Include startup, parsing, compilation, execution, codecs, and I/O in E2E timings.
+3. Reuse the bounded process supervisor and paired alternating sampler. Report wall time, semantic throughput, peak RSS, output size, paired median, and fixed-seed bootstrap confidence interval without deleting samples or subtracting startup.
+4. Require exact correctness prerequisites before timing. Validate deterministic output exactly and stochastic output through fixed semantic or statistical witnesses outside timed regions.
+5. Preserve the `1.25x` Stim parity and `1.15x` seeded self-regression gates. Missing baselines remain unseeded, and no waiver, reduced work, or relaxed threshold can produce a pass.
+6. Retire each legacy benchmark and qualification route as its conclusion moves into the new suite. End P7 with one runner, one policy source, at most 30 release cases, and at most 15 profile-justified diagnostics.
 
-P6 closes only after targeted component and real-binary tests, implemented fixtures, parity check and rendering, workspace formatting, warnings-denied Clippy, all workspace tests, milestone audit, full code review, and repair of every confirmed finding.
+P7 closes only after schema and rejection tests, process-supervisor adversarial tests, output-witness tests, a deterministic dry run of every case, generated documentation, benchmark smoke, workspace checks, milestone audit, full code review, and deletion of the superseded active machinery.
 
 ## Remaining Sequence
 
-- P6 closes real-binary CLI behavior and direct Rust workflows, then removes deprecated dispatch and duplicate routing.
 - P7 replaces both benchmark systems with one capped E2E suite of user workflows.
 - P8 profiles and fixes failing E2E cases without weakening work or thresholds.
 - P9 produces one replayable controlled-host evidence bundle and deletes superseded machinery and status prose.
