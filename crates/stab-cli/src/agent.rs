@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use clap::{Args, CommandFactory, Subcommand, ValueEnum};
 use serde::Serialize;
 use stab_engine::{
-    COMPILATION_DESCRIPTORS, CompilationRequestFingerprint, PlanFingerprint, SamplingCompiler,
-    estimate_sampling_request,
+    COMPILATION_DESCRIPTORS, CompilationRequestFingerprint, PlanFingerprint,
+    ReferenceSampleLoopPolicy, SamplingCompiler, estimate_sampling_request,
 };
 use stab_model::{
     Circuit, DetectorErrorModel, Estimate, Gate, GateArgumentRule, GateCategory,
@@ -24,7 +24,7 @@ use crate::{
 
 const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 5;
 const INSPECT_OUTPUT_SCHEMA_VERSION: u16 = 2;
-const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 3;
+const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 4;
 const STIM_COMPATIBILITY_VERSION: &str = "1.16.0";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -36,7 +36,7 @@ pub(crate) enum AgentOutputFormatArg {
 
 #[derive(Debug, Args)]
 pub(crate) struct CapabilitiesArgs {
-    /// Selects concise human text or schema-version-3 JSON.
+    /// Selects concise human text or schema-version-5 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 }
@@ -98,11 +98,11 @@ struct PlanSampleArgs {
     #[arg(long = "skip_reference_sample")]
     skip_reference_sample: bool,
 
-    /// Accepted compatibility no-op, reported separately from compilation identity.
+    /// Disables invariant-repeat reuse while computing the reference sample.
     #[arg(long = "skip_loop_folding")]
     skip_loop_folding: bool,
 
-    /// Selects concise human text or schema-version-2 JSON.
+    /// Selects concise human text or schema-version-4 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 }
@@ -174,12 +174,20 @@ where
         MAX_CIRCUIT_INPUT_BYTES,
     )?;
     let circuit = Circuit::from_stim_bytes(&input)?;
+    let reference_sample_loop_policy = if args.skip_loop_folding {
+        ReferenceSampleLoopPolicy::Iterate
+    } else {
+        ReferenceSampleLoopPolicy::Fold
+    };
 
     // Compilation is intentionally performed for validation. No sampling method is called.
     let plan = SamplingCompiler::new()
+        .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
         .map_err(CliError::from)?;
     let request_fingerprint = plan.request_fingerprint();
+    let (normalized_loop_policy, loop_policy_effect) =
+        reference_loop_policy_report(plan.reference_sample_loop_policy())?;
     let mut estimates = ResourceEstimateReport::from(estimate_sampling_request(
         &circuit,
         args.shots,
@@ -210,7 +218,7 @@ where
             request_fingerprint: CompilationFingerprintReport::from(request_fingerprint),
             plan_fingerprint: PlanFingerprintReport::from(plan.fingerprint()),
             compiler_schema_version: request_fingerprint.compiler_schema_version(),
-            normalized_options: Vec::new(),
+            normalized_options: vec![normalized_loop_policy],
             configurable_limits: Vec::new(),
             validated: true,
         },
@@ -229,7 +237,7 @@ where
             },
             output_format: output_format.as_str(),
             skip_loop_folding_requested: args.skip_loop_folding,
-            skip_loop_folding_effect: "accepted-no-op",
+            skip_loop_folding_effect: loop_policy_effect,
         },
         estimates,
     };
@@ -239,6 +247,23 @@ where
         &report,
         &render_sample_plan_human(&report),
     )
+}
+
+fn reference_loop_policy_report(
+    policy: ReferenceSampleLoopPolicy,
+) -> Result<(&'static str, &'static str), CliError> {
+    match policy {
+        ReferenceSampleLoopPolicy::Fold => Ok((
+            "reference-loop-policy=fold",
+            "fold-invariant-reference-repeats",
+        )),
+        ReferenceSampleLoopPolicy::Iterate => {
+            Ok(("reference-loop-policy=iterate", "iterate-reference-repeats"))
+        }
+        _ => Err(CliError::AgentOutputInvariant {
+            message: "sampling plan selected an unregistered reference-loop policy",
+        }),
+    }
 }
 
 fn read_agent_input<R>(
@@ -805,7 +830,7 @@ fn render_sample_plan_human(report: &SamplePlanReport) -> String {
             .value
             .map_or_else(|| "unknown".to_string(), |value| value.to_string()),
         if report.run.skip_loop_folding_requested {
-            "\nskip_loop_folding: accepted no-op"
+            "\nskip_loop_folding: iterate reference repeats"
         } else {
             ""
         }

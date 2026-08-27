@@ -96,6 +96,48 @@ impl PartialEq for StabilizerFrame {
 
 impl Eq for StabilizerFrame {}
 
+#[derive(Debug)]
+pub(super) struct StabilizerStateSnapshot {
+    generators: Vec<StabilizerGenerator>,
+}
+
+impl StabilizerStateSnapshot {
+    pub(super) fn try_new(qubit_count: usize) -> Result<Self, FrameStorageError> {
+        let mut generators = Vec::new();
+        generators
+            .try_reserve_exact(qubit_count)
+            .map_err(|_| FrameStorageError::new("stabilizer snapshot generators", qubit_count))?;
+        for _ in 0..qubit_count {
+            generators.push(StabilizerGenerator::try_identity(qubit_count)?);
+        }
+        Ok(Self { generators })
+    }
+
+    pub(super) fn capture(&mut self, frame: &StabilizerFrame) -> bool {
+        if self.generators.len() != frame.generators.len() {
+            return false;
+        }
+        for (destination, source) in self.generators.iter_mut().zip(&frame.generators) {
+            destination.copy_from_generator(source);
+        }
+        true
+    }
+
+    pub(super) fn matches(&self, frame: &StabilizerFrame) -> bool {
+        self.generators == frame.generators
+    }
+
+    pub(super) fn storage_bytes(qubit_count: usize) -> u128 {
+        (qubit_count as u128)
+            .saturating_mul(size_of::<StabilizerGenerator>() as u128)
+            .saturating_add(
+                (qubit_count as u128)
+                    .saturating_mul(qubit_count as u128)
+                    .saturating_mul(size_of::<PauliBasis>() as u128),
+            )
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum MeasurementRandomness {
     Random,
@@ -360,7 +402,7 @@ impl StabilizerFrame {
         MeasurementOutcome::Deterministic(product_negative ^ observable.negative)
     }
 
-    fn len(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         self.qubit_count
     }
 }

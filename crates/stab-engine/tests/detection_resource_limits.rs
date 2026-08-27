@@ -4,18 +4,37 @@
     reason = "resource tests use deterministic model fixtures and exact typed failures"
 )]
 
-use std::mem::ManuallyDrop;
+use std::convert::Infallible;
 
 use stab_engine::{
     DetectionCompileError, DetectionConversionLimits, DetectionError, DetectionRecordLimitSubject,
-    DetectionResourceKind, DetectionResourceLimitError, MeasurementToDetectionCompiler,
-    ReferenceSampleMode, circuit_reference_signs_with_limits,
-    validate_detection_sampling_circuit_with_limits,
+    DetectionResourceKind, DetectionResourceLimitError, DetectionSamplingCompiler,
+    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
+    circuit_reference_signs_with_limits, validate_detection_sampling_circuit_with_limits,
 };
 use stab_model::{
     Circuit, CircuitInstruction, Gate, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
     Target,
 };
+use stab_records::{DetectionBatchView, DetectionSink};
+
+#[derive(Default)]
+struct NullDetectionSink {
+    shots: usize,
+}
+
+impl DetectionSink for NullDetectionSink {
+    type Error = Infallible;
+
+    fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
+        self.shots += batch.shot_count();
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
 
 fn compile(
     circuit: &Circuit,
@@ -41,6 +60,24 @@ fn detection_resource(error: DetectionError) -> DetectionResourceLimitError {
     }
 }
 
+fn compact_reference_sign_plan_bytes(circuit: &Circuit) -> u64 {
+    let mut limit = 0;
+    loop {
+        match circuit_reference_signs_with_limits(
+            circuit,
+            DetectionConversionLimits::default().with_max_compiled_bytes(limit),
+        ) {
+            Ok(_) => return limit,
+            Err(error) => {
+                let resource = detection_resource(error);
+                assert_eq!(resource.kind(), DetectionResourceKind::CompiledBytes);
+                assert!(resource.actual() > limit);
+                limit = resource.actual();
+            }
+        }
+    }
+}
+
 fn nested_circuit(depth: usize, mut body: Circuit) -> Circuit {
     for _ in 0..depth {
         let mut outer = Circuit::new();
@@ -54,11 +91,70 @@ fn nested_circuit(depth: usize, mut body: Circuit) -> Circuit {
     body
 }
 
+fn shallow_repeat_siblings(count: usize, body: &Circuit) -> Circuit {
+    let mut circuit = Circuit::new();
+    for _ in 0..count {
+        circuit.append_repeat_block(RepeatBlock::new(
+            RepeatCount::try_new(1).expect("valid repeat count"),
+            body.clone(),
+            None,
+        ));
+    }
+    circuit
+}
+
+#[test]
+fn shallow_repeat_breadth_does_not_consume_nesting_budget() {
+    let sibling_count = 4_096;
+    let conversion = shallow_repeat_siblings(
+        sibling_count,
+        &Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").expect("conversion body"),
+    );
+    compile(&conversion, DetectionConversionLimits::default())
+        .expect("shallow conversion siblings must not count as nested repeats");
+
+    let direct = shallow_repeat_siblings(
+        sibling_count,
+        &Circuit::from_stim_str("RX 0\nOBSERVABLE_INCLUDE(0) X0\n").expect("direct-frame body"),
+    );
+    DetectionSamplingCompiler::new()
+        .compile(&direct)
+        .expect("shallow direct-frame siblings must not count as nested repeats");
+}
+
 #[test]
 fn repeat_nesting_rejects_before_recursive_work() {
-    let accepted = nested_circuit(RepeatNestingLimit::HARD_MAX, Circuit::new());
-    compile(&accepted, DetectionConversionLimits::default())
-        .expect("the fixed nesting boundary must compile");
+    for direct_frame in [false, true] {
+        std::thread::Builder::new()
+            .stack_size(64 * 1024)
+            .spawn(move || {
+                let body = if direct_frame {
+                    Circuit::from_stim_str("RX 0\nOBSERVABLE_INCLUDE(0) X0\n")
+                        .expect("parse direct-frame fixture")
+                } else {
+                    Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").expect("parse fused fixture")
+                };
+                let circuit = nested_circuit(RepeatNestingLimit::HARD_MAX, body);
+                let plan = DetectionSamplingCompiler::new()
+                    .limits(DetectionConversionLimits::default())
+                    .compile(&circuit)
+                    .expect("the accepted detector nesting boundary must compile");
+                let mut session = plan
+                    .session(RandomPolicy::Seeded(Seed::new(7)))
+                    .expect("the accepted detector nesting boundary must allocate state");
+                let mut sink = NullDetectionSink::default();
+                session
+                    .run(ShotCount::new(1), &mut sink)
+                    .expect("the accepted detector nesting boundary must execute");
+                assert_eq!(sink.shots, 1);
+                drop(session);
+                drop(plan);
+                drop(circuit);
+            })
+            .expect("spawn constrained-stack boundary regression")
+            .join()
+            .expect("accepted nesting must not overflow the stack");
+    }
 
     let rejected = nested_circuit(RepeatNestingLimit::HARD_MAX + 1, Circuit::new());
     for resource in [
@@ -89,7 +185,7 @@ fn repeat_nesting_rejects_before_recursive_work() {
                 } else {
                     Circuit::new()
                 };
-                let circuit = ManuallyDrop::new(nested_circuit(10_000, body));
+                let circuit = nested_circuit(10_000, body);
                 if detector_frame {
                     detection_resource(
                         validate_detection_sampling_circuit_with_limits(
@@ -224,14 +320,11 @@ fn reference_sign_entrypoint_propagates_exact_resource_boundaries() {
 
     let repeated = Circuit::from_stim_str("M 0\nREPEAT 3 {\nDETECTOR rec[-1]\n}\n")
         .expect("parse repeated term fixture");
-    let vector_bytes = u64::try_from(std::mem::size_of::<Vec<usize>>()).expect("Vec size fits");
-    let usize_bytes = u64::try_from(std::mem::size_of::<usize>()).expect("usize size fits");
-    let exact_bytes = 3 * vector_bytes + 3 * usize_bytes;
+    let exact_bytes = compact_reference_sign_plan_bytes(&repeated);
     let exact = DetectionConversionLimits::default()
-        .with_max_repeat_unroll(3)
         .with_max_repeat_iterations(3)
         .with_max_expanded_instructions(4)
-        .with_max_compiled_terms(3)
+        .with_max_compiled_terms(1)
         .with_max_compiled_bytes(exact_bytes);
     circuit_reference_signs_with_limits(&repeated, exact)
         .expect("admit exact repeat, term, and byte limits");
@@ -246,17 +339,10 @@ fn reference_sign_entrypoint_propagates_exact_resource_boundaries() {
         ),
         (
             &repeated,
-            exact.with_max_repeat_unroll(2),
-            DetectionResourceKind::RepeatCount,
-            3,
-            2,
-        ),
-        (
-            &repeated,
-            exact.with_max_compiled_terms(2),
+            exact.with_max_compiled_terms(0),
             DetectionResourceKind::CompiledTerms,
-            3,
-            2,
+            1,
+            0,
         ),
         (
             &repeated,

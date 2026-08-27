@@ -446,6 +446,134 @@ fn m2d_real_process_covers_measurement_sweep_and_output_routes() {
 }
 
 #[test]
+fn m2d_real_process_routes_sweep_pauli_observable_corrections() {
+    let dir = tempdir().expect("tempdir");
+    let circuit = dir.path().join("pauli-sweep.stim");
+    let sweeps = dir.path().join("sweeps.01");
+    write(
+        &circuit,
+        b"R 0 1 2 3\nCZ sweep[0] 0\nOBSERVABLE_INCLUDE(0) X0\nCX sweep[1] 1\nOBSERVABLE_INCLUDE(1) Z1\nCX sweep[2] 2\nOBSERVABLE_INCLUDE(2) Y2\nREPEAT 3 {\n    CX sweep[3] 3\n}\nOBSERVABLE_INCLUDE(3) Z3\n",
+    );
+    write(&sweeps, b"0000\n1111\n");
+
+    for skip_reference in [false, true] {
+        let mut args = vec![
+            OsString::from("m2d"),
+            OsString::from("--in_format=01"),
+            OsString::from("--out_format=01"),
+            OsString::from("--append_observables"),
+            OsString::from("--sweep_format=01"),
+            OsString::from("--circuit"),
+            circuit.clone().into_os_string(),
+            OsString::from("--sweep"),
+            sweeps.clone().into_os_string(),
+        ];
+        if skip_reference {
+            args.push(OsString::from("--skip_reference_sample"));
+        }
+        let output = run(args, b"\n\n");
+        assert_ok(&output, "m2d appended Pauli-observable correction");
+        assert_eq!(output.stdout, b"0000\n1111\n");
+    }
+
+    let observables = dir.path().join("observables.01");
+    let output = run(
+        [
+            OsString::from("m2d"),
+            OsString::from("--in_format=01"),
+            OsString::from("--out_format=01"),
+            OsString::from("--obs_out_format=01"),
+            OsString::from("--skip_reference_sample"),
+            OsString::from("--sweep_format=01"),
+            OsString::from("--circuit"),
+            circuit.into_os_string(),
+            OsString::from("--sweep"),
+            sweeps.into_os_string(),
+            OsString::from("--obs_out"),
+            observables.clone().into_os_string(),
+        ],
+        b"\n\n",
+    );
+    assert_ok(&output, "m2d separate Pauli-observable correction");
+    assert_eq!(output.stdout, b"\n\n");
+    assert_eq!(
+        fs::read(observables).expect("observable side output"),
+        b"0000\n1111\n"
+    );
+}
+
+#[test]
+fn folded_detection_workflows_match_unrolled_outputs_including_ptb64() {
+    const SHOTS: usize = 64;
+    let dir = tempdir().expect("tempdir");
+    let folded = dir.path().join("folded.stim");
+    let unrolled = dir.path().join("unrolled.stim");
+    write(
+        &folded,
+        b"M 0\nREPEAT 3 {\nM 0\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\nREPEAT 2 {\nM 0\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(1) rec[-1] rec[-2]\n}\n}\n",
+    );
+    let mut unrolled_text = String::from("M 0\n");
+    for _ in 0..3 {
+        unrolled_text.push_str("M 0\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n");
+        for _ in 0..2 {
+            unrolled_text
+                .push_str("M 0\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(1) rec[-1] rec[-2]\n");
+        }
+    }
+    write(&unrolled, unrolled_text);
+    let measurements = b"0101101001\n".repeat(SHOTS);
+
+    let run_m2d = |label: &str, circuit: &Path| {
+        let observables = dir.path().join(format!("{label}-observables.b8"));
+        let output = run(
+            [
+                OsString::from("m2d"),
+                OsString::from("--in_format=01"),
+                OsString::from("--out_format=b8"),
+                OsString::from("--skip_reference_sample"),
+                OsString::from("--circuit"),
+                circuit.as_os_str().to_owned(),
+                OsString::from("--obs_out"),
+                observables.clone().into_os_string(),
+                OsString::from("--obs_out_format=b8"),
+            ],
+            &measurements,
+        );
+        assert_ok(&output, &format!("{label} m2d"));
+        (
+            output.stdout,
+            fs::read(observables).expect("observable output"),
+        )
+    };
+    let folded_m2d = run_m2d("folded", &folded);
+    let unrolled_m2d = run_m2d("unrolled", &unrolled);
+    assert_eq!(folded_m2d, unrolled_m2d);
+    assert_eq!(folded_m2d.0.len(), 9_usize.div_ceil(8) * SHOTS);
+    assert_eq!(folded_m2d.1.len(), 2_usize.div_ceil(8) * SHOTS);
+
+    let run_detect = |label: &str, circuit: &Path| {
+        let output = run(
+            [
+                OsString::from("detect"),
+                OsString::from("--shots=64"),
+                OsString::from("--seed=17"),
+                OsString::from("--append_observables"),
+                OsString::from("--out_format=ptb64"),
+                OsString::from("--in"),
+                circuit.as_os_str().to_owned(),
+            ],
+            b"unused stdin",
+        );
+        assert_ok(&output, &format!("{label} detect"));
+        output.stdout
+    };
+    let folded_detect = run_detect("folded", &folded);
+    let unrolled_detect = run_detect("unrolled", &unrolled);
+    assert_eq!(folded_detect, unrolled_detect);
+    assert_eq!(folded_detect.len(), 11 * size_of::<u64>());
+}
+
+#[test]
 fn analyze_errors_real_process_routes_all_nondeprecated_options() {
     let dir = tempdir().expect("tempdir");
     let input = dir.path().join("input.stim");

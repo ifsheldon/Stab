@@ -323,21 +323,21 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             {
                 "operation": "sample",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 3,
+                "compiler_schema_version": 4,
                 "request_fingerprint_schema_version": 1,
                 "configurable_limits": false
             },
             {
                 "operation": "m2d",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 2,
+                "compiler_schema_version": 3,
                 "request_fingerprint_schema_version": null,
                 "configurable_limits": true
             },
             {
                 "operation": "detect",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 2,
+                "compiler_schema_version": 3,
                 "request_fingerprint_schema_version": null,
                 "configurable_limits": true
             },
@@ -602,14 +602,14 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
     let second = json_stdout(&second_stdout);
     assert_sample_plan_schema(&first);
     assert_sample_plan_schema(&second);
-    assert_eq!(pointer(&first, "/schema_version"), 3);
-    assert_eq!(pointer(&second, "/schema_version"), 3);
+    assert_eq!(pointer(&first, "/schema_version"), 4);
+    assert_eq!(pointer(&second, "/schema_version"), 4);
 
     assert_eq!(
         pointer(&first, "/compilation/request_fingerprint/digest"),
         pointer(&second, "/compilation/request_fingerprint/digest")
     );
-    assert_eq!(
+    assert_ne!(
         pointer(&first, "/compilation/plan_fingerprint/digest"),
         pointer(&second, "/compilation/plan_fingerprint/digest")
     );
@@ -619,7 +619,11 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
     );
     assert_eq!(
         pointer(&first, "/compilation/normalized_options"),
-        &serde_json::json!([])
+        &serde_json::json!(["reference-loop-policy=fold"])
+    );
+    assert_eq!(
+        pointer(&second, "/compilation/normalized_options"),
+        &serde_json::json!(["reference-loop-policy=iterate"])
     );
     assert_eq!(
         pointer(&first, "/compilation/configurable_limits"),
@@ -634,8 +638,12 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
         1
     );
     assert_eq!(
+        pointer(&first, "/run/skip_loop_folding_effect"),
+        "fold-invariant-reference-repeats"
+    );
+    assert_eq!(
         pointer(&second, "/run/skip_loop_folding_effect"),
-        "accepted-no-op"
+        "iterate-reference-repeats"
     );
     assert_eq!(pointer(&second, "/executes"), false);
     assert_eq!(pointer(&second, "/compilation/validated"), true);

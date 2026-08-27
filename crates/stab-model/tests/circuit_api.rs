@@ -6,7 +6,8 @@
 use std::collections::BTreeMap;
 
 use stab_model::{
-    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, QubitId, RepeatBlock,
+    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, QubitId, RepeatBlock, RepeatCount,
+    RepeatNestingLimit,
 };
 
 fn single_item(input: &str) -> CircuitItem {
@@ -53,6 +54,58 @@ fn circuit_public_qubit_count_excludes_mpad_pad_values_like_stim() {
     let nested = Circuit::from_stim_str("REPEAT 3 {\n    MPAD 1\n    M 4\n}\n")
         .expect("parse repeat-nested MPAD circuit");
     assert_eq!(nested.count_qubits(), 5);
+}
+
+#[test]
+fn count_qubits_and_drop_fit_the_accepted_repeat_depth_on_a_small_stack() {
+    let worker = std::thread::Builder::new()
+        .name("count-qubits-accepted-depth".to_string())
+        .stack_size(64 * 1024)
+        .spawn(|| {
+            let repeat_count = RepeatCount::try_new(1).expect("nonzero repeat count");
+            let mut circuit =
+                Circuit::from_stim_str("H 1023\n").expect("parse innermost instruction");
+            for _ in 0..RepeatNestingLimit::HARD_MAX {
+                let mut outer = Circuit::new();
+                outer.append_repeat_block(RepeatBlock::new(repeat_count, circuit, None));
+                circuit = outer;
+            }
+
+            assert_eq!(circuit.count_qubits(), 1024);
+            drop(circuit);
+        })
+        .expect("spawn constrained-stack worker");
+
+    worker
+        .join()
+        .expect("counting and normal destruction stay within the constrained stack");
+}
+
+#[test]
+fn count_qubits_temporary_storage_depends_on_depth_not_repeat_siblings() {
+    fn repeated_siblings(count: usize) -> Circuit {
+        let repeat_count = RepeatCount::try_new(1).expect("nonzero repeat count");
+        let body = Circuit::from_stim_str("H 31\n").expect("parse repeated body");
+        let mut circuit = Circuit::new();
+        for _ in 0..count {
+            circuit.append_repeat_block(RepeatBlock::new(repeat_count, body.clone(), None));
+        }
+        circuit
+    }
+
+    let narrow = repeated_siblings(1);
+    let broad = repeated_siblings(4_096);
+    let narrow_allocations = allocation_counter::measure(|| assert_eq!(narrow.count_qubits(), 32));
+    let broad_allocations = allocation_counter::measure(|| assert_eq!(broad.count_qubits(), 32));
+
+    assert_eq!(
+        broad_allocations.count_total,
+        narrow_allocations.count_total
+    );
+    assert_eq!(
+        broad_allocations.bytes_total,
+        narrow_allocations.bytes_total
+    );
 }
 
 #[test]

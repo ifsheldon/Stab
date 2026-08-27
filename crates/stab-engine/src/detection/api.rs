@@ -13,7 +13,7 @@ use stab_records::{
 };
 
 use super::error::DetectionError;
-use super::frame::{DirectDetectorFramePlan, DirectDetectorFrameState};
+use super::frame::{DetectorFrameState, DirectDetectorFramePlan};
 use super::{
     DetectionConversionLimits, DetectionRecordBuffer, PreparedDetectionSampling,
     PreparedMeasurementToDetection, try_false_vec,
@@ -167,7 +167,8 @@ impl DetectionBatchBuffers {
 pub struct MeasurementToDetectionSession {
     plan: MeasurementToDetectionPlan,
     reference_sample: Vec<bool>,
-    reference_scratch: Option<crate::sampling::ReferenceSampleScratch>,
+    sweep_correction: Option<DetectorFrameState>,
+    correction_rng: SmallRng,
     measurement_record: Vec<bool>,
     sweep_record: Vec<bool>,
     detection_record: DetectionRecordBuffer,
@@ -206,10 +207,10 @@ impl MeasurementToDetectionSession {
             reference_sample: converter
                 .try_reusable_reference_sample()
                 .map_err(DetectionExecutionError::Conversion)?,
-            reference_scratch: converter
-                .reference_sample
-                .reusable_scratch()
-                .map_err(reference_scratch_error)?,
+            sweep_correction: converter
+                .try_reusable_sweep_correction()
+                .map_err(DetectionExecutionError::Conversion)?,
+            correction_rng: SmallRng::seed_from_u64(0),
             measurement_record: try_false_vec(
                 converter.measurement_count(),
                 "measurement-to-detection input record",
@@ -465,12 +466,13 @@ impl MeasurementToDetectionSession {
                 self.sweep_record.fill(false);
             }
             converter
-                .convert_record_with_sweep_and_scratch_into(
+                .convert_record_with_sweep_into(
                     &self.measurement_record,
                     &self.sweep_record,
                     &mut self.reference_sample,
                     &mut self.detection_record,
-                    self.reference_scratch.as_mut(),
+                    self.sweep_correction.as_mut(),
+                    &mut self.correction_rng,
                 )
                 .map_err(DetectionExecutionError::Conversion)?;
             self.batch
@@ -668,12 +670,12 @@ impl DetectionSamplingPlan {
 
 #[allow(
     clippy::large_enum_variant,
-    reason = "the fused state keeps SamplingSession's admitted inline frame without an infallible box allocation"
+    reason = "both private variants own already-admitted fallible session storage without a second allocation layer"
 )]
 enum DetectionSamplingState {
     DirectDetectorFrame {
         rng: SmallRng,
-        frame: DirectDetectorFrameState,
+        frame: DetectorFrameState,
         batch: DetectionBatchBuffers,
         cancellation: OnceLock<SamplingCancellation>,
     },
@@ -860,7 +862,7 @@ impl DetectionSamplingSession {
 fn run_direct<Sink>(
     plan: &DetectionSamplingPlan,
     rng: &mut SmallRng,
-    frame: &mut DirectDetectorFrameState,
+    frame: &mut DetectorFrameState,
     batch: &mut DetectionBatchBuffers,
     cancellation: &OnceLock<SamplingCancellation>,
     shots: ShotCount,
@@ -1048,12 +1050,7 @@ fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan) -> u128 {
         .saturating_add(sweeps)
         .saturating_add(records)
         .saturating_add(packed_batch_bytes)
-        .saturating_add(
-            plan.inner
-                .converter
-                .reference_sample
-                .reusable_scratch_storage_bytes(),
-        )
+        .saturating_add(plan.inner.converter.sweep_correction_storage_bytes())
 }
 
 fn construct_fused_state_after_admission<T>(
@@ -1077,9 +1074,9 @@ fn validate_direct_session_storage(
 ) -> Result<(), DetectionExecutionError> {
     let qubits = plan.qubit_count() as u128;
     let measurements = plan.measurement_count() as u128;
-    let records = plan
-        .detector_count()
-        .saturating_add(plan.observable_count()) as u128;
+    let detectors = plan.detector_count() as u128;
+    let observables = plan.observable_count() as u128;
+    let records = detectors.saturating_add(observables);
     let packed_batch_bytes = records
         .saturating_mul(MAX_BATCH_SHOTS as u128)
         .saturating_add(7)
@@ -1087,8 +1084,9 @@ fn validate_direct_session_storage(
     validate_session_storage(
         qubits
             .saturating_mul(2)
-            .saturating_add(measurements)
-            .saturating_add(records)
+            .saturating_add(measurements.saturating_mul(2))
+            .saturating_add(detectors)
+            .saturating_add(observables.saturating_mul(2))
             .saturating_add(packed_batch_bytes),
     )
 }
@@ -1110,25 +1108,6 @@ fn detection_rng(policy: RandomPolicy) -> SmallRng {
 fn storage_error(error: stab_records::FormatError) -> DetectionExecutionError {
     DetectionExecutionError::SessionStorageAllocation {
         message: error.to_string(),
-    }
-}
-
-fn reference_scratch_error(error: crate::SamplingExecutionError) -> DetectionExecutionError {
-    match error {
-        crate::SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes,
-        } => DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes,
-        },
-        crate::SamplingExecutionError::SessionStorageAllocation { message } => {
-            DetectionExecutionError::SessionStorageAllocation { message }
-        }
-        crate::SamplingExecutionError::InvalidSweepRecordWidth { .. } => {
-            DetectionExecutionError::Conversion(DetectionError::from(error))
-        }
-        other => DetectionExecutionError::Sampling(other),
     }
 }
 

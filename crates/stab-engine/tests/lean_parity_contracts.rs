@@ -7,8 +7,9 @@
 use std::convert::Infallible;
 
 use stab_engine::{
-    DetectionRunStatus, DetectionSamplingCompiler, MeasurementToDetectionCompiler, RandomPolicy,
-    ReferenceSampleMode, SamplingCompiler, SamplingRunStatus, Seed, ShotCount,
+    DetectionCompileError, DetectionError, DetectionRunStatus, DetectionSamplingCompiler,
+    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, SamplingCompiler,
+    SamplingRunStatus, Seed, ShotCount,
 };
 use stab_model::Circuit;
 use stab_records::{
@@ -511,13 +512,38 @@ fn detection_common_frame_gate_surface_contract() {
 }
 
 #[test]
-fn detection_sweep_and_feedback_common_contract() {
-    let sweep_circuit =
-        circuit("CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n");
+fn detection_sweep_feedback_and_folded_conversion_contract() {
+    let sweep_circuit = circuit(
+        "REPEAT 3 {\n\
+             R 0 1 4 5\n\
+             RX 2 3\n\
+             CX sweep[0] 0\n\
+             CY sweep[1] 1\n\
+             CZ sweep[2] 2\n\
+             CZ 3 sweep[3]\n\
+             XCZ 4 sweep[4]\n\
+             YCZ 5 sweep[5]\n\
+             M 0 1\n\
+             MX 2 3\n\
+             M 4 5\n\
+             DETECTOR rec[-6]\n\
+             DETECTOR rec[-5]\n\
+             DETECTOR rec[-4]\n\
+             DETECTOR rec[-3]\n\
+             DETECTOR rec[-2]\n\
+             DETECTOR rec[-1]\n\
+             OBSERVABLE_INCLUDE(0) rec[-6]\n\
+             OBSERVABLE_INCLUDE(1) rec[-5]\n\
+             OBSERVABLE_INCLUDE(2) rec[-4]\n\
+             OBSERVABLE_INCLUDE(3) rec[-3]\n\
+             OBSERVABLE_INCLUDE(4) rec[-2]\n\
+             OBSERVABLE_INCLUDE(5) rec[-1]\n\
+         }\n",
+    );
     let plan = MeasurementToDetectionCompiler::new()
         .compile(&sweep_circuit)
         .expect("compile sweep conversion");
-    let measurements = PackedShotBatch::from_records(&[vec![false], vec![false], vec![true]], 1)
+    let measurements = PackedShotBatch::from_records(&[vec![false; 18], vec![false; 18]], 18)
         .expect("pack measurements");
 
     let mut omitted_session = plan.session().expect("create omitted-sweep session");
@@ -529,16 +555,10 @@ fn detection_sweep_and_feedback_common_contract() {
             &mut omitted,
         )
         .expect("convert with omitted all-false sweeps");
-    assert_eq!(
-        omitted.detectors,
-        vec![vec![false], vec![false], vec![true]]
-    );
-    assert_eq!(
-        omitted.observables,
-        vec![vec![false], vec![false], vec![true]]
-    );
+    assert_eq!(omitted.detectors, vec![vec![false; 18]; 2]);
+    assert_eq!(omitted.observables, vec![vec![false; 6]; 2]);
 
-    let sweeps = PackedShotBatch::from_records(&[vec![false], vec![true], vec![true]], 1)
+    let sweeps = PackedShotBatch::from_records(&[vec![false; 6], vec![true; 6]], 6)
         .expect("pack sweep records");
     let mut explicit_session = plan.session().expect("create explicit-sweep session");
     let mut explicit = DetectionCollector::default();
@@ -549,19 +569,64 @@ fn detection_sweep_and_feedback_common_contract() {
             &mut explicit,
         )
         .expect("convert with per-shot sweeps");
-    assert_eq!(
-        explicit.detectors,
-        vec![vec![false], vec![true], vec![false]]
+    assert_eq!(explicit.detectors, vec![vec![false; 18], vec![true; 18]]);
+    assert_eq!(explicit.observables, vec![vec![false; 6], vec![true; 6]]);
+
+    let pauli_circuit = circuit(
+        "R 0 1 2 3\n\
+         CZ sweep[0] 0\n\
+         OBSERVABLE_INCLUDE(0) X0\n\
+         CX sweep[1] 1\n\
+         OBSERVABLE_INCLUDE(1) Z1\n\
+         CX sweep[2] 2\n\
+         OBSERVABLE_INCLUDE(2) Y2\n\
+         REPEAT 3 {\n\
+             CX sweep[3] 3\n\
+         }\n\
+         OBSERVABLE_INCLUDE(3) Z3\n",
     );
-    assert_eq!(
-        explicit.observables,
-        vec![vec![false], vec![true], vec![false]]
-    );
+    let empty_measurements =
+        PackedShotBatch::from_records(&[Vec::new(), Vec::new()], 0).expect("pack empty records");
+    let pauli_sweeps = PackedShotBatch::from_records(
+        &[
+            vec![false, false, false, false],
+            vec![true, true, true, true],
+        ],
+        4,
+    )
+    .expect("pack Pauli-observable sweeps");
+    for mode in [
+        ReferenceSampleMode::UseReferenceSample,
+        ReferenceSampleMode::SkipReferenceSample,
+    ] {
+        let plan = MeasurementToDetectionCompiler::new()
+            .reference_sample_mode(mode)
+            .compile(&pauli_circuit)
+            .expect("compile sweep Pauli-observable conversion");
+        let mut session = plan
+            .session()
+            .expect("create sweep Pauli-observable session");
+        let mut output = DetectionCollector::default();
+        session
+            .run(
+                MeasurementBatchView::new(empty_measurements.view()),
+                Some(MeasurementBatchView::new(pauli_sweeps.view())),
+                &mut output,
+            )
+            .expect("convert sweep Pauli observables");
+        assert_eq!(output.detectors, vec![Vec::new(), Vec::new()]);
+        assert_eq!(
+            output.observables,
+            vec![vec![false; 4], vec![true; 4]],
+            "{mode:?}"
+        );
+    }
 
     for (gate, preparation, measurement) in [
         ("CX rec[-1] 1", "R 1", "M 1"),
         ("CY rec[-1] 1", "R 1", "M 1"),
         ("CZ rec[-1] 1", "RX 1", "MX 1"),
+        ("CZ 1 rec[-1]", "RX 1", "MX 1"),
         ("XCZ 1 rec[-1]", "R 1", "M 1"),
         ("YCZ 1 rec[-1]", "R 1", "M 1"),
     ] {
@@ -605,4 +670,96 @@ fn detection_sweep_and_feedback_common_contract() {
             );
         }
     }
+
+    let folded_feedback = circuit(
+        "R 0 1\n\
+         X 0\n\
+         M 0\n\
+         REPEAT 3 {\n\
+             CX rec[-1] 1\n\
+             M 1\n\
+             DETECTOR rec[-1]\n\
+             OBSERVABLE_INCLUDE(0) rec[-1]\n\
+         }\n",
+    );
+    let folded_plan = MeasurementToDetectionCompiler::new()
+        .compile(&folded_feedback)
+        .expect("compile folded feedback conversion");
+    let folded_measurements = PackedShotBatch::from_records(
+        &[
+            vec![true, true, false, false],
+            vec![true, true, true, false],
+        ],
+        4,
+    )
+    .expect("pack folded feedback measurements");
+    let mut folded_session = folded_plan
+        .session()
+        .expect("create folded feedback session");
+    let mut folded_output = DetectionCollector::default();
+    folded_session
+        .run(
+            MeasurementBatchView::new(folded_measurements.view()),
+            None,
+            &mut folded_output,
+        )
+        .expect("convert folded feedback measurements");
+    assert_eq!(
+        folded_output.detectors,
+        vec![vec![false, false, false], vec![false, true, false]]
+    );
+    assert_eq!(folded_output.observables, vec![vec![false], vec![true]]);
+
+    let classical_cz = circuit(
+        "R 0 1\n\
+         X 0\n\
+         M 0 0\n\
+         REPEAT 2 {\n\
+             CZ rec[-1] sweep[0]\n\
+             CZ sweep[0] rec[-1]\n\
+             CZ rec[-1] rec[-2]\n\
+             CZ sweep[0] sweep[1]\n\
+         }\n\
+         M 1\n\
+         DETECTOR rec[-1]\n",
+    );
+    let noop_plan = MeasurementToDetectionCompiler::new()
+        .compile(&classical_cz)
+        .expect("compile all-classical CZ conversion");
+    let noop_measurements = PackedShotBatch::from_records(&[vec![true, true, false]], 3)
+        .expect("pack no-op measurements");
+    let noop_sweeps =
+        PackedShotBatch::from_records(&[vec![true, true]], 2).expect("pack no-op sweeps");
+    let mut noop_session = noop_plan.session().expect("create no-op session");
+    let mut noop_output = DetectionCollector::default();
+    noop_session
+        .run(
+            MeasurementBatchView::new(noop_measurements.view()),
+            Some(MeasurementBatchView::new(noop_sweeps.view())),
+            &mut noop_output,
+        )
+        .expect("convert all-classical CZ circuit");
+    assert_eq!(noop_output.detectors, vec![vec![false]]);
+
+    let invalid_nested_reference = circuit(
+        "REPEAT 2 {\n\
+             REPEAT 2 {\n\
+                 M 0\n\
+                 DETECTOR rec[-2]\n\
+             }\n\
+         }\n",
+    );
+    let error = MeasurementToDetectionCompiler::new()
+        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
+        .compile(&invalid_nested_reference)
+        .expect_err("a lookback available only after a later iteration must reject");
+    assert!(
+        matches!(
+            error,
+            DetectionCompileError::InvalidCircuit(
+                DetectionError::InvalidResultFormat { ref message }
+            ) if message.contains("rec[-2]") && message.contains("not available")
+        ),
+        "unexpected nested lookback error: {error}"
+    );
 }

@@ -3,19 +3,26 @@ use crate::Target;
 
 impl Circuit {
     pub fn count_qubits(&self) -> usize {
-        self.items
-            .iter()
-            .map(CircuitItem::count_qubits)
-            .max()
-            .unwrap_or(0)
-    }
-}
+        let mut count = 0;
+        let mut pending = Vec::new();
+        let mut items = self.items.iter();
 
-impl CircuitItem {
-    fn count_qubits(&self) -> usize {
-        match self {
-            Self::Instruction(instruction) => instruction.count_qubits(),
-            Self::RepeatBlock(repeat) => repeat.body().count_qubits(),
+        loop {
+            match items.next() {
+                Some(CircuitItem::Instruction(instruction)) => {
+                    count = count.max(instruction.count_qubits());
+                }
+                Some(CircuitItem::RepeatBlock(repeat)) => {
+                    pending.push(items);
+                    items = repeat.body().items().iter();
+                }
+                None => {
+                    let Some(parent) = pending.pop() else {
+                        return count;
+                    };
+                    items = parent;
+                }
+            }
         }
     }
 }

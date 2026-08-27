@@ -46,7 +46,8 @@ use stab_analysis::{
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 use stab_engine::{
-    RandomPolicy, ReferenceSampleMode, RunError, SamplingCompiler, SamplingSession, Seed, ShotCount,
+    RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingCompiler,
+    SamplingSession, Seed, ShotCount,
 };
 use stab_model::{Circuit, CircuitItem, ModelResult, Probability};
 use stab_records::{
@@ -854,7 +855,13 @@ where
         read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "sample circuit input")?
     };
     let circuit = Circuit::from_stim_bytes(&input_bytes)?;
+    let reference_sample_loop_policy = if args.skip_loop_folding {
+        ReferenceSampleLoopPolicy::Iterate
+    } else {
+        ReferenceSampleLoopPolicy::Fold
+    };
     let plan = SamplingCompiler::new()
+        .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
         .map_err(CliError::from)?;
     let skip_reference_sample = args.skip_reference_sample || args.frame0;

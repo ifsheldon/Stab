@@ -891,8 +891,9 @@ fn direct_compiled_bytes(plan: &DetectionSamplingPlan) -> u64 {
 
 #[test]
 fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
-    let circuit =
-        circuit("H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n");
+    let circuit = circuit(
+        "H 0\nCX sweep[0] 0\nSPP X0*Z1\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    );
     let plan = MeasurementToDetectionCompiler::new()
         .compile(&circuit)
         .expect("compile sweep conversion");
@@ -926,7 +927,13 @@ fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
 
 #[test]
 fn warmed_detection_variants_reuse_session_and_batch_storage() {
-    let circuit = circuit("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n");
+    let spp = (0..32)
+        .map(|qubit| format!("X{qubit}"))
+        .collect::<Vec<_>>()
+        .join("*");
+    let circuit = circuit(&format!(
+        "SPP {spp}\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n"
+    ));
     let compiler = DetectionSamplingCompiler::new();
     for plan in [
         compiler
@@ -956,6 +963,17 @@ fn warmed_detection_variants_reuse_session_and_batch_storage() {
         );
         assert_eq!(sink.shots, 64 * 129);
     }
+}
+
+#[test]
+fn direct_frame_rejects_anti_hermitian_spp_during_compilation() {
+    let circuit = circuit("SPP X0*Z0\nM 0\nDETECTOR rec[-1]\n");
+    let error = DetectionSamplingCompiler::new()
+        .compile_direct_for_test(&circuit)
+        .expect_err("reject anti-Hermitian SPP before a session exists");
+
+    assert!(matches!(error, DetectionCompileError::InvalidCircuit(_)));
+    assert!(error.to_string().contains("anti-Hermitian"));
 }
 
 #[test]

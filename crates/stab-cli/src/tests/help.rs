@@ -70,7 +70,7 @@ fn agent_command_help_names_the_current_success_schema() {
     for (topic, schema) in [
         ("capabilities", "schema-version-5"),
         ("inspect", "schema-version-2"),
-        ("plan", "schema-version-3"),
+        ("plan", "schema-version-4"),
     ] {
         let (status, stdout, stderr) = run_cli(&["stab", "help", topic]);
         assert_eq!(status, 0, "{topic}");

@@ -182,7 +182,7 @@ const TWO_QUBIT_FRAME_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
 
 pub(super) fn unsupported_frame_instruction(instruction: &CircuitInstruction) -> DetectionError {
     DetectionError::invalid_sampler_compilation(format!(
-        "M9 detector frame subset does not support {}",
+        "detector frame execution does not support {}",
         instruction.gate().canonical_name()
     ))
 }

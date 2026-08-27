@@ -39,10 +39,11 @@ pub use sampled_flow::{SampledFlowError, sample_if_circuit_has_stabilizer_flows}
 pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{
     CircuitReferenceSampleError, CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy,
-    ReferenceSampleMode, RunError, SamplingBackend, SamplingCancellation, SamplingCompileError,
-    SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError, SamplingPlan,
-    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
-    SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
+    ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingBackend,
+    SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
+    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
+    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
+    circuit_reference_sample, count_determined_measurements,
 };
 pub use sampling_estimate::estimate_sampling_request;
 

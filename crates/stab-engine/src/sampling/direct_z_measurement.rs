@@ -2,7 +2,7 @@ use rand::{Rng, RngExt as _};
 
 use stab_algebra::PauliBasis;
 
-use super::operation::SampleOperation;
+use super::operation::{SampleOperation, SampleProgram, SampleProgramEntry};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct DirectZMeasurementPlan {
@@ -12,26 +12,26 @@ pub(super) struct DirectZMeasurementPlan {
 }
 
 pub(super) fn compile(
-    operations: &[SampleOperation],
+    operations: &SampleProgram,
     measurement_count: usize,
 ) -> Option<DirectZMeasurementPlan> {
     if measurement_count != 1 {
         return None;
     }
-    match operations {
+    match operations.entries() {
         [
-            SampleOperation::SingleQubitPauliChannel {
+            SampleProgramEntry::Execute(SampleOperation::SingleQubitPauliChannel {
                 qubit,
                 probabilities,
                 ..
-            },
-            SampleOperation::Measure {
+            }),
+            SampleProgramEntry::Execute(SampleOperation::Measure {
                 qubit: measure_qubit,
                 basis,
                 inverted,
                 flip_probability,
                 reset,
-            },
+            }),
         ] if qubit == measure_qubit && *basis == PauliBasis::Z && !reset => {
             Some(DirectZMeasurementPlan {
                 pauli_flip_probability: Some(z_measurement_pauli_flip_probability(probabilities)),
@@ -40,13 +40,13 @@ pub(super) fn compile(
             })
         }
         [
-            SampleOperation::Measure {
+            SampleProgramEntry::Execute(SampleOperation::Measure {
                 basis,
                 inverted,
                 flip_probability,
                 reset,
                 ..
-            },
+            }),
         ] if *basis == PauliBasis::Z && !reset => Some(DirectZMeasurementPlan {
             pauli_flip_probability: None,
             measurement_flip_probability: *flip_probability,

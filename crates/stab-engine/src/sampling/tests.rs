@@ -3,6 +3,9 @@
     reason = "sampling unit tests use direct fixture parsing assertions for compact diagnostics"
 )]
 
+use super::execute::{ReferenceExecutionStats, execute_reference_operations};
+use super::small_frame::SmallStabilizerFrame;
+use super::stabilizer_frame::StabilizerStateSnapshot;
 use super::*;
 use stab_model::Gate;
 use stab_records::{MeasurementBatchView, MeasurementSink};
@@ -96,6 +99,180 @@ fn count_determined(input: &str, unknown_input: bool) -> u64 {
     count_determined_measurements(&circuit, unknown_input).expect("count determined measurements")
 }
 
+fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionStats) {
+    let mut rng = SmallRng::seed_from_u64(0);
+    let mut frame = StabilizerFrame::try_new(plan.inner.qubit_count).expect("reference frame");
+    let mut snapshot =
+        StabilizerStateSnapshot::try_new(plan.inner.qubit_count).expect("reference state snapshot");
+    let mut record = Vec::with_capacity(plan.inner.measurement_count);
+    let mut output = Vec::with_capacity(plan.inner.measurement_count);
+    let mut correlated_error_occurred = false;
+    let mut buffers = ExecutionBuffers {
+        frame: &mut frame,
+        record: &mut record,
+        output: &mut output,
+        correlated_error_occurred: &mut correlated_error_occurred,
+    };
+    let stats = execute_reference_operations(
+        &plan.inner.operations,
+        &mut buffers,
+        &mut rng,
+        &[],
+        plan.reference_sample_loop_policy(),
+        Some(&mut snapshot),
+    )
+    .expect("execute reference program");
+    (output, stats)
+}
+
+#[test]
+fn reference_loop_policy_reuses_only_proven_invariant_work() {
+    let invariant = Circuit::from_stim_str("REPEAT 512 {\n    H 0\n    M 0\n    R 0\n}\n")
+        .expect("parse invariant loop");
+    let folded = SamplingCompiler::new()
+        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Fold)
+        .compile(&invariant)
+        .expect("compile folded reference plan");
+    let iterated = SamplingCompiler::new()
+        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
+        .compile(&invariant)
+        .expect("compile iterative reference plan");
+    let (folded_output, folded_stats) = reference_with_stats(&folded);
+    let (iterated_output, iterated_stats) = reference_with_stats(&iterated);
+
+    assert_eq!(folded_output, iterated_output);
+    assert_eq!(folded_output.len(), 512);
+    assert_eq!(folded_stats.folded_repeats, 1);
+    assert_eq!(folded_stats.reused_iterations, 511);
+    assert_eq!(folded_stats.reused_operation_dispatches, 1_533);
+    assert_eq!(iterated_stats, ReferenceExecutionStats::default());
+    assert_ne!(folded.fingerprint(), iterated.fingerprint());
+
+    for source in [
+        "REPEAT 128 {\n    H 0\n}\nM 0\n",
+        "M 0\nREPEAT 128 {\n    CX rec[-1] 0\n    M 0\n}\n",
+    ] {
+        let circuit = Circuit::from_stim_str(source).expect("parse non-foldable loop");
+        let folded = SamplingCompiler::new()
+            .compile(&circuit)
+            .expect("compile non-foldable loop");
+        let iterated = SamplingCompiler::new()
+            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
+            .compile(&circuit)
+            .expect("compile iterative non-foldable loop");
+        let (folded_output, folded_stats) = reference_with_stats(&folded);
+        let (iterated_output, _) = reference_with_stats(&iterated);
+        assert_eq!(folded_output, iterated_output, "{source}");
+        assert_eq!(folded_stats, ReferenceExecutionStats::default(), "{source}");
+    }
+
+    let body = std::iter::repeat_n("    H 0\n", 64).collect::<String>();
+    let narrow = Circuit::from_stim_str(&format!("REPEAT 2 {{\n{body}}}\nM 0\n"))
+        .expect("parse narrow fold-profitability circuit");
+    let wide = Circuit::from_stim_str(&format!("REPEAT 2 {{\n{body}}}\nM 127\n"))
+        .expect("parse wide fold-profitability circuit");
+    let narrow = SamplingCompiler::new()
+        .compile(&narrow)
+        .expect("compile narrow fold-profitability circuit");
+    let wide = SamplingCompiler::new()
+        .compile(&wide)
+        .expect("compile wide fold-profitability circuit");
+    assert!(narrow.inner.has_reference_state_snapshot_candidate());
+    assert!(!wide.inner.has_reference_state_snapshot_candidate());
+    assert!(!wide.inner.uses_reference_state_snapshot());
+}
+
+#[test]
+fn reference_snapshot_storage_is_limited_to_fold_candidates() {
+    let ordinary = SamplingCompiler::new()
+        .compile(&Circuit::from_stim_str("H 0\nM 0\n").expect("parse ordinary reference"))
+        .expect("compile ordinary reference");
+    assert!(!ordinary.inner.has_reference_state_snapshot_candidate());
+    assert!(!ordinary.inner.uses_reference_state_snapshot());
+    assert_eq!(
+        ordinary.estimated_reference_work_storage_bytes(),
+        general_frame_work_storage_bytes(
+            ordinary.inner.qubit_count,
+            ordinary.inner.measurement_count,
+            false,
+        )
+    );
+
+    let repeated = Circuit::from_stim_str("REPEAT 512 {\n    H 0\n    M 0\n    R 0\n}\n")
+        .expect("parse reusable reference repeat");
+    let folded = SamplingCompiler::new()
+        .compile(&repeated)
+        .expect("compile folded reference repeat");
+    let iterated = SamplingCompiler::new()
+        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
+        .compile(&repeated)
+        .expect("compile iterated reference repeat");
+
+    assert!(folded.inner.has_reference_state_snapshot_candidate());
+    assert!(folded.inner.uses_reference_state_snapshot());
+    assert!(!iterated.inner.has_reference_state_snapshot_candidate());
+    assert!(!iterated.inner.uses_reference_state_snapshot());
+    assert_eq!(
+        folded
+            .estimated_reference_work_storage_bytes()
+            .saturating_sub(iterated.estimated_reference_work_storage_bytes()),
+        StabilizerStateSnapshot::storage_bytes(folded.inner.qubit_count)
+    );
+
+    let base = general_frame_work_storage_bytes(
+        folded.inner.qubit_count,
+        folded.inner.measurement_count,
+        false,
+    );
+    assert!(reference_state_snapshot_fits(
+        folded.inner.qubit_count,
+        folded.inner.measurement_count,
+        u64::try_from(folded.estimated_reference_work_storage_bytes())
+            .expect("small folded reference estimate"),
+    ));
+    assert!(!reference_state_snapshot_fits(
+        folded.inner.qubit_count,
+        folded.inner.measurement_count,
+        u64::try_from(base).expect("small base reference estimate"),
+    ));
+
+    let fallback_qubits = (SmallStabilizerFrame::MAX_QUBITS + 1..20_000)
+        .find(|qubits| {
+            let base = general_frame_work_storage_bytes(*qubits, 1, false);
+            base <= u128::from(api::MAX_SAMPLING_SESSION_STORAGE_BYTES)
+                && !reference_state_snapshot_fits(
+                    *qubits,
+                    1,
+                    api::MAX_SAMPLING_SESSION_STORAGE_BYTES,
+                )
+        })
+        .expect("reference snapshot has a fallback-only storage interval");
+    let fallback_repetitions = fallback_qubits.saturating_mul(2).saturating_add(1);
+    let fallback_circuit = Circuit::from_stim_str(&format!(
+        "REPEAT {fallback_repetitions} {{\n    H {}\n}}\nM {}\n",
+        fallback_qubits - 1,
+        fallback_qubits - 1
+    ))
+    .expect("parse snapshot-fallback circuit");
+    let fallback_folded = SamplingCompiler::new()
+        .compile(&fallback_circuit)
+        .expect("compile snapshot-fallback circuit");
+    let fallback_iterated = SamplingCompiler::new()
+        .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
+        .compile(&fallback_circuit)
+        .expect("compile explicit-iteration fallback circuit");
+    assert!(
+        fallback_folded
+            .inner
+            .has_reference_state_snapshot_candidate()
+    );
+    assert!(!fallback_folded.inner.uses_reference_state_snapshot());
+    assert_eq!(
+        fallback_folded.estimated_reference_work_storage_bytes(),
+        fallback_iterated.estimated_reference_work_storage_bytes()
+    );
+}
+
 #[test]
 fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
     let mut circuit_text = String::new();
@@ -118,35 +295,44 @@ fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
     let mut frame = StabilizerFrame::new(sampler.plan.inner.qubit_count);
     let mut record = Vec::with_capacity(sampler.plan.inner.measurement_count);
     let mut output = Vec::with_capacity(sampler.plan.inner.measurement_count);
-    sampler.plan.sample_shot_in_mode_into(
-        &mut rng,
-        ExecutionMode::Sample,
-        &[],
-        &mut frame,
-        &mut record,
-        &mut output,
-    );
-
-    let one = allocation_counter::measure(|| {
-        sampler.plan.sample_shot_in_mode_into(
+    sampler
+        .plan
+        .sample_shot_in_mode_into(
             &mut rng,
             ExecutionMode::Sample,
             &[],
             &mut frame,
             &mut record,
             &mut output,
-        );
-    });
-    let many = allocation_counter::measure(|| {
-        for _ in 0..256 {
-            sampler.plan.sample_shot_in_mode_into(
+        )
+        .expect("warm gate corpus");
+
+    let one = allocation_counter::measure(|| {
+        sampler
+            .plan
+            .sample_shot_in_mode_into(
                 &mut rng,
                 ExecutionMode::Sample,
                 &[],
                 &mut frame,
                 &mut record,
                 &mut output,
-            );
+            )
+            .expect("execute one warmed gate corpus");
+    });
+    let many = allocation_counter::measure(|| {
+        for _ in 0..256 {
+            sampler
+                .plan
+                .sample_shot_in_mode_into(
+                    &mut rng,
+                    ExecutionMode::Sample,
+                    &[],
+                    &mut frame,
+                    &mut record,
+                    &mut output,
+                )
+                .expect("execute warmed gate corpus");
         }
     });
 

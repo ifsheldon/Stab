@@ -90,6 +90,24 @@ fn expect_detection_compile_resource(error: DetectionCompileError) -> DetectionR
     }
 }
 
+fn compact_detection_plan_bytes(circuit: &Circuit) -> u64 {
+    let mut limit = 0;
+    loop {
+        match compile_detection(
+            circuit,
+            DetectionConversionLimits::default().with_max_compiled_bytes(limit),
+        ) {
+            Ok(_) => return limit,
+            Err(error) => {
+                let resource = expect_detection_compile_resource(error);
+                assert_eq!(resource.kind(), DetectionResourceKind::CompiledBytes);
+                assert!(resource.actual() > limit);
+                limit = resource.actual();
+            }
+        }
+    }
+}
+
 #[test]
 fn a6_compilation_descriptors_are_complete_and_executable() {
     let descriptor = COMPILATION_DESCRIPTOR;
@@ -127,14 +145,14 @@ fn a6_compilation_descriptors_are_complete_and_executable() {
             (
                 CompilationOperation::MeasurementToDetection,
                 ModelDialect::StimCircuit,
-                2,
+                3,
                 None,
                 true,
             ),
             (
                 CompilationOperation::DetectionSampling,
                 ModelDialect::StimCircuit,
-                2,
+                3,
                 None,
                 true,
             ),
@@ -357,22 +375,18 @@ fn a2_dem_sampler_work_policy_admission() {
     assert_eq!(rejected_sink.finish_calls, 0);
 }
 
-#[test]
-fn a2_detection_compiled_plan_policy() {
+fn detection_compiled_plan_policy() {
     let circuit = circuit(
         "M 0 1\n\
          REPEAT 3 {\n\
          DETECTOR rec[-1] rec[-2]\n\
          }\n",
     );
-    let vector_bytes = u64::try_from(std::mem::size_of::<Vec<usize>>()).expect("Vec size fits u64");
-    let usize_bytes = u64::try_from(std::mem::size_of::<usize>()).expect("usize size fits u64");
-    let exact_bytes = 3 * vector_bytes + 6 * usize_bytes;
+    let exact_bytes = compact_detection_plan_bytes(&circuit);
     let exact = DetectionConversionLimits::default()
-        .with_max_repeat_unroll(3)
         .with_max_repeat_iterations(3)
         .with_max_expanded_instructions(4)
-        .with_max_compiled_terms(6)
+        .with_max_compiled_terms(2)
         .with_max_compiled_bytes(exact_bytes);
     let plan = compile_detection(&circuit, exact)
         .expect("exact compiled-plan boundaries must be admitted");
@@ -380,10 +394,10 @@ fn a2_detection_compiled_plan_policy() {
 
     for (limits, expected_kind, actual, limit) in [
         (
-            exact.with_max_compiled_terms(5),
+            exact.with_max_compiled_terms(1),
             DetectionResourceKind::CompiledTerms,
-            6,
-            5,
+            2,
+            1,
         ),
         (
             exact.with_max_compiled_bytes(exact_bytes - 1),
@@ -436,26 +450,25 @@ fn a2_detection_frame_policy_propagation() {
          OBSERVABLE_INCLUDE(0) Z0\n\
          }\n",
     );
-    let limits = DetectionConversionLimits::default().with_max_repeat_unroll(1);
+    let limits = DetectionConversionLimits::default().with_max_repeat_iterations(1);
 
     let validation = expect_detection_resource(
         validate_detection_sampling_circuit_with_limits(&circuit, limits)
-            .expect_err("frame validation must apply repeat limits"),
+            .expect_err("frame validation must apply aggregate repeat-work limits"),
     );
     let compilation = expect_detection_compile_resource(
         DetectionSamplingCompiler::new()
             .limits(limits)
             .compile(&circuit)
-            .expect_err("detection sampling compilation must apply repeat limits"),
+            .expect_err("detection sampling compilation must apply aggregate repeat-work limits"),
     );
     for resource in [validation, compilation] {
-        assert_eq!(resource.kind(), DetectionResourceKind::RepeatCount);
+        assert_eq!(resource.kind(), DetectionResourceKind::RepeatIterations);
         assert_eq!((resource.actual(), resource.limit()), (2, 1));
     }
 }
 
-#[test]
-fn a2_detection_record_policy_admission() {
+fn detection_record_policy_admission() {
     let circuit = circuit("M 0 1\nDETECTOR rec[-1]\n");
     let exact = DetectionConversionLimits::default().with_max_record_bits(2);
     let plan = compile_detection(&circuit, exact)
@@ -484,8 +497,7 @@ fn a2_detection_record_policy_admission() {
     assert_eq!((resource.actual(), resource.limit()), (2, 1));
 }
 
-#[test]
-fn a2_detection_repeat_policy_admission() {
+fn detection_repeat_policy_admission() {
     let circuit = circuit(
         "REPEAT 2 {\n\
          REPEAT 2 {\n\
@@ -494,7 +506,6 @@ fn a2_detection_repeat_policy_admission() {
          }\n",
     );
     let exact = DetectionConversionLimits::default()
-        .with_max_repeat_unroll(2)
         .with_max_repeat_iterations(6)
         .with_max_expanded_instructions(100);
     compile_detection(&circuit, exact)
@@ -508,26 +519,33 @@ fn a2_detection_repeat_policy_admission() {
     assert_eq!((resource.actual(), resource.limit()), (6, 5));
 }
 
-#[test]
-fn a2_detection_work_policy_admission() {
-    let circuit = circuit("REPEAT 3 {\nM 0\n}\n");
+fn detection_work_policy_admission() {
+    let repeated_measurement = circuit("REPEAT 3 {\nM 0\n}\n");
     let exact = DetectionConversionLimits::default()
-        .with_max_repeat_unroll(3)
         .with_max_repeat_iterations(3)
         .with_max_expanded_instructions(3);
-    compile_detection(&circuit, exact)
-        .expect("exact repeat and expanded-work maxima must be admitted");
+    compile_detection(&repeated_measurement, exact)
+        .expect("exact aggregate repeat and expanded-work maxima must be admitted");
 
-    let repeat_resource = expect_detection_compile_resource(
-        compile_detection(&circuit, exact.with_max_repeat_unroll(2))
-            .expect_err("per-repeat work must have an independent limit"),
+    let iteration_resource = expect_detection_compile_resource(
+        compile_detection(&repeated_measurement, exact.with_max_repeat_iterations(2))
+            .expect_err("aggregate repeat work must reject its first excess iteration"),
     );
-    assert_eq!(repeat_resource.kind(), DetectionResourceKind::RepeatCount);
-    assert_eq!((repeat_resource.actual(), repeat_resource.limit()), (3, 2));
+    assert_eq!(
+        iteration_resource.kind(),
+        DetectionResourceKind::RepeatIterations
+    );
+    assert_eq!(
+        (iteration_resource.actual(), iteration_resource.limit()),
+        (3, 2)
+    );
 
     let expanded_resource = expect_detection_compile_resource(
-        compile_detection(&circuit, exact.with_max_expanded_instructions(2))
-            .expect_err("expanded instruction work must have an independent limit"),
+        compile_detection(
+            &repeated_measurement,
+            exact.with_max_expanded_instructions(2),
+        )
+        .expect_err("expanded instruction work must have an independent limit"),
     );
     assert_eq!(
         expanded_resource.kind(),
@@ -537,6 +555,23 @@ fn a2_detection_work_policy_admission() {
         (expanded_resource.actual(), expanded_resource.limit()),
         (3, 2)
     );
+
+    let above_old_syntax_cap = circuit("REPEAT 100001 {\nTICK\n}\n");
+    compile_detection(
+        &above_old_syntax_cap,
+        DetectionConversionLimits::default()
+            .with_max_repeat_iterations(100_001)
+            .with_max_expanded_instructions(100_001),
+    )
+    .expect("repeat counts above the obsolete syntax cap remain compact and admissible");
+}
+
+#[test]
+fn a2_detection_compile_limits_are_independent_and_atomic() {
+    detection_compiled_plan_policy();
+    detection_record_policy_admission();
+    detection_repeat_policy_admission();
+    detection_work_policy_admission();
 }
 
 #[test]
@@ -560,8 +595,8 @@ fn a4_sampling_plan_fingerprint_contract() {
 
     let mut executable = Sha256::new();
     executable.update(b"stab:sampling-executable-contract\0");
-    executable.update(2_u16.to_be_bytes());
-    executable.update([1_u8, 1_u8]);
+    executable.update(3_u16.to_be_bytes());
+    executable.update([1_u8, 1_u8, 1_u8]);
     let executable_digest: [u8; 32] = executable.finalize().into();
 
     let mut reconstructed = Sha256::new();
@@ -576,13 +611,13 @@ fn a4_sampling_plan_fingerprint_contract() {
 
     assert_eq!(
         plan.request_fingerprint().digest_hex(),
-        "cf4bb1dd338d9239ca34b7a2874ef93b0af1eccdd8a65f2ebee4c6812fd676f0"
+        "5a20f953b25e8e3e98244638a4dfc4b18f335d0bf8d9a7b38a12a76df3716c6e"
     );
     assert_eq!(fingerprint.executable_contract_digest(), executable_digest);
     assert_eq!(fingerprint.digest(), reconstructed_digest);
     assert_eq!(
         fingerprint.digest_hex(),
-        "82b7cf8908779670b40e4e1711edf3129639007b73fe4fa72d66781934818628"
+        "5aff4a7b7496215be2ff70a7fb57db13a93c1498a71dddcc58604b94e74212ec"
     );
 }
 

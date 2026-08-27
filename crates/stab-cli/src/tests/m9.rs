@@ -180,10 +180,7 @@ fn detect_rejects_invalid_frame_path_sweep_targets_before_opening_output() {
     assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
     let error = String::from_utf8(stderr).unwrap();
-    assert!(
-        error.contains("M9 detector frame subset does not support CX"),
-        "{error}"
-    );
+    assert!(error.contains("CX target shape"), "{error}");
     assert_eq!(
         std::fs::read_to_string(output_path).expect("read output"),
         "keep\n"

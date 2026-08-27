@@ -94,7 +94,9 @@ pub use resources::{CircuitPassStage, ResourceKind, ResourceLimitError, Resource
 /// Low-level lowering operations shared with compilation engines.
 pub mod advanced {
     pub use crate::circuit_flow::flow_record_index;
-    pub use crate::circuit_simplify::decomposed_single_instruction;
+    pub use crate::circuit_simplify::{
+        decomposed_single_instruction, visit_decomposed_spp_instructions,
+    };
     pub use crate::matched_error::{
         CircuitErrorLocationView, CircuitTargetsInsideInstructionView, write_explained_error,
     };

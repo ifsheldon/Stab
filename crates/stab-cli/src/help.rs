@@ -102,7 +102,7 @@ fn command_help(command: &str) -> Option<String> {
             "stab inspect [INPUT]\n\nParses and summarizes a .stim circuit or .dem detector error model without compiling or executing it.\n\nUse --type=stim or --type=dem for stdin or paths without a recognized extension. Use --format=json for schema-version-2 machine output.\n"
         }
         "plan" => {
-            "stab plan sample [INPUT]\n\nValidates and describes a sampling request without executing shots.\n\nRun configuration remains separate from the compilation-request fingerprint. Use --format=json for schema-version-3 machine output.\n"
+            "stab plan sample [INPUT]\n\nValidates and describes a sampling request without executing shots.\n\nRun configuration remains separate from the compilation-request fingerprint. Use --format=json for schema-version-4 machine output.\n"
         }
         "convert" => {
             "stab convert\n\nConverts result data between 01, b8, r8, hits, dets, and ptb64 formats.\n\nLayout flags: --num_measurements, --num_detectors, --num_observables, --bits_per_shot, --circuit, --dem, and --types.\n\nI/O flags: --in_format, --out_format, --in, --out, --obs_out, and --obs_out_format.\n\nThe Stab extension `--in_format=stim --out_format=stim` canonicalizes .stim circuit text.\n"

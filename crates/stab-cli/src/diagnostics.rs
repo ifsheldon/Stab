@@ -69,6 +69,9 @@ pub(crate) enum CliError {
     #[error("failed to serialize agent output: {0}")]
     SerializeAgentOutput(serde_json::Error),
 
+    #[error("internal agent-output contract invariant failed: {message}")]
+    AgentOutputInvariant { message: &'static str },
+
     #[error(transparent)]
     Model(#[from] ModelError),
 
@@ -388,6 +391,7 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::MissingInspectModelType => "missing-inspect-model-type",
         CliError::UnknownInspectModelType { .. } => "unknown-inspect-model-type",
         CliError::SerializeAgentOutput(_) => "agent-output-serialization-failed",
+        CliError::AgentOutputInvariant { .. } => "agent-output-invariant-failed",
         CliError::Model(error) => model_error_code(error),
         CliError::Analysis(error) => analysis_error_code(error),
         CliError::Record(error) | CliError::InputRecord { source: error, .. } => {
@@ -540,6 +544,9 @@ fn cli_error_context(error: &CliError) -> Value {
             "path": path.to_string_lossy(),
         }),
         CliError::SerializeAgentOutput(_) => json!({}),
+        CliError::AgentOutputInvariant { message } => json!({
+            "invariant": message,
+        }),
         CliError::Model(error) => model_error_context(error),
         CliError::Analysis(error) => analysis_error_context(error),
         CliError::Record(error) | CliError::InputRecord { source: error, .. } => {
@@ -980,7 +987,6 @@ fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
     let resource = match error.kind() {
         DetectionResourceKind::RecordBits(_) => "record-bits",
         DetectionResourceKind::RepeatNesting => "repeat-nesting",
-        DetectionResourceKind::RepeatCount => "repeat-count",
         DetectionResourceKind::ExpandedInstructions => "expanded-operations",
         DetectionResourceKind::RepeatIterations => "repeat-iterations",
         DetectionResourceKind::CompiledTerms => "compiled-terms",

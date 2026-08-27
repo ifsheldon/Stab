@@ -153,6 +153,22 @@ pub mod advanced {
         instruction.measurement_result_count()
     }
 
+    /// Returns the minimum heap bytes needed by an untagged clone of an instruction.
+    #[doc(hidden)]
+    pub fn circuit_instruction_minimum_retained_heap_bytes(
+        instruction: &CircuitInstruction,
+    ) -> Option<usize> {
+        instruction.minimum_retained_heap_bytes()
+    }
+
+    /// Returns heap bytes retained by an instruction's actual vector capacities.
+    #[doc(hidden)]
+    pub fn circuit_instruction_retained_heap_bytes(
+        instruction: &CircuitInstruction,
+    ) -> Option<usize> {
+        instruction.retained_heap_bytes()
+    }
+
     /// Reserves exact model storage for a bounded materializing consumer.
     pub fn dem_try_reserve_items_exact(
         model: &mut DetectorErrorModel,

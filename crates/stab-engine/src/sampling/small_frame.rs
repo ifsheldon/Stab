@@ -1,9 +1,10 @@
 use rand::{Rng, RngExt as _};
 
+use super::SamplingExecutionError;
 use super::execute::record_lookback;
 use super::measurement_flip;
 use super::operation::{
-    SINGLE_QUBIT_PAULI_CHANNEL_BASES, SampleOperation, TWO_QUBIT_PAULI_CHANNEL_BASES,
+    SINGLE_QUBIT_PAULI_CHANNEL_BASES, SampleOperation, SampleProgram, TWO_QUBIT_PAULI_CHANNEL_BASES,
 };
 use super::stabilizer_frame::{FrameStorageError, reset_correction};
 use stab_algebra::PauliBasis;
@@ -12,32 +13,33 @@ use stab_model::advanced::ClassicalControl;
 const SMALL_FRAME_MAX_QUBITS: usize = u64::BITS as usize;
 const SMALL_FRAME_MAX_SYMPLECTIC_WIDTH: usize = SMALL_FRAME_MAX_QUBITS * 2;
 
-pub(super) fn supports_operations(operations: &[SampleOperation]) -> bool {
-    operations.iter().all(|operation| match operation {
-        SampleOperation::ApplyHadamard { .. }
-        | SampleOperation::ApplyControlledX { .. }
-        | SampleOperation::Reset { .. }
-        | SampleOperation::Measure { .. }
-        | SampleOperation::MeasureProduct { .. }
-        | SampleOperation::Pad { .. }
-        | SampleOperation::SingleQubitPauliChannel { .. }
-        | SampleOperation::TwoQubitPauliChannel { .. }
-        | SampleOperation::CorrelatedError { .. }
-        | SampleOperation::HeraldedPauliChannel { .. }
-        | SampleOperation::ClassicallyControlledPauli { .. } => true,
-        SampleOperation::Repeat { body, .. } => supports_operations(body),
-        SampleOperation::ApplyTableau { .. } => false,
-    })
+pub(super) fn supports_operations(operations: &SampleProgram) -> bool {
+    operations
+        .executable_operations()
+        .all(|operation| match operation {
+            SampleOperation::ApplyHadamard { .. }
+            | SampleOperation::ApplyControlledX { .. }
+            | SampleOperation::Reset { .. }
+            | SampleOperation::Measure { .. }
+            | SampleOperation::MeasureProduct { .. }
+            | SampleOperation::Pad { .. }
+            | SampleOperation::SingleQubitPauliChannel { .. }
+            | SampleOperation::TwoQubitPauliChannel { .. }
+            | SampleOperation::CorrelatedError { .. }
+            | SampleOperation::HeraldedPauliChannel { .. }
+            | SampleOperation::ClassicallyControlledPauli { .. } => true,
+            SampleOperation::ApplyTableau { .. } => false,
+        })
 }
 
 pub(super) fn sample_shot_into(
-    operations: &[SampleOperation],
+    operations: &SampleProgram,
     frame: &mut SmallStabilizerFrame,
     record: &mut Vec<bool>,
     output: &mut Vec<bool>,
     reference: Option<&[bool]>,
     rng: &mut impl Rng,
-) {
+) -> Result<(), SamplingExecutionError> {
     frame.reset_to_z_basis();
     record.clear();
     output.clear();
@@ -49,25 +51,28 @@ pub(super) fn sample_shot_into(
         output,
         &mut correlated_error_occurred,
         rng,
-    );
+    )?;
     if let Some(reference) = reference {
         for (bit, reference_bit) in output.iter_mut().zip(reference) {
             *bit ^= *reference_bit;
         }
     }
+    Ok(())
 }
 
 fn execute_operations<R>(
-    operations: &[SampleOperation],
+    operations: &SampleProgram,
     frame: &mut SmallStabilizerFrame,
     record: &mut Vec<bool>,
     output: &mut Vec<bool>,
     correlated_error_occurred: &mut bool,
     rng: &mut R,
-) where
+) -> Result<(), SamplingExecutionError>
+where
     R: Rng,
 {
-    for operation in operations {
+    let mut cursor = operations.cursor();
+    while let Some(operation) = cursor.next_operation()? {
         match operation {
             SampleOperation::ApplyHadamard { qubit } => {
                 frame.apply_hadamard(*qubit);
@@ -76,7 +81,10 @@ fn execute_operations<R>(
                 frame.apply_controlled_x(*control, *target);
             }
             SampleOperation::ApplyTableau { .. } => {
-                return;
+                return Err(SamplingExecutionError::InternalInvariant {
+                    message: "small-frame plan retained an unsupported tableau operation"
+                        .to_owned(),
+                });
             }
             SampleOperation::Reset { qubit, basis } => {
                 frame.reset(*qubit, *basis, rng);
@@ -182,13 +190,9 @@ fn execute_operations<R>(
                     frame.apply_pauli(*qubit, *basis);
                 }
             }
-            SampleOperation::Repeat { count, body } => {
-                for _ in 0..*count {
-                    execute_operations(body, frame, record, output, correlated_error_occurred, rng);
-                }
-            }
         }
     }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

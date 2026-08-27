@@ -6,6 +6,7 @@
 
 use stab_analysis::{AnalysisError, circuit_to_tableau, decomposed_circuit, simplified_circuit};
 use stab_model::{Circuit, CircuitItem};
+use std::ops::ControlFlow;
 
 #[test]
 fn simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base() {
@@ -128,6 +129,50 @@ fn decomposed_circuit_reports_typed_anti_hermitian_failures() {
         AnalysisError::InvalidCircuitSimplification { ref message }
             if message.contains("anti-Hermitian")
     ));
+}
+
+#[test]
+fn streamed_spp_lowering_matches_decomposition_and_stops_before_later_work() {
+    let source = circuit("SPP[tag] X0*Y1 Z2\n");
+    let instruction = source
+        .items()
+        .first()
+        .and_then(|item| match item {
+            CircuitItem::Instruction(instruction) => Some(instruction),
+            CircuitItem::RepeatBlock(_) => None,
+        })
+        .expect("SPP fixture must contain one instruction");
+    let mut streamed = Circuit::new();
+    let completion =
+        stab_analysis::advanced::visit_decomposed_spp_instructions(instruction, |lowered| {
+            streamed.append_instruction(lowered);
+            ControlFlow::Continue(())
+        })
+        .expect("stream SPP decomposition");
+    assert!(completion.is_continue());
+    assert_eq!(
+        streamed,
+        decomposed_circuit(&source).expect("materialize SPP decomposition")
+    );
+
+    let source = circuit("SPP X0 X1*Z1\n");
+    let instruction = source
+        .items()
+        .first()
+        .and_then(|item| match item {
+            CircuitItem::Instruction(instruction) => Some(instruction),
+            CircuitItem::RepeatBlock(_) => None,
+        })
+        .expect("SPP fixture must contain one instruction");
+    let mut visits = 0;
+    let completion =
+        stab_analysis::advanced::visit_decomposed_spp_instructions(instruction, |_| {
+            visits += 1;
+            ControlFlow::Break(())
+        })
+        .expect("early stop must not reduce the later anti-Hermitian product");
+    assert!(completion.is_break());
+    assert_eq!(visits, 1);
 }
 
 fn circuit(text: &str) -> Circuit {

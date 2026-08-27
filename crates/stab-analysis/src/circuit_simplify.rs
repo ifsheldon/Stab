@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::ops::ControlFlow;
 
 use stab_algebra::{SingleQubitClifford, StabilizerError};
 use stab_model::{
@@ -30,6 +31,27 @@ pub fn decomposed_single_instruction(instruction: &CircuitInstruction) -> Analys
     let mut result = Circuit::new();
     append_decomposed_instruction(instruction, &mut result)?;
     Ok(result)
+}
+
+/// Visits the base-gate decomposition of one `SPP` or `SPP_DAG` instruction.
+///
+/// The visitor receives each lowered instruction as soon as it is produced. Returning
+/// [`ControlFlow::Break`] stops lowering before later instructions are materialized.
+#[doc(hidden)]
+pub fn visit_decomposed_spp_instructions(
+    instruction: &CircuitInstruction,
+    mut visitor: impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+) -> AnalysisResult<ControlFlow<()>> {
+    let dagger = match instruction.gate().canonical_name() {
+        "SPP" => false,
+        "SPP_DAG" => true,
+        name => {
+            return Err(invalid_simplification(format!(
+                "SPP decomposition expected SPP or SPP_DAG, got {name}"
+            )));
+        }
+    };
+    visit_decomposed_spp(instruction, dagger, &mut visitor)
 }
 
 fn append_simplified_circuit(circuit: &Circuit, result: &mut Circuit) -> AnalysisResult<()> {
@@ -294,20 +316,42 @@ fn append_decomposed_spp(
     result: &mut Circuit,
     dagger: bool,
 ) -> AnalysisResult<()> {
+    let completed = visit_decomposed_spp(instruction, dagger, &mut |lowered| {
+        result.append_instruction(lowered);
+        ControlFlow::Continue(())
+    })?;
+    if completed.is_break() {
+        return Err(invalid_simplification(
+            "circuit-owned SPP decomposition stopped unexpectedly",
+        ));
+    }
+    Ok(())
+}
+
+fn visit_decomposed_spp(
+    instruction: &CircuitInstruction,
+    dagger: bool,
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+) -> AnalysisResult<ControlFlow<()>> {
     for group in instruction.target_groups() {
         let product = reduce_pauli_product(group)?;
         if product.terms.is_empty() {
             continue;
         }
-        append_product_basis_change(result, &product.terms, instruction.tag_bytes())?;
-        append_product_cx_fanout(result, &product.terms, instruction.tag_bytes())?;
+        if visit_product_basis_change(visitor, &product.terms, instruction.tag_bytes())?.is_break()
+        {
+            return Ok(ControlFlow::Break(()));
+        }
+        if visit_product_cx_fanout(visitor, &product.terms, instruction.tag_bytes())?.is_break() {
+            return Ok(ControlFlow::Break(()));
+        }
         let phase_gate = if product.negative ^ dagger {
             Gate::from_name("S_DAG")?
         } else {
             Gate::from_name("S")?
         };
-        append_single_target_sequence(
-            result,
+        if visit_single_target_sequence(
+            visitor,
             &shortest_single_qubit_base_sequence(
                 crate::single_qubit_clifford_for_gate(phase_gate)
                     .map_err(stabilizer_to_simplify_error)?,
@@ -321,11 +365,127 @@ fn append_decomposed_spp(
                 false,
             ),
             instruction.tag_bytes(),
-        )?;
-        append_product_cx_fanout(result, &product.terms, instruction.tag_bytes())?;
-        append_product_basis_change_reversed(result, &product.terms, instruction.tag_bytes())?;
+        )?
+        .is_break()
+        {
+            return Ok(ControlFlow::Break(()));
+        }
+        if visit_product_cx_fanout(visitor, &product.terms, instruction.tag_bytes())?.is_break() {
+            return Ok(ControlFlow::Break(()));
+        }
+        if visit_product_basis_change_reversed(visitor, &product.terms, instruction.tag_bytes())?
+            .is_break()
+        {
+            return Ok(ControlFlow::Break(()));
+        }
     }
-    Ok(())
+    Ok(ControlFlow::Continue(()))
+}
+
+fn visit_product_basis_change(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+    terms: &[ProductTerm],
+    tag: Option<&[u8]>,
+) -> AnalysisResult<ControlFlow<()>> {
+    for term in terms {
+        if visit_basis_change(visitor, *term, tag)?.is_break() {
+            return Ok(ControlFlow::Break(()));
+        }
+    }
+    Ok(ControlFlow::Continue(()))
+}
+
+fn visit_product_basis_change_reversed(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+    terms: &[ProductTerm],
+    tag: Option<&[u8]>,
+) -> AnalysisResult<ControlFlow<()>> {
+    for term in terms.iter().rev() {
+        if visit_basis_change(visitor, *term, tag)?.is_break() {
+            return Ok(ControlFlow::Break(()));
+        }
+    }
+    Ok(ControlFlow::Continue(()))
+}
+
+fn visit_basis_change(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+    term: ProductTerm,
+    tag: Option<&[u8]>,
+) -> AnalysisResult<ControlFlow<()>> {
+    match term.pauli {
+        Pauli::X => visit_gate_targets(
+            visitor,
+            Gate::from_name("H")?,
+            vec![Target::qubit(term.qubit, false)],
+            tag,
+        ),
+        Pauli::Y => visit_single_target_sequence(
+            visitor,
+            &shortest_single_qubit_base_sequence(
+                crate::single_qubit_clifford_for_gate(Gate::from_name("H_YZ")?)
+                    .map_err(stabilizer_to_simplify_error)?,
+            )?,
+            Target::qubit(term.qubit, false),
+            tag,
+        ),
+        Pauli::Z => Ok(ControlFlow::Continue(())),
+    }
+}
+
+fn visit_product_cx_fanout(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+    terms: &[ProductTerm],
+    tag: Option<&[u8]>,
+) -> AnalysisResult<ControlFlow<()>> {
+    let Some(accumulator) = terms.first().map(|term| term.qubit) else {
+        return Ok(ControlFlow::Continue(()));
+    };
+    let cx = Gate::from_name("CX")?;
+    for term in terms.iter().skip(1) {
+        if visit_gate_targets(
+            visitor,
+            cx,
+            vec![
+                Target::qubit(term.qubit, false),
+                Target::qubit(accumulator, false),
+            ],
+            tag,
+        )?
+        .is_break()
+        {
+            return Ok(ControlFlow::Break(()));
+        }
+    }
+    Ok(ControlFlow::Continue(()))
+}
+
+fn visit_single_target_sequence(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+    sequence: &[Gate],
+    target: Target,
+    tag: Option<&[u8]>,
+) -> AnalysisResult<ControlFlow<()>> {
+    for gate in sequence {
+        if visit_gate_targets(visitor, *gate, vec![target.clone()], tag)?.is_break() {
+            return Ok(ControlFlow::Break(()));
+        }
+    }
+    Ok(ControlFlow::Continue(()))
+}
+
+fn visit_gate_targets(
+    visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<()>,
+    gate: Gate,
+    targets: Vec<Target>,
+    tag: Option<&[u8]>,
+) -> AnalysisResult<ControlFlow<()>> {
+    if targets.is_empty() {
+        return Ok(ControlFlow::Continue(()));
+    }
+    let instruction =
+        stab_model::advanced::circuit_instruction_with_tag_bytes(gate, Vec::new(), targets, tag)?;
+    Ok(visitor(instruction))
 }
 
 fn append_product_basis_change(
@@ -584,9 +744,8 @@ struct ReducedProduct {
 
 fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
     let mut phase = 0_u8;
-    let mut terms = BTreeMap::<QubitId, Pauli>::new();
-    let mut seen = BTreeSet::<QubitId>::new();
-    let mut order = Vec::<QubitId>::new();
+    let mut term_indexes = BTreeMap::<QubitId, usize>::new();
+    let mut terms = Vec::<(QubitId, Option<Pauli>)>::new();
 
     for target in group {
         match target {
@@ -598,18 +757,21 @@ fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
                 if *inverted {
                     phase = (phase + 2) % 4;
                 }
-                // `terms` loses cancelled qubits, so first-appearance order
-                // needs its own seen-set; scanning `order` per target made
-                // one large MPP line quadratic.
-                if seen.insert(*id) {
-                    order.push(*id);
-                }
-                let current = terms.remove(id);
+                let index = if let Some(index) = term_indexes.get(id) {
+                    *index
+                } else {
+                    let index = terms.len();
+                    terms.push((*id, None));
+                    term_indexes.insert(*id, index);
+                    index
+                };
+                let slot = terms.get_mut(index).ok_or_else(|| {
+                    invalid_simplification("Pauli product index disagreed with retained terms")
+                })?;
+                let current = slot.1.take();
                 let (next_phase, next_pauli) = multiply_pauli(current, *pauli);
                 phase = (phase + next_phase) % 4;
-                if let Some(next_pauli) = next_pauli {
-                    terms.insert(*id, next_pauli);
-                }
+                slot.1 = next_pauli;
             }
             Target::Combiner => {}
             _ => {
@@ -628,13 +790,9 @@ fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
 
     Ok(ReducedProduct {
         negative: phase == 2,
-        terms: order
+        terms: terms
             .into_iter()
-            .filter_map(|qubit| {
-                terms
-                    .remove(&qubit)
-                    .map(|pauli| ProductTerm { qubit, pauli })
-            })
+            .filter_map(|(qubit, pauli)| pauli.map(|pauli| ProductTerm { qubit, pauli }))
             .collect(),
     })
 }

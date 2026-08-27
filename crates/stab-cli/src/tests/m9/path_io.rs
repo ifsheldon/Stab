@@ -300,7 +300,7 @@ fn m2d_converter_admission_precedes_output_truncation() {
     let measurement_path = dir.path().join("measurements.01");
     let output_path = dir.path().join("output.01");
     let obs_path = dir.path().join("observables.01");
-    std::fs::write(&circuit_path, "REPEAT 100001 {\nM 0\n}\n").expect("write circuit");
+    std::fs::write(&circuit_path, "REPEAT 1000001 {\nTICK\n}\n").expect("write circuit");
     std::fs::write(&measurement_path, "").expect("write measurements");
     std::fs::write(&output_path, "primary sentinel\n").expect("seed primary output");
     std::fs::write(&obs_path, "observable sentinel\n").expect("seed observable output");
@@ -331,7 +331,10 @@ fn m2d_converter_admission_precedes_output_truncation() {
     assert_eq!(status, 1);
     assert!(stdout.is_empty());
     let error = String::from_utf8(stderr).expect("UTF-8 diagnostic");
-    assert!(error.contains("repeat counts up to 100000"), "{error}");
+    assert!(
+        error.contains("1000001 expanded instructions; current limit is 1000000"),
+        "{error}"
+    );
     assert_eq!(
         std::fs::read_to_string(output_path).expect("read primary sentinel"),
         "primary sentinel\n"

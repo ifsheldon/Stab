@@ -2,10 +2,9 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 
 use super::api::SamplingPlanKind;
-use super::stabilizer_frame::StabilizerFrame;
-use super::{
-    ExecutionMode, SamplingExecutionError, SamplingPlan, validate_general_frame_work_storage,
-};
+use super::execute::{ExecutionBuffers, execute_reference_operations};
+use super::stabilizer_frame::{StabilizerFrame, StabilizerStateSnapshot};
+use super::{SamplingExecutionError, SamplingPlan, validate_general_frame_work_storage};
 
 #[derive(Debug)]
 pub(crate) struct ReferenceSampleScratch(ReferenceSampleScratchKind);
@@ -20,6 +19,7 @@ enum ReferenceSampleScratchKind {
     General {
         rng: SmallRng,
         frame: StabilizerFrame,
+        snapshot: Option<StabilizerStateSnapshot>,
         output: Vec<bool>,
     },
 }
@@ -44,12 +44,23 @@ impl SamplingPlan {
         if matches!(self.inner.kind, SamplingPlanKind::DirectZ(_)) {
             return Ok(ReferenceSampleScratch(ReferenceSampleScratchKind::DirectZ));
         }
-        validate_general_frame_work_storage(self.inner.qubit_count, self.inner.measurement_count)?;
+        let needs_snapshot = self.inner.uses_reference_state_snapshot();
+        validate_general_frame_work_storage(
+            self.inner.qubit_count,
+            self.inner.measurement_count,
+            needs_snapshot,
+        )?;
         let frame = StabilizerFrame::try_new(self.inner.qubit_count).map_err(|error| {
             SamplingExecutionError::SessionStorageAllocation {
                 message: error.to_string(),
             }
         })?;
+        let snapshot = needs_snapshot
+            .then(|| StabilizerStateSnapshot::try_new(self.inner.qubit_count))
+            .transpose()
+            .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
+                message: error.to_string(),
+            })?;
         let mut output = Vec::new();
         output
             .try_reserve_exact(self.inner.measurement_count)
@@ -63,6 +74,7 @@ impl SamplingPlan {
             ReferenceSampleScratchKind::General {
                 rng: SmallRng::seed_from_u64(0),
                 frame,
+                snapshot,
                 output,
             },
         ))
@@ -97,15 +109,32 @@ impl SamplingPlan {
             }
             (
                 SamplingPlanKind::SmallFrame | SamplingPlanKind::GeneralFrame,
-                ReferenceSampleScratchKind::General { rng, frame, output },
-            ) => self.sample_shot_in_mode_into(
-                rng,
-                ExecutionMode::ReferenceSample,
-                sweep_record,
-                frame,
-                record,
-                output,
-            ),
+                ReferenceSampleScratchKind::General {
+                    rng,
+                    frame,
+                    snapshot,
+                    output,
+                },
+            ) => {
+                frame.reset_to_z_basis();
+                record.clear();
+                output.clear();
+                let mut correlated_error_occurred = false;
+                let mut buffers = ExecutionBuffers {
+                    frame,
+                    record,
+                    output,
+                    correlated_error_occurred: &mut correlated_error_occurred,
+                };
+                execute_reference_operations(
+                    &self.inner.operations,
+                    &mut buffers,
+                    rng,
+                    sweep_record,
+                    self.inner.reference_sample_loop_policy,
+                    snapshot.as_mut(),
+                )?;
+            }
             _ => {
                 return Err(SamplingExecutionError::InternalInvariant {
                     message: "reference sample scratch does not match the sampling backend"

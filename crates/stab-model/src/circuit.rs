@@ -517,6 +517,27 @@ impl CircuitInstruction {
         &self.targets
     }
 
+    pub(crate) fn minimum_retained_heap_bytes(&self) -> Option<usize> {
+        let argument_bytes = self.args.len().checked_mul(size_of::<f64>())?;
+        let inline_targets = self.targets.inline_size();
+        let target_bytes = if self.targets.len() > inline_targets {
+            self.targets.len().checked_mul(size_of::<Target>())?
+        } else {
+            0
+        };
+        argument_bytes.checked_add(target_bytes)
+    }
+
+    pub(crate) fn retained_heap_bytes(&self) -> Option<usize> {
+        let argument_bytes = self.args.capacity().checked_mul(size_of::<f64>())?;
+        let target_bytes = if self.targets.spilled() {
+            self.targets.capacity().checked_mul(size_of::<Target>())?
+        } else {
+            0
+        };
+        argument_bytes.checked_add(target_bytes)
+    }
+
     /// Returns the non-empty Stim tag attached to this instruction as UTF-8 display text.
     ///
     /// Opaque bytes are represented with the UTF-8 replacement character. Use

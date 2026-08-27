@@ -1,5 +1,4 @@
 const DEFAULT_MAX_RECORD_BITS: usize = 1_000_000;
-const DEFAULT_MAX_REPEAT_UNROLL: u64 = 100_000;
 const DEFAULT_MAX_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 const DEFAULT_MAX_REPEAT_ITERATIONS: u64 = 1_000_000;
 const DEFAULT_MAX_COMPILED_TERMS: u64 = 16_000_000;
@@ -9,7 +8,6 @@ const DEFAULT_MAX_COMPILED_BYTES: u64 = 256 * 1024 * 1024;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DetectionConversionLimits {
     pub(super) max_record_bits: usize,
-    pub(super) max_repeat_unroll: u64,
     pub(super) max_expanded_instructions: u64,
     pub(super) max_repeat_iterations: u64,
     pub(super) max_compiled_terms: u64,
@@ -19,10 +17,6 @@ pub struct DetectionConversionLimits {
 impl DetectionConversionLimits {
     pub const fn max_record_bits(self) -> usize {
         self.max_record_bits
-    }
-
-    pub const fn max_repeat_unroll(self) -> u64 {
-        self.max_repeat_unroll
     }
 
     pub const fn max_expanded_instructions(self) -> u64 {
@@ -44,12 +38,6 @@ impl DetectionConversionLimits {
     #[must_use]
     pub const fn with_max_record_bits(mut self, limit: usize) -> Self {
         self.max_record_bits = limit;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_max_repeat_unroll(mut self, limit: u64) -> Self {
-        self.max_repeat_unroll = limit;
         self
     }
 
@@ -82,7 +70,6 @@ impl Default for DetectionConversionLimits {
     fn default() -> Self {
         Self {
             max_record_bits: DEFAULT_MAX_RECORD_BITS,
-            max_repeat_unroll: DEFAULT_MAX_REPEAT_UNROLL,
             max_expanded_instructions: DEFAULT_MAX_EXPANDED_INSTRUCTIONS,
             max_repeat_iterations: DEFAULT_MAX_REPEAT_ITERATIONS,
             max_compiled_terms: DEFAULT_MAX_COMPILED_TERMS,

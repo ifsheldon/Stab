@@ -1069,19 +1069,39 @@ fn sample_supports_deprecated_frame0_alias() {
 }
 
 #[test]
-fn sample_accepts_skip_loop_folding_flag() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "sample", "--skip_loop_folding"],
-        "H 0\nS 0\nS 0\nH 0\nM 0\n".as_bytes(),
-        &mut stdout,
-        &mut stderr,
+fn sample_loop_folding_flag_preserves_reference_results() {
+    let circuit = "REPEAT 512 {\n    H 0\n    M 0\n    R 0\n}\n";
+    let mut folded_stdout = Vec::new();
+    let mut folded_stderr = Vec::new();
+    // The frame sampler computes and removes the deterministic reference only in
+    // `--skip_reference_sample` mode, so this combination exercises loop selection.
+    let folded_status = run_from(
+        ["stab", "sample", "--skip_reference_sample", "--seed=5"],
+        circuit.as_bytes(),
+        &mut folded_stdout,
+        &mut folded_stderr,
+    );
+    let mut iterated_stdout = Vec::new();
+    let mut iterated_stderr = Vec::new();
+    let iterated_status = run_from(
+        [
+            "stab",
+            "sample",
+            "--skip_reference_sample",
+            "--skip_loop_folding",
+            "--seed=5",
+        ],
+        circuit.as_bytes(),
+        &mut iterated_stdout,
+        &mut iterated_stderr,
     );
 
-    assert_eq!(status, 0);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "1\n");
-    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    assert_eq!((folded_status, iterated_status), (0, 0));
+    assert_eq!(folded_stdout, iterated_stdout);
+    assert_eq!(folded_stdout.len(), 513);
+    assert_eq!(folded_stdout.last(), Some(&b'\n'));
+    assert!(folded_stderr.is_empty());
+    assert!(iterated_stderr.is_empty());
 }
 
 #[test]

@@ -20,7 +20,6 @@ pub enum DetectionRecordLimitSubject {
 pub enum DetectionResourceKind {
     RecordBits(DetectionRecordLimitSubject),
     RepeatNesting,
-    RepeatCount,
     ExpandedInstructions,
     RepeatIterations,
     CompiledTerms,
@@ -46,10 +45,6 @@ impl DetectionResourceLimitError {
 
     pub(crate) const fn detection_repeat_nesting(actual: usize, limit: usize) -> Self {
         Self::repeat_nesting(actual, limit)
-    }
-
-    pub(crate) const fn detection_repeat_count(actual: u64, limit: u64) -> Self {
-        Self::repeat_count(actual, limit)
     }
 
     pub(crate) const fn detection_expanded_instructions(actual: u64, limit: u64) -> Self {
@@ -85,14 +80,6 @@ impl DetectionResourceLimitError {
             kind: DetectionResourceKind::RepeatNesting,
             actual: actual as u64,
             limit: limit as u64,
-        }
-    }
-
-    pub(crate) const fn repeat_count(actual: u64, limit: u64) -> Self {
-        Self {
-            kind: DetectionResourceKind::RepeatCount,
-            actual,
-            limit,
         }
     }
 
@@ -171,11 +158,6 @@ impl Display for DetectionResourceLimitError {
                 formatter,
                 "cannot compile circuit sampler: detection conversion repeat nesting {} exceeds fixed safety limit {}",
                 self.actual, self.limit
-            ),
-            DetectionResourceKind::RepeatCount => write!(
-                formatter,
-                "cannot compile circuit sampler: detection conversion currently supports repeat counts up to {}, got {}",
-                self.limit, self.actual
             ),
             DetectionResourceKind::ExpandedInstructions => write!(
                 formatter,

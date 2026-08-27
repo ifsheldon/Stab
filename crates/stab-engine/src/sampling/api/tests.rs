@@ -59,11 +59,37 @@ impl MeasurementSink for DigestSink {
 fn executable_contract_identity_changes_plan_fingerprint() {
     let circuit = Circuit::from_stim_str("M 0\n").expect("parse circuit");
     let request = CompilationRequestFingerprint::for_sampling(&circuit);
-    let first = PlanFingerprint::for_sampling(request, SamplingBackend::Scalar, 1, 1);
-    let variant = PlanFingerprint::for_sampling(request, SamplingBackend::Scalar, 2, 1);
-    let schema = PlanFingerprint::for_sampling(request, SamplingBackend::Scalar, 1, 2);
+    let first = PlanFingerprint::for_sampling(
+        request,
+        SamplingBackend::Scalar,
+        1,
+        ReferenceSampleLoopPolicy::Fold,
+        1,
+    );
+    let variant = PlanFingerprint::for_sampling(
+        request,
+        SamplingBackend::Scalar,
+        2,
+        ReferenceSampleLoopPolicy::Fold,
+        1,
+    );
+    let policy = PlanFingerprint::for_sampling(
+        request,
+        SamplingBackend::Scalar,
+        1,
+        ReferenceSampleLoopPolicy::Iterate,
+        1,
+    );
+    let schema = PlanFingerprint::for_sampling(
+        request,
+        SamplingBackend::Scalar,
+        1,
+        ReferenceSampleLoopPolicy::Fold,
+        2,
+    );
 
     assert_ne!(first.digest(), variant.digest());
+    assert_ne!(first.digest(), policy.digest());
     assert_ne!(first.digest(), schema.digest());
     assert_ne!(
         first.executable_contract_digest(),
@@ -172,7 +198,8 @@ fn direct_small_and_general_variants_match_the_previous_general_frame_stream() {
                     &mut output,
                     reference.as_deref(),
                     &mut rng,
-                );
+                )
+                .expect("execute general-frame comparison");
                 expected.push(output.clone());
             }
             assert_eq!(sink.records, expected, "{source:?} {reference_mode:?}");

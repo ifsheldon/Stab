@@ -12,6 +12,7 @@ use super::test_support::{
 use super::*;
 
 use crate::ReferenceSampleMode;
+use stab_model::CircuitItem;
 
 #[test]
 fn conversion_admission_does_not_allocate_detector_term_storage() {
@@ -47,6 +48,80 @@ fn conversion_admission_does_not_allocate_detector_term_storage() {
         }
     });
     assert_eq!(measured.count_total, 0, "{measured:?}");
+}
+
+#[test]
+fn conversion_admission_does_not_decompose_or_allocate_wide_spp() {
+    let terms = (0..256)
+        .map(|qubit| format!("X{qubit}"))
+        .collect::<Vec<_>>()
+        .join("*");
+    let circuit = Circuit::from_stim_str(&format!("SPP {terms}\n"))
+        .expect("parse wide SPP admission fixture");
+
+    let measured = allocation_counter::measure(|| {
+        for _ in 0..128 {
+            std::hint::black_box(
+                ConversionPlan::admission_from_circuit_with_limits(
+                    &circuit,
+                    DetectionConversionLimits::default(),
+                )
+                .expect("admit wide SPP without decomposition"),
+            );
+        }
+    });
+    assert_eq!(measured.count_total, 0, "{measured:?}");
+}
+
+#[test]
+fn compact_body_materialization_grows_operation_storage_amortized() {
+    let circuit = Circuit::from_stim_str("M 0\n").expect("parse measurement fixture");
+    let measurement = circuit
+        .items()
+        .first()
+        .and_then(CircuitItem::as_instruction)
+        .expect("fixture must contain a measurement instruction");
+
+    let measured = allocation_counter::measure(|| {
+        let plan = ConversionPlan::from_visitor(DetectionConversionLimits::default(), |plan| {
+            plan.visit_repeated_body(1, |body| {
+                for _ in 0..4_096 {
+                    body.visit_instruction(measurement)?;
+                }
+                Ok(())
+            })
+        })
+        .expect("materialize compact repeated body");
+        std::hint::black_box(plan);
+    });
+
+    assert!(measured.count_total < 64, "{measured:?}");
+}
+
+#[test]
+fn conversion_materialization_rejects_admission_drift() {
+    let circuit = Circuit::from_stim_str("M 0\n").expect("parse measurement fixture");
+    let measurement = circuit
+        .items()
+        .first()
+        .and_then(CircuitItem::as_instruction)
+        .expect("fixture must contain a measurement instruction");
+    let mut pass = 0_u8;
+
+    let error = ConversionPlan::from_visitor(DetectionConversionLimits::default(), |plan| {
+        pass += 1;
+        plan.visit_instruction(measurement)?;
+        if pass == 2 {
+            plan.visit_instruction(measurement)?;
+        }
+        Ok(())
+    })
+    .expect_err("materialization must match the admitted program");
+
+    assert!(
+        error.to_string().contains("disagreed with admission"),
+        "{error}"
+    );
 }
 
 fn convert(
@@ -207,6 +282,53 @@ fn detection_conversion_handles_repeats_coordinates_and_empty_detectors() {
 }
 
 #[test]
+fn compact_nested_conversion_matches_the_same_unrolled_record_program() {
+    let folded = "M 0\n\
+        REPEAT 3 {\n\
+            M 0\n\
+            DETECTOR rec[-1] rec[-2]\n\
+            OBSERVABLE_INCLUDE(0) rec[-1]\n\
+            REPEAT 2 {\n\
+                M 0\n\
+                DETECTOR rec[-1] rec[-2]\n\
+                OBSERVABLE_INCLUDE(1) rec[-1] rec[-2]\n\
+            }\n\
+        }\n";
+    let mut unrolled = String::from("M 0\n");
+    for _ in 0..3 {
+        unrolled.push_str(
+            "M 0\n\
+             DETECTOR rec[-1] rec[-2]\n\
+             OBSERVABLE_INCLUDE(0) rec[-1]\n",
+        );
+        for _ in 0..2 {
+            unrolled.push_str(
+                "M 0\n\
+                 DETECTOR rec[-1] rec[-2]\n\
+                 OBSERVABLE_INCLUDE(1) rec[-1] rec[-2]\n",
+            );
+        }
+    }
+    let records: [&[bool]; 4] = [
+        &[false; 10],
+        &[true; 10],
+        &[
+            false, true, false, true, true, false, true, false, false, true,
+        ],
+        &[
+            true, false, true, false, false, true, false, true, true, false,
+        ],
+    ];
+
+    let folded_output = convert(folded, &records, true);
+    let unrolled_output = convert(&unrolled, &records, true);
+
+    assert_eq!(folded_output.detector_count, 9);
+    assert_eq!(folded_output.observable_count, 2);
+    assert_eq!(folded_output, unrolled_output);
+}
+
+#[test]
 fn detection_conversion_handles_empty_detector_circuits() {
     let output = convert("M 0\n", &[&[false], &[true]], true);
 
@@ -239,7 +361,7 @@ fn detection_conversion_rejects_invalid_measurement_references() {
 }
 
 #[test]
-fn detection_conversion_skip_reference_sample_ignores_sweep_reference() {
+fn detection_conversion_skip_reference_sample_keeps_sweep_corrections() {
     let output = convert_with_sweep(
         "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n",
         &[&[false], &[true]],
@@ -251,11 +373,11 @@ fn detection_conversion_skip_reference_sample_ignores_sweep_reference() {
         output.records,
         vec![
             DetectionRecordBuffer {
-                detectors: vec![false],
+                detectors: vec![true],
                 observables: Vec::new(),
             },
             DetectionRecordBuffer {
-                detectors: vec![true],
+                detectors: vec![false],
                 observables: Vec::new(),
             },
         ]
@@ -297,6 +419,55 @@ fn detection_conversion_supports_sweep_controlled_error_propagation_and_repeats(
             observables: Vec::new(),
         }]
     );
+}
+
+#[test]
+fn detection_conversion_preserves_sweep_pauli_observable_corrections() {
+    for (controlled, observable) in [
+        ("CZ sweep[0] 0", "X0"),
+        ("CX sweep[0] 0", "Z0"),
+        ("CX sweep[0] 0", "Y0"),
+    ] {
+        let source = format!("R 0\n{controlled}\nOBSERVABLE_INCLUDE(0) {observable}\n");
+        for skip_reference_sample in [false, true] {
+            let output = convert_with_sweep(
+                &source,
+                &[&[], &[]],
+                &[&[false], &[true]],
+                skip_reference_sample,
+            );
+            assert_eq!(
+                output.records,
+                vec![
+                    DetectionRecordBuffer {
+                        detectors: Vec::new(),
+                        observables: vec![false],
+                    },
+                    DetectionRecordBuffer {
+                        detectors: Vec::new(),
+                        observables: vec![true],
+                    },
+                ],
+                "{controlled}; {observable}; skip={skip_reference_sample}"
+            );
+        }
+    }
+
+    for (repeat_count, expected) in [(3, true), (4, false)] {
+        let source = format!(
+            "R 0\nREPEAT {repeat_count} {{\n    CX sweep[0] 0\n}}\nOBSERVABLE_INCLUDE(0) Z0\n"
+        );
+        let output = convert_with_sweep(&source, &[&[]], &[&[true]], true);
+        assert_eq!(output.records[0].observables, vec![expected]);
+    }
+
+    let combined = convert_with_sweep(
+        "R 0\nCX sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1] X0\n",
+        &[&[true]],
+        &[&[true]],
+        true,
+    );
+    assert_eq!(combined.records[0].observables, vec![false]);
 }
 
 #[test]
@@ -453,7 +624,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         assert!(
             validation_error
                 .to_string()
-                .contains(&format!("M9 detector frame subset does not support {gate}")),
+                .contains(&format!("{gate} target shape")),
             "{validation_error}"
         );
         let frame_error = sample_detection_events(&unsupported_frame_shape, 1, Some(5))
@@ -461,7 +632,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         assert!(
             frame_error
                 .to_string()
-                .contains(&format!("M9 detector frame subset does not support {gate}")),
+                .contains(&format!("{gate} target shape")),
             "{frame_error}"
         );
     }
@@ -705,9 +876,12 @@ fn detection_conversion_rejects_unbounded_record_shapes() {
         .is_err()
     );
 
-    let huge_repeat =
+    let compact_repeat =
         Circuit::from_stim_str("REPEAT 100001 {\n    M 0\n}\n").expect("parse repeat");
-    assert!(measurement_record_count(&huge_repeat).is_err());
+    assert_eq!(
+        measurement_record_count(&compact_repeat).expect("compact repeat stays within work limits"),
+        100_001
+    );
 }
 
 #[test]

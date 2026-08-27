@@ -1,5 +1,7 @@
+#[cfg(test)]
+use rand::Rng;
+use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng as _};
 use stab_algebra::PauliBasis;
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, GateCategory, MeasureRecordOffset, ModelDialect,
@@ -9,8 +11,10 @@ use stab_model::{
     },
 };
 
-use self::execute::{ExecutionBuffers, count_determined_operations, execute_operations};
-use self::operation::SampleOperation;
+use self::execute::count_determined_operations;
+#[cfg(test)]
+use self::execute::{ExecutionBuffers, execute_operations};
+use self::operation::{SampleOperation, SampleProgram};
 use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
 use crate::{CompilationDescriptor, CompilationOperation, CompilationRequestFingerprint};
 
@@ -26,12 +30,11 @@ mod small_frame;
 mod stabilizer_frame;
 
 pub use api::{
-    PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError, SamplingBackend,
-    SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
-    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
+    PlanFingerprint, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
+    SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
+    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
     SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
 };
-pub(crate) use reference::ReferenceSampleScratch;
 
 /// Sampling compiler descriptor consumed by facade capability aggregation.
 pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
@@ -51,7 +54,11 @@ impl SamplingPlan {
         if let api::SamplingPlanKind::DirectZ(direct) = self.inner.kind {
             return Ok(direct.determined_measurement_count(unknown_input));
         }
-        validate_general_frame_work_storage(self.inner.qubit_count, self.inner.measurement_count)?;
+        validate_general_frame_work_storage(
+            self.inner.qubit_count,
+            self.inner.measurement_count,
+            false,
+        )?;
         let mut rng = SmallRng::seed_from_u64(0);
         let mut frame = if unknown_input {
             StabilizerFrame::try_new_unknown(self.inner.qubit_count)
@@ -81,9 +88,14 @@ impl SamplingPlan {
         if matches!(self.inner.kind, api::SamplingPlanKind::DirectZ(_)) {
             return 1;
         }
-        general_frame_work_storage_bytes(self.inner.qubit_count, self.inner.measurement_count)
+        general_frame_work_storage_bytes(
+            self.inner.qubit_count,
+            self.inner.measurement_count,
+            self.inner.uses_reference_state_snapshot(),
+        )
     }
 
+    #[cfg(test)]
     fn sample_shot_in_mode_into<R>(
         &self,
         rng: &mut R,
@@ -92,7 +104,8 @@ impl SamplingPlan {
         frame: &mut StabilizerFrame,
         record: &mut Vec<bool>,
         output: &mut Vec<bool>,
-    ) where
+    ) -> Result<(), SamplingExecutionError>
+    where
         R: Rng,
     {
         frame.reset_to_z_basis();
@@ -111,15 +124,20 @@ impl SamplingPlan {
             rng,
             mode,
             sweep_record,
-        );
+        )
     }
 }
 
 fn validate_general_frame_work_storage(
     qubit_count: usize,
     measurement_count: usize,
+    include_reference_snapshot: bool,
 ) -> Result<(), SamplingExecutionError> {
-    let estimated_bytes = general_frame_work_storage_bytes(qubit_count, measurement_count);
+    let estimated_bytes = general_frame_work_storage_bytes(
+        qubit_count,
+        measurement_count,
+        include_reference_snapshot,
+    );
     if estimated_bytes > u128::from(api::MAX_SAMPLING_SESSION_STORAGE_BYTES) {
         return Err(SamplingExecutionError::SessionStorageLimit {
             estimated_bytes,
@@ -129,14 +147,34 @@ fn validate_general_frame_work_storage(
     Ok(())
 }
 
-fn general_frame_work_storage_bytes(qubit_count: usize, measurement_count: usize) -> u128 {
+fn general_frame_work_storage_bytes(
+    qubit_count: usize,
+    measurement_count: usize,
+    include_reference_snapshot: bool,
+) -> u128 {
     let qubits = qubit_count as u128;
     let measurements = measurement_count as u128;
-    qubits
+    let base = qubits
         .saturating_mul(qubits)
         .saturating_mul(4)
         .saturating_add(qubits.saturating_mul(256))
-        .saturating_add(measurements)
+        .saturating_add(measurements);
+    if include_reference_snapshot {
+        base.saturating_add(stabilizer_frame::StabilizerStateSnapshot::storage_bytes(
+            qubit_count,
+        ))
+    } else {
+        base
+    }
+}
+
+fn reference_state_snapshot_fits(
+    qubit_count: usize,
+    measurement_count: usize,
+    limit_bytes: u64,
+) -> bool {
+    general_frame_work_storage_bytes(qubit_count, measurement_count, true)
+        <= u128::from(limit_bytes)
 }
 
 /// Error from [`count_determined_measurements`], covering compilation and bounded execution.
@@ -296,11 +334,10 @@ impl CompileState {
 
 fn compile_circuit(
     circuit: &Circuit,
-    operations: &mut Vec<SampleOperation>,
+    program: &mut SampleProgram,
 ) -> Result<CompiledCounts, SamplingCompileError> {
-    let mut state = CompileState::new();
-    compile_circuit_with_state(circuit, operations, &mut state)?;
-    elide_leading_z_resets(operations);
+    let state = compile_circuit_with_state(circuit, program, CompileState::new())?;
+    program.elide_leading_z_resets();
     let measurements = usize::try_from(state.measurement_count).map_err(|_| {
         SamplingCompileError::invalid_circuit(
             "measurement record count cannot fit in usize during sampler compilation",
@@ -319,53 +356,120 @@ fn compile_circuit(
 
 fn compile_circuit_with_state(
     circuit: &Circuit,
-    operations: &mut Vec<SampleOperation>,
-    state: &mut CompileState,
-) -> Result<(), SamplingCompileError> {
-    for item in circuit.items() {
+    program: &mut SampleProgram,
+    state: CompileState,
+) -> Result<CompileState, SamplingCompileError> {
+    let mut frames = arrayvec::ArrayVec::<
+        CompileFrame<'_>,
+        { stab_model::RepeatNestingLimit::HARD_MAX + 1 },
+    >::new();
+    frames.push(CompileFrame::root(circuit, state));
+
+    loop {
+        let item = frames.last_mut().and_then(|frame| frame.items.next());
         match item {
-            CircuitItem::Instruction(instruction) => {
-                compile_instruction(instruction, operations, state)?;
+            Some(CircuitItem::Instruction(instruction)) => {
+                let Some(frame) = frames.last_mut() else {
+                    return Err(SamplingCompileError::invalid_circuit(
+                        "sampler compilation lost its active circuit frame",
+                    ));
+                };
+                compile_instruction(instruction, program, &mut frame.state)?;
             }
-            CircuitItem::RepeatBlock(repeat) => {
-                let mut body = Vec::new();
-                let before_body = state.measurement_count;
-                let mut body_state = *state;
-                compile_circuit_with_state(repeat.body(), &mut body, &mut body_state)?;
-                let body_measurements = body_state.measurement_count - before_body;
-                state.add_repeated_measurements(body_measurements, repeat.repeat_count().get())?;
-                state.sweep_bit_count = state.sweep_bit_count.max(body_state.sweep_bit_count);
-                operations.push(SampleOperation::Repeat {
-                    count: repeat.repeat_count().get(),
-                    body,
-                });
+            Some(CircuitItem::RepeatBlock(repeat)) => {
+                let Some(parent) = frames.last() else {
+                    return Err(SamplingCompileError::invalid_circuit(
+                        "sampler compilation lost its parent repeat frame",
+                    ));
+                };
+                let marker = program.begin_repeat(repeat.repeat_count().get())?;
+                let child = CompileFrame::repeated(
+                    repeat.body(),
+                    parent.state,
+                    marker,
+                    repeat.repeat_count().get(),
+                );
+                frames.try_push(child).map_err(|_| {
+                    SamplingCompileError::invalid_circuit(format!(
+                        "repeat nesting exceeds sampler limit {}",
+                        stab_model::RepeatNestingLimit::HARD_MAX
+                    ))
+                })?;
+            }
+            None => {
+                let Some(completed) = frames.pop() else {
+                    return Err(SamplingCompileError::invalid_circuit(
+                        "sampler compilation exhausted an empty traversal stack",
+                    ));
+                };
+                let Some(repeat) = completed.repeat else {
+                    return Ok(completed.state);
+                };
+                program.finish_repeat(repeat.marker)?;
+                let Some(parent) = frames.last_mut() else {
+                    return Err(SamplingCompileError::invalid_circuit(
+                        "sampler compilation completed a repeat without a parent",
+                    ));
+                };
+                let body_measurements = completed
+                    .state
+                    .measurement_count
+                    .checked_sub(repeat.measurements_before_body)
+                    .ok_or_else(|| {
+                        SamplingCompileError::invalid_circuit(
+                            "repeat-body measurement count moved backwards during sampler compilation",
+                        )
+                    })?;
+                parent
+                    .state
+                    .add_repeated_measurements(body_measurements, repeat.count)?;
+                parent.state.sweep_bit_count = parent
+                    .state
+                    .sweep_bit_count
+                    .max(completed.state.sweep_bit_count);
             }
         }
     }
-    Ok(())
 }
 
-fn elide_leading_z_resets(operations: &mut Vec<SampleOperation>) {
-    let leading_z_resets = operations
-        .iter()
-        .take_while(|operation| {
-            matches!(
-                operation,
-                SampleOperation::Reset {
-                    basis: PauliBasis::Z,
-                    ..
-                }
-            )
-        })
-        .count();
-    if leading_z_resets > 0 {
-        operations.drain(..leading_z_resets);
+struct CompileFrame<'a> {
+    items: std::slice::Iter<'a, CircuitItem>,
+    state: CompileState,
+    repeat: Option<RepeatCompile>,
+}
+
+impl<'a> CompileFrame<'a> {
+    fn root(circuit: &'a Circuit, state: CompileState) -> Self {
+        Self {
+            items: circuit.items().iter(),
+            state,
+            repeat: None,
+        }
     }
+
+    fn repeated(circuit: &'a Circuit, state: CompileState, marker: usize, count: u64) -> Self {
+        Self {
+            items: circuit.items().iter(),
+            state,
+            repeat: Some(RepeatCompile {
+                marker,
+                count,
+                measurements_before_body: state.measurement_count,
+            }),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct RepeatCompile {
+    marker: usize,
+    count: u64,
+    measurements_before_body: u64,
 }
 
 fn compile_instruction(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
 ) -> Result<(), SamplingCompileError> {
     let gate = instruction.gate();
@@ -492,7 +596,7 @@ fn compile_instruction(
 
 fn compile_decomposed_instruction(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
 ) -> Result<(), SamplingCompileError> {
     let decomposed =
@@ -502,26 +606,27 @@ fn compile_decomposed_instruction(
                 instruction.gate().canonical_name()
             ))
         })?;
-    compile_circuit_with_state(&decomposed, operations, state)
+    *state = compile_circuit_with_state(&decomposed, operations, *state)?;
+    Ok(())
 }
 
 fn compile_reset(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
 ) -> Result<(), SamplingCompileError> {
     let basis = measurement_basis(instruction)?;
     for target in instruction.targets() {
         operations.push(SampleOperation::Reset {
             qubit: qubit_index(instruction, target)?,
             basis,
-        });
+        })?;
     }
     Ok(())
 }
 
 fn compile_measurement(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
 ) -> Result<(), SamplingCompileError> {
     let basis = measurement_basis(instruction)?;
@@ -534,7 +639,7 @@ fn compile_measurement(
             inverted: target.is_inverted_result_target(),
             flip_probability,
             reset,
-        });
+        })?;
     }
     state.add_measurements(instruction.targets().len())?;
     Ok(())
@@ -542,7 +647,7 @@ fn compile_measurement(
 
 fn compile_pair_measurement(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
 ) -> Result<(), SamplingCompileError> {
     let basis = pair_measurement_basis(instruction)?;
@@ -559,7 +664,7 @@ fn compile_pair_measurement(
             ],
             inverted: left.is_inverted_result_target() ^ right.is_inverted_result_target(),
             flip_probability,
-        });
+        })?;
     }
     state.add_measurements(groups.len())?;
     Ok(())
@@ -567,7 +672,7 @@ fn compile_pair_measurement(
 
 fn compile_pauli_product_measurement(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
 ) -> Result<(), SamplingCompileError> {
     let flip_probability = measurement_flip_probability(instruction)?;
@@ -592,7 +697,7 @@ fn compile_pauli_product_measurement(
             terms,
             inverted,
             flip_probability,
-        });
+        })?;
     }
     state.add_measurements(groups.len())?;
     Ok(())
@@ -628,7 +733,7 @@ fn pauli_basis(pauli: Pauli) -> PauliBasis {
 
 fn compile_measurement_pads(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
 ) -> Result<(), SamplingCompileError> {
     let flip_probability = measurement_flip_probability(instruction)?;
@@ -639,7 +744,7 @@ fn compile_measurement_pads(
         operations.push(SampleOperation::Pad {
             value: qubit.get() == 1,
             flip_probability,
-        });
+        })?;
     }
     state.add_measurements(instruction.targets().len())?;
     Ok(())
@@ -647,7 +752,7 @@ fn compile_measurement_pads(
 
 fn compile_controlled_or_feedback(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
     feedback_basis: PauliBasis,
 ) -> Result<(), SamplingCompileError> {
@@ -666,7 +771,7 @@ fn compile_controlled_or_feedback(
                     control: admit_classical_control(instruction, state, control)?,
                     qubit: qubit_id_index(target)?,
                     basis,
-                });
+                })?;
             }
             ControlledPauliTargetPair::ClassicalNoop { first, second } => {
                 register_noop_control(state, first)?;
@@ -708,13 +813,13 @@ fn register_noop_control(
 
 fn compile_single_qubit_clifford(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
 ) -> Result<(), SamplingCompileError> {
     if instruction.gate().canonical_name() == "H" {
         for target in instruction.targets() {
             operations.push(SampleOperation::ApplyHadamard {
                 qubit: qubit_index(instruction, target)?,
-            });
+            })?;
         }
         return Ok(());
     }
@@ -726,14 +831,14 @@ fn compile_single_qubit_clifford(
         operations.push(SampleOperation::ApplyTableau {
             targets: vec![qubit_index(instruction, target)?],
             transform: transform.clone(),
-        });
+        })?;
     }
     Ok(())
 }
 
 fn compile_unitary_tableau(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
 ) -> Result<(), SamplingCompileError> {
     for target_group in instruction.target_groups() {
         compile_unitary_tableau_group(instruction, operations, target_group)?;
@@ -743,7 +848,7 @@ fn compile_unitary_tableau(
 
 fn compile_unitary_tableau_group(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     target_group: &[Target],
 ) -> Result<(), SamplingCompileError> {
     let targets = target_group
@@ -756,7 +861,7 @@ fn compile_unitary_tableau_group(
         operations.push(SampleOperation::ApplyControlledX {
             control: *control,
             target: *target,
-        });
+        })?;
         return Ok(());
     }
 
@@ -765,13 +870,13 @@ fn compile_unitary_tableau_group(
     if targets.len() != transform.target_count() {
         return Err(unsupported_sampler_instruction(instruction));
     }
-    operations.push(SampleOperation::ApplyTableau { targets, transform });
+    operations.push(SampleOperation::ApplyTableau { targets, transform })?;
     Ok(())
 }
 
 fn compile_single_qubit_pauli_channel(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     probabilities: [f64; 3],
 ) -> Result<(), SamplingCompileError> {
     let total_probability = probabilities.iter().sum();
@@ -780,14 +885,14 @@ fn compile_single_qubit_pauli_channel(
             qubit: qubit_index(instruction, target)?,
             probabilities,
             total_probability,
-        });
+        })?;
     }
     Ok(())
 }
 
 fn compile_two_qubit_pauli_channel(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     probabilities: [f64; 15],
 ) -> Result<(), SamplingCompileError> {
     let total_probability = probabilities.iter().sum();
@@ -800,14 +905,14 @@ fn compile_two_qubit_pauli_channel(
             right: qubit_index(instruction, right)?,
             probabilities,
             total_probability,
-        });
+        })?;
     }
     Ok(())
 }
 
 fn compile_heralded_pauli_channel(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     state: &mut CompileState,
     probabilities: [f64; 4],
 ) -> Result<(), SamplingCompileError> {
@@ -815,7 +920,7 @@ fn compile_heralded_pauli_channel(
         operations.push(SampleOperation::HeraldedPauliChannel {
             qubit: qubit_index(instruction, target)?,
             probabilities,
-        });
+        })?;
     }
     state.add_measurements(instruction.targets().len())?;
     Ok(())
@@ -823,7 +928,7 @@ fn compile_heralded_pauli_channel(
 
 fn compile_correlated_error(
     instruction: &CircuitInstruction,
-    operations: &mut Vec<SampleOperation>,
+    operations: &mut SampleProgram,
     else_branch: bool,
 ) -> Result<(), SamplingCompileError> {
     let probability = single_probability_argument(instruction)?.get();
@@ -844,7 +949,7 @@ fn compile_correlated_error(
         else_branch,
         probability,
         terms,
-    });
+    })?;
     Ok(())
 }
 
