@@ -5,7 +5,7 @@
 
 use std::str::FromStr;
 
-use stab_algebra::Flow;
+use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_engine::{
     RandomPolicy, SampledFlowError, SamplingExecutionError, Seed, ShotCount,
     sample_if_circuit_has_stabilizer_flows,
@@ -13,7 +13,14 @@ use stab_engine::{
 use stab_model::Circuit;
 
 #[test]
-fn sampled_flow_checks_signed_unitary_and_measurement_record_flows() {
+fn sampled_signed_flow_semantics_match_stim() {
+    assert_signed_unitary_and_measurement_record_flows();
+    assert_record_and_pauli_observables();
+    assert_inverted_observable_targets();
+    assert_malformed_measurement_references_are_rejected();
+}
+
+fn assert_signed_unitary_and_measurement_record_flows() {
     let unitary_circuit = circuit(
         "
         R 2 3
@@ -83,8 +90,7 @@ fn sampled_flow_checks_signed_unitary_and_measurement_record_flows() {
     );
 }
 
-#[test]
-fn sampled_flow_checks_record_and_pauli_observables() {
+fn assert_record_and_pauli_observables() {
     let observable_record_circuit = circuit(
         "
         X 1
@@ -145,8 +151,7 @@ fn sampled_flow_checks_record_and_pauli_observables() {
     );
 }
 
-#[test]
-fn sampled_flow_checks_inverted_observable_targets() {
+fn assert_inverted_observable_targets() {
     let inverted_pauli_circuit = circuit(
         "
         OBSERVABLE_INCLUDE(3) X0
@@ -189,8 +194,7 @@ fn sampled_flow_checks_inverted_observable_targets() {
     );
 }
 
-#[test]
-fn sampled_flow_rejects_malformed_measurement_references() {
+fn assert_malformed_measurement_references_are_rejected() {
     let error = sample_if_circuit_has_stabilizer_flows(
         &circuit("M 0\n"),
         &[flow("Z -> rec[-2]")],
@@ -208,18 +212,40 @@ fn sampled_flow_rejects_malformed_measurement_references() {
 
 #[test]
 fn sampled_flow_preserves_sampling_storage_admission() {
-    let circuit = circuit("H 10000\nM 10000\n");
+    let wide = PauliString::from_bases(PauliSign::Plus, vec![PauliBasis::X; 9_000])
+        .expect("wide active Pauli");
     assert!(matches!(
         sample_if_circuit_has_stabilizer_flows(
-            &circuit,
-            &[flow("1 -> 1")],
-            ShotCount::new(0),
+            &Circuit::new(),
+            &[Flow::from_paulis(wide.clone(), wide)],
+            ShotCount::new(1),
             RandomPolicy::Seeded(Seed::new(29)),
         ),
         Err(SampledFlowError::SamplingExecution(
             SamplingExecutionError::SessionStorageLimit { .. }
         ))
     ));
+}
+
+#[test]
+fn sampled_flow_compacts_sparse_qubits_and_ignores_coordinate_only_width() {
+    let mut input = PauliString::identity(1_000_001).expect("sparse high input");
+    input.set(1_000_000, PauliBasis::X).expect("sparse high X");
+    let mut output = PauliString::identity(1_000_001).expect("sparse high output");
+    output.set(1_000_000, PauliBasis::Z).expect("sparse high Z");
+    assert_eq!(
+        sample_if_circuit_has_stabilizer_flows(
+            &circuit("QUBIT_COORDS(1, 2) 16000000\nREPEAT 3 {\nH 1000000\n}\n"),
+            &[
+                Flow::from_paulis(input.clone(), output),
+                Flow::from_paulis(input.clone(), input),
+            ],
+            ShotCount::new(256),
+            RandomPolicy::Seeded(Seed::new(31)),
+        )
+        .expect("sample sparse high flows"),
+        vec![true, false]
+    );
 }
 
 fn circuit(text: &str) -> Circuit {

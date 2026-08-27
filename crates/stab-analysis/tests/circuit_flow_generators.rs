@@ -1052,6 +1052,24 @@ fn circuit_flow_generators_measurement_subset_supports_measurement_free_mixed_sw
 }
 
 #[test]
+fn sweep_controlled_noops_match_stim_generator_order() {
+    for instruction in [
+        "XCZ 1 sweep[0]",
+        "YCZ 1 sweep[0]",
+        "CX sweep[0] 1",
+        "CY sweep[0] 1",
+        "CZ sweep[0] 1",
+        "CZ 1 sweep[0]",
+    ] {
+        assert_eq!(
+            generator_strings(&format!("{instruction}\n")),
+            ["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
+            "{instruction}"
+        );
+    }
+}
+
+#[test]
 fn circuit_flow_generators_measurement_subset_ignores_noise_without_measurements() {
     assert_eq!(generator_strings("X_ERROR(0.1) 0\n"), ["X -> X", "Z -> Z"]);
 }
@@ -1084,18 +1102,6 @@ fn circuit_flow_generators_measurement_subset_excludes_mpad_values_from_simulate
     assert_eq!(
         generator_strings("H 0\nMPAD 1\n"),
         ["1 -> -rec[0]", "X -> Z", "Z -> X"]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_rejects_excessive_repeat_measurement_expansion() {
-    let error = circuit_flow_generators(&circuit("REPEAT 1000000 {\n    M 0\n}\n"))
-        .expect_err("excessive repeat-contained measurement flow generator")
-        .to_string();
-    assert!(
-        error.contains("measurement-rich flow-generator rows")
-            && error.contains("current limit 4096"),
-        "unexpected excessive repeat error: {error}"
     );
 }
 

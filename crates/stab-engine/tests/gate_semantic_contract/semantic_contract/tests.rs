@@ -185,12 +185,14 @@ fn gate_surface_contract_target_patterns_are_accepted_and_classified() {
 }
 
 #[test]
-fn sampling_and_detection_execute_every_declared_legal_gate_shape() {
-    const EXECUTION_SURFACES: [GateSurface; 4] = [
+fn product_surfaces_execute_every_declared_legal_gate_shape() {
+    const EXECUTION_SURFACES: [GateSurface; 6] = [
         GateSurface::MeasurementSampler,
         GateSurface::DetectionConverter,
         GateSurface::DetectorFrame,
         GateSurface::DetectionSampler,
+        GateSurface::ErrorAnalyzer,
+        GateSurface::FlowGenerator,
     ];
     let measurement_gate = Gate::from_name("M").expect("measurement gate");
     for gate in Gate::all() {
@@ -210,6 +212,28 @@ fn sampling_and_detection_execute_every_declared_legal_gate_shape() {
             }
             let targets = representative_targets(pattern);
             let mut circuit = Circuit::new();
+            if gate.canonical_name() == "ELSE_CORRELATED_ERROR" {
+                circuit.append_instruction(
+                    CircuitInstruction::new(
+                        Gate::from_name("E").expect("correlated error"),
+                        vec![0.0],
+                        Vec::new(),
+                        None,
+                    )
+                    .expect("correlated-error branch prelude"),
+                );
+            }
+            if pattern == GateTargetPattern::ObservableDeclaration {
+                circuit.append_instruction(
+                    CircuitInstruction::new(
+                        Gate::from_name("RX").expect("X reset"),
+                        Vec::new(),
+                        vec![Target::qubit(QubitId::new(0).expect("q0"), false)],
+                        None,
+                    )
+                    .expect("observable stabilizer prelude"),
+                );
+            }
             if targets.iter().any(Target::is_measurement_record_target) {
                 circuit.append_instruction(
                     CircuitInstruction::new(

@@ -280,28 +280,22 @@ fn flat_sum_operations(
 ) -> ModelResult<u64> {
     fn visit(
         circuit: &Circuit,
-        multiplier: u64,
         count_instruction: &mut impl FnMut(&CircuitInstruction) -> ModelResult<u64>,
     ) -> ModelResult<u64> {
         let mut count = 0_u64;
         for item in circuit.items() {
             match item {
                 CircuitItem::Instruction(instruction) => {
-                    let item_count = count_instruction(instruction)?.checked_mul(multiplier);
                     count = count
-                        .checked_add(item_count.ok_or_else(circuit_count_overflow)?)
+                        .checked_add(count_instruction(instruction)?)
                         .ok_or_else(circuit_count_overflow)?;
                 }
                 CircuitItem::RepeatBlock(repeat) => {
-                    let repeated_multiplier = multiplier
+                    let repeated_count = visit(repeat.body(), count_instruction)?
                         .checked_mul(repeat.repeat_count().get())
                         .ok_or_else(circuit_count_overflow)?;
                     count = count
-                        .checked_add(visit(
-                            repeat.body(),
-                            repeated_multiplier,
-                            count_instruction,
-                        )?)
+                        .checked_add(repeated_count)
                         .ok_or_else(circuit_count_overflow)?;
                 }
             }
@@ -309,7 +303,7 @@ fn flat_sum_operations(
         Ok(count)
     }
 
-    visit(circuit, 1, &mut count_instruction)
+    visit(circuit, &mut count_instruction)
 }
 
 fn circuit_count_overflow() -> ModelError {

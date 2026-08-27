@@ -3,9 +3,17 @@
     clippy::unwrap_used,
     reason = "parity tests use fixed detector and tick ids for compact expected maps"
 )]
+#![allow(
+    clippy::panic,
+    reason = "typed resource assertions report the unexpected analysis error variant"
+)]
 
 use super::*;
+use crate::ResourceOperation;
+use stab_model::{RepeatBlock, RepeatCount};
+
 mod generated;
+mod resources;
 
 fn detector(id: u64) -> DemDetectorId {
     DemDetectorId::try_new(id).unwrap()
@@ -46,7 +54,7 @@ fn detecting_regions_common_semantics_match_stim() {
     detecting_regions_target_shape_supports_measurement_pads();
     detecting_regions_target_shape_supports_heralded_record_noise();
     detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped();
-    detecting_regions_clifford_supports_promoted_single_qubit_gates();
+    detecting_regions_clifford_supports_single_qubit_clifford_gate_set();
     detecting_regions_clifford_supports_controlled_pauli_propagation();
     detecting_regions_deduplicates_requested_ids();
     detecting_regions_anticommutation_supports_ignored_mode();
@@ -57,6 +65,11 @@ fn detecting_regions_common_semantics_match_stim() {
     assert_common_measurement_record_feedback();
     assert_common_sweep_controlled_pauli_noops();
     generated::assert_generated_code_regions();
+}
+
+#[test]
+fn detecting_regions_resource_contract_is_bounded() {
+    resources::assert_resource_contract();
 }
 
 #[test]
@@ -427,7 +440,7 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
     .unwrap();
 
     assert_eq!(actual[&detector_target][&tick(0)].to_string(), "+Z");
-    assert!(actual[&observable].is_empty());
+    assert!(!actual.contains_key(&observable));
 
     let all_pad_circuit =
         Circuit::from_stim_str("TICK\nMPAD(0.125) 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n")
@@ -442,8 +455,7 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
     )
     .unwrap();
 
-    assert!(all_pad_regions[&detector(0)].is_empty());
-    assert!(all_pad_regions[&detector(1)].is_empty());
+    assert!(all_pad_regions.is_empty());
 }
 
 fn detecting_regions_target_shape_supports_heralded_record_noise() {
@@ -479,7 +491,7 @@ fn detecting_regions_target_shape_supports_heralded_record_noise() {
         )
         .unwrap();
 
-        assert!(actual[&DemTarget::relative_detector(0).unwrap()].is_empty());
+        assert!(!actual.contains_key(&DemTarget::relative_detector(0).unwrap()));
     }
 }
 
@@ -519,45 +531,26 @@ fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
 fn detecting_regions_target_api_rejects_dense_helper_expansion() {
     let high_observable = Circuit::from_stim_str("OBSERVABLE_INCLUDE(4294967296) Z0\n").unwrap();
     let error = all_detecting_region_targets(&high_observable).unwrap_err();
-    assert!(error.to_string().contains("observable target"));
+    let AnalysisError::ResourceLimit(resource) = error else {
+        panic!("expected typed target-helper rejection, got {error}");
+    };
+    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
+    assert_eq!(resource.resource(), ResourceKind::MaterializedUnits);
+    assert!(resource.actual() > resource.limit());
+    assert_eq!(resource.limit(), MAX_DETECTING_REGION_HELPER_TARGETS);
 
     let many_detectors =
         Circuit::from_stim_str("M 0\nREPEAT 1000001 {\n    DETECTOR rec[-1]\n}\n").unwrap();
     let error = all_detecting_region_targets(&many_detectors).unwrap_err();
-    assert!(error.to_string().contains("materialized target"));
+    let AnalysisError::ResourceLimit(resource) = error else {
+        panic!("expected typed target-helper rejection, got {error}");
+    };
+    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
+    assert_eq!(resource.resource(), ResourceKind::MaterializedUnits);
+    assert_eq!(resource.actual(), 1_000_001);
+    assert_eq!(resource.limit(), MAX_DETECTING_REGION_HELPER_TARGETS);
 }
 
-fn detecting_regions_clifford_supports_promoted_single_qubit_gates() {
-    let cases = [
-        (
-            "R 0\nTICK\nH 0\nS 0\nTICK\nMY 0\nDETECTOR rec[-1]\n",
-            "+Z",
-            "+Y",
-        ),
-        (
-            "R 0\nTICK\nH 0\nS_DAG 0\nTICK\nMY 0\nDETECTOR rec[-1]\n",
-            "+Z",
-            "+Y",
-        ),
-        (
-            "RX 0\nTICK\nH_XY 0\nTICK\nMY 0\nDETECTOR rec[-1]\n",
-            "+X",
-            "+Y",
-        ),
-        (
-            "R 0\nTICK\nC_XYZ 0\nTICK\nMX 0\nDETECTOR rec[-1]\n",
-            "+Z",
-            "+X",
-        ),
-    ];
-    for (text, tick0, tick1) in cases {
-        let actual = regions(text, vec![detector(0)], vec![0, 1]);
-        assert_eq!(actual[&detector(0)][&tick(0)].to_string(), tick0, "{text}");
-        assert_eq!(actual[&detector(0)][&tick(1)].to_string(), tick1, "{text}");
-    }
-}
-
-#[test]
 fn detecting_regions_clifford_supports_single_qubit_clifford_gate_set() {
     let cases = [
         ("I", "RX", "+X"),
@@ -706,7 +699,7 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
         },
     )
     .unwrap();
-    assert!(empty_ticks[&detector(0)].is_empty());
+    assert!(empty_ticks.is_empty());
 
     let empty_targets = circuit_detecting_regions(
         &implicit_start,
@@ -858,7 +851,7 @@ fn detecting_regions_omits_identity_snapshots() {
         vec![2],
     );
 
-    assert!(actual[&detector(0)].is_empty());
+    assert!(!actual.contains_key(&detector(0)));
 }
 
 fn detecting_regions_repeat_supports_bounded_ticks() {
@@ -1110,22 +1103,4 @@ fn detecting_regions_target_shape_rejects_unpromoted_sweep_shapes() {
             "{name}: {error}"
         );
     }
-}
-
-#[test]
-fn detecting_regions_repeat_rejects_excessive_expansion() {
-    let circuit =
-        Circuit::from_stim_str("REPEAT 1000001 {\n    TICK\n}\nMXX 0 1\nDETECTOR rec[-1]\n")
-            .unwrap();
-    let error = circuit_detecting_regions(
-        &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: ticks(&[0]),
-            ignore_anticommutation_errors: false,
-        },
-    )
-    .unwrap_err();
-
-    assert!(error.to_string().contains("expanded repeat iterations"));
 }

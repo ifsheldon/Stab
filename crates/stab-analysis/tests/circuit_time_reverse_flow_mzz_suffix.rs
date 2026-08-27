@@ -96,7 +96,7 @@ fn mzz_unitary_suffix_rejects_unsatisfied_flows() -> Result<(), String> {
 }
 
 #[test]
-fn mzz_unitary_suffix_ignores_input_observable_terms_like_stim() -> Result<(), String> {
+fn mzz_unitary_suffix_rejects_observable_term_loss() -> Result<(), String> {
     let input = circuit(
         "
         MZZ 0 1
@@ -106,41 +106,22 @@ fn mzz_unitary_suffix_ignores_input_observable_terms_like_stim() -> Result<(), S
     ",
     )?;
     let observable_flow = flow("X0*X1 -> X0*Z1 xor rec[-1] xor obs[0]")?;
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[observable_flow])
-        .map_err(|error| error.to_string())?;
-
-    require_eq(
-        &inverse,
-        &circuit("S_DAG 1\nCX 0 1\nH 0\nMZZ 0 1\n")?,
-        "observable-bearing reversed circuit",
-    )?;
-    require_eq(
-        &flows,
-        &vec![flow("X0*Z1 -> X0*X1 xor rec[-1]")?],
-        "observable-bearing reversed flow",
-    )
+    let error = match circuit_time_reversed_for_flows(&input, &[observable_flow]) {
+        Ok(_) => return Err("observable term was silently dropped".to_owned()),
+        Err(error) => error.to_string(),
+    };
+    require_contains(&error, "obs[0]", "observable-bearing flow rejection")
 }
 
 #[test]
-fn mzz_unitary_suffix_rejects_feedback_and_duplicate_targets() -> Result<(), String> {
-    for (circuit_text, flow_text, expected) in [
-        (
-            "MZZ 0 1\nCX rec[-1] 0\n",
-            "Z0 -> Z0 xor rec[-1]",
-            "feedback",
-        ),
-        (
-            "MZZ 0 1 1 2\nH 0\n",
-            "1 -> Z0*Z1 xor rec[-2]",
-            "duplicate target qubit",
-        ),
-    ] {
-        let error =
-            match circuit_time_reversed_for_flows(&circuit(circuit_text)?, &[flow(flow_text)?]) {
-                Ok(_) => return Err(format!("unsupported MZZ shape succeeded: {circuit_text}")),
-                Err(error) => error.to_string(),
-            };
-        require_contains(&error, expected, circuit_text)?;
-    }
-    Ok(())
+fn mzz_unitary_suffix_rejects_feedback() -> Result<(), String> {
+    let circuit_text = "MZZ 0 1\nCX rec[-1] 0\n";
+    let error = match circuit_time_reversed_for_flows(
+        &circuit(circuit_text)?,
+        &[flow("Z0 -> Z0 xor rec[-1]")?],
+    ) {
+        Ok(_) => return Err("feedback MZZ shape unexpectedly succeeded".to_owned()),
+        Err(error) => error.to_string(),
+    };
+    require_contains(&error, "feedback", circuit_text)
 }

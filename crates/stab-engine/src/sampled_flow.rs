@@ -1,7 +1,10 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_analysis::{advanced::flow_record_index, circuit_without_noise};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, QubitId, Target,
+    Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, MeasureRecordOffset, QubitId,
+    Target,
 };
 use stab_records::{MeasurementBatchView, MeasurementSink};
 use thiserror::Error;
@@ -149,9 +152,21 @@ fn augmented_flow_test_circuit(
     flow: &Flow,
     measurement_count: usize,
 ) -> SampledFlowResult<Circuit> {
-    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit)
-        .max(flow.input().len())
-        .max(flow.output().len());
+    let observables = flow.observables().collect::<BTreeSet<_>>();
+    let qubits = DenseQubitMap::for_flow(circuit, flow, &observables)?;
+    let qubit_count = qubits.len();
+    let augmented_measurements = measurement_count.checked_add(1).ok_or_else(|| {
+        SampledFlowError::invalid_flow(
+            "sampled flow witness measurement count overflowed during admission",
+        )
+    })?;
+    crate::sampling::validate_general_frame_work_storage(
+        qubit_count.checked_add(1).ok_or_else(|| {
+            SampledFlowError::invalid_flow("sampled flow ancilla qubit count overflowed")
+        })?,
+        augmented_measurements,
+        true,
+    )?;
     let ancilla = qubit_id_from_index(qubit_count, "sampled flow ancilla qubit")?;
     let mut augmented = Circuit::new();
 
@@ -180,9 +195,8 @@ fn augmented_flow_test_circuit(
         )?;
     }
 
-    append_pauli_controlled_not(&mut augmented, flow.input(), ancilla, None)?;
-    let observables = flow.observables().collect::<Vec<_>>();
-    append_flow_test_block_for_circuit(&mut augmented, circuit, ancilla, &observables)?;
+    append_pauli_controlled_not(&mut augmented, flow.input(), ancilla, &qubits, None)?;
+    append_flow_test_block_for_circuit(&mut augmented, circuit, ancilla, &observables, &qubits)?;
     for measurement in flow.measurements() {
         let record = sampled_flow_measurement_target(measurement, measurement_count)?;
         append_two_target_instruction(
@@ -193,7 +207,7 @@ fn augmented_flow_test_circuit(
             None,
         )?;
     }
-    append_pauli_controlled_not(&mut augmented, flow.output(), ancilla, None)?;
+    append_pauli_controlled_not(&mut augmented, flow.output(), ancilla, &qubits, None)?;
     append_one_target_instruction(
         &mut augmented,
         "M",
@@ -205,11 +219,111 @@ fn augmented_flow_test_circuit(
     Ok(augmented)
 }
 
+struct DenseQubitMap {
+    dense_ids: BTreeMap<u32, QubitId>,
+}
+
+impl DenseQubitMap {
+    fn for_flow(
+        circuit: &Circuit,
+        flow: &Flow,
+        observables: &BTreeSet<u32>,
+    ) -> SampledFlowResult<Self> {
+        let mut originals = BTreeSet::new();
+        collect_flow_qubits(flow.input(), &mut originals)?;
+        collect_flow_qubits(flow.output(), &mut originals)?;
+        collect_circuit_qubits(circuit, observables, &mut originals)?;
+        let dense_ids = originals
+            .into_iter()
+            .enumerate()
+            .map(|(dense, original)| {
+                Ok((
+                    original,
+                    qubit_id_from_index(dense, "sampled flow dense qubit")?,
+                ))
+            })
+            .collect::<SampledFlowResult<_>>()?;
+        Ok(Self { dense_ids })
+    }
+
+    fn len(&self) -> usize {
+        self.dense_ids.len()
+    }
+
+    fn get(&self, original: QubitId) -> SampledFlowResult<QubitId> {
+        self.dense_ids.get(&original.get()).copied().ok_or_else(|| {
+            SampledFlowError::invalid_flow(format!(
+                "sampled flow qubit {} has no dense mapping",
+                original.get()
+            ))
+        })
+    }
+
+    fn get_index(&self, original: usize) -> SampledFlowResult<QubitId> {
+        let original = u32::try_from(original).map_err(|_| {
+            SampledFlowError::invalid_flow(format!(
+                "sampled flow Pauli qubit index {original} exceeds u32"
+            ))
+        })?;
+        self.dense_ids.get(&original).copied().ok_or_else(|| {
+            SampledFlowError::invalid_flow(format!(
+                "sampled flow Pauli qubit {original} has no dense mapping"
+            ))
+        })
+    }
+}
+
+fn collect_flow_qubits(pauli: &PauliString, qubits: &mut BTreeSet<u32>) -> SampledFlowResult<()> {
+    for (index, _) in pauli.active_terms() {
+        qubits.insert(u32::try_from(index).map_err(|_| {
+            SampledFlowError::invalid_flow(format!(
+                "sampled flow Pauli qubit index {index} exceeds u32"
+            ))
+        })?);
+    }
+    Ok(())
+}
+
+fn collect_circuit_qubits(
+    circuit: &Circuit,
+    observables: &BTreeSet<u32>,
+    qubits: &mut BTreeSet<u32>,
+) -> SampledFlowResult<()> {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                let selected_observable = instruction.gate().canonical_name()
+                    == "OBSERVABLE_INCLUDE"
+                    && observable_is_selected(instruction, observables)?;
+                if instruction.gate().category() == GateCategory::Annotation && !selected_observable
+                {
+                    continue;
+                }
+                if instruction.gate().targets_are_pad_values() {
+                    continue;
+                }
+                qubits.extend(
+                    instruction
+                        .targets()
+                        .iter()
+                        .filter_map(Target::qubit_id)
+                        .map(QubitId::get),
+                );
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                collect_circuit_qubits(repeat.body(), observables, qubits)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn append_flow_test_block_for_circuit(
     output: &mut Circuit,
     circuit: &Circuit,
     ancilla: QubitId,
-    observables: &[u32],
+    observables: &BTreeSet<u32>,
+    qubits: &DenseQubitMap,
 ) -> SampledFlowResult<()> {
     for item in circuit.items() {
         match item {
@@ -217,27 +331,71 @@ fn append_flow_test_block_for_circuit(
                 if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE"
                     && observable_is_selected(instruction, observables)? =>
             {
-                append_selected_observable_feedback(output, instruction, ancilla)?;
+                append_selected_observable_feedback(output, instruction, ancilla, qubits)?;
             }
-            CircuitItem::Instruction(instruction) => output.append_instruction(instruction.clone()),
+            CircuitItem::Instruction(instruction)
+                if instruction.gate().category() == GateCategory::Annotation => {}
+            CircuitItem::Instruction(instruction) => {
+                output.append_instruction(remap_instruction(instruction, qubits)?);
+            }
             CircuitItem::RepeatBlock(repeat) => {
                 let mut body = Circuit::new();
-                append_flow_test_block_for_circuit(&mut body, repeat.body(), ancilla, observables)?;
-                output.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
-                    repeat.repeat_count(),
-                    body,
-                    repeat.tag_bytes(),
-                ));
+                append_flow_test_block_for_circuit(
+                    &mut body,
+                    repeat.body(),
+                    ancilla,
+                    observables,
+                    qubits,
+                )?;
+                if !body.is_empty() {
+                    output.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
+                        repeat.repeat_count(),
+                        body,
+                        repeat.tag_bytes(),
+                    ));
+                }
             }
         }
     }
     Ok(())
 }
 
+fn remap_instruction(
+    instruction: &CircuitInstruction,
+    qubits: &DenseQubitMap,
+) -> SampledFlowResult<CircuitInstruction> {
+    let targets = if instruction.gate().targets_are_pad_values() {
+        instruction.targets().to_vec()
+    } else {
+        instruction
+            .targets()
+            .iter()
+            .map(|target| match target {
+                Target::Qubit { id, inverted } => Ok(Target::qubit(qubits.get(*id)?, *inverted)),
+                Target::Pauli {
+                    pauli,
+                    id,
+                    inverted,
+                } => Ok(Target::pauli(*pauli, qubits.get(*id)?, *inverted)),
+                Target::MeasurementRecord { .. } | Target::SweepBit { .. } | Target::Combiner => {
+                    Ok(target.clone())
+                }
+            })
+            .collect::<SampledFlowResult<Vec<_>>>()?
+    };
+    Ok(stab_model::advanced::circuit_instruction_with_tag_bytes(
+        instruction.gate(),
+        instruction.args().to_vec(),
+        targets,
+        instruction.tag_bytes(),
+    )?)
+}
+
 fn append_selected_observable_feedback(
     output: &mut Circuit,
     instruction: &CircuitInstruction,
     ancilla: QubitId,
+    qubits: &DenseQubitMap,
 ) -> SampledFlowResult<()> {
     for target in instruction.targets() {
         if target.is_inverted_result_target() {
@@ -258,11 +416,11 @@ fn append_selected_observable_feedback(
                 instruction.tag_bytes(),
             )?;
         } else if target.is_x_target() {
-            append_pauli_observable_feedback(output, "XCX", target, ancilla, instruction)?;
+            append_pauli_observable_feedback(output, "XCX", target, ancilla, instruction, qubits)?;
         } else if target.is_y_target() {
-            append_pauli_observable_feedback(output, "YCX", target, ancilla, instruction)?;
+            append_pauli_observable_feedback(output, "YCX", target, ancilla, instruction, qubits)?;
         } else if target.is_z_target() {
-            append_pauli_observable_feedback(output, "CX", target, ancilla, instruction)?;
+            append_pauli_observable_feedback(output, "CX", target, ancilla, instruction, qubits)?;
         } else {
             return Err(SampledFlowError::invalid_flow(format!(
                 "sampled flow checking does not support OBSERVABLE_INCLUDE target {target}"
@@ -278,6 +436,7 @@ fn append_pauli_observable_feedback(
     target: &Target,
     ancilla: QubitId,
     source: &CircuitInstruction,
+    qubits: &DenseQubitMap,
 ) -> SampledFlowResult<()> {
     let qubit = target.qubit_id().ok_or_else(|| {
         SampledFlowError::invalid_flow(format!(
@@ -287,7 +446,7 @@ fn append_pauli_observable_feedback(
     append_two_target_instruction(
         output,
         gate_name,
-        Target::qubit(qubit, false),
+        Target::qubit(qubits.get(qubit)?, false),
         Target::qubit(ancilla, false),
         source.tag_bytes(),
     )
@@ -297,6 +456,7 @@ fn append_pauli_controlled_not(
     circuit: &mut Circuit,
     pauli: &PauliString,
     ancilla: QubitId,
+    qubits: &DenseQubitMap,
     tag: Option<&[u8]>,
 ) -> SampledFlowResult<()> {
     for (index, basis) in pauli.active_terms() {
@@ -309,10 +469,7 @@ fn append_pauli_controlled_not(
         append_two_target_instruction(
             circuit,
             gate_name,
-            Target::qubit(
-                qubit_id_from_index(index, "sampled flow Pauli control qubit")?,
-                false,
-            ),
+            Target::qubit(qubits.get_index(index)?, false),
             Target::qubit(ancilla, false),
             tag,
         )?;
@@ -331,7 +488,7 @@ fn append_pauli_controlled_not(
 
 fn observable_is_selected(
     instruction: &CircuitInstruction,
-    selected_observables: &[u32],
+    selected_observables: &BTreeSet<u32>,
 ) -> SampledFlowResult<bool> {
     let observable = instruction.args().first().ok_or_else(|| {
         SampledFlowError::invalid_flow(

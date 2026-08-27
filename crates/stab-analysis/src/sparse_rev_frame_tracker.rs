@@ -6,6 +6,7 @@ use stab_algebra::{
 };
 use stab_model::{Circuit, CircuitInstruction, CircuitItem, DemTarget, Pauli, QubitId, Target};
 
+mod budget;
 mod error_analysis;
 mod pauli_product;
 mod shifted_recurrence;
@@ -14,41 +15,11 @@ mod unitary_repeat;
 
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::{AnalysisError, AnalysisResult, gate_tableau, single_qubit_clifford_for_gate};
+pub(crate) use budget::{AnalyzerProbeBudget, ReverseTrackerBudget, ReverseTrackerWorkBudget};
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
 pub(crate) use shifted_recurrence::{ShiftedRecurrenceSearch, search_shifted_recurrence};
 
 static EMPTY_TARGETS: LazyLock<BTreeSet<DemTarget>> = LazyLock::new(BTreeSet::new);
-
-#[derive(Debug)]
-pub(crate) struct AnalyzerProbeBudget {
-    consumed_steps: u64,
-    max_steps: u64,
-}
-
-impl AnalyzerProbeBudget {
-    pub(crate) fn new(max_steps: u64) -> Self {
-        Self {
-            consumed_steps: 0,
-            max_steps,
-        }
-    }
-
-    fn consume_work_unit(&mut self) -> AnalysisResult<()> {
-        let next = self.consumed_steps.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "analyze_errors recurrence probe step count overflowed",
-            )
-        })?;
-        if next > self.max_steps {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "analyze_errors recurrence probing currently supports at most {} work units across nested circuits and instructions, got at least {next}",
-                self.max_steps
-            )));
-        }
-        self.consumed_steps = next;
-        Ok(())
-    }
-}
 
 fn tracker_basis(basis: PauliBasis) -> AnalysisResult<TrackerBasis> {
     TrackerBasis::from_pauli_basis(basis).ok_or_else(|| {
@@ -118,7 +89,24 @@ impl SparseReverseFrameTracker {
     }
 
     pub(crate) fn undo_circuit(&mut self, circuit: &Circuit) -> AnalysisResult<()> {
-        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve, None)
+        let mut budget = ReverseTrackerBudget::Unlimited;
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve, &mut budget)
+    }
+
+    pub(crate) fn undo_repeated_circuit_with_budget(
+        &mut self,
+        body: &Circuit,
+        repetitions: u64,
+        budget: &mut dyn ReverseTrackerWorkBudget,
+    ) -> AnalysisResult<()> {
+        let mut budget = ReverseTrackerBudget::Metered(budget);
+        shifted_repeat::undo_loop_with_gauge_output(
+            self,
+            body,
+            repetitions,
+            GaugeOutputPolicy::Preserve,
+            &mut budget,
+        )
     }
 
     pub(crate) fn undo_circuit_for_analyzer_probe(
@@ -126,22 +114,21 @@ impl SparseReverseFrameTracker {
         circuit: &Circuit,
         budget: &mut AnalyzerProbeBudget,
     ) -> AnalysisResult<()> {
-        budget.consume_work_unit()?;
-        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Discard, Some(budget))
+        budget.admit_probe_iteration()?;
+        let mut budget = ReverseTrackerBudget::Metered(budget);
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Discard, &mut budget)
     }
 
     fn undo_circuit_with_gauge_output(
         &mut self,
         circuit: &Circuit,
         gauge_output: GaugeOutputPolicy,
-        mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
+        work_budget: &mut ReverseTrackerBudget<'_>,
     ) -> AnalysisResult<()> {
         for item in circuit.items().iter().rev() {
             match item {
                 CircuitItem::Instruction(instruction) => {
-                    if let Some(budget) = analyzer_probe_budget.as_deref_mut() {
-                        budget.consume_work_unit()?;
-                    }
+                    work_budget.admit_instruction(instruction)?;
                     self.undo_instruction(instruction)?;
                     if gauge_output == GaugeOutputPolicy::Discard {
                         self.take_gauge_errors();
@@ -158,7 +145,7 @@ impl SparseReverseFrameTracker {
                         repeat.body(),
                         repeat.repeat_count().get(),
                         gauge_output,
-                        analyzer_probe_budget.as_deref_mut(),
+                        work_budget,
                     )?;
                 }
             }

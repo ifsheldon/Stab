@@ -2,6 +2,13 @@ use stab_model::{Circuit, CircuitInstruction, CircuitItem, Target};
 
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 
+pub(super) fn circuit_has_instructions(circuit: &Circuit) -> bool {
+    circuit.items().iter().any(|item| match item {
+        CircuitItem::Instruction(_) => true,
+        CircuitItem::RepeatBlock(repeat) => circuit_has_instructions(repeat.body()),
+    })
+}
+
 pub(super) fn circuit_is_ignored_only(circuit: &Circuit) -> bool {
     circuit.items().iter().all(|item| match item {
         CircuitItem::Instruction(instruction) => {

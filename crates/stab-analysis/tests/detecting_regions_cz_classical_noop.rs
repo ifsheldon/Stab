@@ -65,11 +65,9 @@ fn detecting_regions_treat_stim_negative_zero_detector_as_empty() -> Result<(), 
     )
     .map_err(|error| error.to_string())?;
 
-    regions
-        .get(&detector(0)?)
-        .is_some_and(|ticks| ticks.is_empty())
+    (!regions.contains_key(&detector(0)?))
         .then_some(())
-        .ok_or_else(|| format!("expected an empty detector D0 region map, got {regions:?}"))
+        .ok_or_else(|| format!("expected inactive detector D0 to be omitted, got {regions:?}"))
 }
 
 #[test]

@@ -4,7 +4,7 @@
 )]
 
 use stab_analysis::{
-    AnalysisError, AnalysisResult, ErrorAnalyzerOptions,
+    AnalysisError, AnalysisResult, ErrorAnalyzerOptions, ResourceKind, ResourceOperation,
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
     circuit_to_detector_error_model, circuit_with_inlined_feedback, circuit_without_noise,
     decomposed_circuit, flattened_circuit, flattened_circuit_operations,
@@ -857,40 +857,17 @@ REPEAT 2 {
 }
 
 #[test]
-fn with_inlined_feedback_rejects_excessive_repeat_work() {
-    let repeat_error = circuit(
-        "
-        REPEAT 100001 {
-            M 0
-            CX rec[-1] 0
-        }
-    ",
-    )
-    .with_inlined_feedback()
-    .expect_err("reject excessive repeat feedback work");
-    assert!(
-        repeat_error.to_string().contains("supports repeat counts"),
-        "{repeat_error}"
-    );
-
-    let nested_repeat_error = circuit(
-        "
-        REPEAT 100000 {
-            REPEAT 100000 {
-                M 0
-                CX rec[-1] 0
-            }
-        }
-    ",
-    )
-    .with_inlined_feedback()
-    .expect_err("reject nested excessive repeat feedback work before generic counting");
-    assert!(
-        nested_repeat_error
-            .to_string()
-            .contains("expanded repeat iterations"),
-        "{nested_repeat_error}"
-    );
+fn with_inlined_feedback_rejects_aggregate_repeat_overflow() {
+    let error = circuit("REPEAT 1000001 {\n    TICK\n}\n")
+        .with_inlined_feedback()
+        .expect_err("reject aggregate feedback repeat work");
+    let resource = error
+        .resource_limit_error()
+        .expect("typed feedback resource error");
+    assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+    assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
+    assert_eq!(resource.actual(), 1_000_001);
+    assert_eq!(resource.limit(), 1_000_000);
 }
 
 #[test]

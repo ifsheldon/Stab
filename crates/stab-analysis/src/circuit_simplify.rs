@@ -2,21 +2,9 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::ops::ControlFlow;
 
 use stab_algebra::{SingleQubitClifford, StabilizerError};
-use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, Pauli, QubitId, Target,
-};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, Pauli, QubitId, Target};
 
 use crate::{AnalysisError, AnalysisResult};
-
-/// Rewrites supported Clifford operations into the current base-gate subset.
-///
-/// M6 covers single-qubit Clifford gates and selected two-qubit Clifford gates used
-/// by the tableau milestone. Gates outside that subset are preserved verbatim.
-pub fn simplified_circuit(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    let mut result = Circuit::new();
-    append_simplified_circuit(circuit, &mut result)?;
-    Ok(result)
-}
 
 /// Rewrites supported operations into Stim's public `Circuit.decomposed()` base-gate set.
 pub fn decomposed_circuit(circuit: &Circuit) -> AnalysisResult<Circuit> {
@@ -54,24 +42,6 @@ pub fn visit_decomposed_spp_instructions<Break>(
     visit_decomposed_spp(instruction, dagger, &mut visitor)
 }
 
-fn append_simplified_circuit(circuit: &Circuit, result: &mut Circuit) -> AnalysisResult<()> {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                append_simplified_instruction(instruction, result)?;
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
-                    repeat.repeat_count(),
-                    simplified_circuit(repeat.body())?,
-                    repeat.tag_bytes(),
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
 fn append_decomposed_circuit(circuit: &Circuit, result: &mut Circuit) -> AnalysisResult<()> {
     for item in circuit.items() {
         match item {
@@ -87,41 +57,6 @@ fn append_decomposed_circuit(circuit: &Circuit, result: &mut Circuit) -> Analysi
             }
         }
     }
-    Ok(())
-}
-
-fn append_simplified_instruction(
-    instruction: &CircuitInstruction,
-    result: &mut Circuit,
-) -> AnalysisResult<()> {
-    if instruction.args().is_empty()
-        && let Some(sequence) = single_qubit_base_decomposition(instruction.gate())?
-    {
-        for target in instruction.targets() {
-            append_single_target_sequence(
-                result,
-                &sequence,
-                target.clone(),
-                instruction.tag_bytes(),
-            )?;
-        }
-        return Ok(());
-    }
-
-    if instruction.args().is_empty()
-        && let Some(sequence) = two_qubit_base_decomposition(instruction.gate())?
-    {
-        for group in instruction.target_groups() {
-            if group.iter().all(Target::is_qubit_target) {
-                append_two_target_sequence(result, &sequence, group, instruction.tag_bytes())?;
-            } else {
-                append_instruction_group(result, instruction, group)?;
-            }
-        }
-        return Ok(());
-    }
-
-    result.append_instruction(instruction.clone());
     Ok(())
 }
 
@@ -149,26 +84,9 @@ fn append_decomposed_instruction(
         _ => {}
     }
 
-    if instruction.gate().is_single_qubit_gate() {
+    if instruction.gate().is_single_qubit_gate() || instruction.gate().is_two_qubit_gate() {
         for segment in instruction.disjoint_target_segments() {
-            for group in segment.target_groups() {
-                append_template_decomposition(instruction, group, result)?;
-            }
-        }
-        return Ok(());
-    }
-
-    if instruction.gate().is_two_qubit_gate() {
-        for segment in instruction.disjoint_target_segments() {
-            for group in segment.target_groups() {
-                if !decomposed_pair_group_supported(instruction.gate(), group) {
-                    return Err(invalid_simplification(format!(
-                        "decomposition of {} with classical target group is not yet supported",
-                        instruction.gate().canonical_name()
-                    )));
-                }
-                append_template_decomposition(instruction, group, result)?;
-            }
+            append_template_decomposition(instruction, &segment, result)?;
         }
         return Ok(());
     }
@@ -179,12 +97,13 @@ fn append_decomposed_instruction(
 
 fn append_template_decomposition(
     instruction: &CircuitInstruction,
-    actual_targets: &[Target],
+    actual_segment: &CircuitInstruction,
     result: &mut Circuit,
 ) -> AnalysisResult<()> {
     let decomposition = crate::gate_h_s_cx_m_r_decomposition(instruction.gate())
         .map_err(|error| invalid_simplification(error.to_string()))?;
     let template = crate::gate_decomposition_to_circuit(decomposition)?;
+    let actual_groups = actual_segment.target_groups();
     for item in template.items() {
         let CircuitItem::Instruction(template_instruction) = item else {
             return Err(invalid_simplification(format!(
@@ -192,23 +111,31 @@ fn append_template_decomposition(
                 instruction.gate().canonical_name()
             )));
         };
-        let targets = template_instruction
-            .targets()
-            .iter()
-            .map(|target| {
-                substitute_template_target(
-                    target,
-                    actual_targets,
-                    template_instruction.gate().produces_measurements(),
-                )
-            })
-            .collect::<AnalysisResult<Vec<_>>>()?;
-        append_gate_targets(
-            result,
+        let mut targets = Vec::new();
+        for template_group in template_instruction.target_groups() {
+            for actual_group in &actual_groups {
+                for template_target in template_group {
+                    let target = substitute_template_target(
+                        template_target,
+                        actual_group,
+                        template_instruction.gate().produces_measurements(),
+                    )?;
+                    if !target.is_classical_bit_target()
+                        || template_instruction
+                            .gate()
+                            .takes_measurement_record_targets()
+                    {
+                        targets.push(target);
+                    }
+                }
+            }
+        }
+        result.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
             template_instruction.gate(),
+            Vec::new(),
             targets,
             instruction.tag_bytes(),
-        )?;
+        )?);
     }
     Ok(())
 }
@@ -250,11 +177,6 @@ fn substitute_template_target(
         } => Ok(Target::pauli(*pauli, *id, *inverted)),
         Target::Combiner => Ok(Target::combiner()),
     }
-}
-
-fn decomposed_pair_group_supported(gate: Gate, group: &[Target]) -> bool {
-    group.iter().all(|target| target.qubit_id().is_some())
-        || matches!(gate.canonical_name(), "CX" | "CY" | "CZ")
 }
 
 fn append_single_target_sequence(
@@ -584,103 +506,6 @@ fn append_gate_targets(
     Ok(())
 }
 
-fn append_instruction_group(
-    result: &mut Circuit,
-    instruction: &CircuitInstruction,
-    targets: &[Target],
-) -> AnalysisResult<()> {
-    result.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
-        instruction.gate(),
-        instruction.args().to_vec(),
-        targets.to_vec(),
-        instruction.tag_bytes(),
-    )?);
-    Ok(())
-}
-
-fn append_two_target_sequence(
-    result: &mut Circuit,
-    sequence: &[BaseTwoQubitStep],
-    targets: &[Target],
-    tag: Option<&[u8]>,
-) -> AnalysisResult<()> {
-    let left = targets
-        .first()
-        .cloned()
-        .ok_or_else(|| invalid_simplification("missing first two-qubit target"))?;
-    let right = targets
-        .get(1)
-        .cloned()
-        .ok_or_else(|| invalid_simplification("missing second two-qubit target"))?;
-    for step in sequence {
-        match step {
-            BaseTwoQubitStep::Right(gate) => append_single_target_sequence(
-                result,
-                std::slice::from_ref(gate),
-                right.clone(),
-                tag,
-            )?,
-            BaseTwoQubitStep::Pair(gate, order) => {
-                let pair = match order {
-                    PairOrder::LeftRight => vec![left.clone(), right.clone()],
-                    PairOrder::RightLeft => vec![right.clone(), left.clone()],
-                };
-                result.append_instruction(
-                    stab_model::advanced::circuit_instruction_with_tag_bytes(
-                        *gate,
-                        Vec::new(),
-                        pair,
-                        tag,
-                    )?,
-                );
-            }
-        }
-    }
-    Ok(())
-}
-
-fn single_qubit_base_decomposition(gate: Gate) -> AnalysisResult<Option<Vec<Gate>>> {
-    if !matches!(
-        gate.category(),
-        GateCategory::HadamardLike
-            | GateCategory::Pauli
-            | GateCategory::Period3
-            | GateCategory::Period4
-    ) {
-        return Ok(None);
-    }
-    let clifford =
-        crate::single_qubit_clifford_for_gate(gate).map_err(stabilizer_to_simplify_error)?;
-    shortest_single_qubit_base_sequence(clifford).map(Some)
-}
-
-fn two_qubit_base_decomposition(gate: Gate) -> AnalysisResult<Option<Vec<BaseTwoQubitStep>>> {
-    let h = Gate::from_name("H")?;
-    let s = Gate::from_name("S")?;
-    let cx = Gate::from_name("CX")?;
-    Ok(match gate.canonical_name() {
-        "CX" => Some(vec![BaseTwoQubitStep::Pair(cx, PairOrder::LeftRight)]),
-        "CZ" => Some(vec![
-            BaseTwoQubitStep::Right(h),
-            BaseTwoQubitStep::Pair(cx, PairOrder::LeftRight),
-            BaseTwoQubitStep::Right(h),
-        ]),
-        "CY" => Some(vec![
-            BaseTwoQubitStep::Right(s),
-            BaseTwoQubitStep::Right(s),
-            BaseTwoQubitStep::Right(s),
-            BaseTwoQubitStep::Pair(cx, PairOrder::LeftRight),
-            BaseTwoQubitStep::Right(s),
-        ]),
-        "SWAP" => Some(vec![
-            BaseTwoQubitStep::Pair(cx, PairOrder::LeftRight),
-            BaseTwoQubitStep::Pair(cx, PairOrder::RightLeft),
-            BaseTwoQubitStep::Pair(cx, PairOrder::LeftRight),
-        ]),
-        _ => None,
-    })
-}
-
 fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> AnalysisResult<Vec<Gate>> {
     let target = clifford.tableau();
     let h = (
@@ -723,18 +548,6 @@ fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> Analysi
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BaseTwoQubitStep {
-    Right(Gate),
-    Pair(Gate, PairOrder),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PairOrder {
-    LeftRight,
-    RightLeft,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ProductTerm {
     qubit: QubitId,
     pauli: Pauli,
@@ -747,6 +560,26 @@ struct ReducedProduct {
 }
 
 fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
+    #[cfg(test)]
+    {
+        reduce_pauli_product_impl(group, None)
+    }
+    #[cfg(not(test))]
+    {
+        reduce_pauli_product_impl(group)
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct PauliReductionWork {
+    index_lookups: usize,
+}
+
+fn reduce_pauli_product_impl(
+    group: &[Target],
+    #[cfg(test)] mut work: Option<&mut PauliReductionWork>,
+) -> AnalysisResult<ReducedProduct> {
     let mut phase = 0_u8;
     let mut term_indexes = BTreeMap::<QubitId, usize>::new();
     let mut terms = Vec::<(QubitId, Option<Pauli>)>::new();
@@ -760,6 +593,10 @@ fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
             } => {
                 if *inverted {
                     phase = (phase + 2) % 4;
+                }
+                #[cfg(test)]
+                if let Some(work) = work.as_deref_mut() {
+                    work.index_lookups += 1;
                 }
                 let index = if let Some(index) = term_indexes.get(id) {
                     *index
@@ -801,6 +638,15 @@ fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
     })
 }
 
+#[cfg(test)]
+fn reduce_pauli_product_with_work(
+    group: &[Target],
+) -> AnalysisResult<(ReducedProduct, PauliReductionWork)> {
+    let mut work = PauliReductionWork::default();
+    let product = reduce_pauli_product_impl(group, Some(&mut work))?;
+    Ok((product, work))
+}
+
 fn multiply_pauli(current: Option<Pauli>, next: Pauli) -> (u8, Option<Pauli>) {
     let Some(current) = current else {
         return (0, Some(next));
@@ -822,4 +668,51 @@ fn stabilizer_to_simplify_error(error: StabilizerError) -> AnalysisError {
 
 fn invalid_simplification(message: impl Into<String>) -> AnalysisError {
     AnalysisError::invalid_circuit_simplification(message)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[allow(
+        clippy::expect_used,
+        reason = "the generated fixture shape is an invariant of this focused work-count test"
+    )]
+    fn huge_single_line_mpp_reduces_without_quadratic_order_scanning() {
+        const TARGET_COUNT: usize = 200_000;
+
+        let mut text = String::from("MPP ");
+        for index in 0..TARGET_COUNT {
+            if index > 0 {
+                text.push('*');
+            }
+            text.push('X');
+            text.push_str(&index.to_string());
+        }
+        text.push('\n');
+
+        let circuit = Circuit::from_stim_str(&text).expect("hostile MPP line parses");
+        let instruction = circuit
+            .items()
+            .first()
+            .and_then(|item| match item {
+                CircuitItem::Instruction(instruction) => Some(instruction),
+                CircuitItem::RepeatBlock(_) => None,
+            })
+            .expect("fixture contains one MPP instruction");
+        let groups = instruction.target_groups();
+        let group = groups.first().expect("MPP instruction has one product");
+
+        let (product, work) =
+            reduce_pauli_product_with_work(group).expect("hostile MPP product reduces");
+
+        assert_eq!(product.terms.len(), TARGET_COUNT);
+        assert_eq!(
+            work,
+            PauliReductionWork {
+                index_lookups: TARGET_COUNT,
+            }
+        );
+    }
 }

@@ -6,7 +6,7 @@
 
 use stab_analysis::{
     circuit_inverse_qec, circuit_inverse_unitary, circuit_with_inlined_feedback,
-    circuit_without_noise, decomposed_circuit, flattened_circuit, simplified_circuit,
+    circuit_without_noise, decomposed_circuit, flattened_circuit,
 };
 use stab_model::{Circuit, CircuitInstruction, CircuitItem};
 
@@ -75,17 +75,17 @@ fn circuit_without_noise_preserves_opaque_tags_on_surviving_records() {
 }
 
 #[test]
-fn simplified_and_decomposed_circuits_preserve_opaque_tags_on_expanded_operations() {
+fn decomposed_circuit_preserves_opaque_tags_on_expanded_operations() {
     let source = circuit_from_bytes(b"H_XY[\xff] 0\nCZ[\xfe] 0 1\n");
-    let simplified = simplified_circuit(&source).expect("simplify tagged circuit");
+    let decomposed = decomposed_circuit(&source).expect("decompose tagged circuit");
 
     assert_eq!(
-        simplified.to_stim_bytes(),
+        decomposed.to_stim_bytes(),
         b"H[\xff] 0\nS[\xff] 0 0\nH[\xff] 0\nS[\xff] 0\n\
           H[\xfe] 1\nCX[\xfe] 0 1\nH[\xfe] 1\n"
     );
     assert_eq!(
-        circuit_instruction_tags(&simplified),
+        circuit_instruction_tags(&decomposed),
         vec![
             Some(b"\xff".as_slice()),
             Some(b"\xff".as_slice()),

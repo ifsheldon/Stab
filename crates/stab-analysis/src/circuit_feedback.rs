@@ -9,8 +9,10 @@ use stab_model::{
     },
 };
 
-use crate::{AnalysisError, AnalysisResult, sparse_rev_frame_tracker::SparseReverseFrameTracker};
-const MAX_FEEDBACK_REPEAT_COUNT: u64 = 100_000;
+use crate::{
+    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
+    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+};
 const MAX_FEEDBACK_REPEAT_WORK_UNITS: u64 = 1_000_000;
 const MAX_FEEDBACK_REPEAT_NESTING: usize = 256;
 
@@ -32,7 +34,6 @@ pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> AnalysisResult<Circui
         ),
         observable_changes: BTreeMap::new(),
         detector_changes: BTreeMap::new(),
-        repeat_work_units: 0,
     };
     helper.undo_circuit(circuit)?;
     helper
@@ -45,7 +46,6 @@ struct WithoutFeedbackHelper {
     tracker: SparseReverseFrameTracker,
     observable_changes: BTreeMap<u64, BTreeSet<MeasureRecordOffset>>,
     detector_changes: BTreeMap<u64, BTreeSet<usize>>,
-    repeat_work_units: u64,
 }
 
 impl WithoutFeedbackHelper {
@@ -61,25 +61,6 @@ impl WithoutFeedbackHelper {
 
     fn undo_repeat_block(&mut self, repeat: &RepeatBlock) -> AnalysisResult<()> {
         let repeat_count = repeat.repeat_count().get();
-        if repeat_count > MAX_FEEDBACK_REPEAT_COUNT {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "feedback inlining currently supports repeat counts up to {MAX_FEEDBACK_REPEAT_COUNT}, got {repeat_count}"
-            )));
-        }
-        self.repeat_work_units = self
-            .repeat_work_units
-            .checked_add(repeat_count)
-            .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "feedback inlining repeat work units overflowed",
-                )
-            })?;
-        if self.repeat_work_units > MAX_FEEDBACK_REPEAT_WORK_UNITS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "feedback inlining currently supports up to {MAX_FEEDBACK_REPEAT_WORK_UNITS} expanded repeat iterations"
-            )));
-        }
-
         let mut outer_output = std::mem::take(&mut self.reversed_output);
         for _ in 0..repeat_count {
             self.reversed_output.clear();
@@ -378,33 +359,40 @@ struct FeedbackRepeatBudget {
 
 impl FeedbackRepeatBudget {
     fn add_expanded_work_units(&mut self, count: u64) -> AnalysisResult<()> {
-        self.expanded_work_units =
-            self.expanded_work_units.checked_add(count).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "feedback inlining repeat work-unit expansion count overflowed",
-                )
-            })?;
-        if self.expanded_work_units > MAX_FEEDBACK_REPEAT_WORK_UNITS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "feedback inlining currently supports up to {MAX_FEEDBACK_REPEAT_WORK_UNITS} expanded work units"
-            )));
+        let actual = self.expanded_work_units.saturating_add(count);
+        if actual > MAX_FEEDBACK_REPEAT_WORK_UNITS {
+            return Err(feedback_resource_error(
+                ResourceKind::ExpandedOperations,
+                actual,
+                MAX_FEEDBACK_REPEAT_WORK_UNITS,
+            ));
         }
+        self.expanded_work_units = actual;
         Ok(())
     }
 
     fn add_repeat_iterations(&mut self, count: u64) -> AnalysisResult<()> {
-        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "feedback inlining repeat iteration count overflowed",
-            )
-        })?;
-        if self.repeat_iterations > MAX_FEEDBACK_REPEAT_WORK_UNITS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "feedback inlining currently supports up to {MAX_FEEDBACK_REPEAT_WORK_UNITS} expanded repeat iterations"
-            )));
+        let actual = self.repeat_iterations.saturating_add(count);
+        if actual > MAX_FEEDBACK_REPEAT_WORK_UNITS {
+            return Err(feedback_resource_error(
+                ResourceKind::RepeatIterations,
+                actual,
+                MAX_FEEDBACK_REPEAT_WORK_UNITS,
+            ));
         }
+        self.repeat_iterations = actual;
         Ok(())
     }
+}
+
+fn feedback_resource_error(resource: ResourceKind, actual: u64, limit: u64) -> AnalysisError {
+    ResourceLimitError::fixed_operation(
+        ResourceOperation::FeedbackInlining,
+        resource,
+        actual,
+        limit,
+    )
+    .into()
 }
 
 fn validate_feedback_repeat_budget(circuit: &Circuit) -> AnalysisResult<()> {
@@ -419,35 +407,21 @@ fn validate_feedback_repeat_budget_inner(
     budget: &mut FeedbackRepeatBudget,
 ) -> AnalysisResult<()> {
     if depth > MAX_FEEDBACK_REPEAT_NESTING {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "feedback inlining repeat nesting exceeds current limit {MAX_FEEDBACK_REPEAT_NESTING}"
-        )));
+        return Err(feedback_resource_error(
+            ResourceKind::RepeatNesting,
+            u64::try_from(depth).unwrap_or(u64::MAX),
+            MAX_FEEDBACK_REPEAT_NESTING as u64,
+        ));
     }
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                let work_units = instruction_work_units(instruction)?
-                    .checked_mul(multiplier)
-                    .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
-                            "feedback inlining repeat work-unit expansion count overflowed",
-                        )
-                    })?;
+                let work_units = instruction_work_units(instruction)?.saturating_mul(multiplier);
                 budget.add_expanded_work_units(work_units)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let repeat_count = repeat.repeat_count().get();
-                if repeat_count > MAX_FEEDBACK_REPEAT_COUNT {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "feedback inlining currently supports repeat counts up to {MAX_FEEDBACK_REPEAT_COUNT}, got {repeat_count}"
-                    )));
-                }
-                let repeated_multiplier =
-                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
-                            "feedback inlining repeat expansion count overflowed",
-                        )
-                    })?;
+                let repeated_multiplier = multiplier.saturating_mul(repeat_count);
                 budget.add_repeat_iterations(repeated_multiplier)?;
                 validate_feedback_repeat_budget_inner(
                     repeat.body(),
@@ -791,6 +765,25 @@ mod tests {
                 DETECTOR rec[-1]\n",
                 controlled_pauli_expected,
             ),
+            (
+                "both CZ record-control orientations",
+                "R 0\n\
+                 RX 1 2\n\
+                 X_ERROR(0.125) 0\n\
+                 M 0\n\
+                 CZ rec[-1] 1\n\
+                 CZ 2 rec[-1]\n\
+                 MX 1 2\n\
+                 DETECTOR rec[-3] rec[-2]\n\
+                 DETECTOR rec[-3] rec[-1]\n",
+                "R 0\n\
+                 RX 1 2\n\
+                 X_ERROR(0.125) 0\n\
+                 M 0\n\
+                 MX 1 2\n\
+                 DETECTOR rec[-2]\n\
+                 DETECTOR rec[-1]\n",
+            ),
         ];
 
         for (name, input, expected) in cases {
@@ -886,32 +879,48 @@ mod tests {
     }
 
     #[test]
-    fn circuit_with_inlined_feedback_rejects_excessive_repeat_work() {
-        let circuit = Circuit::from_stim_str(
-            "REPEAT 100001 {\n\
-                 M 0\n\
-                 CX rec[-1] 0\n\
-             }\n",
-        )
-        .unwrap();
-        let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
-
-        assert!(error.to_string().contains("supports repeat counts"));
-
-        let nested = Circuit::from_stim_str(
-            "REPEAT 100000 {\n\
-                 REPEAT 100000 {\n\
-                     M 0\n\
-                     CX rec[-1] 0\n\
-                 }\n\
-             }\n",
-        )
-        .unwrap();
-        let error = circuit_with_inlined_feedback(&nested).unwrap_err();
-
+    fn feedback_repeat_resource_divergence_has_one_aggregate_policy() {
+        let above_old_per_block_cap = Circuit::from_stim_str("REPEAT 100001 {\nTICK\n}\n").unwrap();
+        let accepted = validate_feedback_repeat_budget(&above_old_per_block_cap);
         assert!(
-            error.to_string().contains("expanded repeat iterations"),
-            "{error}"
+            accepted.is_ok(),
+            "aggregate budget should admit work above the obsolete per-block cap: {accepted:?}"
         );
+
+        let excessive_work = Circuit::from_stim_str("REPEAT 1000001 {\nTICK\n}\n").unwrap();
+        let error = validate_feedback_repeat_budget(&excessive_work).unwrap_err();
+        let resource = error.resource_limit_error().unwrap();
+        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+        assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
+        assert_eq!(resource.actual(), 1_000_001);
+        assert_eq!(resource.limit(), MAX_FEEDBACK_REPEAT_WORK_UNITS);
+
+        let mut expanded = FeedbackRepeatBudget::default();
+        expanded
+            .add_expanded_work_units(MAX_FEEDBACK_REPEAT_WORK_UNITS)
+            .unwrap();
+        let error = expanded.add_expanded_work_units(1).unwrap_err();
+        let resource = error.resource_limit_error().unwrap();
+        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+        assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
+        assert_eq!(resource.actual(), 1_000_001);
+        assert_eq!(resource.limit(), MAX_FEEDBACK_REPEAT_WORK_UNITS);
+
+        let mut nested = Circuit::from_stim_str("TICK\n").unwrap();
+        for _ in 0..=MAX_FEEDBACK_REPEAT_NESTING {
+            let mut outer = Circuit::new();
+            outer.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
+                RepeatCount::try_new(1).unwrap(),
+                nested,
+                None,
+            ));
+            nested = outer;
+        }
+        let error = validate_feedback_repeat_budget(&nested).unwrap_err();
+        let resource = error.resource_limit_error().unwrap();
+        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+        assert_eq!(resource.resource(), ResourceKind::RepeatNesting);
+        assert_eq!(resource.actual(), 257);
+        assert_eq!(resource.limit(), MAX_FEEDBACK_REPEAT_NESTING as u64);
     }
 }

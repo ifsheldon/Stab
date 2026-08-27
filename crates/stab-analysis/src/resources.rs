@@ -3,20 +3,32 @@ use std::fmt::{Display, Formatter};
 /// Analysis operation whose configurable resource budget was exceeded.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ResourceOperation {
+    CircuitToDetectorErrorModel,
     CircuitPass,
     CircuitFlatten,
+    DetectingRegions,
     DetectorErrorModelFlatten,
+    FeedbackInlining,
+    FlowGeneration,
     LogicalErrorSearch,
+    MissingDetectorDiscovery,
+    PauliConjugation,
     SatMaterialization,
 }
 
 impl ResourceOperation {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::CircuitToDetectorErrorModel => "circuit-to-detector-error-model",
             Self::CircuitPass => "circuit-pass",
             Self::CircuitFlatten => "circuit-flatten",
+            Self::DetectingRegions => "detecting-regions",
             Self::DetectorErrorModelFlatten => "detector-error-model-flatten",
+            Self::FeedbackInlining => "feedback-inlining",
+            Self::FlowGeneration => "flow-generation",
             Self::LogicalErrorSearch => "logical-error-search",
+            Self::MissingDetectorDiscovery => "missing-detector-discovery",
+            Self::PauliConjugation => "pauli-conjugation",
             Self::SatMaterialization => "sat-materialization",
         }
     }
@@ -27,6 +39,8 @@ impl ResourceOperation {
 pub enum ResourceKind {
     RepeatNesting,
     RepresentedItems,
+    TraversalWork,
+    LiveStateUnits,
     ExpandedOperations,
     RepeatCount,
     RepeatIterations,
@@ -50,6 +64,7 @@ pub enum ResourceKind {
     Variables,
     Clauses,
     ClauseLiterals,
+    OutputRecords,
     OutputBytes,
 }
 
@@ -58,6 +73,8 @@ impl ResourceKind {
         match self {
             Self::RepeatNesting => "repeat-nesting",
             Self::RepresentedItems => "represented-items",
+            Self::TraversalWork => "traversal-work",
+            Self::LiveStateUnits => "live-state-units",
             Self::ExpandedOperations => "expanded-operations",
             Self::RepeatCount => "repeat-count",
             Self::RepeatIterations => "repeat-iterations",
@@ -81,6 +98,7 @@ impl ResourceKind {
             Self::Variables => "variables",
             Self::Clauses => "clauses",
             Self::ClauseLiterals => "clause-literals",
+            Self::OutputRecords => "output-records",
             Self::OutputBytes => "output-bytes",
         }
     }
@@ -88,7 +106,6 @@ impl ResourceKind {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum SatMaterializationResource {
-    RepeatCount,
     ExpandedInstructions,
     ErrorMechanisms,
     TargetOccurrences,
@@ -117,8 +134,18 @@ pub(crate) enum LogicalErrorSearchResource {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ResourceLimitCause {
+    FixedOperation {
+        operation: ResourceOperation,
+        resource: ResourceKind,
+    },
+    CircuitToDetectorErrorModel {
+        resource: ResourceKind,
+    },
     CircuitPass {
         stage: CircuitPassStage,
+        resource: ResourceKind,
+    },
+    DetectingRegions {
         resource: ResourceKind,
     },
     CircuitFlattenRepeatNesting,
@@ -143,6 +170,9 @@ enum ResourceLimitCause {
     LogicalErrorSearch {
         context: &'static str,
         resource: LogicalErrorSearchResource,
+    },
+    MissingDetectorDiscovery {
+        resource: ResourceKind,
     },
     LogicalErrorTraversalRepeatIterations {
         context: &'static str,
@@ -180,6 +210,34 @@ pub struct ResourceLimitError {
 }
 
 impl ResourceLimitError {
+    pub(crate) const fn fixed_operation(
+        operation: ResourceOperation,
+        resource: ResourceKind,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::FixedOperation {
+                operation,
+                resource,
+            },
+            actual,
+            limit,
+        }
+    }
+
+    pub(crate) const fn circuit_to_detector_error_model(
+        resource: ResourceKind,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::CircuitToDetectorErrorModel { resource },
+            actual,
+            limit,
+        }
+    }
+
     pub(crate) const fn circuit_pass(
         stage: CircuitPassStage,
         resource: ResourceKind,
@@ -188,6 +246,14 @@ impl ResourceLimitError {
     ) -> Self {
         Self {
             cause: ResourceLimitCause::CircuitPass { stage, resource },
+            actual,
+            limit,
+        }
+    }
+
+    pub(crate) const fn detecting_regions(resource: ResourceKind, actual: u64, limit: u64) -> Self {
+        Self {
+            cause: ResourceLimitCause::DetectingRegions { resource },
             actual,
             limit,
         }
@@ -334,6 +400,18 @@ impl ResourceLimitError {
         }
     }
 
+    pub(crate) const fn missing_detector_discovery(
+        resource: ResourceKind,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::MissingDetectorDiscovery { resource },
+            actual,
+            limit,
+        }
+    }
+
     pub(crate) const fn logical_error_traversal_repeat_iterations(
         context: &'static str,
         actual: u64,
@@ -352,7 +430,12 @@ impl ResourceLimitError {
 
     pub const fn operation(self) -> ResourceOperation {
         match self.cause {
+            ResourceLimitCause::FixedOperation { operation, .. } => operation,
+            ResourceLimitCause::CircuitToDetectorErrorModel { .. } => {
+                ResourceOperation::CircuitToDetectorErrorModel
+            }
             ResourceLimitCause::CircuitPass { .. } => ResourceOperation::CircuitPass,
+            ResourceLimitCause::DetectingRegions { .. } => ResourceOperation::DetectingRegions,
             ResourceLimitCause::CircuitFlattenRepeatNesting
             | ResourceLimitCause::CircuitFlattenExpandedOperations
             | ResourceLimitCause::CircuitFlattenTargetOccurrences
@@ -378,12 +461,18 @@ impl ResourceLimitError {
             | ResourceLimitCause::LogicalErrorTraversalRepeatIterations { .. } => {
                 ResourceOperation::LogicalErrorSearch
             }
+            ResourceLimitCause::MissingDetectorDiscovery { .. } => {
+                ResourceOperation::MissingDetectorDiscovery
+            }
         }
     }
 
     pub const fn resource(self) -> ResourceKind {
         match self.cause {
+            ResourceLimitCause::FixedOperation { resource, .. } => resource,
+            ResourceLimitCause::CircuitToDetectorErrorModel { resource } => resource,
             ResourceLimitCause::CircuitPass { resource, .. } => resource,
+            ResourceLimitCause::DetectingRegions { resource } => resource,
             ResourceLimitCause::CircuitFlattenRepeatNesting => ResourceKind::RepeatNesting,
             ResourceLimitCause::CircuitFlattenExpandedOperations => {
                 ResourceKind::ExpandedOperations
@@ -400,7 +489,6 @@ impl ResourceLimitError {
             ResourceLimitCause::DemFlattenMaterializedBytes => ResourceKind::MaterializedBytes,
             ResourceLimitCause::DemFlattenMaterializedUnits => ResourceKind::MaterializedUnits,
             ResourceLimitCause::SatMaterialization { resource } => match resource {
-                SatMaterializationResource::RepeatCount => ResourceKind::RepeatCount,
                 SatMaterializationResource::ExpandedInstructions => {
                     ResourceKind::ExpandedOperations
                 }
@@ -444,6 +532,7 @@ impl ResourceLimitError {
             ResourceLimitCause::LogicalErrorTraversalRepeatIterations { .. } => {
                 ResourceKind::RepeatIterations
             }
+            ResourceLimitCause::MissingDetectorDiscovery { resource } => resource,
         }
     }
 
@@ -466,10 +555,35 @@ impl ResourceLimitError {
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self.cause {
+            ResourceLimitCause::FixedOperation {
+                operation,
+                resource,
+            } => write!(
+                formatter,
+                "{} {} value {} exceeds current limit {}",
+                operation.as_str(),
+                resource.as_str(),
+                self.actual,
+                self.limit
+            ),
+            ResourceLimitCause::CircuitToDetectorErrorModel { resource } => write!(
+                formatter,
+                "circuit-to-detector-error-model {} value {} exceeds current limit {}",
+                resource.as_str(),
+                self.actual,
+                self.limit
+            ),
             ResourceLimitCause::CircuitPass { stage, resource } => write!(
                 formatter,
                 "circuit pass {} {} value {} exceeds current limit {}",
                 stage.as_str(),
+                resource.as_str(),
+                self.actual,
+                self.limit
+            ),
+            ResourceLimitCause::DetectingRegions { resource } => write!(
+                formatter,
+                "detecting-regions {} value {} exceeds current limit {}",
                 resource.as_str(),
                 self.actual,
                 self.limit
@@ -540,11 +654,6 @@ impl Display for ResourceLimitError {
                 self.actual, self.limit
             ),
             ResourceLimitCause::SatMaterialization { resource } => match resource {
-                SatMaterializationResource::RepeatCount => write!(
-                    formatter,
-                    "invalid detector error model: DEM SAT problem generation currently supports repeat counts up to {}, got {}",
-                    self.limit, self.actual
-                ),
                 SatMaterializationResource::ExpandedInstructions => write!(
                     formatter,
                     "invalid detector error model: DEM SAT problem generation currently supports at most {} expanded instructions, got at least {}",
@@ -657,6 +766,27 @@ impl Display for ResourceLimitError {
                 formatter,
                 "invalid detector error model: DEM {context} traversal currently supports at most {} expanded repeat iterations, got at least {}",
                 self.limit, self.actual
+            ),
+            ResourceLimitCause::MissingDetectorDiscovery {
+                resource: ResourceKind::ExpandedOperations,
+            } => write!(
+                formatter,
+                "missing-detector analysis currently supports at most {} expanded instructions, got at least {}",
+                self.limit, self.actual
+            ),
+            ResourceLimitCause::MissingDetectorDiscovery {
+                resource: ResourceKind::RepeatNesting,
+            } => write!(
+                formatter,
+                "missing-detector repeat nesting exceeds current limit {}, got {}",
+                self.limit, self.actual
+            ),
+            ResourceLimitCause::MissingDetectorDiscovery { resource } => write!(
+                formatter,
+                "missing-detector discovery {} value {} exceeds current limit {}",
+                resource.as_str(),
+                self.actual,
+                self.limit
             ),
         }
     }

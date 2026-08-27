@@ -5,7 +5,7 @@ use stab_model::{Circuit, DemTarget};
 use crate::{AnalysisError, AnalysisResult};
 
 use super::{
-    AnalyzerProbeBudget, GaugeOutputPolicy, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
+    GaugeOutputPolicy, ReverseTrackerBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
     search_shifted_recurrence,
 };
 
@@ -15,12 +15,13 @@ pub(super) fn undo_loop(
     body: &Circuit,
     repetitions: u64,
 ) -> AnalysisResult<()> {
+    let mut work_budget = ReverseTrackerBudget::Unlimited;
     undo_loop_with_gauge_output(
         tracker,
         body,
         repetitions,
         GaugeOutputPolicy::Preserve,
-        None,
+        &mut work_budget,
     )
 }
 
@@ -29,7 +30,7 @@ pub(super) fn undo_loop_with_gauge_output(
     body: &Circuit,
     repetitions: u64,
     gauge_output: GaugeOutputPolicy,
-    mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
+    work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
     if repetitions < 5 {
         return undo_loop_by_unrolling_with_gauge_output(
@@ -37,18 +38,14 @@ pub(super) fn undo_loop_with_gauge_output(
             body,
             repetitions,
             gauge_output,
-            analyzer_probe_budget,
+            work_budget,
         );
     }
 
+    work_budget.admit_recurrence_search()?;
     let probe_limit = repetitions / 2 + 1;
     let search = search_shifted_recurrence(tracker, probe_limit, |probe| {
-        undo_probe_iteration(
-            probe,
-            body,
-            gauge_output,
-            analyzer_probe_budget.as_deref_mut(),
-        )
+        undo_probe_iteration(probe, body, gauge_output, work_budget)
     })?;
     let recurrence = match search {
         ShiftedRecurrenceSearch::Found { recurrence } => recurrence,
@@ -63,7 +60,7 @@ pub(super) fn undo_loop_with_gauge_output(
                     )
                 })?,
                 gauge_output,
-                analyzer_probe_budget,
+                work_budget,
             );
         }
     };
@@ -129,7 +126,7 @@ pub(super) fn undo_loop_with_gauge_output(
                 )
             })?,
         gauge_output,
-        analyzer_probe_budget,
+        work_budget,
     )
 }
 
@@ -139,12 +136,13 @@ pub(super) fn undo_loop_by_unrolling(
     body: &Circuit,
     repetitions: u64,
 ) -> AnalysisResult<()> {
+    let mut work_budget = ReverseTrackerBudget::Unlimited;
     undo_loop_by_unrolling_with_gauge_output(
         tracker,
         body,
         repetitions,
         GaugeOutputPolicy::Preserve,
-        None,
+        &mut work_budget,
     )
 }
 
@@ -153,15 +151,10 @@ fn undo_loop_by_unrolling_with_gauge_output(
     body: &Circuit,
     repetitions: u64,
     gauge_output: GaugeOutputPolicy,
-    mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
+    work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
     for _ in 0..repetitions {
-        undo_probe_iteration(
-            tracker,
-            body,
-            gauge_output,
-            analyzer_probe_budget.as_deref_mut(),
-        )?;
+        undo_probe_iteration(tracker, body, gauge_output, work_budget)?;
     }
     Ok(())
 }
@@ -170,19 +163,10 @@ fn undo_probe_iteration(
     tracker: &mut SparseReverseFrameTracker,
     body: &Circuit,
     gauge_output: GaugeOutputPolicy,
-    analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
+    work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
-    match gauge_output {
-        GaugeOutputPolicy::Preserve => tracker.undo_circuit(body),
-        GaugeOutputPolicy::Discard => {
-            let budget = analyzer_probe_budget.ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "analyzer recurrence probe is missing its nested work budget",
-                )
-            })?;
-            tracker.undo_circuit_for_analyzer_probe(body, budget)
-        }
-    }
+    work_budget.admit_probe_iteration()?;
+    tracker.undo_circuit_with_gauge_output(body, gauge_output, work_budget)
 }
 
 pub(super) fn is_shifted_copy(

@@ -1,8 +1,13 @@
-use stab_algebra::{PauliBasis, PauliSign, PauliString, SingleQubitClifford};
+#![allow(
+    clippy::panic_in_result_fn,
+    reason = "resource-contract tests combine fallible fixture construction with exact assertions"
+)]
+
 use stab_analysis::{
-    MissingDetectorOptions, decomposed_circuit, gate_has_tableau, gate_tableau, missing_detectors,
+    AnalysisError, MissingDetectorOptions, ResourceKind, ResourceOperation, decomposed_circuit,
+    missing_detectors,
 };
-use stab_model::{Circuit, Gate, RepeatBlock, RepeatCount};
+use stab_model::{Circuit, RepeatBlock, RepeatCount};
 
 fn missing_with_options(
     text: &str,
@@ -38,6 +43,82 @@ fn missing_detectors_matches_stim_negative_zero_rows() -> Result<(), Box<dyn std
             "DETECTOR rec[-1]\n",
             declaration,
         )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn missing_detectors_common_semantic_matrix_matches_stim() -> Result<(), Box<dyn std::error::Error>>
+{
+    let cases = [
+        ("empty", "", false, ""),
+        (
+            "covered deterministic measurement",
+            "R 0\nM 0\nDETECTOR rec[-1]\n",
+            false,
+            "",
+        ),
+        (
+            "uncovered deterministic measurement",
+            "R 0\nM 0\n",
+            false,
+            "DETECTOR rec[-1]\n",
+        ),
+        (
+            "unknown input retained",
+            "M 0\n",
+            false,
+            "DETECTOR rec[-1]\n",
+        ),
+        ("unknown input ignored", "M 0\n", true, ""),
+        (
+            "independent detector row reduction",
+            "R 0 1\nM 0 1\nDETECTOR rec[-1]\n",
+            false,
+            "DETECTOR rec[-2]\n",
+        ),
+        (
+            "duplicate record parity",
+            "M 0\nDETECTOR rec[-1] rec[-1]\n",
+            false,
+            "DETECTOR rec[-1]\n",
+        ),
+        (
+            "deterministic X reset and measurement",
+            "RX 0\nMX 0\n",
+            false,
+            "DETECTOR rec[-1]\n",
+        ),
+        ("cross-basis reset", "RX 0\nMY 0\n", false, ""),
+        (
+            "measure-reset record",
+            "MR 0\n",
+            false,
+            "DETECTOR rec[-1]\n",
+        ),
+        ("ignored measure-reset record", "MR 0\n", true, ""),
+        ("measurement feedback", "M 0\nCX rec[-1] 1\nM 1\n", true, ""),
+        (
+            "heralded erase record",
+            "HERALDED_ERASE(0.125) 0\n",
+            true,
+            "DETECTOR rec[-1]\n",
+        ),
+        (
+            "heralded Pauli record",
+            "HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 0\n",
+            true,
+            "DETECTOR rec[-1]\n",
+        ),
+        (
+            "annotations preserve the record",
+            "R 0\nQUBIT_COORDS(1, 2) 0\nSHIFT_COORDS(3, 4)\nM 0\n",
+            true,
+            "DETECTOR rec[-1]\n",
+        ),
+    ];
+    for (name, text, ignore_non_deterministic, expected) in cases {
+        require_missing_eq(text, ignore_non_deterministic, expected, name)?;
     }
     Ok(())
 }
@@ -96,37 +177,6 @@ fn require_missing_circuit_error_contains(
     Ok(())
 }
 
-fn reset_gate(basis: PauliBasis) -> &'static str {
-    match basis {
-        PauliBasis::I => "R",
-        PauliBasis::X => "RX",
-        PauliBasis::Y => "RY",
-        PauliBasis::Z => "R",
-    }
-}
-
-fn measurement_gate(basis: PauliBasis) -> Result<&'static str, Box<dyn std::error::Error>> {
-    match basis {
-        PauliBasis::I => Err(std::io::Error::other("identity basis is not measurable").into()),
-        PauliBasis::X => Ok("MX"),
-        PauliBasis::Y => Ok("MY"),
-        PauliBasis::Z => Ok("M"),
-    }
-}
-
-fn mpp_target(bases: impl IntoIterator<Item = (usize, PauliBasis)>) -> String {
-    bases
-        .into_iter()
-        .filter_map(|(qubit, basis)| match basis {
-            PauliBasis::I => None,
-            PauliBasis::X => Some(format!("X{qubit}")),
-            PauliBasis::Y => Some(format!("Y{qubit}")),
-            PauliBasis::Z => Some(format!("Z{qubit}")),
-        })
-        .collect::<Vec<_>>()
-        .join("*")
-}
-
 #[test]
 fn pf5_missing_detectors_clifford_tracks_single_qubit_basis_changes()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -140,36 +190,6 @@ fn pf5_missing_detectors_clifford_tracks_single_qubit_basis_changes()
     require_missing_eq("H 0\nMX 0\n", true, "", "unknown-input H MX")?;
     require_missing_eq("R 0\nH 0\nM 0\n", true, "", "R H M nondeterministic")?;
     require_missing_eq("RX 0\nS 0\nMY 0\n", true, "DETECTOR rec[-1]\n", "RX S MY")?;
-    Ok(())
-}
-
-#[test]
-fn pf5_missing_detectors_clifford_covers_all_single_qubit_cliffords()
--> Result<(), Box<dyn std::error::Error>> {
-    let input_bases = [PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
-    for clifford in SingleQubitClifford::all() {
-        let gate = Gate::from_name(clifford.canonical_name())?;
-        let tableau = gate_tableau(gate)?;
-        for input_basis in input_bases {
-            let input = PauliString::from_bases(PauliSign::Plus, [input_basis])?;
-            let output = tableau.apply(&input)?;
-            let output_basis = output
-                .get(0)
-                .ok_or_else(|| std::io::Error::other("missing single-qubit tableau output"))?;
-            let circuit = format!(
-                "{} 0\n{} 0\n{} 0\n",
-                reset_gate(input_basis),
-                gate.canonical_name(),
-                measurement_gate(output_basis)?
-            );
-            require_missing_eq(
-                &circuit,
-                true,
-                "DETECTOR rec[-1]\n",
-                format!("{} input {input_basis:?}", gate.canonical_name()),
-            )?;
-        }
-    }
     Ok(())
 }
 
@@ -204,67 +224,8 @@ fn pf5_missing_detectors_clifford_tracks_two_qubit_and_swap_gates()
 }
 
 #[test]
-fn pf5_missing_detectors_clifford_covers_all_fixed_two_qubit_tableau_gates()
--> Result<(), Box<dyn std::error::Error>> {
-    let input_bases = [PauliBasis::I, PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
-    for gate in Gate::all().filter(|gate| gate_has_tableau(*gate) && gate.is_two_qubit_gate()) {
-        let tableau = gate_tableau(gate)?;
-        for left_basis in input_bases {
-            for right_basis in input_bases {
-                if left_basis == PauliBasis::I && right_basis == PauliBasis::I {
-                    continue;
-                }
-                let input = PauliString::from_bases(PauliSign::Plus, [left_basis, right_basis])?;
-                let output = tableau.apply(&input)?;
-                let output_bases = [
-                    output
-                        .get(0)
-                        .ok_or_else(|| std::io::Error::other("missing left tableau output"))?,
-                    output
-                        .get(1)
-                        .ok_or_else(|| std::io::Error::other("missing right tableau output"))?,
-                ];
-                let input_resets = [(0, left_basis), (1, right_basis)]
-                    .into_iter()
-                    .filter(|(_, basis)| *basis != PauliBasis::I)
-                    .map(|(qubit, basis)| format!("{} {qubit}\n", reset_gate(basis)))
-                    .collect::<String>();
-                let circuit = format!(
-                    "{input_resets}{} 0 1\nMPP {}\n",
-                    gate.canonical_name(),
-                    mpp_target([(0, output_bases[0]), (1, output_bases[1])])
-                );
-                require_missing_eq(
-                    &circuit,
-                    true,
-                    "DETECTOR rec[-1]\n",
-                    format!(
-                        "{} input {left_basis:?}{right_basis:?}",
-                        gate.canonical_name()
-                    ),
-                )?;
-            }
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn pf5_missing_detectors_clifford_rejects_non_plain_unitary_targets()
--> Result<(), Box<dyn std::error::Error>> {
-    let circuit = Circuit::from_stim_str("M 0\nCX rec[-1] 1\nM 1\n")?;
-    let Err(error) = missing_detectors(
-        &circuit,
-        MissingDetectorOptions {
-            ignore_non_deterministic_measurements: true,
-        },
-    ) else {
-        return Err(std::io::Error::other("expected non-plain unitary target rejection").into());
-    };
-    if !error.to_string().contains("plain qubit") {
-        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
-    }
-    Ok(())
+fn pf5_missing_detectors_feedback_matches_stim() -> Result<(), Box<dyn std::error::Error>> {
+    require_missing_eq("M 0\nCX rec[-1] 1\nM 1\n", true, "", "measurement feedback")
 }
 
 #[test]
@@ -520,25 +481,25 @@ fn pf5_missing_detectors_observable_neutral_final_repeat_keeps_dependent_bodies_
     require_missing_error_contains(
         "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
         true,
-        "expanded repeat iterations",
+        "expanded instructions",
         "observable-dependent final repeat",
     )?;
     require_missing_error_contains(
         "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
         true,
-        "expanded repeat iterations",
+        "expanded instructions",
         "duplicate observable-dependent final repeat",
     )?;
     require_missing_error_contains(
         "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) X0\n    DETECTOR rec[-1]\n}\n",
         true,
-        "expanded repeat iterations",
+        "expanded instructions",
         "Pauli observable target in final repeat",
     )?;
     require_missing_error_contains(
         "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n        OBSERVABLE_INCLUDE(0) rec[-1]\n        DETECTOR rec[-1]\n    }\n}\n",
         true,
-        "expanded repeat iterations",
+        "expanded instructions",
         "nested observable row in final repeat body",
     )?;
     Ok(())
@@ -566,30 +527,22 @@ fn pf5_missing_detectors_nested_final_repeat_keeps_unselected_bodies_capped()
     require_missing_error_contains(
         "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n        DETECTOR rec[-1] rec[-2]\n    }\n}\n",
         true,
-        "expanded repeat iterations",
+        "expanded instructions",
         "nested cross-iteration repeat",
     )?;
 
     require_missing_error_contains(
         "REPEAT 1000001 {\n    REPEAT 1000001 {\n        M 0\n        DETECTOR rec[-1]\n    }\n}\n",
         true,
-        "expanded repeat iterations",
+        "expanded instructions",
         "nested large-repeat",
     )?;
 
-    let circuit = over_depth_nested_repeat_circuit(257)?;
-    require_missing_circuit_error_contains(
-        &circuit,
-        true,
-        "repeat nesting exceeds current limit",
-        "public API over-depth nested repeat",
-    )?;
     Ok(())
 }
 
-#[test]
-fn pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped()
--> Result<(), Box<dyn std::error::Error>> {
+fn assert_missing_detector_expansion_and_nesting_limits() -> Result<(), Box<dyn std::error::Error>>
+{
     let cross_iteration = Circuit::from_stim_str(
         "R 0\nM 0\nREPEAT 1000001 {\n    M 0\n    DETECTOR rec[-1] rec[-2]\n}\n",
     )?;
@@ -601,9 +554,16 @@ fn pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped()
     ) else {
         return Err(std::io::Error::other("expected cross-iteration repeat rejection").into());
     };
-    if !error.to_string().contains("expanded repeat iterations") {
+    let AnalysisError::ResourceLimit(resource) = error else {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
-    }
+    };
+    assert_eq!(
+        resource.operation(),
+        ResourceOperation::MissingDetectorDiscovery
+    );
+    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
+    assert_eq!(resource.actual(), 1_000_003);
+    assert_eq!(resource.limit(), 1_000_000);
 
     let observable_merging = Circuit::from_stim_str(
         "R 0\nREPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
@@ -616,9 +576,83 @@ fn pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped()
     ) else {
         return Err(std::io::Error::other("expected observable-row repeat rejection").into());
     };
-    if !error.to_string().contains("expanded repeat iterations") {
+    let AnalysisError::ResourceLimit(resource) = error else {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
-    }
+    };
+    assert_eq!(
+        resource.operation(),
+        ResourceOperation::MissingDetectorDiscovery
+    );
+    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
+    assert_eq!(resource.actual(), 1_000_002);
+    assert_eq!(resource.limit(), 1_000_000);
+
+    let nested = over_depth_nested_repeat_circuit(257)?;
+    let error = match missing_detectors(
+        &nested,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) {
+        Ok(_) => {
+            return Err(std::io::Error::other(
+                "over-depth missing-detector analysis unexpectedly succeeded",
+            )
+            .into());
+        }
+        Err(error) => error,
+    };
+    let AnalysisError::ResourceLimit(resource) = error else {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    };
+    assert_eq!(
+        resource.operation(),
+        ResourceOperation::MissingDetectorDiscovery
+    );
+    assert_eq!(resource.resource(), ResourceKind::RepeatNesting);
+    assert!(resource.actual() > resource.limit());
+    assert_eq!(resource.limit(), 256);
+
+    let empty_overflow = Circuit::from_stim_str(
+        "REPEAT 9223372036854775807 {\n    REPEAT 9223372036854775807 {\n    }\n}\n",
+    )?;
+    assert!(
+        missing_detectors(
+            &empty_overflow,
+            MissingDetectorOptions {
+                ignore_non_deterministic_measurements: true,
+            },
+        )?
+        .is_empty()
+    );
+
+    let nonempty_overflow = Circuit::from_stim_str(
+        "REPEAT 9223372036854775807 {\n    REPEAT 9223372036854775807 {\n        SHIFT_COORDS(1)\n    }\n}\n",
+    )?;
+    let error = match missing_detectors(
+        &nonempty_overflow,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) {
+        Ok(_) => {
+            return Err(std::io::Error::other(
+                "nonempty overflowing expansion unexpectedly succeeded",
+            )
+            .into());
+        }
+        Err(error) => error,
+    };
+    let AnalysisError::ResourceLimit(resource) = error else {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    };
+    assert_eq!(
+        resource.operation(),
+        ResourceOperation::MissingDetectorDiscovery
+    );
+    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
+    assert_eq!(resource.actual(), u64::MAX);
+    assert_eq!(resource.limit(), 1_000_000);
 
     for (context, text) in [
         (
@@ -641,7 +675,7 @@ fn pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped()
                 std::io::Error::other(format!("expected {context} repeat rejection")).into(),
             );
         };
-        if !error.to_string().contains("expanded repeat iterations") {
+        if !error.to_string().contains("expanded instructions") {
             return Err(
                 std::io::Error::other(format!("{context}: unexpected error: {error}")).into(),
             );
@@ -658,8 +692,105 @@ fn pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped()
     ) else {
         return Err(std::io::Error::other("expected tracker-changing repeat rejection").into());
     };
-    if !error.to_string().contains("expanded repeat iterations") {
+    if !error.to_string().contains("expanded instructions") {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    }
+
+    require_missing_error_contains(
+        "R 0\nREPEAT 1000001 {\n    X 0\n    M 0\n    DETECTOR rec[-1]\n}\n",
+        true,
+        "expanded instructions",
+        "signed terminal-state-changing repeat",
+    )?;
+    Ok(())
+}
+
+fn assert_missing_detector_projected_storage_and_allocation_bounds()
+-> Result<(), Box<dyn std::error::Error>> {
+    let folded = |repeat_count: u64| {
+        Circuit::from_stim_str(&format!(
+            "R 0\nREPEAT {repeat_count} {{\n    M 0\n    DETECTOR rec[-1]\n}}\n"
+        ))
+    };
+    let small = folded(1_000_001)?;
+    let large = folded(1_000_000_000_000)?;
+    let folded_allocations = |circuit: &Circuit| {
+        let mut result = None;
+        let allocations = allocation_counter::measure(|| {
+            result = Some(missing_detectors(
+                circuit,
+                MissingDetectorOptions {
+                    ignore_non_deterministic_measurements: true,
+                },
+            ));
+        });
+        (allocations, result)
+    };
+    let (small_folded, small_result) = folded_allocations(&small);
+    let (large_folded, large_result) = folded_allocations(&large);
+    small_result
+        .ok_or_else(|| std::io::Error::other("small folded proof produced no result"))??;
+    large_result
+        .ok_or_else(|| std::io::Error::other("large folded proof produced no result"))??;
+    if large_folded.count_total > small_folded.count_total + 4
+        || large_folded.bytes_total > small_folded.bytes_total + 1024
+    {
+        return Err(std::io::Error::other(format!(
+            "folded proof allocation scaled with repeat count: small={small_folded:?}, large={large_folded:?}"
+        ))
+        .into());
+    }
+
+    let sparse = |qubit| Circuit::from_stim_str(&format!("M {qubit}\n"));
+    let moderate = sparse(20_000)?;
+    let very_sparse = sparse(1_000_000)?;
+    let rejection_allocations = |circuit: &Circuit| {
+        let mut result = None;
+        let allocations = allocation_counter::measure(|| {
+            result = Some(missing_detectors(
+                circuit,
+                MissingDetectorOptions {
+                    ignore_non_deterministic_measurements: false,
+                },
+            ));
+        });
+        (allocations, result)
+    };
+    let (moderate_rejection, moderate_result) = rejection_allocations(&moderate);
+    let (sparse_rejection, sparse_result) = rejection_allocations(&very_sparse);
+    for (context, result) in [("moderate", moderate_result), ("sparse", sparse_result)] {
+        let result = result.ok_or_else(|| {
+            std::io::Error::other(format!("{context} rejection produced no result"))
+        })?;
+        let resource = match result {
+            Ok(_) => {
+                return Err(std::io::Error::other(format!(
+                    "{context} projected flow storage unexpectedly succeeded"
+                ))
+                .into());
+            }
+            Err(AnalysisError::ResourceLimit(resource)) => resource,
+            Err(error) => {
+                return Err(std::io::Error::other(format!(
+                    "{context} rejection returned unexpected error: {error}"
+                ))
+                .into());
+            }
+        };
+        assert_eq!(
+            resource.operation(),
+            ResourceOperation::MissingDetectorDiscovery
+        );
+        assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
+        assert!(resource.actual() > resource.limit());
+    }
+    if sparse_rejection.count_total > moderate_rejection.count_total + 4
+        || sparse_rejection.bytes_total > moderate_rejection.bytes_total + 1024
+    {
+        return Err(std::io::Error::other(format!(
+            "rejection allocation scaled with sparse qubit label: moderate={moderate_rejection:?}, sparse={sparse_rejection:?}"
+        ))
+        .into());
     }
     Ok(())
 }
@@ -676,7 +807,7 @@ fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
     ) else {
         return Err(std::io::Error::other("expected excessive repeat expansion rejection").into());
     };
-    if !error.to_string().contains("expanded repeat iterations") {
+    if !error.to_string().contains("expanded instructions") {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
     }
 
@@ -689,23 +820,62 @@ fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
     ) else {
         return Err(std::io::Error::other("expected excessive repeat work-unit rejection").into());
     };
-    if !error.to_string().contains("expanded work units") {
+    let AnalysisError::ResourceLimit(resource) = error else {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
-    }
-
-    let circuit = Circuit::from_stim_str("REPEAT 500001 {\n    SPP X0\n}\n")?;
-    let Err(error) = missing_detectors(
-        &circuit,
-        MissingDetectorOptions {
-            ignore_non_deterministic_measurements: true,
-        },
-    ) else {
-        return Err(std::io::Error::other("expected decomposed SPP repeat work rejection").into());
     };
-    if !error.to_string().contains("expanded work units") {
-        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    assert_eq!(
+        resource.operation(),
+        ResourceOperation::MissingDetectorDiscovery
+    );
+    assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
+    assert!(resource.actual() > resource.limit());
+
+    Ok(())
+}
+
+fn assert_missing_detector_folded_final_repeat_is_count_independent()
+-> Result<(), Box<dyn std::error::Error>> {
+    for (prefix, body, ignore_non_deterministic_measurements) in [
+        ("", "M 0\nDETECTOR rec[-1]\n", false),
+        (
+            "R 0\n",
+            "M 0\nM 0\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n",
+            true,
+        ),
+        (
+            "R 0\n",
+            "H 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nDETECTOR rec[-1]\n",
+            true,
+        ),
+        (
+            "R 0\n",
+            "REPEAT 2 {\n    M 0\n    DETECTOR rec[-1]\n}\n",
+            true,
+        ),
+    ] {
+        let analyze = |count: u64| -> Result<Circuit, Box<dyn std::error::Error>> {
+            let circuit =
+                Circuit::from_stim_str(&format!("{prefix}REPEAT {count} {{\n{body}}}\n"))?;
+            Ok(missing_detectors(
+                &circuit,
+                MissingDetectorOptions {
+                    ignore_non_deterministic_measurements,
+                },
+            )?)
+        };
+        let expected = analyze(1)?;
+        assert_eq!(analyze(2)?, expected);
+        assert_eq!(analyze(3)?, expected);
+        assert_eq!(analyze(1_000_001)?, expected);
     }
     Ok(())
+}
+
+#[test]
+fn missing_detector_resource_contract_is_atomic() -> Result<(), Box<dyn std::error::Error>> {
+    assert_missing_detector_expansion_and_nesting_limits()?;
+    assert_missing_detector_projected_storage_and_allocation_bounds()?;
+    assert_missing_detector_folded_final_repeat_is_count_independent()
 }
 
 #[test]

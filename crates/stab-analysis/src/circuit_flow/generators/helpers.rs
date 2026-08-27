@@ -7,30 +7,6 @@ use crate::{AnalysisError, AnalysisResult};
 
 use super::single_pauli;
 
-// Two rows per qubit, two Pauli strings per row, and two bit planes per string.
-const MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS: usize = 8 * 4096 * 4096;
-
-pub(super) fn validate_ignored_only_flow_generator_work(qubit_count: usize) -> AnalysisResult<()> {
-    let pauli_bits = qubit_count
-        .checked_mul(qubit_count)
-        .and_then(|bits| bits.checked_mul(8))
-        .ok_or_else(|| {
-            AnalysisError::invalid_domain_value(
-                "ignored-only flow-generator Pauli bits",
-                "overflowed",
-            )
-        })?;
-    if pauli_bits > MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS {
-        return Err(AnalysisError::invalid_domain_value(
-            "ignored-only flow-generator Pauli bits",
-            format!(
-                "{pauli_bits} exceeds current limit {MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS}"
-            ),
-        ));
-    }
-    Ok(())
-}
-
 pub(super) fn plain_tableau_targets(targets: &[Target]) -> Option<Vec<usize>> {
     let mut qubits = Vec::with_capacity(targets.len());
     for target in targets {

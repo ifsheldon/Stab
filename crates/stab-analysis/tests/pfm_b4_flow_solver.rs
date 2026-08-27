@@ -129,11 +129,14 @@ fn pfm_b4_flow_solver_repeats_match_expansion_and_preserve_caps() {
     );
 
     let error = solve_for_flow_measurements(
-        &circuit("REPEAT 1000000 {\n    M 0\n}\n"),
+        &circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"),
         &[flow("Z -> 1")],
     )
-    .expect_err("solver must preserve flow-generator repeat cap");
-    assert!(error.to_string().contains("current limit 4096"), "{error}");
+    .expect_err("solver must preserve flow-generator expanded-work cap");
+    assert!(
+        error.to_string().contains("current limit 1000000"),
+        "{error}"
+    );
 }
 
 #[test]

@@ -12,4 +12,7 @@ pub use checker::{
     circuit_has_unsigned_stabilizer_flow,
 };
 pub use generators::circuit_flow_generators;
+pub(crate) use generators::{
+    MAX_FLOW_GENERATOR_PROJECTED_BYTES, measurement_rich_flow_generator_projected_bytes,
+};
 pub use solver::solve_for_flow_measurements;

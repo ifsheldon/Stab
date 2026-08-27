@@ -7,8 +7,9 @@ use std::str::FromStr;
 
 use stab_algebra::Flow;
 use stab_analysis::{
-    TimeReversedForFlowsOptions, circuit_has_all_unsigned_stabilizer_flows, circuit_inverse_qec,
-    circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
+    InverseQecOptions, TimeReversedForFlowsOptions, circuit_has_all_unsigned_stabilizer_flows,
+    circuit_inverse_qec, circuit_inverse_qec_with_options, circuit_time_reversed_for_flows,
+    circuit_time_reversed_for_flows_with_options,
 };
 use stab_model::Circuit;
 
@@ -42,8 +43,8 @@ fn inverse_qec_common_semantic_matrix_matches_stim() {
         ),
         (
             "noisy measure resets",
-            "MR(0.125) 0 1 2 0 2 4\nMRX(0.25) 0\nMRY(0.375) 0\n",
-            "MRY 0\nZ_ERROR(0.375) 0\nMRX 0\nZ_ERROR(0.25) 0\nMR 4 2 0\nX_ERROR(0.125) 4 2 0\nMR 2 1 0\nX_ERROR(0.125) 2 1 0\n",
+            "MR(0.125) 0 1 2\nMRX(0.25) 0\nMRY(0.375) 0\n",
+            "MRY 0\nZ_ERROR(0.375) 0\nMRX 0\nZ_ERROR(0.25) 0\nMR 2 1 0\nX_ERROR(0.125) 2 1 0\n",
         ),
         (
             "noisy pair-product detector flow",
@@ -61,9 +62,39 @@ fn inverse_qec_common_semantic_matrix_matches_stim() {
             "MPAD 1 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n",
         ),
         (
+            "MPAD observable parity and metadata",
+            "MPAD 0 1\nOBSERVABLE_INCLUDE[a](0) rec[-2]\nOBSERVABLE_INCLUDE[b](0) rec[-1]\n",
+            "MPAD 1 0\nOBSERVABLE_INCLUDE[a](0) rec[-2] rec[-1]\n",
+        ),
+        (
             "observable Pauli packet",
             "RX 1\nOBSERVABLE_INCLUDE[test](1) X1\n",
             "OBSERVABLE_INCLUDE[test](1) X1\nMX 1\nOBSERVABLE_INCLUDE(1) rec[-1]\n",
+        ),
+        (
+            "mixed tracker surface",
+            "R 0\nH 0\nMX 0\nDETECTOR rec[-1]\n",
+            "RX 0\nH 0\nM 0\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "pair measurements",
+            "MXX 0 1\nMYY 2 3\nMZZ 4 5\n",
+            "MZZ 4 5\nMYY 2 3\nMXX 0 1\n",
+        ),
+        (
+            "measurement-rich repeat",
+            "REPEAT 2 {\n    M(0.125) 0\n}\n",
+            "M(0.125) 0 0\n",
+        ),
+        (
+            "tagged detector and tick ordering",
+            "R 0 1 2\nTICK[a]\nM 0 1 2\nTICK[b]\nM 0 1 2\nDETECTOR[c](2) rec[-1]\nDETECTOR[d](1) rec[-2]\n",
+            "R 2 1\nM 0\nTICK[b]\nM 2 1 0\nTICK[a]\nM 2 1 0\nDETECTOR[c](2) rec[-3]\nDETECTOR[d](1) rec[-2]\n",
+        ),
+        (
+            "targetless products and ordinary noise",
+            "X_ERROR(0.125)\nMPP\nMPAD\n",
+            "MPAD\nMPP\nX_ERROR(0.125)\n",
         ),
     ];
 
@@ -77,8 +108,40 @@ fn inverse_qec_common_semantic_matrix_matches_stim() {
 }
 
 #[test]
+fn inverse_qec_keep_measurements_uses_the_general_reverse_flow_contract() {
+    let input = circuit("R 0\nH 0\nMX 0\nDETECTOR rec[-1]\n");
+    let expected = circuit("MX 0\nH 0\nM 0\nDETECTOR rec[-2] rec[-1]\n");
+
+    assert_eq!(
+        circuit_inverse_qec_with_options(
+            &input,
+            InverseQecOptions {
+                keep_measurements: true,
+            },
+        )
+        .expect("inverse mixed QEC circuit while retaining measurements"),
+        expected
+    );
+}
+
+#[test]
+fn inverse_qec_rejects_anticommuting_measure_reset() {
+    let input = circuit("R 0\nMX 0\nMR 0\nDETECTOR rec[-1]\n");
+    let error = circuit_inverse_qec(&input)
+        .expect_err("anticommuting reset, measurement, and measure-reset packet")
+        .to_string();
+    assert!(error.contains("anti-commuted"), "{error}");
+}
+
+#[test]
 fn time_reversal_for_flows_common_semantic_matrix_matches_stim() {
     let empty_flow_cases = [
+        ("empty circuit", "", ""),
+        (
+            "reset H MX detector",
+            "R 0\nH 0\nMX 0\nDETECTOR rec[-1]\n",
+            "RX 0\nH 0\nM 0\nDETECTOR rec[-1]\n",
+        ),
         (
             "unitary packet",
             "H 0\nISWAP 0 1 1 2 3 2\nS 0 3 4\n",
@@ -192,13 +255,6 @@ fn time_reversal_for_flows_common_semantic_matrix_matches_stim() {
             &["X0*Z1 -> X0*X1 xor rec[-1]", "Z0*Z1 -> Z0 xor rec[-1]"],
         ),
         (
-            "observable-bearing reset",
-            "R 0\n",
-            &["1 -> Z0 xor obs[0]"],
-            "M 0\n",
-            &["Z0 -> rec[-1]"],
-        ),
-        (
             "bounded measurement repeat",
             "REPEAT 2 {\n    M 0\n}\n",
             &[],
@@ -223,65 +279,6 @@ fn time_reversal_for_flows_common_semantic_matrix_matches_stim() {
             "{name}"
         );
     }
-}
-
-#[test]
-fn circuit_inverse_qec_matches_stim_negative_zero_detector_packet() {
-    let input = circuit("R 0\nM 0\nDETECTOR rec[-0]\n");
-    let expected = circuit("M 0 0\n");
-
-    assert_eq!(
-        circuit_inverse_qec(&input).expect("inverse negative-zero detector packet"),
-        expected
-    );
-}
-
-#[test]
-fn circuit_inverse_qec_matches_stim_negative_zero_measure_reset_packet() {
-    let input = circuit("R 0\nM 0\nMR 0\nDETECTOR rec[-0]\n");
-    let expected = circuit("MR 0\nM 0 0\n");
-
-    assert_eq!(
-        circuit_inverse_qec(&input).expect("inverse negative-zero measure-reset packet"),
-        expected
-    );
-}
-
-#[test]
-fn circuit_inverse_qec_rejects_unpromoted_two_to_one_shapes() {
-    for circuit_text in [
-        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR\n",
-        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR rec[-2]\n",
-        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-3]\n",
-        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-1] rec[-2]\n",
-        "R 0 0\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1\nCX 0 1\nM 0 0\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1\nCX 0 1\nM 1 2\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1 2\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1\nCX 0 1\nM 0 1 2\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1\nCX 1 0\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1\nCX 0 2\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1\nCX 0 1 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1 2\nCX 0 1\nM 0 1 2\nDETECTOR rec[-1] rec[-2]\n",
-        "R 0 1\nCX 0 1\nM(0.125) 0 1\nDETECTOR rec[-1] rec[-2]\n",
-        "RX 0 1\nCX 0 1\nMX 0 1\nDETECTOR rec[-1] rec[-2]\n",
-    ] {
-        let error = circuit_inverse_qec(&circuit(circuit_text))
-            .expect_err("unpromoted two_to_one shape is rejected")
-            .to_string();
-
-        assert!(
-            error.contains("inverse_qec selected two_to_one subset")
-                || error.contains("operation R is not unitary")
-                || error.contains("operation RX is not unitary")
-                || error.contains("operation DETECTOR is not unitary"),
-            "{circuit_text}: {error}"
-        );
-    }
-    let detector_error = Circuit::from_stim_str("R 0 1\nCX 0 1\nM 0 1\nDETECTOR 0\n")
-        .expect_err("DETECTOR is record-only at the circuit boundary")
-        .to_string();
-    assert!(detector_error.contains("DETECTOR"), "{detector_error}");
 }
 
 #[test]
@@ -427,103 +424,6 @@ fn circuit_inverse_qec_simplifies_measure_reset_pass_through_detector_parity() {
             circuit_inverse_qec(&input).expect("inverse measure-reset detector parity"),
             expected,
             "{input_text}"
-        );
-    }
-}
-
-#[test]
-fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
-    for circuit_text in [
-        "
-        R 0
-        TICK
-        M 0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M 1
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M 0
-        DETECTOR rec[-2]
-        ",
-        "
-        R 0
-        M(0.125) 0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        MX 0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M !0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0 0
-        M 0 0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M 0
-        MR 0
-        DETECTOR rec[-2]
-        ",
-        "
-        R 0
-        M 1
-        MR 1
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M 0
-        MR 1
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M 0
-        MR(0.125) 0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        MX 0
-        MR 0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M 0
-        MR !0
-        DETECTOR rec[-1]
-        ",
-        "
-        R 0 0
-        M 0 0
-        MR 0 0
-        DETECTOR rec[-1]
-        ",
-    ] {
-        let error = circuit_inverse_qec(&circuit(circuit_text))
-            .expect_err("unpromoted inverse-QEC measurement rewrite is rejected")
-            .to_string();
-
-        assert!(
-            error.contains("inverse_qec selected reset-measure-detector subset")
-                || error.contains("inverse_qec selected measure-reset pass-through subset")
-                || error.contains("operation R is not unitary")
-                || error.contains("operation TICK is not unitary")
-                || error.contains("operation DETECTOR is not unitary"),
-            "{circuit_text}: {error}"
         );
     }
 }
@@ -1064,20 +964,46 @@ fn time_reversed_for_flows_general_engine_handles_multiple_measurements() {
 }
 
 #[test]
-fn time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_measurement_targets() {
-    for (circuit_text, input_flow) in [
-        ("M 0 0\n", "1 -> Z0 xor rec[-1]"),
-        ("MX 0 0\n", "1 -> X0 xor rec[-1]"),
-        ("MY 0 0\n", "1 -> Y0 xor rec[-1]"),
-        ("MZZ 0 1 1 2\n", "1 -> Z0*Z1 xor rec[-2]"),
+fn time_reversed_for_flows_matches_stim_duplicate_measurement_targets() {
+    for (circuit_text, input_flow, expected_circuit, expected_flow) in [
+        ("M 0 0\n", "1 -> Z0 xor rec[-1]", "M 0 0\n", "Z0 -> rec[-2]"),
+        (
+            "MX 0 0\n",
+            "1 -> X0 xor rec[-1]",
+            "MX 0 0\n",
+            "X0 -> rec[-2]",
+        ),
+        (
+            "MY 0 0\n",
+            "1 -> Y0 xor rec[-1]",
+            "MY 0 0\n",
+            "Y0 -> rec[-2]",
+        ),
+        (
+            "MZZ 0 1 1 2\n",
+            "1 -> Z0*Z1 xor rec[-2]",
+            "MZZ 1 2 0 1\n",
+            "Z0*Z1 -> rec[-1]",
+        ),
     ] {
-        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-            .expect_err("duplicate measurement targets are not in the scoped subset")
-            .to_string();
+        let (actual_circuit, actual_flows) =
+            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+                .expect("reverse Stim-accepted duplicate measurement targets");
 
+        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
+        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
+    }
+}
+
+#[test]
+fn inverse_qec_rejects_negative_zero_record_offsets() {
+    for circuit_text in [
+        "R 0\nM 0\nDETECTOR rec[-0]\n",
+        "R 0\nM 0\nMR 0\nDETECTOR rec[-0]\n",
+    ] {
         assert!(
-            error.contains("duplicate target qubit"),
-            "{circuit_text}: {error}"
+            circuit_inverse_qec(&circuit(circuit_text)).is_err(),
+            "{circuit_text}"
         );
     }
 }
@@ -1093,65 +1019,63 @@ fn time_reversed_for_flows_general_engine_preserves_noisy_measurements() {
 }
 
 #[test]
-fn time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_reset_targets() {
-    for (circuit_text, input_flow) in [
-        ("R 0 0\n", "1 -> Z0"),
-        ("RX 0 0\n", "1 -> X0"),
-        ("RY 0 0\n", "1 -> Y0"),
+fn time_reversed_for_flows_preserves_duplicate_reset_semantics() {
+    for (circuit_text, input_flow, expected_flow) in [
+        ("R 0 0\n", "1 -> Z0", "Z0 -> rec[-2]"),
+        ("RX 0 0\n", "1 -> X0", "X0 -> rec[-2]"),
+        ("RY 0 0\n", "1 -> Y0", "Y0 -> rec[-2]"),
+        ("MR 0 0\n", "1 -> Z0", "Z0 -> rec[-2]"),
+        ("MRX 0 0\n", "1 -> X0", "X0 -> rec[-2]"),
+        ("MRY 0 0\n", "1 -> Y0", "Y0 -> rec[-2]"),
+        ("MR 0 1 0\n", "1 -> Z0*Z1", "Z0*Z1 -> rec[-3] xor rec[-2]"),
     ] {
-        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-            .expect_err("duplicate reset-only flow rewrites are not in the scoped subset")
-            .to_string();
-
+        let (inverse, reversed_flows) =
+            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+                .expect("reverse duplicate reset semantics");
+        assert_eq!(reversed_flows, vec![flow(expected_flow)], "{circuit_text}");
         assert!(
-            error.contains("duplicate target qubit"),
-            "{circuit_text}: {error}"
+            circuit_has_all_unsigned_stabilizer_flows(&inverse, &reversed_flows),
+            "{circuit_text}: {inverse}\n{reversed_flows:?}"
         );
     }
 }
 
 #[test]
-fn time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_measure_reset_targets() {
-    for (circuit_text, input_flow) in [
-        ("MR 0 0\n", "1 -> Z0"),
-        ("MRX 0 0\n", "1 -> X0"),
-        ("MRY 0 0\n", "1 -> Y0"),
-        ("MR 0 1 0\n", "1 -> Z0*Z1"),
-    ] {
-        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-            .expect_err("duplicate measure-reset flow rewrites are not in the scoped subset")
-            .to_string();
+fn time_reversed_for_flows_rejects_observable_dependencies_before_expansion() {
+    let error = circuit_time_reversed_for_flows(
+        &circuit("REPEAT 1000001 {\nR 0\n}\n"),
+        &[flow("1 -> Z0 xor obs[7]")],
+    )
+    .expect_err("reject under-specified observable reversal")
+    .to_string();
+    assert!(error.contains("flow 0"), "{error}");
+    assert!(error.contains("obs[7]"), "{error}");
 
-        assert!(
-            error.contains("duplicate target qubit"),
-            "{circuit_text}: {error}"
-        );
-    }
-}
-
-#[test]
-fn time_reversed_for_flows_general_engine_handles_observable_terms() {
-    for (gate, basis, inverse_gate) in [
-        ("R", "Z", "M"),
-        ("RX", "X", "MX"),
-        ("RY", "Y", "MY"),
-        ("MR", "Z", "MR"),
-        ("MRX", "X", "MRX"),
-        ("MRY", "Y", "MRY"),
-    ] {
-        let input = circuit(&format!("{gate} 0\n"));
-        let input_flow = flow(&format!("1 -> {basis}0 xor obs[0]"));
-        let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[input_flow])
-            .expect("reverse observable-bearing flow");
-
-        assert_eq!(inverse, circuit(&format!("{inverse_gate} 0\n")), "{gate}");
-        assert_eq!(flows, vec![flow(&format!("{basis}0 -> rec[-1]"))], "{gate}");
-    }
+    let cancelled = stab_algebra::Flow::new(
+        stab_algebra::PauliString::identity(0).expect("identity input"),
+        stab_algebra::PauliString::identity(0).expect("identity output"),
+        [],
+        [3, 3],
+    )
+    .expect("canonical cancelled observable terms");
+    assert!(
+        circuit_time_reversed_for_flows(&Circuit::new(), &[cancelled]).is_ok(),
+        "cancelled observable terms do not survive the Flow boundary"
+    );
 
     let error = circuit_time_reversed_for_flows(&circuit("R 0\n"), &[flow("1 -> Z0 xor rec[0]")])
         .expect_err("reset flow cannot reference a nonexistent measurement")
         .to_string();
     assert!(error.contains("out of range measurement"), "{error}");
+}
+
+#[test]
+fn time_reversed_for_flows_accepts_and_normalizes_signed_inputs_like_stim() {
+    for signed in ["-X -> X", "X -> -X"] {
+        let (_, reversed) = circuit_time_reversed_for_flows(&circuit("I 0\n"), &[flow(signed)])
+            .expect("signed flow is validated without its sign");
+        assert_eq!(reversed, [flow("X -> X")], "{signed}");
+    }
 }
 
 fn circuit(text: &str) -> Circuit {

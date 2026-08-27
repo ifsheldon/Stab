@@ -57,7 +57,7 @@ pub use circuit_pass::{
     CircuitPassOutput, CircuitPassProjectionError, CircuitPassResources, run_circuit_pass,
 };
 pub use circuit_pauli::{pauli_after_circuit, pauli_before_circuit};
-pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
+pub use circuit_simplify::decomposed_circuit;
 pub use circuit_tableau::circuit_to_tableau;
 pub use circuit_to_dem::{
     DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,

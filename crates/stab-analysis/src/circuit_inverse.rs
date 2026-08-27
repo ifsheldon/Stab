@@ -1,11 +1,10 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, StabilizerResource, Tableau};
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, GateCategory, Target};
+use stab_model::{Circuit, CircuitInstruction, CircuitItem, Target};
 
 use crate::{
     AnalysisError, AnalysisResult, circuit_flow::check_unsigned_flows_with_sparse_tracker,
 };
 
-mod qec;
 mod reverse_flow;
 
 const MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
@@ -13,12 +12,7 @@ const MAX_TIME_REVERSE_TABLEAU_QUBITS: usize = StabilizerResource::TableauQubits
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct InverseQecOptions {
-    /// Preserve selected measurement records instead of turning them into resets.
-    ///
-    /// The current Rust API implements this only for the exact one-qubit
-    /// reset-measure-detector `r_m_det_keep_m` packet. Other selected QEC packets
-    /// and broader reset-measure-detector variants reject this option instead of
-    /// silently ignoring it.
+    /// Preserve measurements instead of turning eligible measurements into resets.
     pub keep_measurements: bool,
 }
 
@@ -31,16 +25,37 @@ pub struct TimeReversedForFlowsOptions {
     pub dont_turn_measurements_into_resets: bool,
 }
 
-/// Returns the inverse of a circuit made only from supported unitary Clifford gates.
+/// Returns the strict inverse of a unitary circuit and its invertible annotations.
 ///
-/// Repeat blocks are inverted recursively. Non-unitary instructions return a circuit
-/// error instead of being skipped or approximated.
+/// Leading `QUBIT_COORDS` instructions are preserved, `TICK` is self-inverse,
+/// `SHIFT_COORDS` arguments are negated, and repeat blocks are inverted recursively.
+/// Measurements, resets, noise, detectors, observables, and non-leading qubit
+/// coordinates return an error instead of being skipped or approximated.
 pub fn circuit_inverse_unitary(circuit: &Circuit) -> AnalysisResult<Circuit> {
+    let leading_coordinates = circuit
+        .items()
+        .iter()
+        .take_while(|item| {
+            matches!(
+                item,
+                CircuitItem::Instruction(instruction)
+                    if instruction.gate().canonical_name() == "QUBIT_COORDS"
+            )
+        })
+        .count();
     let mut result = Circuit::new();
-    for item in circuit.items().iter().rev() {
+    for item in circuit.items().iter().take(leading_coordinates) {
+        let CircuitItem::Instruction(instruction) = item else {
+            return Err(AnalysisError::invalid_tableau_conversion(
+                "leading-coordinate prefix unexpectedly contained a repeat block",
+            ));
+        };
+        result.append_instruction(inverse_coordinate_instruction(instruction)?);
+    }
+    for item in circuit.items().iter().skip(leading_coordinates).rev() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                let inverse = inverse_instruction(instruction)?;
+                let inverse = inverse_public_instruction(instruction)?;
                 result.append_instruction(inverse);
             }
             CircuitItem::RepeatBlock(repeat) => {
@@ -56,54 +71,53 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> AnalysisResult<Circuit> {
     Ok(result)
 }
 
-/// Returns the currently implemented QEC inverse subset.
-///
-/// This includes the unitary inverse plus selected Stim-compatible
-/// reset-measure-detector, selected two-to-one detector-flow, selected `m_det`,
-/// selected MPP identity-parity detector-flow, selected MPAD record-tail,
-/// selected noisy MZZ detector-flow, noisy measurement-only,
-/// noisy measure-reset-only, exact noisy measure-reset detector-flow, selected
-/// observable Pauli include, and measure-reset pass-through packets.
-/// Broader QEC-specific inverse rewrites for measurements, resets, detectors,
-/// observables, noise, and feedback remain active follow-up work.
+fn circuit_inverse_unitary_strict(circuit: &Circuit) -> AnalysisResult<Circuit> {
+    let mut result = Circuit::new();
+    for item in circuit.items().iter().rev() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                result.append_instruction(inverse_unitary_instruction(instruction)?);
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                let inverse_body = circuit_inverse_unitary_strict(repeat.body())?;
+                result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
+                    repeat.repeat_count(),
+                    inverse_body,
+                    repeat.tag_bytes(),
+                ));
+            }
+        }
+    }
+    Ok(result)
+}
+
+/// Returns the tracker-driven QEC inverse of a circuit.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> AnalysisResult<Circuit> {
     circuit_inverse_qec_with_options(circuit, InverseQecOptions::default())
 }
 
-/// Returns the currently implemented QEC inverse subset with explicit options.
-///
-/// `keep_measurements` is currently implemented only for the exact one-qubit
-/// reset-measure-detector packet matching Stim v1.16.0 `r_m_det_keep_m`.
+/// Returns the tracker-driven QEC inverse with explicit measurement handling.
 pub fn circuit_inverse_qec_with_options(
     circuit: &Circuit,
     options: InverseQecOptions,
 ) -> AnalysisResult<Circuit> {
-    if options.keep_measurements {
-        if let Some(inverse) = qec::selected_keep_measurements_qec_inverse(circuit)? {
-            return Ok(inverse);
-        }
-        if qec::selected_qec_inverse(circuit)?.is_some() {
-            return Err(AnalysisError::invalid_tableau_conversion(
-                "inverse_qec keep_measurements is currently supported only for the exact one-qubit reset-measure-detector subset",
-            ));
-        }
-        return circuit_inverse_unitary(circuit);
-    }
-    if let Some(inverse) = qec::selected_qec_inverse(circuit)? {
-        return Ok(inverse);
-    }
-    circuit_inverse_unitary(circuit)
+    let reverse_options = TimeReversedForFlowsOptions {
+        dont_turn_measurements_into_resets: options.keep_measurements,
+    };
+    let (inverse, _) = circuit_time_reversed_for_flows_with_options(circuit, &[], reverse_options)?;
+    Ok(inverse)
 }
 
-/// Returns the supported tracker-driven time reversal for unsigned flows.
+/// Returns the supported tracker-driven time reversal for flows.
 ///
 /// The implementation validates each input flow, reverses supported Clifford,
 /// measurement, reset, measure-reset, pair-measurement, MPP, MPAD, detector,
-/// observable, coordinate, and ordinary-noise gate families through shared
-/// reverse transitions, and validates the returned flows. Pure unitary repeats
-/// stay folded; measurement-rich repeats use bounded expansion capped at one
-/// million instructions. Measurement-record feedback, heralded record reversal,
-/// and duplicate collapse targets remain fail-closed.
+/// observable, coordinate, heralded-record, and ordinary-noise gate families
+/// through shared reverse transitions, and validates the returned flows. Pure
+/// unitary repeats stay folded; measurement-rich repeats use bounded expansion
+/// capped at one million instructions. Supplied Pauli signs are accepted but
+/// ignored in the returned flows, and measurement-record feedback is rejected,
+/// matching pinned Stim.
 pub fn circuit_time_reversed_for_flows(
     circuit: &Circuit,
     flows: &[Flow],
@@ -115,9 +129,7 @@ pub fn circuit_time_reversed_for_flows(
     )
 }
 
-/// Returns the currently supported time-reversal subset for flows with explicit options.
-///
-/// See [`TimeReversedForFlowsOptions`] for the currently selected option scope.
+/// Returns tracker-driven time reversal for flows with explicit options.
 pub fn circuit_time_reversed_for_flows_with_options(
     circuit: &Circuit,
     flows: &[Flow],
@@ -129,9 +141,9 @@ pub fn circuit_time_reversed_for_flows_with_options(
     for (index, flow) in flows.iter().enumerate() {
         reject_non_unitary_flow_terms(index, flow)?;
     }
-    let inverse = circuit_inverse_unitary(circuit).map_err(|error| {
+    let inverse = circuit_inverse_unitary_strict(circuit).map_err(|error| {
         AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows unitary subset requires a unitary circuit: {error}"
+            "time_reversed_for_flows unitary fast path requires a unitary circuit: {error}"
         ))
     })?;
     if flows.is_empty() {
@@ -145,7 +157,7 @@ pub fn circuit_time_reversed_for_flows_with_options(
     {
         if !satisfied {
             return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "time_reversed_for_flows unitary subset requires input circuit to satisfy flow {index}: {flow}"
+                "time_reversed_for_flows unitary fast path requires input circuit to satisfy flow {index}: {flow}"
             )));
         }
     }
@@ -169,9 +181,52 @@ pub fn circuit_time_reversed_for_flows_with_options(
     Ok((inverse, reversed_flows))
 }
 
-fn inverse_instruction(instruction: &CircuitInstruction) -> AnalysisResult<CircuitInstruction> {
+fn inverse_public_instruction(
+    instruction: &CircuitInstruction,
+) -> AnalysisResult<CircuitInstruction> {
+    if instruction.gate().is_unitary() {
+        return inverse_unitary_instruction(instruction);
+    }
     let gate = instruction.gate();
-    if !is_unitary_category(gate.category()) {
+    let args = match gate.canonical_name() {
+        "TICK" => instruction.args().to_vec(),
+        "SHIFT_COORDS" => instruction.args().iter().map(|arg| -*arg).collect(),
+        "QUBIT_COORDS" => {
+            return Err(AnalysisError::invalid_tableau_conversion(
+                "inverting QUBIT_COORDS is supported only at the start of a circuit or repeat block",
+            ));
+        }
+        _ => {
+            return Err(AnalysisError::invalid_tableau_conversion(format!(
+                "operation {} has no strict circuit inverse",
+                gate.canonical_name()
+            )));
+        }
+    };
+    Ok(stab_model::advanced::circuit_instruction_with_tag_bytes(
+        gate,
+        args,
+        reversed_target_groups(instruction),
+        instruction.tag_bytes(),
+    )?)
+}
+
+fn inverse_coordinate_instruction(
+    instruction: &CircuitInstruction,
+) -> AnalysisResult<CircuitInstruction> {
+    Ok(stab_model::advanced::circuit_instruction_with_tag_bytes(
+        instruction.gate(),
+        instruction.args().to_vec(),
+        reversed_target_groups(instruction),
+        instruction.tag_bytes(),
+    )?)
+}
+
+fn inverse_unitary_instruction(
+    instruction: &CircuitInstruction,
+) -> AnalysisResult<CircuitInstruction> {
+    let gate = instruction.gate();
+    if !gate.is_unitary() {
         return Err(AnalysisError::invalid_tableau_conversion(format!(
             "operation {} is not unitary",
             gate.canonical_name()
@@ -185,38 +240,6 @@ fn inverse_instruction(instruction: &CircuitInstruction) -> AnalysisResult<Circu
         targets,
         instruction.tag_bytes(),
     )?)
-}
-
-fn is_unitary_category(category: GateCategory) -> bool {
-    matches!(
-        category,
-        GateCategory::Controlled
-            | GateCategory::HadamardLike
-            | GateCategory::Pauli
-            | GateCategory::Period3
-            | GateCategory::Period4
-            | GateCategory::ParityPhasing
-            | GateCategory::Swap
-    )
-}
-
-fn reset_inverse_gate_and_basis(name: &str) -> Option<(&'static str, PauliBasis)> {
-    match name {
-        "R" => Some(("M", PauliBasis::Z)),
-        "RX" => Some(("MX", PauliBasis::X)),
-        "RY" => Some(("MY", PauliBasis::Y)),
-        _ => None,
-    }
-}
-
-fn is_plain_qubit_target(target: &Target) -> bool {
-    matches!(
-        target,
-        Target::Qubit {
-            inverted: false,
-            ..
-        }
-    )
 }
 
 fn reversed_target_groups(instruction: &CircuitInstruction) -> Vec<Target> {
@@ -240,7 +263,7 @@ fn reversed_pauli_only_flow(flow: &Flow) -> Flow {
 fn reject_non_unitary_flow_terms(index: usize, flow: &Flow) -> AnalysisResult<()> {
     if flow.measurements().next().is_some() || flow.observables().next().is_some() {
         return Err(AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows unitary subset does not support measurement-record or observable terms in flow {index}: {flow}"
+            "time_reversed_for_flows unitary fast path does not support measurement-record or observable terms in flow {index}: {flow}"
         )));
     }
     Ok(())
@@ -273,7 +296,7 @@ impl FlowValidation {
             return Ok(Self::SparseFolded);
         }
         Err(AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows unitary subset requires at most {MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS} expanded instructions and {MAX_TIME_REVERSE_TABLEAU_QUBITS} tableau qubits unless the circuit is supported by folded sparse validation"
+            "time_reversed_for_flows unitary fast path requires at most {MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS} expanded instructions and {MAX_TIME_REVERSE_TABLEAU_QUBITS} tableau qubits unless the circuit is supported by folded sparse validation"
         )))
     }
 

@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use stab_algebra::{Flow, FlowMeasurementIndex, PauliString};
 use stab_analysis::{
-    AnalysisError, UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
+    UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,
     check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
     circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
@@ -16,7 +16,7 @@ use stab_analysis::{
 use stab_model::Circuit;
 
 #[test]
-fn core_flow_generator_preserves_coordinate_flattening_errors() {
+fn flow_generation_ignores_coordinate_overflow_irrelevant_to_semantics() {
     let circuit = circuit(
         "
         REPEAT 2 {
@@ -25,12 +25,10 @@ fn core_flow_generator_preserves_coordinate_flattening_errors() {
         }
     ",
     );
-    let error = circuit_flow_generators(&circuit)
-        .expect_err("core facade must retain coordinate-aware repeat preflight");
-    assert!(matches!(error, AnalysisError::InvalidResultFormat { .. }));
+    let flows = circuit_flow_generators(&circuit).expect("generate flows without flattening");
     assert_eq!(
-        error.to_string(),
-        "invalid result format data: coordinate shift overflowed"
+        flows.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        vec!["1 -> rec[0] xor rec[1]", "1 -> Z xor rec[1]", "Z -> rec[1]",]
     );
 }
 

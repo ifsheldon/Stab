@@ -134,7 +134,7 @@ impl SamplingPlan {
     }
 }
 
-fn validate_general_frame_work_storage(
+pub(crate) fn validate_general_frame_work_storage(
     qubit_count: usize,
     measurement_count: usize,
     include_reference_snapshot: bool,

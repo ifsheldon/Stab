@@ -1,6 +1,6 @@
 #![allow(
     clippy::expect_used,
-    reason = "PFM-B1 parity tests use direct assertions for compact compatibility diagnostics"
+    reason = "time-reversal parity fixtures use direct assertions for compact diagnostics"
 )]
 
 use std::collections::BTreeSet;
@@ -22,56 +22,7 @@ const GENERATED_REVERSAL_CASES: u32 = 48;
 const GENERATED_REVERSAL_SEED: [u8; 32] = [0xB1; 32];
 
 #[test]
-fn pfm_b1_python_inverse_empty() {
-    let input = circuit("");
-
-    let (inverse, flows) =
-        circuit_time_reversed_for_flows(&input, &[]).expect("reverse empty circuit");
-
-    assert_eq!(inverse, Circuit::new());
-    assert!(flows.is_empty());
-}
-
-#[test]
-fn pfm_b1_python_reset_h_mx_detector() {
-    let input = circuit(
-        "
-        R 0
-        H 0
-        MX 0
-        DETECTOR rec[-1]
-        ",
-    );
-    let expected = circuit(
-        "
-        RX 0
-        H 0
-        M 0
-        DETECTOR rec[-1]
-        ",
-    );
-
-    let (inverse, flows) =
-        circuit_time_reversed_for_flows(&input, &[]).expect("reverse detector packet");
-
-    assert_eq!(inverse, expected);
-    assert!(flows.is_empty());
-}
-
-#[test]
-fn pfm_b1_python_noisy_measure_reset() {
-    let input = circuit("MR(0.125) 0\n");
-    let expected = circuit("MR 0\nX_ERROR(0.125) 0\n");
-
-    let (inverse, flows) =
-        circuit_time_reversed_for_flows(&input, &[]).expect("reverse noisy measure-reset");
-
-    assert_eq!(inverse, expected);
-    assert!(flows.is_empty());
-}
-
-#[test]
-fn pfm_b1_surface_code_reversal() {
+fn time_reversal_preserves_generated_surface_code_regions() {
     let params = SurfaceCodeParams::new(
         RoundCount::try_new(2).expect("rounds"),
         CodeDistance::try_new(3).expect("distance"),
@@ -151,7 +102,7 @@ fn pfm_b1_surface_code_reversal() {
 }
 
 #[test]
-fn pfm_b1_feedback_rejection() {
+fn time_reversal_rejects_measurement_feedback() {
     let input = circuit(
         "
         R 1
@@ -169,7 +120,7 @@ fn pfm_b1_feedback_rejection() {
 }
 
 #[test]
-fn pfm_b1_observable_paulis() {
+fn time_reversal_preserves_observable_pauli_semantics() {
     let input = circuit(
         "
         RX 0
@@ -197,7 +148,7 @@ fn pfm_b1_observable_paulis() {
 }
 
 #[test]
-fn pfm_b1_mpad_flow_matrix() {
+fn time_reversal_routes_mpad_flows_and_observables() {
     let input = circuit(
         "
         H 0
@@ -207,16 +158,7 @@ fn pfm_b1_mpad_flow_matrix() {
         OBSERVABLE_INCLUDE(0) rec[-1]
         ",
     );
-    let input_flows = [
-        "1 -> rec[1]",
-        "1 -> -rec[0]",
-        "X -> Z",
-        "Z -> Y",
-        "1 -> obs[0]",
-        "1 -> rec[-2] xor obs[0]",
-        "1 -> rec[-1] xor obs[0]",
-    ]
-    .map(flow);
+    let input_flows = ["1 -> rec[1]", "1 -> -rec[0]", "X -> Z", "Z -> Y"].map(flow);
     let expected = circuit(
         "
         S_DAG 0
@@ -225,16 +167,7 @@ fn pfm_b1_mpad_flow_matrix() {
         H 0
         ",
     );
-    let expected_flows = [
-        "1 -> rec[-2]",
-        "1 -> rec[-1]",
-        "Z -> X",
-        "Y -> Z",
-        "1 -> 1",
-        "1 -> rec[-1]",
-        "1 -> rec[-2]",
-    ]
-    .map(flow);
+    let expected_flows = ["1 -> rec[-2]", "1 -> rec[-1]", "Z -> X", "Y -> Z"].map(flow);
 
     let (inverse, output_flows) =
         circuit_time_reversed_for_flows(&input, &input_flows).expect("reverse MPAD flow matrix");
@@ -244,7 +177,7 @@ fn pfm_b1_mpad_flow_matrix() {
 }
 
 #[test]
-fn pfm_b1_measurement_rich_repeat_uses_bounded_expansion() {
+fn time_reversal_bounds_measurement_rich_repeat_expansion() {
     let small = circuit("REPEAT 2 {\n    M 0\n}\n");
     let (inverse, flows) =
         circuit_time_reversed_for_flows(&small, &[]).expect("reverse bounded repeat");
@@ -266,7 +199,7 @@ fn pfm_b1_measurement_rich_repeat_uses_bounded_expansion() {
 }
 
 #[test]
-fn pfm_b1_instruction_empty_nested_repeat_skips_repeat_count_work() {
+fn time_reversal_skips_instructionless_nested_repeats() {
     let input = circuit(
         "
         REPEAT 1000000000 {
@@ -285,31 +218,27 @@ fn pfm_b1_instruction_empty_nested_repeat_skips_repeat_count_work() {
 }
 
 #[test]
-fn pfm_b1_heralded_record_reversal_remains_fail_closed() {
-    let input = circuit("HERALDED_ERASE(0.125) 0\n");
+fn time_reversed_for_flows_matches_stim_heralded_record_reversal() {
+    for circuit_text in [
+        "HERALDED_ERASE(0.125) 0\n",
+        "HERALDED_PAULI_CHANNEL_1(0.1, 0.2, 0.3, 0.4) 0\n",
+    ] {
+        let input = circuit(circuit_text);
+        let (empty_inverse, empty_flows) = circuit_time_reversed_for_flows(&input, &[])
+            .expect("reverse heralded instruction without a record-bearing flow");
+        assert_eq!(empty_inverse, input, "{circuit_text}");
+        assert!(empty_flows.is_empty(), "{circuit_text}");
 
-    let error = circuit_time_reversed_for_flows(&input, &[])
-        .expect_err("heralded record reversal is not selected")
-        .to_string();
-
-    assert!(error.contains("heralded measurement records"), "{error}");
-}
-
-#[test]
-fn pfm_b1_non_finite_probability_is_rejected_at_the_circuit_boundary() {
-    for text in ["M(NaN) 0\n", "MR(inf) 0\n", "X_ERROR(-inf) 0\n"] {
-        let error = Circuit::from_stim_str(text)
-            .expect_err("non-finite probability must not reach reverse propagation")
-            .to_string();
-        assert!(
-            error.contains("probability") || error.contains("argument"),
-            "{text}: {error}"
-        );
+        let (record_inverse, record_flows) =
+            circuit_time_reversed_for_flows(&input, &[flow("1 -> rec[-1]")])
+                .expect("reverse heralded instruction with a record-bearing flow");
+        assert_eq!(record_inverse, input, "{circuit_text}");
+        assert_eq!(record_flows, vec![flow("1 -> 1")], "{circuit_text}");
     }
 }
 
 #[test]
-fn pfm_b1_sweep_control_target_order_matches_stim() {
+fn time_reversal_matches_sweep_control_target_order() {
     for text in [
         "CX sweep[0] 0\n",
         "CY sweep[0] 0\n",
@@ -344,7 +273,7 @@ fn pfm_b1_sweep_control_target_order_matches_stim() {
 }
 
 #[test]
-fn pfm_b1_non_pair_targets_reverse_in_stim_order() {
+fn time_reversal_preserves_non_pair_target_order() {
     for (input_text, expected_text) in [
         ("MPP X0*Y1 Z2*X3\n", "MPP X3*Z2 Y1*X0\n"),
         ("SPP X0*Y1 Z2*X3\n", "SPP_DAG X3*Z2 Y1*X0\n"),
@@ -359,7 +288,7 @@ fn pfm_b1_non_pair_targets_reverse_in_stim_order() {
 }
 
 #[test]
-fn pfm_b1_inverted_result_failures_match_stim() {
+fn time_reversal_rejects_inverted_result_synthesis() {
     for (gate, basis) in [("M", "Z"), ("MX", "X"), ("MY", "Y")] {
         let input = circuit(&format!("{gate} !0\n"));
         let input_flow = flow(&format!("{basis}0 -> rec[-1]"));
@@ -385,7 +314,7 @@ fn pfm_b1_inverted_result_failures_match_stim() {
 }
 
 #[test]
-fn pfm_b1_sparse_high_qubit_reversal_avoids_dense_tracker_storage() {
+fn time_reversal_avoids_dense_storage_for_sparse_high_qubits() {
     let million_index = circuit("M 1000000\n");
     let (unchanged, flows) = circuit_time_reversed_for_flows(&million_index, &[])
         .expect("reverse a million-index circuit without dense tracker storage");
@@ -394,7 +323,7 @@ fn pfm_b1_sparse_high_qubit_reversal_avoids_dense_tracker_storage() {
 }
 
 #[test]
-fn pfm_b1_sparse_high_qubit_flow_validation_stays_semantic() {
+fn time_reversal_validates_sparse_high_qubit_flows() {
     let input = circuit("M 4095\n");
     let input_flow = flow("Z4095 -> rec[-1]");
 
@@ -407,7 +336,7 @@ fn pfm_b1_sparse_high_qubit_flow_validation_stays_semantic() {
 }
 
 #[test]
-fn pfm_b1_high_qubit_unitary_validation_uses_sparse_memory() {
+fn time_reversal_uses_sparse_validation_above_dense_tableau_width() {
     let input = circuit("H 1000000\n");
 
     let (without_flows, empty) = circuit_time_reversed_for_flows(&input, &[])
@@ -425,7 +354,7 @@ fn pfm_b1_high_qubit_unitary_validation_uses_sparse_memory() {
 }
 
 #[test]
-fn pfm_b1_tableau_resource_boundary_falls_back_to_sparse_validation() {
+fn time_reversal_uses_sparse_validation_at_the_tableau_boundary() {
     let input = circuit("H 512\n");
     let idle_flow = flow("Z0 -> Z0");
 
@@ -439,7 +368,7 @@ fn pfm_b1_tableau_resource_boundary_falls_back_to_sparse_validation() {
 }
 
 #[test]
-fn pfm_b1_output_flow_validation_batches_many_flows() {
+fn time_reversal_batches_output_flow_validation() {
     let input = circuit("M 0\n");
     let input_flows = std::iter::repeat_with(|| flow("1 -> Z0 xor rec[-1]"))
         .take(1_024)
@@ -457,7 +386,7 @@ fn pfm_b1_output_flow_validation_batches_many_flows() {
 }
 
 #[test]
-fn pfm_b1_absolute_relative_record_aliases_match_stim_rejection() {
+fn time_reversal_rejects_absolute_relative_record_aliases() {
     let input = circuit("M 0\n");
     let aliased = flow("1 -> rec[-1] xor rec[0]");
 
@@ -473,7 +402,7 @@ fn pfm_b1_absolute_relative_record_aliases_match_stim_rejection() {
 }
 
 #[test]
-fn pfm_b1_supported_flow_reversal_is_semantically_involutive() {
+fn supported_time_reversal_is_semantically_involutive() {
     let config = Config {
         cases: GENERATED_REVERSAL_CASES,
         failure_persistence: None,

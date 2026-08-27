@@ -86,4 +86,15 @@ fn circuit_counts_accept_u64_maximum_and_reject_the_first_overflow() {
             ValidationError::CircuitCountOverflow
         ))
     );
+
+    let zero_contribution = Circuit::from_stim_str(
+        "REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        TICK\n    }\n}\n",
+    )
+    .expect("nested zero-measurement repeat");
+    assert_eq!(
+        zero_contribution
+            .count_measurements()
+            .expect("zero-contribution count"),
+        0
+    );
 }

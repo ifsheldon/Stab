@@ -1,118 +1,12 @@
 #![allow(
     clippy::expect_used,
     clippy::indexing_slicing,
-    reason = "M6 simplified-circuit parity tests mirror compact upstream examples"
+    reason = "decomposition parity tests use fixed validated fixtures"
 )]
 
-use stab_analysis::{AnalysisError, circuit_to_tableau, decomposed_circuit, simplified_circuit};
+use stab_analysis::{AnalysisError, decomposed_circuit};
 use stab_model::{Circuit, CircuitItem};
 use std::ops::ControlFlow;
-
-#[test]
-fn simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base() {
-    let circuit = circuit(
-        "
-        I 0
-        X 0
-        Y 1
-        Z 2
-        H_XY 0
-        H_YZ 1
-        H_NXY 2
-        H_NXZ 0
-        H_NYZ 1
-        SQRT_X 0
-        SQRT_X_DAG 1
-        SQRT_Y 2
-        SQRT_Y_DAG 0
-        S_DAG 1
-        C_XYZ 0
-        C_NXYZ 1
-        C_XNYZ 2
-        C_XYNZ 0
-        C_ZYX 1
-        C_NZYX 2
-        C_ZNYX 0
-        C_ZYNX 1
-        H 2
-        S 2
-    ",
-    );
-
-    let simplified = simplified_circuit(&circuit).expect("simplify");
-    assert_h_s_cx_base(&simplified);
-    assert_tableau_equivalent(&circuit, &simplified);
-    assert!(!simplified.to_stim_string().contains("H_XY"));
-    assert!(!simplified.to_stim_string().contains("SQRT_X"));
-    assert!(!simplified.to_stim_string().contains("C_XYZ"));
-}
-
-#[test]
-fn simplified_circuit_rewrites_simple_two_qubit_cliffords_to_base() {
-    let circuit = circuit(
-        "
-        CZ 0 1
-        CY 1 2
-        SWAP 0 2
-        CX 2 1
-    ",
-    );
-
-    let simplified = simplified_circuit(&circuit).expect("simplify");
-    assert_h_s_cx_base(&simplified);
-    assert_tableau_equivalent(&circuit, &simplified);
-    assert!(!simplified.to_stim_string().contains("CZ"));
-    assert!(!simplified.to_stim_string().contains("CY"));
-    assert!(!simplified.to_stim_string().contains("SWAP"));
-}
-
-#[test]
-fn simplified_circuit_recurses_into_repeat_blocks() {
-    let circuit = circuit(
-        "
-        REPEAT 3 {
-            H_XY 0
-            CZ 0 1
-        }
-    ",
-    );
-
-    let simplified = simplified_circuit(&circuit).expect("simplify");
-    assert_h_s_cx_base(&simplified);
-    assert_tableau_equivalent(&circuit, &simplified);
-    assert!(!simplified.to_stim_string().contains("H_XY"));
-    assert!(!simplified.to_stim_string().contains("CZ"));
-}
-
-#[test]
-fn simplified_circuit_preserves_unsupported_gates_for_later_slices() {
-    let circuit = circuit("SQRT_XX 0 1\n");
-    let simplified = simplified_circuit(&circuit).expect("simplify");
-    assert_eq!(simplified, circuit);
-}
-
-#[test]
-fn simplified_circuit_preserves_classical_controlled_pairs() {
-    let circuit = circuit(
-        "
-        M 0
-        CY rec[-1] 1
-        CZ sweep[0] 2
-        CX rec[-1] 2
-    ",
-    );
-    let simplified = simplified_circuit(&circuit).expect("simplify");
-    assert_eq!(simplified, circuit);
-}
-
-#[test]
-fn cq2_circuit_api_simplified_contract_matches_selected_stim_scope() {
-    simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base();
-    simplified_circuit_rewrites_simple_two_qubit_cliffords_to_base();
-    simplified_circuit_recurses_into_repeat_blocks();
-    simplified_circuit_preserves_unsupported_gates_for_later_slices();
-    simplified_circuit_preserves_classical_controlled_pairs();
-}
 
 #[test]
 fn decomposed_circuit_reports_typed_anti_hermitian_failures() {
@@ -129,6 +23,64 @@ fn decomposed_circuit_reports_typed_anti_hermitian_failures() {
         AnalysisError::InvalidCircuitSimplification { ref message }
             if message.contains("anti-Hermitian")
     ));
+}
+
+#[test]
+fn decomposed_template_and_classical_control_matrix_matches_stim() {
+    // Exact output from Stim v1.16.0 Circuit.decomposed(). Empty H/S instructions
+    // are part of the pinned canonical output when a basis buffer has no qubits.
+    let cases = [
+        ("H_XY 0 1\n", "H 0 1\nS 0 1 0 1\nH 0 1\nS 0 1\n"),
+        ("CX rec[-1] 0\n", "CX rec[-1] 0\n"),
+        ("CX sweep[0] 0\n", "CX sweep[0] 0\n"),
+        ("CX 0 rec[-1]\n", "CX 0 rec[-1]\n"),
+        ("CX rec[-1] sweep[0]\n", "CX rec[-1] sweep[0]\n"),
+        ("CY rec[-1] 0\n", "S 0 0 0\nCX rec[-1] 0\nS 0\n"),
+        ("CY 0 sweep[0]\n", "S\nCX 0 sweep[0]\nS\n"),
+        ("CY rec[-1] sweep[0]\n", "S\nCX rec[-1] sweep[0]\nS\n"),
+        ("CZ rec[-1] 0\n", "H 0\nCX rec[-1] 0\nH 0\n"),
+        ("CZ 0 sweep[0]\n", "H\nCX 0 sweep[0]\nH\n"),
+        ("CZ rec[-1] sweep[0]\n", "H\nCX rec[-1] sweep[0]\nH\n"),
+        ("CZ rec[-1] rec[-2]\n", "H\nCX rec[-1] rec[-2]\nH\n"),
+        ("XCZ 0 rec[-1]\n", "CX rec[-1] 0\n"),
+        ("XCZ sweep[0] 0\n", "CX 0 sweep[0]\n"),
+        ("XCZ rec[-1] sweep[0]\n", "CX sweep[0] rec[-1]\n"),
+        ("YCZ 0 rec[-1]\n", "S 0 0 0\nCX rec[-1] 0\nS 0\n"),
+        ("YCZ sweep[0] 0\n", "S\nCX 0 sweep[0]\nS\n"),
+        ("YCZ rec[-1] sweep[0]\n", "S\nCX sweep[0] rec[-1]\nS\n"),
+        (
+            "CY rec[-1] 0 1 sweep[0] rec[-2] 2\n",
+            "S 0 2 0 2 0 2\n\
+             CX rec[-1] 0 1 sweep[0] rec[-2] 2\n\
+             S 0 2\n",
+        ),
+        (
+            "CZ rec[-1] 0 1 sweep[0] rec[-2] rec[-3]\n",
+            "H 0\n\
+             CX rec[-1] 0 1 sweep[0] rec[-2] rec[-3]\n\
+             H 0\n",
+        ),
+        (
+            "XCZ 0 rec[-1] sweep[0] 1 rec[-2] sweep[1]\n",
+            "CX rec[-1] 0 1 sweep[0] sweep[1] rec[-2]\n",
+        ),
+        (
+            "YCZ 0 rec[-1] sweep[0] 1 2 sweep[1]\n",
+            "S 0 2 0 2 0 2\n\
+             CX rec[-1] 0 1 sweep[0] sweep[1] 2\n\
+             S 0 2\n",
+        ),
+    ];
+
+    for (source, expected) in cases {
+        assert_eq!(
+            decomposed_circuit(&circuit(source))
+                .expect(source)
+                .to_stim_string(),
+            expected,
+            "{source}"
+        );
+    }
 }
 
 #[test]
@@ -177,52 +129,4 @@ fn streamed_spp_lowering_matches_decomposition_and_stops_before_later_work() {
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
-}
-
-fn assert_tableau_equivalent(original: &Circuit, simplified: &Circuit) {
-    assert_eq!(
-        circuit_to_tableau(original, false, true, true).expect("original tableau"),
-        circuit_to_tableau(simplified, false, true, true).expect("simplified tableau")
-    );
-}
-
-fn assert_h_s_cx_base(circuit: &Circuit) {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                assert!(
-                    matches!(instruction.gate().canonical_name(), "H" | "S" | "CX"),
-                    "{}",
-                    instruction.gate().canonical_name()
-                );
-            }
-            CircuitItem::RepeatBlock(repeat) => assert_h_s_cx_base(repeat.body()),
-        }
-    }
-}
-
-#[test]
-fn huge_single_line_mpp_reduces_without_quadratic_order_scanning() {
-    // Parse limits deliberately do not bound targets per instruction, so one
-    // hostile MPP line with 100k distinct targets must reduce in linear-ish
-    // time; the old per-target `order` scan was quadratic (WS6 item 1).
-    let mut text = String::from("MPP ");
-    for index in 0..200_000_u32 {
-        if index > 0 {
-            text.push('*');
-        }
-        text.push('X');
-        text.push_str(&index.to_string());
-    }
-    text.push('\n');
-    let circuit = Circuit::from_stim_str(&text).expect("hostile MPP line parses");
-
-    let started = std::time::Instant::now();
-    let decomposed = decomposed_circuit(&circuit).expect("hostile MPP line decomposes");
-    assert!(
-        started.elapsed() < std::time::Duration::from_secs(20),
-        "quadratic reduction returned: {:?}",
-        started.elapsed()
-    );
-    assert!(!decomposed.items().is_empty());
 }

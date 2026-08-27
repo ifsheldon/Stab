@@ -1,17 +1,26 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_algebra::{FlexPauliString, PauliBasis};
+use stab_algebra::{FlexPauliString, PauliBasis, StabilizerResource};
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget, GateCategory,
-    Target,
+    QubitId, Target,
 };
 
-use crate::{AnalysisError, AnalysisResult, sparse_rev_frame_tracker::SparseReverseFrameTracker};
+use crate::{
+    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError,
+    sparse_rev_frame_tracker::{ReverseTrackerWorkBudget, SparseReverseFrameTracker},
+};
 
-const MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_DETECTING_REGION_REPEAT_ITERATIONS: u64 = 1_000_000;
-const MAX_DETECTING_REGION_HELPER_TARGETS: u64 = MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS;
-const MAX_DETECTING_REGION_OBSERVABLE_TARGETS: u64 = u32::MAX as u64 + 1;
+const MAX_DETECTING_REGION_REPRESENTED_WORK: u64 = 1_000_000;
+const MAX_DETECTING_REGION_TRAVERSAL_WORK: u64 = 1_000_000;
+const MAX_DETECTING_REGION_LIVE_STATE_UNITS: u64 = 1_000_000;
+const MAX_DETECTING_REGION_OUTPUT_REGIONS: u64 = 1_000_000;
+const MAX_DETECTING_REGION_OUTPUT_BYTES: u64 = 256 * 1024 * 1024;
+// This keeps every recursive compact traversal inside ordinary worker and test-thread stacks.
+const MAX_DETECTING_REGION_REPEAT_NESTING: usize = 128;
+const MAX_DETECTING_REGION_HELPER_TARGETS: u64 = MAX_DETECTING_REGION_REPRESENTED_WORK;
+const MAX_DETECTING_REGION_HELPER_TICKS: u64 = 1_000_000;
+const DETECTING_REGION_OUTPUT_ENTRY_OVERHEAD_BYTES: u64 = 64;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetectingRegionOptions {
@@ -59,36 +68,41 @@ pub fn circuit_detecting_regions_for_targets(
     circuit: &Circuit,
     options: DetectingRegionTargetOptions,
 ) -> AnalysisResult<DetectingRegionTargetMap> {
+    let mut budget =
+        DetectingRegionBudget::for_request(options.targets.len(), options.ticks.len())?;
+    validate_supported_subset(circuit, &mut budget)?;
     let fail_on_anticommute = !options.ignore_anticommutation_errors;
     let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
     let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
-    validate_supported_subset(circuit)?;
     let detector_count = circuit.count_detectors()?;
     let observable_count = circuit.count_observables()?;
     let tick_count = circuit.count_ticks()?;
     validate_targets(&targets, detector_count, observable_count)?;
     validate_ticks(&ticks, tick_count)?;
 
-    let mut regions = targets
-        .iter()
-        .copied()
-        .map(|target| (target, BTreeMap::new()))
-        .collect::<DetectingRegionTargetMap>();
-
+    let represented_qubits = represented_qubit_ids(circuit, &mut budget)?;
+    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let mut regions = DetectingRegionTargetMap::new();
     let mut tracker = SparseReverseFrameTracker::new(
-        stab_model::advanced::circuit_simulated_qubit_count(circuit),
+        qubit_count,
         detecting_region_measurement_count(circuit)?,
         detector_count,
         fail_on_anticommute,
     );
     let mut current_tick = tick_count;
+    let snapshot_context = SnapshotContext {
+        targets: &targets,
+        ticks: &ticks,
+        represented_qubits: &represented_qubits,
+        qubit_count,
+    };
     undo_circuit_with_snapshots(
         circuit,
         &mut tracker,
-        &targets,
-        &ticks,
+        &snapshot_context,
         &mut current_tick,
         &mut regions,
+        &mut budget,
     )?;
     tracker.undo_implicit_rz_at_start_of_circuit()?;
     Ok(regions)
@@ -112,47 +126,49 @@ fn dense_target_helper_capacity(
     detector_count: u64,
     observable_count: u64,
 ) -> AnalysisResult<usize> {
-    if observable_count > MAX_DETECTING_REGION_OBSERVABLE_TARGETS {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "detecting-region all-target helper cannot materialize {observable_count} observable target(s); logical-observable targets are limited to {MAX_DETECTING_REGION_OBSERVABLE_TARGETS}"
-        )));
-    }
-    let target_count = detector_count
-        .checked_add(observable_count)
-        .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "detecting-region all-target helper target count overflowed",
-            )
-        })?;
+    let target_count = detector_count.saturating_add(observable_count);
     if target_count > MAX_DETECTING_REGION_HELPER_TARGETS {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "detecting-region all-target helper currently supports at most {MAX_DETECTING_REGION_HELPER_TARGETS} materialized target(s), got {target_count}"
-        )));
+        return Err(detecting_region_resource_error(
+            ResourceKind::MaterializedUnits,
+            target_count,
+            MAX_DETECTING_REGION_HELPER_TARGETS,
+        ));
     }
     usize::try_from(target_count).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "detecting-region all-target helper target count {target_count} does not fit in memory on this platform"
-        ))
+        detecting_region_resource_error(
+            ResourceKind::MaterializedUnits,
+            target_count,
+            usize::MAX as u64,
+        )
     })
 }
 
 pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<CircuitTick>> {
     let tick_count = circuit.count_ticks()?;
-    if tick_count > MAX_DETECTING_REGION_REPEAT_ITERATIONS {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "detecting-region all-tick helper currently supports at most {MAX_DETECTING_REGION_REPEAT_ITERATIONS} ticks, got {tick_count}"
-        )));
+    if tick_count > MAX_DETECTING_REGION_HELPER_TICKS {
+        return Err(detecting_region_resource_error(
+            ResourceKind::MaterializedUnits,
+            tick_count,
+            MAX_DETECTING_REGION_HELPER_TICKS,
+        ));
     }
     Ok((0..tick_count).map(CircuitTick::new).collect())
+}
+
+struct SnapshotContext<'a> {
+    targets: &'a BTreeSet<DemTarget>,
+    ticks: &'a BTreeSet<CircuitTick>,
+    represented_qubits: &'a BTreeSet<QubitId>,
+    qubit_count: usize,
 }
 
 fn undo_circuit_with_snapshots(
     circuit: &Circuit,
     tracker: &mut SparseReverseFrameTracker,
-    targets: &BTreeSet<DemTarget>,
-    ticks: &BTreeSet<CircuitTick>,
+    context: &SnapshotContext<'_>,
     current_tick: &mut u64,
     regions: &mut DetectingRegionTargetMap,
+    budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
     for item in circuit.items().iter().rev() {
         match item {
@@ -160,25 +176,142 @@ fn undo_circuit_with_snapshots(
                 undo_instruction_with_snapshots(
                     instruction,
                     tracker,
-                    targets,
-                    ticks,
+                    context,
                     current_tick,
                     regions,
+                    budget,
                 )?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                for _ in 0..repeat.repeat_count().get() {
-                    undo_circuit_with_snapshots(
-                        repeat.body(),
-                        tracker,
-                        targets,
-                        ticks,
-                        current_tick,
-                        regions,
-                    )?;
-                }
+                undo_repeat_with_snapshots(
+                    repeat.body(),
+                    repeat.repeat_count().get(),
+                    tracker,
+                    context,
+                    current_tick,
+                    regions,
+                    budget,
+                )?;
             }
         }
+    }
+    Ok(())
+}
+
+fn undo_repeat_with_snapshots(
+    body: &Circuit,
+    repetitions: u64,
+    tracker: &mut SparseReverseFrameTracker,
+    context: &SnapshotContext<'_>,
+    current_tick: &mut u64,
+    regions: &mut DetectingRegionTargetMap,
+    budget: &mut DetectingRegionBudget,
+) -> AnalysisResult<()> {
+    if repetitions == 0 {
+        return Ok(());
+    }
+    let ticks_per_iteration = body.count_ticks()?;
+    if ticks_per_iteration == 0 {
+        return tracker.undo_repeated_circuit_with_budget(body, repetitions, budget);
+    }
+    let repeated_ticks = ticks_per_iteration
+        .checked_mul(repetitions)
+        .ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "detecting-region repeat tick count overflowed",
+            )
+        })?;
+    let repeat_start = current_tick.checked_sub(repeated_ticks).ok_or_else(|| {
+        AnalysisError::invalid_detector_error_model("detecting-region repeat tick span underflowed")
+    })?;
+    let repeat_start_tick = CircuitTick::new(repeat_start);
+    let repeat_end_tick = CircuitTick::new(*current_tick);
+    if context
+        .ticks
+        .range(repeat_start_tick..repeat_end_tick)
+        .next()
+        .is_none()
+    {
+        tracker.undo_repeated_circuit_with_budget(body, repetitions, budget)?;
+        *current_tick = repeat_start;
+        return Ok(());
+    }
+
+    let mut remaining = repetitions;
+    while remaining > 0 {
+        let iteration_start = current_tick
+            .checked_sub(ticks_per_iteration)
+            .ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "detecting-region repeat iteration tick span underflowed",
+                )
+            })?;
+        let selected_in_iteration = context
+            .ticks
+            .range(CircuitTick::new(iteration_start)..CircuitTick::new(*current_tick))
+            .next()
+            .is_some();
+        if selected_in_iteration {
+            undo_circuit_with_snapshots(body, tracker, context, current_tick, regions, budget)?;
+            if *current_tick != iteration_start {
+                return Err(AnalysisError::invalid_detector_error_model(
+                    "detecting-region repeat body tick count changed during traversal",
+                ));
+            }
+            remaining -= 1;
+            continue;
+        }
+
+        let Some(previous_selected_tick) = context
+            .ticks
+            .range(CircuitTick::new(repeat_start)..CircuitTick::new(*current_tick))
+            .next_back()
+            .map(|tick| tick.get())
+        else {
+            tracker.undo_repeated_circuit_with_budget(body, remaining, budget)?;
+            *current_tick = repeat_start;
+            return Ok(());
+        };
+        let selected_iteration = previous_selected_tick
+            .checked_sub(repeat_start)
+            .map(|offset| offset / ticks_per_iteration)
+            .ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "detecting-region selected tick preceded its repeat span",
+                )
+            })?;
+        let skipped = remaining
+            .checked_sub(selected_iteration.checked_add(1).ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "detecting-region selected repeat iteration overflowed",
+                )
+            })?)
+            .ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "detecting-region selected repeat iteration exceeded its remaining span",
+                )
+            })?;
+        if skipped == 0 {
+            return Err(AnalysisError::invalid_detector_error_model(
+                "detecting-region repeat skip made no progress",
+            ));
+        }
+        tracker.undo_repeated_circuit_with_budget(body, skipped, budget)?;
+        let skipped_ticks = ticks_per_iteration.checked_mul(skipped).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "detecting-region skipped tick count overflowed",
+            )
+        })?;
+        *current_tick = current_tick.checked_sub(skipped_ticks).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "detecting-region skipped tick span underflowed",
+            )
+        })?;
+        remaining = remaining.checked_sub(skipped).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "detecting-region skipped repeat count underflowed",
+            )
+        })?;
     }
     Ok(())
 }
@@ -186,11 +319,12 @@ fn undo_circuit_with_snapshots(
 fn undo_instruction_with_snapshots(
     instruction: &CircuitInstruction,
     tracker: &mut SparseReverseFrameTracker,
-    targets: &BTreeSet<DemTarget>,
-    ticks: &BTreeSet<CircuitTick>,
+    context: &SnapshotContext<'_>,
     current_tick: &mut u64,
     regions: &mut DetectingRegionTargetMap,
+    budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
+    budget.admit_tracker_instruction(instruction)?;
     if instruction.gate().canonical_name() == "TICK" {
         *current_tick = current_tick.checked_sub(1).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
@@ -198,108 +332,134 @@ fn undo_instruction_with_snapshots(
             )
         })?;
         let tick = CircuitTick::new(*current_tick);
-        if ticks.contains(&tick) {
-            snapshot_regions(tick, tracker, targets, regions)?;
+        if context.ticks.contains(&tick) {
+            snapshot_regions(tick, tracker, context, regions, budget)?;
         }
     }
-    undo_detecting_region_instruction(instruction, tracker)
-}
-
-fn undo_detecting_region_instruction(
-    instruction: &CircuitInstruction,
-    tracker: &mut SparseReverseFrameTracker,
-) -> AnalysisResult<()> {
-    if instruction.gate().canonical_name() != "CZ" {
-        tracker.undo_instruction(instruction)?;
-        return Ok(());
-    }
-
-    let mut kept_targets = Vec::new();
-    let mut skipped_classical_noop = false;
-    for group in instruction.target_groups() {
-        let [left, right] = group else {
-            tracker.undo_instruction(instruction)?;
-            return Ok(());
-        };
-        if is_cz_classical_bit_noop("CZ", left, right) {
-            skipped_classical_noop = true;
-        } else {
-            kept_targets.extend(group.iter().cloned());
-        }
-    }
-    if !skipped_classical_noop {
-        tracker.undo_instruction(instruction)?;
-        return Ok(());
-    }
-    if kept_targets.is_empty() {
-        return Ok(());
-    }
-
-    let kept_instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
-        instruction.gate(),
-        instruction.args().to_vec(),
-        kept_targets,
-        instruction.tag_bytes(),
-    )?;
-    tracker.undo_instruction(&kept_instruction)?;
-    Ok(())
+    tracker.undo_instruction(instruction)
 }
 
 fn snapshot_regions(
     tick: CircuitTick,
     tracker: &SparseReverseFrameTracker,
-    targets: &BTreeSet<DemTarget>,
+    context: &SnapshotContext<'_>,
     regions: &mut DetectingRegionTargetMap,
+    budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
-    for target in targets {
-        let region = tracker.region_for_target(*target)?;
-        if is_identity_region(&region) {
-            continue;
-        }
-        let Some(target_regions) = regions.get_mut(target) else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "target {target} was not initialized in detecting-region output",
-            )));
-        };
-        target_regions.insert(tick, region);
+    budget.consume_traversal_work(usize_to_u64(
+        context.represented_qubits.len(),
+        "snapshot qubit count",
+    )?)?;
+    let mut active_targets = BTreeSet::new();
+    for qubit in context.represented_qubits {
+        let qubit_targets = tracker.pauli_targets_at(*qubit)?;
+        active_targets.extend(qubit_targets.intersection(context.targets).copied());
+    }
+    budget.consume_traversal_work(usize_to_u64(
+        active_targets.len(),
+        "snapshot active target count",
+    )?)?;
+    for target in active_targets {
+        let output_bytes = budget.admit_output_candidate(context.qubit_count)?;
+        let region = tracker.region_for_target(target)?;
+        budget.commit_output_region(output_bytes)?;
+        regions.entry(target).or_default().insert(tick, region);
     }
     Ok(())
 }
 
-fn is_identity_region(region: &FlexPauliString) -> bool {
-    (0..region.len()).all(|index| region.get(index).unwrap_or(PauliBasis::I) == PauliBasis::I)
+fn validate_supported_subset(
+    circuit: &Circuit,
+    budget: &mut DetectingRegionBudget,
+) -> AnalysisResult<()> {
+    validate_supported_subset_inner(circuit, 0, budget)
 }
 
-fn validate_supported_subset(circuit: &Circuit) -> AnalysisResult<()> {
-    let mut budget = DetectingRegionBudget::default();
-    validate_supported_subset_inner(circuit, 1, &mut budget)
+fn represented_qubit_ids(
+    circuit: &Circuit,
+    budget: &mut DetectingRegionBudget,
+) -> AnalysisResult<BTreeSet<QubitId>> {
+    fn collect(
+        circuit: &Circuit,
+        qubits: &mut BTreeSet<QubitId>,
+        budget: &mut DetectingRegionBudget,
+    ) -> AnalysisResult<()> {
+        for item in circuit.items() {
+            match item {
+                CircuitItem::Instruction(instruction) => {
+                    if instruction.gate().targets_are_pad_values() {
+                        continue;
+                    }
+                    for qubit in instruction.targets().iter().filter_map(Target::qubit_id) {
+                        if !qubits.contains(&qubit) {
+                            budget.reserve_live_state(1)?;
+                            qubits.insert(qubit);
+                        }
+                    }
+                }
+                CircuitItem::RepeatBlock(repeat) => collect(repeat.body(), qubits, budget)?,
+            }
+        }
+        Ok(())
+    }
+
+    let mut qubits = BTreeSet::new();
+    collect(circuit, &mut qubits, budget)?;
+    Ok(qubits)
 }
 
 fn validate_supported_subset_inner(
     circuit: &Circuit,
-    multiplier: u64,
+    depth: usize,
     budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
+    if depth > MAX_DETECTING_REGION_REPEAT_NESTING {
+        return Err(detecting_region_resource_error(
+            ResourceKind::RepeatNesting,
+            depth as u64,
+            MAX_DETECTING_REGION_REPEAT_NESTING as u64,
+        ));
+    }
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                budget.add_expanded_instructions(multiplier)?;
                 validate_supported_instruction(instruction)?;
+                budget.add_represented_work(instruction_represented_work(instruction)?)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                let repeat_count = repeat.repeat_count().get();
-                let repeated_multiplier =
-                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
-                            "detecting-region repeat expansion count overflowed",
-                        )
-                    })?;
-                budget.add_repeat_iterations(repeated_multiplier)?;
-                validate_supported_subset_inner(repeat.body(), repeated_multiplier, budget)?;
+                let tag_bytes = repeat.tag_bytes().map_or(0, <[u8]>::len);
+                budget.add_represented_work(
+                    usize_to_u64(tag_bytes, "repeat tag byte count")?
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            AnalysisError::invalid_detector_error_model(
+                                "detecting-region represented repeat work overflowed",
+                            )
+                        })?,
+                )?;
+                validate_supported_subset_inner(repeat.body(), depth.saturating_add(1), budget)?;
             }
         }
     }
     Ok(())
+}
+
+fn instruction_represented_work(instruction: &CircuitInstruction) -> AnalysisResult<u64> {
+    let target_count = usize_to_u64(instruction.targets().len(), "instruction target count")?;
+    let argument_count = usize_to_u64(instruction.args().len(), "instruction argument count")?;
+    let tag_bytes = usize_to_u64(
+        instruction.tag_bytes().map_or(0, <[u8]>::len),
+        "instruction tag byte count",
+    )?;
+    1_u64
+        .checked_add(target_count)
+        .and_then(|work| work.checked_add(argument_count))
+        .and_then(|work| work.checked_add(tag_bytes))
+        .ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "detecting-region represented instruction work overflowed",
+            )
+        })
 }
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> {
@@ -640,45 +800,192 @@ fn validate_ticks(ticks: &BTreeSet<CircuitTick>, tick_count: u64) -> AnalysisRes
     Ok(())
 }
 
-#[derive(Default)]
 struct DetectingRegionBudget {
-    expanded_instructions: u64,
-    repeat_iterations: u64,
+    represented_work: u64,
+    traversal_work: u64,
+    live_state_units: u64,
+    tracker_state_units: u64,
+    tracked_target_upper_bound: u64,
+    output_regions: u64,
+    output_bytes: u64,
 }
 
 impl DetectingRegionBudget {
-    fn add_expanded_instructions(&mut self, count: u64) -> AnalysisResult<()> {
-        self.expanded_instructions =
-            self.expanded_instructions
-                .checked_add(count)
-                .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "detecting-region expanded instruction count overflowed",
-                    )
-                })?;
-        if self.expanded_instructions > MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "detecting-region extraction currently supports at most {MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.expanded_instructions
-            )));
-        }
+    fn for_request(target_count: usize, tick_count: usize) -> AnalysisResult<Self> {
+        let request_units = usize_to_u64(target_count, "requested target count")?
+            .saturating_add(usize_to_u64(tick_count, "requested tick count")?);
+        let mut result = Self {
+            represented_work: 0,
+            traversal_work: 0,
+            live_state_units: 0,
+            tracker_state_units: 0,
+            tracked_target_upper_bound: 0,
+            output_regions: 0,
+            output_bytes: 0,
+        };
+        result.reserve_live_state(request_units)?;
+        Ok(result)
+    }
+
+    fn add_represented_work(&mut self, count: u64) -> AnalysisResult<()> {
+        let next = self.represented_work.saturating_add(count);
+        ensure_resource_limit(
+            ResourceKind::RepresentedItems,
+            next,
+            MAX_DETECTING_REGION_REPRESENTED_WORK,
+        )?;
+        self.represented_work = next;
         Ok(())
     }
 
-    fn add_repeat_iterations(&mut self, count: u64) -> AnalysisResult<()> {
-        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "detecting-region repeat iteration count overflowed",
-            )
-        })?;
-        if self.repeat_iterations > MAX_DETECTING_REGION_REPEAT_ITERATIONS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "detecting-region extraction currently supports at most {MAX_DETECTING_REGION_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
-                self.repeat_iterations
-            )));
-        }
+    fn consume_traversal_work(&mut self, count: u64) -> AnalysisResult<()> {
+        let next = self.traversal_work.saturating_add(count);
+        ensure_resource_limit(
+            ResourceKind::TraversalWork,
+            next,
+            MAX_DETECTING_REGION_TRAVERSAL_WORK,
+        )?;
+        self.traversal_work = next;
         Ok(())
     }
+
+    fn reserve_live_state(&mut self, count: u64) -> AnalysisResult<()> {
+        let next = self.live_state_units.saturating_add(count);
+        ensure_resource_limit(
+            ResourceKind::LiveStateUnits,
+            next,
+            MAX_DETECTING_REGION_LIVE_STATE_UNITS,
+        )?;
+        self.live_state_units = next;
+        Ok(())
+    }
+
+    fn admit_transient_live_state(&self, count: u64) -> AnalysisResult<()> {
+        ensure_resource_limit(
+            ResourceKind::LiveStateUnits,
+            self.live_state_units.saturating_add(count),
+            MAX_DETECTING_REGION_LIVE_STATE_UNITS,
+        )
+    }
+
+    fn reserve_tracker_state(&mut self, count: u64) -> AnalysisResult<()> {
+        let next_tracker = self.tracker_state_units.saturating_add(count);
+        self.reserve_live_state(count)?;
+        self.tracker_state_units = next_tracker;
+        Ok(())
+    }
+
+    fn admit_tracker_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> AnalysisResult<()> {
+        self.consume_traversal_work(1)?;
+        let gate_name = instruction.gate().canonical_name();
+        let target_slots = usize_to_u64(instruction.targets().len(), "traversed target count")?;
+        let state_growth = match gate_name {
+            "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => 0,
+            "DETECTOR" | "OBSERVABLE_INCLUDE" => {
+                self.tracked_target_upper_bound = self.tracked_target_upper_bound.saturating_add(1);
+                target_slots.max(1)
+            }
+            _ if instruction.gate().category() == GateCategory::Noise
+                && !is_heralded_record_noise(instruction) =>
+            {
+                0
+            }
+            _ => self.tracked_target_upper_bound.saturating_mul(target_slots),
+        };
+        self.reserve_tracker_state(state_growth)
+    }
+
+    fn admit_recurrence_probe(&mut self) -> AnalysisResult<()> {
+        let cloned_tracker_state = self.tracker_state_units.saturating_mul(2);
+        self.admit_transient_live_state(cloned_tracker_state)
+    }
+
+    fn admit_output_candidate(&self, qubit_count: usize) -> AnalysisResult<u64> {
+        let pauli_limit = StabilizerResource::PauliQubits.limit();
+        if qubit_count > pauli_limit {
+            return Err(detecting_region_resource_error(
+                ResourceKind::MaterializedUnits,
+                qubit_count as u64,
+                pauli_limit as u64,
+            ));
+        }
+        let candidate_bytes = output_region_bytes(qubit_count)?;
+        self.next_output_totals(candidate_bytes)?;
+        Ok(candidate_bytes)
+    }
+
+    fn commit_output_region(&mut self, bytes: u64) -> AnalysisResult<()> {
+        let (next_region_count, next_output_bytes) = self.next_output_totals(bytes)?;
+        self.output_regions = next_region_count;
+        self.output_bytes = next_output_bytes;
+        Ok(())
+    }
+
+    fn next_output_totals(&self, bytes: u64) -> AnalysisResult<(u64, u64)> {
+        let next_region_count = self.output_regions.saturating_add(1);
+        ensure_resource_limit(
+            ResourceKind::OutputRecords,
+            next_region_count,
+            MAX_DETECTING_REGION_OUTPUT_REGIONS,
+        )?;
+        let next_output_bytes = self.output_bytes.saturating_add(bytes);
+        ensure_resource_limit(
+            ResourceKind::OutputBytes,
+            next_output_bytes,
+            MAX_DETECTING_REGION_OUTPUT_BYTES,
+        )?;
+        Ok((next_region_count, next_output_bytes))
+    }
+}
+
+impl ReverseTrackerWorkBudget for DetectingRegionBudget {
+    fn admit_probe_iteration(&mut self) -> AnalysisResult<()> {
+        self.consume_traversal_work(1)
+    }
+
+    fn admit_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
+        self.admit_tracker_instruction(instruction)
+    }
+
+    fn admit_recurrence_search(&mut self) -> AnalysisResult<()> {
+        self.admit_recurrence_probe()
+    }
+}
+
+fn output_region_bytes(qubit_count: usize) -> AnalysisResult<u64> {
+    let qubits = usize_to_u64(qubit_count, "output qubit count")?;
+    let dense_temporary =
+        qubits.saturating_mul(usize_to_u64(size_of::<PauliBasis>(), "Pauli basis size")?);
+    let words = qubits.saturating_add(63) / 64;
+    let packed_storage = words.saturating_mul(16);
+    Ok(dense_temporary
+        .saturating_add(packed_storage)
+        .saturating_add(DETECTING_REGION_OUTPUT_ENTRY_OVERHEAD_BYTES))
+}
+
+fn ensure_resource_limit(resource: ResourceKind, actual: u64, limit: u64) -> AnalysisResult<()> {
+    if actual <= limit {
+        return Ok(());
+    }
+    Err(detecting_region_resource_error(resource, actual, limit))
+}
+
+fn detecting_region_resource_error(
+    resource: ResourceKind,
+    actual: u64,
+    limit: u64,
+) -> AnalysisError {
+    ResourceLimitError::detecting_regions(resource, actual, limit).into()
+}
+
+fn usize_to_u64(value: usize, label: &str) -> AnalysisResult<u64> {
+    u64::try_from(value).map_err(|_| {
+        let _ = label;
+        detecting_region_resource_error(ResourceKind::LiveStateUnits, u64::MAX, u64::MAX - 1)
+    })
 }
 
 #[cfg(test)]

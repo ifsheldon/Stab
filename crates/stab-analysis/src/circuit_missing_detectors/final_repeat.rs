@@ -1,49 +1,45 @@
 use stab_model::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock, advanced::CircuitBuilder};
 
 use super::{
-    MAX_MISSING_DETECTOR_EXPANDED_WORK_UNITS, MAX_MISSING_DETECTOR_REPEAT_ITERATIONS,
-    MissingDetectorFinder, MissingDetectorOptions, expanded_circuit_work_units,
-    validate_repeat_budget,
+    MissingDetectorOptions, contains_measurement_row_instruction, missing_detectors_bounded,
+    terminal_state_signature,
 };
-use crate::{AnalysisError, AnalysisResult};
+use crate::AnalysisResult;
 
 pub(super) fn try_missing_detectors_folded_final_repeat(
     circuit: &Circuit,
     options: MissingDetectorOptions,
+    qubit_count: usize,
 ) -> AnalysisResult<Option<Circuit>> {
     let Some((prefix, repeat)) = final_repeat_with_prefix(circuit) else {
         return Ok(None);
     };
-
-    validate_repeat_budget(&prefix)?;
-    validate_repeat_budget(repeat.body())?;
-
     let Some(proof_body) = repeat_body_proof_circuit(repeat.body())? else {
         return Ok(None);
     };
-    if !repeat_exceeds_materialized_budget(repeat)? {
+    if !contains_measurement_row_instruction(&proof_body) || proof_body.count_measurements()? == 0 {
         return Ok(None);
     }
 
-    let mut finder = MissingDetectorFinder::new(
-        stab_model::advanced::circuit_simulated_qubit_count(circuit),
-        options,
-    )?;
-    if finder.process_circuit(&prefix).is_err() {
+    let prefix_missing = missing_detectors_bounded(&prefix, options, qubit_count)?;
+    if !prefix_missing.is_empty() {
         return Ok(None);
     }
-    if !matches!(finder.build_output(), Ok(output) if output.is_empty()) {
+    let Some(prefix_state) = terminal_state_signature(&prefix, options, qubit_count)? else {
         return Ok(None);
-    }
+    };
 
-    let tracker_before_repeat = finder.tracker.clone();
-    if finder.process_circuit(&proof_body).is_err() {
+    let mut one_iteration = prefix;
+    one_iteration.append_circuit(&proof_body);
+    let iteration_missing = missing_detectors_bounded(&one_iteration, options, qubit_count)?;
+    if !iteration_missing.is_empty() {
         return Ok(None);
     }
-    if finder.tracker != tracker_before_repeat {
+    let Some(iteration_state) = terminal_state_signature(&one_iteration, options, qubit_count)?
+    else {
         return Ok(None);
-    }
-    if !matches!(finder.build_output(), Ok(output) if output.is_empty()) {
+    };
+    if iteration_state != prefix_state {
         return Ok(None);
     }
 
@@ -59,20 +55,6 @@ fn final_repeat_with_prefix(circuit: &Circuit) -> Option<(Circuit, &RepeatBlock)
         CircuitBuilder::from_unfused_items(prefix_items.to_vec()).finish(),
         repeat,
     ))
-}
-
-fn repeat_exceeds_materialized_budget(repeat: &RepeatBlock) -> AnalysisResult<bool> {
-    let repeat_count = repeat.repeat_count().get();
-    if repeat_count > MAX_MISSING_DETECTOR_REPEAT_ITERATIONS {
-        return Ok(true);
-    }
-    let body_work_units = expanded_circuit_work_units(repeat.body())?;
-    let expanded_work_units = body_work_units.checked_mul(repeat_count).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(
-            "missing-detector repeat work-unit expansion count overflowed",
-        )
-    })?;
-    Ok(expanded_work_units > MAX_MISSING_DETECTOR_EXPANDED_WORK_UNITS)
 }
 
 fn repeat_body_proof_circuit(circuit: &Circuit) -> AnalysisResult<Option<Circuit>> {
@@ -103,8 +85,7 @@ fn repeat_body_proof_circuit(circuit: &Circuit) -> AnalysisResult<Option<Circuit
                 if !circuit_record_targets_are_local(repeat.body(), &mut body_measurements)? {
                     return Ok(None);
                 }
-                let repeat_count = repeat.repeat_count().get();
-                let Ok(repeat_count) = i64::try_from(repeat_count) else {
+                let Ok(repeat_count) = i64::try_from(repeat.repeat_count().get()) else {
                     return Ok(None);
                 };
                 let Some(produced) = body_measurements.checked_mul(repeat_count) else {
@@ -144,8 +125,7 @@ fn circuit_record_targets_are_local(
                 if !circuit_record_targets_are_local(repeat.body(), &mut body_measurements)? {
                     return Ok(false);
                 }
-                let repeat_count = repeat.repeat_count().get();
-                let Ok(repeat_count) = i64::try_from(repeat_count) else {
+                let Ok(repeat_count) = i64::try_from(repeat.repeat_count().get()) else {
                     return Ok(false);
                 };
                 let Some(produced) = body_measurements.checked_mul(repeat_count) else {
