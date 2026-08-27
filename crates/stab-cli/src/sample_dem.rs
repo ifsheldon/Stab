@@ -54,14 +54,6 @@ pub(super) struct SampleDemArgs {
     #[arg(long, value_parser = super::parse_stim_u64)]
     seed: Option<u64>,
 
-    /// Append observable flips after detector-event bits.
-    #[arg(long = "append_observables", hide = true)]
-    append_observables: bool,
-
-    /// Deprecated Stim alias that writes observable flips before detector bits.
-    #[arg(long = "prepend_observables", hide = true)]
-    prepend_observables: bool,
-
     /// Optional separate observable-flip output path.
     #[arg(long = "obs_out")]
     obs_output: Option<PathBuf>,
@@ -108,7 +100,6 @@ where
     R: Read,
     W: Write,
 {
-    validate_observable_routing(&args)?;
     validate_ptb64_routing(&args)?;
     let input_roles = [
         (FileRole::Input, args.input.as_deref()),
@@ -156,12 +147,11 @@ where
             args.shots,
         )?;
     }
-    let observable_mode = observable_output_mode(&args);
     let encoder = DemSampleBatchEncoder::try_new(
         plan.detector_count(),
         plan.observable_count(),
         plan.error_count(),
-        observable_mode,
+        DetectionObservableOutputMode::DetectorsOnly,
         args.out_format.record_format(),
         args.obs_output
             .as_ref()
@@ -309,16 +299,6 @@ fn sample_dem_record_format(format: RecordFormatArg) -> Result<RecordFormat, Cli
     format
         .record_format()
         .ok_or(CliError::UnsupportedDetectionFormat { format: "stim" })
-}
-
-fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
-    let selected_routes = usize::from(args.prepend_observables)
-        + usize::from(args.append_observables)
-        + usize::from(args.obs_output.is_some());
-    if selected_routes > 1 {
-        return Err(CliError::ConflictingObservableRouting);
-    }
-    Ok(())
 }
 
 fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
@@ -628,14 +608,4 @@ where
         }
     }
     Ok(())
-}
-
-fn observable_output_mode(args: &SampleDemArgs) -> DetectionObservableOutputMode {
-    if args.append_observables {
-        DetectionObservableOutputMode::Append
-    } else if args.prepend_observables {
-        DetectionObservableOutputMode::Prepend
-    } else {
-        DetectionObservableOutputMode::DetectorsOnly
-    }
 }

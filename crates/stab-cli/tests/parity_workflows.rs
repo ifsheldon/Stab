@@ -699,3 +699,65 @@ fn json_diagnostics_real_process_keeps_machine_output_separate() {
         Some("stim-circuit")
     );
 }
+
+#[test]
+fn removed_compatibility_routes_are_absent_from_real_binary_and_help() {
+    let removed: &[(&[&str], &str)] = &[
+        (&["--gen=repetition_code"], "--gen"),
+        (&["--convert"], "--convert"),
+        (&["--sample=1"], "--sample"),
+        (&["--detect=1"], "--detect"),
+        (&["--m2d"], "--m2d"),
+        (&["--analyze_errors"], "--analyze_errors"),
+        (&["--detector_hypergraph"], "--detector_hypergraph"),
+        (&["--help=sample"], "--help"),
+        (&["sample", "--frame0"], "--frame0"),
+        (
+            &["detect", "--prepend_observables"],
+            "--prepend_observables",
+        ),
+        (
+            &["sample_dem", "--append_observables"],
+            "--append_observables",
+        ),
+        (
+            &["sample_dem", "--prepend_observables"],
+            "--prepend_observables",
+        ),
+    ];
+    for (args, removed_flag) in removed {
+        let output = run(*args, b"M 0\n");
+        assert!(!output.status.success(), "removed route accepted: {args:?}");
+        assert!(
+            output.stdout.is_empty(),
+            "removed route wrote stdout: {args:?}"
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(removed_flag),
+            "removed route error omitted {removed_flag}: {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    for args in [
+        &["help", "sample"][..],
+        &["sample", "--help"][..],
+        &["help", "detect"][..],
+        &["detect", "--help"][..],
+        &["help", "sample_dem"][..],
+        &["sample_dem", "--help"][..],
+    ] {
+        let output = run(args, b"");
+        assert_ok(&output, &format!("help surface {args:?}"));
+        let help = String::from_utf8_lossy(&output.stdout);
+        for removed_flag in ["--frame0", "--prepend_observables", "--append_observables"] {
+            if args.contains(&"detect") && removed_flag == "--append_observables" {
+                continue;
+            }
+            assert!(
+                !help.contains(removed_flag),
+                "help {args:?} advertises removed flag {removed_flag}: {help}"
+            );
+        }
+    }
+}

@@ -5,7 +5,6 @@ use super::run_from;
 use tempfile::tempdir;
 
 mod batch_formats;
-mod deprecation;
 mod path_io;
 mod pf7_cli;
 mod sweep;
@@ -259,26 +258,6 @@ fn detect_zero_shots_returns_without_parsing_input() {
 }
 
 #[test]
-fn detect_supports_deprecated_prepend_observables_alias() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "detect", "--prepend_observables"],
-        "X_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n".as_bytes(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "11\n");
-    assert!(
-        String::from_utf8(stderr)
-            .unwrap()
-            .contains("[DEPRECATION] Avoid using `--prepend_observables`")
-    );
-}
-
-#[test]
 fn detect_rejects_conflicting_observable_routes() {
     let temp_dir = tempdir().expect("temp dir");
     let obs_path = temp_dir.path().join("obs.01");
@@ -303,7 +282,7 @@ fn detect_rejects_conflicting_observable_routes() {
     assert!(
         String::from_utf8(stderr)
             .unwrap()
-            .contains("cannot combine --prepend_observables")
+            .contains("cannot combine --obs_out with detector output that includes observables")
     );
 }
 
@@ -552,35 +531,6 @@ fn m2d_preserves_a_valid_prefix_before_a_later_malformed_record() {
             .unwrap()
             .contains("01 record contains non-bit byte")
     );
-}
-
-#[test]
-fn legacy_m2d_flag_matches_m9_oracle_golden() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        [
-            "stab",
-            "--m2d",
-            "--in_format=01",
-            "--out_format=dets",
-            concat!(
-                "--circuit=",
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../oracle/fixtures/inputs/m2d_basic.stim"
-            ),
-        ],
-        include_bytes!("../../../../oracle/fixtures/inputs/m2d_basic_measurements.01").as_slice(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0);
-    assert_eq!(
-        String::from_utf8(stdout).unwrap(),
-        include_str!("../../../../oracle/fixtures/expected/m9_m2d_basic.stdout")
-    );
-    assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
 
 #[test]

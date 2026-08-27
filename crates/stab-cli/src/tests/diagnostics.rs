@@ -276,32 +276,6 @@ fn json_sampling_work_above_u64_is_an_explicit_lower_bound() {
 }
 
 #[test]
-fn json_warnings_and_errors_are_ordered_json_lines() {
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "sample", "--frame0", "--error-format=json"],
-        b"\xff",
-    );
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
-    let [warning, error] =
-        <[Value; 2]>::try_from(json_lines(&stderr)).expect("warning followed by error");
-    assert_eq!(field(&warning, "/code"), "deprecated-frame0");
-    assert_eq!(field(&warning, "/severity"), "warning");
-    assert_eq!(
-        field(&warning, "/context/replacement"),
-        "--skip_reference_sample"
-    );
-    assert_eq!(field(&error, "/code"), "invalid-utf8-input");
-    assert_eq!(field(&error, "/severity"), "error");
-    assert_eq!(field(&error, "/span/byte_start"), 0);
-    assert_eq!(field(&error, "/span/byte_length"), 1);
-    assert_eq!(field(&error, "/context/dialect"), "stim-circuit");
-    assert_eq!(field(&error, "/context/valid_up_to"), 0);
-    assert_eq!(field(&error, "/context/error_length"), 1);
-}
-
-#[test]
 fn json_invalid_utf8_diagnostics_are_consistent_across_model_inputs() {
     for (args, dialect) in [
         (
@@ -577,9 +551,11 @@ fn help_and_version_remain_successful_human_stdout() {
 }
 
 #[test]
-fn global_error_format_can_precede_legacy_dispatch_and_help_topics() {
-    let (status, stdout, stderr) =
-        run_cli(&["stab", "--error-format=json", "--sample=1"], b"M 0\n");
+fn global_error_format_can_precede_named_commands_and_help_topics() {
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "--error-format=json", "sample", "--shots=1"],
+        b"M 0\n",
+    );
     assert_eq!(status, 0);
     assert_eq!(stdout, b"0\n");
     assert_eq!(stderr, b"");
@@ -588,7 +564,7 @@ fn global_error_format_can_precede_legacy_dispatch_and_help_topics() {
         &[
             "stab",
             "--error-format=json",
-            "--convert",
+            "convert",
             "--in_format=01",
             "--out_format=b8",
             "--bits_per_shot=2",
@@ -599,15 +575,11 @@ fn global_error_format_can_precede_legacy_dispatch_and_help_topics() {
     assert_eq!(stdout, [1]);
     assert_eq!(stderr, b"");
 
-    for args in [
-        &["stab", "--error-format=json", "--help", "sample"][..],
-        &["stab", "--error-format=json", "--help=sample"][..],
-    ] {
-        let (status, stdout, stderr) = run_cli(args, b"");
-        assert_eq!(status, 0, "{args:?}");
-        assert!(stdout.starts_with(b"stab sample\n"), "{args:?}");
-        assert_eq!(stderr, b"", "{args:?}");
-    }
+    let args = &["stab", "--error-format=json", "help", "sample"];
+    let (status, stdout, stderr) = run_cli(args, b"");
+    assert_eq!(status, 0);
+    assert!(stdout.starts_with(b"stab sample\n"));
+    assert_eq!(stderr, b"");
 }
 
 #[test]

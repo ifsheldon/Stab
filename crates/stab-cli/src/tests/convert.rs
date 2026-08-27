@@ -621,29 +621,6 @@ fn convert_reports_missing_input_output_and_layout_paths() {
 }
 
 #[test]
-fn legacy_convert_alias_dispatches_and_conflicts_with_other_legacy_modes() {
-    let output = run_ok(
-        &[
-            "stab",
-            "--convert",
-            "--in_format",
-            "01",
-            "--out_format",
-            "b8",
-            "--bits_per_shot",
-            "2",
-        ],
-        b"10\n01\n",
-    );
-    assert_eq!(output, vec![1, 2]);
-
-    let (status, stdout, stderr) = run_cli(&["stab", "--convert", "--sample"], b"10\n");
-    assert_eq!(status, 1);
-    assert_eq!(stdout, Vec::<u8>::new());
-    assert!(stderr.contains("--sample"));
-}
-
-#[test]
 fn stim_extension_rejects_irrelevant_roles_without_touching_them() {
     let directory = tempdir().expect("temp dir");
     let observable_output = directory.path().join("observables.01");

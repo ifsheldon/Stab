@@ -18,11 +18,7 @@ fn run_cli(args: &[&str]) -> (i32, String, String) {
 
 #[test]
 fn help_lists_implemented_commands_for_help_spellings() {
-    for args in [
-        &["stab", "help"][..],
-        &["stab", "--help"][..],
-        &["stab", "help", "commands"][..],
-    ] {
+    for args in [&["stab", "help"][..], &["stab", "help", "commands"][..]] {
         let (status, stdout, stderr) = run_cli(args);
         assert_eq!(status, 0, "{args:?}");
         assert_eq!(stderr, "", "{args:?}");
@@ -51,7 +47,7 @@ fn help_topics_cover_commands_formats_and_gates() {
             "--block_decompose_from_introducing_remnant_edges",
         ),
         (
-            &["stab", "--help", "sample"][..],
+            &["stab", "help", "sample"][..],
             "Samples measurements from a circuit",
         ),
         (&["stab", "help", "01"][..], "0 and 1"),
@@ -88,6 +84,26 @@ fn subcommand_clap_help_still_works() {
     assert_eq!(stderr, "");
     assert!(stdout.contains("Samples measurements from a circuit"));
     assert!(stdout.contains("--shots"));
+}
+
+#[test]
+fn root_clap_help_lists_parser_owned_commands() {
+    let (status, stdout, stderr) = run_cli(&["stab", "--help"]);
+
+    assert_eq!(status, 0);
+    assert_eq!(stderr, "");
+    for command in [
+        "help",
+        "gen",
+        "convert",
+        "sample",
+        "detect",
+        "m2d",
+        "analyze_errors",
+        "sample_dem",
+    ] {
+        assert!(stdout.contains(command), "missing {command}: {stdout}");
+    }
 }
 
 #[test]

@@ -14,7 +14,7 @@ use stab_records::{
 };
 
 use crate::{
-    CliError, ErrorFormatArg, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
+    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo},
@@ -49,10 +49,6 @@ pub(crate) struct DetectArgs {
     /// Append observable flips after detector-event bits.
     #[arg(long = "append_observables")]
     append_observables: bool,
-
-    /// Deprecated Stim alias that writes observable flips before detector bits.
-    #[arg(long = "prepend_observables", hide = true)]
-    prepend_observables: bool,
 
     /// Optional separate observable-flip output path.
     #[arg(long = "obs_out")]
@@ -114,25 +110,15 @@ pub(crate) struct M2dArgs {
     ran_without_feedback: bool,
 }
 
-pub(crate) fn run_detect<R, W, E>(
+pub(crate) fn run_detect<R, W>(
     args: DetectArgs,
-    error_format: ErrorFormatArg,
     input: &mut R,
     stdout: &mut W,
-    stderr: &mut E,
 ) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
-    E: Write,
 {
-    // Pinned Stim emits the flag-driven deprecation warning while reading
-    // flags, before any routing validation can reject the combination, so
-    // the warning precedes every detect error.
-    if args.prepend_observables {
-        crate::write_prepend_observables_deprecation(stderr, error_format)
-            .map_err(CliError::WriteOutput)?;
-    }
     validate_detect_observable_routing(&args)?;
     validate_detect_ptb64_shots(&args)?;
     let mut io = PendingIo::preflight(
@@ -462,12 +448,9 @@ fn validate_m2d_output_format(format: RecordFormatArg) -> Result<(), CliError> {
 }
 
 fn validate_detect_observable_routing(args: &DetectArgs) -> Result<(), CliError> {
-    let effective_prepend = args.prepend_observables
-        || (args.out_format == SampleOutFormatArg::Dets && !args.append_observables);
-    let selected_routes = usize::from(effective_prepend)
-        + usize::from(args.append_observables)
-        + usize::from(args.obs_output.is_some());
-    if selected_routes > 1 {
+    let primary_includes_observables =
+        args.append_observables || args.out_format == SampleOutFormatArg::Dets;
+    if primary_includes_observables && args.obs_output.is_some() {
         return Err(CliError::ConflictingObservableRouting);
     }
     Ok(())
@@ -485,7 +468,7 @@ fn validate_detect_ptb64_shots(args: &DetectArgs) -> Result<(), CliError> {
 fn detect_observable_output_mode(args: &DetectArgs) -> DetectionObservableOutputMode {
     if args.append_observables {
         DetectionObservableOutputMode::Append
-    } else if args.prepend_observables || args.out_format == SampleOutFormatArg::Dets {
+    } else if args.out_format == SampleOutFormatArg::Dets {
         DetectionObservableOutputMode::Prepend
     } else {
         DetectionObservableOutputMode::DetectorsOnly

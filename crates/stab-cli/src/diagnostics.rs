@@ -134,7 +134,7 @@ pub(crate) enum CliError {
     #[error("format {format} is not supported for detection data")]
     UnsupportedDetectionFormat { format: &'static str },
 
-    #[error("cannot combine --prepend_observables, --append_observables, or --obs_out")]
+    #[error("cannot combine --obs_out with detector output that includes observables")]
     ConflictingObservableRouting,
 
     #[error("replay error input has {actual} records but --shots requested {expected}")]
@@ -240,60 +240,6 @@ pub(crate) fn write_clap_error(writer: &mut impl Write, error: &clap::Error) -> 
             }),
         },
     )
-}
-
-pub(crate) fn write_frame0_deprecation(
-    writer: &mut impl Write,
-    format: ErrorFormatArg,
-) -> io::Result<()> {
-    match format {
-        ErrorFormatArg::Human => writeln!(
-            writer,
-            "[DEPRECATION] Use `--skip_reference_sample` instead of `--frame0`"
-        ),
-        ErrorFormatArg::Json => write_json(
-            writer,
-            &JsonDiagnostic {
-                schema_version: JSON_DIAGNOSTIC_SCHEMA_VERSION,
-                code: "deprecated-frame0",
-                severity: DiagnosticSeverity::Warning.as_str(),
-                message: "`--frame0` is deprecated".to_string(),
-                span: None,
-                labels: Vec::new(),
-                help: Some("Use `--skip_reference_sample` instead."),
-                context: json!({
-                    "flag": "--frame0",
-                    "replacement": "--skip_reference_sample",
-                }),
-            },
-        ),
-    }
-}
-
-pub(crate) fn write_prepend_observables_deprecation(
-    writer: &mut impl Write,
-    format: ErrorFormatArg,
-) -> io::Result<()> {
-    const MESSAGE: &str = "Avoid using `--prepend_observables`. Data readers assume observables are appended, not prepended.";
-    match format {
-        ErrorFormatArg::Human => writeln!(writer, "[DEPRECATION] {MESSAGE}"),
-        ErrorFormatArg::Json => write_json(
-            writer,
-            &JsonDiagnostic {
-                schema_version: JSON_DIAGNOSTIC_SCHEMA_VERSION,
-                code: "deprecated-prepend-observables",
-                severity: DiagnosticSeverity::Warning.as_str(),
-                message: "`--prepend_observables` is deprecated".to_string(),
-                span: None,
-                labels: Vec::new(),
-                help: Some("Use appended observables or `--obs_out` instead."),
-                context: json!({
-                    "flag": "--prepend_observables",
-                    "replacement": "--obs_out",
-                }),
-            },
-        ),
-    }
 }
 
 #[derive(Serialize)]

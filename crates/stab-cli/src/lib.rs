@@ -32,10 +32,7 @@ use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use convert::{ConvertArgs, run_convert};
 use detection::{DetectArgs, M2dArgs, run_detect, run_m2d};
-use diagnostics::{
-    CliError, ErrorFormatArg, probe_error_format, write_cli_error, write_frame0_deprecation,
-    write_prepend_observables_deprecation,
-};
+use diagnostics::{CliError, ErrorFormatArg, probe_error_format, write_cli_error};
 use help::{HelpArgs, run_help};
 use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo};
@@ -304,10 +301,6 @@ struct SampleArgs {
     /// Disable reference-sample loop folding.
     #[arg(long = "skip_loop_folding")]
     skip_loop_folding: bool,
-
-    /// Deprecated Stim alias for --skip_reference_sample.
-    #[arg(long = "frame0", hide = true)]
-    frame0: bool,
 }
 
 fn parse_stim_usize(value: &str) -> Result<usize, String> {
@@ -338,7 +331,7 @@ where
     W: Write,
     E: Write,
 {
-    let args = normalize_legacy_args(args);
+    let args = args.into_iter().map(Into::into).collect::<Vec<OsString>>();
     let error_format_probe = probe_error_format(&args);
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
@@ -358,12 +351,8 @@ where
         Some(Command::Plan(args)) => run_plan(args, &mut input, &mut stdout),
         Some(Command::Gen(args)) => run_gen(args, &mut stdout),
         Some(Command::Convert(args)) => run_convert(args, &mut input, &mut stdout),
-        Some(Command::Sample(args)) => {
-            run_sample(args, error_format, &mut input, &mut stdout, &mut stderr)
-        }
-        Some(Command::Detect(args)) => {
-            run_detect(args, error_format, &mut input, &mut stdout, &mut stderr)
-        }
+        Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout),
+        Some(Command::Detect(args)) => run_detect(args, &mut input, &mut stdout),
         Some(Command::M2d(args)) => run_m2d(args, &mut input, &mut stdout),
         Some(Command::AnalyzeErrors(args)) => run_analyze_errors(args, &mut input, &mut stdout),
         Some(Command::SampleDem(args)) => run_sample_dem(args, &mut input, &mut stdout),
@@ -407,181 +396,6 @@ fn error_chain_is_broken_pipe(error: &CliError) -> bool {
         source = current.source();
     }
     false
-}
-
-fn normalize_legacy_args<I, S>(args: I) -> Vec<OsString>
-where
-    I: IntoIterator<Item = S>,
-    S: Into<OsString>,
-{
-    let mut args = args.into_iter().map(Into::into).collect::<Vec<_>>();
-    if args.len() < 2 {
-        return args;
-    }
-
-    let mut legacy_index = 1;
-    while let Some(arg) = args.get(legacy_index) {
-        let arg = arg.to_string_lossy();
-        if arg == "--error-format" {
-            legacy_index = legacy_index.saturating_add(2);
-        } else if arg.starts_with("--error-format=") {
-            legacy_index = legacy_index.saturating_add(1);
-        } else {
-            break;
-        }
-    }
-    if legacy_index >= args.len() {
-        return args;
-    }
-    relocate_single_legacy_mode_flag(&mut args, legacy_index);
-
-    let legacy_arg = args
-        .get(legacy_index)
-        .map(|arg| arg.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    if let Some(topic) = legacy_arg.strip_prefix("--help=") {
-        args.splice(
-            legacy_index..legacy_index + 1,
-            [OsString::from("help"), OsString::from(topic)],
-        );
-    } else if legacy_arg == "--help" {
-        if let Some(arg) = args.get_mut(legacy_index) {
-            *arg = OsString::from("help");
-        }
-    } else if legacy_arg == "--convert" {
-        if let Some(arg) = args.get_mut(legacy_index) {
-            *arg = OsString::from("convert");
-        }
-    } else if let Some(code) = legacy_arg.strip_prefix("--gen=") {
-        args.splice(
-            legacy_index..legacy_index + 1,
-            [
-                OsString::from("gen"),
-                OsString::from("--code"),
-                OsString::from(code),
-            ],
-        );
-    } else if legacy_arg == "--gen" && args.len() >= 3 {
-        if let Some(arg) = args.get_mut(legacy_index) {
-            *arg = OsString::from("gen");
-        }
-        args.insert(legacy_index + 1, OsString::from("--code"));
-    } else if let Some(shots) = legacy_arg.strip_prefix("--sample=") {
-        args.splice(
-            legacy_index..legacy_index + 1,
-            [
-                OsString::from("sample"),
-                OsString::from("--shots"),
-                OsString::from(shots),
-            ],
-        );
-    } else if legacy_arg == "--sample" {
-        if let Some(arg) = args.get_mut(legacy_index) {
-            *arg = OsString::from("sample");
-        }
-        // An explicit --shots elsewhere in the vector keeps the shot count,
-        // matching pinned Stim's `--shots 2 --sample` behavior.
-        let has_explicit_shots = args.iter().any(|arg| {
-            let arg = arg.to_string_lossy();
-            arg == "--shots" || arg.starts_with("--shots=")
-        });
-        if !has_explicit_shots {
-            args.insert(legacy_index + 1, OsString::from("--shots"));
-            if args
-                .get(legacy_index + 2)
-                .map(|arg| arg.to_string_lossy().starts_with('-'))
-                .unwrap_or(true)
-            {
-                args.insert(legacy_index + 2, OsString::from("1"));
-            }
-        }
-    } else if let Some(shots) = legacy_arg.strip_prefix("--detect=") {
-        args.splice(
-            legacy_index..legacy_index + 1,
-            [
-                OsString::from("detect"),
-                OsString::from("--shots"),
-                OsString::from(shots),
-            ],
-        );
-    } else if legacy_arg == "--detect" {
-        if let Some(arg) = args.get_mut(legacy_index) {
-            *arg = OsString::from("detect");
-        }
-        if args
-            .get(legacy_index + 1)
-            .map(|arg| !arg.to_string_lossy().starts_with('-'))
-            .unwrap_or(false)
-        {
-            args.insert(legacy_index + 1, OsString::from("--shots"));
-        }
-    } else if legacy_arg == "--m2d"
-        && let Some(arg) = args.get_mut(legacy_index)
-    {
-        *arg = OsString::from("m2d");
-    } else if legacy_arg == "--analyze_errors"
-        && let Some(arg) = args.get_mut(legacy_index)
-    {
-        *arg = OsString::from("analyze_errors");
-    }
-    args
-}
-
-fn is_legacy_mode_flag(arg: &str) -> bool {
-    matches!(
-        arg,
-        "--convert" | "--sample" | "--detect" | "--m2d" | "--analyze_errors" | "--gen"
-    ) || arg.starts_with("--gen=")
-        || arg.starts_with("--sample=")
-        || arg.starts_with("--detect=")
-}
-
-/// Pinned Stim accepts its legacy mode flag anywhere in the argument vector,
-/// so when exactly one appears after other flags it moves (with its adjacent
-/// shot-count value for bare `--sample`/`--detect`) to the normalization
-/// position; zero or several mode flags leave the vector unchanged so the
-/// parser keeps rejecting ambiguous invocations.
-fn relocate_single_legacy_mode_flag(args: &mut Vec<OsString>, legacy_index: usize) {
-    let boundary = args
-        .iter()
-        .position(|arg| arg == "--")
-        .unwrap_or(args.len());
-    if legacy_index >= boundary {
-        return;
-    }
-    let at_index = args
-        .get(legacy_index)
-        .map(|arg| arg.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    if !at_index.starts_with("--") || is_legacy_mode_flag(&at_index) {
-        return;
-    }
-    let mode_positions = (legacy_index + 1..boundary)
-        .filter(|&index| {
-            args.get(index)
-                .is_some_and(|arg| is_legacy_mode_flag(&arg.to_string_lossy()))
-        })
-        .collect::<Vec<_>>();
-    let [position] = mode_positions.as_slice() else {
-        return;
-    };
-    let mut end = position + 1;
-    let takes_adjacent_value = args.get(*position).is_some_and(|arg| {
-        matches!(
-            arg.to_string_lossy().as_ref(),
-            "--sample" | "--detect" | "--gen"
-        )
-    });
-    if takes_adjacent_value
-        && end < boundary
-        && args
-            .get(end)
-            .is_some_and(|arg| !arg.to_string_lossy().starts_with('-'))
-    {
-        end += 1;
-    }
-    let moved = args.drain(*position..end).collect::<Vec<_>>();
-    args.splice(legacy_index..legacy_index, moved);
 }
 
 fn run_gen<W>(args: GenArgs, stdout: &mut W) -> Result<(), CliError>
@@ -816,17 +630,10 @@ where
     }
 }
 
-fn run_sample<R, W, E>(
-    args: SampleArgs,
-    error_format: ErrorFormatArg,
-    input: &mut R,
-    stdout: &mut W,
-    stderr: &mut E,
-) -> Result<(), CliError>
+fn run_sample<R, W>(args: SampleArgs, input: &mut R, stdout: &mut W) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
-    E: Write,
 {
     if args.shots == 0 {
         PendingIo::reject_aliases_without_opening(
@@ -842,9 +649,6 @@ where
         [(FileRole::Input, args.input.as_deref())],
         [(FileRole::Output, args.output.as_deref())],
     )?;
-    if args.frame0 {
-        write_frame0_deprecation(stderr, error_format).map_err(CliError::WriteOutput)?;
-    }
     let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
         read_limited_input_file(
             &mut input_file,
@@ -864,9 +668,9 @@ where
         .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
         .map_err(CliError::from)?;
-    let skip_reference_sample = args.skip_reference_sample || args.frame0;
+    let skip_reference_sample = args.skip_reference_sample;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
-        legacy_tableau_visible_measurements(&circuit)?
+        one_shot_visible_measurements(&circuit)?
     } else {
         None
     };
@@ -1024,9 +828,9 @@ where
     }
 }
 
-fn legacy_tableau_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<usize>>, CliError> {
+fn one_shot_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<usize>>, CliError> {
     // Stim v1.16's one-shot tableau CLI path records heralds for feedback but does not write them.
-    if legacy_tableau_hidden_measurement_count(circuit)? == 0 {
+    if hidden_herald_measurement_count(circuit)? == 0 {
         return Ok(None);
     }
 
@@ -1051,8 +855,8 @@ fn legacy_tableau_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<u
     Ok(Some(visible))
 }
 
-fn legacy_tableau_visible_measurement_count(circuit: &Circuit) -> Result<Option<usize>, CliError> {
-    let hidden = legacy_tableau_hidden_measurement_count(circuit)?;
+fn one_shot_visible_measurement_count(circuit: &Circuit) -> Result<Option<usize>, CliError> {
+    let hidden = hidden_herald_measurement_count(circuit)?;
     if hidden == 0 {
         return Ok(None);
     }
@@ -1065,7 +869,7 @@ fn legacy_tableau_visible_measurement_count(circuit: &Circuit) -> Result<Option<
         .map_err(|_| CliError::MeasurementCountOverflow)
 }
 
-fn legacy_tableau_hidden_measurement_count(circuit: &Circuit) -> Result<u64, CliError> {
+fn hidden_herald_measurement_count(circuit: &Circuit) -> Result<u64, CliError> {
     let mut hidden = 0u64;
     for item in circuit.items() {
         let contribution = match item {
@@ -1079,11 +883,9 @@ fn legacy_tableau_hidden_measurement_count(circuit: &Circuit) -> Result<u64, Cli
                     .map_err(|_| CliError::MeasurementCountOverflow)?
             }
             CircuitItem::Instruction(_) => 0,
-            CircuitItem::RepeatBlock(repeat) => {
-                legacy_tableau_hidden_measurement_count(repeat.body())?
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or(CliError::MeasurementCountOverflow)?
-            }
+            CircuitItem::RepeatBlock(repeat) => hidden_herald_measurement_count(repeat.body())?
+                .checked_mul(repeat.repeat_count().get())
+                .ok_or(CliError::MeasurementCountOverflow)?,
         };
         hidden = hidden
             .checked_add(contribution)

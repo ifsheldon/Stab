@@ -1101,32 +1101,6 @@ fn analyze_errors_else_correlated_error_matches_m10_oracle_golden() {
 }
 
 #[test]
-fn legacy_analyze_errors_alias_matches_subcommand() {
-    let input = b"M 0\nDETECTOR rec[-1]\n";
-    let mut legacy_stdout = Vec::new();
-    let mut legacy_stderr = Vec::new();
-    let legacy_status = run_from(
-        ["stab", "--analyze_errors"],
-        input.as_slice(),
-        &mut legacy_stdout,
-        &mut legacy_stderr,
-    );
-    let mut subcommand_stdout = Vec::new();
-    let mut subcommand_stderr = Vec::new();
-    let subcommand_status = run_from(
-        ["stab", "analyze_errors"],
-        input.as_slice(),
-        &mut subcommand_stdout,
-        &mut subcommand_stderr,
-    );
-
-    assert_eq!(legacy_status, 0);
-    assert_eq!(subcommand_status, 0);
-    assert_eq!(legacy_stdout, subcommand_stdout);
-    assert_eq!(legacy_stderr, subcommand_stderr);
-}
-
-#[test]
 fn analyze_errors_maps_simple_pauli_noise_to_dem_errors() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

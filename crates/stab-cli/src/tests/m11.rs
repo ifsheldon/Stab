@@ -153,52 +153,6 @@ fn sample_dem_dets_output_keeps_observables_separate_like_upstream() {
 }
 
 #[test]
-fn sample_dem_rejects_conflicting_observable_routes() {
-    let dir = tempdir().expect("tempdir");
-    let obs_path = dir.path().join("obs.01");
-    for args in [
-        vec![
-            OsString::from("stab"),
-            OsString::from("sample_dem"),
-            OsString::from("--append_observables"),
-            OsString::from("--prepend_observables"),
-        ],
-        vec![
-            OsString::from("stab"),
-            OsString::from("sample_dem"),
-            OsString::from("--append_observables"),
-            OsString::from("--obs_out"),
-            obs_path.clone().into_os_string(),
-        ],
-        vec![
-            OsString::from("stab"),
-            OsString::from("sample_dem"),
-            OsString::from("--prepend_observables"),
-            OsString::from("--obs_out"),
-            obs_path.clone().into_os_string(),
-        ],
-    ] {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            args,
-            b"error(1) D0 L0\n".as_slice(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 1);
-        assert_eq!(String::from_utf8(stdout).unwrap(), "");
-        assert!(!obs_path.exists());
-        assert!(
-            String::from_utf8(stderr).unwrap().contains(
-                "cannot combine --prepend_observables, --append_observables, or --obs_out"
-            )
-        );
-    }
-}
-
-#[test]
 fn sample_dem_writes_error_records_to_err_out_like_upstream() {
     let dir = tempdir().expect("tempdir");
     let err_path = dir.path().join("errors.01");
@@ -903,50 +857,6 @@ fn sample_dem_validates_replay_path_before_streaming_output() {
     let stderr = String::from_utf8(stderr).unwrap();
     assert!(stderr.contains("failed to read"), "{stderr}");
     assert!(stderr.contains("missing.01"), "{stderr}");
-}
-
-#[test]
-fn sample_dem_observable_routing_flags_are_hidden_but_functional() {
-    // Decision D4: pinned Stim's sample_dem exposes neither observable-routing
-    // flag, so both stay out of --help while remaining functional
-    // compatibility conveniences.
-    let mut help_stdout = Vec::new();
-    let mut help_stderr = Vec::new();
-    let help_status = run_from(
-        ["stab", "sample_dem", "--help"].map(OsString::from),
-        b"".as_slice(),
-        &mut help_stdout,
-        &mut help_stderr,
-    );
-    assert_eq!(help_status, 0);
-    let help_text = String::from_utf8(help_stdout).expect("utf-8 help");
-    assert!(!help_text.contains("--append_observables"), "{help_text}");
-    assert!(!help_text.contains("--prepend_observables"), "{help_text}");
-
-    for (flag, expected) in [
-        ("--append_observables", "shot D0 L0\n"),
-        ("--prepend_observables", "shot L0 D0\n"),
-    ] {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "sample_dem",
-                "--shots",
-                "1",
-                "--out_format",
-                "dets",
-                flag,
-            ]
-            .map(OsString::from),
-            b"error(1) D0 L0\n".as_slice(),
-            &mut stdout,
-            &mut stderr,
-        );
-        assert_eq!(status, 0, "{flag}");
-        assert_eq!(String::from_utf8(stdout).unwrap(), expected, "{flag}");
-    }
 }
 
 #[test]

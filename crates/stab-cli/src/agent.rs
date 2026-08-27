@@ -18,8 +18,8 @@ use stab_records::{
 
 use crate::{
     Cli, CliError, FileRole, MAX_CIRCUIT_INPUT_BYTES, PendingIo, SampleOutFormatArg,
-    legacy_tableau_visible_measurement_count, parse_stim_u64, parse_stim_usize,
-    read_limited_input_file, read_limited_stdin,
+    one_shot_visible_measurement_count, parse_stim_u64, parse_stim_usize, read_limited_input_file,
+    read_limited_stdin,
 };
 
 const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 5;
@@ -195,7 +195,7 @@ where
     ));
 
     let visible_measurements = if args.shots == 1 && !args.skip_reference_sample {
-        legacy_tableau_visible_measurement_count(&circuit)?
+        one_shot_visible_measurement_count(&circuit)?
     } else {
         None
     };

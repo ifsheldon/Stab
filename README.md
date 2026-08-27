@@ -37,7 +37,7 @@ stab m2d --circuit surface_d3.stim --in shots.01 --in_format 01 --out dets_from_
 
 # Decompose the circuit into a detector error model (committed as examples/surface_d3.dem) and sample it.
 stab analyze_errors --in surface_d3.stim --out model.dem
-stab sample_dem --shots 1000 --seed 42 --in model.dem --out dem_dets.dets --out_format dets --append_observables
+stab sample_dem --shots 1000 --seed 42 --in model.dem --out dem_dets.dets --out_format dets --obs_out dem_obs.dets --obs_out_format dets
 
 # Convert result data between formats.
 stab convert --in shots.01 --in_format 01 --out shots.b8 --out_format b8 --circuit surface_d3.stim --types M

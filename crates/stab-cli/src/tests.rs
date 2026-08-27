@@ -6,7 +6,6 @@ mod convert;
 mod diagnostics;
 mod generation;
 mod help;
-mod legacy;
 mod m10;
 mod m11;
 mod m9;
@@ -42,63 +41,6 @@ fn gen_repetition_code_matches_m7_oracle_golden() {
             "stab",
             "gen",
             "--code",
-            "repetition_code",
-            "--task",
-            "memory",
-            "--distance",
-            "3",
-            "--rounds",
-            "2",
-        ],
-        "".as_bytes(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0);
-    assert_eq!(
-        String::from_utf8(stdout).unwrap(),
-        include_str!("../../../oracle/fixtures/expected/m7_gen_repetition_code.stdout")
-    );
-    assert_eq!(String::from_utf8(stderr).unwrap(), "");
-}
-
-#[test]
-fn legacy_gen_repetition_code_matches_m7_oracle_golden() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        [
-            "stab",
-            "--gen=repetition_code",
-            "--task",
-            "memory",
-            "--distance",
-            "3",
-            "--rounds",
-            "2",
-        ],
-        "".as_bytes(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0);
-    assert_eq!(
-        String::from_utf8(stdout).unwrap(),
-        include_str!("../../../oracle/fixtures/expected/m7_gen_repetition_code.stdout")
-    );
-    assert_eq!(String::from_utf8(stderr).unwrap(), "");
-}
-
-#[test]
-fn legacy_gen_space_separated_code_matches_m7_oracle_golden() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        [
-            "stab",
-            "--gen",
             "repetition_code",
             "--task",
             "memory",
@@ -691,44 +633,6 @@ fn sample_matches_stim_heralded_record_output_paths() {
 }
 
 #[test]
-fn legacy_sample_flag_matches_m8_oracle_golden() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "--sample=2"],
-        include_bytes!("../../../oracle/fixtures/inputs/sample_basic.stim").as_slice(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0);
-    assert_eq!(
-        String::from_utf8(stdout).unwrap(),
-        include_str!("../../../oracle/fixtures/expected/m8_sample_basic.stdout")
-    );
-    assert_eq!(String::from_utf8(stderr).unwrap(), "");
-}
-
-#[test]
-fn legacy_sample_space_separated_flag_matches_m8_oracle_golden() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "--sample", "2"],
-        include_bytes!("../../../oracle/fixtures/inputs/sample_basic.stim").as_slice(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0);
-    assert_eq!(
-        String::from_utf8(stdout).unwrap(),
-        include_str!("../../../oracle/fixtures/expected/m8_sample_basic.stdout")
-    );
-    assert_eq!(String::from_utf8(stderr).unwrap(), "");
-}
-
-#[test]
 fn sample_supports_deterministic_pauli_frame_measurements() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -1037,7 +941,7 @@ fn sample_supports_skip_reference_sample_flag() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
-        ["stab", "--sample", "--skip_reference_sample"],
+        ["stab", "sample", "--skip_reference_sample"],
         "H 0\nS 0\nS 0\nH 0\nM 0\n".as_bytes(),
         &mut stdout,
         &mut stderr,
@@ -1046,26 +950,6 @@ fn sample_supports_skip_reference_sample_flag() {
     assert_eq!(status, 0);
     assert_eq!(String::from_utf8(stdout).unwrap(), "0\n");
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
-}
-
-#[test]
-fn sample_supports_deprecated_frame0_alias() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "sample", "--frame0"],
-        "H 0\nS 0\nS 0\nH 0\nM 0\n".as_bytes(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "0\n");
-    assert!(
-        String::from_utf8(stderr)
-            .unwrap()
-            .contains("[DEPRECATION] Use `--skip_reference_sample` instead of `--frame0`")
-    );
 }
 
 #[test]
