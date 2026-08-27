@@ -3,11 +3,16 @@ use std::path::{Path, PathBuf};
 
 use clap::{Args, CommandFactory, Subcommand, ValueEnum};
 use serde::Serialize;
-use stab_core::{
-    CapabilitySet, Circuit, CompilationRequestFingerprint, DetectorErrorModel, EncodedSizeEstimate,
-    Estimate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule,
-    ModelFingerprint, ParseLimits, PlanFingerprint, RecordFormat, ResourceEstimate,
-    SamplingCompiler, advanced::records::validate_ptb64_shot_count, estimate_sampling_request,
+use stab_engine::{
+    COMPILATION_DESCRIPTORS, CompilationRequestFingerprint, PlanFingerprint, SamplingCompiler,
+};
+use stab_model::{
+    Circuit, CircuitItem, DetectorErrorModel, Estimate, Gate, GateArgumentRule, GateCategory,
+    GateTargetGroupKind, GateTargetRule, ModelDialect, ModelFingerprint, ParseLimits,
+    ResourceEstimate,
+};
+use stab_records::{
+    EncodedSizeEstimate, RecordFormat, codec_capabilities, validate_ptb64_shot_count,
 };
 
 use crate::{
@@ -19,6 +24,7 @@ use crate::{
 const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 4;
 const INSPECT_OUTPUT_SCHEMA_VERSION: u16 = 2;
 const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 3;
+const STIM_COMPATIBILITY_VERSION: &str = "1.16.0";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
 pub(crate) enum AgentOutputFormatArg {
@@ -171,7 +177,7 @@ where
     // Compilation is intentionally performed for validation. No sampling method is called.
     let plan = SamplingCompiler::new()
         .compile(&circuit)
-        .map_err(|error| CliError::Circuit(stab_core::CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
     let request_fingerprint = plan.request_fingerprint();
     let mut estimates = ResourceEstimateReport::from(estimate_sampling_request(
         &circuit,
@@ -324,19 +330,17 @@ struct CapabilitiesReport {
 
 impl CapabilitiesReport {
     fn current() -> Self {
-        let capabilities = CapabilitySet::current();
         Self {
             schema_version: CAPABILITIES_OUTPUT_SCHEMA_VERSION,
             stab_version: env!("CARGO_PKG_VERSION"),
-            stim_compatibility_version: CapabilitySet::STIM_COMPATIBILITY_VERSION,
+            stim_compatibility_version: STIM_COMPATIBILITY_VERSION,
             commands: command_descriptions()
                 .into_iter()
                 .map(|(name, summary)| CommandReport { name, summary })
                 .collect(),
-            dialects: capabilities
-                .dialects()
+            dialects: ModelDialect::all()
                 .map(|dialect| {
-                    let limits = capabilities.default_parse_limits(dialect);
+                    let limits = ParseLimits::default();
                     DialectReport {
                         name: dialect.as_str(),
                         default_parse_limits: ParseLimitsReport {
@@ -346,8 +350,7 @@ impl CapabilitiesReport {
                     }
                 })
                 .collect(),
-            gates: capabilities
-                .gates()
+            gates: Gate::all()
                 .map(|gate| GateReport {
                     canonical_name: gate.canonical_name(),
                     aliases: gate.aliases(),
@@ -358,8 +361,9 @@ impl CapabilitiesReport {
                     support_scope: "accepted-circuit-syntax",
                 })
                 .collect(),
-            codecs: capabilities
-                .codecs()
+            codecs: codec_capabilities()
+                .iter()
+                .copied()
                 .map(|codec| CodecReport {
                     name: codec.format().as_str(),
                     encoding: codec.format().encoding().as_str(),
@@ -369,15 +373,15 @@ impl CapabilitiesReport {
                     records_per_group: codec.format().records_per_group(),
                 })
                 .collect(),
-            compilers: capabilities
-                .compilation_operations()
-                .map(|compiler| CompilerReport {
-                    operation: compiler.operation().as_str(),
-                    input_dialect: compiler.input_dialect().as_str(),
-                    compiler_schema_version: compiler.compiler_schema_version(),
-                    request_fingerprint_schema_version: compiler
+            compilers: COMPILATION_DESCRIPTORS
+                .iter()
+                .map(|descriptor| CompilerReport {
+                    operation: descriptor.operation().as_str(),
+                    input_dialect: descriptor.input_dialect().as_str(),
+                    compiler_schema_version: descriptor.compiler_schema_version(),
+                    request_fingerprint_schema_version: descriptor
                         .request_fingerprint_schema_version(),
-                    configurable_limits: compiler.has_configurable_limits(),
+                    configurable_limits: descriptor.has_configurable_limits(),
                 })
                 .collect(),
         }
@@ -676,6 +680,56 @@ impl From<ResourceEstimate> for ResourceEstimateReport {
             work_units: EstimateReport::from(estimate.work_units()),
         }
     }
+}
+
+fn estimate_sampling_request(
+    circuit: &Circuit,
+    shots: usize,
+    output_format: RecordFormat,
+) -> ResourceEstimate {
+    let (input_items, expanded_operations) = sampling_operation_counts(circuit);
+    let output_bytes = circuit
+        .count_measurements()
+        .ok()
+        .and_then(|measurements| usize::try_from(measurements).ok())
+        .map_or(Estimate::Unknown, |measurements| {
+            match output_format.estimate_output_bytes(shots, measurements) {
+                EncodedSizeEstimate::Exact(value) => Estimate::Exact(value),
+                EncodedSizeEstimate::Unknown => Estimate::Unknown,
+            }
+        });
+
+    ResourceEstimate::builder()
+        .input_items(input_items.map_or(Estimate::Unknown, Estimate::Exact))
+        .expanded_operations(expanded_operations.map_or(Estimate::Unknown, Estimate::Exact))
+        .folded_traversal(input_items.map_or(Estimate::Unknown, Estimate::Exact))
+        .output_bytes(output_bytes)
+        .build()
+}
+
+fn sampling_operation_counts(circuit: &Circuit) -> (Option<usize>, Option<usize>) {
+    let mut represented = Some(circuit.items().len());
+    let mut expanded = Some(0usize);
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(_) => {
+                expanded = expanded.and_then(|count| count.checked_add(1));
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                let (body_represented, body_expanded) = sampling_operation_counts(repeat.body());
+                represented = represented
+                    .zip(body_represented)
+                    .and_then(|(count, body)| count.checked_add(body));
+                expanded = expanded.zip(body_expanded).and_then(|(count, body)| {
+                    usize::try_from(repeat.repeat_count().get())
+                        .ok()
+                        .and_then(|repetitions| body.checked_mul(repetitions))
+                        .and_then(|body| count.checked_add(body))
+                });
+            }
+        }
+    }
+    (represented, expanded)
 }
 
 #[derive(Serialize)]

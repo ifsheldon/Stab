@@ -71,7 +71,7 @@ Detailed component contracts use [the component contract template](component-con
 The current product graph after the A8 circuit-pass and backend-selection boundary is:
 
 ```text
-stab-cli -> stab-core
+stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 
 stab-reference-decoder -> stab-decoder + stab-model + stab-records
 stab-reference-noise-pass -> stab-analysis + stab-model
@@ -98,7 +98,7 @@ stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-decoder -> stab-model + stab-records
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
-stab-cli -> stab-core
+stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 
 ops -> product crates
 product crates -X-> ops
@@ -116,7 +116,7 @@ The shared result-format corpus lives under `test-support/compat-corpus` and is 
 
 Portable SIMD belongs only to the optional `stab-kernels-simd` product crate. Any product-to-ops edge, product runtime edge to test support, unapproved test-support upward edge, direct `std::simd` or `core::simd` source site, portable-SIMD feature gate outside that crate, mandatory Stable-component dependency on that crate, or Stable default feature reaching that crate fails the check. Every unstable Rust `feature(...)` gate is rejected in Stable components, including target-gated and nested `cfg_attr` forms.
 
-`just architecture::consumer-check` compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed direct-component consumer workspaces under `test-support/consumers/`. It checks their resolved feature graphs, including the absence of the kernel from both scalar graphs and exactly one kernel package with `portable-simd` enabled through bits, algebra, and core in each portable graph.
+`just architecture::consumer-check` compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed direct-component consumer workspaces under `test-support/consumers/`. It checks their resolved feature graphs, including the absence of the kernel from both scalar graphs and exactly one kernel package with `portable-simd` enabled through the feature paths selected by each portable consumer.
 
 `just architecture::docs-check` uses `pulldown-cmark` with GitHub Flavored Markdown extensions to recursively validate repository-owned Markdown links. It derives same-file and cross-file heading anchors using GitHub's Unicode stripping and duplicate-suffix rules, treats heading text such as `{#custom}` literally instead of enabling non-GFM custom heading attributes, resolves local targets without permitting traversal outside the repository, reports all failures in deterministic source order, skips explicit external schemes, and excludes generated, build, vendor, and Git trees.
 

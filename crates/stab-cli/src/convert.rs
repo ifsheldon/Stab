@@ -2,10 +2,11 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use clap::Args;
-use stab_core::{
-    Circuit, CircuitError, CircuitItem, DetectorErrorModel, RecordFormat, RepeatBlock,
-    advanced::records::{DetsLayout, DetsResultType, MeasureRecordWriter, RecordStreamReader},
-    detection_record_width, measurement_record_count,
+use stab_engine::{detection_record_width, measurement_record_count};
+use stab_model::{Circuit, CircuitItem, DetectorErrorModel, RepeatBlock};
+use stab_records::{
+    DetsLayout, DetsResultType, FormatError, FormatErrorCode, MeasureRecordWriter, RecordFormat,
+    RecordStreamReader,
 };
 
 use crate::{
@@ -204,7 +205,6 @@ impl ConvertLayout {
                 0
             },
         )
-        .map_err(CircuitError::from)
         .map_err(CliError::from)
     }
 }
@@ -542,9 +542,7 @@ impl ConvertOutput {
             return self.write_ptb64_record(bits);
         }
         let record_format = self.format.required_record_format()?;
-        let mut writer = MeasureRecordWriter::try_new(record_format)
-            .map_err(CircuitError::from)
-            .map_err(CliError::from)?;
+        let mut writer = MeasureRecordWriter::try_new(record_format).map_err(CliError::from)?;
         writer.write_bits(&bits);
         writer.write_end();
         self.output.extend_from_slice(&writer.into_bytes());
@@ -555,9 +553,8 @@ impl ConvertOutput {
         &mut self,
         types: &[(DetsResultType, &[bool])],
     ) -> Result<(), CliError> {
-        let mut writer = MeasureRecordWriter::try_new(RecordFormat::Dets)
-            .map_err(CircuitError::from)
-            .map_err(CliError::from)?;
+        let mut writer =
+            MeasureRecordWriter::try_new(RecordFormat::Dets).map_err(CliError::from)?;
         for (result_type, bits) in types {
             writer.begin_dets_result_type(*result_type);
             writer.write_bits(bits);
@@ -694,5 +691,9 @@ fn usize_from_u64(value: u64, kind: &'static str) -> Result<usize, CliError> {
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
-    CliError::Circuit(CircuitError::invalid_result_format(message))
+    CliError::Record(FormatError::new(
+        FormatErrorCode::InvalidData,
+        message,
+        None,
+    ))
 }

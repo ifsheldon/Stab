@@ -26,7 +26,7 @@ const FEATURE_CONTRACTS: [FeatureContract; 6] = [
     FeatureContract {
         package: "stab-cli",
         default: &[],
-        portable: &["stab-bits/portable-simd", "stab-core/portable-simd"],
+        portable: &["stab-bits/portable-simd"],
     },
     FeatureContract {
         package: "stab-oracle",

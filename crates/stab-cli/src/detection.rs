@@ -2,21 +2,20 @@ use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_core::{
-    ByteSpan, CircuitError, DetectionBatchView, DetectionObservableOutputMode, DetectionSink,
-    FormatError, FormatErrorCode, MeasurementBatchView, PackedShotBatch, RandomPolicy,
-    ReferenceSampleMode, Seed, ShotCount,
-    advanced::records::{RecordStreamReader, read_measurement_records, validate_ptb64_shot_count},
-    circuit_with_inlined_feedback,
-    execution::{
-        DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
-        MeasurementToDetectionSinkAdapter,
-    },
+use stab_analysis::circuit_with_inlined_feedback;
+use stab_engine::{
+    DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
+    MeasurementToDetectionSinkAdapter, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
+};
+use stab_records::{
+    ByteSpan, DetectionBatchView, DetectionSink, FormatError, FormatErrorCode,
+    MeasurementBatchView, PackedShotBatch, RecordFormat, RecordStreamReader,
+    read_measurement_records, validate_ptb64_shot_count,
 };
 
 use crate::{
     CliError, ErrorFormatArg, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
-    batch_output::DetectionBatchEncoder,
+    batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo},
     parse_circuit_bytes,
@@ -166,7 +165,7 @@ where
     let observable_mode = detect_observable_output_mode(&args);
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit)
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
@@ -183,7 +182,7 @@ where
     };
     let mut session = plan
         .session(random_policy(args.seed))
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
     session
         .run(shot_count(args.shots)?, &mut sink)
         .map(|_| ())
@@ -229,10 +228,8 @@ where
     let plan = MeasurementToDetectionCompiler::new()
         .reference_sample_mode(reference_sample_mode(args.skip_reference_sample))
         .compile(&circuit)
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
-    let mut session = plan
-        .session()
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
+    let mut session = plan.session().map_err(CliError::from)?;
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
@@ -257,13 +254,13 @@ where
             "m2d sweep input",
         )
     });
-    let mut measurement_batch = PackedShotBatch::zeros(1, plan.measurement_width().get())
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+    let mut measurement_batch =
+        PackedShotBatch::zeros(1, plan.measurement_width().get()).map_err(CliError::from)?;
     let mut sweep_batch = sweeps
         .as_ref()
         .map(|_| PackedShotBatch::zeros(1, plan.sweep_width().get()))
         .transpose()
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
     let mut outputs = io.activate()?;
     let primary = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     let observable = outputs
@@ -274,9 +271,7 @@ where
         observable,
         encoder,
     };
-    let mut delivery = session
-        .start_delivery(&mut sink)
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+    let mut delivery = session.start_delivery(&mut sink).map_err(CliError::from)?;
     if let Some(sweeps) = sweeps.as_mut() {
         loop {
             match measurements.next_record()? {
@@ -383,13 +378,13 @@ where
 {
     measurement_batch
         .copy_shot_from_bools(0, measurement_record)
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
     let measurements = MeasurementBatchView::new(measurement_batch.view());
     let sweeps = match (sweep_batch, sweep_record) {
         (Some(batch), Some(record)) => {
             batch
                 .copy_shot_from_bools(0, record)
-                .map_err(|error| CliError::from(CircuitError::from(error)))?;
+                .map_err(CliError::from)?;
             Some(MeasurementBatchView::new(batch.view()))
         }
         (None, None) => None,
@@ -416,7 +411,7 @@ where
 
 fn map_detection_run_error(error: DetectionRunError<CliError>) -> CliError {
     match error {
-        DetectionRunError::Engine { source, .. } => CliError::from(CircuitError::from(source)),
+        DetectionRunError::Engine { source, .. } => CliError::from(source),
         DetectionRunError::Sink { source, .. } => source,
     }
 }
@@ -442,7 +437,7 @@ fn reference_sample_mode(skip_reference_sample: bool) -> ReferenceSampleMode {
     }
 }
 
-fn detection_record_format(format: RecordFormatArg) -> Result<stab_core::RecordFormat, CliError> {
+fn detection_record_format(format: RecordFormatArg) -> Result<RecordFormat, CliError> {
     format
         .record_format()
         .ok_or(CliError::UnsupportedDetectionFormat { format: "stim" })
@@ -458,7 +453,7 @@ fn validate_m2d_output_formats(args: &M2dArgs) -> Result<(), CliError> {
 
 fn validate_m2d_output_format(format: RecordFormatArg) -> Result<(), CliError> {
     let format = format.required_record_format()?;
-    if format == stab_core::RecordFormat::Ptb64 {
+    if format == RecordFormat::Ptb64 {
         return Err(CliError::UnsupportedDetectionFormat { format: "ptb64" });
     }
     Ok(())
@@ -504,7 +499,11 @@ fn observable_output_mode(append_observables: bool) -> DetectionObservableOutput
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
-    CliError::from(CircuitError::invalid_result_format(message))
+    CliError::Record(FormatError::new(
+        FormatErrorCode::InvalidData,
+        message,
+        None,
+    ))
 }
 
 fn read_error(path: Option<&PathBuf>, source: std::io::Error) -> CliError {
@@ -520,7 +519,7 @@ fn read_error(path: Option<&PathBuf>, source: std::io::Error) -> CliError {
 /// Per-record decode source for one m2d input stream.
 ///
 /// The r8 and ptb64 formats decode through the shared
-/// [`stab_core::advanced::records::RecordStreamReader`]; the text and b8 formats keep m2d's
+/// [`stab_records::RecordStreamReader`]; the text and b8 formats keep m2d's
 /// line-framed and zero-width-sweep-aware local transports.
 enum M2dRecordDecoder<'a> {
     Shared(RecordStreamReader<Box<dyn BufRead + 'a>>),
@@ -576,7 +575,7 @@ impl<'a> M2dRecordStream<'a> {
         let decoder = match format {
             RecordFormatArg::R8 => M2dRecordDecoder::Shared(RecordStreamReader::measurements(
                 input.reader,
-                stab_core::RecordFormat::R8,
+                RecordFormat::R8,
                 bits_per_record,
                 MAX_M2D_TEXT_RECORD_BYTES,
             )),
@@ -688,7 +687,7 @@ impl<'a> M2dRecordStream<'a> {
                 continue;
             }
             let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-                CircuitError::invalid_result_format(format!(
+                invalid_result_format(format!(
                     "{} record decoded into {} records",
                     self.kind,
                     records.len()
@@ -723,7 +722,7 @@ impl<'a> M2dRecordStream<'a> {
         match read {
             RecordRead::Complete => decode_single_m2d_record(
                 &record_bytes,
-                stab_core::RecordFormat::B8,
+                RecordFormat::B8,
                 self.bits_per_record,
                 self.kind,
             )
@@ -755,14 +754,14 @@ fn validate_m2d_text_record_terminator(
     line: &[u8],
     format: RecordFormatArg,
     kind: &str,
-) -> Result<(), CircuitError> {
+) -> Result<(), FormatError> {
     match format {
         RecordFormatArg::ZeroOne | RecordFormatArg::Hits if !line.ends_with(b"\n") => {
-            Err(CircuitError::from(FormatError::new(
+            Err(FormatError::new(
                 FormatErrorCode::MissingRecordTerminator,
                 format!("{} {} record must end with a newline", kind, format.name()),
                 ByteSpan::try_new(line.len(), 0),
-            )))
+            ))
         }
         _ => Ok(()),
     }
@@ -770,13 +769,13 @@ fn validate_m2d_text_record_terminator(
 
 fn decode_single_m2d_record(
     input: &[u8],
-    format: stab_core::RecordFormat,
+    format: RecordFormat,
     measurement_width: usize,
     kind: &str,
 ) -> Result<Vec<bool>, CliError> {
     let records = read_measurement_records(input, format, measurement_width)?;
     let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-        CircuitError::invalid_result_format(format!(
+        invalid_result_format(format!(
             "{kind} record decoded into {} records",
             records.len()
         ))

@@ -14,15 +14,16 @@ workspace = true
 
 [features]
 default = []
-portable-simd = ["stab-bits/portable-simd", "stab-core/portable-simd"]
+portable-simd = ["stab-bits/portable-simd"]
 
 [dependencies]
 clap = { workspace = true }
 same-file = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+stab-analysis = { workspace = true }
 stab-bits = { workspace = true }
-stab-core = { workspace = true }
+stab-engine = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }
 thiserror = { workspace = true }

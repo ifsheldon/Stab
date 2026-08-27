@@ -1,16 +1,22 @@
 use std::io::{self, Write};
 
 use stab_bits::BitSlice;
-use stab_core::{CircuitError, DetectionObservableOutputMode};
 use stab_records::{
-    BitPlane64Batch, DemSampleBatchView, DetectionBatchView, DetsResultType, MeasureRecordWriter,
-    PackedShotBatchView, RecordFormat,
+    BitPlane64Batch, DemSampleBatchView, DetectionBatchView, DetsResultType, FormatError,
+    FormatErrorCode, MeasureRecordWriter, PackedShotBatchView, RecordFormat,
 };
 
 use crate::{
     CliError,
     streaming::{FileOutputSink, OutputSink},
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum DetectionObservableOutputMode {
+    DetectorsOnly,
+    Append,
+    Prepend,
+}
 
 pub(crate) struct DetectionBatchEncoder {
     detector_width: usize,
@@ -240,8 +246,7 @@ impl RecordBatchEncoder {
     fn try_new(format: RecordFormat, width: usize) -> Result<Self, CliError> {
         if format == RecordFormat::Ptb64 {
             return Ok(Self::Ptb64 {
-                planes: BitPlane64Batch::zeros(64, width)
-                    .map_err(|error| CliError::from(CircuitError::from(error)))?,
+                planes: BitPlane64Batch::zeros(64, width).map_err(CliError::from)?,
                 pending_shots: 0,
             });
         }
@@ -252,9 +257,7 @@ impl RecordBatchEncoder {
         Ok(Self::Records {
             format,
             width,
-            writer: MeasureRecordWriter::try_new(format)
-                .map_err(CircuitError::from)
-                .map_err(CliError::from)?,
+            writer: MeasureRecordWriter::try_new(format).map_err(CliError::from)?,
         })
     }
 
@@ -400,7 +403,11 @@ fn format_io(error: impl std::fmt::Display) -> io::Error {
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
-    CliError::from(CircuitError::invalid_result_format(message))
+    CliError::Record(FormatError::new(
+        FormatErrorCode::InvalidData,
+        message,
+        None,
+    ))
 }
 
 #[cfg(test)]

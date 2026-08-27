@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use stab_core::{BitPlane64Batch, MeasurementBatchView, MeasurementSink};
+use stab_records::{BitPlane64Batch, MeasurementBatchView, MeasurementSink};
 use tempfile::tempdir;
 
 use super::run_from;

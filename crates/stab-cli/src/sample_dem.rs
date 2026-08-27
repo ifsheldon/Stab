@@ -2,20 +2,17 @@ use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_core::{
-    CircuitError, DemSampleBatchView, DemSampleSink, DetectionObservableOutputMode,
-    DetectorErrorModel, RandomPolicy, RecordFormat, Seed, ShotCount,
-    advanced::records::for_each_sparse_record,
-    advanced::records::{
-        FormatErrorCode as RecordFormatErrorCode, RecordStreamReadError, RecordStreamReader,
-        read_measurement_records, validate_ptb64_shot_count,
-    },
-    execution::{DemSamplingCompiler, DemSamplingRunError},
+use stab_engine::{DemSamplingCompiler, DemSamplingRunError, RandomPolicy, Seed, ShotCount};
+use stab_model::DetectorErrorModel;
+use stab_records::{
+    DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
+    RecordFormat, RecordStreamReadError, RecordStreamReader, for_each_sparse_record,
+    read_measurement_records, validate_ptb64_shot_count,
 };
 
 use super::{
     CliError, RecordFormatArg, SampleOutFormatArg,
-    batch_output::DemSampleBatchEncoder,
+    batch_output::{DemSampleBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo},
     streaming::{FileOutputSink, OutputSink},
@@ -137,11 +134,10 @@ where
     let dem = parse_dem_bytes(&input_bytes)?;
     let plan = DemSamplingCompiler::new()
         .compile(&dem)
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
     let shots = dem_shot_count(args.shots)?;
     if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
-        plan.validate_replay(shots)
-            .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        plan.validate_replay(shots).map_err(CliError::from)?;
         validate_replay_prefix(
             replay_input,
             args.replay_err_in_format,
@@ -167,7 +163,7 @@ where
     )?;
     let mut session = plan
         .session(dem_random_policy(args.seed))
-        .map_err(|error| CliError::from(CircuitError::from(error)))?;
+        .map_err(CliError::from)?;
     let mut io = io.with_outputs(output_roles)?;
     let mut replay_input = io.take_input(FileRole::ReplayErrorInput);
     let mut outputs = io.activate()?;
@@ -261,7 +257,7 @@ where
 
 fn map_dem_run_error(error: DemSamplingRunError<CliError>) -> CliError {
     match error {
-        DemSamplingRunError::Engine { source, .. } => CliError::from(CircuitError::from(source)),
+        DemSamplingRunError::Engine { source, .. } => CliError::from(source),
         DemSamplingRunError::Sink { source, .. } => source,
     }
 }
@@ -284,7 +280,11 @@ fn parse_dem_bytes(input: &[u8]) -> Result<DetectorErrorModel, CliError> {
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
-    CliError::from(CircuitError::invalid_result_format(message))
+    CliError::Record(FormatError::new(
+        RecordFormatErrorCode::InvalidData,
+        message,
+        None,
+    ))
 }
 
 fn sample_dem_record_format(format: RecordFormatArg) -> Result<RecordFormat, CliError> {
@@ -452,7 +452,7 @@ where
         }
         let records = read_measurement_records(&record_bytes, RecordFormat::B8, error_count)?;
         let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-            CircuitError::invalid_result_format(format!(
+            invalid_result_format(format!(
                 "b8 replay record decoded into {} records",
                 records.len()
             ))
@@ -501,7 +501,7 @@ where
         let parsed = if format == RecordFormatArg::Hits {
             vec![
                 read_hits_replay_record(&line, error_count).map_err(|error| match error {
-                    CliError::Circuit(source) => CliError::InputRecord {
+                    CliError::Record(source) => CliError::InputRecord {
                         byte_offset: record_byte_offset,
                         source,
                     },
@@ -522,7 +522,7 @@ where
             continue;
         }
         let [record] = <[Vec<bool>; 1]>::try_from(parsed).map_err(|records| {
-            CircuitError::invalid_result_format(format!(
+            invalid_result_format(format!(
                 "replay record decoded into {} records",
                 records.len()
             ))
@@ -538,32 +538,34 @@ fn read_hits_replay_record(input: &[u8], error_count: usize) -> Result<Vec<bool>
     let mut record = None;
     for_each_sparse_record(input, RecordFormat::Hits, error_count, |hits| {
         if record.is_some() {
-            return Err(CircuitError::invalid_result_format(
+            return Err(FormatError::new(
+                RecordFormatErrorCode::InvalidData,
                 "HITS replay line decoded into multiple records",
+                None,
             ));
         }
         let mut decoded = vec![false; error_count];
         for hit in hits {
             let index = usize::try_from(*hit).map_err(|_| {
-                CircuitError::invalid_result_format(format!(
-                    "HITS replay index {hit} does not fit usize"
-                ))
+                FormatError::new(
+                    RecordFormatErrorCode::InvalidData,
+                    format!("HITS replay index {hit} does not fit usize"),
+                    None,
+                )
             })?;
             let bit = decoded.get_mut(index).ok_or_else(|| {
-                CircuitError::invalid_result_format(format!(
-                    "HITS replay index {index} exceeds error count {error_count}"
-                ))
+                FormatError::new(
+                    RecordFormatErrorCode::InvalidData,
+                    format!("HITS replay index {index} exceeds error count {error_count}"),
+                    None,
+                )
             })?;
             *bit = true;
         }
         record = Some(decoded);
         Ok(())
     })?;
-    record.ok_or_else(|| {
-        CliError::from(CircuitError::invalid_result_format(
-            "HITS replay line did not contain one record",
-        ))
-    })
+    record.ok_or_else(|| invalid_result_format("HITS replay line did not contain one record"))
 }
 
 fn checked_text_replay_scan_bytes(current: usize, added: usize) -> Result<usize, CliError> {

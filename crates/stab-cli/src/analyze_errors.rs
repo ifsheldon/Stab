@@ -2,7 +2,8 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_core::{ErrorAnalyzerOptions, Probability, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_model::Probability;
 
 use crate::{
     CliError,

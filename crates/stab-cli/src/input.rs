@@ -6,7 +6,7 @@ use std::fs::File;
 #[cfg(test)]
 use std::path::PathBuf;
 
-use stab_records::RecordStreamReadError;
+use stab_records::{FormatError, FormatErrorCode, RecordStreamReadError};
 
 use crate::CliError;
 use crate::io_plan::InputFile;
@@ -17,9 +17,7 @@ use crate::io_plan::InputFile;
 pub(crate) fn record_stream_error(error: RecordStreamReadError, path: Option<&Path>) -> CliError {
     match error {
         RecordStreamReadError::Io(source) => read_stream_error(path, source),
-        RecordStreamReadError::Format(error) => {
-            CliError::from(stab_core::CircuitError::from(error))
-        }
+        RecordStreamReadError::Format(error) => CliError::from(error),
     }
 }
 
@@ -146,9 +144,11 @@ where
                 });
             }
             let chunk = available.get(..consumed).ok_or_else(|| {
-                CliError::from(stab_core::CircuitError::invalid_result_format(format!(
-                    "{kind} byte range was out of bounds"
-                )))
+                CliError::Record(FormatError::new(
+                    FormatErrorCode::InvalidData,
+                    format!("{kind} byte range was out of bounds"),
+                    None,
+                ))
             })?;
             line.extend_from_slice(chunk);
             (consumed, chunk.last() == Some(&b'\n'))

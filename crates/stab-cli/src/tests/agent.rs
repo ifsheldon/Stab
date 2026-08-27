@@ -3,7 +3,8 @@ use std::fs::File;
 
 use clap::CommandFactory;
 use serde_json::Value;
-use stab_core::{CapabilitySet, Gate, RecordFormat};
+use stab_model::Gate;
+use stab_records::RecordFormat;
 use tempfile::tempdir;
 
 use crate::{Cli, run_from};
@@ -246,10 +247,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
     let report = json_stdout(&stdout);
     assert_capability_schema(&report);
     assert_eq!(pointer(&report, "/schema_version"), 4);
-    assert_eq!(
-        pointer(&report, "/stim_compatibility_version"),
-        CapabilitySet::STIM_COMPATIBILITY_VERSION
-    );
+    assert_eq!(pointer(&report, "/stim_compatibility_version"), "1.16.0");
 
     let command_names = pointer(&report, "/commands")
         .as_array()

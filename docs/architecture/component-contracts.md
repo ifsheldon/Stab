@@ -211,7 +211,7 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `error.rs` | Facade compatibility | Losslessly converts model-owned `ModelError`, analysis-owned `AnalysisError`, including complete typed gate-projection failures, plus records and operation resource failures into `CircuitError` without changing established variants or human display. |
 | `lib.rs` | Facade | Root reexports remain curated compatibility adapters and do not determine implementation ownership. |
 
-`stab-cli/src/agent.rs` is a CLI adapter, not a new product component. It discovers commands from Clap, renders core descriptors and identities, reuses retained-handle input admission, and may compose parsing, compilation validation, and estimates. It must not become an alternate source of gate, codec, compiler, backend, or qualification truth.
+`stab-cli/src/agent.rs` is a CLI adapter, not a new product component. It discovers commands from Clap, renders model, record, and engine descriptors and identities directly, reuses retained-handle input admission, and may compose parsing, compilation validation, and request estimates. It must not become an alternate source of gate, codec, compiler, backend, or qualification truth.
 
 Packed storage is available directly from `stab_bits` or through `stab_core::advanced::storage`. Result compatibility adapters are available through `stab_core::advanced::records`; the private facade modules own no second codec implementation. Common models, algebra values, plans, sessions, batches, diagnostics, and policies remain at the facade root.
 

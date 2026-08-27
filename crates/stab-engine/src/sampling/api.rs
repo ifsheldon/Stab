@@ -74,7 +74,7 @@ pub enum SamplingCompileError {
     #[error(transparent)]
     Analysis(#[from] stab_analysis::AnalysisError),
 
-    #[error("{message}")]
+    #[error("cannot compile circuit sampler: {message}")]
     InvalidCircuit { message: String },
 }
 

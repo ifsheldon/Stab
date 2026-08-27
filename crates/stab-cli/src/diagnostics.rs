@@ -5,11 +5,18 @@ use std::path::{Path, PathBuf};
 use clap::ValueEnum;
 use serde::Serialize;
 use serde_json::{Value, json};
-use stab_core::{
-    ByteSpan, CircuitError, DiagnosticSeverity, FormatError, FormatErrorContext, ModelDialect,
-    ModelError, ParseError, ParseErrorContext, ResourceLimitError, RunError,
-    advanced::records::DetsResultType,
+use stab_analysis::{AnalysisError, ResourceLimitError as AnalysisResourceLimitError};
+use stab_engine::{
+    DemError, DemResourceKind, DemResourceLimitError, DemSamplingExecutionError,
+    DetectionCompileError, DetectionError, DetectionExecutionError, DetectionRecordLimitSubject,
+    DetectionResourceKind, DetectionResourceLimitError, RunError, SamplingCompileError,
+    SamplingExecutionError,
 };
+use stab_model::{
+    ByteSpan as ModelByteSpan, DiagnosticSeverity, ModelDialect, ModelError, ParseError,
+    ParseErrorContext, ResourceLimitError as ModelResourceLimitError, ValidationError,
+};
+use stab_records::{ByteSpan as RecordByteSpan, DetsResultType, FormatError, FormatErrorContext};
 use thiserror::Error;
 
 const JSON_DIAGNOSTIC_SCHEMA_VERSION: u8 = 1;
@@ -62,14 +69,41 @@ pub(crate) enum CliError {
     #[error("failed to serialize agent output: {0}")]
     SerializeAgentOutput(serde_json::Error),
 
-    #[error("{0}")]
-    Circuit(#[from] CircuitError),
+    #[error(transparent)]
+    Model(#[from] ModelError),
 
-    #[error("{source}")]
+    #[error(transparent)]
+    Analysis(#[from] AnalysisError),
+
+    #[error("invalid result format data: {0}")]
+    Record(#[from] FormatError),
+
+    #[error(transparent)]
+    SamplingCompile(#[from] SamplingCompileError),
+
+    #[error(transparent)]
+    SamplingExecution(#[from] SamplingExecutionError),
+
+    #[error(transparent)]
+    Detection(#[from] DetectionError),
+
+    #[error(transparent)]
+    DetectionCompile(#[from] DetectionCompileError),
+
+    #[error(transparent)]
+    DetectionExecution(#[from] DetectionExecutionError),
+
+    #[error(transparent)]
+    Dem(#[from] DemError),
+
+    #[error(transparent)]
+    DemSamplingExecution(#[from] DemSamplingExecutionError),
+
+    #[error("invalid result format data: {source}")]
     InputRecord {
         byte_offset: usize,
         #[source]
-        source: CircuitError,
+        source: FormatError,
     },
 
     #[error("{kind} byte offset overflowed")]
@@ -131,12 +165,6 @@ pub(crate) enum CliError {
 
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
-}
-
-impl From<ModelError> for CliError {
-    fn from(error: ModelError) -> Self {
-        Self::Circuit(error.into())
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -283,8 +311,17 @@ struct JsonSpan {
     byte_length: usize,
 }
 
-impl From<ByteSpan> for JsonSpan {
-    fn from(span: ByteSpan) -> Self {
+impl From<ModelByteSpan> for JsonSpan {
+    fn from(span: ModelByteSpan) -> Self {
+        Self {
+            byte_start: span.byte_start(),
+            byte_length: span.byte_length(),
+        }
+    }
+}
+
+impl From<RecordByteSpan> for JsonSpan {
+    fn from(span: RecordByteSpan) -> Self {
         Self {
             byte_start: span.byte_start(),
             byte_length: span.byte_length(),
@@ -304,24 +341,22 @@ fn cli_error_diagnostic(error: &CliError) -> JsonDiagnostic {
             code: parse_error.code().as_str(),
             severity: parse_error.severity().as_str(),
             message: parse_error.message().to_string(),
-            span: shifted_span(parse_error.span(), byte_offset),
+            span: shifted_model_span(parse_error.span(), byte_offset),
             labels: Vec::new(),
             help: cli_error_help(error),
             context: parse_error_context(parse_error),
         };
     }
-    if let Some((resource_error, byte_offset)) = resource_error_with_offset(error) {
+    if let Some(resource) = resource_diagnostic(error) {
         return JsonDiagnostic {
             schema_version: JSON_DIAGNOSTIC_SCHEMA_VERSION,
-            code: resource_error.code(),
+            code: "resource-limit-exceeded",
             severity: DiagnosticSeverity::Error.as_str(),
-            message: resource_error.to_string(),
-            span: resource_error
-                .span()
-                .and_then(|span| shifted_span(span, byte_offset)),
+            message: resource.message(),
+            span: resource.span(),
             labels: Vec::new(),
             help: cli_error_help(error),
-            context: resource_error_context(resource_error),
+            context: resource.context(),
         };
     }
     let (format_error, byte_offset) = format_error_with_offset(error).unzip();
@@ -333,7 +368,7 @@ fn cli_error_diagnostic(error: &CliError) -> JsonDiagnostic {
             .map_or_else(|| error.to_string(), |error| error.message().to_string()),
         span: format_error
             .and_then(FormatError::span)
-            .and_then(|span| shifted_span(span, byte_offset.unwrap_or(0))),
+            .and_then(|span| shifted_record_span(span, byte_offset.unwrap_or(0))),
         labels: Vec::new(),
         help: cli_error_help(error),
         context: format_error.map_or_else(|| cli_error_context(error), format_error_context),
@@ -353,8 +388,18 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::MissingInspectModelType => "missing-inspect-model-type",
         CliError::UnknownInspectModelType { .. } => "unknown-inspect-model-type",
         CliError::SerializeAgentOutput(_) => "agent-output-serialization-failed",
-        CliError::Circuit(error) => circuit_error_code(error),
-        CliError::InputRecord { source, .. } => circuit_error_code(source),
+        CliError::Model(error) => model_error_code(error),
+        CliError::Analysis(error) => analysis_error_code(error),
+        CliError::Record(error) | CliError::InputRecord { source: error, .. } => {
+            error.code().as_str()
+        }
+        CliError::SamplingCompile(error) => sampling_compile_error_code(error),
+        CliError::SamplingExecution(error) => sampling_execution_error_code(error),
+        CliError::Detection(error) => detection_error_code(error),
+        CliError::DetectionCompile(error) => detection_compile_error_code(error),
+        CliError::DetectionExecution(error) => detection_execution_error_code(error),
+        CliError::Dem(error) => dem_error_code(error),
+        CliError::DemSamplingExecution(error) => dem_execution_error_code(error),
         CliError::InputByteOffsetOverflow { .. } => "input-byte-offset-overflow",
         CliError::UnsupportedRepetitionTask { .. } => "unsupported-repetition-task",
         CliError::UnsupportedSurfaceTask { .. } => "unsupported-surface-task",
@@ -384,21 +429,78 @@ fn sample_run_error_code(error: &RunError<std::io::Error>, writes_path: bool) ->
     }
 }
 
-fn circuit_error_code(error: &CircuitError) -> &'static str {
+fn model_error_code(error: &ModelError) -> &'static str {
     match error {
-        CircuitError::Parse(error) => error.code().as_str(),
-        CircuitError::UnknownGate(_) => "unknown-gate",
-        CircuitError::InvalidDomainValue { .. } => "invalid-domain-value",
-        CircuitError::InvalidArgumentCount { .. } => "invalid-gate-argument-count",
-        CircuitError::InvalidArgument { .. } => "invalid-gate-argument",
-        CircuitError::InvalidTarget { .. } => "invalid-gate-target",
-        CircuitError::InvalidTargetCount { .. } => "invalid-gate-target-count",
-        CircuitError::InvalidTableauConversion { .. } => "invalid-tableau-conversion",
-        CircuitError::InvalidCircuitSimplification { .. } => "invalid-circuit-simplification",
-        CircuitError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
-        CircuitError::InvalidResultFormat(error) => error.code().as_str(),
-        CircuitError::ResourceLimit(error) => error.code(),
-        CircuitError::InvalidDetectorErrorModel { .. } => "invalid-detector-error-model",
+        ModelError::Parse(error) => error.code().as_str(),
+        ModelError::ResourceLimit(error) => error.code(),
+        ModelError::Validation(error) => error.code().as_str(),
+    }
+}
+
+fn analysis_error_code(error: &AnalysisError) -> &'static str {
+    match error {
+        AnalysisError::Model(error) => model_error_code(error),
+        AnalysisError::InvalidDomainValue { .. } => "invalid-domain-value",
+        AnalysisError::InvalidTableauConversion { .. } => "invalid-tableau-conversion",
+        AnalysisError::InvalidCircuitSimplification { .. } => "invalid-circuit-simplification",
+        AnalysisError::InvalidResultFormat { .. } => "invalid-result-format",
+        AnalysisError::InvalidDetectorErrorModel { .. } => "invalid-detector-error-model",
+        AnalysisError::ResourceLimit(_) => "resource-limit-exceeded",
+    }
+}
+
+fn sampling_compile_error_code(error: &SamplingCompileError) -> &'static str {
+    match error {
+        SamplingCompileError::Model(error) => model_error_code(error),
+        SamplingCompileError::Analysis(error) => analysis_error_code(error),
+        SamplingCompileError::InvalidCircuit { .. } => "invalid-sampler-compilation",
+    }
+}
+
+fn sampling_execution_error_code(error: &SamplingExecutionError) -> &'static str {
+    match error {
+        SamplingExecutionError::InvalidSweepRecordWidth { .. } => "invalid-result-format",
+        _ => "sampling-execution-failed",
+    }
+}
+
+fn detection_error_code(error: &DetectionError) -> &'static str {
+    match error {
+        DetectionError::Model(error) => model_error_code(error),
+        DetectionError::Analysis(error) => analysis_error_code(error),
+        DetectionError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
+        DetectionError::InvalidResultFormat { .. } => "invalid-result-format",
+        DetectionError::ResourceLimit(_) => "resource-limit-exceeded",
+    }
+}
+
+fn detection_compile_error_code(error: &DetectionCompileError) -> &'static str {
+    match error {
+        DetectionCompileError::InvalidCircuit(error) => detection_error_code(error),
+    }
+}
+
+fn detection_execution_error_code(error: &DetectionExecutionError) -> &'static str {
+    match error {
+        DetectionExecutionError::Conversion(error) => detection_error_code(error),
+        DetectionExecutionError::Sampling(error) => sampling_execution_error_code(error),
+        _ => "detection-execution-failed",
+    }
+}
+
+fn dem_error_code(error: &DemError) -> &'static str {
+    match error {
+        DemError::Model(error) => model_error_code(error),
+        DemError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
+        DemError::InvalidResultFormat { .. } => "invalid-result-format",
+        DemError::ResourceLimit(_) => "resource-limit-exceeded",
+    }
+}
+
+fn dem_execution_error_code(error: &DemSamplingExecutionError) -> &'static str {
+    match error {
+        DemSamplingExecutionError::InvalidRequest(error) => dem_error_code(error),
+        _ => "dem-sampling-execution-failed",
     }
 }
 
@@ -438,8 +540,23 @@ fn cli_error_context(error: &CliError) -> Value {
             "path": path.to_string_lossy(),
         }),
         CliError::SerializeAgentOutput(_) => json!({}),
-        CliError::Circuit(error) => circuit_error_context(error),
-        CliError::InputRecord { source, .. } => circuit_error_context(source),
+        CliError::Model(error) => model_error_context(error),
+        CliError::Analysis(error) => analysis_error_context(error),
+        CliError::Record(error) | CliError::InputRecord { source: error, .. } => {
+            format_error_context(error)
+        }
+        CliError::SamplingCompile(error) => sampling_compile_error_context(error),
+        CliError::SamplingExecution(_) => json!({}),
+        CliError::Detection(error) => detection_error_context(error),
+        CliError::DetectionCompile(error) => match error {
+            DetectionCompileError::InvalidCircuit(error) => detection_error_context(error),
+        },
+        CliError::DetectionExecution(error) => detection_execution_error_context(error),
+        CliError::Dem(error) => dem_error_context(error),
+        CliError::DemSamplingExecution(error) => match error {
+            DemSamplingExecutionError::InvalidRequest(error) => dem_error_context(error),
+            _ => json!({}),
+        },
         CliError::InputByteOffsetOverflow { kind } => json!({
             "input_kind": kind,
         }),
@@ -507,40 +624,66 @@ fn sample_run_error_context(error: &RunError<std::io::Error>, path: Option<&Path
 
 fn format_error_with_offset(error: &CliError) -> Option<(&FormatError, usize)> {
     match error {
-        CliError::Circuit(error) => error.format_error().map(|error| (error, 0)),
+        CliError::Record(error) => Some((error, 0)),
         CliError::InputRecord {
             byte_offset,
             source,
-        } => source.format_error().map(|error| (error, *byte_offset)),
+        } => Some((source, *byte_offset)),
         _ => None,
     }
 }
 
 fn parse_error_with_offset(error: &CliError) -> Option<(&ParseError, usize)> {
+    model_error(error)?.parse_error().map(|error| (error, 0))
+}
+
+fn model_error(error: &CliError) -> Option<&ModelError> {
     match error {
-        CliError::Circuit(error) => error.parse_error().map(|error| (error, 0)),
-        CliError::InputRecord {
-            byte_offset,
-            source,
-        } => source.parse_error().map(|error| (error, *byte_offset)),
+        CliError::Model(error) => Some(error),
+        CliError::Analysis(error) => model_error_from_analysis(error),
+        CliError::SamplingCompile(error) => match error {
+            SamplingCompileError::Model(error) => Some(error),
+            SamplingCompileError::Analysis(error) => model_error_from_analysis(error),
+            SamplingCompileError::InvalidCircuit { .. } => None,
+        },
+        CliError::Detection(error) => model_error_from_detection(error),
+        CliError::DetectionCompile(DetectionCompileError::InvalidCircuit(error)) => {
+            model_error_from_detection(error)
+        }
+        CliError::DetectionExecution(DetectionExecutionError::Conversion(error)) => {
+            model_error_from_detection(error)
+        }
+        CliError::Dem(error) => model_error_from_dem(error),
+        CliError::DemSamplingExecution(DemSamplingExecutionError::InvalidRequest(error)) => {
+            model_error_from_dem(error)
+        }
         _ => None,
     }
 }
 
-fn resource_error_with_offset(error: &CliError) -> Option<(&ResourceLimitError, usize)> {
+fn model_error_from_analysis(error: &AnalysisError) -> Option<&ModelError> {
     match error {
-        CliError::Circuit(error) => error.resource_limit_error().map(|error| (error, 0)),
-        CliError::InputRecord {
-            byte_offset,
-            source,
-        } => source
-            .resource_limit_error()
-            .map(|error| (error, *byte_offset)),
+        AnalysisError::Model(error) => Some(error),
         _ => None,
     }
 }
 
-fn shifted_span(span: ByteSpan, byte_offset: usize) -> Option<JsonSpan> {
+fn model_error_from_detection(error: &DetectionError) -> Option<&ModelError> {
+    match error {
+        DetectionError::Model(error) => Some(error),
+        DetectionError::Analysis(error) => model_error_from_analysis(error),
+        _ => None,
+    }
+}
+
+fn model_error_from_dem(error: &DemError) -> Option<&ModelError> {
+    match error {
+        DemError::Model(error) => Some(error),
+        _ => None,
+    }
+}
+
+fn shifted_model_span(span: ModelByteSpan, byte_offset: usize) -> Option<JsonSpan> {
     let byte_start = span.byte_start().checked_add(byte_offset)?;
     Some(JsonSpan {
         byte_start,
@@ -548,17 +691,32 @@ fn shifted_span(span: ByteSpan, byte_offset: usize) -> Option<JsonSpan> {
     })
 }
 
-fn circuit_error_context(error: &CircuitError) -> Value {
+fn shifted_record_span(span: RecordByteSpan, byte_offset: usize) -> Option<JsonSpan> {
+    let byte_start = span.byte_start().checked_add(byte_offset)?;
+    Some(JsonSpan {
+        byte_start,
+        byte_length: span.byte_length(),
+    })
+}
+
+fn model_error_context(error: &ModelError) -> Value {
     match error {
-        CircuitError::Parse(error) => parse_error_context(error),
-        CircuitError::UnknownGate(gate) => json!({
+        ModelError::Parse(error) => parse_error_context(error),
+        ModelError::ResourceLimit(error) => model_resource_context(error),
+        ModelError::Validation(error) => validation_error_context(error),
+    }
+}
+
+fn validation_error_context(error: &ValidationError) -> Value {
+    match error {
+        ValidationError::UnknownGate(gate) => json!({
             "gate": gate,
         }),
-        CircuitError::InvalidDomainValue { kind, value } => json!({
+        ValidationError::InvalidDomainValue { kind, value } => json!({
             "domain": kind,
             "value": value,
         }),
-        CircuitError::InvalidArgumentCount {
+        ValidationError::InvalidArgumentCount {
             gate,
             expected,
             actual,
@@ -567,24 +725,77 @@ fn circuit_error_context(error: &CircuitError) -> Value {
             "expected": expected,
             "actual": actual,
         }),
-        CircuitError::InvalidArgument { gate, argument } => json!({
+        ValidationError::InvalidArgument { gate, argument } => json!({
             "gate": gate,
             "argument": argument,
         }),
-        CircuitError::InvalidTarget { gate, target } => json!({
+        ValidationError::InvalidTarget { gate, target } => json!({
             "gate": gate,
             "target": target,
         }),
-        CircuitError::InvalidTargetCount { gate, count } => json!({
+        ValidationError::InvalidTargetCount { gate, count } => json!({
             "gate": gate,
             "count": count,
         }),
-        CircuitError::InvalidTableauConversion { .. }
-        | CircuitError::InvalidCircuitSimplification { .. }
-        | CircuitError::InvalidSamplerCompilation { .. }
-        | CircuitError::InvalidDetectorErrorModel { .. } => json!({}),
-        CircuitError::InvalidResultFormat(error) => format_error_context(error),
-        CircuitError::ResourceLimit(error) => resource_error_context(error),
+        ValidationError::DetectorIndexOutOfRange {
+            index,
+            detector_count,
+        } => json!({
+            "index": index,
+            "detector_count": detector_count,
+        }),
+        _ => json!({}),
+    }
+}
+
+fn analysis_error_context(error: &AnalysisError) -> Value {
+    match error {
+        AnalysisError::Model(error) => model_error_context(error),
+        AnalysisError::InvalidDomainValue { kind, value } => json!({
+            "domain": kind,
+            "value": value,
+        }),
+        AnalysisError::ResourceLimit(error) => analysis_resource_context(error),
+        _ => json!({}),
+    }
+}
+
+fn sampling_compile_error_context(error: &SamplingCompileError) -> Value {
+    match error {
+        SamplingCompileError::Model(error) => model_error_context(error),
+        SamplingCompileError::Analysis(error) => analysis_error_context(error),
+        SamplingCompileError::InvalidCircuit { .. } => json!({}),
+    }
+}
+
+fn detection_error_context(error: &DetectionError) -> Value {
+    match error {
+        DetectionError::Model(error) => model_error_context(error),
+        DetectionError::Analysis(error) => analysis_error_context(error),
+        DetectionError::ResourceLimit(error) => detection_resource_context(error),
+        _ => json!({}),
+    }
+}
+
+fn detection_execution_error_context(error: &DetectionExecutionError) -> Value {
+    match error {
+        DetectionExecutionError::Conversion(error) => detection_error_context(error),
+        DetectionExecutionError::Sampling(SamplingExecutionError::InvalidSweepRecordWidth {
+            expected,
+            actual,
+        }) => json!({
+            "expected_bits": expected,
+            "actual_bits": actual,
+        }),
+        _ => json!({}),
+    }
+}
+
+fn dem_error_context(error: &DemError) -> Value {
+    match error {
+        DemError::Model(error) => model_error_context(error),
+        DemError::ResourceLimit(error) => dem_resource_context(error),
+        _ => json!({}),
     }
 }
 
@@ -662,10 +873,153 @@ fn parse_error_context(error: &ParseError) -> Value {
     }
 }
 
-fn resource_error_context(error: &ResourceLimitError) -> Value {
+enum ResourceDiagnostic<'a> {
+    Model(&'a ModelResourceLimitError),
+    Analysis(&'a AnalysisResourceLimitError),
+    Detection(&'a DetectionResourceLimitError),
+    Dem(&'a DemResourceLimitError),
+}
+
+impl ResourceDiagnostic<'_> {
+    fn message(&self) -> String {
+        match self {
+            Self::Model(error) => error.to_string(),
+            Self::Analysis(error) => error.to_string(),
+            Self::Detection(error) => error.to_string(),
+            Self::Dem(error) => error.to_string(),
+        }
+    }
+
+    fn span(&self) -> Option<JsonSpan> {
+        match self {
+            Self::Model(error) => shifted_model_span(error.span(), 0),
+            Self::Analysis(_) | Self::Detection(_) | Self::Dem(_) => None,
+        }
+    }
+
+    fn context(&self) -> Value {
+        match self {
+            Self::Model(error) => model_resource_context(error),
+            Self::Analysis(error) => analysis_resource_context(error),
+            Self::Detection(error) => detection_resource_context(error),
+            Self::Dem(error) => dem_resource_context(error),
+        }
+    }
+}
+
+fn resource_diagnostic(error: &CliError) -> Option<ResourceDiagnostic<'_>> {
+    if let Some(error) = model_error(error).and_then(ModelError::resource_limit_error) {
+        return Some(ResourceDiagnostic::Model(error));
+    }
+    if let Some(error) = analysis_error(error).and_then(AnalysisError::resource_limit_error) {
+        return Some(ResourceDiagnostic::Analysis(error));
+    }
+    if let Some(error) = detection_resource_error(error) {
+        return Some(ResourceDiagnostic::Detection(error));
+    }
+    dem_resource_error(error).map(ResourceDiagnostic::Dem)
+}
+
+fn analysis_error(error: &CliError) -> Option<&AnalysisError> {
+    match error {
+        CliError::Analysis(error) => Some(error),
+        CliError::SamplingCompile(SamplingCompileError::Analysis(error)) => Some(error),
+        CliError::Detection(DetectionError::Analysis(error))
+        | CliError::DetectionCompile(DetectionCompileError::InvalidCircuit(
+            DetectionError::Analysis(error),
+        ))
+        | CliError::DetectionExecution(DetectionExecutionError::Conversion(
+            DetectionError::Analysis(error),
+        )) => Some(error),
+        _ => None,
+    }
+}
+
+fn detection_resource_error(error: &CliError) -> Option<&DetectionResourceLimitError> {
+    match error {
+        CliError::Detection(DetectionError::ResourceLimit(error))
+        | CliError::DetectionCompile(DetectionCompileError::InvalidCircuit(
+            DetectionError::ResourceLimit(error),
+        ))
+        | CliError::DetectionExecution(DetectionExecutionError::Conversion(
+            DetectionError::ResourceLimit(error),
+        )) => Some(error),
+        _ => None,
+    }
+}
+
+fn dem_resource_error(error: &CliError) -> Option<&DemResourceLimitError> {
+    match error {
+        CliError::Dem(DemError::ResourceLimit(error))
+        | CliError::DemSamplingExecution(DemSamplingExecutionError::InvalidRequest(
+            DemError::ResourceLimit(error),
+        )) => Some(error),
+        _ => None,
+    }
+}
+
+fn model_resource_context(error: &ModelResourceLimitError) -> Value {
     json!({
         "operation": error.operation().as_str(),
         "resource": error.resource().as_str(),
+        "actual": error.actual(),
+        "limit": error.limit(),
+    })
+}
+
+fn analysis_resource_context(error: &AnalysisResourceLimitError) -> Value {
+    json!({
+        "operation": error.operation().as_str(),
+        "resource": error.resource().as_str(),
+        "actual": error.actual(),
+        "limit": error.limit(),
+    })
+}
+
+fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
+    let resource = match error.kind() {
+        DetectionResourceKind::RecordBits(_) => "record-bits",
+        DetectionResourceKind::RepeatNesting => "repeat-nesting",
+        DetectionResourceKind::RepeatCount => "repeat-count",
+        DetectionResourceKind::ExpandedInstructions => "expanded-operations",
+        DetectionResourceKind::RepeatIterations => "repeat-iterations",
+        DetectionResourceKind::CompiledTerms => "compiled-terms",
+        DetectionResourceKind::CompiledBytes => "materialized-bytes",
+    };
+    let subject = match error.kind() {
+        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::DetectionRecord) => {
+            Some("detection-record")
+        }
+        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::MeasurementRecord) => {
+            Some("measurement-record")
+        }
+        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::SweepRecord) => {
+            Some("sweep-record")
+        }
+        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::ObservableCount) => {
+            Some("observable-count")
+        }
+        _ => None,
+    };
+    json!({
+        "operation": "detection-conversion",
+        "resource": resource,
+        "subject": subject,
+        "actual": error.actual(),
+        "limit": error.limit(),
+    })
+}
+
+fn dem_resource_context(error: &DemResourceLimitError) -> Value {
+    let resource = match error.kind() {
+        DemResourceKind::SampledErrorApplications => "sampled-error-applications",
+        DemResourceKind::ReplayWorkUnits => "replay-work-units",
+        DemResourceKind::MaterializedUnits => "materialized-units",
+        DemResourceKind::MaterializedBytes => "materialized-bytes",
+    };
+    json!({
+        "operation": "detector-error-model-sampling",
+        "resource": resource,
         "actual": error.actual(),
         "limit": error.limit(),
     })

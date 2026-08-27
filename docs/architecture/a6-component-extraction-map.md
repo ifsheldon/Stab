@@ -35,7 +35,7 @@ stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
-stab-cli -> stab-core
+stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 ```
 
 The policy reserves the future `stab-decoder` package name, but A6 does not claim that crate or an edge to it. A7 must add the implementation and update the graph from source-current Cargo metadata.
@@ -230,7 +230,7 @@ The facade does not retain implementation modules after their owner moves.
 | `stab-analysis` | Stable | No SIMD feature. |
 | `stab-engine` | Scalar | Does not depend on the raw kernel crate and keeps explicit `PortableSimd` requests unavailable until a later packed-frame implementation supplies a distinct execution plan. |
 | `stab-core` | Scalar by default | Forwards the additive feature to bits and algebra only; it does not reinterpret build-time leaf acceleration as sampling-backend selection. |
-| `stab-cli`, `stab-oracle`, `stab-bench` | Scalar by default | Expose an explicit `portable-simd` feature that forwards to `stab-core`; current qualification builds select scalar explicitly and the A6 diagnostic selects each variant independently. |
+| `stab-cli`, `stab-oracle`, `stab-bench` | Scalar by default | `stab-cli` forwards its optional feature only to the packed-bit owner it consumes directly; oracle and benchmark packages may also enable facade feature paths needed by their direct consumers. Current qualification builds select scalar explicitly and the A6 diagnostic selects each variant independently. |
 
 There is no `scalar` feature. Scalar behavior is defined by the absence of `portable-simd`.
 

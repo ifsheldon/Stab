@@ -40,14 +40,18 @@ use help::{HelpArgs, run_help};
 use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo};
 use sample_dem::{SampleDemArgs, run_sample_dem};
-use stab_core::{
-    BitPlane64Batch, Circuit, CircuitError, CircuitItem, CircuitResult, CodeDistance,
-    ColorCodeParams, ColorCodeTask, GeneratedCircuit, MeasurementBatchView, MeasurementSink,
-    Probability, RandomPolicy, RecordFormat, ReferenceSampleMode, RepetitionCodeParams,
-    RepetitionCodeTask, RoundCount, RunError, SamplingCompiler, SamplingSession, Seed, ShotCount,
-    SurfaceCodeParams, SurfaceCodeTask,
-    advanced::records::{MeasureRecordWriter, validate_ptb64_shot_count},
+use stab_analysis::{
+    CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
+    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
+};
+use stab_engine::{
+    RandomPolicy, ReferenceSampleMode, RunError, SamplingCompiler, SamplingSession, Seed, ShotCount,
+};
+use stab_model::{Circuit, CircuitItem, ModelResult, Probability};
+use stab_records::{
+    BitPlane64Batch, MeasureRecordWriter, MeasurementBatchView, MeasurementSink, RecordFormat,
+    validate_ptb64_shot_count,
 };
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
@@ -205,18 +209,17 @@ enum RecordFormatArg {
 
 impl RecordFormatArg {
     fn name(self) -> &'static str {
-        self.record_format()
-            .map_or("stim", stab_core::RecordFormat::as_str)
+        self.record_format().map_or("stim", RecordFormat::as_str)
     }
 
-    fn record_format(self) -> Option<stab_core::RecordFormat> {
+    fn record_format(self) -> Option<RecordFormat> {
         match self {
-            Self::ZeroOne => Some(stab_core::RecordFormat::ZeroOne),
-            Self::B8 => Some(stab_core::RecordFormat::B8),
-            Self::R8 => Some(stab_core::RecordFormat::R8),
-            Self::Ptb64 => Some(stab_core::RecordFormat::Ptb64),
-            Self::Hits => Some(stab_core::RecordFormat::Hits),
-            Self::Dets => Some(stab_core::RecordFormat::Dets),
+            Self::ZeroOne => Some(RecordFormat::ZeroOne),
+            Self::B8 => Some(RecordFormat::B8),
+            Self::R8 => Some(RecordFormat::R8),
+            Self::Ptb64 => Some(RecordFormat::Ptb64),
+            Self::Hits => Some(RecordFormat::Hits),
+            Self::Dets => Some(RecordFormat::Dets),
             Self::Stim => None,
         }
     }
@@ -251,25 +254,23 @@ enum SampleOutFormatArg {
 }
 
 impl SampleOutFormatArg {
-    fn record_format(self) -> stab_core::RecordFormat {
+    fn record_format(self) -> RecordFormat {
         match self {
-            Self::ZeroOne => stab_core::RecordFormat::ZeroOne,
-            Self::B8 => stab_core::RecordFormat::B8,
-            Self::R8 => stab_core::RecordFormat::R8,
-            Self::Ptb64 => stab_core::RecordFormat::Ptb64,
-            Self::Hits => stab_core::RecordFormat::Hits,
-            Self::Dets => stab_core::RecordFormat::Dets,
+            Self::ZeroOne => RecordFormat::ZeroOne,
+            Self::B8 => RecordFormat::B8,
+            Self::R8 => RecordFormat::R8,
+            Self::Ptb64 => RecordFormat::Ptb64,
+            Self::Hits => RecordFormat::Hits,
+            Self::Dets => RecordFormat::Dets,
         }
     }
 
-    fn stream_writer(self) -> Result<Option<MeasureRecordWriter>, CircuitError> {
+    fn stream_writer(self) -> Result<Option<MeasureRecordWriter>, stab_records::FormatError> {
         let format = self.record_format();
         if format == RecordFormat::Ptb64 {
             return Ok(None);
         }
-        MeasureRecordWriter::try_new(format)
-            .map(Some)
-            .map_err(CircuitError::from)
+        MeasureRecordWriter::try_new(format).map(Some)
     }
 }
 
@@ -753,8 +754,8 @@ fn parse_color_task(task: &str) -> Result<ColorCodeTask, CliError> {
     }
 }
 
-fn probability_arg(value: f64) -> CircuitResult<Probability> {
-    Ok(Probability::try_new(value)?)
+fn probability_arg(value: f64) -> ModelResult<Probability> {
+    Probability::try_new(value)
 }
 
 fn write_probability_header(out: &mut String, name: &str, value: Probability) {
@@ -855,7 +856,7 @@ where
     let circuit = Circuit::from_stim_bytes(&input_bytes)?;
     let plan = SamplingCompiler::new()
         .compile(&circuit)
-        .map_err(CircuitError::from)?;
+        .map_err(CliError::from)?;
     let skip_reference_sample = args.skip_reference_sample || args.frame0;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
         legacy_tableau_visible_measurements(&circuit)?
@@ -872,8 +873,8 @@ where
     };
     let mut session = plan
         .session_with_reference_mode(random_policy, reference_mode)
-        .map_err(CircuitError::from)?;
-    let shots = ShotCount::try_from(args.shots).map_err(CircuitError::from)?;
+        .map_err(CliError::from)?;
+    let shots = ShotCount::try_from(args.shots).map_err(CliError::from)?;
     let writer = args.out_format.stream_writer()?;
     let mut outputs = io.activate()?;
     if let Some(mut output) = outputs.take(FileRole::Output) {
