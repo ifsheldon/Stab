@@ -162,7 +162,7 @@ minimum_tier = "pr"
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
-name = "parity::tests::pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit"
+name = "parity::tests::pinned_stim::pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit"
 minimum_tier = "pr"
 
 [[families]]

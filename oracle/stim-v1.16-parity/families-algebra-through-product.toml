@@ -397,7 +397,7 @@ minimum_tier = "pr"
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
-name = "parity::tests::pinned_stim_circuit_equality_retains_orphaned_repeat_storage"
+name = "parity::tests::pinned_stim::pinned_stim_circuit_equality_retains_orphaned_repeat_storage"
 minimum_tier = "pr"
 
 [[families]]
@@ -421,7 +421,7 @@ minimum_tier = "pr"
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
-name = "parity::tests::pinned_stim_circuit_equality_ignores_repeat_tags"
+name = "parity::tests::pinned_stim::pinned_stim_circuit_equality_ignores_repeat_tags"
 minimum_tier = "pr"
 
 [[families]]
@@ -798,9 +798,9 @@ name = "gate::semantic_contract::tests::sampling_and_detection_execute_every_dec
 minimum_tier = "pr"
 
 [[families]]
-id = "detection.sweep-and-feedback-common"
+id = "detection.sweep-feedback-and-folded-conversion"
 area = "detection"
-contract = "In-memory measurement conversion accepts omitted all-false or explicit sweep records and preserves the implemented selected feedback semantics."
+contract = "Measurement conversion accepts omitted all-false and explicit sweep records, executes every legal sweep and measurement-record controlled Pauli orientation, preserves all-classical CZ no-ops, and keeps record offsets, detector order, record and Pauli observable parity, sweep correction in both reference modes, and reference correction across compact nested repeats."
 stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc", "src/stim/cmd/command_m2d.test.cc"]
 status = "done"
 owner = "stab-engine"
@@ -810,17 +810,8 @@ status = "verified"
 package = "stab-engine"
 kind = "test"
 target = "lean_parity_contracts"
-name = "detection_sweep_and_feedback_common_contract"
+name = "detection_sweep_feedback_and_folded_conversion_contract"
 minimum_tier = "pr"
-
-[[families]]
-id = "detection.sweep-and-feedback-remaining"
-area = "detection"
-contract = "Measurement conversion honors every remaining legal sweep-conditioned and repeat-contained feedback shape supported by Stim."
-stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc", "src/stim/cmd/command_m2d.test.cc"]
-status = "missing"
-owner = "stab-engine"
-milestone = "P4"
 
 [[families]]
 id = "gate-catalog.catalog-membership"

@@ -367,7 +367,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "cli-baseline: Stab and pinned Stim run as bounded subprocesses with identical stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight must match the frozen pre-A4 unrotated-surface d3/r3 b8 witness",
         ),
         "m8-sample-high-repeat-contract" => Some(
-            "cli-baseline: Stab and pinned Stim run as bounded subprocesses with identical stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight must match the frozen pre-A4 repeat-heavy b8 witness, while optimized loop folding remains a logged M8 spec gap",
+            "cli-baseline: Stab and pinned Stim run as bounded subprocesses with identical stdin, arguments, iteration policy, and discarded stdout; an untimed Stab preflight must match the frozen pre-A4 repeat-heavy b8 witness; this one-shot normal-reference row exercises compact repeat execution but not the separate reference-sample loop policy",
         ),
         _ => None,
     }

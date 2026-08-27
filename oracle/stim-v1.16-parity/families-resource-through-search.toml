@@ -177,19 +177,19 @@ minimum_tier = "pr"
 [[families]]
 id = "resource-safety.detection-compile-limits"
 area = "resource-safety"
-contract = "Detection conversion compilation admits exact repeat and expanded-instruction limits and rejects the first excess with the corresponding typed resource kind."
+contract = "Compact detection conversion compilation admits exact aggregate repeat-iteration, expanded-instruction, retained-term, retained-byte, and record-width limits and rejects the first excess with the corresponding typed resource kind without a per-block syntax cap."
 stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc"]
 status = "divergence"
 owner = "stab-engine"
 divergence_kind = "resource-limit"
-rationale = "Stab gives detection conversion explicit repeat-count and expanded-instruction admission boundaries."
+rationale = "Stab gives compact detection conversion explicit aggregate work and retained-storage admission boundaries without rejecting a folded circuit solely because one repeat count exceeds 100000."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-engine"
 kind = "test"
 target = "canonical_owner_evidence"
-name = "a2_detection_work_policy_admission"
+name = "a2_detection_compile_limits_are_independent_and_atomic"
 minimum_tier = "pr"
 
 [[families]]
@@ -449,7 +449,7 @@ minimum_tier = "pr"
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
-name = "parity::tests::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
+name = "parity::tests::pinned_stim::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
 minimum_tier = "pr"
 
 [[families]]
@@ -473,7 +473,7 @@ minimum_tier = "pr"
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
-name = "parity::tests::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
+name = "parity::tests::pinned_stim::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
 minimum_tier = "pr"
 
 [[families]]
@@ -731,11 +731,18 @@ rationale = "Stim does not promise this identity itself; Stab requires determini
 [[families]]
 id = "sampling.loop-folding-selection"
 area = "sampling"
-contract = "The sample loop-folding option changes the compilation strategy while preserving output semantics instead of being an accepted no-op."
+contract = "The sample loop-folding option authorizes exact-recurrence reuse only when estimated saved stabilizer work pays for bounded snapshot capture and comparison, and otherwise falls back to iteration while preserving output semantics instead of being an accepted no-op."
 stim_refs = ["src/stim/cmd/command_sample.cc", "src/stim/cmd/command_sample.test.cc"]
-status = "missing"
+status = "done"
 owner = "stab-engine"
-milestone = "P4"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "lib"
+target = "stab_engine"
+name = "sampling::tests::reference_loop_policy_reuses_only_proven_invariant_work"
+minimum_tier = "pr"
 
 [[families]]
 id = "sampling.noise-complete"
