@@ -3,7 +3,9 @@
     reason = "hostile-nesting regressions use direct fixture assertions"
 )]
 
-use stab_model::{Circuit, ModelError, RepeatBlock, RepeatCount, ValidationError};
+use stab_model::{
+    AbsoluteTolerance, Circuit, ModelError, RepeatBlock, RepeatCount, ValidationError,
+};
 
 /// WS6 item 7: deeply nested API-built circuits must clone, compare, and drop
 /// without exhausting the stack; parse-path nesting is capped, so the
@@ -14,7 +16,8 @@ fn deeply_programmatic_circuit_clones_compares_and_drops_on_a_small_stack() {
     std::thread::Builder::new()
         .stack_size(64 * 1024)
         .spawn(|| {
-            let mut body = Circuit::new();
+            let mut body = Circuit::from_stim_str("X_ERROR(0.1) 0\n").expect("reference leaf");
+            let mut different = Circuit::from_stim_str("X_ERROR(0.2) 0\n").expect("different leaf");
             for _ in 0..4_096 {
                 let mut outer = Circuit::new();
                 outer.append_repeat_block(RepeatBlock::new(
@@ -23,11 +26,29 @@ fn deeply_programmatic_circuit_clones_compares_and_drops_on_a_small_stack() {
                     None,
                 ));
                 body = outer;
+
+                let mut different_outer = Circuit::new();
+                different_outer.append_repeat_block(RepeatBlock::new(
+                    RepeatCount::try_new(1).expect("unit repeat count"),
+                    different,
+                    None,
+                ));
+                different = different_outer;
             }
             let cloned = body.clone();
             assert_eq!(cloned, body);
+            assert!(cloned.approx_equals(
+                &body,
+                AbsoluteTolerance::try_new(0.0).expect("exact tolerance")
+            ));
+            assert_ne!(body, different);
+            assert!(!body.approx_equals(
+                &different,
+                AbsoluteTolerance::try_new(0.01).expect("narrow tolerance")
+            ));
             drop(cloned);
             drop(body);
+            drop(different);
         })
         .expect("spawn small-stack circuit worker")
         .join()

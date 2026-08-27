@@ -1,0 +1,235 @@
+## Transform parity families.
+
+[[families]]
+id = "transforms.circuit-decomposition-common"
+area = "transforms"
+contract = "Circuit decomposition lowers the currently supported ISWAP, MPP, pair-measurement, and metadata-preserving common families."
+stim_refs = ["src/stim/circuit/gate_decomposition.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_circuit_api_decomposed_transform"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-decomposition-remaining"
+area = "transforms"
+contract = "Circuit decomposition lowers every Stim-decomposable gate and legal classical target shape beyond the owned common families, including XCZ and YCZ feedback, while preserving tags, noise, measurements, and flows."
+stim_refs = ["src/stim/circuit/gate_decomposition.test.cc", "src/stim/util_top/simplified_circuit.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.circuit-flattening"
+area = "transforms"
+contract = "Circuit flattening removes repeat blocks and applies coordinate shifts while preserving canonical instruction order and tags."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_circuit_api_flattened_transform"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-simplification-common"
+area = "transforms"
+contract = "Circuit simplification rewrites the implemented single- and two-qubit Clifford families into the H, S, CX, M, and R base while preserving repeats and unsupported instructions."
+stim_refs = ["src/stim/util_top/simplified_circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_simplify"
+name = "cq2_circuit_api_simplified_contract_matches_selected_stim_scope"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-simplification-remaining"
+area = "transforms"
+contract = "Circuit simplification lowers every remaining Stim-supported instruction and target shape into the declared base set while preserving semantics and metadata."
+stim_refs = ["src/stim/util_top/simplified_circuit.test.cc"]
+coverage = ["capability:circuit-simplification"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.circuit-tag-removal"
+area = "transforms"
+contract = "Circuit tag removal recursively erases instruction and repeat tags without mutating the source or fusing instruction boundaries."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "gate_and_tag_contracts"
+name = "circuit_without_tags_is_recursive_non_mutating_and_preserves_boundaries"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-unitary-inverse-common"
+area = "transforms"
+contract = "Unitary circuit inversion reverses instruction order and replaces supported unitary gates with their pinned Stim inverse while preserving qubit order semantics."
+stim_refs = ["src/stim/util_top/circuit_inverse_unitary.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_inverse"
+name = "circuit_inverse_unitary_matches_stim_example"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-unitary-inverse-remaining"
+area = "transforms"
+contract = "Unitary circuit inversion handles every Stim-legal unitary circuit annotation and instruction, including TICK and preserved leading QUBIT_COORDS metadata."
+stim_refs = ["src/stim/util_top/circuit_inverse_unitary.test.cc", "src/stim/circuit/circuit.pybind.cc"]
+coverage = ["capability:circuit-unitary-inverse"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.dem-tag-removal"
+area = "transforms"
+contract = "DEM tag removal recursively erases instruction and repeat tags without changing detector error model semantics."
+stim_refs = ["src/stim/dem/detector_error_model.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_transforms"
+name = "cq2_dem_compact_transform_contract_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.feedback-inlining-common"
+area = "transforms"
+contract = "Feedback inlining preserves Stim-accepted demolition, interleaved-order, MPP, CX/CY record-control, bounded-loop, and selected nested-repeat cases."
+stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_feedback::tests::feedback_inlining_common_semantic_matrix_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.feedback-inlining-remaining"
+area = "transforms"
+contract = "Feedback inlining supports every remaining legal measurement-record control and compact repeat shape without selected-control or bounded-expansion gaps."
+stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.inverse-qec-common"
+area = "transforms"
+contract = "Inverse-QEC construction supports the implemented unitary, reset, measurement, measure-reset, pair-product, MPP, MPAD, detector-flow, observable, and selected-noise packets."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_inverse_qec"
+name = "inverse_qec_common_semantic_matrix_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.inverse-qec-remaining"
+area = "transforms"
+contract = "Inverse-QEC construction supports every remaining Stim flow-driven reset, measurement, detector, observable, noise, feedback, and duplicate-target surface."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.qasm-quirk-crumble-exports"
+area = "transforms"
+contract = "Circuit export produces QASM, Quirk URLs, and Crumble URLs."
+stim_refs = ["src/stim/circuit/circuit2.pybind.cc"]
+status = "deferred"
+rationale = "QASM, Quirk, and Crumble exports are explicitly deferred and do not include ordinary .stim, .dem, or result-format serialization."
+
+[[families]]
+id = "transforms.remaining-gate-target-surface"
+area = "transforms"
+contract = "Each in-scope circuit transform accepts every Stim-legal instruction and target shape not covered by its dedicated family row and rejects only the same invalid or semantically unsupported inputs."
+stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/util_top/simplified_circuit.test.cc"]
+coverage = ["consumer:transform"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.time-reversal-for-flows-common"
+area = "transforms"
+contract = "Time reversal for flows supports the implemented folded unitary, measurement-rich, detector, observable, coordinate, product-measurement, MPAD, ordinary-noise, generated-code, and bounded-repeat workflows."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_inverse_qec"
+name = "time_reversal_for_flows_common_semantic_matrix_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.time-reversal-for-flows-remaining"
+area = "transforms"
+contract = "Time reversal for flows supports every remaining legal QEC circuit, feedback, heralded-record, duplicate-target, and compact-repeat surface and returns exact transformed flows."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "missing"
+owner = "stab-analysis"
+milestone = "P5"
+
+[[families]]
+id = "transforms.without-noise"
+area = "transforms"
+contract = "Noise removal erases noise while preserving annotations, records, tags, and heralded measurement padding."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "canonical_owner_evidence"
+name = "cq2_circuit_api_without_noise_transform"
+minimum_tier = "pr"

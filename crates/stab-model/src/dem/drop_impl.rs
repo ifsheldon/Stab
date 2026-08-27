@@ -52,27 +52,6 @@ pub(super) fn clone_model(model: &DetectorErrorModel) -> DetectorErrorModel {
     }
 }
 
-pub(super) fn models_equal(left: &DetectorErrorModel, right: &DetectorErrorModel) -> bool {
-    let mut pending = vec![(left.items.as_slice(), right.items.as_slice())];
-    while let Some((left_items, right_items)) = pending.pop() {
-        if left_items.len() != right_items.len() {
-            return false;
-        }
-        for (left_item, right_item) in left_items.iter().zip(right_items) {
-            match (left_item, right_item) {
-                (DemItem::Instruction(left), DemItem::Instruction(right)) if left == right => {}
-                (DemItem::RepeatBlock(left), DemItem::RepeatBlock(right))
-                    if left.repeat_count == right.repeat_count && left.tag == right.tag =>
-                {
-                    pending.push((left.body.items.as_slice(), right.body.items.as_slice()));
-                }
-                _ => return false,
-            }
-        }
-    }
-    true
-}
-
 pub(super) fn drop_items(items: &mut Vec<DemItem>) {
     drop_items_bounded(items, 0);
 }

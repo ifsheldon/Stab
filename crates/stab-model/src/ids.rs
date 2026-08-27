@@ -78,6 +78,26 @@ impl CircuitTick {
     }
 }
 
+/// A finite, nonnegative absolute tolerance for approximate model comparison.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub struct AbsoluteTolerance(f64);
+
+impl AbsoluteTolerance {
+    pub fn try_new(value: f64) -> ModelResult<Self> {
+        if !value.is_finite() || value < 0.0 {
+            return Err(ModelError::invalid_domain_value(
+                "absolute tolerance",
+                value,
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub fn get(self) -> f64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct RepeatCount(u64);
 

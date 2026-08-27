@@ -274,6 +274,90 @@ fn pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug() {
 }
 
 #[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_circuit_equality_ignores_repeat_tags() {
+    run_pinned_stim_circuit_equality_probe(
+        "repeat-tag",
+        br#"
+#include "stim/circuit/circuit.h"
+
+int main() {
+    stim::Circuit left("REPEAT[left] 2 {\nX_ERROR(0.1) 0\n}\n");
+    stim::Circuit right("REPEAT[right] 2 {\nX_ERROR(0.1) 0\n}\n");
+    return left == right && left.approx_equals(right, 0) ? 0 : 1;
+}
+"#,
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_circuit_equality_retains_orphaned_repeat_storage() {
+    run_pinned_stim_circuit_equality_probe(
+        "orphaned-repeat-storage",
+        br#"
+#include "stim/circuit/circuit.h"
+
+int main() {
+    stim::Circuit popped("REPEAT 2 {\nX_ERROR(0.1) 0\n}\n");
+    stim::Circuit empty;
+    popped.operations.clear();
+    return popped != empty && !popped.approx_equals(empty, 0) ? 0 : 1;
+}
+"#,
+    );
+}
+
+fn run_pinned_stim_circuit_equality_probe(name: &str, source: &[u8]) {
+    let root = RepoRoot::resolve(
+        &Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("workspace root"),
+    )
+    .expect("repository root");
+    let stim = ensure_stim_binary(&root, false).expect("pinned Stim binary");
+    let library = stim
+        .parent()
+        .expect("Stim output directory")
+        .join("libstim.a");
+    assert!(library.is_file(), "pinned Stim static library is missing");
+
+    let directory = tempfile::tempdir().expect("probe directory");
+    let probe = directory.path().join(name);
+    let args = vec![
+        OsString::from("-std=c++20"),
+        OsString::from("-O2"),
+        OsString::from("-I"),
+        root.path.join("vendor/stim/src").into_os_string(),
+        OsString::from("-x"),
+        OsString::from("c++"),
+        OsString::from("-"),
+        OsString::from("-x"),
+        OsString::from("none"),
+        library.into_os_string(),
+        OsString::from("-pthread"),
+        OsString::from("-o"),
+        probe.clone().into_os_string(),
+    ];
+    let compile = run_process(Path::new("c++"), &args, source, Some(&root.path))
+        .expect("compile pinned Stim circuit-equality probe");
+    assert!(
+        compile.success(),
+        "probe compilation failed: {}",
+        compile.stderr.render_for_diagnostics()
+    );
+
+    let result = run_process(&probe, std::iter::empty::<&str>(), &[], Some(&root.path))
+        .expect("execute pinned Stim circuit-equality probe");
+    assert!(
+        result.success(),
+        "pinned Stim circuit-equality reproduction {name:?} failed: {}",
+        result.stderr.render_for_diagnostics()
+    );
+}
+
+#[test]
 fn valid_atomic_ledger_passes() {
     let (_directory, root) = test_root();
     validate(&root, &valid_ledger(), &route_only_expected()).expect("valid ledger");

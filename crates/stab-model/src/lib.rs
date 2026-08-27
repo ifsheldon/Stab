@@ -1,5 +1,6 @@
 //! Stable typed Stim circuit and detector-error-model values.
 
+mod approximate;
 mod circuit;
 mod dem;
 mod diagnostics;
@@ -38,8 +39,8 @@ pub use gate::{
     Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
 };
 pub use ids::{
-    CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset, MeasureRecordOffsetText,
-    ObservableId, Probability, ProbabilityStimText, QubitId, RepeatCount,
+    AbsoluteTolerance, CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset,
+    MeasureRecordOffsetText, ObservableId, Probability, ProbabilityStimText, QubitId, RepeatCount,
 };
 pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
 pub use resource_limit::{

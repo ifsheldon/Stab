@@ -18,8 +18,8 @@ pub use stab_decoder::{
     DecoderLayout, DecoderModelView, DecoderModelViewError, DecoderSession, ValidatedDecodeBatch,
 };
 pub use stab_model::{
-    ByteSpan, Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, CircuitTick,
-    DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
+    AbsoluteTolerance, ByteSpan, Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem,
+    CircuitTick, DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
     DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
     DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
     DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, DiagnosticSeverity, Estimate,

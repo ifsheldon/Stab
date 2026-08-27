@@ -7,12 +7,13 @@ use crate::model_bytes::PreparedModelText;
 use crate::model_tag::ModelTag;
 use crate::target::TargetVec;
 use crate::{
-    Gate, GateArgumentRule, ModelDialect, ModelError, ModelFingerprint, ModelResult, ObservableId,
-    ParseLimits, Probability, RepeatCount, Target, ValidationError,
+    AbsoluteTolerance, Gate, GateArgumentRule, ModelDialect, ModelError, ModelFingerprint,
+    ModelResult, ObservableId, ParseLimits, Probability, RepeatCount, Target, ValidationError,
 };
 
 mod api;
 mod counts;
+mod equality;
 mod iter;
 
 pub use iter::{CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter};
@@ -43,7 +44,7 @@ impl Clone for Circuit {
 
 impl PartialEq for Circuit {
     fn eq(&self, other: &Self) -> bool {
-        drop_impl::circuits_equal(self, other)
+        equality::circuits_equal(self, other)
     }
 }
 
@@ -136,6 +137,15 @@ impl Circuit {
     /// identifies this source model only, not compiler options, a backend, or an executable plan.
     pub fn fingerprint(&self) -> ModelFingerprint {
         ModelFingerprint::for_circuit(self)
+    }
+
+    /// Checks structural equality while allowing corresponding numeric arguments to differ by at
+    /// most `tolerance`.
+    ///
+    /// Instruction order, gates, targets, tags, repeat counts, and repeat structure remain exact.
+    #[must_use]
+    pub fn approx_equals(&self, other: &Self, tolerance: AbsoluteTolerance) -> bool {
+        equality::circuits_approx_equal(self, other, tolerance)
     }
 
     pub fn items(&self) -> &[CircuitItem] {

@@ -1,7 +1,9 @@
 schema_version = 1
 family_files = [
     "oracle/stim-v1.16-parity/families-algebra-through-product.toml",
-    "oracle/stim-v1.16-parity/families-resource-through-transforms.toml",
+    "oracle/stim-v1.16-parity/families-resource-through-search.toml",
+    "oracle/stim-v1.16-parity/families-stab-extensions.toml",
+    "oracle/stim-v1.16-parity/families-transforms.toml",
 ]
 
 [stim]

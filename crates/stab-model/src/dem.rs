@@ -7,6 +7,7 @@ use smallvec::SmallVec;
 mod api;
 mod coordinate_scan;
 mod drop_impl;
+mod equality;
 mod error_mechanisms;
 mod parser;
 mod tag;
@@ -35,8 +36,8 @@ use traversal::FoldedDemTraversal;
 
 use crate::model_bytes::PreparedModelText;
 use crate::{
-    DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult, ParseLimits,
-    Probability, RepeatNestingLimit,
+    AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
+    ParseLimits, Probability, RepeatNestingLimit,
 };
 use parser::{parse_dem, parse_unsigned_dem_text_value};
 use tag::DemTag;
@@ -85,6 +86,15 @@ impl DetectorErrorModel {
     /// identifies this source model only, not an analysis policy or executable plan.
     pub fn fingerprint(&self) -> ModelFingerprint {
         ModelFingerprint::for_dem(self)
+    }
+
+    /// Checks structural equality while allowing corresponding numeric arguments to differ by at
+    /// most `tolerance`.
+    ///
+    /// Instruction order, kinds, targets, tags, repeat counts, and repeat structure remain exact.
+    #[must_use]
+    pub fn approx_equals(&self, other: &Self, tolerance: AbsoluteTolerance) -> bool {
+        equality::models_approx_equal(self, other, tolerance)
     }
 
     fn from_items(items: Vec<DemItem>) -> Self {
@@ -239,7 +249,7 @@ impl std::fmt::Debug for DetectorErrorModel {
 
 impl PartialEq for DetectorErrorModel {
     fn eq(&self, other: &Self) -> bool {
-        drop_impl::models_equal(self, other)
+        equality::models_equal(self, other)
     }
 }
 

@@ -1,0 +1,200 @@
+[[families]]
+id = "stab-extensions.agent-capabilities"
+area = "stab-extensions"
+contract = "The capabilities command emits source-derived product, command, format, backend, and limit discovery in a stable machine-readable schema."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:agent-capabilities"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no machine-readable command that exposes Stab's component and capability graph."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::agent::capabilities_json_is_generated_from_product_and_clap_descriptors"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.agent-inspect"
+area = "stab-extensions"
+contract = "The inspect command reports bounded circuit and DEM structure without executing the model."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:agent-inspect"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no nonexecuting structured model-inspection command."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::agent::inspect_json_reports_exact_circuit_and_dem_structure_without_execution"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.agent-plan"
+area = "stab-extensions"
+contract = "The plan command validates and reports a sampling compilation plan without consuming entropy or producing shots."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:agent-plan"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no dry-run compilation-plan command for agent orchestration."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::agent::plan_sample_separates_compilation_identity_from_run_configuration"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.circuit-pass"
+area = "stab-extensions"
+contract = "CircuitPass validates returned closed models and preserves typed framework and implementation diagnostics across successful and rejected transformations."
+stim_refs = ["src/stim/circuit/circuit.test.cc"]
+coverage = ["extension:circuit-pass"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stab-extension"
+rationale = "CircuitPass is Stab's bounded external transformation seam, not a Stim API."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_pass"
+name = "circuit_pass_validates_output_and_preserves_typed_diagnostics"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.decoder-session-layout-and-reuse"
+area = "stab-extensions"
+contract = "DecoderSession projects detector-model layouts and reuses state across whole and partitioned batches with equivalent predictions."
+stim_refs = ["doc/file_format_dem_detector_error_model.md"]
+coverage = ["extension:decoder-session"]
+status = "divergence"
+owner = "stab-decoder"
+divergence_kind = "stab-extension"
+rationale = "Stim produces detection data but does not define a reusable decoder session interface."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-decoder"
+kind = "test"
+target = "session_contract"
+name = "decoder_session_layout_projection_reuse_and_partitioning"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.decoder-session-preflight"
+area = "stab-extensions"
+contract = "DecoderSession rejects detector-width, correction-width, and prediction-capacity mismatches before dispatch or output mutation."
+stim_refs = ["doc/file_format_dem_detector_error_model.md"]
+status = "divergence"
+owner = "stab-decoder"
+divergence_kind = "stab-extension"
+rationale = "Stim produces detection data but does not define a reusable decoder session interface."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-decoder"
+kind = "test"
+target = "session_contract"
+name = "decoder_session_preflight_is_atomic"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.decoder-session-progress"
+area = "stab-extensions"
+contract = "DecoderSession cancellation and implementation failure preserve exact completed-prefix progress and leave untouched output suffixes unchanged."
+stim_refs = ["doc/file_format_dem_detector_error_model.md"]
+status = "divergence"
+owner = "stab-decoder"
+divergence_kind = "stab-extension"
+rationale = "Stim produces detection data but does not define a reusable decoder session interface."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-decoder"
+kind = "test"
+target = "session_contract"
+name = "decoder_session_cancellation_and_failure_preserve_progress"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.decoder-session-protocol"
+area = "stab-extensions"
+contract = "DecoderSession rejects impossible progress and layout reports while preserving defined zero-shot behavior."
+stim_refs = ["doc/file_format_dem_detector_error_model.md"]
+status = "divergence"
+owner = "stab-decoder"
+divergence_kind = "stab-extension"
+rationale = "Stim produces detection data but does not define a reusable decoder session interface."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-decoder"
+kind = "test"
+target = "session_contract"
+name = "decoder_session_protocol_and_zero_shot_contracts"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.json-diagnostics"
+area = "stab-extensions"
+contract = "The global error-format option emits bounded schema-versioned JSON Lines diagnostics while keeping successful machine output on stdout."
+stim_refs = ["doc/usage_command_line.md"]
+coverage = ["extension:json-diagnostics"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no global structured diagnostic stream for agent and automation consumers."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "parity_workflows"
+name = "json_diagnostics_real_process_keeps_machine_output_separate"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.model-approximate-equality-typed-tolerance"
+area = "stab-extensions"
+contract = "Rust approximate-equality APIs accept a shared finite nonnegative AbsoluteTolerance value and reject negative, NaN, and infinite external values before comparison."
+stim_refs = ["doc/stim.pyi", "src/stim/circuit/circuit.pybind.cc", "src/stim/dem/detector_error_model.pybind.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "stab-extension"
+rationale = "The Rust API eliminates invalid absolute-tolerance states instead of exposing Stim's undocumented IEEE comparison results for negative and non-finite tolerances."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "approximate_equality"
+name = "absolute_tolerance_rejects_invalid_numeric_domains"
+minimum_tier = "pr"
+
+[[families]]
+id = "stab-extensions.stim-canonical-convert"
+area = "stab-extensions"
+contract = "convert accepts .stim input and emits canonical .stim output while rejecting result-only roles before touching their paths."
+stim_refs = ["doc/file_format_stim_circuit.md", "src/stim/circuit/circuit.test.cc"]
+coverage = ["extension:stim-canonical-convert"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim has no result-convert route for canonical .stim to .stim conversion."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::diagnostics::model_cli_paths_accept_opaque_metadata_bytes_and_preserve_stim_conversion"
+minimum_tier = "pr"

@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 and P2 are complete; P3 is next; P4 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 and P2 are complete; P3 is in progress; P4 through P9 have not started.
 
 ## Summary
 
@@ -269,6 +269,14 @@ Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `
 - Every model, gate, alias, target, and result-format parity row is `done`, `deferred`, or an explicit divergence.
 - One grammar and one metadata catalog own each public syntax fact.
 - No second CLI parser or duplicate format enum exists.
+
+### Implementation Checkpoint
+
+- The first P3 slice closes circuit and DEM approximate equality with one typed finite nonnegative `AbsoluteTolerance` and private iterative comparators over each model's reachable compact item tree. Numeric instruction arguments use inclusive absolute error; instruction kinds, gates, targets, argument counts, tags, repeat counts, ordering, and folded structure remain exact.
+- Concise table-driven owners cover tolerance boundaries, probabilities, coordinates, shifts, separators, aliases, parser fusion, nested repeats, exact structural mismatches, invalid tolerances, and 4,096-level stack safety with both equal and unequal leaves.
+- Two pinned Stim bugs are explicit divergences instead of copied behavior: exact and approximate circuit equality omit repeat tags, and removing a repeat through Python leaves hidden backing storage that can make visibly empty circuits unequal. Focused C++ probes linked to the frozen `libstim.a` reproduce both defects.
+- Approximate equality receives no benchmark row because it is not an active release E2E workflow and no profile attributes at least 10% of a user workflow to it. This slice changes no existing measured loop and makes no timing claim.
+- P3 remains open for `circuit-model.reference-signs` and `resource-safety.model-remaining-parse-limits`. All other P3-owned ledger families are already done, deferred, or explicit divergences.
 
 ## Milestone P4: Close Sampling And Detection Parity
 

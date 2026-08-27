@@ -329,12 +329,19 @@ milestone = "P5"
 [[families]]
 id = "circuit-model.approximate-equality"
 area = "circuit-model"
-contract = "Circuit approximate equality compares instruction structure and numeric arguments with Stim-compatible absolute tolerance semantics."
-stim_refs = ["doc/stim.pyi"]
+contract = "For finite nonnegative tolerances, circuit approximate equality keeps the reachable compact item tree, instruction order, gates, targets, argument counts, and instruction tags exact while comparing corresponding numeric arguments by inclusive absolute error without expanding repeats."
+stim_refs = ["doc/stim.pyi", "src/stim/circuit/circuit.cc", "src/stim/circuit/circuit_instruction.cc", "src/stim/circuit/circuit.test.cc"]
 coverage = ["capability:circuit-approximate-equality"]
-status = "missing"
+status = "done"
 owner = "stab-model"
-milestone = "P3"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "approximate_equality"
+name = "circuit_approximate_equality_matches_stim_structure_and_tolerance"
+minimum_tier = "pr"
 
 [[families]]
 id = "circuit-model.coordinates-and-counts"
@@ -367,6 +374,54 @@ package = "stab-engine"
 kind = "test"
 target = "circuit_api"
 name = "pf1_circuit_reference_determined_count_determined_measurements_matches_public_helper_subset"
+minimum_tier = "pr"
+
+[[families]]
+id = "circuit-model.equality-orphaned-repeat-storage"
+area = "circuit-model"
+contract = "After a repeat block is removed, exact and approximate circuit equality compare the remaining public item tree without retaining hidden backing storage."
+stim_refs = ["src/stim/circuit/circuit.cc", "src/stim/circuit/circuit.pybind.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim's Python pop removes the repeat operation but leaves its backing block, and both equality paths compare the unreachable block count; visibly empty circuits can therefore compare unequal. Stab owns repeats directly in its item tree and removes the complete value."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "approximate_equality"
+name = "circuit_equality_discards_popped_repeat_storage"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim_circuit_equality_retains_orphaned_repeat_storage"
+minimum_tier = "pr"
+
+[[families]]
+id = "circuit-model.equality-repeat-tags"
+area = "circuit-model"
+contract = "Exact and approximate circuit equality compare repeat-block tags instead of silently treating differently tagged repeats as equal."
+stim_refs = ["doc/stim.pyi", "src/stim/circuit/circuit.cc", "src/stim/circuit/circuit.pybind.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim's repeat-specialized exact and approximate comparisons check count and body but omit the repeat tag, contradicting the documented all-other-details-exact contract and instruction-tag comparison."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "approximate_equality"
+name = "circuit_equality_compares_repeat_tags_despite_pinned_stim_bug"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim_circuit_equality_ignores_repeat_tags"
 minimum_tier = "pr"
 
 [[families]]
@@ -623,12 +678,19 @@ minimum_tier = "pr"
 [[families]]
 id = "dem-model.approximate-equality"
 area = "dem-model"
-contract = "Detector error model approximate equality compares structure and floating-point arguments with Stim-compatible absolute tolerance semantics."
-stim_refs = ["doc/stim.pyi"]
+contract = "For finite nonnegative tolerances, detector error model approximate equality keeps stored structure, instruction order and kinds, targets, argument counts, tags, and repeat counts exact while comparing corresponding numeric arguments by inclusive absolute error without expanding repeats."
+stim_refs = ["doc/stim.pyi", "src/stim/dem/detector_error_model.cc", "src/stim/dem/dem_instruction.cc", "src/stim/dem/detector_error_model.test.cc"]
 coverage = ["capability:dem-approximate-equality"]
-status = "missing"
+status = "done"
 owner = "stab-model"
-milestone = "P3"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "approximate_equality"
+name = "dem_approximate_equality_matches_stim_structure_and_tolerance"
+minimum_tier = "pr"
 
 [[families]]
 id = "dem-model.counts-coordinates-and-values"

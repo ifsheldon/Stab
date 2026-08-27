@@ -3,7 +3,10 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_model::{DemInstruction, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel};
+use stab_model::{
+    AbsoluteTolerance, DemInstruction, DemRepeatBlock, DemRepeatCount, DemTarget,
+    DetectorErrorModel,
+};
 
 #[test]
 fn dem_instruction_targets_parse_stim_limits() {
@@ -75,19 +78,43 @@ fn dem_count_detectors_rejects_shifted_detector_count_overflow() {
 }
 
 #[test]
-fn deeply_programmatic_dem_drops_on_a_small_stack() {
+fn deeply_programmatic_dem_clones_compares_and_drops_on_a_small_stack() {
     std::thread::Builder::new()
         .stack_size(64 * 1024)
         .spawn(|| {
-            let mut body = DetectorErrorModel::new();
+            let mut body =
+                DetectorErrorModel::from_dem_str("error(0.1) D0\n").expect("reference leaf");
+            let mut different =
+                DetectorErrorModel::from_dem_str("error(0.2) D0\n").expect("different leaf");
             for _ in 0..4_096 {
                 let mut outer = DetectorErrorModel::new();
                 outer.push_repeat_block(DemRepeatBlock::new(DemRepeatCount::new(1), body, None));
                 body = outer;
+
+                let mut different_outer = DetectorErrorModel::new();
+                different_outer.push_repeat_block(DemRepeatBlock::new(
+                    DemRepeatCount::new(1),
+                    different,
+                    None,
+                ));
+                different = different_outer;
             }
+            let cloned = body.clone();
+            assert_eq!(cloned, body);
+            assert!(cloned.approx_equals(
+                &body,
+                AbsoluteTolerance::try_new(0.0).expect("exact tolerance")
+            ));
+            assert_ne!(body, different);
+            assert!(!body.approx_equals(
+                &different,
+                AbsoluteTolerance::try_new(0.01).expect("narrow tolerance")
+            ));
+            drop(cloned);
             drop(body);
+            drop(different);
         })
         .expect("spawn small-stack drop worker")
         .join()
-        .expect("deep DEM drop remains stack safe");
+        .expect("deep DEM clone, comparison, and drop remain stack safe");
 }
