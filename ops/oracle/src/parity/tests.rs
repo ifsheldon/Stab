@@ -1,6 +1,8 @@
 use super::*;
 
+mod catalog_semantics;
 mod pinned_stim;
+mod support;
 
 fn test_owner(tier: Tier) -> TestOwner {
     TestOwner {
