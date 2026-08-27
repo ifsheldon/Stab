@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "crates/stab-cli",
-    "crates/stab-core",
+    "crates/stab-model",
     "ops/fixture-ops",
     "test-support/fixture-support",
 ]
@@ -10,3 +10,4 @@ resolver = "2"
 [workspace.package]
 edition = "2024"
 version = "0.2.0"
+rust-version = "1.97.1"

@@ -374,7 +374,7 @@ mod tests {
         assert_eq!(cli.binary_targets, ["stab", "stab-helper"]);
         assert!(graph.declared_path_dependencies.iter().any(|dependency| {
             dependency.from == "stab-cli"
-                && dependency.to == "stab-core"
+                && dependency.to == "stab-model"
                 && dependency.version_req
                     == cargo_metadata::semver::VersionReq::parse("0.2.0")
                         .expect("fixture requirement should parse")

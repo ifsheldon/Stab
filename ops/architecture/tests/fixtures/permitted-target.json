@@ -27,7 +27,11 @@
     { "from": "stab-decoder", "to": "stab-records", "kind": "normal" },
     { "from": "stab-core", "to": "stab-engine", "kind": "normal" },
     { "from": "stab-core", "to": "stab-decoder", "kind": "normal" },
-    { "from": "stab-cli", "to": "stab-core", "kind": "normal" },
+    { "from": "stab-cli", "to": "stab-analysis", "kind": "normal" },
+    { "from": "stab-cli", "to": "stab-bits", "kind": "normal" },
+    { "from": "stab-cli", "to": "stab-engine", "kind": "normal" },
+    { "from": "stab-cli", "to": "stab-model", "kind": "normal" },
+    { "from": "stab-cli", "to": "stab-records", "kind": "normal" },
     { "from": "stab-architecture", "to": "stab-core", "kind": "development" }
   ],
   "expected_violation_codes": []

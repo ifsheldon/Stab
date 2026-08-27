@@ -438,7 +438,7 @@ mod tests {
                 assert_eq!(fixture, "publishable-fixture");
                 assert_eq!(
                     packages,
-                    ["fixture-ops", "fixture-support", "stab-cli", "stab-core"]
+                    ["fixture-ops", "fixture-support", "stab-cli", "stab-model"]
                 );
             }
             other => panic!("unexpected fixture-publication error: {other}"),

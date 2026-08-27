@@ -1,3 +1,3 @@
 fn main() {
-    stab_core::fixture_core();
+    stab_model::fixture_model();
 }
