@@ -60,10 +60,7 @@
         "1 -> rec[1]",
         "1 -> -rec[0]",
         "X -> Z",
-        "Z -> Y",
-        "1 -> obs[0]",
-        "1 -> rec[-2] xor obs[0]",
-        "1 -> rec[-1] xor obs[0]"
+        "Z -> Y"
       ]
     },
     "pfm2-record-alias-rejection": {

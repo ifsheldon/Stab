@@ -1,35 +1,43 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
+use std::sync::OnceLock;
 
 use stab_analysis::{
-    ErrorAnalyzerOptions, circuit_flow_generators, circuit_inverse_unitary,
+    DetectingRegionTargetOptions, ErrorAnalyzerOptions, MissingDetectorOptions,
+    all_detecting_region_targets, all_detecting_region_ticks,
+    circuit_detecting_regions_for_targets, circuit_flow_generators, circuit_inverse_unitary,
     circuit_to_detector_error_model, decomposed_circuit, gate_has_h_s_cx_m_r_decomposition,
+    gate_has_tableau, missing_detectors,
 };
 use stab_model::{Circuit, Gate, GateArgumentRule, GateCategory, GateTargetRule, Probability};
 
 use super::support::PinnedStimProgram;
 
-const MAX_CASES: usize = 256;
+const MAX_CASES: usize = 512;
 const MAX_CASE_BYTES: usize = 64 * 1024;
 const MAX_MATRIX_BYTES: usize = 4 * 1024 * 1024;
 const ANALYZER_QUBITS: &str = "0 1 2 3 4 5 6 7";
+const REGION_QUBITS: &str = "0 1 2 3 4 5 6 7 8";
 
 const PINNED_STIM_CATALOG_HELPER: &[u8] = br#"
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
 #include "stim/circuit/circuit.h"
 #include "stim/simulators/error_analyzer.h"
+#include "stim/util_top/circuit_to_detecting_regions.h"
 #include "stim/util_top/circuit_flow_generators.h"
+#include "stim/util_top/missing_detectors.h"
 #include "stim/util_top/simplified_circuit.h"
 
 namespace {
 
-constexpr uint64_t MAX_CASES = 256;
+constexpr uint64_t MAX_CASES = 512;
 constexpr uint64_t MAX_CASE_BYTES = 64ULL << 10;
 constexpr uint64_t MAX_MATRIX_BYTES = 4ULL << 20;
 
@@ -67,6 +75,46 @@ void write_result(const char *outcome, const std::string &payload) {
     std::cout << '\n';
 }
 
+std::string flow_generators_text(const stim::Circuit &circuit) {
+    std::ostringstream out;
+    for (const auto &flow : stim::circuit_flow_generators<64>(circuit)) {
+        out << flow << '\n';
+    }
+    std::string result = out.str();
+    while (!result.empty() && result.back() == '\n') {
+        result.pop_back();
+    }
+    return result;
+}
+
+std::string detecting_regions_text(const stim::Circuit &circuit) {
+    const auto stats = circuit.compute_stats();
+    std::set<stim::DemTarget> targets;
+    for (uint64_t k = 0; k < stats.num_detectors; k++) {
+        targets.insert(stim::DemTarget::relative_detector_id(k));
+    }
+    for (uint64_t k = 0; k < stats.num_observables; k++) {
+        targets.insert(stim::DemTarget::observable_id(k));
+    }
+    std::set<uint64_t> ticks;
+    for (uint64_t k = 0; k < stats.num_ticks; k++) {
+        ticks.insert(k);
+    }
+
+    std::ostringstream out;
+    for (const auto &[target, snapshots] :
+         stim::circuit_to_detecting_regions(circuit, std::move(targets), std::move(ticks), true)) {
+        for (const auto &[tick, pauli] : snapshots) {
+            out << target << '@' << tick << '=' << pauli << '\n';
+        }
+    }
+    std::string result = out.str();
+    while (!result.empty() && result.back() == '\n') {
+        result.pop_back();
+    }
+    return result;
+}
+
 std::string evaluate(const std::string &behavior, const std::string &source) {
     stim::Circuit circuit(source);
     if (behavior == "dem") {
@@ -79,6 +127,9 @@ std::string evaluate(const std::string &behavior, const std::string &source) {
                    false,
                    false)
             .str();
+    }
+    if (behavior == "decompose") {
+        return stim::simplified_circuit(circuit).str();
     }
     if (behavior == "decompose-flows") {
         circuit = stim::simplified_circuit(circuit);
@@ -99,16 +150,17 @@ std::string evaluate(const std::string &behavior, const std::string &source) {
     if (behavior == "inverse") {
         return circuit.inverse(false).str();
     }
-    if (behavior == "decompose-flows") {
-        std::ostringstream out;
-        for (const auto &flow : stim::circuit_flow_generators<64>(circuit)) {
-            out << flow << '\n';
-        }
-        std::string result = out.str();
-        while (!result.empty() && result.back() == '\n') {
-            result.pop_back();
-        }
-        return result;
+    if (behavior == "detecting-regions") {
+        return detecting_regions_text(circuit);
+    }
+    if (behavior == "missing-known-input") {
+        return stim::missing_detectors(circuit, false).str();
+    }
+    if (behavior == "missing-unknown-input") {
+        return stim::missing_detectors(circuit, true).str();
+    }
+    if (behavior == "flows" || behavior == "decompose-flows") {
+        return flow_generators_text(circuit);
     }
     throw std::invalid_argument("unknown catalog behavior");
 }
@@ -151,6 +203,31 @@ int main(int argc, char **argv) {
 struct CatalogCase {
     id: String,
     source: String,
+    expectation: CatalogExpectation,
+}
+
+impl CatalogCase {
+    fn canonical(id: impl Into<String>, source: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            source: source.into(),
+            expectation: CatalogExpectation::Canonical,
+        }
+    }
+
+    fn rejected(id: impl Into<String>, source: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            source: source.into(),
+            expectation: CatalogExpectation::Rejected,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CatalogExpectation {
+    Canonical,
+    Rejected,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -169,18 +246,8 @@ struct TargetShape {
 #[test]
 #[ignore = "builds and executes a metadata-driven differential against pinned libstim"]
 fn p5_catalog_circuit_to_dem_matches_pinned_stim() {
-    let cases = Gate::all()
-        .flat_map(|gate| {
-            analyzer_target_shapes(gate)
-                .into_iter()
-                .map(move |shape| analyzer_case(gate, shape))
-        })
-        .collect::<Vec<_>>();
+    let cases = catalog_gate_target_cases(false);
     let gate_count = Gate::all().len();
-    assert!(
-        cases.len() >= gate_count,
-        "every canonical gate must own at least one analyzer case"
-    );
     compare_catalog_matrix("dem", &cases, |source| {
         let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
         let options = ErrorAnalyzerOptions {
@@ -202,6 +269,77 @@ fn p5_catalog_circuit_to_dem_matches_pinned_stim() {
 
 #[test]
 #[ignore = "builds and executes a metadata-driven differential against pinned libstim"]
+fn p5_catalog_flow_generators_match_pinned_stim() {
+    let mut cases = catalog_gate_target_cases(true);
+    cases.push(CatalogCase::canonical(
+        "nested-compact-repeat",
+        "REPEAT 3 {\n    REPEAT 2 {\n        H 0\n    }\n}\n",
+    ));
+    let gate_count = Gate::all().len();
+    compare_catalog_matrix("flows", &cases, |source| {
+        let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
+        circuit_flow_generators(&circuit)
+            .map(flow_text)
+            .map_err(|error| error.to_string())
+    });
+    eprintln!(
+        "[stab-oracle] flow-generator catalog evidence covered {gate_count} gates across {} legal target-shape cases",
+        cases.len()
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a metadata-driven differential against pinned libstim"]
+fn p5_catalog_detecting_regions_match_pinned_stim() {
+    let cases = detecting_region_catalog_cases();
+    let gate_count = fixed_tableau_gates().len();
+    compare_catalog_matrix("detecting-regions", &cases, |source| {
+        let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
+        detecting_regions_text(&circuit)
+    });
+    eprintln!(
+        "[stab-oracle] detecting-region catalog evidence covered {gate_count} fixed-tableau gates across {} value-level target-shape probes",
+        cases.len()
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a metadata-driven differential against pinned libstim"]
+fn p5_catalog_missing_detectors_match_pinned_stim() {
+    let gate_cases = missing_detector_gate_cases();
+    let repeat_pairs = missing_detector_repeat_pairs();
+    let mut cases = gate_cases.clone();
+    cases.extend(
+        repeat_pairs
+            .iter()
+            .flat_map(|(compact, explicit)| [compact.clone(), explicit.clone()]),
+    );
+    for (behavior, ignore_non_deterministic_measurements) in [
+        ("missing-known-input", false),
+        ("missing-unknown-input", true),
+    ] {
+        compare_catalog_matrix_with_probe(catalog_probe(), behavior, &cases, |source| {
+            missing_detector_text(source, ignore_non_deterministic_measurements)
+        });
+        for (compact, explicit) in &repeat_pairs {
+            assert_eq!(
+                missing_detector_text(&compact.source, ignore_non_deterministic_measurements),
+                missing_detector_text(&explicit.source, ignore_non_deterministic_measurements),
+                "{behavior}/{}: compact and explicit repeats diverged",
+                compact.id
+            );
+        }
+    }
+    let gate_count = fixed_tableau_gates().len();
+    eprintln!(
+        "[stab-oracle] missing-detector catalog evidence covered {gate_count} fixed-tableau gates through {} probes and {} compact/explicit repeat pairs in both input-state modes",
+        gate_cases.len(),
+        repeat_pairs.len()
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a metadata-driven differential against pinned libstim"]
 fn p5_catalog_base_gate_decomposition_matches_pinned_stim() {
     let gates = Gate::all()
         .filter(|gate| gate_has_h_s_cx_m_r_decomposition(*gate))
@@ -210,10 +348,10 @@ fn p5_catalog_base_gate_decomposition_matches_pinned_stim() {
         .iter()
         .copied()
         .map(|gate| {
-            Ok(CatalogCase {
-                id: gate.canonical_name().to_string(),
-                source: representative_quantum_instruction(gate)?,
-            })
+            Ok(CatalogCase::canonical(
+                gate.canonical_name(),
+                representative_quantum_instruction(gate)?,
+            ))
         })
         .collect::<Result<Vec<_>, String>>()
         .expect("every decomposition-bearing gate has a quantum target shape");
@@ -223,8 +361,18 @@ fn p5_catalog_base_gate_decomposition_matches_pinned_stim() {
         let decomposed = decomposed_circuit(&circuit).map_err(|error| error.to_string())?;
         base_gate_flow_text(&decomposed)
     });
+    let cross_cutting = [CatalogCase::canonical(
+        "tags-noise-constants-repeat",
+        "QUBIT_COORDS[q](1, 2) 0 1 2\nREPEAT[loop] 2 {\n    X_ERROR[noise](0.125) 0\n    SPP[phase] X0*Y1\n    MPP[product] X0*Y1 !Z2*Z2\n    MXX[pair](0.25) 0 1\n    DETECTOR[det](3) rec[-1]\n    TICK[tick]\n}\n",
+    )];
+    compare_catalog_matrix("decompose", &cross_cutting, |source| {
+        let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
+        decomposed_circuit(&circuit)
+            .map(|decomposed| without_terminal_newlines(decomposed.to_stim_string()))
+            .map_err(|error| error.to_string())
+    });
     eprintln!(
-        "[stab-oracle] base-gate decomposition catalog evidence covered {} decomposition-bearing gates",
+        "[stab-oracle] base-gate decomposition catalog evidence covered {} decomposition-bearing gates and one cross-cutting exact fixture",
         cases.len()
     );
 }
@@ -239,10 +387,10 @@ fn p5_catalog_strict_unitary_inverse_matches_pinned_stim() {
         .iter()
         .copied()
         .map(|gate| {
-            Ok(CatalogCase {
-                id: gate.canonical_name().to_string(),
-                source: representative_quantum_instruction(gate)?,
-            })
+            Ok(CatalogCase::canonical(
+                gate.canonical_name(),
+                representative_quantum_instruction(gate)?,
+            ))
         })
         .collect::<Result<Vec<_>, String>>()
         .expect("every unitary gate has a quantum target shape");
@@ -262,10 +410,24 @@ fn p5_catalog_strict_unitary_inverse_matches_pinned_stim() {
 fn compare_catalog_matrix(
     behavior: &str,
     cases: &[CatalogCase],
+    evaluate_stab: impl FnMut(&str) -> Result<String, String>,
+) {
+    compare_catalog_matrix_with_probe(catalog_probe(), behavior, cases, evaluate_stab);
+}
+
+fn catalog_probe() -> &'static PinnedStimProgram {
+    static PROBE: OnceLock<PinnedStimProgram> = OnceLock::new();
+    PROBE
+        .get_or_init(|| PinnedStimProgram::compile("catalog-semantics", PINNED_STIM_CATALOG_HELPER))
+}
+
+fn compare_catalog_matrix_with_probe(
+    probe: &PinnedStimProgram,
+    behavior: &str,
+    cases: &[CatalogCase],
     mut evaluate_stab: impl FnMut(&str) -> Result<String, String>,
 ) {
     validate_matrix(cases);
-    let probe = PinnedStimProgram::compile("catalog-semantics", PINNED_STIM_CATALOG_HELPER);
     let input = encode_matrix(cases);
     let output = probe.run([OsString::from(behavior)], &input);
     assert!(
@@ -277,20 +439,33 @@ fn compare_catalog_matrix(
 
     let mut failures = Vec::new();
     for (case, pinned) in cases.iter().zip(pinned) {
-        match (evaluate_stab(&case.source), pinned) {
-            (Ok(stab), PinnedOutcome::Canonical(pinned)) if stab != pinned => {
+        match (case.expectation, evaluate_stab(&case.source), pinned) {
+            (
+                CatalogExpectation::Canonical,
+                Ok(stab),
+                PinnedOutcome::Canonical(pinned),
+            ) if stab != pinned => {
                 failures.push(format!(
                     "{behavior}/{}: canonical output mismatch\nsource:\n{}\nStab:\n{}\npinned Stim:\n{}",
                     case.id, case.source, stab, pinned
                 ));
             }
-            (Ok(_), PinnedOutcome::Canonical(_)) => {}
-            (Err(error), PinnedOutcome::Canonical(_)) => failures.push(format!(
+            (CatalogExpectation::Canonical, Ok(_), PinnedOutcome::Canonical(_)) => {}
+            (CatalogExpectation::Canonical, Err(error), PinnedOutcome::Canonical(_)) => failures.push(format!(
                 "{behavior}/{}: Stab rejected a legal case: {error}\nsource:\n{}",
                 case.id, case.source
             )),
-            (stab, PinnedOutcome::Rejected { class, detail }) => failures.push(format!(
+            (CatalogExpectation::Canonical, stab, PinnedOutcome::Rejected { class, detail }) => failures.push(format!(
                 "{behavior}/{}: pinned Stim rejected a generated legal case as {class}: {detail}\nStab outcome: {stab:?}\nsource:\n{}",
+                case.id, case.source
+            )),
+            (CatalogExpectation::Rejected, Err(_), PinnedOutcome::Rejected { .. }) => {}
+            (CatalogExpectation::Rejected, Ok(stab), PinnedOutcome::Rejected { class, detail }) => failures.push(format!(
+                "{behavior}/{}: Stab accepted a shape expected to reject while pinned Stim rejected it as {class}: {detail}\nStab output:\n{stab}\nsource:\n{}",
+                case.id, case.source
+            )),
+            (CatalogExpectation::Rejected, stab, PinnedOutcome::Canonical(pinned)) => failures.push(format!(
+                "{behavior}/{}: a shape marked as rejected was accepted by pinned Stim\nStab outcome: {stab:?}\npinned Stim:\n{pinned}\nsource:\n{}",
                 case.id, case.source
             )),
         }
@@ -379,8 +554,247 @@ fn read_frame_line<'a>(encoded: &'a [u8], cursor: &mut usize) -> &'a str {
     line
 }
 
-fn analyzer_case(gate: Gate, shape: TargetShape) -> CatalogCase {
-    let mut source = format!("R {ANALYZER_QUBITS}\nM 7\n");
+fn detecting_region_catalog_cases() -> Vec<CatalogCase> {
+    fixed_tableau_gates()
+        .into_iter()
+        .flat_map(|gate| {
+            fixed_tableau_detecting_shapes(gate)
+                .into_iter()
+                .flat_map(move |(shape, probes)| {
+                    probes.iter().map(move |&(probe_id, probe)| {
+                        let id = format!("{}/{}/{probe_id}", gate.canonical_name(), shape.id);
+                        let source = format!(
+                            "R {REGION_QUBITS}\nM 7 8\nTICK\n{}TICK\nMPP {probe}\nDETECTOR rec[-1]\n",
+                            instruction_text(gate, &shape, false)
+                        );
+                        catalog_case_for_shape(gate, &shape, false, id, source)
+                    })
+                })
+        })
+        .collect()
+}
+
+fn fixed_tableau_gates() -> Vec<Gate> {
+    let gates = Gate::all()
+        .filter(|gate| gate_has_tableau(*gate))
+        .collect::<Vec<_>>();
+    assert_eq!(gates.len(), 46, "pinned Stim fixed-tableau gate count");
+    gates
+}
+
+fn fixed_tableau_detecting_shapes(
+    gate: Gate,
+) -> Vec<(TargetShape, &'static [(&'static str, &'static str)])> {
+    const EMPTY: &[(&str, &str)] = &[("identity", "X0")];
+    const SINGLE: &[(&str, &str)] = &[("x", "X0"), ("z", "Z0")];
+    const SINGLE_MANY: &[(&str, &str)] = &[("xyz", "X0*Y2*Z5")];
+    const PAIR: &[(&str, &str)] = &[
+        ("x-left", "X0"),
+        ("z-left", "Z0"),
+        ("x-right", "X1"),
+        ("z-right", "Z1"),
+    ];
+    const PAIR_MANY: &[(&str, &str)] = &[("four-generators", "X0*Z2*X5*Z7")];
+    const FEEDBACK: &[(&str, &str)] = &[("x", "X1"), ("z", "Z1")];
+
+    match gate.target_rule() {
+        GateTargetRule::AnySingleQubit => vec![
+            (shape("empty", "", 0), EMPTY),
+            (shape("single", "0", 0), SINGLE),
+            (shape("many", "0 2 5", 0), SINGLE_MANY),
+        ],
+        GateTargetRule::PlainPairs => vec![
+            (shape("empty", "", 0), EMPTY),
+            (shape("pair", "0 1", 0), PAIR),
+            (shape("many-pairs", "0 1 2 3 4 5 6 7", 0), PAIR_MANY),
+        ],
+        target_rule => {
+            assert_eq!(
+                target_rule,
+                GateTargetRule::ClassicalControlPairs,
+                "fixed-tableau gate {} has unsupported target rule {target_rule:?}",
+                gate.canonical_name()
+            );
+            let mut shapes = vec![
+                (shape("empty", "", 0), EMPTY),
+                (shape("pair", "0 1", 0), PAIR),
+                (shape("many-pairs", "0 1 2 3 4 5 6 7", 0), PAIR_MANY),
+            ];
+            shapes.extend(
+                classical_control_shapes(gate)
+                    .into_iter()
+                    .filter(|shape| shape.id.contains("record") || shape.id.contains("sweep"))
+                    .map(|shape| (shape, FEEDBACK)),
+            );
+            shapes
+        }
+    }
+}
+
+fn detecting_regions_text(circuit: &Circuit) -> Result<String, String> {
+    let targets = all_detecting_region_targets(circuit).map_err(|error| error.to_string())?;
+    let ticks = all_detecting_region_ticks(circuit).map_err(|error| error.to_string())?;
+    circuit_detecting_regions_for_targets(
+        circuit,
+        DetectingRegionTargetOptions {
+            targets,
+            ticks,
+            ignore_anticommutation_errors: true,
+        },
+    )
+    .map(|regions| {
+        regions
+            .into_iter()
+            .flat_map(|(target, snapshots)| {
+                snapshots
+                    .into_iter()
+                    .map(move |(tick, pauli)| format!("{target}@{}={pauli}", tick.get()))
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    })
+    .map_err(|error| error.to_string())
+}
+
+fn missing_detector_gate_cases() -> Vec<CatalogCase> {
+    fixed_tableau_gates()
+        .into_iter()
+        .map(|gate| {
+            let target_rule = gate.target_rule();
+            let source = if target_rule == GateTargetRule::AnySingleQubit {
+                format!("{} 0 1 2\nMPP X0 Y1 Z2\n", gate.canonical_name())
+            } else {
+                assert!(
+                    matches!(
+                        target_rule,
+                        GateTargetRule::PlainPairs | GateTargetRule::ClassicalControlPairs
+                    ),
+                    "fixed-tableau gate {} has unsupported target rule {target_rule:?}",
+                    gate.canonical_name()
+                );
+                two_qubit_missing_detector_probe(gate)
+            };
+            CatalogCase::canonical(gate.canonical_name(), source)
+        })
+        .collect()
+}
+
+fn two_qubit_missing_detector_probe(gate: Gate) -> String {
+    let bases = ['I', 'X', 'Y', 'Z'];
+    let mut gate_targets = Vec::new();
+    let mut measurements = Vec::new();
+    let mut pair_index = 0_usize;
+    for left in bases {
+        for right in bases {
+            if left == 'I' && right == 'I' {
+                continue;
+            }
+            let left_qubit = pair_index * 2;
+            let right_qubit = left_qubit + 1;
+            gate_targets.extend([left_qubit.to_string(), right_qubit.to_string()]);
+            let mut product = String::new();
+            if left != 'I' {
+                product.push(left);
+                product.push_str(&left_qubit.to_string());
+            }
+            if right != 'I' {
+                if !product.is_empty() {
+                    product.push('*');
+                }
+                product.push(right);
+                product.push_str(&right_qubit.to_string());
+            }
+            measurements.push(product);
+            pair_index += 1;
+        }
+    }
+    assert_eq!(pair_index, 15, "two-qubit nonidentity Pauli probes");
+    format!(
+        "{} {}\nMPP {}\n",
+        gate.canonical_name(),
+        gate_targets.join(" "),
+        measurements.join(" ")
+    )
+}
+
+fn missing_detector_repeat_pairs() -> Vec<(CatalogCase, CatalogCase)> {
+    vec![
+        repeat_pair("covered-row", "R 0\n", "M 0\nDETECTOR rec[-1]\n", 4),
+        repeat_pair(
+            "cross-iteration-row",
+            "R 0\nM 0\n",
+            "M 0\nDETECTOR rec[-1] rec[-2]\n",
+            3,
+        ),
+        repeat_pair(
+            "state-preserving-clifford",
+            "RX 0\n",
+            "H 0\nH 0\nMX 0\nDETECTOR rec[-1]\n",
+            5,
+        ),
+        (
+            CatalogCase::canonical(
+                "nested-covered/compact",
+                "R 0\nREPEAT 3 {\n    REPEAT 2 {\n        M 0\n        DETECTOR rec[-1]\n    }\n}\n",
+            ),
+            CatalogCase::canonical(
+                "nested-covered/explicit",
+                format!("R 0\n{}", "M 0\nDETECTOR rec[-1]\n".repeat(6)),
+            ),
+        ),
+    ]
+}
+
+fn repeat_pair(
+    id: &str,
+    prefix: &str,
+    body: &str,
+    repetitions: usize,
+) -> (CatalogCase, CatalogCase) {
+    (
+        CatalogCase::canonical(
+            format!("{id}/compact"),
+            format!("{prefix}REPEAT {repetitions} {{\n{body}}}\n"),
+        ),
+        CatalogCase::canonical(
+            format!("{id}/explicit"),
+            format!("{prefix}{}", body.repeat(repetitions)),
+        ),
+    )
+}
+
+fn missing_detector_text(
+    source: &str,
+    ignore_non_deterministic_measurements: bool,
+) -> Result<String, String> {
+    let circuit = Circuit::from_stim_str(source).map_err(|error| error.to_string())?;
+    missing_detectors(
+        &circuit,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements,
+        },
+    )
+    .map(|missing| without_terminal_newlines(missing.to_stim_string()))
+    .map_err(|error| error.to_string())
+}
+
+fn catalog_gate_target_cases(classical_only_noops: bool) -> Vec<CatalogCase> {
+    let cases = Gate::all()
+        .flat_map(|gate| {
+            analyzer_target_shapes(gate)
+                .into_iter()
+                .map(move |shape| analyzer_case(gate, shape, classical_only_noops))
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        cases.len() >= Gate::all().len(),
+        "every canonical gate must own at least one catalog case"
+    );
+    cases
+}
+
+fn analyzer_case(gate: Gate, shape: TargetShape, classical_only_noops: bool) -> CatalogCase {
+    let mut source = format!("R {ANALYZER_QUBITS}\nM 6 7\n");
     if gate.target_rule() == GateTargetRule::RecOrPauli && shape.id == "pauli-set" {
         source.push_str("RX 0\nRY 1\n");
     }
@@ -398,10 +812,13 @@ fn analyzer_case(gate: Gate, shape: TargetShape) -> CatalogCase {
     }
     source.push_str(&format!("M {ANALYZER_QUBITS}\n"));
     append_recent_result_detectors(&mut source, 8);
-    CatalogCase {
-        id: format!("{}/{}", gate.canonical_name(), shape.id),
+    catalog_case_for_shape(
+        gate,
+        &shape,
+        classical_only_noops,
+        format!("{}/{}", gate.canonical_name(), shape.id),
         source,
-    }
+    )
 }
 
 fn append_recent_result_detectors(source: &mut String, count: usize) {
@@ -475,7 +892,34 @@ fn classical_control_shapes(gate: Gate) -> Vec<TargetShape> {
             shape("sweep-first", "sweep[0] 1", 0),
         ]);
     }
+    shapes.extend([
+        shape("record-record", "rec[-1] rec[-2]", 0),
+        shape("record-sweep", "rec[-1] sweep[0]", 0),
+        shape("sweep-record", "sweep[0] rec[-1]", 0),
+        shape("sweep-sweep", "sweep[0] sweep[1]", 0),
+    ]);
     shapes
+}
+
+fn catalog_case_for_shape(
+    gate: Gate,
+    shape: &TargetShape,
+    classical_only_noops: bool,
+    id: impl Into<String>,
+    source: impl Into<String>,
+) -> CatalogCase {
+    if classical_only_shape(shape) && !classical_only_noops && !gate.is_symmetric_gate() {
+        CatalogCase::rejected(id, source)
+    } else {
+        CatalogCase::canonical(id, source)
+    }
+}
+
+fn classical_only_shape(shape: &TargetShape) -> bool {
+    matches!(
+        shape.id,
+        "record-record" | "record-sweep" | "sweep-record" | "sweep-sweep"
+    )
 }
 
 const fn shape(id: &'static str, targets: &'static str, measurement_count: usize) -> TargetShape {

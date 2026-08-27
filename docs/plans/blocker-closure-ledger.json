@@ -47,7 +47,7 @@
               "stab-analysis",
               "--test",
               "circuit_inverse_qec",
-              "circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed",
+              "inverse_qec_rejects_anticommuting_measure_reset",
               "--quiet",
               "--exact"
             ]
@@ -59,7 +59,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec|circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec|inverse_qec_rejects_anticommuting_measure_reset|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
             }
           },
@@ -105,7 +105,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_flow_reverse_measurement.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "5c89183d6dc8fd746e6c7c6276dca9f10b575434f435e9cca78cc24e39e2f0c7"
             }
           },
@@ -152,7 +152,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_flow_through_mzz.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "92b01ae76b350429e120185faa051c8f540b6069a0cc0d23325caf13a71493d1"
             }
           },
@@ -199,7 +199,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_flow_past_idle_qubits.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "075b695a3293c80c579bcd70f09cc063168e3febe9141a70754f6efed209ef13"
             }
           },
@@ -229,8 +229,8 @@
               "-p",
               "stab-analysis",
               "--test",
-              "circuit_inverse_qec_pfm_b1",
-              "pfm_b1_python_inverse_empty",
+              "circuit_inverse_qec",
+              "time_reversal_for_flows_common_semantic_matrix_matches_stim",
               "--quiet",
               "--exact"
             ]
@@ -246,7 +246,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_inverse_empty.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "e442a604849d62e587f2d53cfcbe439f8f64ad060b03c2bb259c83b96c4ee0f4"
             }
           },
@@ -275,8 +275,8 @@
               "-p",
               "stab-analysis",
               "--test",
-              "circuit_inverse_qec_pfm_b1",
-              "pfm_b1_python_reset_h_mx_detector",
+              "circuit_inverse_qec",
+              "time_reversal_for_flows_common_semantic_matrix_matches_stim",
               "--quiet",
               "--exact"
             ]
@@ -292,7 +292,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_reset_h_mx_detector.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "2ac1f50662cc55ff094e00e2dd06158f4140aa865080c2dfbe67d49f2f8def92"
             }
           },
@@ -339,7 +339,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_measurement_to_reset.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "bcd7757ce96790511b3dd13044da3deb91de989810e43ef2613b141ccca39b9e"
             }
           },
@@ -386,7 +386,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_reset_to_measurement.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "5c89183d6dc8fd746e6c7c6276dca9f10b575434f435e9cca78cc24e39e2f0c7"
             }
           },
@@ -433,7 +433,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_dont_turn_measurement.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "07de4caae1a95774594c70f0cdf47430a1107a5cfbc2e34f4ee3708d2c31dc51"
             }
           },
@@ -463,8 +463,8 @@
               "-p",
               "stab-analysis",
               "--test",
-              "circuit_inverse_qec_pfm_b1",
-              "pfm_b1_python_noisy_measure_reset",
+              "circuit_inverse_qec",
+              "time_reversal_for_flows_common_semantic_matrix_matches_stim",
               "--quiet",
               "--exact"
             ]
@@ -480,7 +480,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_noisy_measure_reset.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "1c651f0a410e9a6f16e2d47b86b920ba0544f40040f20858cea4820499a7ef5d"
             }
           },
@@ -510,8 +510,8 @@
               "-p",
               "stab-analysis",
               "--test",
-              "circuit_inverse_qec_pfm_b1",
-              "pfm_b1_surface_code_reversal",
+              "circuit_time_reversal",
+              "time_reversal_preserves_generated_surface_code_regions",
               "--quiet",
               "--exact"
             ]
@@ -523,7 +523,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec_pfm_b1|pfm_b1_surface_code_reversal|--|--exact",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_time_reversal|time_reversal_preserves_generated_surface_code_regions|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
@@ -570,7 +570,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_more_flow_qubits.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "f642e12d8720ff14662d7ee5d3a80f28961af9385fe74063629fe94fabb9d858"
             }
           },
@@ -729,8 +729,8 @@
               "-p",
               "stab-analysis",
               "--test",
-              "circuit_inverse_qec_pfm_b1",
-              "pfm_b1_feedback_rejection",
+              "circuit_time_reversal",
+              "time_reversal_rejects_measurement_feedback",
               "--quiet",
               "--exact"
             ]
@@ -742,7 +742,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-analysis|--test|circuit_inverse_qec_pfm_b1",
+              "argv": "cargo-test|-p|stab-analysis|--test|circuit_time_reversal",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
@@ -771,8 +771,8 @@
               "-p",
               "stab-analysis",
               "--test",
-              "circuit_inverse_qec_pfm_b1",
-              "pfm_b1_observable_paulis",
+              "circuit_time_reversal",
+              "time_reversal_preserves_observable_pauli_semantics",
               "--quiet",
               "--exact"
             ]
@@ -788,7 +788,7 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_python_observable_paulis.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
               "expected_stdout_sha256": "d6de5f028e6f7a77df04ae437111fff20ac6425cb9eb49a3a32f4f94860b61c7"
             }
           },
@@ -818,8 +818,8 @@
               "-p",
               "stab-analysis",
               "--test",
-              "circuit_inverse_qec_pfm_b1",
-              "pfm_b1_mpad_flow_matrix",
+              "circuit_time_reversal",
+              "time_reversal_routes_mpad_flows_and_observables",
               "--quiet",
               "--exact"
             ]
@@ -835,8 +835,8 @@
               "upstream_source": "src/stim/util_top/circuit_inverse_qec.cc",
               "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
               "expected_stdout_path": "expected/pfm_b1_mpad_flow_matrix.stdout",
-              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
-              "expected_stdout_sha256": "95b64d3063e6b8cd039c238c49c8b33a07d941120c0714174ec9d64ab7750687"
+              "stdin_sha256": "5d5860df84b325694a41f1ead0669708366cb5c03541d8eca990cb5867815246",
+              "expected_stdout_sha256": "c128b5ce6442ef22c0e52d51b471a146f3e39f8c8562526483477ef6215b8a53"
             }
           },
           "benchmark": {
@@ -3850,7 +3850,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|detecting_regions_repeat_",
+            "argv": "cargo-test|-p|stab-analysis|--lib|circuit_detecting_regions::tests::detecting_regions_resource_contract_is_bounded|--|--exact",
             "upstream_source": "src/stim/util_top/circuit_to_detecting_regions.test.cc"
           }
         },
@@ -3860,7 +3860,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|detecting_regions_target_api",
+            "argv": "cargo-test|-p|stab-analysis|--lib|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "src/stim/circuit/circuit_pybind_test.py"
           }
         },
@@ -3870,7 +3870,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|detecting_regions_target_shape",
+            "argv": "cargo-test|-p|stab-analysis|--lib|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "src/stim/simulators/sparse_rev_frame_tracker.test.cc"
           }
         },
@@ -3880,7 +3880,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|detecting_regions_target",
+            "argv": "cargo-test|-p|stab-analysis|--lib|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "src/stim/circuit/circuit_pybind_test.py"
           }
         },
@@ -3890,7 +3890,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-analysis|detecting_regions_clifford",
+            "argv": "cargo-test|-p|stab-analysis|--lib|circuit_detecting_regions::tests::detecting_regions_common_semantics_match_stim|--|--exact",
             "upstream_source": "doc/python_api_reference_vDev.md"
           }
         },

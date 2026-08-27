@@ -1,6 +1,7 @@
 use super::*;
 use std::ffi::OsString;
 
+use super::support::PinnedStimProgram;
 use crate::ensure_stim_binary;
 use crate::process::run_process;
 
@@ -100,6 +101,101 @@ int main() {
     stim::Circuit mixed("H 0\nMPAD 1\n");
     stim::Circuit pads("MPAD 0 1 0\n");
     return mixed.count_qubits() == 2 && pads.count_qubits() == 2 ? 0 : 1;
+}
+"#,
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_inverse_qec_misindexes_duplicate_reset_flows() {
+    run_pinned_stim_circuit_probe(
+        "inverse-qec-duplicate-reset-flow",
+        br#"
+#include <vector>
+
+#include "stim/util_top/circuit_inverse_qec.h"
+
+int main() {
+    std::vector<stim::Flow<64>> flows{
+        stim::Flow<64>::from_str("1 -> Z0"),
+    };
+    auto result = stim::circuit_inverse_qec<64>(stim::Circuit("R 0 0\n"), flows);
+    return result.first == stim::Circuit("M 0 0\n") &&
+                   result.second == std::vector<stim::Flow<64>>{
+                       stim::Flow<64>::from_str("Z -> rec[-4] xor rec[-3]"),
+                   }
+               ? 0
+               : 1;
+}
+"#,
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_inverse_qec_rewrites_negative_zero_records() {
+    run_pinned_stim_circuit_probe(
+        "inverse-qec-negative-zero",
+        br#"
+#include "stim/util_top/circuit_inverse_qec.h"
+
+int main() {
+    auto detector = stim::circuit_inverse_qec<64>(
+        stim::Circuit("R 0\nM 0\nDETECTOR rec[-0]\n"), {});
+    auto measure_reset = stim::circuit_inverse_qec<64>(
+        stim::Circuit("R 0\nM 0\nMR 0\nDETECTOR rec[-0]\n"), {});
+    return detector.first == stim::Circuit("M 0 0\n") &&
+                   measure_reset.first == stim::Circuit("MR 0\nM 0 0\n")
+               ? 0
+               : 1;
+}
+"#,
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_inverse_qec_silently_drops_flow_observables() {
+    run_pinned_stim_circuit_probe(
+        "inverse-qec-dropped-flow-observable",
+        br#"
+#include <vector>
+
+#include "stim/util_top/circuit_inverse_qec.h"
+
+int main() {
+    std::vector<stim::Flow<64>> flows{
+        stim::Flow<64>::from_str("1 -> Z0 xor obs[0]"),
+    };
+    auto result = stim::circuit_inverse_qec<64>(stim::Circuit("R 0\n"), flows);
+    return result.first == stim::Circuit("M 0\n") &&
+                   result.second == std::vector<stim::Flow<64>>{
+                       stim::Flow<64>::from_str("Z0 -> rec[-1]"),
+                   }
+               ? 0
+               : 1;
+}
+"#,
+    );
+}
+
+#[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_weighted_wcnf_emits_false_sentinels_for_sparse_zero_probability_targets() {
+    run_pinned_stim_circuit_probe(
+        "weighted-wcnf-zero-probability-sentinel",
+        br#"
+#include <string>
+
+#include "stim/search/sat/wcnf.h"
+
+int main() {
+    auto actual = stim::likeliest_error_sat_problem(stim::DetectorErrorModel(
+        "error(0) D9 L3\n"
+        "error(0.1) D0 L0\n"
+        "error(0.1) D0\n"), 10);
+    return actual.find("18446744073709551615") == std::string::npos ? 1 : 0;
 }
 "#,
     );
@@ -331,47 +427,8 @@ fn pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit() {
 }
 
 fn run_pinned_stim_circuit_probe(name: &str, source: &[u8]) {
-    let root = RepoRoot::resolve(
-        &Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .canonicalize()
-            .expect("workspace root"),
-    )
-    .expect("repository root");
-    let stim = ensure_stim_binary(&root, false).expect("pinned Stim binary");
-    let library = stim
-        .parent()
-        .expect("Stim output directory")
-        .join("libstim.a");
-    assert!(library.is_file(), "pinned Stim static library is missing");
-
-    let directory = tempfile::tempdir().expect("probe directory");
-    let probe = directory.path().join(name);
-    let args = vec![
-        OsString::from("-std=c++20"),
-        OsString::from("-O2"),
-        OsString::from("-I"),
-        root.path.join("vendor/stim/src").into_os_string(),
-        OsString::from("-x"),
-        OsString::from("c++"),
-        OsString::from("-"),
-        OsString::from("-x"),
-        OsString::from("none"),
-        library.into_os_string(),
-        OsString::from("-pthread"),
-        OsString::from("-o"),
-        probe.clone().into_os_string(),
-    ];
-    let compile = run_process(Path::new("c++"), &args, source, Some(&root.path))
-        .expect("compile pinned Stim circuit-equality probe");
-    assert!(
-        compile.success(),
-        "probe compilation failed: {}",
-        compile.stderr.render_for_diagnostics()
-    );
-
-    let result = run_process(&probe, std::iter::empty::<&str>(), &[], Some(&root.path))
-        .expect("execute pinned Stim circuit-equality probe");
+    let probe = PinnedStimProgram::compile(name, source);
+    let result = probe.run(std::iter::empty::<&str>(), &[]);
     assert!(
         result.success(),
         "pinned Stim circuit-equality reproduction {name:?} failed: {}",

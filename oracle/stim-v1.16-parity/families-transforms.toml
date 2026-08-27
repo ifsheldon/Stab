@@ -3,8 +3,41 @@
 [[families]]
 id = "transforms.circuit-decomposition-common"
 area = "transforms"
-contract = "Circuit decomposition lowers the currently supported ISWAP, MPP, pair-measurement, and metadata-preserving common families."
+contract = "Circuit decomposition is the sole public base-gate lowering operation and preserves ISWAP, MPP, SPP, pair-measurement, constant-product, noise, annotation, tag, repeat, and flow semantics."
 stim_refs = ["src/stim/circuit/gate_decomposition.test.cc"]
+coverage = ["capability:circuit-simplification", "consumer:transform"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::catalog_semantics::p5_catalog_base_gate_decomposition_matches_pinned_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-decomposition-gate-catalog"
+area = "transforms"
+contract = "Base-gate decomposition preserves the exact stabilizer-flow action of every canonical Stim gate that declares an H, S, CX, M, and R decomposition."
+stim_refs = ["src/stim/circuit/gate_decomposition.test.cc", "src/stim/gates/gates.test.cc"]
+status = "done"
+owner = "stab-analysis"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::catalog_semantics::p5_catalog_base_gate_decomposition_matches_pinned_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.circuit-decomposition-target-matrix"
+area = "transforms"
+contract = "Template decomposition lowers every Stim-decomposable single- and two-qubit Clifford target shape, including record- and sweep-controlled CX, CY, CZ, XCZ, and YCZ orientations, into the declared H, S, CX, M, and R base."
+stim_refs = ["src/stim/circuit/gate_decomposition.test.cc", "src/stim/util_top/simplified_circuit.cc"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
@@ -12,18 +45,9 @@ status = "verified"
 [families.evidence.test]
 package = "stab-analysis"
 kind = "test"
-target = "canonical_owner_evidence"
-name = "cq2_circuit_api_decomposed_transform"
+target = "circuit_simplify"
+name = "decomposed_template_and_classical_control_matrix_matches_stim"
 minimum_tier = "pr"
-
-[[families]]
-id = "transforms.circuit-decomposition-remaining"
-area = "transforms"
-contract = "Circuit decomposition lowers every Stim-decomposable gate and legal classical target shape beyond the owned common families, including XCZ and YCZ feedback, while preserving tags, noise, measurements, and flows."
-stim_refs = ["src/stim/circuit/gate_decomposition.test.cc", "src/stim/util_top/simplified_circuit.cc"]
-status = "missing"
-owner = "stab-analysis"
-milestone = "P5"
 
 [[families]]
 id = "transforms.circuit-flattening"
@@ -40,32 +64,6 @@ kind = "test"
 target = "canonical_owner_evidence"
 name = "cq2_circuit_api_flattened_transform"
 minimum_tier = "pr"
-
-[[families]]
-id = "transforms.circuit-simplification-common"
-area = "transforms"
-contract = "Circuit simplification rewrites the implemented single- and two-qubit Clifford families into the H, S, CX, M, and R base while preserving repeats and unsupported instructions."
-stim_refs = ["src/stim/util_top/simplified_circuit.test.cc"]
-status = "done"
-owner = "stab-analysis"
-[families.evidence]
-status = "verified"
-[families.evidence.test]
-package = "stab-analysis"
-kind = "test"
-target = "circuit_simplify"
-name = "cq2_circuit_api_simplified_contract_matches_selected_stim_scope"
-minimum_tier = "pr"
-
-[[families]]
-id = "transforms.circuit-simplification-remaining"
-area = "transforms"
-contract = "Circuit simplification lowers every remaining Stim-supported instruction and target shape into the declared base set while preserving semantics and metadata."
-stim_refs = ["src/stim/util_top/simplified_circuit.test.cc"]
-coverage = ["capability:circuit-simplification"]
-status = "missing"
-owner = "stab-analysis"
-milestone = "P5"
 
 [[families]]
 id = "transforms.circuit-tag-removal"
@@ -86,8 +84,9 @@ minimum_tier = "pr"
 [[families]]
 id = "transforms.circuit-unitary-inverse-common"
 area = "transforms"
-contract = "Unitary circuit inversion reverses instruction order and replaces supported unitary gates with their pinned Stim inverse while preserving qubit order semantics."
+contract = "Unitary circuit inversion reverses every Stim-legal unitary instruction, SPP product, TICK, coordinate shift, leading QUBIT_COORDS prefix, tag, and compact repeat while preserving qubit-order semantics."
 stim_refs = ["src/stim/util_top/circuit_inverse_unitary.test.cc"]
+coverage = ["capability:circuit-unitary-inverse"]
 status = "done"
 owner = "stab-analysis"
 [families.evidence]
@@ -96,18 +95,24 @@ status = "verified"
 package = "stab-analysis"
 kind = "test"
 target = "circuit_inverse"
-name = "circuit_inverse_unitary_matches_stim_example"
+name = "circuit_inverse_unitary_matches_stim_spp_and_annotation_contract"
 minimum_tier = "pr"
 
 [[families]]
-id = "transforms.circuit-unitary-inverse-remaining"
+id = "transforms.circuit-unitary-inverse-gate-catalog"
 area = "transforms"
-contract = "Unitary circuit inversion handles every Stim-legal unitary circuit annotation and instruction, including TICK and preserved leading QUBIT_COORDS metadata."
-stim_refs = ["src/stim/util_top/circuit_inverse_unitary.test.cc", "src/stim/circuit/circuit.pybind.cc"]
-coverage = ["capability:circuit-unitary-inverse"]
-status = "missing"
+contract = "Strict unitary inversion matches pinned Stim canonical output for every canonical unitary gate through a legal representative target shape."
+stim_refs = ["src/stim/util_top/circuit_inverse_unitary.test.cc", "src/stim/gates/gates.test.cc"]
+status = "done"
 owner = "stab-analysis"
-milestone = "P5"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::catalog_semantics::p5_catalog_strict_unitary_inverse_matches_pinned_stim"
+minimum_tier = "pr"
 
 [[families]]
 id = "transforms.dem-tag-removal"
@@ -128,7 +133,7 @@ minimum_tier = "pr"
 [[families]]
 id = "transforms.feedback-inlining-common"
 area = "transforms"
-contract = "Feedback inlining preserves Stim-accepted demolition, interleaved-order, MPP, CX/CY record-control, bounded-loop, and selected nested-repeat cases."
+contract = "Feedback inlining preserves Stim-accepted demolition, interleaved ordering, MPP, every record-controlled CX, CY, and CZ orientation, and compact nested-repeat semantics under one aggregate work limit."
 stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
 status = "done"
 owner = "stab-analysis"
@@ -166,18 +171,27 @@ name = "parity::tests::pinned_stim::pinned_stim_feedback_transform_mistakes_a_sw
 minimum_tier = "pr"
 
 [[families]]
-id = "transforms.feedback-inlining-remaining"
+id = "transforms.feedback-inlining-xcz-ycz-controls"
 area = "transforms"
-contract = "Feedback inlining supports every remaining legal measurement-record control and compact repeat shape without selected-control or bounded-expansion gaps."
-stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
-status = "missing"
+contract = "Feedback inlining accepts XCZ and YCZ record-control orientations by lowering them to the equivalent controlled-X and controlled-Y semantics."
+stim_refs = ["src/stim/util_top/transform_without_feedback.cc"]
+status = "divergence"
 owner = "stab-analysis"
-milestone = "P5"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim's feedback transform omits XCZ and YCZ dispatch even though the gate dialect defines equivalent controlled-Pauli orientations; Stab accepts the typed equivalents."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_feedback::tests::feedback_inlining_xcz_ycz_extension_matches_equivalent_controls"
+minimum_tier = "pr"
 
 [[families]]
 id = "transforms.inverse-qec-common"
 area = "transforms"
-contract = "Inverse-QEC construction supports the implemented unitary, reset, measurement, measure-reset, pair-product, MPP, MPAD, detector-flow, observable, and selected-noise packets."
+contract = "Inverse-QEC construction uses the general reverse-flow engine for unitary, reset, measurement, measure-reset, pair-product, MPP, MPAD, detector, observable, coordinate, annotation, ordinary-noise, generated-code, and bounded measurement-rich repeat semantics."
 stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
 status = "done"
 owner = "stab-analysis"
@@ -191,13 +205,28 @@ name = "inverse_qec_common_semantic_matrix_matches_stim"
 minimum_tier = "pr"
 
 [[families]]
-id = "transforms.inverse-qec-remaining"
+id = "transforms.inverse-qec-negative-zero-record"
 area = "transforms"
-contract = "Inverse-QEC construction supports every remaining Stim flow-driven reset, measurement, detector, observable, noise, feedback, and duplicate-target surface."
+contract = "Inverse-QEC rejects rec[-0] declarations instead of synthesizing extra measurements from a zero-lookback alias."
 stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
-status = "missing"
+status = "divergence"
 owner = "stab-analysis"
-milestone = "P5"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim accepts rec[-0] during inverse QEC and rewrites it into duplicate measurements even though zero is not a valid backward record offset; Stab rejects the malformed boundary."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_inverse_qec"
+name = "inverse_qec_rejects_negative_zero_record_offsets"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim::pinned_stim_inverse_qec_rewrites_negative_zero_records"
+minimum_tier = "pr"
 
 [[families]]
 id = "transforms.qasm-quirk-crumble-exports"
@@ -208,19 +237,9 @@ status = "deferred"
 rationale = "QASM, Quirk, and Crumble exports are explicitly deferred and do not include ordinary .stim, .dem, or result-format serialization."
 
 [[families]]
-id = "transforms.remaining-gate-target-surface"
-area = "transforms"
-contract = "Each in-scope circuit transform accepts every Stim-legal instruction and target shape not covered by its dedicated family row and rejects only the same invalid or semantically unsupported inputs."
-stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/util_top/simplified_circuit.test.cc"]
-coverage = ["consumer:transform"]
-status = "missing"
-owner = "stab-analysis"
-milestone = "P5"
-
-[[families]]
 id = "transforms.time-reversal-for-flows-common"
 area = "transforms"
-contract = "Time reversal for flows supports the implemented folded unitary, measurement-rich, detector, observable, coordinate, product-measurement, MPAD, ordinary-noise, generated-code, and bounded-repeat workflows."
+contract = "Time reversal for flows supports folded unitary, measurement-rich, circuit-observable, coordinate, product-measurement, MPAD, heralded-record, ordinary-noise, generated-code, duplicate-measurement, and bounded-repeat workflows when supplied flows contain no observable dependencies; supplied signs are accepted and normalized, while record feedback is rejected, matching pinned Stim."
 stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
 status = "done"
 owner = "stab-analysis"
@@ -234,13 +253,52 @@ name = "time_reversal_for_flows_common_semantic_matrix_matches_stim"
 minimum_tier = "pr"
 
 [[families]]
-id = "transforms.time-reversal-for-flows-remaining"
+id = "transforms.time-reversal-for-flows-duplicate-reset-indexing"
 area = "transforms"
-contract = "Time reversal for flows supports every remaining legal QEC circuit, feedback, heralded-record, duplicate-target, and compact-repeat surface and returns exact transformed flows."
+contract = "Duplicate reset and measure-reset targets reverse by disjoint target segment and return flows whose record indexes are valid for the returned circuit."
 stim_refs = ["src/stim/util_top/circuit_inverse_qec.test.cc"]
-status = "missing"
+status = "divergence"
 owner = "stab-analysis"
-milestone = "P5"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim loops over the full instruction for every disjoint duplicate-target segment and can return rec[-4] for a two-measurement inverse; Stab indexes each segment once and validates the corrected flow."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_inverse_qec"
+name = "time_reversed_for_flows_preserves_duplicate_reset_semantics"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim::pinned_stim_inverse_qec_misindexes_duplicate_reset_flows"
+minimum_tier = "pr"
+
+[[families]]
+id = "transforms.time-reversal-for-flows-observable-dependencies"
+area = "transforms"
+contract = "Time reversal rejects a surviving obs[k] term in a supplied flow before expansion instead of silently dropping that dependency from the returned flow."
+stim_refs = ["src/stim/util_top/circuit_inverse_qec.inl", "src/stim/util_top/circuit_inverse_qec.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim stores the input observable list but neither seeds it into reverse tracking nor emits it in the returned flow. Stab rejects this under-specified operation instead of reporting a lossy success."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_inverse_qec"
+name = "time_reversed_for_flows_rejects_observable_dependencies_before_expansion"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim::pinned_stim_inverse_qec_silently_drops_flow_observables"
+minimum_tier = "pr"
 
 [[families]]
 id = "transforms.without-noise"

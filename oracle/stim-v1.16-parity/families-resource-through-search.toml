@@ -55,6 +55,24 @@ name = "circuit_pass_resource_admission_is_atomic_across_framework_stages"
 minimum_tier = "pr"
 
 [[families]]
+id = "resource-safety.circuit-to-dem-expanded-work-limit"
+area = "resource-safety"
+contract = "Circuit-to-DEM analysis admits aggregate expanded operations, repeat iterations, and nesting through one typed one-million-work policy."
+stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/util_top/circuit_to_dem.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab bounds total analyzer work and nesting explicitly instead of relying on unbounded expansion."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_traversal_resource"
+name = "pf4_dem_analyzer_repeat_resource_policy_is_source_owned"
+minimum_tier = "pr"
+
+[[families]]
 id = "resource-safety.circuit-to-dem-local-decomposition-limit"
 area = "resource-safety"
 contract = "Circuit-to-DEM local graphlike decomposition accepts exactly sixteen detector symptoms and rejects seventeen with Stim's bounded-local-mask failure."
@@ -68,6 +86,24 @@ package = "stab-analysis"
 kind = "test"
 target = "consolidation_matrix"
 name = "circuit_to_dem_local_decomposition_symptom_boundary_matches_stim"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.circuit-to-dem-no-recurrence-limit"
+area = "resource-safety"
+contract = "Circuit-to-DEM loop folding rejects a non-recurrent repeat after one million recurrence probes or unrolled iterations instead of searching through an arbitrarily large repeat count."
+stim_refs = ["src/stim/simulators/error_analyzer.cc", "src/stim/simulators/error_analyzer.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Pinned Stim searches through the requested iterations when no shifted recurrence is found; Stab uses the source-owned analyzer work ceiling to prevent tiny compact inputs from requesting unbounded state evolution."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_analyzer_loop_folding"
+name = "pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget"
 minimum_tier = "pr"
 
 [[families]]
@@ -175,6 +211,24 @@ name = "work_limits_reject_before_rng_or_sink_and_leave_session_reusable"
 minimum_tier = "pr"
 
 [[families]]
+id = "resource-safety.detecting-regions-limits"
+area = "resource-safety"
+contract = "Detecting-region extraction admits compact repeat counts independently of syntax, omits inactive outputs, and reports typed represented-work, traversal-work, live-state, output-record, output-byte, materialized-width, and 128-level nesting excesses."
+stim_refs = ["src/stim/util_top/circuit_to_detecting_regions.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab bounds hostile detecting-region requests and retained output explicitly while preserving folded repeat semantics and sparse inactive snapshots."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_detecting_regions::tests::detecting_regions_resource_contract_is_bounded"
+minimum_tier = "pr"
+
+[[families]]
 id = "resource-safety.detection-compile-limits"
 area = "resource-safety"
 contract = "Compact detection conversion compilation admits exact aggregate repeat-iteration, expanded-instruction, retained-term, retained-byte, and record-width limits and rejects the first excess with the corresponding typed resource kind without a per-block syntax cap."
@@ -190,6 +244,42 @@ package = "stab-engine"
 kind = "test"
 target = "canonical_owner_evidence"
 name = "a2_detection_compile_limits_are_independent_and_atomic"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.feedback-inlining-fixed-limits"
+area = "resource-safety"
+contract = "Feedback inlining has no per-block repeat-count cap, admits one aggregate expanded-work and repeat-iteration boundary, and reports typed expanded-operation, repeat-iteration, and 256-level nesting excesses."
+stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab bounds the current feedback-expansion algorithm explicitly instead of relying on host runtime or allocation failure."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_feedback::tests::feedback_repeat_resource_divergence_has_one_aggregate_policy"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.flow-generation-fixed-limits"
+area = "resource-safety"
+contract = "Measurement-rich flow generation reports typed projected-payload, expanded-operation, and 256-level repeat-nesting excesses while ignored-only and compact unitary paths retain their specialized behavior."
+stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab bounds owned flow storage and expansion work explicitly before allocating rows or traversing hostile compact repeats."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "circuit_flow_resources"
+name = "circuit_flow_generators_admit_owned_rows_and_report_typed_limits"
 minimum_tier = "pr"
 
 [[families]]
@@ -244,6 +334,24 @@ package = "stab-analysis"
 kind = "test"
 target = "logical_search_materialization_limits"
 name = "logical_search_limits_return_typed_failures_without_mutating_source"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.missing-detector-fixed-limits"
+area = "resource-safety"
+contract = "Missing-detector discovery reports typed expanded-operation, projected-payload, and repeat-nesting limits while a proven final local repeat remains count-independent."
+stim_refs = ["src/stim/util_top/missing_detectors.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab bounds unsupported expanded analysis shapes and projected flow storage explicitly, but proves covered final local repeats from one iteration instead of rejecting by repeat count."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "missing_detectors"
+name = "missing_detector_resource_contract_is_atomic"
 minimum_tier = "pr"
 
 [[families]]
@@ -334,6 +442,24 @@ package = "stab-model"
 kind = "test"
 target = "parse_resources"
 name = "parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.pauli-conjugation-fixed-limit"
+area = "resource-safety"
+contract = "Pauli conjugation keeps pure Clifford repeats compact and reports a typed expanded-operation excess before traversing more than 1,000,000 nonunitary instructions."
+stim_refs = ["src/stim/circuit/circuit2.pybind.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "resource-limit"
+rationale = "Stab bounds the measurement/reset traversal explicitly while preserving the unbounded compact tableau path for unitary repeats."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "algebra_circuit_conversions"
+name = "pauli_circuit_conjugation_keeps_compact_unitaries_and_bounds_nonunitary_work"
 minimum_tier = "pr"
 
 [[families]]
@@ -702,7 +828,7 @@ status = "verified"
 package = "stab-engine"
 kind = "test"
 target = "gate_semantic_contract"
-name = "gate::semantic_contract::tests::sampling_and_detection_execute_every_declared_legal_gate_shape"
+name = "gate::semantic_contract::tests::product_surfaces_execute_every_declared_legal_gate_shape"
 minimum_tier = "pr"
 
 [[families]]
@@ -812,7 +938,7 @@ minimum_tier = "pr"
 [[families]]
 id = "search.likeliest-error-wcnf-common"
 area = "search"
-contract = "Likeliest-error weighted CNF generation matches Stim variables, clauses, weights, observables, and unsatisfiable behavior for direct DEMs including sparse identifiers and the implemented compact zero-shift repeat families."
+contract = "Likeliest-error weighted CNF generation matches Stim variables, clauses, log-odds weights, observables, unsatisfiable behavior, ordinary sparse identifiers, and exact flat and nested repeat expansion."
 stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
 status = "done"
 owner = "stab-analysis"
@@ -826,18 +952,49 @@ name = "likeliest_error_wcnf_common_matches_stim"
 minimum_tier = "pr"
 
 [[families]]
-id = "search.likeliest-error-wcnf-remaining"
+id = "search.likeliest-error-wcnf-exhaustive-optimum"
 area = "search"
-contract = "Likeliest-error weighted CNF generation matches Stim for every remaining shifted-active, non-flat, and broader mixed repeat family without selected-subset exits."
+contract = "Across 360 bounded nested-repeat models, compact and explicit DEMs produce identical WCNF and select the same optimum as direct enumeration."
 stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
-status = "missing"
+status = "done"
 owner = "stab-analysis"
-milestone = "P5"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_sat_repeat_semantics"
+name = "likeliest_wcnf_repeat_semantics_match_direct_exhaustion"
+minimum_tier = "pr"
+
+[[families]]
+id = "search.likeliest-error-wcnf-zero-probability-sparse-targets"
+area = "search"
+contract = "Weighted WCNF retains one variable per zero-probability error but omits its parity contribution without serializing internal false sentinels as invalid DIMACS literals."
+stim_refs = ["src/stim/search/sat/wcnf.cc", "src/stim/search/sat/wcnf.test.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim serializes SIZE_MAX for untouched sparse observable slots introduced only by zero-probability errors; Stab preserves variable numbering while emitting a valid semantic observable clause."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_sat_repeat_folding"
+name = "likeliest_error_wcnf_avoids_stim_zero_probability_sparse_literal_bug"
+minimum_tier = "pr"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim::pinned_stim_weighted_wcnf_emits_false_sentinels_for_sparse_zero_probability_targets"
+minimum_tier = "pr"
 
 [[families]]
 id = "search.shortest-error-wcnf"
 area = "search"
-contract = "Shortest-error weighted CNF generation matches Stim variables, clauses, observables, and unsatisfiable cases."
+contract = "Shortest-error weighted CNF generation matches Stim variables, clauses, observables, unsatisfiable cases, and exact flat and nested repeat expansion."
 stim_refs = ["src/stim/search/sat/wcnf.test.cc"]
 status = "done"
 owner = "stab-analysis"
