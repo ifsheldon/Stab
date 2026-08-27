@@ -2,7 +2,7 @@ use rand::{Rng, RngExt as _};
 use stab_algebra::{PauliBasis, PauliSign};
 use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, Pauli, Target};
 
-use super::error::{DetectionError as CircuitError, DetectionResult as CircuitResult};
+use super::error::{DetectionError, DetectionResult};
 use super::{try_false_vec, try_vec_with_capacity};
 
 mod helpers;
@@ -36,7 +36,7 @@ impl ScalarDetectionFrame {
         measurement_count: usize,
         detector_count: usize,
         observable_count: usize,
-    ) -> CircuitResult<Self> {
+    ) -> DetectionResult<Self> {
         Ok(Self {
             xs: try_false_vec(qubit_count, "detection frame X state")?,
             zs: try_false_vec(qubit_count, "detection frame Z state")?,
@@ -66,7 +66,7 @@ impl ScalarDetectionFrame {
         circuit: &Circuit,
         max_repeat_unroll: u64,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         for item in circuit.items() {
             match item {
                 CircuitItem::Instruction(instruction) => {
@@ -75,7 +75,7 @@ impl ScalarDetectionFrame {
                 CircuitItem::RepeatBlock(repeat) => {
                     let repeat_count = repeat.repeat_count().get();
                     if repeat_count > max_repeat_unroll {
-                        return Err(CircuitError::invalid_sampler_compilation(format!(
+                        return Err(DetectionError::invalid_sampler_compilation(format!(
                             "frame detection currently supports repeat counts up to {max_repeat_unroll}, got {repeat_count}"
                         )));
                     }
@@ -93,7 +93,7 @@ impl ScalarDetectionFrame {
         instruction: &CircuitInstruction,
         max_repeat_unroll: u64,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         match instruction.gate().canonical_name() {
             "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => Ok(()),
             "DETECTOR" => self.record_detector(instruction),
@@ -159,7 +159,7 @@ impl ScalarDetectionFrame {
                 self.apply_tableau_instruction(instruction)
             }
             _ if zero_probability_noise(instruction)? => Ok(()),
-            name => Err(CircuitError::invalid_sampler_compilation(format!(
+            name => Err(DetectionError::invalid_sampler_compilation(format!(
                 "M9 detector frame subset does not support {name}"
             ))),
         }
@@ -170,16 +170,16 @@ impl ScalarDetectionFrame {
         instruction: &CircuitInstruction,
         max_repeat_unroll: u64,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let decomposed = decomposed_frame_instruction(instruction)?;
         self.execute_circuit(&decomposed, max_repeat_unroll, rng)
     }
 
-    fn record_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn record_detector(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
         let mut bit = false;
         for target in instruction.targets() {
             let Some(offset) = target.measurement_record_offset() else {
-                return Err(CircuitError::invalid_result_format(format!(
+                return Err(DetectionError::invalid_result_format(format!(
                     "DETECTOR target {target} is not a measurement record"
                 )));
             };
@@ -189,18 +189,18 @@ impl ScalarDetectionFrame {
         Ok(())
     }
 
-    fn record_observable(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        let observable = instruction
-            .observable_id_argument()?
-            .ok_or_else(|| CircuitError::invalid_result_format("OBSERVABLE_INCLUDE missing id"))?;
+    fn record_observable(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
+        let observable = instruction.observable_id_argument()?.ok_or_else(|| {
+            DetectionError::invalid_result_format("OBSERVABLE_INCLUDE missing id")
+        })?;
         let observable_id = usize::try_from(observable.get()).map_err(|_| {
-            CircuitError::invalid_result_format(format!(
+            DetectionError::invalid_result_format(format!(
                 "observable id {} does not fit usize",
                 observable.get()
             ))
         })?;
         if self.observables.get(observable_id).is_none() {
-            return Err(CircuitError::invalid_result_format(format!(
+            return Err(DetectionError::invalid_result_format(format!(
                 "observable id {observable_id} was not initialized"
             )));
         }
@@ -211,14 +211,14 @@ impl ScalarDetectionFrame {
             } else if target.is_pauli_target() {
                 bit ^= self.pauli_target_frame_bit(target)?;
             } else {
-                return Err(CircuitError::invalid_result_format(format!(
+                return Err(DetectionError::invalid_result_format(format!(
                     "OBSERVABLE_INCLUDE target {target} is not supported"
                 )));
             }
         }
         if bit {
             let observable = self.observables.get_mut(observable_id).ok_or_else(|| {
-                CircuitError::invalid_result_format(format!(
+                DetectionError::invalid_result_format(format!(
                     "observable id {observable_id} was not initialized"
                 ))
             })?;
@@ -232,7 +232,7 @@ impl ScalarDetectionFrame {
         instruction: &CircuitInstruction,
         basis: PauliBasis,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         for target in instruction.targets() {
             self.reset_qubit(qubit_index(instruction, target)?, basis, rng)?;
         }
@@ -245,7 +245,7 @@ impl ScalarDetectionFrame {
         basis: PauliBasis,
         reset: bool,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let flip_probability = measurement_flip_probability(instruction)?;
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
@@ -263,7 +263,7 @@ impl ScalarDetectionFrame {
         &mut self,
         instruction: &CircuitInstruction,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let flip_probability = measurement_flip_probability(instruction)?;
         for target in instruction.targets() {
             if target.qubit_id().is_none() {
@@ -279,7 +279,7 @@ impl ScalarDetectionFrame {
         instruction: &CircuitInstruction,
         basis: PauliBasis,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let flip_probability = measurement_flip_probability(instruction)?;
         for target_group in instruction.target_groups() {
             let [left, right] = target_group else {
@@ -299,7 +299,7 @@ impl ScalarDetectionFrame {
         &mut self,
         instruction: &CircuitInstruction,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let flip_probability = measurement_flip_probability(instruction)?;
         for target_group in instruction.target_groups() {
             let mut raw_terms = Vec::new();
@@ -324,7 +324,7 @@ impl ScalarDetectionFrame {
         terms: &[(usize, PauliBasis)],
         flip_probability: f64,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let mut result = sample_flip(flip_probability, rng);
         for (qubit, basis) in terms {
             result ^= self.frame_measurement_bit(*qubit, *basis)?;
@@ -348,7 +348,7 @@ impl ScalarDetectionFrame {
         &mut self,
         terms: &[(usize, PauliBasis)],
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         if !rng.random_bool(0.5) {
             return Ok(());
         }
@@ -370,7 +370,7 @@ impl ScalarDetectionFrame {
         &mut self,
         instruction: &CircuitInstruction,
         basis: PauliBasis,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         for target_group in instruction.target_groups() {
             let [control, target] = target_group else {
                 return Err(unsupported_frame_instruction(instruction));
@@ -396,7 +396,7 @@ impl ScalarDetectionFrame {
         Ok(())
     }
 
-    fn apply_cz_or_feedback(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn apply_cz_or_feedback(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
         for target_group in instruction.target_groups() {
             let [left, right] = target_group else {
                 return Err(unsupported_frame_instruction(instruction));
@@ -433,7 +433,10 @@ impl ScalarDetectionFrame {
         Ok(())
     }
 
-    fn apply_x_or_y_controlled_z(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn apply_x_or_y_controlled_z(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> DetectionResult<()> {
         let feedback_basis = match instruction.gate().canonical_name() {
             "XCZ" => PauliBasis::X,
             "YCZ" => PauliBasis::Y,
@@ -462,14 +465,17 @@ impl ScalarDetectionFrame {
         Ok(())
     }
 
-    fn apply_tableau_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn apply_tableau_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> DetectionResult<()> {
         for target_group in instruction.target_groups() {
             self.apply_tableau_targets(instruction.gate(), target_group)?;
         }
         Ok(())
     }
 
-    fn apply_tableau_targets(&mut self, gate: Gate, targets: &[Target]) -> CircuitResult<()> {
+    fn apply_tableau_targets(&mut self, gate: Gate, targets: &[Target]) -> DetectionResult<()> {
         let gate_name = gate.canonical_name();
         let tableau = stab_analysis::gate_tableau(gate)?;
         let qubits = targets
@@ -480,16 +486,16 @@ impl ScalarDetectionFrame {
                     .ok_or_else(|| unsupported_frame_target(gate_name, target))
                     .and_then(|qubit| {
                         usize::try_from(qubit.get()).map_err(|_| {
-                            CircuitError::invalid_sampler_compilation(format!(
+                            DetectionError::invalid_sampler_compilation(format!(
                                 "qubit target {} cannot fit in this platform's usize",
                                 qubit.get()
                             ))
                         })
                     })
             })
-            .collect::<CircuitResult<Vec<_>>>()?;
+            .collect::<DetectionResult<Vec<_>>>()?;
         if qubits.len() != tableau.len() {
-            return Err(CircuitError::invalid_sampler_compilation(format!(
+            return Err(DetectionError::invalid_sampler_compilation(format!(
                 "gate {gate_name} frame transform expected {} targets but got {}",
                 tableau.len(),
                 qubits.len()
@@ -498,14 +504,14 @@ impl ScalarDetectionFrame {
         let bases = qubits
             .iter()
             .map(|qubit| self.qubit_basis(*qubit))
-            .collect::<CircuitResult<Vec<_>>>()?;
+            .collect::<DetectionResult<Vec<_>>>()?;
         let input = stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, bases);
         let output = tableau
             .apply(&input)
-            .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
+            .map_err(|error| DetectionError::invalid_sampler_compilation(error.to_string()))?;
         for (local_index, qubit) in qubits.into_iter().enumerate() {
             let basis = output.get(local_index).ok_or_else(|| {
-                CircuitError::invalid_sampler_compilation(
+                DetectionError::invalid_sampler_compilation(
                     "tableau frame transform changed output length",
                 )
             })?;
@@ -520,7 +526,7 @@ impl ScalarDetectionFrame {
         instruction: &CircuitInstruction,
         probabilities: [f64; 3],
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
             if let Some(basis) = sample_single_pauli(probabilities, rng) {
@@ -535,7 +541,7 @@ impl ScalarDetectionFrame {
         instruction: &CircuitInstruction,
         probabilities: [f64; 15],
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         for target_group in instruction.target_groups() {
             let [left, right] = target_group else {
                 return Err(unsupported_frame_instruction(instruction));
@@ -559,7 +565,7 @@ impl ScalarDetectionFrame {
         instruction: &CircuitInstruction,
         else_branch: bool,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         if else_branch && self.correlated_error_occurred {
             return Ok(());
         }
@@ -589,7 +595,7 @@ impl ScalarDetectionFrame {
         &mut self,
         instruction: &CircuitInstruction,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let probability = single_probability_argument(instruction)?.get();
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
@@ -611,7 +617,7 @@ impl ScalarDetectionFrame {
         &mut self,
         instruction: &CircuitInstruction,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         let probabilities = probability_list::<4>(instruction)?;
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
@@ -644,7 +650,7 @@ impl ScalarDetectionFrame {
         qubit: usize,
         basis: PauliBasis,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
             PauliBasis::X => {
@@ -669,13 +675,13 @@ impl ScalarDetectionFrame {
         qubit: usize,
         basis: PauliBasis,
         rng: &mut impl Rng,
-    ) -> CircuitResult<bool> {
+    ) -> DetectionResult<bool> {
         let result = self.frame_measurement_bit(qubit, basis)?;
         self.randomize_measured_basis(qubit, basis, rng)?;
         Ok(result)
     }
 
-    fn frame_measurement_bit(&self, qubit: usize, basis: PauliBasis) -> CircuitResult<bool> {
+    fn frame_measurement_bit(&self, qubit: usize, basis: PauliBasis) -> DetectionResult<bool> {
         match basis {
             PauliBasis::I => Ok(false),
             PauliBasis::X => self.z_bit(qubit),
@@ -689,7 +695,7 @@ impl ScalarDetectionFrame {
         qubit: usize,
         basis: PauliBasis,
         rng: &mut impl Rng,
-    ) -> CircuitResult<()> {
+    ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
             PauliBasis::X => self.set_x_bit(qubit, rng.random_bool(0.5))?,
@@ -704,7 +710,7 @@ impl ScalarDetectionFrame {
         Ok(())
     }
 
-    fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) -> CircuitResult<()> {
+    fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
             PauliBasis::X => self.xor_x_bit(qubit, true)?,
@@ -717,14 +723,14 @@ impl ScalarDetectionFrame {
         Ok(())
     }
 
-    fn pauli_target_frame_bit(&self, target: &Target) -> CircuitResult<bool> {
+    fn pauli_target_frame_bit(&self, target: &Target) -> DetectionResult<bool> {
         let qubit = target.qubit_id().ok_or_else(|| {
-            CircuitError::invalid_result_format(format!(
+            DetectionError::invalid_result_format(format!(
                 "OBSERVABLE_INCLUDE Pauli target {target} has no qubit id"
             ))
         })?;
         let qubit = usize::try_from(qubit.get()).map_err(|_| {
-            CircuitError::invalid_result_format(format!(
+            DetectionError::invalid_result_format(format!(
                 "qubit target {} cannot fit in this platform's usize",
                 qubit.get()
             ))
@@ -733,37 +739,37 @@ impl ScalarDetectionFrame {
             Some(Pauli::X) => self.z_bit(qubit),
             Some(Pauli::Y) => Ok(self.x_bit(qubit)? ^ self.z_bit(qubit)?),
             Some(Pauli::Z) => self.x_bit(qubit),
-            None => Err(CircuitError::invalid_result_format(format!(
+            None => Err(DetectionError::invalid_result_format(format!(
                 "OBSERVABLE_INCLUDE target {target} is not a Pauli target"
             ))),
         }
     }
 
-    fn qubit_basis(&self, qubit: usize) -> CircuitResult<PauliBasis> {
+    fn qubit_basis(&self, qubit: usize) -> DetectionResult<PauliBasis> {
         Ok(PauliBasis::from_xz(self.x_bit(qubit)?, self.z_bit(qubit)?))
     }
 
-    fn x_bit(&self, qubit: usize) -> CircuitResult<bool> {
+    fn x_bit(&self, qubit: usize) -> DetectionResult<bool> {
         frame_bit(&self.xs, qubit)
     }
 
-    fn z_bit(&self, qubit: usize) -> CircuitResult<bool> {
+    fn z_bit(&self, qubit: usize) -> DetectionResult<bool> {
         frame_bit(&self.zs, qubit)
     }
 
-    fn set_x_bit(&mut self, qubit: usize, value: bool) -> CircuitResult<()> {
+    fn set_x_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
         set_frame_bit(&mut self.xs, qubit, value)
     }
 
-    fn set_z_bit(&mut self, qubit: usize, value: bool) -> CircuitResult<()> {
+    fn set_z_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
         set_frame_bit(&mut self.zs, qubit, value)
     }
 
-    fn xor_x_bit(&mut self, qubit: usize, value: bool) -> CircuitResult<()> {
+    fn xor_x_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
         xor_frame_bit(&mut self.xs, qubit, value)
     }
 
-    fn xor_z_bit(&mut self, qubit: usize, value: bool) -> CircuitResult<()> {
+    fn xor_z_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
         xor_frame_bit(&mut self.zs, qubit, value)
     }
 }

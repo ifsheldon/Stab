@@ -12,7 +12,7 @@ use stab_records::{
     ObservableWidth, PackedShotBatch,
 };
 
-use super::error::DetectionError as CircuitError;
+use super::error::DetectionError;
 use super::frame::{DirectDetectorFramePlan, DirectDetectorFrameState};
 use super::{
     DetectionConversionLimits, DetectionRecordBuffer, PreparedDetectionSampling,
@@ -30,7 +30,7 @@ pub use contracts::{
     DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
     DetectionRunStatus, DetectionRunSummary,
 };
-pub use delivery::MeasurementToDetectionSinkAdapter;
+pub use delivery::MeasurementToDetectionTransaction;
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_DETECTION_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
@@ -175,6 +175,7 @@ pub struct MeasurementToDetectionSession {
     cancellation: OnceLock<SamplingCancellation>,
     total_committed_shots: u64,
     poisoned: bool,
+    transaction_active: bool,
     not_sync: PhantomData<Cell<()>>,
 }
 
@@ -192,6 +193,7 @@ impl fmt::Debug for MeasurementToDetectionSession {
             )
             .field("total_committed_shots", &self.total_committed_shots)
             .field("poisoned", &self.poisoned)
+            .field("transaction_active", &self.transaction_active)
             .finish_non_exhaustive()
     }
 }
@@ -226,6 +228,7 @@ impl MeasurementToDetectionSession {
             cancellation: OnceLock::new(),
             total_committed_shots: 0,
             poisoned: false,
+            transaction_active: false,
             not_sync: PhantomData,
         })
     }
@@ -246,19 +249,25 @@ impl MeasurementToDetectionSession {
 
     /// Starts one incremental conversion and sink lifecycle.
     ///
-    /// The returned adapter binds this session to exactly one sink, preserves already committed
-    /// output when a later input record is malformed, and must be finalized exactly once.
-    pub fn start_delivery<'session, 'sink, Sink>(
+    /// The returned transaction binds this session to exactly one sink and preserves already
+    /// committed output when a later input record is malformed. Once a batch commits, the
+    /// transaction must be finalized; an untouched transaction may be dropped without poisoning
+    /// the session.
+    pub fn start_transaction<'session, 'sink, Sink>(
         &'session mut self,
         sink: &'sink mut Sink,
-    ) -> Result<MeasurementToDetectionSinkAdapter<'session, 'sink, Sink>, DetectionExecutionError>
+    ) -> Result<MeasurementToDetectionTransaction<'session, 'sink, Sink>, DetectionExecutionError>
     where
         Sink: DetectionSink,
     {
         if self.poisoned {
             return Err(DetectionExecutionError::SessionPoisoned);
         }
-        Ok(MeasurementToDetectionSinkAdapter::new(self, sink))
+        if self.transaction_active {
+            return Err(DetectionExecutionError::TransactionActive);
+        }
+        self.transaction_active = true;
+        Ok(MeasurementToDetectionTransaction::new(self, sink))
     }
 
     fn write_batch_with_progress<Sink>(
@@ -322,7 +331,8 @@ impl MeasurementToDetectionSession {
         Ok(self.summary(DetectionRunStatus::Completed, shots, shots.get()))
     }
 
-    /// Converts one bounded batch and owns the supplied sink's complete lifecycle.
+    /// Converts one bounded batch and owns the supplied sink's complete non-empty lifecycle.
+    /// A zero-shot request leaves the sink untouched.
     pub fn run<Sink>(
         &mut self,
         measurements: MeasurementBatchView<'_>,
@@ -339,7 +349,7 @@ impl MeasurementToDetectionSession {
             }
         })?);
         let mut delivery =
-            self.start_delivery(sink)
+            self.start_transaction(sink)
                 .map_err(|source| DetectionRunError::Engine {
                     source,
                     progress: DetectionRunProgress::new(0, 0),
@@ -387,7 +397,7 @@ impl MeasurementToDetectionSession {
         }
         if measurements.width() != self.plan.measurement_width() {
             return Err(DetectionExecutionError::Conversion(
-                CircuitError::invalid_result_format(format!(
+                DetectionError::invalid_result_format(format!(
                     "measurement batch expected {} bits per shot, got {}",
                     self.plan.measurement_width().get(),
                     measurements.width().get()
@@ -396,7 +406,7 @@ impl MeasurementToDetectionSession {
         }
         if measurements.shot_count() > MAX_BATCH_SHOTS {
             return Err(DetectionExecutionError::Conversion(
-                CircuitError::invalid_result_format(format!(
+                DetectionError::invalid_result_format(format!(
                     "measurement-to-detection batches contain at most {MAX_BATCH_SHOTS} shots, got {}",
                     measurements.shot_count()
                 )),
@@ -405,7 +415,7 @@ impl MeasurementToDetectionSession {
         if let Some(sweeps) = sweeps {
             if sweeps.width() != self.plan.sweep_width() {
                 return Err(DetectionExecutionError::Conversion(
-                    CircuitError::invalid_result_format(format!(
+                    DetectionError::invalid_result_format(format!(
                         "sweep batch expected {} bits per shot, got {}",
                         self.plan.sweep_width().get(),
                         sweeps.width().get()
@@ -414,7 +424,7 @@ impl MeasurementToDetectionSession {
             }
             if sweeps.shot_count() != measurements.shot_count() {
                 return Err(DetectionExecutionError::Conversion(
-                    CircuitError::invalid_result_format(format!(
+                    DetectionError::invalid_result_format(format!(
                         "measurement batch has {} shots but sweep batch has {}",
                         measurements.shot_count(),
                         sweeps.shot_count()
@@ -951,14 +961,14 @@ fn run_fused<Sink>(
 where
     Sink: DetectionSink,
 {
-    let mut adapter =
+    let mut transaction =
         conversion
-            .start_delivery(sink)
+            .start_transaction(sink)
             .map_err(|source| DetectionRunError::Engine {
                 source,
                 progress: DetectionRunProgress::new(0, 0),
             })?;
-    match sampling.run(shots, &mut adapter) {
+    match sampling.run(shots, &mut transaction) {
         Ok(summary) => Ok(DetectionRunSummary {
             status: match summary.status() {
                 SamplingRunStatus::Completed => DetectionRunStatus::Completed,
@@ -977,11 +987,11 @@ where
         }),
         Err(RunError::Sink {
             source, progress, ..
-        }) => flatten_adapter_error(source, progress),
+        }) => flatten_transaction_error(source, progress),
     }
 }
 
-fn flatten_adapter_error<SinkError>(
+fn flatten_transaction_error<SinkError>(
     error: DetectionRunError<SinkError>,
     sampling_progress: crate::SamplingRunProgress,
 ) -> Result<DetectionRunSummary, DetectionRunError<SinkError>> {
@@ -1116,7 +1126,7 @@ fn reference_scratch_error(error: crate::SamplingExecutionError) -> DetectionExe
             DetectionExecutionError::SessionStorageAllocation { message }
         }
         crate::SamplingExecutionError::InvalidSweepRecordWidth { .. } => {
-            DetectionExecutionError::Conversion(CircuitError::from(error))
+            DetectionExecutionError::Conversion(DetectionError::from(error))
         }
         other => DetectionExecutionError::Sampling(other),
     }

@@ -111,10 +111,10 @@ impl TestSampler {
         &self,
         error_records: &[Vec<bool>],
     ) -> Result<TestDetectionOutput, DemSamplingExecutionError> {
-        let mut session = self.session(RandomPolicy::Seeded(Seed::new(0)))?;
+        let mut session = self.plan.replay_session(shot_count(error_records.len())?)?;
         let mut sink = CollectSink::default();
         session
-            .replay(error_records, &mut sink)
+            .run(error_records, &mut sink)
             .map_err(engine_run_error)?;
         Ok(TestDetectionOutput {
             records: sink
@@ -395,7 +395,43 @@ fn streamed_sessions_match_materialized_sampling_across_dem_families() {
         assert_eq!(
             streamed.sampled_errors,
             materialized_errors
-                .into_iter()
+                .iter()
+                .cloned()
+                .map(Some)
+                .collect::<Vec<_>>()
+        );
+
+        let replayed = sampler
+            .replay_samples(&materialized_errors)
+            .expect("materialize replay reference");
+        let mut replay_session = plan
+            .replay_session(ShotCount::new(65))
+            .expect("create replay session");
+        let mut replay_sink = CollectSink::default();
+        replay_session
+            .run(&materialized_errors, &mut replay_sink)
+            .expect("stream replay records");
+        assert_eq!(
+            replay_sink.detectors,
+            replayed
+                .records
+                .iter()
+                .map(|record| record.detectors.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            replay_sink.observables,
+            replayed
+                .records
+                .iter()
+                .map(|record| record.observables.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            replay_sink.sampled_errors,
+            materialized_errors
+                .iter()
+                .cloned()
                 .map(Some)
                 .collect::<Vec<_>>()
         );
@@ -452,7 +488,40 @@ fn seeded_sessions_partition_exactly_for_both_sampling_algorithms() {
 }
 
 #[test]
-fn incremental_replay_owns_one_sink_lifecycle_and_does_not_advance_rng() {
+fn replay_session_owns_plan_state_and_binds_one_sink_per_transaction() {
+    let mut replay = {
+        let sampler = compile_dem("error(1) D0 L0\n");
+        sampler
+            .plan()
+            .replay_session(ShotCount::new(2))
+            .expect("owned replay session")
+    };
+    let mut sink = CollectSink::default();
+    let mut transaction = replay
+        .start_transaction(&mut sink)
+        .expect("bind replay sink");
+    transaction
+        .write_batch(&[vec![true]])
+        .expect("deliver first replay record");
+    transaction
+        .write_batch(&[vec![false]])
+        .expect("deliver second replay record");
+    let summary = transaction.finish().expect("finish owned replay");
+
+    assert_eq!(summary.committed_shots(), ShotCount::new(2));
+    assert_eq!(sink.finish_calls, 1);
+
+    replay.reset().expect("reuse completed replay storage");
+    let mut second_sink = CollectSink::default();
+    let summary = replay
+        .run(&[vec![false], vec![true]], &mut second_sink)
+        .expect("run reset replay session");
+    assert_eq!(summary.total_committed_shots(), ShotCount::new(4));
+    assert_eq!(second_sink.finish_calls, 1);
+}
+
+#[test]
+fn incremental_replay_matches_complete_replay_across_chunking() {
     let sampler = compile_dem("error(0.25) D0 L0\nerror(0.6) D1\n");
     let (_, error_records) = sampler
         .collect_samples_with_errors(65, Some(13))
@@ -461,36 +530,31 @@ fn incremental_replay_owns_one_sink_lifecycle_and_does_not_advance_rng() {
         .replay_samples(&error_records)
         .expect("materialized replay");
 
-    let mut session = sampler
-        .session(RandomPolicy::Seeded(Seed::new(99)))
-        .expect("replay session");
-    let mut before = CollectSink::default();
-    session
-        .run(ShotCount::new(9), &mut before)
-        .expect("sample before replay");
+    let mut replay = sampler
+        .plan()
+        .replay_session(ShotCount::new(65))
+        .expect("incremental replay session");
     let mut replayed = CollectSink::default();
+    let mut transaction = replay
+        .start_transaction(&mut replayed)
+        .expect("bind incremental replay sink");
+    assert!(
+        transaction
+            .write_batch(error_records.get(..1).expect("first replay record"))
+            .expect("write first replay batch")
+            .is_accepted()
+    );
+    for records in error_records
+        .get(1..)
+        .expect("remaining replay records")
+        .chunks(11)
     {
-        let mut replay = session
-            .start_replay(ShotCount::new(65), &mut replayed)
-            .expect("start replay delivery");
-        assert!(
-            replay
-                .write_batch(error_records.get(..1).expect("first replay record"),)
-                .expect("write first replay batch")
-                .is_accepted()
-        );
-        for records in error_records
-            .get(1..)
-            .expect("remaining replay records")
-            .chunks(11)
-        {
-            replay
-                .write_batch(records)
-                .expect("write incremental replay batch");
-        }
-        let summary = replay.finish().expect("finish replay");
-        assert_eq!(summary.committed_shots().get(), 65);
+        transaction
+            .write_batch(records)
+            .expect("write incremental replay batch");
     }
+    let summary = transaction.finish().expect("finish replay");
+    assert_eq!(summary.committed_shots().get(), 65);
     assert_eq!(replayed.finish_calls, 1);
     assert_eq!(
         replayed.detectors,
@@ -512,95 +576,101 @@ fn incremental_replay_owns_one_sink_lifecycle_and_does_not_advance_rng() {
         replayed.sampled_errors,
         error_records.iter().cloned().map(Some).collect::<Vec<_>>()
     );
-
-    let mut after = CollectSink::default();
-    session
-        .run(ShotCount::new(9), &mut after)
-        .expect("sample after replay");
-    let mut control = sampler
-        .session(RandomPolicy::Seeded(Seed::new(99)))
-        .expect("control session");
-    let mut control_before = CollectSink::default();
-    let mut control_after = CollectSink::default();
-    control
-        .run(ShotCount::new(9), &mut control_before)
-        .expect("control prefix");
-    control
-        .run(ShotCount::new(9), &mut control_after)
-        .expect("control suffix");
-    assert_eq!(before.detectors, control_before.detectors);
-    assert_eq!(before.observables, control_before.observables);
-    assert_eq!(after.detectors, control_after.detectors);
-    assert_eq!(after.observables, control_after.observables);
 }
 
 #[test]
-fn replay_batch_validation_is_retryable_but_abandoned_output_poisons() {
+#[allow(
+    clippy::mem_forget,
+    reason = "prove forgotten transactions fail closed instead of rebinding a sink"
+)]
+fn replay_batch_validation_is_retryable_and_abandonment_retains_no_sink() {
     let sampler = compile_dem("error(1) D0\n");
     let valid = vec![vec![true], vec![false]];
     let invalid = vec![Vec::new()];
 
-    let mut session = sampler
-        .session(RandomPolicy::Seeded(Seed::new(1)))
+    let mut replay = sampler
+        .plan()
+        .replay_session(ShotCount::new(2))
         .expect("retryable replay session");
     let mut sink = CollectSink::default();
-    {
-        let mut replay = session
-            .start_replay(ShotCount::new(2), &mut sink)
-            .expect("start retryable replay");
-        let error = replay
-            .write_batch(&invalid)
-            .expect_err("reject invalid replay width");
-        assert_eq!(error.progress().committed_shots().get(), 0);
-        replay
-            .write_batch(&valid)
-            .expect("retry valid replay delivery");
-        replay.finish().expect("finish retried replay");
-    }
-    assert!(!session.is_poisoned());
+    let mut transaction = replay
+        .start_transaction(&mut sink)
+        .expect("bind retryable replay sink");
+    let error = transaction
+        .write_batch(&invalid)
+        .expect_err("reject invalid replay width");
+    assert_eq!(error.progress().committed_shots().get(), 0);
+    transaction
+        .write_batch(&valid)
+        .expect("retry valid replay delivery");
+    transaction.finish().expect("finish retried replay");
+    assert!(!replay.is_poisoned());
     assert_eq!(sink.write_calls, 1);
     assert_eq!(sink.finish_calls, 1);
 
-    let mut session = sampler
-        .session(RandomPolicy::Seeded(Seed::new(1)))
+    let mut replay = sampler
+        .plan()
+        .replay_session(ShotCount::new(2))
         .expect("prefix-progress replay session");
     let mut sink = CollectSink::default();
-    {
-        let mut replay = session
-            .start_replay(ShotCount::new(2), &mut sink)
-            .expect("start prefix-progress replay");
-        replay
-            .write_batch(valid.get(..1).expect("first valid replay record"))
-            .expect("commit valid replay prefix");
-        let error = replay
-            .write_batch(&invalid)
-            .expect_err("reject invalid replay width after a valid prefix");
-        assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
-        assert_eq!(error.progress().attempted_batch_shots(), ShotCount::new(1));
-        replay
-            .write_batch(valid.get(1..).expect("second valid replay record"))
-            .expect("retry the second replay record");
-        replay.finish().expect("finish prefix-progress replay");
-    }
-    assert!(!session.is_poisoned());
+    let mut transaction = replay
+        .start_transaction(&mut sink)
+        .expect("bind prefix-progress replay sink");
+    transaction
+        .write_batch(valid.get(..1).expect("first valid replay record"))
+        .expect("commit valid replay prefix");
+    let error = transaction
+        .write_batch(&invalid)
+        .expect_err("reject invalid replay width after a valid prefix");
+    assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
+    assert_eq!(error.progress().attempted_batch_shots(), ShotCount::new(1));
+    transaction
+        .write_batch(valid.get(1..).expect("second valid replay record"))
+        .expect("retry the second replay record");
+    transaction.finish().expect("finish prefix-progress replay");
+    assert!(!replay.is_poisoned());
     assert_eq!(sink.write_calls, 2);
     assert_eq!(sink.finish_calls, 1);
 
-    let mut session = sampler
-        .session(RandomPolicy::Seeded(Seed::new(1)))
+    let mut replay = sampler
+        .plan()
+        .replay_session(ShotCount::new(2))
         .expect("abandoned replay session");
     let mut sink = CollectSink::default();
-    {
-        let mut replay = session
-            .start_replay(ShotCount::new(2), &mut sink)
-            .expect("start abandoned replay");
-        replay
-            .write_batch(valid.get(..1).expect("first valid replay record"))
-            .expect("commit replay prefix");
-    }
-    assert!(session.is_poisoned());
+    let mut transaction = replay
+        .start_transaction(&mut sink)
+        .expect("bind abandoned replay sink");
+    transaction
+        .write_batch(valid.get(..1).expect("first valid replay record"))
+        .expect("commit replay prefix");
+    drop(transaction);
+    assert!(replay.is_poisoned());
     assert_eq!(sink.write_calls, 1);
     assert_eq!(sink.finish_calls, 0);
+
+    let mut replay = sampler
+        .plan()
+        .replay_session(ShotCount::new(2))
+        .expect("forgotten replay transaction session");
+    let mut first_sink = CollectSink::default();
+    let mut transaction = replay
+        .start_transaction(&mut first_sink)
+        .expect("bind forgotten replay transaction");
+    transaction
+        .write_batch(valid.get(..1).expect("first replay record"))
+        .expect("commit forgotten replay prefix");
+    std::mem::forget(transaction);
+    let mut second_sink = CollectSink::default();
+    let error = replay
+        .run(&valid, &mut second_sink)
+        .expect_err("an active forgotten transaction must block another sink");
+    assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
+    assert_eq!(second_sink.write_calls, 0);
+    assert_eq!(second_sink.finish_calls, 0);
+    assert!(matches!(
+        replay.reset(),
+        Err(DemSamplingExecutionError::ReplayLifecycle { .. })
+    ));
 }
 
 #[test]
@@ -640,55 +710,64 @@ fn cancellation_commits_only_complete_batches_and_session_resumes() {
     assert_eq!(first.observables, expected.observables);
 
     let mut replay_session = sampler
-        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .plan()
+        .replay_session(ShotCount::new(65))
         .expect("cancellable replay session");
     let replay_cancellation = replay_session.cancellation();
     replay_cancellation.cancel();
     let replay_records = vec![vec![true]; 64];
     let mut replay_sink = CollectSink::default();
-    let replay_summary = {
-        let mut replay = replay_session
-            .start_replay(ShotCount::new(65), &mut replay_sink)
-            .expect("start cancelled replay");
-        let status = replay
-            .write_batch(&replay_records)
-            .expect("observe replay cancellation");
-        assert!(status.is_cancelled());
-        replay.finish().expect("finish cancelled replay")
-    };
+    let mut transaction = replay_session
+        .start_transaction(&mut replay_sink)
+        .expect("bind cancelled replay sink");
+    let status = transaction
+        .write_batch(&replay_records)
+        .expect("observe replay cancellation");
+    assert!(status.is_cancelled());
+    let replay_summary = transaction.finish().expect("finish cancelled replay");
     assert!(replay_summary.status().is_cancelled());
     assert_eq!(replay_summary.committed_shots(), ShotCount::new(0));
     assert_eq!(replay_sink.write_calls, 0);
     assert_eq!(replay_sink.finish_calls, 1);
     assert!(!replay_session.is_poisoned());
 
-    replay_cancellation.reset();
+    let mut replay_session = sampler
+        .plan()
+        .replay_session(ShotCount::new(2))
+        .expect("replay session cancelled before finish");
+    let replay_cancellation = replay_session.cancellation();
     let cancellation_for_sink = replay_cancellation.clone();
     let mut replay_sink = CollectSink::after_write(move || {
         cancellation_for_sink.cancel();
     });
-    let replay_summary = {
-        let mut replay = replay_session
-            .start_replay(ShotCount::new(2), &mut replay_sink)
-            .expect("start replay cancelled before finish");
-        replay
-            .write_batch(&[vec![true], vec![false]])
-            .expect("commit replay batch before cancellation");
-        replay
-            .finish()
-            .expect("finish observes cooperative cancellation")
-    };
+    let mut transaction = replay_session
+        .start_transaction(&mut replay_sink)
+        .expect("bind replay sink cancelled after write");
+    transaction
+        .write_batch(&[vec![true], vec![false]])
+        .expect("commit replay batch before cancellation");
+    let replay_summary = transaction
+        .finish()
+        .expect("finish observes cooperative cancellation");
     assert!(replay_summary.status().is_cancelled());
     assert_eq!(replay_summary.committed_shots(), ShotCount::new(2));
     assert_eq!(replay_sink.write_calls, 1);
     assert_eq!(replay_sink.finish_calls, 1);
     assert!(!replay_session.is_poisoned());
 
+    assert!(matches!(
+        replay_session.reset(),
+        Err(DemSamplingExecutionError::ReplayLifecycle { .. })
+    ));
     replay_cancellation.reset();
-    let mut resumed_sink = CollectSink::default();
     replay_session
-        .run(ShotCount::new(1), &mut resumed_sink)
-        .expect("session remains reusable after replay cancellation at finish");
+        .reset()
+        .expect("reset replay after resetting cancellation token");
+    let mut resumed_replay_sink = CollectSink::default();
+    replay_session
+        .run(&[vec![false], vec![true]], &mut resumed_replay_sink)
+        .expect("run replay after cancellation reset");
+    assert_eq!(resumed_replay_sink.finish_calls, 1);
 }
 
 #[test]
@@ -788,9 +867,11 @@ fn zero_shots_touch_neither_sink_nor_seeded_rng() {
     session
         .run_with_sampled_errors(ShotCount::new(0), &mut zero_sink)
         .expect("zero-shot sampled-error run");
-    session
-        .replay(&[], &mut zero_sink)
-        .expect("zero-shot replay");
+    let mut replay = sampler
+        .plan()
+        .replay_session(ShotCount::new(0))
+        .expect("zero-shot replay session");
+    replay.run(&[], &mut zero_sink).expect("zero-shot replay");
     assert_eq!(zero_sink.write_calls, 0);
     assert_eq!(zero_sink.finish_calls, 0);
 
@@ -875,35 +956,26 @@ fn work_limits_reject_before_rng_or_sink_and_leave_session_reusable() {
     assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
     assert_eq!(resource.actual(), 4);
     assert_eq!(resource.limit(), 2);
-    let mut replay_session = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), replay_limits)
-        .expect("limited replay session");
-    let mut replay_sink = CollectSink::default();
-    let error = replay_session
-        .start_replay(ShotCount::new(2), &mut replay_sink)
+    let error = sampler
+        .plan()
+        .replay_session_with_limits(ShotCount::new(2), replay_limits)
         .expect_err("reject replay work before delivery");
-    assert_eq!(error.progress().committed_shots().get(), 0);
-    assert_eq!(replay_sink.write_calls, 0);
-    assert_eq!(replay_sink.finish_calls, 0);
-    assert!(!replay_session.is_poisoned());
+    let DemSamplingExecutionError::InvalidRequest(DemError::ResourceLimit(resource)) = error else {
+        panic!("replay session must expose typed resource context");
+    };
+    assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
+    assert_eq!((resource.actual(), resource.limit()), (4, 2));
 }
 
 #[test]
-fn replay_convenience_api_admits_session_and_work_before_record_widths() {
+fn replay_session_admits_work_and_poisoning_before_record_widths() {
     let sampler = compile_dem("error(0.25) D0\nerror(0.5) D1\n");
     let limits = DemSamplerLimits::default().with_max_replay_work_units(2);
-    let malformed_records = vec![Vec::new(), Vec::new()];
-    let mut limited = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), limits)
-        .expect("create replay-order session");
-    let mut untouched = CollectSink::default();
-    let work_error = limited
-        .replay(&malformed_records, &mut untouched)
+    let work_error = sampler
+        .plan()
+        .replay_session_with_limits(ShotCount::new(2), limits)
         .expect_err("work admission must precede record widths");
-    let DemSamplingRunError::Engine { source, .. } = work_error else {
-        panic!("expected replay work engine error");
-    };
-    let DemSamplingExecutionError::InvalidRequest(source) = source else {
+    let DemSamplingExecutionError::InvalidRequest(source) = work_error else {
         panic!("expected typed replay work request");
     };
     let DemError::ResourceLimit(resource) = source else {
@@ -912,19 +984,23 @@ fn replay_convenience_api_admits_session_and_work_before_record_widths() {
     assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
     assert_eq!(resource.actual(), 8);
     assert_eq!(resource.limit(), 2);
-    assert_eq!(untouched.write_calls, 0);
-    assert_eq!(untouched.finish_calls, 0);
-
     let mut poisoned = sampler
-        .session(RandomPolicy::Seeded(Seed::new(22)))
-        .expect("create poisoned replay-order session");
+        .plan()
+        .replay_session(ShotCount::new(1))
+        .expect("create replay session to poison");
     let mut failing = CollectSink::failing_finish();
-    poisoned
-        .run(ShotCount::new(1), &mut failing)
+    let mut transaction = poisoned
+        .start_transaction(&mut failing)
+        .expect("bind failing replay sink");
+    transaction
+        .write_batch(&[vec![false, false]])
+        .expect("write replay record before finish failure");
+    transaction
+        .finish()
         .expect_err("poison session through finish failure");
     let mut second_untouched = CollectSink::default();
     let poison_error = poisoned
-        .replay(&[Vec::new()], &mut second_untouched)
+        .run(&[Vec::new()], &mut second_untouched)
         .expect_err("poison admission must precede record widths");
     assert!(matches!(
         poison_error,
@@ -970,29 +1046,24 @@ fn post_warmup_session_execution_allocations_are_record_count_independent() {
     assert_eq!(allocations.count_total, 0, "{allocations:?}");
     assert_eq!(allocations.bytes_total, 0, "{allocations:?}");
 
-    let replay_records = vec![vec![true, false, true]; 64];
+    let replay_records = vec![vec![true, false, true]; 65];
     let mut replay_session = sampler
-        .session(RandomPolicy::Seeded(Seed::new(71)))
+        .plan()
+        .replay_session(ShotCount::new(65))
         .expect("replay allocation session");
     let mut replay_sink = WitnessSink::default();
-    {
-        let mut replay = replay_session
-            .start_replay(ShotCount::new(1), &mut replay_sink)
-            .expect("warm replay");
-        replay
-            .write_batch(replay_records.get(..1).expect("warm replay record"))
-            .expect("deliver warm replay");
-        replay.finish().expect("finish warm replay");
-    }
+    let mut transaction = replay_session
+        .start_transaction(&mut replay_sink)
+        .expect("bind allocation replay sink");
+    transaction
+        .write_batch(replay_records.get(..1).expect("warm replay record"))
+        .expect("warm replay storage");
     let allocations = allocation_counter::measure(|| {
-        let mut replay = replay_session
-            .start_replay(ShotCount::new(64), &mut replay_sink)
-            .expect("start measured replay");
-        replay
-            .write_batch(&replay_records)
+        transaction
+            .write_batch(replay_records.get(1..).expect("measured replay records"))
             .expect("deliver measured replay");
-        replay.finish().expect("finish measured replay");
     });
     assert_eq!(allocations.count_total, 0, "{allocations:?}");
     assert_eq!(allocations.bytes_total, 0, "{allocations:?}");
+    transaction.finish().expect("finish measured replay");
 }

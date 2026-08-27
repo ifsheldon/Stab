@@ -15,7 +15,7 @@ use super::super::test_support::{
     sample_detection_events,
 };
 use super::*;
-use crate::{DetectionError, DetectionResourceKind, Seed};
+use crate::{DetectionResourceKind, Seed};
 
 #[derive(Default)]
 struct CollectSink {
@@ -197,7 +197,7 @@ fn plans_are_shareable_and_streamed_conversion_matches_materialized_output() {
 }
 
 #[test]
-fn measurement_sink_adapter_preserves_sweep_semantics_and_sink_lifecycle() {
+fn measurement_sink_transaction_preserves_sweep_semantics_and_sink_lifecycle() {
     let circuit =
         circuit("H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n");
     let measurements = vec![vec![false], vec![false], vec![true], vec![true]];
@@ -208,28 +208,28 @@ fn measurement_sink_adapter_preserves_sweep_semantics_and_sink_lifecycle() {
         &sweeps,
         ReferenceSampleMode::UseReferenceSample,
     )
-    .expect("materialize adapter oracle");
+    .expect("materialize transaction oracle");
     let plan = MeasurementToDetectionCompiler::new()
         .compile(&circuit)
-        .expect("compile adapter plan");
+        .expect("compile transaction plan");
     assert_eq!(plan.measurement_width().get(), 1);
     assert_eq!(plan.sweep_width().get(), 1);
     let measurement_batch = packed(&measurements, 1);
     let sweep_batch = packed(&sweeps, 1);
-    let mut session = plan.session().expect("create adapter session");
+    let mut session = plan.session().expect("create transaction session");
     let mut sink = CollectSink::default();
     {
-        let mut adapter = session
-            .start_delivery(&mut sink)
-            .expect("start adapted delivery");
-        let summary = adapter
+        let mut transaction = session
+            .start_transaction(&mut sink)
+            .expect("start conversion transaction");
+        let summary = transaction
             .write_batch_with_sweep(
                 MeasurementBatchView::new(measurement_batch.view()),
                 Some(MeasurementBatchView::new(sweep_batch.view())),
             )
-            .expect("adapt measurement batch with sweep data");
+            .expect("convert measurement batch with sweep data");
         assert_eq!(summary.status(), DetectionRunStatus::Completed);
-        adapter.finish().expect("finish adapted sink");
+        transaction.finish().expect("finish conversion sink");
     }
     assert_eq!(sink.records, expected.records);
     assert_eq!(sink.finish_count, 1);
@@ -247,7 +247,7 @@ fn conversion_cancellation_rejects_a_whole_batch_and_is_resumable() {
     cancellation.cancel();
     let mut untouched = CollectSink::default();
     let mut delivery = session
-        .start_delivery(&mut untouched)
+        .start_transaction(&mut untouched)
         .expect("start cancellable delivery");
     let summary = delivery
         .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
@@ -263,6 +263,41 @@ fn conversion_cancellation_rejects_a_whole_batch_and_is_resumable() {
     assert_eq!(untouched.records.len(), 1);
     assert!(!session.is_poisoned());
     assert_eq!(session.total_committed_shots(), ShotCount::new(1));
+}
+
+#[test]
+fn composed_conversion_cancellation_reports_the_committed_transaction_prefix() {
+    let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("compile composed conversion");
+    let input = packed(&[vec![true]], 1);
+    let mut session = plan.session().expect("create composed conversion");
+    let cancellation = session.cancellation();
+    let mut sink = CollectSink::default();
+    let mut transaction = session
+        .start_transaction(&mut sink)
+        .expect("start composed conversion");
+
+    MeasurementSink::write_batch(&mut transaction, MeasurementBatchView::new(input.view()))
+        .expect("commit first conversion batch");
+    cancellation.cancel();
+    let error =
+        MeasurementSink::write_batch(&mut transaction, MeasurementBatchView::new(input.view()))
+            .expect_err("cancel second conversion batch");
+
+    assert!(matches!(
+        &error,
+        DetectionRunError::Engine {
+            source: DetectionExecutionError::CancelledComposition,
+            ..
+        }
+    ));
+    assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
+    assert_eq!(error.progress().attempted_batch_shots(), ShotCount::new(1));
+    cancellation.reset();
+    transaction.finish().expect("finish committed prefix");
+    assert_eq!(sink.records.len(), 1);
 }
 
 #[test]
@@ -318,7 +353,7 @@ fn record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse() {
     let mut sink = CollectSink::default();
 
     let mut delivery = session
-        .start_delivery(&mut sink)
+        .start_transaction(&mut sink)
         .expect("start prefix delivery");
     delivery
         .write_batch_with_sweep(MeasurementBatchView::new(valid.view()), None)
@@ -355,7 +390,7 @@ fn incremental_delivery_finalizes_once_and_rejects_post_finish_writes() {
     let mut session = plan.session().expect("create delivery lifecycle session");
     let mut sink = CollectSink::default();
     let mut delivery = session
-        .start_delivery(&mut sink)
+        .start_transaction(&mut sink)
         .expect("start delivery lifecycle");
     delivery
         .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
@@ -405,7 +440,7 @@ fn incremental_finish_failure_reports_committed_prefix_and_poisons_session() {
         writes: 0,
     };
     let mut delivery = session
-        .start_delivery(&mut sink)
+        .start_transaction(&mut sink)
         .expect("start finish failure delivery");
     for _ in 0..2 {
         delivery
@@ -437,7 +472,7 @@ fn dropping_a_committed_incremental_delivery_poisons_the_parent_session() {
     let mut sink = CollectSink::default();
     {
         let mut delivery = session
-            .start_delivery(&mut sink)
+            .start_transaction(&mut sink)
             .expect("start abandoned delivery");
         delivery
             .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
@@ -445,6 +480,38 @@ fn dropping_a_committed_incremental_delivery_poisons_the_parent_session() {
     }
     assert!(session.is_poisoned());
     assert_eq!(sink.finish_count, 0);
+}
+
+#[test]
+#[allow(
+    clippy::mem_forget,
+    reason = "prove forgotten transactions fail closed instead of rebinding a sink"
+)]
+fn forgotten_incremental_transaction_cannot_rebind_another_sink() {
+    let circuit = circuit("M 0\nDETECTOR rec[-1]\n");
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("compile forgotten transaction");
+    let input = packed(&[vec![true]], 1);
+    let mut session = plan
+        .session()
+        .expect("create forgotten transaction session");
+    let mut first_sink = CollectSink::default();
+    let mut transaction = session
+        .start_transaction(&mut first_sink)
+        .expect("start forgotten transaction");
+    transaction
+        .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
+        .expect("write forgotten transaction prefix");
+    std::mem::forget(transaction);
+
+    let mut second_sink = CollectSink::default();
+    let error = session
+        .start_transaction(&mut second_sink)
+        .expect_err("an active forgotten transaction must block sink rebinding");
+    assert_eq!(error, DetectionExecutionError::TransactionActive);
+    assert_eq!(first_sink.finish_count, 0);
+    assert_eq!(second_sink.finish_count, 0);
 }
 
 #[test]
@@ -837,7 +904,7 @@ fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
     let mut sink = NullSink::default();
 
     let mut delivery = session
-        .start_delivery(&mut sink)
+        .start_transaction(&mut sink)
         .expect("start allocation delivery");
     delivery
         .write_batch_with_sweep(measurement_view, Some(sweep_view))

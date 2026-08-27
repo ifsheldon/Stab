@@ -2,7 +2,10 @@ use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_engine::{DemSamplingCompiler, DemSamplingRunError, RandomPolicy, Seed, ShotCount};
+use stab_engine::{
+    DemReplaySession, DemSamplingCompiler, DemSamplingRunError, DemSamplingSession, RandomPolicy,
+    Seed, ShotCount,
+};
 use stab_model::DetectorErrorModel;
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
@@ -20,6 +23,14 @@ use super::{
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
 const MAX_SAMPLE_DEM_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+
+enum SampleDemExecution {
+    Replay {
+        input: InputFile,
+        session: DemReplaySession,
+    },
+    Sample(DemSamplingSession),
+}
 
 #[derive(Debug, Args)]
 pub(super) struct SampleDemArgs {
@@ -161,11 +172,18 @@ where
             .map(|_| sample_dem_record_format(args.err_out_format))
             .transpose()?,
     )?;
-    let mut session = plan
-        .session(dem_random_policy(args.seed))
-        .map_err(CliError::from)?;
     let mut io = io.with_outputs(output_roles)?;
-    let mut replay_input = io.take_input(FileRole::ReplayErrorInput);
+    let mut execution = if let Some(input) = io.take_input(FileRole::ReplayErrorInput) {
+        SampleDemExecution::Replay {
+            input,
+            session: plan.replay_session(shots).map_err(CliError::from)?,
+        }
+    } else {
+        SampleDemExecution::Sample(
+            plan.session(dem_random_policy(args.seed))
+                .map_err(CliError::from)?,
+        )
+    };
     let mut outputs = io.activate()?;
     let primary = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     let observable = outputs
@@ -180,44 +198,44 @@ where
         sampled_errors,
         encoder,
     };
-    if let Some(replay_input) = replay_input.as_mut() {
-        let mut replay_record = Vec::new();
-        replay_record
-            .try_reserve_exact(plan.error_count())
-            .map_err(|error| {
-                invalid_result_format(format!(
-                    "sample_dem replay record could not reserve {} bits: {error}",
-                    plan.error_count()
-                ))
-            })?;
-        let mut replay = session
-            .start_replay(shots, &mut sink)
-            .map_err(map_dem_run_error)?;
-        for_each_replay_error_record(
-            replay_input,
-            args.replay_err_in_format,
-            plan.error_count(),
-            args.shots,
-            |error_record| {
-                replay_record.clear();
-                replay_record.extend_from_slice(error_record);
-                replay
-                    .write_batch(std::slice::from_ref(&replay_record))
-                    .map(|_| ())
-                    .map_err(map_dem_run_error)
-            },
-        )?;
-        replay.finish().map(|_| ()).map_err(map_dem_run_error)
-    } else if args.error_output.is_some() {
-        session
+    match &mut execution {
+        SampleDemExecution::Replay { input, session } => {
+            let mut replay_record = Vec::new();
+            replay_record
+                .try_reserve_exact(plan.error_count())
+                .map_err(|error| {
+                    invalid_result_format(format!(
+                        "sample_dem replay record could not reserve {} bits: {error}",
+                        plan.error_count()
+                    ))
+                })?;
+            let mut transaction = session
+                .start_transaction(&mut sink)
+                .map_err(map_dem_run_error)?;
+            for_each_replay_error_record(
+                input,
+                args.replay_err_in_format,
+                plan.error_count(),
+                args.shots,
+                |error_record| {
+                    replay_record.clear();
+                    replay_record.extend_from_slice(error_record);
+                    transaction
+                        .write_batch(std::slice::from_ref(&replay_record))
+                        .map(|_| ())
+                        .map_err(map_dem_run_error)
+                },
+            )?;
+            transaction.finish().map(|_| ()).map_err(map_dem_run_error)
+        }
+        SampleDemExecution::Sample(session) if args.error_output.is_some() => session
             .run_with_sampled_errors(shots, &mut sink)
             .map(|_| ())
-            .map_err(map_dem_run_error)
-    } else {
-        session
+            .map_err(map_dem_run_error),
+        SampleDemExecution::Sample(session) => session
             .run(shots, &mut sink)
             .map(|_| ())
-            .map_err(map_dem_run_error)
+            .map_err(map_dem_run_error),
     }
 }
 

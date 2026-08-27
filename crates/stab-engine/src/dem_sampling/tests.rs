@@ -148,11 +148,11 @@ fn seeded_partitioning_and_replay_preserve_exact_dem_streams() {
         assert_eq!(partitioned_sink.error_records, whole_sink.error_records);
 
         let mut replay = plan
-            .session(RandomPolicy::Seeded(Seed::new(99)))
+            .replay_session(ShotCount::new(65))
             .expect("replay session");
         let mut replay_sink = CollectingSink::default();
         replay
-            .replay(&whole_sink.error_records, &mut replay_sink)
+            .run(&whole_sink.error_records, &mut replay_sink)
             .expect("replay sampled errors");
         assert_eq!(replay_sink.records, whole_sink.records);
         assert_eq!(replay_sink.error_records, whole_sink.error_records);

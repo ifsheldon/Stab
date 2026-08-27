@@ -1,11 +1,10 @@
 use stab_model::{Circuit, CircuitItem, RepeatNestingLimit, Target};
 
 use super::error::{
-    DetectionError as CircuitError, DetectionResourceLimitError as ResourceLimitError,
-    DetectionResult as CircuitResult,
+    DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
 
-pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> CircuitResult<bool> {
+pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> DetectionResult<bool> {
     let mut requires_detector_frame = false;
     let mut stack = vec![(circuit, 0_usize)];
     while let Some((current, depth)) = stack.pop() {
@@ -28,7 +27,7 @@ pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> CircuitResul
                 CircuitItem::Instruction(_) => {}
                 CircuitItem::RepeatBlock(repeat) => {
                     let next_depth = depth.checked_add(1).ok_or_else(|| {
-                        CircuitError::invalid_sampler_compilation(
+                        DetectionError::invalid_sampler_compilation(
                             "detection conversion repeat nesting overflowed",
                         )
                     })?;

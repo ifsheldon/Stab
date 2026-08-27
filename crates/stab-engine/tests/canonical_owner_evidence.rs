@@ -299,35 +299,26 @@ fn a2_dem_sampler_replay_work_policy_admission() {
         .expect("two replay records reach the exact four-unit work limit");
 
     let mut accepted_session = plan
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(7)), exact)
+        .replay_session_with_limits(ShotCount::new(2), exact)
         .expect("construct exact-limit replay session");
     let mut accepted_sink = DemWitnessSink::default();
     let summary = accepted_session
-        .replay(&records, &mut accepted_sink)
+        .run(&records, &mut accepted_sink)
         .expect("replay at exact work limit");
     assert_eq!(summary.committed_shots(), ShotCount::new(2));
     assert_eq!(accepted_sink.detector_zero, vec![true, false]);
     assert_eq!(accepted_sink.sampled_error_shots, 2);
 
     let rejected = exact.with_max_replay_work_units(3);
-    let mut rejected_session = plan
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(7)), rejected)
-        .expect("construct below-limit replay session");
-    let mut rejected_sink = DemWitnessSink::default();
-    let error = rejected_session
-        .replay(&records, &mut rejected_sink)
+    let error = plan
+        .replay_session_with_limits(ShotCount::new(2), rejected)
         .expect_err("the first excess replay-work unit must fail before output");
     let resource = match error {
-        DemSamplingRunError::Engine {
-            source: DemSamplingExecutionError::InvalidRequest(DemError::ResourceLimit(resource)),
-            ..
-        } => resource,
+        DemSamplingExecutionError::InvalidRequest(DemError::ResourceLimit(resource)) => resource,
         other => panic!("expected replay resource rejection, got {other:?}"),
     };
     assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
     assert_eq!((resource.actual(), resource.limit()), (4, 3));
-    assert_eq!(rejected_sink.write_calls, 0);
-    assert_eq!(rejected_sink.finish_calls, 0);
 }
 
 #[test]

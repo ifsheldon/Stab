@@ -10,8 +10,7 @@ use super::helpers::{
     zero_probability_noise,
 };
 use crate::detection::error::{
-    DetectionError as CircuitError, DetectionResourceLimitError as ResourceLimitError,
-    DetectionResult as CircuitResult,
+    DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
 use crate::detection::{ConversionPlan, DetectionConversionLimits};
 
@@ -24,7 +23,7 @@ impl AdmittedFrameConversion {
     fn admit(
         circuit: &Circuit,
         limits: DetectionConversionLimits,
-    ) -> CircuitResult<AdmittedFrameConversion> {
+    ) -> DetectionResult<AdmittedFrameConversion> {
         let admission = ConversionPlan::admission_from_visitor(limits, |plan| {
             append_frame_conversion_plan(circuit, plan)
         })?;
@@ -43,7 +42,7 @@ impl AdmittedFrameConversion {
         })
     }
 
-    fn materialize_execution_circuit(&self, circuit: &Circuit) -> CircuitResult<Circuit> {
+    fn materialize_execution_circuit(&self, circuit: &Circuit) -> DetectionResult<Circuit> {
         let mut result = CircuitAssembler::new();
         append_frame_execution_circuit(circuit, &mut result, self.execution_storage.root_items)?;
         Ok(result.finish())
@@ -74,7 +73,7 @@ impl DirectDetectorFramePlan {
     pub(in crate::detection) fn compile(
         circuit: &Circuit,
         limits: DetectionConversionLimits,
-    ) -> CircuitResult<Self> {
+    ) -> DetectionResult<Self> {
         let admitted = AdmittedFrameConversion::admit(circuit, limits)?;
         let executable = admitted.materialize_execution_circuit(circuit)?;
         Ok(Self {
@@ -101,14 +100,14 @@ impl DirectDetectorFramePlan {
     }
 
     #[cfg(test)]
-    pub(in crate::detection) fn compiled_bytes(&self) -> CircuitResult<u64> {
+    pub(in crate::detection) fn compiled_bytes(&self) -> DetectionResult<u64> {
         self.conversion
             .compiled_storage_bytes()?
             .checked_add(frame_execution_storage(&self.executable)?.retained_bytes)
             .ok_or_else(storage_overflow)
     }
 
-    pub(in crate::detection) fn state(&self) -> CircuitResult<DirectDetectorFrameState> {
+    pub(in crate::detection) fn state(&self) -> DetectionResult<DirectDetectorFrameState> {
         Ok(DirectDetectorFrameState {
             frame: ScalarDetectionFrame::try_reusable(
                 self.executable.count_qubits(),
@@ -123,27 +122,27 @@ impl DirectDetectorFramePlan {
         &self,
         state: &'a mut DirectDetectorFrameState,
         rng: &mut impl Rng,
-    ) -> CircuitResult<(&'a [bool], &'a [bool])> {
+    ) -> DetectionResult<(&'a [bool], &'a [bool])> {
         state.frame.reset(rng);
         state
             .frame
             .execute_circuit(&self.executable, self.limits.max_repeat_unroll(), rng)?;
         if state.frame.measurements.len() != self.measurement_count() {
-            return Err(CircuitError::invalid_result_format(format!(
+            return Err(DetectionError::invalid_result_format(format!(
                 "frame detection sampled {} measurement bits but expected {}",
                 state.frame.measurements.len(),
                 self.measurement_count()
             )));
         }
         if state.frame.detectors.len() != self.detector_count() {
-            return Err(CircuitError::invalid_result_format(format!(
+            return Err(DetectionError::invalid_result_format(format!(
                 "frame detection sampled {} detector bits but expected {}",
                 state.frame.detectors.len(),
                 self.detector_count()
             )));
         }
         if state.frame.observables.len() != self.observable_count() {
-            return Err(CircuitError::invalid_result_format(format!(
+            return Err(DetectionError::invalid_result_format(format!(
                 "frame detection sampled {} observable bits but expected {}",
                 state.frame.observables.len(),
                 self.observable_count()
@@ -161,11 +160,14 @@ pub(in crate::detection) struct DirectDetectorFrameState {
 pub(in crate::detection) fn frame_conversion_plan_with_limits(
     circuit: &Circuit,
     limits: DetectionConversionLimits,
-) -> CircuitResult<ConversionPlan> {
+) -> DetectionResult<ConversionPlan> {
     ConversionPlan::from_visitor(limits, |plan| append_frame_conversion_plan(circuit, plan))
 }
 
-fn append_frame_conversion_plan(circuit: &Circuit, plan: &mut ConversionPlan) -> CircuitResult<()> {
+fn append_frame_conversion_plan(
+    circuit: &Circuit,
+    plan: &mut ConversionPlan,
+) -> DetectionResult<()> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction)
@@ -197,7 +199,7 @@ fn append_frame_conversion_plan(circuit: &Circuit, plan: &mut ConversionPlan) ->
     Ok(())
 }
 
-fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> DetectionResult<()> {
     match instruction.gate().canonical_name() {
         "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE"
         | "I_ERROR" | "II_ERROR" => Ok(()),
@@ -226,7 +228,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         | "ELSE_CORRELATED_ERROR"
         | "HERALDED_ERASE"
         | "HERALDED_PAULI_CHANNEL_1" => Ok(()),
-        "SPP" | "SPP_DAG" => Err(CircuitError::invalid_sampler_compilation(
+        "SPP" | "SPP_DAG" => Err(DetectionError::invalid_sampler_compilation(
             "frame detection must decompose SPP instructions before validation",
         )),
         "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
@@ -234,7 +236,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         "XCZ" | "YCZ" => validate_frame_x_or_y_controlled_z_targets(instruction),
         _ if stab_analysis::gate_has_tableau(instruction.gate()) => Ok(()),
         _ if zero_probability_noise(instruction)? => Ok(()),
-        name => Err(CircuitError::invalid_sampler_compilation(format!(
+        name => Err(DetectionError::invalid_sampler_compilation(format!(
             "M9 detector frame subset does not support {name}"
         ))),
     }
@@ -242,16 +244,18 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
 
 pub(super) fn decomposed_frame_instruction(
     instruction: &CircuitInstruction,
-) -> CircuitResult<Circuit> {
+) -> DetectionResult<Circuit> {
     stab_analysis::advanced::decomposed_single_instruction(instruction).map_err(|error| {
-        CircuitError::invalid_sampler_compilation(format!(
+        DetectionError::invalid_sampler_compilation(format!(
             "{} cannot be executed by frame detection via decomposition: {error}",
             instruction.gate().canonical_name()
         ))
     })
 }
 
-fn validate_frame_controlled_pauli_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_frame_controlled_pauli_targets(
+    instruction: &CircuitInstruction,
+) -> DetectionResult<()> {
     for target_group in instruction.targets().chunks(2) {
         let [control, target] = target_group else {
             return Err(unsupported_frame_instruction(instruction));
@@ -266,7 +270,7 @@ fn validate_frame_controlled_pauli_targets(instruction: &CircuitInstruction) -> 
     Ok(())
 }
 
-fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> DetectionResult<()> {
     for target_group in instruction.targets().chunks(2) {
         let [left, right] = target_group else {
             return Err(unsupported_frame_instruction(instruction));
@@ -281,7 +285,7 @@ fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> CircuitResult<
 
 fn validate_frame_x_or_y_controlled_z_targets(
     instruction: &CircuitInstruction,
-) -> CircuitResult<()> {
+) -> DetectionResult<()> {
     for target_group in instruction.targets().chunks(2) {
         let [left, right] = target_group else {
             return Err(unsupported_frame_instruction(instruction));
@@ -300,7 +304,7 @@ fn validate_frame_x_or_y_controlled_z_targets(
     Ok(())
 }
 
-fn frame_execution_storage(circuit: &Circuit) -> CircuitResult<FrameExecutionStorage> {
+fn frame_execution_storage(circuit: &Circuit) -> DetectionResult<FrameExecutionStorage> {
     let mut storage = FrameExecutionStorage::default();
     for item in circuit.items() {
         match item {
@@ -345,7 +349,7 @@ fn frame_execution_storage(circuit: &Circuit) -> CircuitResult<FrameExecutionSto
     Ok(storage)
 }
 
-fn instruction_retained_bytes(arg_count: usize, target_count: usize) -> CircuitResult<u64> {
+fn instruction_retained_bytes(arg_count: usize, target_count: usize) -> DetectionResult<u64> {
     let item = u64::try_from(size_of::<CircuitItem>()).map_err(|_| storage_overflow())?;
     let args = byte_product(arg_count, size_of::<f64>())?;
     let targets = byte_product(target_count, size_of::<Target>())?;
@@ -355,7 +359,7 @@ fn instruction_retained_bytes(arg_count: usize, target_count: usize) -> CircuitR
 fn checked_add_storage(
     left: FrameExecutionStorage,
     right: FrameExecutionStorage,
-) -> CircuitResult<FrameExecutionStorage> {
+) -> DetectionResult<FrameExecutionStorage> {
     Ok(FrameExecutionStorage {
         root_items: left
             .root_items
@@ -365,17 +369,17 @@ fn checked_add_storage(
     })
 }
 
-fn byte_product(count: usize, item_size: usize) -> CircuitResult<u64> {
+fn byte_product(count: usize, item_size: usize) -> DetectionResult<u64> {
     let bytes = count.checked_mul(item_size).ok_or_else(storage_overflow)?;
     u64::try_from(bytes).map_err(|_| storage_overflow())
 }
 
-fn checked_add_bytes(left: u64, right: u64) -> CircuitResult<u64> {
+fn checked_add_bytes(left: u64, right: u64) -> DetectionResult<u64> {
     left.checked_add(right).ok_or_else(storage_overflow)
 }
 
-fn storage_overflow() -> CircuitError {
-    CircuitError::invalid_sampler_compilation(
+fn storage_overflow() -> DetectionError {
+    DetectionError::invalid_sampler_compilation(
         "direct detector-frame retained byte count overflowed",
     )
 }
@@ -384,7 +388,7 @@ fn admit_combined_compiled_storage(
     conversion_bytes: u64,
     execution_bytes: u64,
     limit_bytes: u64,
-) -> CircuitResult<u64> {
+) -> DetectionResult<u64> {
     let combined = conversion_bytes
         .checked_add(execution_bytes)
         .ok_or_else(storage_overflow)?;
@@ -398,7 +402,7 @@ fn append_frame_execution_circuit(
     circuit: &Circuit,
     result: &mut CircuitAssembler,
     root_item_capacity: usize,
-) -> CircuitResult<()> {
+) -> DetectionResult<()> {
     result.try_reserve_exact(root_item_capacity)?;
     append_frame_execution_items(circuit, result)
 }
@@ -406,7 +410,7 @@ fn append_frame_execution_circuit(
 fn append_frame_execution_items(
     circuit: &Circuit,
     result: &mut CircuitAssembler,
-) -> CircuitResult<()> {
+) -> DetectionResult<()> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction)
@@ -439,11 +443,11 @@ fn append_frame_execution_items(
 
 fn try_clone_execution_instruction(
     instruction: &CircuitInstruction,
-) -> CircuitResult<CircuitInstruction> {
+) -> DetectionResult<CircuitInstruction> {
     let mut args = Vec::new();
     args.try_reserve_exact(instruction.args().len())
         .map_err(|error| {
-            CircuitError::invalid_sampler_compilation(format!(
+            DetectionError::invalid_sampler_compilation(format!(
                 "unable to reserve {} direct-frame argument slots: {error}",
                 instruction.args().len()
             ))
@@ -453,7 +457,7 @@ fn try_clone_execution_instruction(
     targets
         .try_reserve_exact(instruction.targets().len())
         .map_err(|error| {
-            CircuitError::invalid_sampler_compilation(format!(
+            DetectionError::invalid_sampler_compilation(format!(
                 "unable to reserve {} direct-frame target slots: {error}",
                 instruction.targets().len()
             ))
@@ -470,7 +474,7 @@ fn try_clone_execution_instruction(
 
 fn frame_execution_instruction<'a>(
     instruction: &'a CircuitInstruction,
-) -> CircuitResult<Option<Cow<'a, CircuitInstruction>>> {
+) -> DetectionResult<Option<Cow<'a, CircuitInstruction>>> {
     let retained_targets = match frame_execution_instruction_disposition(instruction)? {
         FrameExecutionInstructionDisposition::Borrowed => {
             return Ok(Some(Cow::Borrowed(instruction)));
@@ -483,7 +487,7 @@ fn frame_execution_instruction<'a>(
     targets
         .try_reserve_exact(retained_targets)
         .map_err(|error| {
-            CircuitError::invalid_sampler_compilation(format!(
+            DetectionError::invalid_sampler_compilation(format!(
                 "unable to reserve {retained_targets} filtered direct-frame targets: {error}"
             ))
         })?;
@@ -500,7 +504,7 @@ fn frame_execution_instruction<'a>(
     let mut args = Vec::new();
     args.try_reserve_exact(instruction.args().len())
         .map_err(|error| {
-            CircuitError::invalid_sampler_compilation(format!(
+            DetectionError::invalid_sampler_compilation(format!(
                 "unable to reserve {} filtered direct-frame arguments: {error}",
                 instruction.args().len()
             ))
@@ -518,7 +522,7 @@ fn frame_execution_instruction<'a>(
 
 fn frame_execution_instruction_disposition(
     instruction: &CircuitInstruction,
-) -> CircuitResult<FrameExecutionInstructionDisposition> {
+) -> DetectionResult<FrameExecutionInstructionDisposition> {
     if !matches!(instruction.gate().canonical_name(), "XCZ" | "YCZ") {
         return Ok(FrameExecutionInstructionDisposition::Borrowed);
     }

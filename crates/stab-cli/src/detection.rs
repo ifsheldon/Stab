@@ -5,7 +5,7 @@ use clap::Args;
 use stab_analysis::circuit_with_inlined_feedback;
 use stab_engine::{
     DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
-    MeasurementToDetectionSinkAdapter, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
+    MeasurementToDetectionTransaction, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
 };
 use stab_records::{
     ByteSpan, DetectionBatchView, DetectionSink, FormatError, FormatErrorCode,
@@ -271,7 +271,9 @@ where
         observable,
         encoder,
     };
-    let mut delivery = session.start_delivery(&mut sink).map_err(CliError::from)?;
+    let mut delivery = session
+        .start_transaction(&mut sink)
+        .map_err(CliError::from)?;
     if let Some(sweeps) = sweeps.as_mut() {
         loop {
             match measurements.next_record()? {
@@ -367,7 +369,7 @@ where
 }
 
 fn write_m2d_record<Sink>(
-    delivery: &mut MeasurementToDetectionSinkAdapter<'_, '_, Sink>,
+    delivery: &mut MeasurementToDetectionTransaction<'_, '_, Sink>,
     measurement_batch: &mut PackedShotBatch,
     measurement_record: &[bool],
     sweep_batch: Option<&mut PackedShotBatch>,
@@ -401,7 +403,7 @@ where
 }
 
 fn finish_m2d<Sink>(
-    delivery: MeasurementToDetectionSinkAdapter<'_, '_, Sink>,
+    delivery: MeasurementToDetectionTransaction<'_, '_, Sink>,
 ) -> Result<(), CliError>
 where
     Sink: DetectionSink<Error = CliError>,

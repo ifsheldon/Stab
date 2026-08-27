@@ -8,12 +8,14 @@ mod probability;
 mod reference_sample_tree;
 mod sampled_flow;
 mod sampling;
+mod sampling_estimate;
 
 pub use dem_sampling::{
     DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayBatchStatus, DemReplaySession,
-    DemResourceKind, DemResourceLimitError, DemSamplerLimits, DemSamplingCancellation,
-    DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError,
-    DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession,
+    DemReplayTransaction, DemResourceKind, DemResourceLimitError, DemSamplerLimits,
+    DemSamplingCancellation, DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan,
+    DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,
+    DemSamplingSession,
 };
 pub use descriptor::CompilationDescriptor;
 pub(crate) use detection::DetectionRecordBuffer;
@@ -24,7 +26,7 @@ pub use detection::{
     DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
     DetectionSamplingSession, MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR,
     MeasurementToDetectionCompiler, MeasurementToDetectionPlan, MeasurementToDetectionSession,
-    MeasurementToDetectionSinkAdapter, detection_record_width, detection_record_width_with_limits,
+    MeasurementToDetectionTransaction, detection_record_width, detection_record_width_with_limits,
     measurement_record_count, measurement_record_count_with_limits,
     validate_detection_sampling_circuit, validate_detection_sampling_circuit_with_limits,
 };
@@ -40,6 +42,7 @@ pub use sampling::{
     SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
     SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
 };
+pub use sampling_estimate::estimate_sampling_request;
 
 /// Compiler registrations exposed through product capability discovery.
 pub const COMPILATION_DESCRIPTORS: &[CompilationDescriptor] = &[

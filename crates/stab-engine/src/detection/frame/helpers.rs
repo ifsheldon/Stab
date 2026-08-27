@@ -4,15 +4,15 @@ use stab_model::{
     CircuitInstruction, GateCategory, MeasureRecordOffset, Pauli, Probability, Target,
 };
 
-use super::super::error::{DetectionError as CircuitError, DetectionResult as CircuitResult};
+use super::super::error::{DetectionError, DetectionResult};
 
-pub(super) fn frame_bit(bits: &[bool], qubit: usize) -> CircuitResult<bool> {
+pub(super) fn frame_bit(bits: &[bool], qubit: usize) -> DetectionResult<bool> {
     bits.get(qubit)
         .copied()
         .ok_or_else(|| frame_qubit_out_of_range(qubit))
 }
 
-pub(super) fn set_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> CircuitResult<()> {
+pub(super) fn set_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> DetectionResult<()> {
     let bit = bits
         .get_mut(qubit)
         .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
@@ -20,7 +20,7 @@ pub(super) fn set_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> Cir
     Ok(())
 }
 
-pub(super) fn xor_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> CircuitResult<()> {
+pub(super) fn xor_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> DetectionResult<()> {
     let bit = bits
         .get_mut(qubit)
         .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
@@ -28,8 +28,8 @@ pub(super) fn xor_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> Cir
     Ok(())
 }
 
-fn frame_qubit_out_of_range(qubit: usize) -> CircuitError {
-    CircuitError::invalid_sampler_compilation(format!(
+fn frame_qubit_out_of_range(qubit: usize) -> DetectionError {
+    DetectionError::invalid_sampler_compilation(format!(
         "qubit target {qubit} is outside the detector frame state"
     ))
 }
@@ -37,18 +37,18 @@ fn frame_qubit_out_of_range(qubit: usize) -> CircuitError {
 pub(super) fn measurement_record_bit(
     measurements: &[bool],
     offset: MeasureRecordOffset,
-) -> CircuitResult<bool> {
+) -> DetectionResult<bool> {
     let len = i64::try_from(measurements.len())
-        .map_err(|_| CircuitError::invalid_result_format("measurement count does not fit i64"))?;
+        .map_err(|_| DetectionError::invalid_result_format("measurement count does not fit i64"))?;
     let index = len + i64::from(offset.get());
     let index = usize::try_from(index).map_err(|_| {
-        CircuitError::invalid_result_format(format!(
+        DetectionError::invalid_result_format(format!(
             "measurement record target rec[{}] is not available",
             offset.stim_text()
         ))
     })?;
     measurements.get(index).copied().ok_or_else(|| {
-        CircuitError::invalid_result_format(format!(
+        DetectionError::invalid_result_format(format!(
             "measurement record target rec[{}] is not available",
             offset.stim_text()
         ))
@@ -69,7 +69,7 @@ pub(super) fn sample_flip(probability: f64, rng: &mut impl Rng) -> bool {
 
 pub(super) fn single_probability_argument(
     instruction: &CircuitInstruction,
-) -> CircuitResult<Probability> {
+) -> DetectionResult<Probability> {
     if instruction.args().len() != 1 {
         return Err(unsupported_frame_instruction(instruction));
     }
@@ -78,7 +78,9 @@ pub(super) fn single_probability_argument(
         .ok_or_else(|| unsupported_frame_instruction(instruction))
 }
 
-pub(super) fn measurement_flip_probability(instruction: &CircuitInstruction) -> CircuitResult<f64> {
+pub(super) fn measurement_flip_probability(
+    instruction: &CircuitInstruction,
+) -> DetectionResult<f64> {
     match instruction.probability_argument()? {
         None => Ok(0.0),
         Some(probability) => Ok(probability.get()),
@@ -87,7 +89,7 @@ pub(super) fn measurement_flip_probability(instruction: &CircuitInstruction) -> 
 
 pub(super) fn probability_list<const N: usize>(
     instruction: &CircuitInstruction,
-) -> CircuitResult<[f64; N]> {
+) -> DetectionResult<[f64; N]> {
     if instruction.args().len() != N {
         return Err(unsupported_frame_instruction(instruction));
     }
@@ -96,7 +98,7 @@ pub(super) fn probability_list<const N: usize>(
     Ok(values)
 }
 
-pub(super) fn zero_probability_noise(instruction: &CircuitInstruction) -> CircuitResult<bool> {
+pub(super) fn zero_probability_noise(instruction: &CircuitInstruction) -> DetectionResult<bool> {
     if !matches!(
         instruction.gate().category(),
         GateCategory::Noise | GateCategory::HeraldedNoise
@@ -112,12 +114,12 @@ pub(super) fn zero_probability_noise(instruction: &CircuitInstruction) -> Circui
 pub(super) fn qubit_index(
     instruction: &CircuitInstruction,
     target: &Target,
-) -> CircuitResult<usize> {
+) -> DetectionResult<usize> {
     let Some(qubit) = target.qubit_id() else {
         return Err(unsupported_frame_instruction(instruction));
     };
     usize::try_from(qubit.get()).map_err(|_| {
-        CircuitError::invalid_sampler_compilation(format!(
+        DetectionError::invalid_sampler_compilation(format!(
             "qubit target {} cannot fit in this platform's usize",
             qubit.get()
         ))
@@ -182,15 +184,15 @@ const TWO_QUBIT_FRAME_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
     (Some(PauliBasis::Z), Some(PauliBasis::Z)),
 ];
 
-pub(super) fn unsupported_frame_instruction(instruction: &CircuitInstruction) -> CircuitError {
-    CircuitError::invalid_sampler_compilation(format!(
+pub(super) fn unsupported_frame_instruction(instruction: &CircuitInstruction) -> DetectionError {
+    DetectionError::invalid_sampler_compilation(format!(
         "M9 detector frame subset does not support {}",
         instruction.gate().canonical_name()
     ))
 }
 
-pub(super) fn unsupported_frame_target(gate_name: &str, target: &Target) -> CircuitError {
-    CircuitError::invalid_sampler_compilation(format!(
+pub(super) fn unsupported_frame_target(gate_name: &str, target: &Target) -> DetectionError {
+    DetectionError::invalid_sampler_compilation(format!(
         "gate {gate_name} has non-qubit frame target {target}"
     ))
 }

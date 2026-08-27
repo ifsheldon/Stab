@@ -528,13 +528,13 @@ impl PipelineState {
             finished: false,
         };
         {
-            let mut adapter = self
+            let mut transaction = self
                 .conversion
-                .start_delivery(&mut sink)
+                .start_transaction(&mut sink)
                 .map_err(|error| DecoderDiagnosticError::Pipeline(error.to_string()))?;
             let summary = self
                 .sampling
-                .run(ShotCount::new(shots), &mut adapter)
+                .run(ShotCount::new(shots), &mut transaction)
                 .map_err(|error| DecoderDiagnosticError::Pipeline(error.to_string()))?;
             if summary.committed_shots().get() != shots {
                 return Err(DecoderDiagnosticError::Progress {

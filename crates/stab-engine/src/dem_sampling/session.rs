@@ -49,6 +49,9 @@ pub enum DemSamplingExecutionError {
     #[error("DEM sampling session shot counter overflowed")]
     ShotCounterOverflow,
 
+    #[error("DEM replay session lifecycle error: {message}")]
+    ReplayLifecycle { message: &'static str },
+
     #[error(
         "DEM sampling session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte safety limit"
     )]
@@ -302,93 +305,6 @@ impl DemSamplingSession {
         self.run_mode(shots, sink, RunMode::WithSampledErrors)
     }
 
-    /// Replays caller-owned sampled-error records without advancing this session's RNG.
-    pub fn replay<Sink>(
-        &mut self,
-        error_records: &[Vec<bool>],
-        sink: &mut Sink,
-    ) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>>
-    where
-        Sink: DemSampleSink,
-    {
-        let shots = u64::try_from(error_records.len())
-            .map(ShotCount::new)
-            .map_err(|_| DemSamplingRunError::Engine {
-                source: DemSamplingExecutionError::ShotCounterOverflow,
-                progress: DemSamplingRunProgress::new(0, 0),
-            })?;
-        self.preflight_replay_request(shots)?;
-        for (shot_index, error_record) in error_records.iter().enumerate() {
-            self.plan
-                .validate_error_record_width(error_record, Some(shot_index))
-                .map_err(preflight_error)?;
-        }
-        let mut replay = self.start_replay_after_preflight(shots, sink)?;
-        for records in error_records.chunks(MAX_BATCH_SHOTS) {
-            if replay.write_batch(records)? == DemReplayBatchStatus::Cancelled {
-                break;
-            }
-        }
-        replay.finish()
-    }
-
-    /// Starts one replay sink lifecycle after the caller has validated and rewound its source.
-    ///
-    /// The returned delivery object accepts record batches incrementally and finalizes the sink
-    /// exactly once. Dropping it after committed output poisons the parent session because the
-    /// sink lifecycle is then incomplete.
-    pub fn start_replay<'session, 'sink, Sink>(
-        &'session mut self,
-        expected_shots: ShotCount,
-        sink: &'sink mut Sink,
-    ) -> Result<DemReplaySession<'session, 'sink, Sink>, DemSamplingRunError<Sink::Error>>
-    where
-        Sink: DemSampleSink,
-    {
-        self.preflight_replay_request(expected_shots)?;
-        self.start_replay_after_preflight(expected_shots, sink)
-    }
-
-    fn preflight_replay_request<SinkError>(
-        &self,
-        expected_shots: ShotCount,
-    ) -> Result<(), DemSamplingRunError<SinkError>> {
-        self.preflight_common(expected_shots)?;
-        let shots =
-            usize::try_from(expected_shots.get()).map_err(|_| DemSamplingRunError::Engine {
-                source: DemSamplingExecutionError::ShotCounterOverflow,
-                progress: DemSamplingRunProgress::new(0, 0),
-            })?;
-        if shots != 0 {
-            self.plan
-                .validate_replay_with_limits(expected_shots, self.limits)
-                .map_err(preflight_error)?;
-        }
-        Ok(())
-    }
-
-    fn start_replay_after_preflight<'session, 'sink, Sink>(
-        &'session mut self,
-        expected_shots: ShotCount,
-        sink: &'sink mut Sink,
-    ) -> Result<DemReplaySession<'session, 'sink, Sink>, DemSamplingRunError<Sink::Error>>
-    where
-        Sink: DemSampleSink,
-    {
-        if expected_shots.get() != 0 {
-            self.ensure_sampled_error_storage()
-                .map_err(preflight_execution_error)?;
-        }
-        Ok(DemReplaySession {
-            session: self,
-            sink,
-            expected_shots,
-            committed_shots: 0,
-            cancelled: false,
-            finished: false,
-        })
-    }
-
     fn run_mode<Sink>(
         &mut self,
         shots: ShotCount,
@@ -398,7 +314,8 @@ impl DemSamplingSession {
     where
         Sink: DemSampleSink,
     {
-        self.preflight_common(shots)?;
+        self.preflight_common(shots)
+            .map_err(preflight_execution_error)?;
         if shots.get() == 0 {
             return Ok(self.summary(DemSamplingRunStatus::Completed, shots, 0));
         }
@@ -450,25 +367,16 @@ impl DemSamplingSession {
         self.finish_run(sink, shots, committed, remaining == 0)
     }
 
-    fn preflight_common<SinkError>(
-        &self,
-        shots: ShotCount,
-    ) -> Result<(), DemSamplingRunError<SinkError>> {
+    fn preflight_common(&self, shots: ShotCount) -> Result<(), DemSamplingExecutionError> {
         if self.poisoned {
-            return Err(DemSamplingRunError::Engine {
-                source: DemSamplingExecutionError::SessionPoisoned,
-                progress: DemSamplingRunProgress::new(0, 0),
-            });
+            return Err(DemSamplingExecutionError::SessionPoisoned);
         }
         if self
             .total_committed_shots
             .checked_add(shots.get())
             .is_none()
         {
-            return Err(DemSamplingRunError::Engine {
-                source: DemSamplingExecutionError::ShotCounterOverflow,
-                progress: DemSamplingRunProgress::new(0, 0),
-            });
+            return Err(DemSamplingExecutionError::ShotCounterOverflow);
         }
         Ok(())
     }
@@ -674,23 +582,17 @@ impl DemReplayBatchStatus {
     }
 }
 
-/// One incremental replay delivery and sink lifecycle.
-pub struct DemReplaySession<'session, 'sink, Sink>
-where
-    Sink: DemSampleSink,
-{
-    session: &'session mut DemSamplingSession,
-    sink: &'sink mut Sink,
+/// Owned mutable state for one incremental sampled-error replay.
+pub struct DemReplaySession {
+    session: DemSamplingSession,
     expected_shots: ShotCount,
     committed_shots: u64,
     cancelled: bool,
     finished: bool,
+    transaction_active: bool,
 }
 
-impl<Sink> fmt::Debug for DemReplaySession<'_, '_, Sink>
-where
-    Sink: DemSampleSink,
-{
+impl fmt::Debug for DemReplaySession {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("DemReplaySession")
@@ -698,25 +600,145 @@ where
             .field("committed_shots", &self.committed_shots)
             .field("cancelled", &self.cancelled)
             .field("finished", &self.finished)
+            .field("transaction_active", &self.transaction_active)
             .finish_non_exhaustive()
     }
 }
 
-impl<Sink> DemReplaySession<'_, '_, Sink>
-where
-    Sink: DemSampleSink,
-{
-    /// Delivers at most 64 prevalidated-width replay records without finalizing the sink.
-    pub fn write_batch(
+impl DemReplaySession {
+    pub(super) fn new(
+        plan: DemSamplingPlan,
+        expected_shots: ShotCount,
+        limits: DemSamplerLimits,
+    ) -> Result<Self, DemSamplingExecutionError> {
+        let mut session =
+            DemSamplingSession::new(plan, RandomPolicy::Seeded(crate::Seed::new(0)), limits)?;
+        session.preflight_common(expected_shots)?;
+        if expected_shots.get() != 0 {
+            session
+                .plan
+                .validate_replay_with_limits(expected_shots, limits)
+                .map_err(DemSamplingExecutionError::InvalidRequest)?;
+            session.ensure_sampled_error_storage()?;
+        }
+        Ok(Self {
+            session,
+            expected_shots,
+            committed_shots: 0,
+            cancelled: false,
+            finished: false,
+            transaction_active: false,
+        })
+    }
+
+    pub fn cancellation(&self) -> DemSamplingCancellation {
+        self.session.cancellation()
+    }
+
+    pub const fn is_poisoned(&self) -> bool {
+        self.session.is_poisoned()
+    }
+
+    pub const fn committed_shots(&self) -> ShotCount {
+        ShotCount::new(self.committed_shots)
+    }
+
+    /// Reopens a completed replay lifecycle while retaining bounded session storage.
+    pub fn reset(&mut self) -> Result<(), DemSamplingExecutionError> {
+        if self.transaction_active {
+            return Err(DemSamplingExecutionError::ReplayLifecycle {
+                message: "finish the active replay transaction before resetting it",
+            });
+        }
+        if self.session.poisoned {
+            return Err(DemSamplingExecutionError::SessionPoisoned);
+        }
+        if !self.finished {
+            return Err(DemSamplingExecutionError::ReplayLifecycle {
+                message: "finish the current replay before resetting it",
+            });
+        }
+        if self.session.is_cancelled() {
+            return Err(DemSamplingExecutionError::ReplayLifecycle {
+                message: "reset the replay cancellation token before reopening the replay",
+            });
+        }
+        self.session.preflight_common(self.expected_shots)?;
+        self.committed_shots = 0;
+        self.cancelled = false;
+        self.finished = false;
+        Ok(())
+    }
+
+    /// Binds this reusable replay state to one sink for an incremental delivery lifecycle.
+    pub fn start_transaction<'session, 'sink, Sink>(
+        &'session mut self,
+        sink: &'sink mut Sink,
+    ) -> Result<DemReplayTransaction<'session, 'sink, Sink>, DemSamplingRunError<Sink::Error>>
+    where
+        Sink: DemSampleSink,
+    {
+        self.ensure_available()?;
+        self.transaction_active = true;
+        Ok(DemReplayTransaction {
+            starting_committed_shots: self.committed_shots,
+            session: self,
+            sink,
+            finished: false,
+        })
+    }
+
+    /// Replays a complete caller-owned record set after validating it before delivery.
+    pub fn run<Sink>(
         &mut self,
         error_records: &[Vec<bool>],
-    ) -> Result<DemReplayBatchStatus, DemSamplingRunError<Sink::Error>> {
-        if self.finished || self.session.poisoned {
+        sink: &mut Sink,
+    ) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>>
+    where
+        Sink: DemSampleSink,
+    {
+        self.ensure_available()?;
+        if self.committed_shots != 0 {
             return Err(DemSamplingRunError::Engine {
-                source: DemSamplingExecutionError::SessionPoisoned,
+                source: DemSamplingExecutionError::ReplayLifecycle {
+                    message: "reset the replay before running a complete record set",
+                },
                 progress: DemSamplingRunProgress::new(self.committed_shots, 0),
             });
         }
+        let actual_shots = u64::try_from(error_records.len()).map_err(|_| {
+            preflight_execution_error(DemSamplingExecutionError::ShotCounterOverflow)
+        })?;
+        if actual_shots != self.expected_shots.get() {
+            return Err(preflight_error(DemError::invalid_result_format(format!(
+                "DEM replay expected {} records, got {actual_shots}",
+                self.expected_shots.get()
+            ))));
+        }
+        for (shot_index, error_record) in error_records.iter().enumerate() {
+            self.session
+                .plan
+                .validate_error_record_width(error_record, Some(shot_index))
+                .map_err(preflight_error)?;
+        }
+        let mut transaction = self.start_transaction(sink)?;
+        for records in error_records.chunks(MAX_BATCH_SHOTS) {
+            if transaction.write_batch(records)? == DemReplayBatchStatus::Cancelled {
+                break;
+            }
+        }
+        transaction.finish()
+    }
+
+    fn write_batch_to<Sink>(
+        &mut self,
+        error_records: &[Vec<bool>],
+        sink: &mut Sink,
+    ) -> Result<DemReplayBatchStatus, DemSamplingRunError<Sink::Error>>
+    where
+        Sink: DemSampleSink,
+    {
+        self.ensure_transaction_state()?;
         if error_records.len() > MAX_BATCH_SHOTS {
             return Err(DemSamplingRunError::Engine {
                 source: DemSamplingExecutionError::InvalidRequest(DemError::invalid_result_format(
@@ -806,7 +828,7 @@ where
             }
             if let Err(error) =
                 self.session
-                    .write_active_batch(batch_shots, true, self.sink, self.committed_shots)
+                    .write_active_batch(batch_shots, true, sink, self.committed_shots)
             {
                 self.finished = true;
                 return Err(error);
@@ -818,15 +840,58 @@ where
         Ok(DemReplayBatchStatus::Accepted)
     }
 
-    /// Finalizes this replay sink exactly once.
-    pub fn finish(mut self) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>> {
-        if self.finished || self.session.poisoned {
-            self.finished = true;
+    fn ensure_available<SinkError>(&self) -> Result<(), DemSamplingRunError<SinkError>> {
+        if self.session.poisoned {
             return Err(DemSamplingRunError::Engine {
                 source: DemSamplingExecutionError::SessionPoisoned,
                 progress: DemSamplingRunProgress::new(self.committed_shots, 0),
             });
         }
+        if self.transaction_active {
+            return Err(DemSamplingRunError::Engine {
+                source: DemSamplingExecutionError::ReplayLifecycle {
+                    message: "finish the active replay transaction before starting another",
+                },
+                progress: DemSamplingRunProgress::new(self.committed_shots, 0),
+            });
+        }
+        if self.finished {
+            return Err(DemSamplingRunError::Engine {
+                source: DemSamplingExecutionError::ReplayLifecycle {
+                    message: "reset the completed replay before starting another transaction",
+                },
+                progress: DemSamplingRunProgress::new(self.committed_shots, 0),
+            });
+        }
+        Ok(())
+    }
+
+    fn ensure_transaction_state<SinkError>(&self) -> Result<(), DemSamplingRunError<SinkError>> {
+        if self.session.poisoned {
+            return Err(DemSamplingRunError::Engine {
+                source: DemSamplingExecutionError::SessionPoisoned,
+                progress: DemSamplingRunProgress::new(self.committed_shots, 0),
+            });
+        }
+        if self.finished {
+            return Err(DemSamplingRunError::Engine {
+                source: DemSamplingExecutionError::ReplayLifecycle {
+                    message: "reset the completed replay before delivering more records",
+                },
+                progress: DemSamplingRunProgress::new(self.committed_shots, 0),
+            });
+        }
+        Ok(())
+    }
+
+    fn finish_to<Sink>(
+        &mut self,
+        sink: &mut Sink,
+    ) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>>
+    where
+        Sink: DemSampleSink,
+    {
+        self.ensure_transaction_state()?;
         if self.expected_shots.get() == 0 {
             self.finished = true;
             return Ok(self.session.summary(
@@ -856,22 +921,70 @@ where
         }
         let completed = !self.cancelled;
         self.finished = true;
-        self.session.finish_run(
-            self.sink,
-            self.expected_shots,
-            self.committed_shots,
-            completed,
-        )
+        self.session
+            .finish_run(sink, self.expected_shots, self.committed_shots, completed)
     }
 }
 
-impl<Sink> Drop for DemReplaySession<'_, '_, Sink>
+/// One short-lived replay transaction bound to exactly one output sink.
+pub struct DemReplayTransaction<'session, 'sink, Sink>
+where
+    Sink: DemSampleSink,
+{
+    session: &'session mut DemReplaySession,
+    sink: &'sink mut Sink,
+    starting_committed_shots: u64,
+    finished: bool,
+}
+
+impl<Sink> fmt::Debug for DemReplayTransaction<'_, '_, Sink>
+where
+    Sink: DemSampleSink,
+{
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("DemReplayTransaction")
+            .field("sink_type", &std::any::type_name::<Sink>())
+            .field("starting_committed_shots", &self.starting_committed_shots)
+            .field("committed_shots", &self.session.committed_shots)
+            .field("finished", &self.finished)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<Sink> DemReplayTransaction<'_, '_, Sink>
+where
+    Sink: DemSampleSink,
+{
+    /// Delivers at most 64 replay records without finalizing this transaction.
+    pub fn write_batch(
+        &mut self,
+        error_records: &[Vec<bool>],
+    ) -> Result<DemReplayBatchStatus, DemSamplingRunError<Sink::Error>> {
+        self.session.write_batch_to(error_records, self.sink)
+    }
+
+    /// Finalizes the same sink that received every preceding replay batch.
+    pub fn finish(mut self) -> Result<DemSamplingRunSummary, DemSamplingRunError<Sink::Error>> {
+        let result = self.session.finish_to(self.sink);
+        self.session.transaction_active = false;
+        self.finished = true;
+        result
+    }
+}
+
+impl<Sink> Drop for DemReplayTransaction<'_, '_, Sink>
 where
     Sink: DemSampleSink,
 {
     fn drop(&mut self) {
-        if !self.finished && self.committed_shots != 0 {
-            self.session.poisoned = true;
+        if self.finished {
+            return;
+        }
+        self.session.transaction_active = false;
+        if self.session.committed_shots != self.starting_committed_shots {
+            self.session.session.poisoned = true;
+            self.session.finished = true;
         }
     }
 }
@@ -1043,5 +1156,35 @@ fn preflight_execution_error<SinkError>(
     DemSamplingRunError::Engine {
         source,
         progress: DemSamplingRunProgress::new(0, 0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::DemSamplingCompiler;
+    use stab_model::DetectorErrorModel;
+
+    #[test]
+    #[allow(clippy::expect_used, reason = "the fixture must exist before mutation")]
+    fn replay_reset_rechecks_cumulative_shot_overflow() {
+        let dem = DetectorErrorModel::from_dem_str("error(1) D0\n").expect("parse DEM");
+        let plan = DemSamplingCompiler::new()
+            .compile(&dem)
+            .expect("compile DEM");
+        let mut replay = plan
+            .replay_session(ShotCount::new(1))
+            .expect("create replay");
+        replay.finished = true;
+        replay.session.total_committed_shots = u64::MAX;
+
+        assert!(matches!(
+            replay.reset(),
+            Err(DemSamplingExecutionError::ShotCounterOverflow)
+        ));
+        assert!(
+            replay.finished,
+            "a rejected reset must not reopen the replay"
+        );
     }
 }

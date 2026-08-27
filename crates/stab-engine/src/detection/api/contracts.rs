@@ -22,6 +22,9 @@ pub enum DetectionExecutionError {
     #[error("detection delivery is already finalized")]
     DeliveryFinished,
 
+    #[error("a detection transaction is already active")]
+    TransactionActive,
+
     #[error("detection session shot counter overflowed")]
     ShotCounterOverflow,
 

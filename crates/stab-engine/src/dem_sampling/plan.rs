@@ -11,7 +11,7 @@ use super::program::{
     DemSampleBlock, SampledErrorOutput, apply_error_record_block, compile_block,
     reset_detection_record, sample_block_into, usize_from_u64,
 };
-use super::session::{DemSamplingExecutionError, DemSamplingSession};
+use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
 use super::{DemError, DemResourceLimitError, DemResult, DemSamplerLimits};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount};
 
@@ -106,6 +106,23 @@ impl DemSamplingPlan {
         limits: DemSamplerLimits,
     ) -> Result<DemSamplingSession, DemSamplingExecutionError> {
         DemSamplingSession::new(self.clone(), random_policy, limits)
+    }
+
+    /// Creates owned mutable state for one incremental sampled-error replay.
+    pub fn replay_session(
+        &self,
+        expected_shots: ShotCount,
+    ) -> Result<DemReplaySession, DemSamplingExecutionError> {
+        self.replay_session_with_limits(expected_shots, DemSamplerLimits::default())
+    }
+
+    /// Creates an owned replay session under explicit caller-selected resource limits.
+    pub fn replay_session_with_limits(
+        &self,
+        expected_shots: ShotCount,
+        limits: DemSamplerLimits,
+    ) -> Result<DemReplaySession, DemSamplingExecutionError> {
+        DemReplaySession::new(self.clone(), expected_shots, limits)
     }
 
     /// Validates replay traversal work without constructing a session or touching a sink.

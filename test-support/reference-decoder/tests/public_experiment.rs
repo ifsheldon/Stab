@@ -92,11 +92,11 @@ fn run_experiment(partitions: &[u64]) -> ExperimentReport {
     for &shots in partitions {
         let mut sink = LogicalFailureSink::new(&mut decoder, &mut report);
         {
-            let mut adapter = conversion
-                .start_delivery(&mut sink)
+            let mut transaction = conversion
+                .start_transaction(&mut sink)
                 .expect("start typed conversion delivery");
             let summary = sampling
-                .run(ShotCount::new(shots), &mut adapter)
+                .run(ShotCount::new(shots), &mut transaction)
                 .expect("sample through typed conversion delivery");
             assert_eq!(summary.committed_shots().get(), shots);
         }

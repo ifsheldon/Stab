@@ -7,18 +7,18 @@ use super::{
     DetectionRunSummary, MeasurementToDetectionSession,
 };
 
-/// Adapts a detection sink into the measurement-sink seam consumed by a sampling session.
-pub struct MeasurementToDetectionSinkAdapter<'session, 'sink, Sink> {
+/// One short-lived conversion transaction bound to exactly one detection sink.
+pub struct MeasurementToDetectionTransaction<'session, 'sink, Sink> {
     session: &'session mut MeasurementToDetectionSession,
     sink: &'sink mut Sink,
     committed_shots: u64,
     finished: bool,
 }
 
-impl<Sink> fmt::Debug for MeasurementToDetectionSinkAdapter<'_, '_, Sink> {
+impl<Sink> fmt::Debug for MeasurementToDetectionTransaction<'_, '_, Sink> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("MeasurementToDetectionSinkAdapter")
+            .debug_struct("MeasurementToDetectionTransaction")
             .field("session", &self.session)
             .field("sink_type", &std::any::type_name::<Sink>())
             .field("committed_shots", &self.committed_shots)
@@ -27,7 +27,7 @@ impl<Sink> fmt::Debug for MeasurementToDetectionSinkAdapter<'_, '_, Sink> {
     }
 }
 
-impl<'session, 'sink, Sink> MeasurementToDetectionSinkAdapter<'session, 'sink, Sink>
+impl<'session, 'sink, Sink> MeasurementToDetectionTransaction<'session, 'sink, Sink>
 where
     Sink: DetectionSink,
 {
@@ -87,11 +87,13 @@ where
             });
         }
         self.finished = true;
-        self.session.finish_sink(self.sink, self.committed_shots)
+        let result = self.session.finish_sink(self.sink, self.committed_shots);
+        self.session.transaction_active = false;
+        result
     }
 }
 
-impl<Sink> MeasurementSink for MeasurementToDetectionSinkAdapter<'_, '_, Sink>
+impl<Sink> MeasurementSink for MeasurementToDetectionTransaction<'_, '_, Sink>
 where
     Sink: DetectionSink,
 {
@@ -103,7 +105,7 @@ where
             return Err(DetectionRunError::Engine {
                 source: DetectionExecutionError::CancelledComposition,
                 progress: DetectionRunProgress::new(
-                    summary.committed_shots().get(),
+                    self.committed_shots,
                     summary.requested_shots().get(),
                 ),
             });
@@ -116,8 +118,9 @@ where
     }
 }
 
-impl<Sink> Drop for MeasurementToDetectionSinkAdapter<'_, '_, Sink> {
+impl<Sink> Drop for MeasurementToDetectionTransaction<'_, '_, Sink> {
     fn drop(&mut self) {
+        self.session.transaction_active = false;
         if !self.finished && self.committed_shots != 0 {
             self.session.poisoned = true;
         }

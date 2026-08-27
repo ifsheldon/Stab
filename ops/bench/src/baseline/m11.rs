@@ -565,11 +565,11 @@ fn measure_dem_session_replay(
         })
         .collect::<Vec<_>>();
     let mut preflight_session = plan
-        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .replay_session(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64))
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let mut preflight_sink = DemDigestSink::default();
     let preflight_summary = preflight_session
-        .replay(&replay_records, &mut preflight_sink)
+        .run(&replay_records, &mut preflight_sink)
         .map_err(|error| stab_runner_error(&row.id, error))?;
     ensure_dem_phase_witness(
         row,
@@ -579,11 +579,11 @@ fn measure_dem_session_replay(
         preflight_sink.witness(),
     )?;
     let session = plan
-        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .replay_session(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64))
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let sink = DemDigestSink::default();
     let mut memory_session = plan
-        .session(RandomPolicy::Seeded(Seed::new(5)))
+        .replay_session(ShotCount::new(M11_SAMPLE_DEM_SHOTS as u64))
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let mut memory_sink = DemDigestSink::default();
     let mut timing_state = (session, sink);
@@ -594,7 +594,7 @@ fn measure_dem_session_replay(
         |state| {
             state
                 .0
-                .replay(&replay_records, &mut state.1)
+                .run(&replay_records, &mut state.1)
                 .map_err(|error| stab_runner_error(&row.id, error))
         },
         |state, summary| {
@@ -606,13 +606,17 @@ fn measure_dem_session_replay(
                 summary.committed_shots().get(),
                 actual,
             )?;
+            state
+                .0
+                .reset()
+                .map_err(|error| stab_runner_error(&row.id, error))?;
             state.1.reset();
             black_box(actual);
             Ok(())
         },
         || {
             let summary = memory_session
-                .replay(&replay_records, &mut memory_sink)
+                .run(&replay_records, &mut memory_sink)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             let actual = memory_sink.witness();
             ensure_dem_phase_witness(
