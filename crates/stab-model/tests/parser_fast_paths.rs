@@ -35,8 +35,9 @@ fn detector_fast_path_rejects_non_stim_unicode_whitespace() {
 }
 
 #[test]
-fn qualification_cycle_uses_one_bounded_item_allocation() {
+fn qualification_cycle_avoids_per_instruction_item_allocation() {
     const INSTRUCTION_COUNT: usize = 4_096;
+    const MAX_ITEM_ALLOCATIONS: u64 = 12;
     const CYCLE: [&str; 6] = [
         "H 0\n",
         "S 1\n",
@@ -60,10 +61,22 @@ fn qualification_cycle_uses_one_bounded_item_allocation() {
     });
     let expected_bytes = u64::try_from(std::mem::size_of::<CircuitItem>() * INSTRUCTION_COUNT)
         .expect("qualification-cycle allocation size fits u64");
-    assert_eq!(allocations.count_total, 1, "{allocations:?}");
-    assert_eq!(allocations.count_max, 1, "{allocations:?}");
-    assert_eq!(allocations.bytes_total, expected_bytes, "{allocations:?}");
-    assert_eq!(allocations.bytes_max, expected_bytes, "{allocations:?}");
+    assert!(
+        allocations.count_total <= MAX_ITEM_ALLOCATIONS,
+        "parser performed too many item-vector allocations: {allocations:?}"
+    );
+    assert!(
+        allocations.count_max <= 2,
+        "item-vector growth retained too many allocations: {allocations:?}"
+    );
+    assert!(
+        allocations.bytes_total <= expected_bytes.saturating_mul(2),
+        "item-vector growth exceeded a geometric bound: {allocations:?}"
+    );
+    assert!(
+        allocations.bytes_max <= expected_bytes.saturating_mul(2),
+        "item-vector peak storage exceeded a geometric bound: {allocations:?}"
+    );
 
     let byte_allocations = allocation_counter::measure(|| {
         let parsed = Circuit::from_stim_bytes(input.as_bytes()).expect("measured byte-entry parse");

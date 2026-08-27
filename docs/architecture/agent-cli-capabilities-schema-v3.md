@@ -1,6 +1,6 @@
 # Agent CLI Capabilities Schema Version 3
 
-This historical document records the schema-version-3 contract. Stab now emits [capabilities schema version 4](agent-cli-capabilities-schema-v4.md) and does not provide a version-3 compatibility view.
+This historical document records the schema-version-3 contract. Stab now emits [capabilities schema version 5](agent-cli-capabilities-schema-v5.md) and does not provide a version-3 compatibility view.
 
 The command is an additive Stab extension and does not claim a matching Stim v1.16.0 command name or output bytes.
 

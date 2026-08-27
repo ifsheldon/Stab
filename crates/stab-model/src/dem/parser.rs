@@ -2,9 +2,9 @@ use super::{
     DemArgVec, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTag, DemTarget, DemTargetVec,
     DetectorErrorModel,
 };
-use crate::advanced::{dem_repeat_nesting_limit_error, dem_source_line_limit_error};
 use crate::diagnostics::bounded_parse_diagnostic_text;
 use crate::model_parse::{line_error, unexpected_repeat_terminator, unterminated_repeat_block};
+use crate::parse_limits::ParseAdmission;
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::{
     ByteSpan, DemRepeatCount, ModelDialect, ModelError, ModelResult, ParseErrorCode,
@@ -17,34 +17,30 @@ mod items;
 use items::{ParsedDemItemStorage, ParsedNestedDemItems};
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
-const MAX_DEM_PREALLOCATED_ITEMS: usize = 131_072;
-const DEM_PREALLOCATION_SAMPLE_BYTES: usize = 256;
 const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
 
 pub(super) fn parse_dem(input: &str, limits: ParseLimits) -> ModelResult<DetectorErrorModel> {
-    DemParser::new(input, limits).parse()
+    DemParser::new(input, limits)?.parse()
 }
 
 struct DemParser<'a> {
     commands: SourceCommands<'a>,
     input_len: usize,
-    top_level_capacity: usize,
-    limits: ParseLimits,
+    admission: ParseAdmission,
 }
 
 impl<'a> DemParser<'a> {
-    fn new(input: &'a str, limits: ParseLimits) -> Self {
-        Self {
+    fn new(input: &'a str, limits: ParseLimits) -> ModelResult<Self> {
+        let admission = ParseAdmission::new(ModelDialect::DetectorErrorModel, input.len(), limits)?;
+        Ok(Self {
             commands: SourceCommands::new(input),
             input_len: input.len(),
-            top_level_capacity: top_level_item_capacity(input, limits),
-            limits,
-        }
+            admission,
+        })
     }
 
     fn parse(mut self) -> ModelResult<DetectorErrorModel> {
-        let items = Vec::with_capacity(self.top_level_capacity);
-        self.parse_block(items, 0)
+        self.parse_block(Vec::new(), 0)
     }
 
     // Keep the top-level Vec and nested inline-storage loops in separate compact code paths.
@@ -70,6 +66,8 @@ impl<'a> DemParser<'a> {
                     semantic_line.span(),
                 ));
             }
+            self.admission
+                .admit_instruction(line_number, semantic_line.span())?;
 
             if let Some(header) = semantic_line.without_suffix('{') {
                 let header = trim_command_space_end(header);
@@ -83,19 +81,11 @@ impl<'a> DemParser<'a> {
                 } else {
                     self.parse_repeat_header(line_number, header, command.end_error_span())?
                 };
-                let limit = self.limits.repeat_nesting_limit().get();
-                if depth >= limit {
-                    let actual = depth.checked_add(1).ok_or_else(|| {
-                        ModelError::invalid_detector_error_model(
-                            "DEM repeat nesting depth overflowed",
-                        )
-                    })?;
-                    return Err(dem_repeat_nesting_limit_error(
-                        actual,
-                        limit,
-                        semantic_line.span(),
-                    ));
-                }
+                let actual = depth.checked_add(1).ok_or_else(|| {
+                    ModelError::invalid_detector_error_model("DEM repeat nesting depth overflowed")
+                })?;
+                self.admission
+                    .admit_repeat_nesting(line_number, actual, semantic_line.span())?;
                 let body = self.parse_block(ParsedNestedDemItems::nested(), depth + 1)?;
                 items.push_item(super::DemItem::RepeatBlock(DemRepeatBlock::from_parts(
                     repeat.count,
@@ -103,12 +93,25 @@ impl<'a> DemParser<'a> {
                     repeat.tag,
                 )));
             } else {
-                let instruction =
-                    if let Some(instruction) = fast::parse_canonical_instruction(line.text()) {
-                        instruction
-                    } else {
-                        parse_dem_instruction(line_number, line, command.end_error_span())?
-                    };
+                let instruction = if self
+                    .admission
+                    .target_budget_allows_upper_bound(line.text().len())
+                    && let Some(instruction) = fast::parse_canonical_instruction(line.text())
+                {
+                    self.admission.admit_targets(
+                        instruction.targets().len(),
+                        line_number,
+                        line.span(),
+                    )?;
+                    instruction
+                } else {
+                    parse_dem_instruction(
+                        line_number,
+                        line,
+                        command.end_error_span(),
+                        &mut self.admission,
+                    )?
+                };
                 items.push_item(super::DemItem::Instruction(instruction));
             }
         }
@@ -128,14 +131,8 @@ impl<'a> DemParser<'a> {
             return Ok(None);
         };
         let line_number = command.line_number();
-        let limit = self.limits.source_line_limit().get();
-        if line_number > limit {
-            return Err(dem_source_line_limit_error(
-                line_number,
-                limit,
-                command.source().span(),
-            ));
-        }
+        self.admission
+            .admit_source_line(line_number, command.source().span())?;
         Ok(Some(command))
     }
 
@@ -211,34 +208,11 @@ struct ParsedRepeatHeader {
     tag: Option<DemTag>,
 }
 
-fn top_level_item_capacity(input: &str, limits: ParseLimits) -> usize {
-    let admitted_lines = limits.source_line_limit().get();
-    if input.is_empty() || admitted_lines == 0 {
-        return 0;
-    }
-    let sample_len = input.len().min(DEM_PREALLOCATION_SAMPLE_BYTES);
-    let newline_count = input
-        .as_bytes()
-        .iter()
-        .take(sample_len)
-        .filter(|byte| **byte == b'\n')
-        .count();
-    if newline_count == 0 {
-        return 1;
-    }
-    input
-        .len()
-        .saturating_mul(newline_count)
-        .div_ceil(sample_len)
-        .saturating_add(1)
-        .min(MAX_DEM_PREALLOCATED_ITEMS)
-        .min(admitted_lines)
-}
-
 fn parse_dem_instruction(
     line_number: usize,
     line: SourceSlice<'_>,
     end_error_span: ByteSpan,
+    admission: &mut ParseAdmission,
 ) -> ModelResult<DemInstruction> {
     let (kind, name, rest) = parse_instruction_kind(line_number, line)?;
     if name.text().eq_ignore_ascii_case("repeat") {
@@ -269,7 +243,7 @@ fn parse_dem_instruction(
     })?;
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
     let (args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
-    let targets = parse_dem_targets(line_number, name.text(), rest, end_error_span)?;
+    let targets = parse_dem_targets(line_number, name.text(), rest, end_error_span, admission)?;
     if let Err(error) = super::validate_dem_instruction(kind, &args.values, &targets.values) {
         let (code, span, context) = dem_validation_location(kind, name.text(), &args, &targets);
         return Err(line_error(
@@ -561,6 +535,7 @@ fn parse_dem_targets<'a>(
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
+    admission: &mut ParseAdmission,
 ) -> ModelResult<ParsedDemTargets<'a>> {
     if rest.text().is_empty() {
         return Ok(ParsedDemTargets {
@@ -616,6 +591,7 @@ fn parse_dem_targets<'a>(
             .slice(start, cursor)
             .ok_or_else(|| parse_line_error(line_number, "invalid DEM target"))?;
         let target = parse_arbitrary_target(line_number, instruction, token)?;
+        admission.admit_target(line_number, token.span())?;
         values.push(target);
         region_start.get_or_insert(token.byte_start());
         region_end = token.byte_end();

@@ -16,7 +16,7 @@ The stable byte contract for backend-neutral compiler inputs is defined by [comp
 
 The stable byte contract for backend-bearing executable identities is defined by [plan fingerprint schema version 1](plan-fingerprint-schema-v1.md).
 
-The current successful machine-output contracts are [capabilities schema version 4](agent-cli-capabilities-schema-v4.md), [plan schema version 3](agent-cli-plan-schema-v3.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Older schema documents are historical and are not emitted as compatibility views.
+The current successful machine-output contracts are [capabilities schema version 5](agent-cli-capabilities-schema-v5.md), [plan schema version 3](agent-cli-plan-schema-v3.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Older schema documents are historical and are not emitted as compatibility views.
 
 The A2 decision for each caller-selectable, fixed, semantic, representational, and implementation resource boundary is recorded in [the A2 resource policy inventory](a2-resource-policy-inventory.md).
 

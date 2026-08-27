@@ -1,6 +1,6 @@
-use crate::advanced::{circuit_repeat_nesting_limit_error, circuit_source_line_limit_error};
 use crate::diagnostics::bounded_parse_diagnostic_text;
 use crate::model_parse::{line_error, validation_error};
+use crate::parse_limits::ParseAdmission;
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{
@@ -10,37 +10,35 @@ use crate::{
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
-const CIRCUIT_PREALLOCATION_SAMPLE_BYTES: usize = 1 << 20;
 const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
 const MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE: u64 = 1_u64 << 63;
 
 mod fast;
 
 pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
-    Parser::new(input, limits, true).parse()
+    Parser::new(input, limits, true)?.parse()
 }
 
 pub(super) fn parse_circuit_unfused(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
-    Parser::new(input, limits, false).parse()
+    Parser::new(input, limits, false)?.parse()
 }
 
 struct Parser<'a> {
     commands: SourceCommands<'a>,
     input_len: usize,
-    top_level_capacity: usize,
-    limits: ParseLimits,
+    admission: ParseAdmission,
     fuse_instructions: bool,
 }
 
 impl<'a> Parser<'a> {
-    fn new(input: &'a str, limits: ParseLimits, fuse_instructions: bool) -> Self {
-        Self {
+    fn new(input: &'a str, limits: ParseLimits, fuse_instructions: bool) -> ModelResult<Self> {
+        let admission = ParseAdmission::new(ModelDialect::StimCircuit, input.len(), limits)?;
+        Ok(Self {
             commands: SourceCommands::new(input),
             input_len: input.len(),
-            top_level_capacity: top_level_item_capacity(input, limits),
-            limits,
+            admission,
             fuse_instructions,
-        }
+        })
     }
 
     fn parse(mut self) -> ModelResult<Circuit> {
@@ -48,21 +46,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> ModelResult<Circuit> {
-        let mut circuit = if stop_on_terminator {
-            Circuit::new()
-        } else {
-            Circuit::with_capacity(self.top_level_capacity)
-        };
+        let mut circuit = Circuit::new();
         while let Some(command) = self.commands.next() {
             let line_number = command.line_number();
-            let limit = self.limits.source_line_limit().get();
-            if line_number > limit {
-                return Err(circuit_source_line_limit_error(
-                    line_number,
-                    limit,
-                    command.source().span(),
-                ));
-            }
+            self.admission
+                .admit_source_line(line_number, command.source().span())?;
 
             let line = command.source().trim_ascii_start();
             let semantic_line = line.trim_ascii_end();
@@ -78,6 +66,8 @@ impl<'a> Parser<'a> {
                     semantic_line.span(),
                 ));
             }
+            self.admission
+                .admit_instruction(line_number, semantic_line.span())?;
             if let Some(header) = semantic_line.without_suffix('{') {
                 let repeat = self.parse_repeat_header(
                     line_number,
@@ -93,7 +83,12 @@ impl<'a> Parser<'a> {
                     repeat.tag,
                 )));
             } else {
-                let instruction = parse_instruction(line_number, line, command.end_error_span())?;
+                let instruction = parse_instruction(
+                    line_number,
+                    line,
+                    command.end_error_span(),
+                    &mut self.admission,
+                )?;
                 if self.fuse_instructions {
                     circuit.push_instruction(instruction);
                 } else {
@@ -220,18 +215,11 @@ impl<'a> Parser<'a> {
                 false,
             )
         })?;
-        let limit = self.limits.repeat_nesting_limit().get();
-        if depth >= limit {
-            let actual = depth.checked_add(1).ok_or_else(|| {
-                ModelError::invalid_domain_value("circuit repeat nesting", "depth overflow")
-            })?;
-            return Err(circuit_repeat_nesting_limit_error(
-                line_number,
-                actual,
-                limit,
-                header_span,
-            ));
-        }
+        let actual = depth.checked_add(1).ok_or_else(|| {
+            ModelError::invalid_domain_value("circuit repeat nesting", "depth overflow")
+        })?;
+        self.admission
+            .admit_repeat_nesting(line_number, actual, header_span)?;
         Ok(ParsedRepeatHeader {
             count: repeat_count,
             tag,
@@ -244,46 +232,26 @@ struct ParsedRepeatHeader {
     tag: Option<String>,
 }
 
-fn top_level_item_capacity(input: &str, limits: ParseLimits) -> usize {
-    let admitted_lines = limits.source_line_limit().get();
-    if input.is_empty() || admitted_lines == 0 {
-        return 0;
-    }
-
-    let sample_len = input.len().min(CIRCUIT_PREALLOCATION_SAMPLE_BYTES);
-    let newline_count = input
-        .as_bytes()
-        .iter()
-        .take(sample_len)
-        .filter(|byte| **byte == b'\n')
-        .count();
-    let estimated_items = if sample_len == input.len() {
-        newline_count + usize::from(!input.ends_with('\n'))
-    } else if newline_count == 0 {
-        1
-    } else {
-        input
-            .len()
-            .saturating_mul(newline_count)
-            .div_ceil(sample_len)
-            .saturating_add(1)
-    };
-    estimated_items.min(admitted_lines)
-}
-
 fn parse_instruction(
     line_number: usize,
     line: SourceSlice<'_>,
     end_error_span: ByteSpan,
+    admission: &mut ParseAdmission,
 ) -> ModelResult<CircuitInstruction> {
-    if let Some(Ok(instruction)) = fast::parse_common_plain_instruction(line.text()) {
+    if admission.target_budget_allows_upper_bound(line.text().len())
+        && let Some(Ok(instruction)) = fast::parse_common_plain_instruction(line.text())
+    {
+        admission.admit_targets(instruction.targets().len(), line_number, line.span())?;
         return Ok(instruction);
     }
     let (name, rest) = parse_name(line_number, line)?;
-    if let Some(Ok(instruction)) = parse_simple_plain_instruction(name.text(), rest.text()) {
+    if admission.target_budget_allows_upper_bound(rest.text().len())
+        && let Some(Ok(instruction)) = parse_simple_plain_instruction(name.text(), rest.text())
+    {
+        admission.admit_targets(instruction.targets().len(), line_number, rest.span())?;
         return Ok(instruction);
     }
-    parse_instruction_fully_generic_from_parts(line_number, name, rest, end_error_span)
+    parse_instruction_fully_generic_from_parts(line_number, name, rest, end_error_span, admission)
 }
 
 fn parse_instruction_fully_generic_from_parts(
@@ -291,6 +259,7 @@ fn parse_instruction_fully_generic_from_parts(
     name: SourceSlice<'_>,
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
+    admission: &mut ParseAdmission,
 ) -> ModelResult<CircuitInstruction> {
     let gate = Gate::lookup_name(name.text()).ok_or_else(|| {
         let name_excerpt = bounded_parse_diagnostic_text(name.text());
@@ -324,7 +293,7 @@ fn parse_instruction_fully_generic_from_parts(
     }
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
     let (args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
-    let targets = parse_targets(line_number, name.text(), rest, end_error_span)?;
+    let targets = parse_targets(line_number, name.text(), rest, end_error_span, admission)?;
     gate.validate(&args.values, &targets.values)
         .map_err(|error| {
             let (code, span) = validation_span(&error, &args, &targets);
@@ -351,9 +320,20 @@ fn parse_instruction_fully_generic(
     line_number: usize,
     line: &str,
 ) -> ModelResult<CircuitInstruction> {
+    let mut admission = ParseAdmission::new(
+        ModelDialect::StimCircuit,
+        line.len(),
+        ParseLimits::default(),
+    )?;
     let line = SourceSlice::new(line, 0);
     let (name, rest) = parse_name(line_number, line)?;
-    parse_instruction_fully_generic_from_parts(line_number, name, rest, line.end_span())
+    parse_instruction_fully_generic_from_parts(
+        line_number,
+        name,
+        rest,
+        line.end_span(),
+        &mut admission,
+    )
 }
 
 fn parse_name(
@@ -604,6 +584,7 @@ fn parse_targets(
     instruction: &str,
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
+    admission: &mut ParseAdmission,
 ) -> ModelResult<ParsedTargets> {
     if rest.text().is_empty() {
         return Ok(ParsedTargets {
@@ -670,9 +651,14 @@ fn parse_targets(
         let token = content
             .slice(start, cursor)
             .ok_or_else(|| internal_parser_error(line_number, "invalid target"))?;
-        parse_target_token_into(token.text(), &mut values).map_err(|error| {
+        if let Err(error) = parse_target_token_into(token.text(), &mut values, || {
+            admission.admit_target(line_number, token.span())
+        }) {
+            if error.resource_limit_error().is_some() {
+                return Err(error);
+            }
             let code = target_parse_error_code(&error);
-            validation_error(
+            return Err(validation_error(
                 ModelDialect::StimCircuit,
                 line_number,
                 instruction,
@@ -680,8 +666,8 @@ fn parse_targets(
                 token.span(),
                 error,
                 true,
-            )
-        })?;
+            ));
+        }
         region_start.get_or_insert(token.byte_start());
         region_end = token.span().byte_end();
     }

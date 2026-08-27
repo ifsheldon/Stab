@@ -68,7 +68,7 @@ fn help_topics_cover_commands_formats_and_gates() {
 #[test]
 fn agent_command_help_names_the_current_success_schema() {
     for (topic, schema) in [
-        ("capabilities", "schema-version-4"),
+        ("capabilities", "schema-version-5"),
         ("inspect", "schema-version-2"),
         ("plan", "schema-version-3"),
     ] {

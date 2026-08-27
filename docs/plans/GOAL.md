@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P2 are complete. P3 is in progress; P4 through P9 have not started.
+Status: Active. P0 through P3 are complete. P4 through P9 have not started.
 
 ## Objective
 
@@ -23,21 +23,25 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - No approximate-equality benchmark is active because the comparator has no measured release-workflow cost or other evidence that it accounts for at least 10% of a user workflow.
 - The second P3 slice computes typed circuit reference signs in `stab-engine` by reusing the existing sampling reference and repeat-aware measurement-to-detection plan. A focused Rust owner and pinned `libstim.a` conversion probe cover output order, sparse observable ids, folded repeats, duplicate cancellation, noise-free reference behavior, Pauli targets combined with `XCZ` and `YCZ` sweep controls, empty output, typed failure, and configurable resource admission.
 - Reference signs have no standalone benchmark because they are not a release E2E workflow and no profile attributes at least 10% of one to this API.
-- P3 now has one missing contract: `resource-safety.model-remaining-parse-limits`.
+- The final P3 slice gives both model parsers one typed admission policy for original bytes, physical lines, compact declarations, retained targets, and repeat nesting. Byte admission precedes bounded byte-metadata preparation; declarations count before repeat expansion and circuit fusion; decoded targets are admitted before retention; wide fast paths cannot bypass the cumulative target budget. Byte preparation is bounded by source-byte and admitted-line policy and intentionally precedes semantic declaration and target admission.
+- One table-driven owner proves exact reduced boundaries, first excess, typed operation/resource/dialect/source-line/span data, zero limits, and byte-before-UTF-8 precedence through string and byte entry points. A separate allocation owner proves that model-item storage grows only from successful declarations: thousands of units after a rejected or invalid command do not change allocation count or peak bytes, and blank or comment-only source reserves no model-item storage.
+- Parser admission has no benchmark row because rejection is not a release E2E workflow and no profile attributes at least 10% of one workflow to these checks. Existing circuit and DEM parsing workflows remain the diagnostic performance owners.
+- Source-current diagnostics after removing input-derived reservation passed: `m4-circuit-parse` measured `0.554x` and `0.503x` Stim for its dense and sparse pairs, while serial sealed-worker probes measured `0.922499x` for circuit parse and `0.915128x` for DEM parse. These dirty-tree diagnostics make no promotable timing claim.
+- P3 has no missing nondeferred parity rows. Exact parser boundaries, optimization-independent accounting, and rejected-source allocation are explicit resource-limit divergences because Stim v1.16.0 exposes no comparable configurable policy.
 - The historical correctness inventory is only a generated bridge for active benchmark prerequisites. Add no semantic ownership to it; P7 deletes it with the inherited benchmark system.
 - Historical timing remains historical. Formal evidence waits for the final clean architecture and benchmark contracts.
 - Development occurs directly on `main`; do not create a branch or linked worktree.
 
 ## Immediate Work
 
-1. Implement `resource-safety.model-remaining-parse-limits` in `stab-model`. Introduce typed byte, represented-instruction, and represented-target admission at the parser boundary, prove exact-limit acceptance and first-excess rejection for both dialects, and reject before proportional allocation.
-2. Start with failing owner tests, update the parity ledger only after behavior passes independently, regenerate `docs/stim-parity.md`, and keep shared syntax and policy in one production owner.
-3. Add a P3 benchmark candidate only when it represents a future E2E workflow or profiling attributes at least 10% of one workflow to the changed path. Otherwise record the no-benchmark rationale.
-4. Run the focused tests, parity PR owners, workspace checks, architecture checks, oracle contracts, benchmark smoke, `milestone-audit`, and `full-code-review`; fix confirmed findings and commit the bounded slice before continuing.
+1. Start P4 from the five missing engine contracts: complete circuit gate execution, ordinary sweep-controlled sampling, meaningful loop-folding selection, complete detection gate execution, and remaining sweep/feedback conversion.
+2. Inventory each legal gate and target shape against the existing private execution IR before adding code. Consolidate duplicated lowering or selected-subset exits instead of creating per-surface compatibility paths.
+3. Add one generated semantic matrix per real execution path, pinned-Stim statistical or exact comparators where applicable, and focused resource/cancellation owners. Keep complete gate coverage distinct from already verified common, noise, reference-correction, and feedback families.
+4. Add or retain an E2E benchmark only when the workflow is user-visible and the changed path is measured. Do not create per-gate timing rows.
+5. Run the focused tests, parity PR owners, workspace and architecture checks, oracle contracts, benchmark smoke, `milestone-audit`, and `full-code-review`; fix confirmed findings and commit each bounded P4 slice before continuing.
 
 ## Remaining Milestones
 
-- P3: model, gate, and result-format parity.
 - P4: sampling and detection parity.
 - P5: analysis, transform, search, and algebra parity.
 - P6: CLI and Rust workflow parity.

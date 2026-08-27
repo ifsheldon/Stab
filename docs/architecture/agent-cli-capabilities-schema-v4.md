@@ -1,6 +1,6 @@
-# Agent CLI Capabilities Schema Version 4
+# Agent CLI Capabilities Schema Version 4 (Historical)
 
-This document defines the successful machine-output contract for `stab capabilities --format=json`.
+This document records the historical schema-version-4 contract. Stab now emits [capabilities schema version 5](agent-cli-capabilities-schema-v5.md) and does not provide a version-4 compatibility view.
 
 The command is a Stab extension and does not claim Stim v1.16.0 command or byte parity. JSON mode writes one complete document followed by LF to stdout; diagnostics remain on stderr under the independent `--error-format` contract.
 

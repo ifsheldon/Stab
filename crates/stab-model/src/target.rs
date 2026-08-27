@@ -277,8 +277,13 @@ impl Display for Target {
     }
 }
 
-pub(crate) fn parse_target_token_into(token: &str, targets: &mut TargetVec) -> ModelResult<()> {
+pub(crate) fn parse_target_token_into(
+    token: &str,
+    targets: &mut TargetVec,
+    mut admit: impl FnMut() -> ModelResult<()>,
+) -> ModelResult<()> {
     if token == "*" {
+        admit()?;
         targets.push(Target::combiner());
         return Ok(());
     }
@@ -289,9 +294,12 @@ pub(crate) fn parse_target_token_into(token: &str, targets: &mut TargetVec) -> M
             .is_some_and(|byte| byte.is_ascii_digit())
         {
             let id = parse_u24(token, "qubit target")?;
+            admit()?;
             targets.push(Target::qubit(QubitId::new(id)?, false));
         } else {
-            targets.push(Target::from_str(token)?);
+            let target = Target::from_str(token)?;
+            admit()?;
+            targets.push(target);
         }
         return Ok(());
     }
@@ -300,10 +308,13 @@ pub(crate) fn parse_target_token_into(token: &str, targets: &mut TargetVec) -> M
     // which validate_combiners mirrors; empty split parts therefore emit only the combiner.
     for (index, part) in token.split('*').enumerate() {
         if index > 0 {
+            admit()?;
             targets.push(Target::combiner());
         }
         if !part.is_empty() {
-            targets.push(Target::from_str(part)?);
+            let target = Target::from_str(part)?;
+            admit()?;
+            targets.push(target);
         }
     }
     Ok(())

@@ -42,10 +42,11 @@ pub use ids::{
     AbsoluteTolerance, CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset,
     MeasureRecordOffsetText, ObservableId, Probability, ProbabilityStimText, QubitId, RepeatCount,
 };
-pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit};
-pub use resource_limit::{
-    ResourceKind, ResourceLimitContext, ResourceLimitError, ResourceOperation,
+pub use parse_limits::{
+    ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, RepresentedInstructionLimit,
+    RepresentedTargetLimit, SourceByteLimit, SourceLineLimit,
 };
+pub use resource_limit::{ResourceKind, ResourceLimitError, ResourceOperation};
 pub use resources::{Estimate, EstimateClass, ResourceEstimate, ResourceEstimateBuilder};
 pub use target::{Pauli, Target};
 pub use validation::{ValidationError, ValidationErrorCode};
@@ -57,8 +58,8 @@ pub mod advanced {
     use super::{
         ByteSpan, Circuit, CircuitInstruction, DemInstruction, DemInstructionKind, DemRepeatBlock,
         DemTarget, DetectorErrorModel, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
-        ModelError, ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability,
-        RepeatBlock, RepeatCount, ResourceLimitError, Target,
+        ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability, RepeatBlock,
+        RepeatCount, Target,
     };
     pub use crate::dem::MAX_DEM_REPEAT_NESTING;
     pub use crate::dem::advanced::{
@@ -67,11 +68,6 @@ pub mod advanced {
         shifted_targets,
     };
     pub use crate::gate::GateUnitaryRows;
-    use smallvec::SmallVec;
-
-    /// Inline target storage used by the exact Stim parsers.
-    pub type TargetVec = SmallVec<[Target; 4]>;
-
     /// Stim's exclusive upper bound for encoded target values.
     pub const STIM_TARGET_VALUE_LIMIT: u32 = crate::ids::STIM_TARGET_VALUE_LIMIT;
 
@@ -226,39 +222,6 @@ pub mod advanced {
         dialect.fingerprint_discriminator()
     }
 
-    /// Constructs the circuit source-line admission failure used by the exact parser.
-    pub fn circuit_source_line_limit_error(
-        actual: usize,
-        limit: usize,
-        span: ByteSpan,
-    ) -> ModelError {
-        ResourceLimitError::circuit_source_lines(actual, limit, span).into()
-    }
-
-    /// Constructs the circuit repeat-depth admission failure used by the exact parser.
-    pub fn circuit_repeat_nesting_limit_error(
-        source_line: usize,
-        actual: usize,
-        limit: usize,
-        span: ByteSpan,
-    ) -> ModelError {
-        ResourceLimitError::circuit_repeat_nesting(source_line, actual, limit, span).into()
-    }
-
-    /// Constructs the DEM source-line admission failure used by the exact parser.
-    pub fn dem_source_line_limit_error(actual: usize, limit: usize, span: ByteSpan) -> ModelError {
-        ResourceLimitError::dem_source_lines(actual, limit, span).into()
-    }
-
-    /// Constructs the DEM repeat-depth admission failure used by the exact parser.
-    pub fn dem_repeat_nesting_limit_error(
-        actual: usize,
-        limit: usize,
-        span: ByteSpan,
-    ) -> ModelError {
-        ResourceLimitError::dem_repeat_nesting(actual, limit, span).into()
-    }
-
     /// Constructs a probability after the caller has proved its domain.
     pub fn probability_from_valid(value: f64) -> Probability {
         Probability::from_valid_probability(value)
@@ -277,16 +240,6 @@ pub mod advanced {
     /// Formats an offset using Stim target syntax.
     pub fn measure_record_offset_stim_text(offset: MeasureRecordOffset) -> impl Display {
         offset.stim_text()
-    }
-
-    /// Parses one possibly combined target token into caller-provided storage.
-    pub fn parse_target_token_into(token: &str, targets: &mut TargetVec) -> ModelResult<()> {
-        crate::target::parse_target_token_into(token, targets)
-    }
-
-    /// Parses the fast path for a whitespace-separated plain-qubit target list.
-    pub fn parse_plain_qubit_target_text(text: &str) -> ModelResult<Option<TargetVec>> {
-        crate::target::parse_plain_qubit_target_text(text)
     }
 
     /// Looks up any canonical or aliased Stim v1.16.0 gate name.

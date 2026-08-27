@@ -97,12 +97,6 @@ impl Circuit {
         Self { items: Vec::new() }
     }
 
-    fn with_capacity(capacity: usize) -> Self {
-        Self {
-            items: Vec::with_capacity(capacity),
-        }
-    }
-
     pub fn from_stim_str(input: &str) -> ModelResult<Self> {
         Self::from_stim_str_with_limits(input, ParseLimits::default())
     }

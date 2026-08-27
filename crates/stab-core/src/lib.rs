@@ -27,8 +27,8 @@ pub use stab_model::{
     GateTargetRule, MeasureRecordOffset, ModelDialect, ModelError, ModelFingerprint, ModelResult,
     ObservableId, ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
     ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
-    RepeatNestingLimitError, ResourceEstimate, SourceLineLimit, Target, ValidationError,
-    ValidationErrorCode,
+    RepeatNestingLimitError, RepresentedInstructionLimit, RepresentedTargetLimit, ResourceEstimate,
+    SourceByteLimit, SourceLineLimit, Target, ValidationError, ValidationErrorCode,
 };
 pub use stab_records::{
     BitPlane64Batch, BitPlane64BatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,

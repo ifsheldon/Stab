@@ -69,7 +69,13 @@ fn assert_capability_schema(report: &Value) {
         assert_exact_keys(dialect, &["name", "default_parse_limits"]);
         assert_exact_keys(
             pointer(dialect, "/default_parse_limits"),
-            &["source_lines", "repeat_nesting"],
+            &[
+                "source_bytes",
+                "source_lines",
+                "represented_instructions",
+                "represented_targets",
+                "repeat_nesting",
+            ],
         );
     }
     for gate in pointer(report, "/gates")
@@ -246,8 +252,20 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
 
     let report = json_stdout(&stdout);
     assert_capability_schema(&report);
-    assert_eq!(pointer(&report, "/schema_version"), 4);
+    assert_eq!(pointer(&report, "/schema_version"), 5);
     assert_eq!(pointer(&report, "/stim_compatibility_version"), "1.16.0");
+    for limits in pointer(&report, "/dialects")
+        .as_array()
+        .expect("dialects are an array")
+        .iter()
+        .map(|dialect| pointer(dialect, "/default_parse_limits"))
+    {
+        assert_eq!(pointer(limits, "/source_bytes"), 64 * 1024 * 1024);
+        assert_eq!(pointer(limits, "/source_lines"), 1_000_000);
+        assert_eq!(pointer(limits, "/represented_instructions"), 1_000_000);
+        assert_eq!(pointer(limits, "/represented_targets"), 32_000_000);
+        assert_eq!(pointer(limits, "/repeat_nesting"), 256);
+    }
 
     let command_names = pointer(&report, "/commands")
         .as_array()

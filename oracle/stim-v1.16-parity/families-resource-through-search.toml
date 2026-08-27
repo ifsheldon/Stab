@@ -283,13 +283,58 @@ name = "byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode"
 minimum_tier = "pr"
 
 [[families]]
+id = "resource-safety.model-parse-accounting-order"
+area = "resource-safety"
+contract = "Circuit and DEM canonical fast paths charge retained targets cumulatively, and adjacent circuit declarations are admitted before fusion."
+stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/dem/detector_error_model.test.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "resource-limit"
+rationale = "Stim v1.16.0 has no configurable counterpart; Stab applies one caller-selected accounting policy independently of parser optimization and post-parse circuit fusion."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "parse_resources"
+name = "parser_admission_accumulates_fast_path_targets_and_prefusion_declarations"
+minimum_tier = "pr"
+
+[[families]]
+id = "resource-safety.model-parse-allocation-admission"
+area = "resource-safety"
+contract = "Circuit and DEM model-item storage grows only from successfully parsed declarations; rejected or invalid suffixes and blank or comment-only source cannot drive retained allocation."
+stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/dem/detector_error_model.test.cc"]
+status = "divergence"
+owner = "stab-model"
+divergence_kind = "resource-limit"
+rationale = "Stim v1.16.0 exposes no caller-selected equivalent; Stab makes rejected-source allocation independent of unadmitted suffix size while preserving geometric growth for accepted models."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "parse_resources"
+name = "parser_allocation_depends_only_on_admitted_model_storage"
+minimum_tier = "pr"
+
+[[families]]
 id = "resource-safety.model-remaining-parse-limits"
 area = "resource-safety"
-contract = "Circuit and DEM parsing enforce typed byte, instruction-count, and target-count admission not covered by the circuit and DEM line and repeat-depth rows before allocation."
+contract = "Circuit and DEM parsing enforce typed original-byte, compact-declaration, and retained-target admission at exact inclusive boundaries through string and byte entry points."
 stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/dem/detector_error_model.test.cc"]
-status = "missing"
+status = "divergence"
 owner = "stab-model"
-milestone = "P3"
+divergence_kind = "resource-limit"
+rationale = "Stim v1.16.0 has no equivalent configurable byte, compact-declaration, or retained-target parser policy; Stab rejects hostile model growth at typed caller-selected boundaries."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-model"
+kind = "test"
+target = "parse_resources"
+name = "parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit"
+minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.record-streaming-dense-packed-bounds"

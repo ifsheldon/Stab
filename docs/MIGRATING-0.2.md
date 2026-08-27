@@ -49,6 +49,12 @@ There are no `advanced` or `experimental` tiers. Low-level APIs and extension co
 
 The CLI composes owner errors into private human or JSON diagnostics. Library callers should preserve typed owner errors or define an application-specific aggregate only where a workflow genuinely crosses domains.
 
+## Parser Limits
+
+`ParseLimits::new` now takes typed source-byte, source-line, represented-instruction, represented-target, and repeat-nesting limits in that order. The new `SourceByteLimit`, `RepresentedInstructionLimit`, and `RepresentedTargetLimit` values are also available from the `stab-core` facade. Existing parser entry points use inclusive defaults of 64 MiB, 1,000,000 physical lines, 1,000,000 compact declarations, 32,000,000 retained targets, and 256 repeat levels.
+
+`ResourceLimitContext` and the parser-only `stab_model::advanced` error and target-parser constructors were removed. A `ResourceLimitError` now reports its `dialect`, `operation`, `resource`, optional `source_line`, `actual`, `limit`, and source `span` directly.
+
 ## Execution APIs
 
 Whole-output and callback compatibility adapters are removed. Reusable execution follows one ownership shape:

@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 and P2 are complete; P3 is in progress; P4 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P3 are complete; P4 through P9 have not started.
 
 ## Summary
 
@@ -279,7 +279,12 @@ Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `
 - The second P3 slice adds `CircuitReferenceSigns`, `circuit_reference_signs`, and `circuit_reference_signs_with_limits` to `stab-engine`. The implementation reuses the engine's noiseless all-zero-sweep sampler and repeat-aware detection-conversion terms instead of adding a second simulator or annotation traversal in `stab-analysis`; configurable limits reuse the one detection-conversion policy.
 - One semantic Rust owner covers Stim's documented result, detector declaration order, sparse observable ids, folded repeats, duplicate cancellation, ignored noise and measurement-flip probabilities, Pauli observable targets combined with `XCZ` and `YCZ` sweep controls, empty circuits, and typed invalid-record failures. The existing detection-resource suite separately proves exact admission boundaries. An independent C++ probe linked to the pinned `libstim.a` obtains the same signs through Stim's measurement-to-detection converter instead of copying Stab's implementation.
 - Reference signs receive no benchmark row because the standalone API is not a release E2E workflow and no profile attributes at least 10% of one to its work. Existing sampling and detection workflows already own the shared hot paths.
-- P3 remains open only for `resource-safety.model-remaining-parse-limits`. All other P3-owned ledger families are already done, deferred, or explicit divergences.
+- The final P3 slice extends `ParseLimits` with typed original-byte, compact-declaration, and retained-target admission. One private `ParseAdmission` owns both dialects: byte checks precede bounded byte-metadata preparation, declaration checks occur before payload parsing and circuit fusion, targets are admitted after decoding and before retention, model-item storage grows only after successful parsing, and wide fast paths obey the cumulative target budget. Byte preparation is bounded by source-byte and admitted-line policy and intentionally precedes semantic declaration and target admission.
+- `ResourceLimitError` now stores dialect, resource, optional source line, values, and span directly; the multiplicative `ResourceLimitContext` enum and parser-only public `advanced` constructors are removed. `stab capabilities` schema version 5 exposes the complete default parser policy.
+- One table-driven semantic owner covers exact reduced boundaries, first excess, folded declaration counting, circuit combiners, DEM separators, cumulative fast-path charging, pre-fusion declarations, zero limits, typed diagnostics, and byte-before-UTF-8 precedence through string and byte entry points. A separate allocation owner proves that a large suffix after a rejected or invalid command does not change allocation count or peak bytes and that blank or comment-only source reserves no model-item storage.
+- Parser admission receives no benchmark row because rejection is not a release E2E workflow and no profile attributes at least 10% of one to these checks. Existing circuit and DEM parse workflows remain diagnostic performance owners.
+- Removing input-derived top-level reservation triggered source-current diagnostics. A fresh `m4-circuit-parse` baseline and three-run compare under `target/benchmarks/p3-parser-admission-circuit-{baseline,compare}` measured direct dense and sparse ratios of `0.554x` and `0.503x`; serial sealed-worker probes measured `pq2-circuit-parse-adapter-smoke` at `0.922499x` and `pq2-dem-parse-adapter-smoke` at `0.915128x`. The initially concurrent adapter probes were discarded as contaminated. All values are dirty-tree diagnostics, not promotable evidence.
+- P3 is complete: every P3-owned family is done, deferred, or an explicit divergence. The exact-boundary, optimization-independent-accounting, and rejected-source-allocation families are verified resource-limit divergences because Stim v1.16.0 has no equivalent configurable policy.
 
 ## Milestone P4: Close Sampling And Detection Parity
 

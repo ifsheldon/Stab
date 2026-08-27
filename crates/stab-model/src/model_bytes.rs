@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use crate::{
     ModelDialect, ModelError, ModelResult, ParseError, ParseLimits,
-    advanced::invalid_utf8_parse_error,
+    advanced::invalid_utf8_parse_error, parse_limits::ParseAdmission,
 };
 
 pub(crate) struct PreparedModelText<'a> {
@@ -18,6 +18,7 @@ impl<'a> PreparedModelText<'a> {
         dialect: ModelDialect,
         limits: ParseLimits,
     ) -> ModelResult<Self> {
+        ParseAdmission::admit_source_bytes(dialect, input.len(), limits)?;
         let input = admitted_source_prefix(input, limits.source_line_limit().get());
         if let Ok(text) = std::str::from_utf8(input) {
             return Ok(Self {

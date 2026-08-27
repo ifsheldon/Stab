@@ -3,7 +3,6 @@ use super::super::{
     validate_dem_instruction,
 };
 use super::{MAX_DEM_TEXT_INTEGER, MAX_STIM_NUMBER_TOKEN_BYTES};
-
 pub(super) fn parse_canonical_instruction(line: &str) -> Option<DemInstruction> {
     let (kind, rest) = match line.as_bytes().first().copied()? {
         b'e' => (DemInstructionKind::Error, line.strip_prefix("error")?),
@@ -194,7 +193,9 @@ fn parse_canonical_uint60(token: &str) -> Option<u64> {
 )]
 mod tests {
     use super::*;
+    use crate::parse_limits::ParseAdmission;
     use crate::source_text::SourceSlice;
+    use crate::{ModelDialect, ParseLimits};
 
     #[test]
     fn canonical_fast_path_matches_the_diagnostic_parser() {
@@ -212,8 +213,15 @@ mod tests {
         ] {
             let fast = parse_canonical_instruction(line).expect("canonical fast path");
             let source = SourceSlice::new(line, 0);
-            let generic = super::super::parse_dem_instruction(1, source, source.end_span())
-                .expect("generic parser");
+            let mut admission = ParseAdmission::new(
+                ModelDialect::DetectorErrorModel,
+                line.len(),
+                ParseLimits::default(),
+            )
+            .expect("default admission");
+            let generic =
+                super::super::parse_dem_instruction(1, source, source.end_span(), &mut admission)
+                    .expect("generic parser");
             assert_eq!(fast, generic, "{line}");
         }
     }

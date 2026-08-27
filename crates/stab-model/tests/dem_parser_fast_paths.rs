@@ -137,7 +137,7 @@ fn qualification_cycle_has_bounded_parser_allocations() {
 fn representative_flat_and_coordinate_families_avoid_per_instruction_allocations() {
     const TOP_LEVEL_ITEMS: usize = 4_096;
     const CYCLE_ITEMS: usize = 8;
-    const MAX_PARSE_ALLOCATIONS: u64 = 2;
+    const MAX_PARSE_ALLOCATIONS: u64 = 16;
     const FLAT_ERRORS_CYCLE: &str = concat!(
         "error(0.125) D0\n",
         "error(0.25) D1 D2\n",
@@ -183,7 +183,7 @@ fn representative_flat_and_coordinate_families_avoid_per_instruction_allocations
 fn representative_folded_family_bounds_nested_body_storage() {
     const TOP_LEVEL_ITEMS: usize = 4_096;
     const NESTED_BODIES_PER_ITEM: usize = 2;
-    const MAX_FIXED_ALLOCATIONS: u64 = 2;
+    const MAX_FIXED_ALLOCATIONS: u64 = 16;
     const MAX_ALLOCATED_BYTES: u64 = 6_500_000;
     const CYCLE: &str = concat!(
         "repeat[outer] 1000000 {\n",

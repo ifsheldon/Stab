@@ -96,9 +96,12 @@ stab_model::RepeatBlock
 stab_model::RepeatCount
 stab_model::RepeatNestingLimit
 stab_model::RepeatNestingLimitError
+stab_model::RepresentedInstructionLimit
+stab_model::RepresentedTargetLimit
 stab_model::ResourceEstimate
 stab_records::SampledErrorWidth
 stab_algebra::SingleQubitClifford
+stab_model::SourceByteLimit
 stab_model::SourceLineLimit
 stab_algebra::StabilizerError
 stab_algebra::StabilizerResource

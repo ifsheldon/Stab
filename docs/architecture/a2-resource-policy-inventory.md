@@ -19,7 +19,7 @@ The presence of a numeric constant does not by itself justify a public policy fi
 
 | Policy and owner | Configurable dimensions and defaults | Why it is public |
 | --- | --- | --- |
-| `ParseLimits`, model parsing | 1,000,000 physical source lines; repeat nesting up to the shared 256-level hard maximum | Callers can cap hostile source structure before allocation proportional to rejected work. A bounded capacity estimate samples only a fixed input prefix and is capped by admitted lines. Byte preparation retains at most one byte of the first rejected line, and opaque metadata classification advances a single source-ordered range cursor instead of rescanning prior ranges. Source-line admission may be tightened or relaxed. Repeat nesting may only be tightened while recursive consumers retain the shared envelope. |
+| `ParseLimits`, model parsing | 64 MiB original source; 1,000,000 physical lines; 1,000,000 compact declarations; 32,000,000 retained targets; repeat nesting up to the shared 256-level hard maximum | Callers can cap hostile source and compact model growth before proportional work and retention. Byte admission precedes byte-metadata preparation; that preparation is bounded by source-byte and admitted-line policy and intentionally precedes semantic declaration and target admission. Top-level model storage grows only from successfully parsed declarations, blank and comment-only source reserves no model storage, and each decoded target is admitted before retention. Byte, line, declaration, and target limits may be tightened or relaxed; repeat nesting may only be tightened while recursive consumers retain the shared envelope. |
 | `CircuitFlattenLimits`, circuit flatten analysis | 1,000,000 materialized operations; 32,000,000 retained target occurrences; 16,000,000 retained argument values; 512 MiB conservative materialized bytes | Flattening is explicitly materializing, and callers can choose smaller or larger output and payload budgets before the output circuit is allocated. Both materialized circuit and operation-vector adapters first admit programmatic models against the fixed 256-level recursive envelope and the platform's maximum instruction-vector capacity. The adapters use fallible reservation after admission. |
 | `DemFlattenLimits`, DEM flatten analysis | repeat unroll 100,000; expanded instructions 1,000,000; aggregate repeat iterations 1,000,000; 32,000,000 retained target occurrences; 16,000,000 retained argument values; 512 MiB conservative materialized bytes | The operation explicitly expands folded input, and traversal and retained-payload dimensions can be admitted before appending output. |
 | `DetectionConversionLimits`, detection compilation and conversion | fixed 256-level repeat-nesting safety envelope; record width 1,000,000 bits; repeat unroll 100,000; expanded instructions 1,000,000; aggregate repeat iterations 1,000,000; retained measurement terms 16,000,000; conservative compiled-plan bytes 256 MiB | Callers may independently bound per-record shape, traversal work, and retained compiled-plan storage. Repeat nesting is a non-configurable model-safety invariant and is admitted iteratively before direct or detector-frame recursive planning. Direct detector-frame compilation charges both conversion terms and the complete stripped executable-circuit representation, including nested bodies, arguments, and targets, before fallible construction. Canonical sessions retain bounded batch scratch while output retention belongs to the caller, so the retired whole-output materializer and `max_materialized_bits` policy no longer exist. The first draft used representational maxima for aggregate traversal because no prior named policy existed. Audit showed that this permitted compact hostile repeats to drive unbounded CPU and retained terms, so A2 defines finite operation-safety defaults. |
@@ -29,7 +29,7 @@ The presence of a numeric constant does not by itself justify a public policy fi
 
 All default entry points delegate through these exact defaults.
 
-Every policy rejection exposes `ResourceLimitError` with a stable operation, resource kind, actual amount, and limit.
+Every policy rejection exposes `ResourceLimitError` with a stable operation, resource kind, actual amount, and limit. Model-parser failures additionally retain the dialect, optional source line, and rejected byte span.
 
 ## Boundary Evidence Rules
 
@@ -59,8 +59,10 @@ Any row that does not meet that contract is labeled `Open`.
 
 | Dimension | Default | Exact test selector | Real default max executed? | Reduced-boundary justification or remaining gap |
 | --- | ---: | --- | --- | --- |
-| Fixed repeat nesting | 256 levels | `cargo test -p stab-engine --test detection_resource_limits repeat_nesting_rejects_before_recursive_work -- --exact` | Yes | Direct conversion accepts depth 256 and rejects 257 with typed context. Direct and detector-frame 10,000-level programmatic inputs reject on a 64 KiB thread stack before recursive conversion planning. |
-| Physical source lines | 1,000,000 | `cargo test -p stab-model --test parse_resources parse_limits_preserve_default_custom_and_hard_boundaries -- --exact` and `cargo test -p stab-model --test model_parse_diagnostics byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode -- --exact` | Yes | The typed default is fixed at one million lines; a compact exact-boundary test proves the shared circuit and DEM parser admits the configured limit and rejects the first excess line without carrying a million-line duplicate fixture. |
+| Original source bytes | 64 MiB | `cargo test -p stab-model --test parse_resources parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit -- --exact` | No | The capabilities contract publishes the production default. This owner accepts exact reduced byte limits and rejects the next byte before UTF-8 decoding through both dialects; the allocation owner separately proves that a rejected byte suffix allocates nothing. Materializing a separate 64 MiB fixture would add cost without exercising a different branch. |
+| Physical source lines | 1,000,000 | `cargo test -p stab-model --test model_parse_diagnostics byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode -- --exact` | No | Both dialects accept a configured two-line boundary and reject line three with exact typed context. A million-line fixture would test repetition rather than another admission branch. |
+| Compact declarations | 1,000,000 | `cargo test -p stab-model --test parse_resources parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit -- --exact` | No | Both dialects count repeat headers and body declarations before expansion. `parser_admission_accumulates_fast_path_targets_and_prefusion_declarations` separately proves adjacent circuit declarations remain distinct before fusion, and the allocation owner proves a large post-rejection suffix is not retained. |
+| Retained targets | 32,000,000 | `cargo test -p stab-model --test parse_resources parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit -- --exact` | No | Circuit combiners and DEM separators count as represented targets. Both dialects admit three and reject the fourth at its exact token before retention; `parser_admission_accumulates_fast_path_targets_and_prefusion_declarations` proves cumulative charging through canonical fast paths. A 32-million-target fixture would require substantial model storage without exercising another branch. |
 | Repeat nesting | 256 | `cargo test -p stab-model --test model_parse_diagnostics default_repeat_depth_rejects_the_first_unsafe_header_without_stack_overflow -- --exact` | Yes | Circuit and DEM parsing reject level 257 with exact typed context and source spans; owner-level folded traversal separately proves the accepted boundary. |
 
 ### CircuitFlattenLimits
@@ -141,7 +143,7 @@ Together they cover mechanism, target, graph-edge, stored-graph-term, search-sta
 
 The SAT checked-arithmetic selector is `cargo test -p stab-analysis --test sat_materialization_limits arithmetic_overflow_is_rejected_without_mutating_the_source -- --exact`.
 
-The selectors above execute every practical production maximum directly: both `ParseLimits` dimensions, both DEM-flatten repeat dimensions, detection record width and all three detection traversal dimensions, both logical-search repeat dimensions, and hyperedge degree.
+The selectors above execute practical production maxima directly where the row says `Yes`. Large retained or repetitive maxima use the stated exact reduced-boundary substitution instead of manufacturing expensive tests.
 
 Every remaining reduced boundary is closed by the substitution rule with an exact configured value, an accepted custom `N`, a rejected `N + 1`, checked arithmetic or a dominating platform-capacity guard, and a concrete resource reason recorded in its row.
 
@@ -197,7 +199,7 @@ These caps belong to CLI and file conveniences, not to model, engine, or analysi
 
 ## Implementation Thresholds
 
-Word width, 64-qubit small-frame selection, 16-byte inline DEM tags, boxed rare opaque-tag payloads, parser preallocation sample sizes, parser preallocated-item caps, float formatting buffers, transpose tile size, and probability-generator bucket counts are implementation choices.
+Word width, 64-qubit small-frame selection, 16-byte inline DEM tags, boxed rare opaque-tag payloads, geometric model-vector growth, float formatting buffers, transpose tile size, and probability-generator bucket counts are implementation choices.
 
 They may affect performance and allocation but do not reject otherwise valid work solely because the threshold is crossed.
 

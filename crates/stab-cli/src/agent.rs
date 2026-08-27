@@ -22,7 +22,7 @@ use crate::{
     read_limited_input_file, read_limited_stdin,
 };
 
-const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 4;
+const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 5;
 const INSPECT_OUTPUT_SCHEMA_VERSION: u16 = 2;
 const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 3;
 const STIM_COMPATIBILITY_VERSION: &str = "1.16.0";
@@ -345,7 +345,10 @@ impl CapabilitiesReport {
                     DialectReport {
                         name: dialect.as_str(),
                         default_parse_limits: ParseLimitsReport {
+                            source_bytes: limits.source_byte_limit().get(),
                             source_lines: limits.source_line_limit().get(),
+                            represented_instructions: limits.represented_instruction_limit().get(),
+                            represented_targets: limits.represented_target_limit().get(),
                             repeat_nesting: limits.repeat_nesting_limit().get(),
                         },
                     }
@@ -403,7 +406,10 @@ struct DialectReport {
 
 #[derive(Serialize)]
 struct ParseLimitsReport {
+    source_bytes: usize,
     source_lines: usize,
+    represented_instructions: usize,
+    represented_targets: usize,
     repeat_nesting: usize,
 }
 

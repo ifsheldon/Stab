@@ -96,7 +96,7 @@ fn command_help(command: &str) -> Option<String> {
             "stab gen\n\nGenerates supported repetition, surface, and color-code circuits.\n\nKey flags: --code, --task, --distance, --rounds, --out, and supported noise probabilities.\n"
         }
         "capabilities" => {
-            "stab capabilities\n\nReports commands, model dialects, gate syntax, result codecs, compilers, and parse defaults from source-owned descriptors.\n\nUse --format=json for schema-version-4 machine output.\n"
+            "stab capabilities\n\nReports commands, model dialects, gate syntax, result codecs, compilers, and parse defaults from source-owned descriptors.\n\nUse --format=json for schema-version-5 machine output.\n"
         }
         "inspect" => {
             "stab inspect [INPUT]\n\nParses and summarizes a .stim circuit or .dem detector error model without compiling or executing it.\n\nUse --type=stim or --type=dem for stdin or paths without a recognized extension. Use --format=json for schema-version-2 machine output.\n"
