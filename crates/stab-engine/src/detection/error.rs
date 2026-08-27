@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use thiserror::Error;
 
-use crate::{SamplingCompileError, SamplingExecutionError};
+use crate::{ResourceAmount, SamplingCompileError, SamplingExecutionError};
 
 pub(crate) type DetectionResult<T> = Result<T, DetectionError>;
 
@@ -31,12 +31,12 @@ pub enum DetectionResourceKind {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DetectionResourceLimitError {
     kind: DetectionResourceKind,
-    actual: u64,
+    actual: ResourceAmount,
     limit: u64,
 }
 
 impl DetectionResourceLimitError {
-    pub(crate) const fn sampling_expanded_operations(actual: u64, limit: u64) -> Self {
+    pub(crate) const fn sampling_expanded_operations(actual: ResourceAmount, limit: u64) -> Self {
         Self {
             kind: DetectionResourceKind::SamplingExpandedOperations,
             actual,
@@ -79,7 +79,7 @@ impl DetectionResourceLimitError {
     ) -> Self {
         Self {
             kind: DetectionResourceKind::RecordBits(subject),
-            actual,
+            actual: ResourceAmount::exact(actual),
             limit,
         }
     }
@@ -87,7 +87,7 @@ impl DetectionResourceLimitError {
     pub(crate) const fn repeat_nesting(actual: usize, limit: usize) -> Self {
         Self {
             kind: DetectionResourceKind::RepeatNesting,
-            actual: actual as u64,
+            actual: ResourceAmount::exact(actual as u64),
             limit: limit as u64,
         }
     }
@@ -95,7 +95,7 @@ impl DetectionResourceLimitError {
     pub(crate) const fn expanded_instructions(actual: u64, limit: u64) -> Self {
         Self {
             kind: DetectionResourceKind::ExpandedInstructions,
-            actual,
+            actual: ResourceAmount::exact(actual),
             limit,
         }
     }
@@ -103,7 +103,7 @@ impl DetectionResourceLimitError {
     pub(crate) const fn repeat_iterations(actual: u64, limit: u64) -> Self {
         Self {
             kind: DetectionResourceKind::RepeatIterations,
-            actual,
+            actual: ResourceAmount::exact(actual),
             limit,
         }
     }
@@ -111,7 +111,7 @@ impl DetectionResourceLimitError {
     pub(crate) const fn compiled_terms(actual: u64, limit: u64) -> Self {
         Self {
             kind: DetectionResourceKind::CompiledTerms,
-            actual,
+            actual: ResourceAmount::exact(actual),
             limit,
         }
     }
@@ -119,7 +119,7 @@ impl DetectionResourceLimitError {
     pub(crate) const fn compiled_bytes(actual: u64, limit: u64) -> Self {
         Self {
             kind: DetectionResourceKind::CompiledBytes,
-            actual,
+            actual: ResourceAmount::exact(actual),
             limit,
         }
     }
@@ -129,7 +129,11 @@ impl DetectionResourceLimitError {
     }
 
     pub const fn actual(&self) -> u64 {
-        self.actual
+        self.actual.value()
+    }
+
+    pub const fn actual_is_lower_bound(&self) -> bool {
+        self.actual.is_lower_bound()
     }
 
     pub const fn limit(&self) -> u64 {
@@ -144,22 +148,25 @@ impl Display for DetectionResourceLimitError {
                 DetectionRecordLimitSubject::DetectionRecord => write!(
                     formatter,
                     "invalid result format data: detection record width {} exceeds current limit {}",
-                    self.actual, self.limit
+                    self.actual.value(),
+                    self.limit
                 ),
                 DetectionRecordLimitSubject::MeasurementRecord => write!(
                     formatter,
                     "invalid result format data: measurement record width {} exceeds current detection conversion limit {}",
-                    self.actual, self.limit
+                    self.actual.value(),
+                    self.limit
                 ),
                 DetectionRecordLimitSubject::SweepRecord => write!(
                     formatter,
                     "invalid result format data: sweep bit width {} exceeds current detection conversion limit {}",
-                    self.actual, self.limit
+                    self.actual.value(),
+                    self.limit
                 ),
                 DetectionRecordLimitSubject::ObservableCount => write!(
                     formatter,
                     "invalid result format data: observable id {} exceeds current detection record limit {}",
-                    self.actual.saturating_sub(1),
+                    self.actual.value().saturating_sub(1),
                     self.limit
                 ),
             },

@@ -124,8 +124,9 @@ impl Gate {
     /// Returns true when this gate's targets play a metadata-only pad role instead of
     /// naming qubits.
     ///
-    /// Stim excludes such targets from qubit counting (`circuit_instruction.cc:64-69`):
     /// `MPAD` pads reserve measurement records, and their 0/1 targets are values, not qubits.
+    /// Stim excludes them from simulation statistics, although its target-based
+    /// `Circuit::count_qubits` compatibility helper still includes their numeric values.
     #[inline]
     pub fn targets_are_pad_values(self) -> bool {
         matches!(self.info.target_rule, TargetRule::MeasurementPads)

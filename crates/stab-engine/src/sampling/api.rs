@@ -19,7 +19,7 @@ use super::operation::SampleProgram;
 use super::small_frame::SmallStabilizerFrame;
 use super::stabilizer_frame::{StabilizerFrame, StabilizerStateSnapshot};
 use super::{ExecutionMode, compile_circuit, direct_z_measurement, sampler_rng, small_frame};
-use crate::CompilationRequestFingerprint;
+use crate::{CompilationRequestFingerprint, ResourceAmount};
 
 mod compile_error;
 
@@ -173,7 +173,7 @@ impl SamplingCompiler {
             && counts.expanded_operations > u128::from(MAX_EXPANDED_OPERATIONS_PER_SHOT)
         {
             return Err(SamplingCompileError::ExpandedOperationLimit {
-                actual: u64::try_from(counts.expanded_operations).unwrap_or(u64::MAX),
+                actual: ResourceAmount::from_u128(counts.expanded_operations),
                 limit: MAX_EXPANDED_OPERATIONS_PER_SHOT,
             });
         }

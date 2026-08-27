@@ -174,6 +174,7 @@ impl SampleProgram {
         SampleProgramCursor::new(&self.entries, start, end)
     }
 
+    #[cfg(test)]
     pub(super) fn compact_operation_count(&self, start: usize, end: usize) -> usize {
         self.entries
             .get(start..end)

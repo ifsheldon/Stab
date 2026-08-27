@@ -774,11 +774,19 @@ fn sampling_compile_error_context(error: &SamplingCompileError) -> Value {
         SamplingCompileError::Model(error) => model_error_context(error),
         SamplingCompileError::Analysis(error) => analysis_error_context(error),
         SamplingCompileError::InvalidCircuit { .. } => json!({}),
-        SamplingCompileError::ExpandedOperationLimit { actual, limit } => json!({
-            "resource": "expanded-operations-per-shot",
-            "actual": actual.to_string(),
-            "limit": limit.to_string(),
-        }),
+        SamplingCompileError::ExpandedOperationLimit { actual, limit } => {
+            let mut context = json!({
+                "resource": "expanded-operations-per-shot",
+                "actual": actual.value().to_string(),
+                "limit": limit.to_string(),
+            });
+            if actual.is_lower_bound()
+                && let Value::Object(fields) = &mut context
+            {
+                fields.insert("actual_is_lower_bound".to_owned(), Value::Bool(true));
+            }
+            context
+        }
     }
 }
 
@@ -1023,13 +1031,19 @@ fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
     } else {
         "detection-conversion"
     };
-    json!({
+    let mut context = json!({
         "operation": operation,
         "resource": resource,
         "subject": subject,
         "actual": error.actual(),
         "limit": error.limit(),
-    })
+    });
+    if error.actual_is_lower_bound()
+        && let Value::Object(fields) = &mut context
+    {
+        fields.insert("actual_is_lower_bound".to_owned(), Value::Bool(true));
+    }
+    context
 }
 
 fn dem_resource_context(error: &DemResourceLimitError) -> Value {

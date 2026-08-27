@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::ResourceAmount;
+
 /// Stable code classifying a sampling compilation failure.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -32,7 +34,7 @@ pub enum SamplingCompileError {
     #[error(
         "cannot compile circuit sampler: expanded operation work {actual} exceeds per-shot limit {limit}"
     )]
-    ExpandedOperationLimit { actual: u64, limit: u64 },
+    ExpandedOperationLimit { actual: ResourceAmount, limit: u64 },
 }
 
 impl SamplingCompileError {

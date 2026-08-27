@@ -177,8 +177,8 @@ pub(super) fn take_reference_execution_stats() -> ReferenceExecutionStats {
     REFERENCE_EXECUTION_STATS.replace(ReferenceExecutionStats::default())
 }
 
+#[cfg(test)]
 fn record_reference_fold(reused_iterations: u64, reused_operation_dispatches: u128) {
-    #[cfg(test)]
     REFERENCE_EXECUTION_STATS.with(|cell| {
         let mut stats = cell.get();
         stats.folded_repeats = stats.folded_repeats.saturating_add(1);
@@ -188,8 +188,6 @@ fn record_reference_fold(reused_iterations: u64, reused_operation_dispatches: u1
             .saturating_add(reused_operation_dispatches);
         cell.set(stats);
     });
-    #[cfg(not(test))]
-    let _ = (reused_iterations, reused_operation_dispatches);
 }
 
 pub(super) fn execute_reference_operations(
@@ -283,11 +281,11 @@ pub(super) fn execute_reference_operations(
                             output_start,
                             count.saturating_sub(1),
                         )?;
-                        let reused_iterations = count.saturating_sub(1);
+                        #[cfg(test)]
                         record_reference_fold(
-                            reused_iterations,
+                            count.saturating_sub(1),
                             (program.compact_operation_count(body_start, *body_end) as u128)
-                                .saturating_mul(u128::from(reused_iterations)),
+                                .saturating_mul(u128::from(count.saturating_sub(1))),
                         );
                         index = body_end.checked_add(1).ok_or_else(|| {
                             SamplingExecutionError::InternalInvariant {

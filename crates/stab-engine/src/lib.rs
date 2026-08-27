@@ -6,6 +6,7 @@ mod detection;
 mod fingerprint;
 mod probability;
 mod reference_sample_tree;
+mod resource_amount;
 mod sampled_flow;
 mod sampling;
 mod sampling_estimate;
@@ -35,6 +36,7 @@ pub use detection::{
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use probability::biased_randomize_bits;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
+pub use resource_amount::ResourceAmount;
 pub use sampled_flow::{SampledFlowError, sample_if_circuit_has_stabilizer_flows};
 pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{

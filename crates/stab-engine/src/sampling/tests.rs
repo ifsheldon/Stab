@@ -291,7 +291,7 @@ fn expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work(
     assert_eq!(
         SamplingCompiler::new().compile(&first_excess),
         Err(SamplingCompileError::ExpandedOperationLimit {
-            actual: 1_000_001,
+            actual: crate::ResourceAmount::exact(1_000_001),
             limit: 1_000_000,
         })
     );
@@ -336,10 +336,34 @@ fn expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work(
     assert_eq!(
         SamplingCompiler::new().compile(&nested),
         Err(SamplingCompileError::ExpandedOperationLimit {
-            actual: 128_000_000_000_128,
+            actual: crate::ResourceAmount::exact(128_000_000_000_128),
             limit: 1_000_000,
         })
     );
+
+    let above_u64 = Circuit::from_stim_str(
+        "REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n",
+    )
+    .expect("parse work above u64");
+    let error = SamplingCompiler::new()
+        .compile(&above_u64)
+        .expect_err("work above u64 must retain a truthful lower-bound diagnostic");
+    assert_eq!(
+        error,
+        SamplingCompileError::ExpandedOperationLimit {
+            actual: crate::ResourceAmount::from_u128(u128::MAX),
+            limit: 1_000_000,
+        }
+    );
+    let detection_error = crate::DetectionError::from(error);
+    assert!(matches!(
+        detection_error,
+        crate::DetectionError::ResourceLimit(_)
+    ));
+    if let crate::DetectionError::ResourceLimit(detection_limit) = detection_error {
+        assert_eq!(detection_limit.actual(), u64::MAX);
+        assert!(detection_limit.actual_is_lower_bound());
+    }
 }
 
 #[test]

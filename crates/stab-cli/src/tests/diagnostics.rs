@@ -230,6 +230,52 @@ fn json_sampling_work_limit_preserves_typed_resource_context() {
 }
 
 #[test]
+fn json_sampling_work_above_u64_is_an_explicit_lower_bound() {
+    let circuit =
+        b"REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n";
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "sample", "--shots=1", "--error-format=json"],
+        circuit,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert_eq!(
+        only_json_line(&stderr),
+        serde_json::json!({
+            "schema_version": 1,
+            "code": "resource-limit-exceeded",
+            "severity": "error",
+            "message": "cannot compile circuit sampler: expanded operation work at least 18446744073709551615 exceeds per-shot limit 1000000",
+            "span": null,
+            "labels": [],
+            "help": null,
+            "context": {
+                "resource": "expanded-operations-per-shot",
+                "actual": "18446744073709551615",
+                "actual_is_lower_bound": true,
+                "limit": "1000000",
+            },
+        })
+    );
+
+    let (status, stdout, stderr) = run_cli(
+        &["stab", "detect", "--shots=1", "--error-format=json"],
+        circuit,
+    );
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(field(&diagnostic, "/code"), "resource-limit-exceeded");
+    assert_eq!(
+        field(&diagnostic, "/context/operation"),
+        "detection-conversion"
+    );
+    assert_eq!(field(&diagnostic, "/context/actual"), 1_000_000_000_000u64);
+    assert_eq!(diagnostic.pointer("/context/actual_is_lower_bound"), None);
+}
+
+#[test]
 fn json_warnings_and_errors_are_ordered_json_lines() {
     let (status, stdout, stderr) = run_cli(
         &["stab", "sample", "--frame0", "--error-format=json"],
