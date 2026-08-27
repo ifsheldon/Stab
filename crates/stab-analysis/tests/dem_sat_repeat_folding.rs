@@ -52,6 +52,66 @@ p wcnf 3 7 71
 71 -3 0
 71 1 0
 ";
+const FLAT_REPEAT_SHORTEST: &str = "\
+p wcnf 3 7 8
+1 -1 0
+8 1 2 -3 0
+8 1 -2 3 0
+8 -1 2 3 0
+8 -1 -2 -3 0
+1 -2 0
+8 3 0
+";
+const FLAT_REPEAT_LIKELIEST: &str = "\
+p wcnf 3 7 71
+10 -1 0
+71 1 2 -3 0
+71 1 -2 3 0
+71 -1 2 3 0
+71 -1 -2 -3 0
+10 -2 0
+71 3 0
+";
+const NESTED_REPEAT_SHORTEST: &str = "\
+p wcnf 7 17 18
+1 -1 0
+18 1 2 -5 0
+18 1 -2 5 0
+18 -1 2 5 0
+18 -1 -2 -5 0
+1 -2 0
+18 5 3 -6 0
+18 5 -3 6 0
+18 -5 3 6 0
+18 -5 -3 -6 0
+1 -3 0
+18 6 4 -7 0
+18 6 -4 7 0
+18 -6 4 7 0
+18 -6 -4 -7 0
+1 -4 0
+18 7 0
+";
+const NESTED_REPEAT_LIKELIEST: &str = "\
+p wcnf 7 17 171
+10 -1 0
+171 1 2 -5 0
+171 1 -2 5 0
+171 -1 2 5 0
+171 -1 -2 -5 0
+10 -2 0
+171 5 3 -6 0
+171 5 -3 6 0
+171 -5 3 6 0
+171 -5 -3 -6 0
+10 -3 0
+171 6 4 -7 0
+171 6 -4 7 0
+171 -6 4 7 0
+171 -6 -4 -7 0
+10 -4 0
+171 7 0
+";
 
 fn dem(input: &str) -> AnalysisResult<DetectorErrorModel> {
     DetectorErrorModel::from_dem_str(input).map_err(Into::into)
@@ -76,8 +136,6 @@ fn shortest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
         "error(1) D0 L0\nerror(0) D0\n",
         "error(0.001) D0 L0\nerror(0.999) D0\n",
         "error(0.1) D1000001 L1000001\nerror(0.2) D1000001\n",
-        "repeat 100001 {\nerror(0.1) D0 L0\nerror(0.2) D0\n}\n",
-        "repeat 100001 {\nrepeat 100001 {\nerror(0.1) D0 L0\nshift_detectors 0\nerror(0.2) D0\n}\n}\n",
     ] {
         assert_eq!(
             shortest_error_sat_problem(&dem(source)?)?,
@@ -85,16 +143,19 @@ fn shortest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
             "{source}"
         );
     }
-
-    assert_eq!(
-        shortest_error_sat_problem(&dem("repeat 100001 {\nerror(0) L1000001\n}\n")?)?,
-        SINGLE_OBSERVABLE_SHORTEST
-    );
     assert_eq!(
         shortest_error_sat_problem(&dem(
             "repeat 2 {\nerror(0.1) D0\nshift_detectors 1\n}\nerror(0.1) D0 L0\n"
         )?)?,
         "p wcnf 3 7 8\n1 -1 0\n1 -2 0\n1 -3 0\n8 -1 0\n8 -2 0\n8 -3 0\n8 3 0\n"
+    );
+    assert_eq!(
+        shortest_error_sat_problem(&dem("repeat 2 {\nerror(0.1) L0\n}\n")?)?,
+        FLAT_REPEAT_SHORTEST
+    );
+    assert_eq!(
+        shortest_error_sat_problem(&dem("repeat 2 {\nrepeat 2 {\nerror(0.1) L0\n}\n}\n")?)?,
+        NESTED_REPEAT_SHORTEST
     );
     Ok(())
 }
@@ -132,49 +193,33 @@ fn likeliest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
     );
     assert!(likeliest_error_sat_problem(&dem("error(0.1) L0\n")?, 0).is_err());
 
-    for source in [
-        "error(0) D9 L3\nerror(0.1) D0 L0\nerror(0.1) D0\n",
-        "error(0.1) D1000001 L1000001\nerror(0.1) D1000001\n",
-        "repeat 100001 {\nerror(0.1) D0 L0\n}\nerror(0.1) D0\n",
-        "repeat 100001 {\nrepeat 100001 {\nerror(0.1) D0 L0\nshift_detectors 0\n}\n}\nerror(0.1) D0\n",
-        "repeat 1000001 {\nerror(0) D0 L1000001\nshift_detectors 1\n}\nerror(0.1) D0 L0\nerror(0.1) D0\n",
-    ] {
-        assert_eq!(
-            likeliest_error_sat_problem(&dem(source)?, 10)?,
-            TWO_ERROR_LIKELIEST,
-            "{source}"
-        );
-    }
-
-    let even_high_probability =
-        dem("repeat 100002 {\nerror(0.9) D0 L0\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
-    let reduced_even_high_probability = dem("error(0.1) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
+    let sparse_source = "error(0.1) D1000001 L1000001\nerror(0.1) D1000001\n";
     assert_eq!(
-        likeliest_error_sat_problem(&even_high_probability, 100)?,
-        likeliest_error_sat_problem(&reduced_even_high_probability, 100)?
+        likeliest_error_sat_problem(&dem(sparse_source)?, 10)?,
+        TWO_ERROR_LIKELIEST,
+        "{sparse_source}"
     );
 
-    let odd_high_probability =
-        dem("repeat 100001 {\nerror(0.9) D0 L0\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
-    let reduced_odd_high_probability = dem("error(0.9) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
     assert_eq!(
-        likeliest_error_sat_problem(&odd_high_probability, 100)?,
-        likeliest_error_sat_problem(&reduced_odd_high_probability, 100)?
+        likeliest_error_sat_problem(&dem("repeat 2 {\nerror(0.1) L0\n}\n")?, 10)?,
+        FLAT_REPEAT_LIKELIEST
+    );
+    assert_eq!(
+        likeliest_error_sat_problem(&dem("repeat 2 {\nrepeat 2 {\nerror(0.1) L0\n}\n}\n")?, 10,)?,
+        NESTED_REPEAT_LIKELIEST
     );
 
-    let even_deterministic =
-        dem("repeat 100002 {\nerror(1) D0 L0\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n")?;
-    let reduced_even_deterministic = dem("error(0.1) D0\nerror(0.1) D0 L0\n")?;
-    assert_eq!(
-        likeliest_error_sat_problem(&even_deterministic, 100)?,
-        likeliest_error_sat_problem(&reduced_even_deterministic, 100)?
-    );
+    Ok(())
+}
 
-    let odd_deterministic =
-        dem("repeat 100001 {\nrepeat 100001 {\nerror(1) D0 L0\nshift_detectors 0\n}\n}\n")?;
+#[test]
+fn likeliest_error_wcnf_avoids_stim_zero_probability_sparse_literal_bug() -> AnalysisResult<()> {
     assert_eq!(
-        likeliest_error_sat_problem(&odd_deterministic, 100)?,
-        likeliest_error_sat_problem(&dem("error(1) D0 L0\n")?, 100)?
+        likeliest_error_sat_problem(
+            &dem("error(0) D9 L3\nerror(0.1) D0 L0\nerror(0.1) D0\n")?,
+            10,
+        )?,
+        "p wcnf 4 8 81\n10 -2 0\n81 2 3 -4 0\n81 2 -3 4 0\n81 -2 3 4 0\n81 -2 -3 -4 0\n10 -3 0\n81 -4 0\n81 2 0\n"
     );
     Ok(())
 }

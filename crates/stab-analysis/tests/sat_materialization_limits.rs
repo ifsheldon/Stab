@@ -75,12 +75,6 @@ fn sat_materialization_limits_admit_exact_boundaries_and_preserve_source() -> An
 
     for (source, accepted, rejected, resource) in [
         (
-            "repeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n",
-            defaults.with_max_repeat_unroll(2),
-            defaults.with_max_repeat_unroll(1),
-            ResourceKind::RepeatCount,
-        ),
-        (
             "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
             defaults.with_max_repeat_iterations(6),
             defaults.with_max_repeat_iterations(5),

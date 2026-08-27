@@ -38,12 +38,10 @@ DETECTOR rec[-1]
         },
     )
     .expect_err("nested recurrence probing must stop at its cumulative work limit");
-    assert!(
-        error.to_string().contains(&format!(
-            "at most {MAX_LOOP_CYCLE_STEPS} work units across nested circuits and instructions"
-        )),
-        "{error}"
-    );
+    let resource = error.resource_limit_error().expect("typed resource limit");
+    assert_eq!(resource.resource(), crate::ResourceKind::ExpandedOperations);
+    assert_eq!(resource.actual(), MAX_LOOP_CYCLE_STEPS + 1);
+    assert_eq!(resource.limit(), MAX_LOOP_CYCLE_STEPS);
 }
 
 #[test]
@@ -55,10 +53,8 @@ fn pfm_b5_supported_unitary_nested_analyzer_probe_work_is_bounded() {
     let error = tracker
         .undo_circuit_for_analyzer_probe(&nested_unitary, &mut budget)
         .expect_err("supported-unitary nested probes must share the instruction budget");
-    assert!(
-        error
-            .to_string()
-            .contains("at most 2 work units across nested circuits and instructions"),
-        "{error}"
-    );
+    let resource = error.resource_limit_error().expect("typed resource limit");
+    assert_eq!(resource.resource(), crate::ResourceKind::ExpandedOperations);
+    assert_eq!(resource.actual(), 3);
+    assert_eq!(resource.limit(), 2);
 }

@@ -1,11 +1,11 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::ControlFlow;
 
 use crate::resources::SatMaterializationResource;
 use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 use stab_model::advanced::{
-    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
-    FoldedDemVisitor, shifted_detector, shifted_targets,
+    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemTraversal, FoldedDemVisitor,
+    shifted_detector, shifted_targets,
 };
 use stab_model::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemRepeatBlock, DemTarget,
@@ -101,6 +101,9 @@ fn preflight_sat_shape(
     let mut soft_clause_count = 0usize;
 
     for error in errors {
+        if !error_participates_in_constraints(mode, error.probability) {
+            continue;
+        }
         if soft_clause_is_stored(mode, error.probability) {
             soft_clause_count = checked_sat_add(soft_clause_count, 1, "soft clause count")?;
         }
@@ -133,12 +136,14 @@ fn preflight_sat_shape(
         }
     }
 
+    let active_detectors = seen_detectors.iter().filter(|seen| **seen).count();
+    let active_observables = seen_observables.iter().filter(|seen| **seen).count();
     let variables = checked_sat_add(errors.len(), xor_count, "variable count")?;
     let xor_clauses = checked_sat_product(xor_count, 4, "XOR clause count")?;
     let clauses = checked_sat_add(
         checked_sat_add(xor_clauses, soft_clause_count, "soft and XOR clause count")?,
         checked_sat_add(
-            target_index.detector_to_slot.len(),
+            active_detectors,
             1,
             "hard detector and observable clause count",
         )?,
@@ -151,8 +156,8 @@ fn preflight_sat_shape(
             "soft and XOR clause literal count",
         )?,
         checked_sat_add(
-            target_index.detector_to_slot.len(),
-            target_index.observable_to_slot.len(),
+            active_detectors,
+            active_observables,
             "hard target clause literal count",
         )?,
         "total clause literal count",
@@ -213,7 +218,7 @@ fn sat_problem_as_wcnf_string(
     if model.count_observables()? == 0 || model.count_errors()? == 0 {
         return unsat_wdimacs(limits);
     }
-    let errors = flattened_error_instructions(model, mode, limits)?;
+    let errors = flattened_error_instructions(model, limits)?;
     if errors.is_empty() {
         return unsat_wdimacs(limits);
     }
@@ -243,14 +248,16 @@ fn sat_problem_as_wcnf_string(
             .get(error_index)
             .copied()
             .ok_or_else(|| AnalysisError::invalid_detector_error_model("missing SAT error ref"))?;
-        add_error_parity_terms(
-            &mut instance,
-            error_ref,
-            &error.targets,
-            &target_index,
-            &mut detectors_activated,
-            &mut observables_flipped,
-        )?;
+        if error_participates_in_constraints(mode, error.probability) {
+            add_error_parity_terms(
+                &mut instance,
+                error_ref,
+                &error.targets,
+                &target_index,
+                &mut detectors_activated,
+                &mut observables_flipped,
+            )?;
+        }
         add_error_soft_clause(&mut instance, mode, error_ref, error.probability)?;
     }
 
@@ -361,16 +368,18 @@ fn soft_clause_is_stored(mode: SatProblemMode, probability: f64) -> bool {
     }
 }
 
+fn error_participates_in_constraints(mode: SatProblemMode, probability: f64) -> bool {
+    matches!(mode, SatProblemMode::Unweighted) || probability != 0.0
+}
+
 fn flattened_error_instructions(
     model: &DetectorErrorModel,
-    mode: SatProblemMode,
     limits: SatMaterializationLimits,
 ) -> AnalysisResult<Vec<FlattenedError>> {
     let traversal = FoldedDemTraversal::new(model)?;
     traversal.validate_repeat_depth("SAT problem generation")?;
-    let block_policies = SatBlockPolicies::new(traversal.root());
     // Complete traversal admission before reserving or mutating flattened error storage.
-    let mut admission = SatErrorVisitor::new(mode, limits, &block_policies, None);
+    let mut admission = SatErrorVisitor::new(limits, None);
     let _ = traversal.try_visit(&mut admission)?;
     let expected_counts = admission.counts;
 
@@ -383,7 +392,7 @@ fn flattened_error_instructions(
             )
         })?;
     let collected_counts = {
-        let mut collector = SatErrorVisitor::new(mode, limits, &block_policies, Some(&mut errors));
+        let mut collector = SatErrorVisitor::new(limits, Some(&mut errors));
         let _ = traversal.try_visit(&mut collector)?;
         collector.counts
     };
@@ -403,25 +412,19 @@ struct SatTraversalCounts {
 }
 
 struct SatErrorVisitor<'a> {
-    mode: SatProblemMode,
     limits: SatMaterializationLimits,
     counts: SatTraversalCounts,
-    block_policies: &'a SatBlockPolicies,
     errors: Option<&'a mut Vec<FlattenedError>>,
 }
 
 impl SatErrorVisitor<'_> {
     fn new<'a>(
-        mode: SatProblemMode,
         limits: SatMaterializationLimits,
-        block_policies: &'a SatBlockPolicies,
         errors: Option<&'a mut Vec<FlattenedError>>,
     ) -> SatErrorVisitor<'a> {
         SatErrorVisitor {
-            mode,
             limits,
             counts: SatTraversalCounts::default(),
-            block_policies,
             errors,
         }
     }
@@ -534,28 +537,11 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
                         "SAT error instruction is missing probability",
                     )
                 })?;
-                if !self.mode.includes_zero_probability_errors() && probability == 0.0 {
-                    return Ok(ControlFlow::Continue(()));
-                }
-                let probability = match self.mode {
-                    SatProblemMode::Unweighted => probability,
-                    SatProblemMode::Weighted { .. } if state.folded_repeat_multiplicity() > 1 => {
-                        weighted_repeat_map_probability(
-                            probability,
-                            state.folded_repeat_multiplicity(),
-                        )
-                    }
-                    SatProblemMode::Weighted { .. } => probability,
-                };
-                if self.mode.includes_zero_probability_errors() || probability != 0.0 {
-                    self.add_expanded_instruction()?;
-                    self.push_error(probability, instruction.targets(), state.detector_offset())?;
-                }
+                self.add_expanded_instruction()?;
+                self.push_error(probability, instruction.targets(), state.detector_offset())?;
             }
             DemInstructionKind::ShiftDetectors => {
-                if state.folded_repeat_multiplicity() == 1 {
-                    self.add_expanded_instruction()?;
-                }
+                self.add_expanded_instruction()?;
             }
             DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
         }
@@ -564,34 +550,12 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
 
     fn enter_repeat(
         &mut self,
-        repeat: &DemRepeatBlock,
+        _repeat: &DemRepeatBlock,
         body: &FoldedDemBlock<'_>,
-        state: &DemTraversalState,
+        _state: &DemTraversalState,
     ) -> AnalysisResult<DemRepeatSelection> {
-        let repeat_count = repeat.repeat_count().get();
-        let body_shift = body.summary().detector_shift()?;
-        let in_folded_repeat = state.folded_repeat_multiplicity() > 1;
         if body.summary().error_count()? == 0 {
             return Ok(DemRepeatSelection::Skip);
-        }
-        if !self.mode.includes_zero_probability_errors()
-            && !self.block_policies.has_nonzero_probability_error(body)?
-        {
-            return Ok(DemRepeatSelection::Skip);
-        }
-        if (in_folded_repeat || repeat_count > self.limits.max_repeat_unroll())
-            && body_shift == 0
-            && (in_folded_repeat || !body.items().is_empty())
-        {
-            return Ok(DemRepeatSelection::FoldOnce);
-        }
-        if repeat_count > self.limits.max_repeat_unroll() {
-            return Err(ResourceLimitError::sat_materialization(
-                SatMaterializationResource::RepeatCount,
-                repeat_count,
-                self.limits.max_repeat_unroll(),
-            )
-            .into());
         }
         Ok(DemRepeatSelection::Expand {
             max_total_iterations: self.limits.max_repeat_iterations(),
@@ -616,78 +580,6 @@ fn sat_resource_amount(value: usize, context: &str) -> AnalysisResult<u64> {
             "{context} does not fit resource diagnostics"
         ))
     })
-}
-
-#[derive(Debug, Default)]
-struct SatBlockPolicies {
-    has_nonzero_probability_error: HashMap<usize, bool>,
-}
-
-impl SatBlockPolicies {
-    fn new(root: &FoldedDemBlock<'_>) -> Self {
-        let mut policies = Self::default();
-        summarize_sat_block_policy(root, &mut policies.has_nonzero_probability_error);
-        policies
-    }
-
-    fn has_nonzero_probability_error(&self, block: &FoldedDemBlock<'_>) -> AnalysisResult<bool> {
-        self.has_nonzero_probability_error
-            .get(&block.compact_id())
-            .copied()
-            .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "DEM SAT compact policy is missing a folded block",
-                )
-            })
-    }
-}
-
-fn summarize_sat_block_policy(
-    block: &FoldedDemBlock<'_>,
-    by_block: &mut HashMap<usize, bool>,
-) -> bool {
-    let mut has_nonzero_probability_error = false;
-    for item in block.items() {
-        match item {
-            FoldedDemItem::Instruction(instruction) => {
-                has_nonzero_probability_error |= instruction.kind() == DemInstructionKind::Error
-                    && instruction.args().first().copied().unwrap_or(0.0) != 0.0;
-            }
-            FoldedDemItem::Repeat { repeat, body } => {
-                let child_has_nonzero_probability_error =
-                    summarize_sat_block_policy(body, by_block);
-                if repeat.repeat_count().get() > 0 {
-                    has_nonzero_probability_error |= child_has_nonzero_probability_error;
-                }
-            }
-        }
-    }
-    by_block.insert(block.compact_id(), has_nonzero_probability_error);
-    has_nonzero_probability_error
-}
-
-fn weighted_repeat_map_probability(probability: f64, repeat_count: u64) -> f64 {
-    if repeat_count == 0 || probability <= 0.0 {
-        return 0.0;
-    }
-    if probability >= 1.0 {
-        return if repeat_count.is_multiple_of(2) {
-            0.0
-        } else {
-            1.0
-        };
-    }
-    if probability == 0.5 {
-        return 0.5;
-    }
-    if probability < 0.5 {
-        return probability;
-    }
-    if repeat_count.is_multiple_of(2) {
-        1.0 - probability
-    } else {
-        probability
-    }
 }
 
 fn checked_sat_add(left: usize, right: usize, context: &str) -> AnalysisResult<usize> {

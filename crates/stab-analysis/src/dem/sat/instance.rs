@@ -8,12 +8,6 @@ pub(super) enum SatProblemMode {
     Weighted { quantization: u32 },
 }
 
-impl SatProblemMode {
-    pub(super) fn includes_zero_probability_errors(self) -> bool {
-        matches!(self, Self::Unweighted)
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BoolAtom {
     Constant(bool),

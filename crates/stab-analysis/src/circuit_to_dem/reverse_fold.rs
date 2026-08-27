@@ -22,7 +22,7 @@ use crate::sparse_rev_frame_tracker::{
     AnalyzerProbeBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
     search_shifted_recurrence,
 };
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError};
 
 mod local_decomposition;
 mod output;
@@ -38,7 +38,6 @@ use output::unreverse_model;
 const MAX_LOOP_CYCLE_STEPS: u64 = 1_000_000;
 #[cfg(test)]
 const MAX_LOOP_CYCLE_STEPS: u64 = 4_096;
-const MAX_BOUNDED_REPEAT_UNROLL: u64 = 100_000;
 
 type ErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
 
@@ -800,10 +799,13 @@ impl ReverseFoldAnalyzer {
         let recurrence = match search {
             ShiftedRecurrenceSearch::Found { recurrence } => recurrence,
             ShiftedRecurrenceSearch::Exhausted { .. } => {
-                if iterations > MAX_BOUNDED_REPEAT_UNROLL {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "analyze_errors found no loop-state recurrence within {MAX_LOOP_CYCLE_STEPS} iterations for repeat count {iterations}"
-                    )));
+                if iterations > super::MAX_ANALYZER_REPEAT_ITERATIONS {
+                    return Err(ResourceLimitError::circuit_to_detector_error_model(
+                        ResourceKind::RepeatIterations,
+                        iterations,
+                        super::MAX_ANALYZER_REPEAT_ITERATIONS,
+                    )
+                    .into());
                 }
                 return self.undo_loop_by_unrolling(body, iterations);
             }

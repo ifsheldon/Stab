@@ -4,7 +4,6 @@
 /// validation, or compact-model semantics.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SatMaterializationLimits {
-    max_repeat_unroll: u64,
     max_expanded_instructions: u64,
     max_repeat_iterations: u64,
     max_error_mechanisms: usize,
@@ -16,7 +15,6 @@ pub struct SatMaterializationLimits {
 }
 
 impl SatMaterializationLimits {
-    pub const DEFAULT_MAX_REPEAT_UNROLL: u64 = 100_000;
     pub const DEFAULT_MAX_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
     pub const DEFAULT_MAX_REPEAT_ITERATIONS: u64 = 1_000_000;
     pub const DEFAULT_MAX_ERROR_MECHANISMS: usize = 250_000;
@@ -25,10 +23,6 @@ impl SatMaterializationLimits {
     pub const DEFAULT_MAX_CLAUSES: usize = 500_000;
     pub const DEFAULT_MAX_CLAUSE_LITERALS: usize = 1_500_000;
     pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 128 * 1024 * 1024;
-
-    pub const fn max_repeat_unroll(self) -> u64 {
-        self.max_repeat_unroll
-    }
 
     pub const fn max_expanded_instructions(self) -> u64 {
         self.max_expanded_instructions
@@ -60,12 +54,6 @@ impl SatMaterializationLimits {
 
     pub const fn max_output_bytes(self) -> usize {
         self.max_output_bytes
-    }
-
-    #[must_use]
-    pub const fn with_max_repeat_unroll(mut self, limit: u64) -> Self {
-        self.max_repeat_unroll = limit;
-        self
     }
 
     #[must_use]
@@ -120,7 +108,6 @@ impl SatMaterializationLimits {
 impl Default for SatMaterializationLimits {
     fn default() -> Self {
         Self {
-            max_repeat_unroll: Self::DEFAULT_MAX_REPEAT_UNROLL,
             max_expanded_instructions: Self::DEFAULT_MAX_EXPANDED_INSTRUCTIONS,
             max_repeat_iterations: Self::DEFAULT_MAX_REPEAT_ITERATIONS,
             max_error_mechanisms: Self::DEFAULT_MAX_ERROR_MECHANISMS,

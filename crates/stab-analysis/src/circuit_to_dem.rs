@@ -16,7 +16,8 @@ pub use error_decomp::{
 };
 pub use options::ErrorAnalyzerOptions;
 
-const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
+const MAX_ANALYZER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
+const MAX_ANALYZER_REPEAT_ITERATIONS: u64 = 1_000_000;
 
 pub(super) type AnalyzerTag = Box<[u8]>;
 

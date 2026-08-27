@@ -3,7 +3,7 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{ErrorAnalyzerOptions, ResourceKind, circuit_to_detector_error_model};
 use stab_model::{Circuit, Probability};
 
 fn analyze_folding_loops(text: &str) -> String {
@@ -139,7 +139,9 @@ fn dem_analyzer_rejects_nested_repeat_expansion_budget() {
     let error = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
         .expect_err("reject nested expansion");
 
-    assert!(error.to_string().contains("expanded repeat iterations"));
+    let resource = error.resource_limit_error().expect("typed resource limit");
+    assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
+    assert!(resource.actual() > resource.limit());
 }
 
 #[test]
@@ -493,24 +495,20 @@ fn pf6_dem_analyzer_fallback_enforces_each_expansion_budget() {
     // retired heralded fallback used to exercise.
     let cases = [
         (
-            "REPEAT 100001 {\n    HERALDED_ERASE(0.125) 0\n}\n".to_string(),
-            "repeat counts up to 100000",
-        ),
-        (
             "REPEAT 1001 {\n    REPEAT 1000 {\n        HERALDED_ERASE(0.125) 0\n    }\n}\n"
                 .to_string(),
-            "at most 1000000 expanded repeat iterations",
+            ResourceKind::RepeatIterations,
         ),
         (
             format!(
                 "REPEAT 100000 {{\n{} }}\n",
                 "    HERALDED_ERASE(0.125) 0\n    TICK\n".repeat(6)
             ),
-            "at most 1000000 expanded instructions",
+            ResourceKind::ExpandedOperations,
         ),
     ];
 
-    for (text, expected) in cases {
+    for (text, expected_resource) in cases {
         let circuit = Circuit::from_stim_str(&text).expect("valid unroll budget circuit");
         let error = circuit_to_detector_error_model(
             &circuit,
@@ -523,10 +521,15 @@ fn pf6_dem_analyzer_fallback_enforces_each_expansion_budget() {
             },
         )
         .expect_err("unrolled expansion must be preflighted");
-        assert!(
-            error.to_string().contains(expected),
-            "expected {expected:?} for:\n{text}\ngot: {error}"
+        let resource = error
+            .resource_limit_error()
+            .expect("unrolled expansion must return a typed resource error");
+        assert_eq!(
+            resource.resource(),
+            expected_resource,
+            "wrong resource for:\n{text}"
         );
+        assert!(resource.actual() > resource.limit());
     }
 }
 
@@ -583,13 +586,13 @@ fn pf6_dem_analyzer_rejects_folded_observables_crossing_iterations() {
 }
 
 #[test]
-fn pf6_dem_analyzer_no_recurrence_preserves_repeat_count_cap() {
+fn pf6_dem_analyzer_no_recurrence_uses_aggregate_repeat_budget() {
     let circuit = Circuit::from_stim_str(
         "
         R 0
         M 0
         DETECTOR rec[-1]
-        REPEAT 100001 {
+        REPEAT 1000001 {
             X_ERROR(0.125) 0
             M 0
             DETECTOR rec[-1] rec[-2]
@@ -607,18 +610,23 @@ fn pf6_dem_analyzer_no_recurrence_preserves_repeat_count_cap() {
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject unsummarizable repeat beyond cap");
+    .expect_err("reject unsummarizable repeat beyond aggregate budget");
 
-    assert!(
-        error
-            .to_string()
-            .contains("found no loop-state recurrence within 1000000 iterations"),
-        "{error}"
+    let resource = error.resource_limit_error().expect("typed resource limit");
+    assert_eq!(
+        resource.operation(),
+        stab_analysis::ResourceOperation::CircuitToDetectorErrorModel
     );
+    assert_eq!(
+        resource.resource(),
+        stab_analysis::ResourceKind::ExpandedOperations
+    );
+    assert_eq!(resource.actual(), 1_000_001);
+    assert_eq!(resource.limit(), 1_000_000);
 }
 
 #[test]
-fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_cap() {
+fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -629,7 +637,7 @@ fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_cap() {
         DETECTOR rec[-1]
         M 0
         DETECTOR rec[-1]
-        REPEAT 100001 {
+        REPEAT 1000001 {
             X_ERROR(0.125) 0
             M 0
             R 0
@@ -648,14 +656,19 @@ fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_cap() {
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject unsummarizable delayed dependency beyond repeat cap");
+    .expect_err("reject unsummarizable delayed dependency beyond repeat budget");
 
-    assert!(
-        error
-            .to_string()
-            .contains("found no loop-state recurrence within 1000000 iterations"),
-        "{error}"
+    let resource = error.resource_limit_error().expect("typed resource limit");
+    assert_eq!(
+        resource.operation(),
+        stab_analysis::ResourceOperation::CircuitToDetectorErrorModel
     );
+    assert_eq!(
+        resource.resource(),
+        stab_analysis::ResourceKind::ExpandedOperations
+    );
+    assert_eq!(resource.actual(), 1_000_001);
+    assert_eq!(resource.limit(), 1_000_000);
 }
 
 #[test]

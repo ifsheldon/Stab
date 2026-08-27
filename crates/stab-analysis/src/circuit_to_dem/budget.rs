@@ -1,11 +1,8 @@
 use stab_model::advanced::MAX_DEM_REPEAT_NESTING;
 use stab_model::{Circuit, CircuitItem};
 
-use super::MAX_ANALYZER_REPEAT_UNROLL;
-use crate::{AnalysisError, AnalysisResult};
-
-const MAX_ANALYZER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_ANALYZER_REPEAT_ITERATIONS: u64 = 1_000_000;
+use super::{MAX_ANALYZER_EXPANDED_INSTRUCTIONS, MAX_ANALYZER_REPEAT_ITERATIONS};
+use crate::{AnalysisResult, ResourceKind, ResourceLimitError};
 
 #[derive(Debug, Default)]
 struct AnalyzerExpansionBudget {
@@ -15,34 +12,27 @@ struct AnalyzerExpansionBudget {
 
 impl AnalyzerExpansionBudget {
     fn add_expanded_instructions(&mut self, count: u64) -> AnalysisResult<()> {
-        self.expanded_instructions =
-            self.expanded_instructions
-                .checked_add(count)
-                .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "analyze_errors expanded instruction count overflowed",
-                    )
-                })?;
+        self.expanded_instructions = self.expanded_instructions.saturating_add(count);
         if self.expanded_instructions > MAX_ANALYZER_EXPANDED_INSTRUCTIONS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "analyze_errors currently supports at most {MAX_ANALYZER_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.expanded_instructions
-            )));
+            return Err(ResourceLimitError::circuit_to_detector_error_model(
+                ResourceKind::ExpandedOperations,
+                self.expanded_instructions,
+                MAX_ANALYZER_EXPANDED_INSTRUCTIONS,
+            )
+            .into());
         }
         Ok(())
     }
 
     fn add_repeat_iterations(&mut self, count: u64) -> AnalysisResult<()> {
-        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "analyze_errors repeat iteration count overflowed",
-            )
-        })?;
+        self.repeat_iterations = self.repeat_iterations.saturating_add(count);
         if self.repeat_iterations > MAX_ANALYZER_REPEAT_ITERATIONS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "analyze_errors currently supports at most {MAX_ANALYZER_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
-                self.repeat_iterations
-            )));
+            return Err(ResourceLimitError::circuit_to_detector_error_model(
+                ResourceKind::RepeatIterations,
+                self.repeat_iterations,
+                MAX_ANALYZER_REPEAT_ITERATIONS,
+            )
+            .into());
         }
         Ok(())
     }
@@ -60,26 +50,19 @@ fn validate_analyzer_expansion_budget_items(
     budget: &mut AnalyzerExpansionBudget,
 ) -> AnalysisResult<()> {
     if depth > MAX_DEM_REPEAT_NESTING {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "analyze_errors repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-        )));
+        return Err(ResourceLimitError::circuit_to_detector_error_model(
+            ResourceKind::RepeatNesting,
+            depth as u64,
+            MAX_DEM_REPEAT_NESTING as u64,
+        )
+        .into());
     }
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(_) => budget.add_expanded_instructions(multiplier)?,
             CircuitItem::RepeatBlock(repeat) => {
                 let repeat_count = repeat.repeat_count().get();
-                if repeat_count > MAX_ANALYZER_REPEAT_UNROLL {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "analyze_errors currently supports repeat counts up to {MAX_ANALYZER_REPEAT_UNROLL}, got {repeat_count}"
-                    )));
-                }
-                let repeated_multiplier =
-                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
-                            "analyze_errors repeat expansion count overflowed",
-                        )
-                    })?;
+                let repeated_multiplier = multiplier.saturating_mul(repeat_count);
                 budget.add_repeat_iterations(repeated_multiplier)?;
                 validate_analyzer_expansion_budget_items(
                     repeat.body(),
