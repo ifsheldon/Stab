@@ -37,7 +37,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures selected nested zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, shifted nested, non-flat, SAT/WCNF, analyzer, ErrorMatcher, and sampler repeat traversal remains capped or excluded, while raw numeric error targets are validation-owned instead of traversal-owned",
         ),
         "pf4-dem-sat-flat-repeat-fold" => Some(
-            "contract-only: Stab measures selected SAT/WCNF flat and nested zero-shift repeat folding for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT; broader shifted, non-flat, and high-index dense-target structural SAT repeat traversal remains capped",
+            "contract-only: Stab measures exact SAT/WCNF expansion for admitted flat and nested zero-shift repeats, including zero-probability structural mechanisms and weighted concrete-MAP SAT; the workloads stay below source-owned mechanism and materialization limits and no longer claim a repeat-folding shortcut",
         ),
         "pf4-error-matcher-filter-flat-repeat" => Some(
             "contract-only: Stab measures selected ErrorMatcher filter DEM flat detector-touching zero-shift repeat folding by compact filter-key semantics; detectorless logical-observable-only filter repeats are measured by pf4-error-matcher-filter-logical-repeat, while broader shifted, mixed-instruction, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",

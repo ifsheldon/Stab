@@ -27,7 +27,7 @@ fn transform_benchmark_work_contracts_are_exact() {
             "pfm-b1-time-reverse-mpad-matrix",
             "stab_circuit_time_reversed_for_flows_mpad_matrix"
         ),
-        Some((7.0, "flows/s"))
+        Some((4.0, "flows/s"))
     );
     for size in [1, 8, 64] {
         assert_eq!(

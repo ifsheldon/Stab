@@ -55,9 +55,13 @@ const SAT_REPEAT_COUNT: u64 = 512;
 #[cfg(test)]
 const SAT_REPEAT_COUNT: u64 = 2;
 #[cfg(not(test))]
-const SAT_FLAT_REPEAT_COUNT: u64 = 1_000_000;
+const SAT_FLAT_REPEAT_COUNT: u64 = 100_000;
 #[cfg(test)]
-const SAT_FLAT_REPEAT_COUNT: u64 = 100_001;
+const SAT_FLAT_REPEAT_COUNT: u64 = 8;
+#[cfg(not(test))]
+const SAT_NESTED_REPEAT_COUNT: u64 = 300;
+#[cfg(test)]
+const SAT_NESTED_REPEAT_COUNT: u64 = 3;
 #[cfg(not(test))]
 const ANALYZER_REPEAT_COUNT: u64 = 1024;
 #[cfg(test)]
@@ -490,7 +494,7 @@ fn run_dem_sat_flat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, B
     let sat_zero_probability_flat_model =
         DetectorErrorModel::from_dem_str(&sat_zero_probability_flat_fixture)
             .map_err(|error| stab_runner_error(&row.id, error))?;
-    let sat_nested_fixture = sat_nested_repeat_fixture(SAT_FLAT_REPEAT_COUNT);
+    let sat_nested_fixture = sat_nested_repeat_fixture(SAT_NESTED_REPEAT_COUNT);
     let sat_nested_model = DetectorErrorModel::from_dem_str(&sat_nested_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
     Ok(vec![
@@ -740,7 +744,7 @@ error(0.1) D1 L1
 }
 
 fn sat_nested_folded_errors() -> f64 {
-    let repeat_count = SAT_FLAT_REPEAT_COUNT as f64;
+    let repeat_count = SAT_NESTED_REPEAT_COUNT as f64;
     repeat_count * repeat_count * 2.0
 }
 

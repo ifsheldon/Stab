@@ -129,15 +129,8 @@ const TIME_REVERSE_FLOW_MPAD_MATRIX: &str = "H 0\n\
                                              S 0\n\
                                              OBSERVABLE_INCLUDE(0) rec[-2]\n\
                                              OBSERVABLE_INCLUDE(0) rec[-1]\n";
-const TIME_REVERSE_FLOW_MPAD_MATRIX_TEXTS: [&str; 7] = [
-    "1 -> rec[1]",
-    "1 -> -rec[0]",
-    "X -> Z",
-    "Z -> Y",
-    "1 -> obs[0]",
-    "1 -> rec[-2] xor obs[0]",
-    "1 -> rec[-1] xor obs[0]",
-];
+const TIME_REVERSE_FLOW_MPAD_MATRIX_TEXTS: [&str; 4] =
+    ["1 -> rec[1]", "1 -> -rec[0]", "X -> Z", "Z -> Y"];
 const TIME_REVERSE_FLOW_GENERATED_SURFACE_CASES: [(&str, u64, u32, usize); 3] = [
     ("d3_r2", 2, 3, 66),
     ("d5_r2", 2, 5, 130),
@@ -691,7 +684,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures a no-repeat distance matrix of rotated-memory-X reverse-flow transforms with fixture generation, repeat absence, and literal compact source-instruction validation outside each sample; pinned Stim has no faithful in-process Rust baseline in this harness",
         ),
         "pfm-b1-time-reverse-mpad-matrix" => Some(
-            "contract-only: Stab measures the seven-flow MPAD semantic matrix plus 1, 8, and 64 independent MPAD record-flow scaling points; pinned Stim has no faithful in-process Rust baseline in this harness",
+            "contract-only: Stab measures the supported four-flow MPAD record-and-Pauli matrix plus 1, 8, and 64 independent MPAD record-flow scaling points; observable-dependent input flows are an explicit Stim-bug divergence and are tested as a rejection instead of timed",
         ),
         "pfm-b1-time-reverse-large-unitary-repeat" => Some(
             "contract-only: Stab measures one transform per sample across repeat-count and repeat-body/state-size matrices; repeat count and compact body work are validated outside timing and no expanded-operation throughput is claimed; pinned Stim has no faithful in-process Rust baseline in this harness",
