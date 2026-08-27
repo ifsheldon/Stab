@@ -677,9 +677,16 @@ area = "sampling"
 contract = "Batch circuit sampling executes every legal instruction, target shape, repeat form, and classical control beyond the separately owned common measurement, 46 fixed-tableau gate, sweep, noise, and loop-folding contracts."
 stim_refs = ["src/stim/simulators/frame_simulator.test.cc", "src/stim/simulators/tableau_simulator.test.cc"]
 coverage = ["consumer:sampling"]
-status = "missing"
+status = "done"
 owner = "stab-engine"
-milestone = "P4"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "gate_semantic_contract"
+name = "gate::semantic_contract::tests::measurement_sampler_executes_every_declared_legal_gate_shape"
+minimum_tier = "pr"
 
 [[families]]
 id = "sampling.circuit-sweep-controls"

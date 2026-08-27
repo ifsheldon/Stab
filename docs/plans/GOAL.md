@@ -30,13 +30,14 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - P3 has no missing nondeferred parity rows. Exact parser boundaries, optimization-independent accounting, and rejected-source allocation are explicit resource-limit divergences because Stim v1.16.0 exposes no comparable configurable policy.
 - The first P4 slice removes the private reject-versus-allow sweep compiler split. The sole sampling compiler lowers every legal sweep-controlled Pauli into the existing typed operation IR, and ordinary sessions use Stim's omitted all-false sweep semantics through repeats. Sampling compiler schema version 2 and the derived request and plan fingerprints identify the changed admission contract.
 - The generated classical-control matrix owns ordinary sampling across every accepted sweep target orientation and compares omitted-sweep output to the all-false baseline. Existing release CLI sampling workflows remain the performance owners; adding a per-control benchmark would measure no distinct user hot path.
+- A metadata-driven sampler owner constructs and executes every declared legal canonical gate/target pattern and a nested-repeat program. The audit found no missing legal sampler kernel after sweep admission; remaining compiler rejections are narrow invalid-shape failures already classified by the gate contract. Common semantic and statistical owners retain value-level coverage instead of being duplicated into the admission matrix.
 - The historical correctness inventory is only a generated bridge for active benchmark prerequisites. Add no semantic ownership to it; P7 deletes it with the inherited benchmark system.
 - Historical timing remains historical. Formal evidence waits for the final clean architecture and benchmark contracts.
 - Development occurs directly on `main`; do not create a branch or linked worktree.
 
 ## Immediate Work
 
-1. Continue P4 from the four remaining engine contracts: complete circuit gate execution, meaningful loop-folding selection, complete detection gate execution, and remaining sweep/feedback conversion.
+1. Continue P4 from the three remaining engine contracts: meaningful loop-folding selection, complete detection gate execution, and remaining sweep/feedback conversion.
 2. Inventory each legal gate and target shape against the existing private execution IR before adding code. Consolidate duplicated lowering or selected-subset exits instead of creating per-surface compatibility paths.
 3. Add one generated semantic matrix per real execution path, pinned-Stim statistical or exact comparators where applicable, and focused resource/cancellation owners. Keep complete gate coverage distinct from already verified common, noise, reference-correction, and feedback families.
 4. Add or retain an E2E benchmark only when the workflow is user-visible and the changed path is measured. Do not create per-gate timing rows.

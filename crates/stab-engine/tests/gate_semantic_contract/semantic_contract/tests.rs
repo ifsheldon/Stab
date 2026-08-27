@@ -12,8 +12,8 @@ use super::{
     GateSurfaceContractExt, GateTargetPattern, gate_semantic_family,
 };
 use crate::{
-    Circuit, Gate, MeasureRecordOffset, MeasurementBatchView, MeasurementSink, Pauli, QubitId,
-    Target,
+    Circuit, CircuitInstruction, Gate, MeasureRecordOffset, MeasurementBatchView, MeasurementSink,
+    Pauli, QubitId, Target,
     execution::{
         RandomPolicy, ReferenceSampleMode, SamplingCompileError, SamplingCompiler, SamplingPlan,
         Seed, ShotCount,
@@ -182,6 +182,61 @@ fn gate_surface_contract_target_patterns_are_accepted_and_classified() {
             );
         }
     }
+}
+
+#[test]
+fn measurement_sampler_executes_every_declared_legal_gate_shape() {
+    let measurement_gate = Gate::from_name("M").expect("measurement gate");
+    for gate in Gate::all() {
+        let contract = gate.surface_contract();
+        for &pattern in contract.target_patterns() {
+            let decision = contract
+                .decision(GateSurface::MeasurementSampler, pattern)
+                .expect("declared measurement-sampler decision");
+            if matches!(
+                decision.behavior,
+                GateSurfaceBehavior::UnsupportedShape | GateSurfaceBehavior::NotApplicable
+            ) {
+                continue;
+            }
+
+            let targets = representative_targets(pattern);
+            let mut circuit = Circuit::new();
+            if targets.iter().any(Target::is_measurement_record_target) {
+                circuit.append_instruction(
+                    CircuitInstruction::new(
+                        measurement_gate,
+                        Vec::new(),
+                        vec![
+                            Target::qubit(QubitId::new(2).expect("q2"), false),
+                            Target::qubit(QubitId::new(3).expect("q3"), false),
+                        ],
+                        None,
+                    )
+                    .expect("record prelude"),
+                );
+            }
+            circuit.append_instruction(
+                CircuitInstruction::new(gate, representative_args(gate), targets, None)
+                    .unwrap_or_else(|error| panic!("{gate:?} {pattern:?}: {error}")),
+            );
+
+            let fixture = SamplingFixture::compile(&circuit)
+                .unwrap_or_else(|error| panic!("{gate:?} {pattern:?}: {error}"));
+            fixture.sample_zero_one_with_seed(1, Some(17));
+        }
+    }
+
+    let nested = Circuit::from_stim_str(
+        "REPEAT 2 {\n    REPEAT 3 {\n        H 0\n        H 0\n        M 0\n    }\n}\n",
+    )
+    .expect("nested repeat fixture");
+    assert_eq!(
+        SamplingFixture::compile(&nested)
+            .expect("compile nested repeat")
+            .sample_zero_one_with_seed(1, Some(17)),
+        vec![vec![false; 6]],
+    );
 }
 
 #[test]

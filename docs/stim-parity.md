@@ -8,8 +8,8 @@ Pinned target: `v1.16.0` at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
 | Status | Families |
 | --- | ---: |
-| done | 80 |
-| missing | 19 |
+| done | 81 |
+| missing | 18 |
 | deferred | 12 |
 | divergence | 37 |
 
@@ -17,9 +17,9 @@ Status describes implementation only. A `done` row may still need a lean canonic
 
 | Evidence | Families |
 | --- | ---: |
-| verified | 117 |
+| verified | 118 |
 | needs-owner | 0 |
-| not-applicable | 31 |
+| not-applicable | 30 |
 
 ## Result Format Applicability
 
@@ -219,7 +219,7 @@ Status describes implementation only. A `done` row may still need a lean canonic
 | --- | --- | --- | --- | --- | --- | --- |
 | `sampling.circuit-common-measurement-and-reset` | done | verified | `stab-engine` | Batch circuit sampling implements the selected measurement, reset, measure-reset, pair-measurement, MPP, MPAD, record-feedback, repeat, and reference-sample semantics used by current Rust and CLI workflows. | `cargo test -p stab-engine --test lean_parity_contracts -- sampling_circuit_common_measurement_and_reset_contract --exact --include-ignored` (pr) | [`src/stim/simulators/frame_simulator.test.cc`](../vendor/stim/src/stim/simulators/frame_simulator.test.cc), [`src/stim/simulators/tableau_simulator.test.cc`](../vendor/stim/src/stim/simulators/tableau_simulator.test.cc) |
 | `sampling.circuit-core-gates` | done | verified | `stab-engine` | All 46 fixed-tableau gate cases execute through batch sampling with inverse cancellation. | `cargo test -p stab-engine --test gate_semantic_execution -- fixed_tableau_gates_execute_across_current_public_surfaces --exact --include-ignored` (pr) | [`src/stim/simulators/frame_simulator.test.cc`](../vendor/stim/src/stim/simulators/frame_simulator.test.cc) |
-| `sampling.circuit-remaining-gate-target-surface` | missing | not-applicable | `stab-engine` | Batch circuit sampling executes every legal instruction, target shape, repeat form, and classical control beyond the separately owned common measurement, 46 fixed-tableau gate, sweep, noise, and loop-folding contracts. | Finish in P4 | [`src/stim/simulators/frame_simulator.test.cc`](../vendor/stim/src/stim/simulators/frame_simulator.test.cc), [`src/stim/simulators/tableau_simulator.test.cc`](../vendor/stim/src/stim/simulators/tableau_simulator.test.cc) |
+| `sampling.circuit-remaining-gate-target-surface` | done | verified | `stab-engine` | Batch circuit sampling executes every legal instruction, target shape, repeat form, and classical control beyond the separately owned common measurement, 46 fixed-tableau gate, sweep, noise, and loop-folding contracts. | `cargo test -p stab-engine --test gate_semantic_contract -- gate::semantic_contract::tests::measurement_sampler_executes_every_declared_legal_gate_shape --exact --include-ignored` (pr) | [`src/stim/simulators/frame_simulator.test.cc`](../vendor/stim/src/stim/simulators/frame_simulator.test.cc), [`src/stim/simulators/tableau_simulator.test.cc`](../vendor/stim/src/stim/simulators/tableau_simulator.test.cc) |
 | `sampling.circuit-sweep-controls` | done | verified | `stab-engine` | Ordinary circuit sampling accepts legal sweep-controlled Pauli operations and treats omitted sweep data as all false. | `cargo test -p stab-engine --test gate_semantic_contract -- gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls --exact --include-ignored` (pr) | [`src/stim/simulators/tableau_simulator.test.cc`](../vendor/stim/src/stim/simulators/tableau_simulator.test.cc), [`src/stim/simulators/frame_simulator.test.cc`](../vendor/stim/src/stim/simulators/frame_simulator.test.cc) |
 | `sampling.dem-sampling-and-replay` | done | verified | `stab-engine` | Compiled DEM sampling preserves detector, observable, correlated-error, repeat, sampled-error, and replay semantics through reusable sessions. | `cargo test -p stab-engine --test dem_sampling_plan_session -- streamed_sessions_match_materialized_sampling_across_dem_families --exact --include-ignored` (pr) | [`src/stim/simulators/dem_sampler.test.cc`](../vendor/stim/src/stim/simulators/dem_sampler.test.cc) |
 | `sampling.exact-stim-random-streams` | deferred | not-applicable | - | Seeded Stab sampling reproduces Stim's exact random bit stream across implementations, batching, SIMD widths, and releases. | Stim does not promise this identity itself; Stab requires deterministic semantic and statistical equivalence instead. | [`doc/stim.pyi`](../vendor/stim/doc/stim.pyi), [`doc/usage_command_line.md`](../vendor/stim/doc/usage_command_line.md) |

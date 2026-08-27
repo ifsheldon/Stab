@@ -9,8 +9,8 @@ pub(crate) use stab_algebra::{Flow, PauliBasis, PauliPhase, PauliSign, PauliStri
 pub(crate) use stab_analysis as analysis;
 pub(crate) use stab_engine as execution;
 pub(crate) use stab_model::{
-    Circuit, DetectorErrorModel, Gate, GateArgumentRule, GateCategory, MeasureRecordOffset, Pauli,
-    Probability, QubitId, Target,
+    Circuit, CircuitInstruction, DetectorErrorModel, Gate, GateArgumentRule, GateCategory,
+    MeasureRecordOffset, Pauli, Probability, QubitId, Target,
 };
 pub(crate) use stab_records::{
     DetectionBatchView, DetectionSink, MeasurementBatchView, MeasurementSink,

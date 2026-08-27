@@ -300,6 +300,8 @@ Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `
 
 Execution checkpoint: ordinary sampling now uses the sole public sampling compiler for sweep-conditioned and non-sweep circuits. Legal `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` sweep target orientations lower into the existing typed `SweepPauli` IR, omitted sweep data is all false through nested repeats, and compiler schema version 2 plus derived fingerprints identify the admission change. The generated classical-control semantic matrix owns the row across every accepted target pattern and real execution surface. No per-control benchmark was added because the existing release CLI sampling workflows already measure this lowering and execution architecture without creating a distinct user hot path.
 
+Gate-surface checkpoint: a metadata-driven owner constructs and executes every declared legal canonical gate/target pattern through the public sampling plan and session, then executes a nested folded repeat. The owner deliberately proves admission and dispatch only; existing common, fixed-tableau, sweep, noise, and statistical owners retain value-level semantics. The audit found no missing legal sampler kernel, so no production branch or per-gate benchmark was added merely to close the aggregate ledger row.
+
 ### Tests
 
 - Deterministic differential tests for every gate family and target orientation where noise is absent or forced to probability 0 or 1.
