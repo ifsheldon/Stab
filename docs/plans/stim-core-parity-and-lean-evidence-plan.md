@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P4 are complete; P5 is in progress; P6 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P5 are complete; P6 through P9 have not started.
 
 ## Summary
 
@@ -45,6 +45,7 @@ The cleanup must preserve the parts that prove real risk: strict result-format g
 - `explain_errors` and full `ErrorMatcher` provenance.
 - `repl` and interactive simulator products.
 - Public `TableauSimulator` and `FlipSimulator` products; their internal algebra and frame semantics remain required by batch workflows.
+- Python or NumPy array conversion, state-vector conversion, arbitrary-unitary import or export, and `tableau_to_unitary`; the existing bounded Rust `unitary_to_tableau` subset remains a separately owned capability.
 - QASM, Quirk, and other export surfaces.
 - GPU execution.
 - Exact reproduction of Stim's random bit streams.
@@ -344,7 +345,7 @@ These are P4 performance dispositions, not milestone-local timing gates. All fou
 
 1. Support circuit-to-DEM lowering for every in-scope gate and target shape.
 2. Complete loop folding, gauge handling, approximation controls, decomposition, correlated errors, coordinate propagation, and feedback across repeats.
-3. Complete the selected public transforms: flattening, noise removal, error decomposition, simplification, feedback handling, inverse QEC construction, time reversal for flows, flow generation and checking, detecting regions, and missing-detector discovery.
+3. Complete the selected public transforms: flattening, noise removal, error decomposition, base-gate decomposition, feedback handling, inverse QEC construction, time reversal for flows, flow generation and checking, detecting regions, and missing-detector discovery.
 4. Make the reverse tracker the sole implementation for reverse-flow state instead of preserving parallel representations.
 5. Retain and independently prove graphlike shortest-error search, hypergraph heuristic search, shortest-error WCNF production, likeliest-error WCNF production, and detector-hyperedge semantics needed by analysis.
 6. Keep reusable decoder sessions as a Stab extension with their own conformance tests and self-regression workflow; do not use them to close a Stim parity row.
@@ -369,6 +370,17 @@ These are P4 performance dispositions, not milestone-local timing gates. All fou
 - Every nondeferred analysis, transform, search, and algebra row has one executable owner test; decoder conformance is reported separately as a Stab extension.
 - Public APIs do not expose knowingly selected subsets as though they were complete.
 - No duplicate reverse-tracking or DEM traversal representation remains.
+
+### Implementation Checkpoint
+
+- Every P5 family has an implementation owner, an explicit Stim-bug or resource divergence, or a declared deferral; the only remaining `missing` family belongs to P6 deprecated-route removal.
+- Six live metadata-driven catalog tests compare strict unitary inversion, detecting regions, circuit-to-DEM lowering, base-gate decomposition, flow generation, and missing-detector discovery against pinned Stim across every declared legal gate shape.
+- Reverse-flow state, detecting regions, missing-detector discovery, circuit-to-DEM lowering, and flow generation share the sparse tracker and typed resource policy instead of selected-subset engines or pre-admission materialization.
+- Tableau construction, powers, direct sums, embedding, local append, canonical stabilizers, H/S/CX synthesis, and Pauli circuit conjugation have direct algebra or analysis owners; local one- and two-qubit append performs no destination-width allocation.
+- Likeliest-error WCNF repeat semantics are checked against direct exhaustive optimization over a finite independent corpus, while graphlike, hypergraph, shortest-WCNF, and resource owners remain independently executable.
+- Historical fixture rows now target the consolidated semantic parents, and supplied flow-observable dependencies remain a separately reproduced Stim-bug divergence instead of contaminating the common MPAD parity fixture.
+- P5 makes no timing conclusion: `analyze-folded` and the reusable Rust sample-detect-decode workflow remain fixed P7 E2E cases, and benchmark smoke only validates the surviving historical contract during migration.
+- P5 is complete after targeted and workspace tests, 137 canonical parity owners, all implemented fixtures, six live catalog comparisons, parity rendering, benchmark smoke, milestone audit, full code review, and repair of every confirmed finding passed on the integrated source.
 
 ## Milestone P6: Close CLI And Rust Workflow Parity
 
