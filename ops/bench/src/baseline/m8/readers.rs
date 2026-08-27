@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use sha2::{Digest as _, Sha256};
 use stab_core::{
-    SampleFormat,
+    RecordFormat,
     advanced::records::{
         for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record,
         write_ptb64_records_checked, write_records,
@@ -29,14 +29,15 @@ pub(super) enum MeasureReaderMode {
 
 pub(super) fn run_measure_reader_format_row(
     row: &BenchmarkRow,
-    format: SampleFormat,
+    format: RecordFormat,
     cases: &[(&'static str, MeasureReaderMode, usize)],
 ) -> Result<Vec<Measurement>, BenchError> {
     cases
         .iter()
         .map(|(name, mode, denominator)| {
             let source_record = measure_reader_record(*denominator);
-            let input = write_records(std::slice::from_ref(&source_record), format);
+            let input = write_records(std::slice::from_ref(&source_record), format)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
             validate_measure_reader_input_digest(&row.id, &input, format, *denominator)?;
             validate_measure_reader_preflight(&row.id, &input, format, *mode, &source_record)?;
             measure_stab_batched(name, TINY_DIRECT_COMPARE_REPETITIONS, || {
@@ -95,32 +96,32 @@ pub(super) fn run_measure_reader_ptb64_row(
 pub(super) fn validate_measure_reader_input_digest(
     row_id: &str,
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     denominator: usize,
 ) -> Result<(), BenchError> {
     let expected = match (format, denominator) {
-        (SampleFormat::ZeroOne, 10) => {
+        (RecordFormat::ZeroOne, 10) => {
             "76ddc795bc51947da415b2fc5bac6e7d30b948bcd813309db6075b2c00b0db40"
         }
-        (SampleFormat::B8, 10) => {
+        (RecordFormat::B8, 10) => {
             "3c6008cec14343e54fba03d665043ef59e68370e12b446e442afdb233e88f4fa"
         }
-        (SampleFormat::R8, 10) => {
+        (RecordFormat::R8, 10) => {
             "cf256c7b6499e41f098f267e35f115abcc1b57fdc2de41f4cbc7d4d3041afefe"
         }
-        (SampleFormat::R8, 100) => {
+        (RecordFormat::R8, 100) => {
             "43e16015e8e60c97063ab47c30684f69ef3716bc38a572d0ad603b3885200a52"
         }
-        (SampleFormat::Hits, 10) => {
+        (RecordFormat::Hits, 10) => {
             "739e9a3344b85f790ae633b3ada8a5e9d466bafbcbb5a3e999ca956c21d390cf"
         }
-        (SampleFormat::Hits, 100) => {
+        (RecordFormat::Hits, 100) => {
             "93afafc60cae0af47244df4b36dbfc4d0866611eb1307b1cd8dc6a744c087e87"
         }
-        (SampleFormat::Dets, 10) => {
+        (RecordFormat::Dets, 10) => {
             "2a6d998dbb26149505728e84aa669ba56b404e2d033120c9f74a880615e5dfc5"
         }
-        (SampleFormat::Dets, 100) => {
+        (RecordFormat::Dets, 100) => {
             "f11213f1e37e3e16307249b385ef2fedf8c0ac14da64a7bbe930113df93880f0"
         }
         _ => {
@@ -148,7 +149,7 @@ fn validate_frozen_input_digest(
 pub(super) fn validate_measure_reader_preflight(
     row_id: &str,
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     mode: MeasureReaderMode,
     expected: &[bool],
 ) -> Result<(), BenchError> {

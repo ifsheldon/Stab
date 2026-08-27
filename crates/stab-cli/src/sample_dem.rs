@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::Args;
 use stab_core::{
     CircuitError, DemSampleBatchView, DemSampleSink, DetectionObservableOutputMode,
-    DetectorErrorModel, RandomPolicy, RecordFormat, SampleFormat, Seed, ShotCount,
+    DetectorErrorModel, RandomPolicy, RecordFormat, Seed, ShotCount,
     advanced::records::for_each_sparse_record,
     advanced::records::{
         FormatErrorCode as RecordFormatErrorCode, RecordStreamReadError, RecordStreamReader,
@@ -450,7 +450,7 @@ where
                 }
             }
         }
-        let records = read_measurement_records(&record_bytes, SampleFormat::B8, error_count)?;
+        let records = read_measurement_records(&record_bytes, RecordFormat::B8, error_count)?;
         let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
             CircuitError::invalid_result_format(format!(
                 "b8 replay record decoded into {} records",
@@ -472,7 +472,7 @@ fn for_each_line_replay_error_record<F>(
 where
     F: FnMut(&[bool]) -> Result<(), CliError>,
 {
-    let sample_format = format.sample_format()?;
+    let record_format = format.required_record_format()?;
     let path = input.path().to_path_buf();
     let mut reader = BufReader::new(input);
     let mut records_read = 0usize;
@@ -509,7 +509,7 @@ where
                 })?,
             ]
         } else {
-            read_measurement_records(&line, sample_format, error_count).map_err(|source| {
+            read_measurement_records(&line, record_format, error_count).map_err(|source| {
                 CliError::InputRecord {
                     byte_offset: record_byte_offset,
                     source,
@@ -536,7 +536,7 @@ where
 
 fn read_hits_replay_record(input: &[u8], error_count: usize) -> Result<Vec<bool>, CliError> {
     let mut record = None;
-    for_each_sparse_record(input, SampleFormat::Hits, error_count, |hits| {
+    for_each_sparse_record(input, RecordFormat::Hits, error_count, |hits| {
         if record.is_some() {
             return Err(CircuitError::invalid_result_format(
                 "HITS replay line decoded into multiple records",
@@ -591,7 +591,7 @@ where
     let path = input.path().to_path_buf();
     let mut reader = RecordStreamReader::measurements(
         &mut *input,
-        SampleFormat::R8,
+        RecordFormat::R8,
         error_count,
         MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES,
     );

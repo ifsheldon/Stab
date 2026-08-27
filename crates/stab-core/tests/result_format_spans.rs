@@ -6,7 +6,7 @@
 
 use stab_core::{
     ByteSpan, CircuitError, CircuitResult, DiagnosticSeverity, FormatError, FormatErrorCode,
-    FormatErrorContext, SampleFormat,
+    FormatErrorContext, RecordFormat,
     advanced::records::{
         DetsLayout, DetsResultType, read_dets_records, read_ptb64_records, read_ptb64_records_all,
         read_records,
@@ -89,7 +89,7 @@ fn zero_one_errors_report_exact_byte_spans_across_readers() {
     }
 
     assert_format_error(
-        read_records(b"0", SampleFormat::ZeroOne, 2).expect_err("partial record"),
+        read_records(b"0", RecordFormat::ZeroOne, 2).expect_err("partial record"),
         FormatErrorCode::UnexpectedEndOfInput,
         span(1, 0),
         FormatErrorContext::RecordWidth {
@@ -99,56 +99,56 @@ fn zero_one_errors_report_exact_byte_spans_across_readers() {
         "01 data ended in the middle of a record at bit 1; expected 2 bits",
     );
     assert_format_error(
-        read_records(b"0\xff\n", SampleFormat::ZeroOne, 2).expect_err("invalid byte"),
+        read_records(b"0\xff\n", RecordFormat::ZeroOne, 2).expect_err("invalid byte"),
         FormatErrorCode::InvalidByte,
         span(1, 1),
         FormatErrorContext::InvalidByte { byte: 255 },
         "01 record contains non-bit byte 255",
     );
     assert_format_error(
-        read_records(b"01", SampleFormat::ZeroOne, 2).expect_err("missing newline"),
+        read_records(b"01", RecordFormat::ZeroOne, 2).expect_err("missing newline"),
         FormatErrorCode::MissingRecordTerminator,
         span(2, 0),
         FormatErrorContext::None,
         "01 data did not end with a newline after the expected record width",
     );
     assert_format_error(
-        read_records(b"01\rX", SampleFormat::ZeroOne, 2).expect_err("invalid CRLF"),
+        read_records(b"01\rX", RecordFormat::ZeroOne, 2).expect_err("invalid CRLF"),
         FormatErrorCode::MissingRecordTerminator,
         span(3, 1),
         FormatErrorContext::None,
         "01 carriage return was not followed by a line feed",
     );
     assert_format_error(
-        read_records(b"0\xc3\xa9\n", SampleFormat::ZeroOne, 2).expect_err("UTF-8 byte"),
+        read_records(b"0\xc3\xa9\n", RecordFormat::ZeroOne, 2).expect_err("UTF-8 byte"),
         FormatErrorCode::InvalidByte,
         span(1, 1),
         FormatErrorContext::InvalidByte { byte: 195 },
         "01 record contains non-bit byte 195",
     );
 
-    assert!(read_records(b"01\n", SampleFormat::ZeroOne, 2).is_ok());
-    assert!(read_records(b"01\r\n", SampleFormat::ZeroOne, 2).is_ok());
+    assert!(read_records(b"01\n", RecordFormat::ZeroOne, 2).is_ok());
+    assert!(read_records(b"01\r\n", RecordFormat::ZeroOne, 2).is_ok());
 }
 
 #[test]
 fn hits_errors_report_separator_integer_and_bounds_spans() {
     assert_format_error(
-        read_records(b"1,,2\n", SampleFormat::Hits, 4).expect_err("double comma"),
+        read_records(b"1,,2\n", RecordFormat::Hits, 4).expect_err("double comma"),
         FormatErrorCode::MissingIndex,
         span(2, 1),
         FormatErrorContext::None,
         "HITS index was not followed by an unsigned integer",
     );
     assert_format_error(
-        read_records(b"1,2", SampleFormat::Hits, 4).expect_err("unterminated"),
+        read_records(b"1,2", RecordFormat::Hits, 4).expect_err("unterminated"),
         FormatErrorCode::InvalidRecordSeparator,
         span(3, 0),
         FormatErrorContext::None,
         "HITS data was not comma-separated integers terminated by a newline",
     );
     assert_format_error(
-        read_records(b"4\n", SampleFormat::Hits, 4).expect_err("out of range"),
+        read_records(b"4\n", RecordFormat::Hits, 4).expect_err("out of range"),
         FormatErrorCode::IndexOutOfRange,
         span(0, 1),
         FormatErrorContext::Index {
@@ -159,7 +159,7 @@ fn hits_errors_report_separator_integer_and_bounds_spans() {
         "HITS index 4 exceeds record width 4",
     );
     assert_format_error(
-        read_records(b"18446744073709551616\n", SampleFormat::Hits, 4)
+        read_records(b"18446744073709551616\n", RecordFormat::Hits, 4)
             .expect_err("integer overflow"),
         FormatErrorCode::IntegerOverflow,
         span(0, 20),
@@ -167,7 +167,7 @@ fn hits_errors_report_separator_integer_and_bounds_spans() {
         "HITS index overflowed u64",
     );
 
-    assert!(read_records(b"1,2\r\n", SampleFormat::Hits, 4).is_ok());
+    assert!(read_records(b"1,2\r\n", RecordFormat::Hits, 4).is_ok());
 }
 
 #[test]
@@ -215,7 +215,7 @@ fn dets_errors_report_prefix_namespace_and_index_spans() -> CircuitResult<()> {
 
 #[test]
 fn b8_errors_report_trailing_partial_record_across_readers() {
-    for error in packed_reader_errors(b"\x01", SampleFormat::B8, 9) {
+    for error in packed_reader_errors(b"\x01", RecordFormat::B8, 9) {
         assert_format_error(
             error,
             FormatErrorCode::InvalidPackedLength,
@@ -228,7 +228,7 @@ fn b8_errors_report_trailing_partial_record_across_readers() {
         );
     }
 
-    for error in packed_reader_errors(b"", SampleFormat::B8, 0) {
+    for error in packed_reader_errors(b"", RecordFormat::B8, 0) {
         assert_format_error_without_span(
             error,
             FormatErrorCode::InvalidRecordWidth,
@@ -243,7 +243,7 @@ fn b8_errors_report_trailing_partial_record_across_readers() {
 
 #[test]
 fn r8_errors_report_eof_and_overshooting_byte_across_readers() {
-    for error in packed_reader_errors(b"\x01", SampleFormat::R8, 3) {
+    for error in packed_reader_errors(b"\x01", RecordFormat::R8, 3) {
         assert_format_error(
             error,
             FormatErrorCode::UnexpectedEndOfInput,
@@ -256,7 +256,7 @@ fn r8_errors_report_eof_and_overshooting_byte_across_readers() {
         );
     }
 
-    for error in packed_reader_errors(b"\x04", SampleFormat::R8, 3) {
+    for error in packed_reader_errors(b"\x04", RecordFormat::R8, 3) {
         assert_format_error(
             error,
             FormatErrorCode::RunLengthOvershoot,
@@ -315,22 +315,22 @@ fn ptb64_errors_report_partial_group_and_missing_prefix_bytes() {
 
 fn zero_one_reader_errors(input: &[u8], width: usize) -> Vec<CircuitError> {
     let mut errors =
-        vec![read_records(input, SampleFormat::ZeroOne, width).expect_err("materialized reader")];
+        vec![read_records(input, RecordFormat::ZeroOne, width).expect_err("materialized reader")];
     errors.push(
-        for_each_record(input, SampleFormat::ZeroOne, width, |_| Ok(())).expect_err("dense reader"),
+        for_each_record(input, RecordFormat::ZeroOne, width, |_| Ok(())).expect_err("dense reader"),
     );
     errors.push(
-        for_each_packed_record(input, SampleFormat::ZeroOne, width, |_| Ok(()))
+        for_each_packed_record(input, RecordFormat::ZeroOne, width, |_| Ok(()))
             .expect_err("packed reader"),
     );
     errors.push(
-        for_each_sparse_record(input, SampleFormat::ZeroOne, width, |_| Ok(()))
+        for_each_sparse_record(input, RecordFormat::ZeroOne, width, |_| Ok(()))
             .expect_err("sparse reader"),
     );
     errors
 }
 
-fn packed_reader_errors(input: &[u8], format: SampleFormat, width: usize) -> Vec<CircuitError> {
+fn packed_reader_errors(input: &[u8], format: RecordFormat, width: usize) -> Vec<CircuitError> {
     let mut errors = vec![read_records(input, format, width).expect_err("materialized reader")];
     errors.push(for_each_record(input, format, width, |_| Ok(())).expect_err("dense reader"));
     errors

@@ -1,12 +1,12 @@
 use crate::{
-    BitSlice, CircuitError, CircuitResult, DetsLayout, DetsToken, SampleFormat,
+    BitSlice, CircuitError, CircuitResult, DetsLayout, DetsToken, RecordFormat,
     result_formats::SparseShot,
 };
 use stab_records::RecordStreamError;
 
 pub fn for_each_record<F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
     visit: F,
 ) -> CircuitResult<()>
@@ -19,7 +19,7 @@ where
 
 pub fn for_each_packed_record<F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
     visit: F,
 ) -> CircuitResult<()>
@@ -32,7 +32,7 @@ where
 
 pub fn for_each_sparse_record<F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
     visit: F,
 ) -> CircuitResult<()>

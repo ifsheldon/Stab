@@ -16,12 +16,29 @@ pub use capabilities::{CodecCapability, RecordEncoding, RecordFormat};
 pub use dets::{DetsLayout, DetsResultType, DetsToken, read_dets_records};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SampleFormat {
+enum PerRecordFormat {
     ZeroOne,
     B8,
     R8,
     Hits,
     Dets,
+}
+
+impl TryFrom<RecordFormat> for PerRecordFormat {
+    type Error = FormatError;
+
+    fn try_from(format: RecordFormat) -> RecordResult<Self> {
+        match format {
+            RecordFormat::ZeroOne => Ok(Self::ZeroOne),
+            RecordFormat::B8 => Ok(Self::B8),
+            RecordFormat::R8 => Ok(Self::R8),
+            RecordFormat::Hits => Ok(Self::Hits),
+            RecordFormat::Dets => Ok(Self::Dets),
+            RecordFormat::Ptb64 => Err(FormatError::invalid_data(
+                "ptb64 requires a complete 64-record group",
+            )),
+        }
+    }
 }
 
 const ZERO_ONE_LINES_BY_BYTE: [[u8; 16]; 256] = zero_one_lines_by_byte();
@@ -45,13 +62,16 @@ const fn zero_one_lines_by_byte() -> [[u8; 16]; 256] {
     table
 }
 
-pub fn write_records(records: &[Vec<bool>], format: SampleFormat) -> Vec<u8> {
-    let mut writer = MeasureRecordWriter::new(format);
+pub fn write_records(records: &[Vec<bool>], format: RecordFormat) -> RecordResult<Vec<u8>> {
+    if format == RecordFormat::Ptb64 {
+        return write_ptb64_records_checked(records);
+    }
+    let mut writer = MeasureRecordWriter::try_new(format)?;
     for record in records {
         writer.write_bits(record);
         writer.write_end();
     }
-    writer.into_bytes()
+    Ok(writer.into_bytes())
 }
 
 fn write_ptb64_records(records: &[Vec<bool>]) -> Vec<u8> {
@@ -380,7 +400,7 @@ impl MeasureRecordBatch {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MeasureRecordWriter {
-    format: SampleFormat,
+    format: PerRecordFormat,
     output: Vec<u8>,
     index: usize,
     b8_byte: u8,
@@ -392,14 +412,14 @@ pub struct MeasureRecordWriter {
 }
 
 impl MeasureRecordWriter {
-    pub fn new(format: SampleFormat) -> Self {
-        Self::with_capacity(format, 0)
+    pub fn try_new(format: RecordFormat) -> RecordResult<Self> {
+        Self::try_with_capacity(format, 0)
     }
 
-    pub fn with_capacity(format: SampleFormat, capacity: usize) -> Self {
-        Self {
-            format,
-            output: Vec::with_capacity(capacity),
+    pub fn try_with_capacity(format: RecordFormat, capacity: usize) -> RecordResult<Self> {
+        let mut writer = Self {
+            format: PerRecordFormat::try_from(format)?,
+            output: Vec::new(),
             index: 0,
             b8_byte: 0,
             b8_bit_index: 0,
@@ -407,13 +427,7 @@ impl MeasureRecordWriter {
             hits_first: true,
             dets_started: false,
             dets_type: b'M',
-        }
-    }
-
-    /// Creates a writer whose initial output reservation fails with a typed error instead of
-    /// aborting the process when the allocation cannot be satisfied.
-    pub fn try_with_capacity(format: SampleFormat, capacity: usize) -> RecordResult<Self> {
-        let mut writer = Self::new(format);
+        };
         writer.reserve_output(capacity)?;
         Ok(writer)
     }
@@ -441,7 +455,7 @@ impl MeasureRecordWriter {
     /// New component code should use [`Self::begin_dets_result_type`] so invalid prefixes are not
     /// representable.
     pub fn begin_result_type(&mut self, result_type: u8) {
-        if self.format != SampleFormat::Dets {
+        if self.format != PerRecordFormat::Dets {
             return;
         }
         self.dets_type = result_type;
@@ -467,7 +481,7 @@ impl MeasureRecordWriter {
     }
 
     pub fn write_packed_batch(&mut self, batch: PackedShotBatchView<'_>) -> RecordResult<()> {
-        if self.format == SampleFormat::ZeroOne
+        if self.format == PerRecordFormat::ZeroOne
             && batch.bits_per_shot() == 1
             && self.is_at_record_boundary()
         {
@@ -491,7 +505,7 @@ impl MeasureRecordWriter {
 
     #[inline]
     pub fn write_bit_plane_batch(&mut self, batch: BitPlane64BatchView<'_>) -> RecordResult<()> {
-        if self.format == SampleFormat::ZeroOne
+        if self.format == PerRecordFormat::ZeroOne
             && batch.bits_per_shot() == 1
             && self.is_at_record_boundary()
         {
@@ -593,32 +607,32 @@ impl MeasureRecordWriter {
 
     pub fn write_bit(&mut self, bit: bool) {
         match self.format {
-            SampleFormat::ZeroOne => {
+            PerRecordFormat::ZeroOne => {
                 self.output.push(if bit { b'1' } else { b'0' });
             }
-            SampleFormat::B8 => self.write_b8_bit(bit),
-            SampleFormat::R8 => self.write_r8_bit(bit),
-            SampleFormat::Hits => self.write_hits_bit(bit),
-            SampleFormat::Dets => self.write_dets_bit(bit),
+            PerRecordFormat::B8 => self.write_b8_bit(bit),
+            PerRecordFormat::R8 => self.write_r8_bit(bit),
+            PerRecordFormat::Hits => self.write_hits_bit(bit),
+            PerRecordFormat::Dets => self.write_dets_bit(bit),
         }
         self.index += 1;
     }
 
     pub fn write_end(&mut self) {
         match self.format {
-            SampleFormat::ZeroOne | SampleFormat::Hits => {
+            PerRecordFormat::ZeroOne | PerRecordFormat::Hits => {
                 self.output.push(b'\n');
             }
-            SampleFormat::Dets => {
+            PerRecordFormat::Dets => {
                 self.ensure_dets_started();
                 self.output.push(b'\n');
             }
-            SampleFormat::B8 => {
+            PerRecordFormat::B8 => {
                 if self.b8_bit_index != 0 {
                     self.output.push(self.b8_byte);
                 }
             }
-            SampleFormat::R8 => {
+            PerRecordFormat::R8 => {
                 if self.r8_false_run == u8::MAX {
                     self.output.push(u8::MAX);
                     self.r8_false_run = 0;
@@ -718,12 +732,12 @@ fn append_usize_decimal(output: &mut Vec<u8>, mut value: usize) {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MeasureRecordBatchWriter {
-    format: SampleFormat,
+    format: RecordFormat,
     records: Vec<Vec<bool>>,
 }
 
 impl MeasureRecordBatchWriter {
-    pub fn new(shots: usize, format: SampleFormat) -> Self {
+    pub fn new(shots: usize, format: RecordFormat) -> Self {
         Self {
             format,
             records: vec![Vec::new(); shots],
@@ -744,7 +758,7 @@ impl MeasureRecordBatchWriter {
         Ok(())
     }
 
-    pub fn write_end(&self) -> Vec<u8> {
+    pub fn write_end(&self) -> RecordResult<Vec<u8>> {
         write_records(&self.records, self.format)
     }
 }
@@ -791,23 +805,24 @@ impl SparseShot {
 
 pub fn read_records(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
 ) -> RecordResult<Vec<Vec<bool>>> {
     match format {
-        SampleFormat::ZeroOne => read_zero_one_records(input, bits_per_record),
-        SampleFormat::B8 => read_b8_records(input, bits_per_record),
-        SampleFormat::R8 => read_r8_records(input, bits_per_record),
-        SampleFormat::Hits => read_hits_records(input, bits_per_record),
-        SampleFormat::Dets => {
+        RecordFormat::ZeroOne => read_zero_one_records(input, bits_per_record),
+        RecordFormat::B8 => read_b8_records(input, bits_per_record),
+        RecordFormat::R8 => read_r8_records(input, bits_per_record),
+        RecordFormat::Hits => read_hits_records(input, bits_per_record),
+        RecordFormat::Dets => {
             read_dets_records(input, DetsLayout::measurement_only(bits_per_record))
         }
+        RecordFormat::Ptb64 => read_ptb64_records_all(input, bits_per_record),
     }
 }
 
 pub fn read_measurement_records(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
 ) -> RecordResult<Vec<Vec<bool>>> {
     read_records(input, format, bits_per_record)

@@ -449,9 +449,17 @@ fn detection_record_format(format: RecordFormatArg) -> Result<stab_core::RecordF
 }
 
 fn validate_m2d_output_formats(args: &M2dArgs) -> Result<(), CliError> {
-    args.out_format.sample_format()?;
+    validate_m2d_output_format(args.out_format)?;
     if args.obs_output.is_some() {
-        args.obs_out_format.sample_format()?;
+        validate_m2d_output_format(args.obs_out_format)?;
+    }
+    Ok(())
+}
+
+fn validate_m2d_output_format(format: RecordFormatArg) -> Result<(), CliError> {
+    let format = format.required_record_format()?;
+    if format == stab_core::RecordFormat::Ptb64 {
+        return Err(CliError::UnsupportedDetectionFormat { format: "ptb64" });
     }
     Ok(())
 }
@@ -568,7 +576,7 @@ impl<'a> M2dRecordStream<'a> {
         let decoder = match format {
             RecordFormatArg::R8 => M2dRecordDecoder::Shared(RecordStreamReader::measurements(
                 input.reader,
-                stab_core::SampleFormat::R8,
+                stab_core::RecordFormat::R8,
                 bits_per_record,
                 MAX_M2D_TEXT_RECORD_BYTES,
             )),
@@ -670,8 +678,8 @@ impl<'a> M2dRecordStream<'a> {
                     source,
                 },
             )?;
-            let sample_format = self.format.sample_format()?;
-            let records = read_measurement_records(&line, sample_format, self.bits_per_record)
+            let record_format = self.format.required_record_format()?;
+            let records = read_measurement_records(&line, record_format, self.bits_per_record)
                 .map_err(|source| CliError::InputRecord {
                     byte_offset: record_byte_offset,
                     source,
@@ -715,7 +723,7 @@ impl<'a> M2dRecordStream<'a> {
         match read {
             RecordRead::Complete => decode_single_m2d_record(
                 &record_bytes,
-                stab_core::SampleFormat::B8,
+                stab_core::RecordFormat::B8,
                 self.bits_per_record,
                 self.kind,
             )
@@ -762,7 +770,7 @@ fn validate_m2d_text_record_terminator(
 
 fn decode_single_m2d_record(
     input: &[u8],
-    format: stab_core::SampleFormat,
+    format: stab_core::RecordFormat,
     measurement_width: usize,
     kind: &str,
 ) -> Result<Vec<bool>, CliError> {

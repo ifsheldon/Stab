@@ -3,7 +3,7 @@
 use std::convert::Infallible;
 
 use crate::{
-    CircuitError, CircuitResult, FormatError, MeasurementCodecSink, RecordFormat, SampleFormat,
+    CircuitError, CircuitResult, FormatError, MeasurementCodecSink, RecordFormat,
     result_formats::MeasureRecordWriter,
     sampling::{
         CompiledSampler, RunError, SamplingExecutionError, SamplingRunProgress, ShotCount,
@@ -67,14 +67,14 @@ impl CompiledSampler {
 
     /// Encodes `01` measurement records while preserving execution and allocation failures.
     pub fn try_sample_zero_one_bytes(&self, shots: usize) -> Result<Vec<u8>, RunError<Infallible>> {
-        self.try_sample_bytes(shots, SampleFormat::ZeroOne)
+        self.try_sample_bytes(shots, RecordFormat::ZeroOne)
     }
 
     /// Encodes measurement records while preserving execution and allocation failures.
     pub fn try_sample_bytes(
         &self,
         shots: usize,
-        format: SampleFormat,
+        format: RecordFormat,
     ) -> Result<Vec<u8>, RunError<Infallible>> {
         self.try_sample_bytes_with_seed(shots, format, None)
     }
@@ -83,7 +83,7 @@ impl CompiledSampler {
     pub fn try_sample_bytes_with_seed(
         &self,
         shots: usize,
-        format: SampleFormat,
+        format: RecordFormat,
         seed: Option<u64>,
     ) -> Result<Vec<u8>, RunError<Infallible>> {
         self.try_sample_bytes_with_seed_and_reference_mode(shots, format, seed, false)
@@ -93,7 +93,7 @@ impl CompiledSampler {
     pub fn try_sample_bytes_with_seed_and_reference_mode(
         &self,
         shots: usize,
-        format: SampleFormat,
+        format: RecordFormat,
         seed: Option<u64>,
         skip_reference_sample: bool,
     ) -> Result<Vec<u8>, RunError<Infallible>> {
@@ -165,7 +165,7 @@ impl CompiledSampler {
     ///
     /// Panics when sampling execution or output allocation fails. Use [`Self::try_sample_bytes`]
     /// to preserve these failures.
-    pub fn sample_bytes(&self, shots: usize, format: SampleFormat) -> Vec<u8> {
+    pub fn sample_bytes(&self, shots: usize, format: RecordFormat) -> Vec<u8> {
         legacy_materialization(self.try_sample_bytes(shots, format))
     }
 
@@ -178,7 +178,7 @@ impl CompiledSampler {
     pub fn sample_bytes_with_seed(
         &self,
         shots: usize,
-        format: SampleFormat,
+        format: RecordFormat,
         seed: Option<u64>,
     ) -> Vec<u8> {
         legacy_materialization(self.try_sample_bytes_with_seed(shots, format, seed))
@@ -193,7 +193,7 @@ impl CompiledSampler {
     pub fn sample_bytes_with_seed_and_reference_mode(
         &self,
         shots: usize,
-        format: SampleFormat,
+        format: RecordFormat,
         seed: Option<u64>,
         skip_reference_sample: bool,
     ) -> Vec<u8> {
@@ -262,25 +262,35 @@ fn validate_materialized_request(
 
 #[derive(Debug)]
 struct FallibleSampleEncoder {
-    format: SampleFormat,
+    format: RecordFormat,
     width: usize,
     writer: MeasureRecordWriter,
 }
 
 impl FallibleSampleEncoder {
     fn try_new(
-        format: SampleFormat,
+        format: RecordFormat,
         shots: usize,
         width: usize,
     ) -> Result<Self, SamplingExecutionError> {
         ShotCount::try_from(shots)?;
         let minimum_per_record = match format {
-            SampleFormat::ZeroOne => width.checked_add(1).ok_or_else(|| {
+            RecordFormat::ZeroOne => width.checked_add(1).ok_or_else(|| {
                 adapter_size_error("01 encoded record length overflowed".to_owned())
             })?,
-            SampleFormat::B8 => width.div_ceil(8),
-            SampleFormat::R8 | SampleFormat::Hits => 1,
-            SampleFormat::Dets => 5,
+            RecordFormat::B8 => width.div_ceil(8),
+            RecordFormat::R8 | RecordFormat::Hits => 1,
+            RecordFormat::Dets => 5,
+            RecordFormat::Ptb64 => {
+                return Err(SamplingExecutionError::InternalInvariant {
+                    message: "ptb64 output requires the grouped sampling adapter".to_owned(),
+                });
+            }
+            _ => {
+                return Err(SamplingExecutionError::InternalInvariant {
+                    message: "unrecognized record format reached the sampling adapter".to_owned(),
+                });
+            }
         };
         let minimum_output = shots.checked_mul(minimum_per_record).ok_or_else(|| {
             adapter_size_error(format!(
@@ -323,23 +333,27 @@ impl FallibleSampleEncoder {
     }
 }
 
-fn sample_format_name(format: SampleFormat) -> &'static str {
+fn sample_format_name(format: RecordFormat) -> &'static str {
     match format {
-        SampleFormat::ZeroOne => "01",
-        SampleFormat::B8 => "b8",
-        SampleFormat::R8 => "r8",
-        SampleFormat::Hits => "hits",
-        SampleFormat::Dets => "dets",
+        RecordFormat::ZeroOne => "01",
+        RecordFormat::B8 => "b8",
+        RecordFormat::R8 => "r8",
+        RecordFormat::Hits => "hits",
+        RecordFormat::Dets => "dets",
+        RecordFormat::Ptb64 => "ptb64",
+        _ => "unknown",
     }
 }
 
-fn sample_format_allocation_label(format: SampleFormat) -> &'static str {
+fn sample_format_allocation_label(format: RecordFormat) -> &'static str {
     match format {
-        SampleFormat::ZeroOne => "01 sample output",
-        SampleFormat::B8 => "b8 sample output",
-        SampleFormat::R8 => "r8 sample output",
-        SampleFormat::Hits => "hits sample output",
-        SampleFormat::Dets => "dets sample output",
+        RecordFormat::ZeroOne => "01 sample output",
+        RecordFormat::B8 => "b8 sample output",
+        RecordFormat::R8 => "r8 sample output",
+        RecordFormat::Hits => "hits sample output",
+        RecordFormat::Dets => "dets sample output",
+        RecordFormat::Ptb64 => "ptb64 sample output",
+        _ => "unknown sample output",
     }
 }
 

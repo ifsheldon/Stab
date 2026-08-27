@@ -43,8 +43,8 @@ use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
     BitPlane64Batch, Circuit, CircuitError, CircuitItem, CircuitResult, CodeDistance,
     ColorCodeParams, ColorCodeTask, GeneratedCircuit, MeasurementBatchView, MeasurementSink,
-    Probability, RandomPolicy, ReferenceSampleMode, RepetitionCodeParams, RepetitionCodeTask,
-    RoundCount, RunError, SampleFormat, SamplingCompiler, SamplingSession, Seed, ShotCount,
+    Probability, RandomPolicy, RecordFormat, ReferenceSampleMode, RepetitionCodeParams,
+    RepetitionCodeTask, RoundCount, RunError, SamplingCompiler, SamplingSession, Seed, ShotCount,
     SurfaceCodeParams, SurfaceCodeTask,
     advanced::records::{MeasureRecordWriter, validate_ptb64_shot_count},
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
@@ -221,13 +221,11 @@ impl RecordFormatArg {
         }
     }
 
-    fn sample_format(self) -> Result<SampleFormat, CliError> {
+    fn required_record_format(self) -> Result<RecordFormat, CliError> {
         let Some(record_format) = self.record_format() else {
             return Err(CliError::UnsupportedDetectionFormat { format: "stim" });
         };
-        record_format
-            .sample_format()
-            .ok_or(CliError::UnsupportedDetectionFormat { format: "ptb64" })
+        Ok(record_format)
     }
 }
 
@@ -264,10 +262,14 @@ impl SampleOutFormatArg {
         }
     }
 
-    fn stream_writer(self) -> Option<MeasureRecordWriter> {
-        self.record_format()
-            .sample_format()
-            .map(MeasureRecordWriter::new)
+    fn stream_writer(self) -> Result<Option<MeasureRecordWriter>, CircuitError> {
+        let format = self.record_format();
+        if format == RecordFormat::Ptb64 {
+            return Ok(None);
+        }
+        MeasureRecordWriter::try_new(format)
+            .map(Some)
+            .map_err(CircuitError::from)
     }
 }
 
@@ -872,6 +874,7 @@ where
         .session_with_reference_mode(random_policy, reference_mode)
         .map_err(CircuitError::from)?;
     let shots = ShotCount::try_from(args.shots).map_err(CircuitError::from)?;
+    let writer = args.out_format.stream_writer()?;
     let mut outputs = io.activate()?;
     if let Some(mut output) = outputs.take(FileRole::Output) {
         return write_sample_output(
@@ -879,6 +882,7 @@ where
             shots,
             args.out_format,
             visible_measurements.as_deref(),
+            writer,
             &mut output,
         )
         .map_err(|source| CliError::SamplePath {
@@ -891,6 +895,7 @@ where
         shots,
         args.out_format,
         visible_measurements.as_deref(),
+        writer,
         stdout,
     )
     .map_err(CliError::SampleOutput)
@@ -905,6 +910,7 @@ fn write_sample_output<W>(
     shots: ShotCount,
     format: SampleOutFormatArg,
     visible_measurements: Option<&[usize]>,
+    writer: Option<MeasureRecordWriter>,
     output: &mut W,
 ) -> Result<(), RunError<std::io::Error>>
 where
@@ -914,7 +920,7 @@ where
         format,
         visible_measurements,
         filtered_record: visible_measurements.map(|indices| Vec::with_capacity(indices.len())),
-        writer: format.stream_writer(),
+        writer,
         output,
     };
     session.run(shots, &mut sink).map(|_| ())

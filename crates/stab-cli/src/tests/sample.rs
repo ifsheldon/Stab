@@ -33,7 +33,7 @@ fn warmed_cli_sample_encoding_has_no_record_count_dependent_allocation() {
             format,
             visible_measurements: None,
             filtered_record: None,
-            writer: format.stream_writer(),
+            writer: format.stream_writer().expect("construct sample writer"),
             output: &mut output,
         };
         let view = MeasurementBatchView::from_bit_planes(batch.view());
@@ -73,7 +73,7 @@ fn warmed_filtered_cli_sample_encoding_reuses_projection_storage() {
         format,
         visible_measurements: Some(&visible),
         filtered_record: Some(Vec::with_capacity(visible.len())),
-        writer: format.stream_writer(),
+        writer: format.stream_writer().expect("construct sample writer"),
         output: &mut output,
     };
     let view = MeasurementBatchView::from_bit_planes(batch.view());

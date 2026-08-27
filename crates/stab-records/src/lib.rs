@@ -23,11 +23,10 @@ pub use estimate::EncodedSizeEstimate;
 pub use record_stream::{RecordStreamReadError, RecordStreamReader};
 pub use result_formats::{
     CodecCapability, DetsLayout, DetsResultType, DetsToken, MeasureRecord, MeasureRecordBatch,
-    MeasureRecordBatchWriter, MeasureRecordWriter, RecordEncoding, RecordFormat, SampleFormat,
-    SparseShot, codec_capabilities, ptb64_record_count, read_dets_records,
-    read_measurement_records, read_ptb64_records, read_ptb64_records_all, read_records,
-    validate_ptb64_shot_count, write_bit_plane_64_batch, write_ptb64_records_checked,
-    write_records,
+    MeasureRecordBatchWriter, MeasureRecordWriter, RecordEncoding, RecordFormat, SparseShot,
+    codec_capabilities, ptb64_record_count, read_dets_records, read_measurement_records,
+    read_ptb64_records, read_ptb64_records_all, read_records, validate_ptb64_shot_count,
+    write_bit_plane_64_batch, write_ptb64_records_checked, write_records,
 };
 pub use result_streaming::{
     RecordStreamError, for_each_dets_packed_record, for_each_dets_record,

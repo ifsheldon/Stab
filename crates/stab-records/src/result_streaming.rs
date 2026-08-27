@@ -1,5 +1,5 @@
 use crate::{
-    FormatError, RecordResult, SampleFormat,
+    FormatError, RecordFormat, RecordResult,
     result_formats::{
         DetsLayout, DetsResultType, DetsToken, SparseShot,
         ptb64_record_count as materialized_ptb64_record_count, validate_ptb64_shot_count,
@@ -25,7 +25,7 @@ pub enum RecordStreamError<E> {
 
 pub fn try_for_each_record<E, F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
     mut visit: F,
 ) -> Result<(), RecordStreamError<E>>
@@ -41,7 +41,7 @@ where
 
 pub fn for_each_record<F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
     visit: F,
 ) -> RecordResult<()>
@@ -49,39 +49,52 @@ where
     F: FnMut(&[bool]) -> RecordResult<()>,
 {
     match format {
-        SampleFormat::ZeroOne => for_each_zero_one_record(input, bits_per_record, visit),
-        SampleFormat::B8 => for_each_b8_record(input, bits_per_record, visit),
-        SampleFormat::R8 => for_each_r8_record(input, bits_per_record, visit),
-        SampleFormat::Hits => for_each_hits_record(input, bits_per_record, visit),
-        SampleFormat::Dets => {
+        RecordFormat::ZeroOne => for_each_zero_one_record(input, bits_per_record, visit),
+        RecordFormat::B8 => for_each_b8_record(input, bits_per_record, visit),
+        RecordFormat::R8 => for_each_r8_record(input, bits_per_record, visit),
+        RecordFormat::Hits => for_each_hits_record(input, bits_per_record, visit),
+        RecordFormat::Dets => {
             for_each_dets_record(input, DetsLayout::measurement_only(bits_per_record), visit)
         }
+        RecordFormat::Ptb64 => for_each_ptb64_record_all(input, bits_per_record, visit),
     }
 }
 
 pub fn for_each_packed_record<F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
-    visit: F,
+    mut visit: F,
 ) -> RecordResult<()>
 where
     F: FnMut(BitSlice<'_>) -> RecordResult<()>,
 {
     match format {
-        SampleFormat::ZeroOne => for_each_zero_one_packed_record(input, bits_per_record, visit),
-        SampleFormat::B8 => for_each_b8_packed_record(input, bits_per_record, visit),
-        SampleFormat::R8 => for_each_r8_packed_record(input, bits_per_record, visit),
-        SampleFormat::Hits => for_each_hits_packed_record(input, bits_per_record, visit),
-        SampleFormat::Dets => {
+        RecordFormat::ZeroOne => for_each_zero_one_packed_record(input, bits_per_record, visit),
+        RecordFormat::B8 => for_each_b8_packed_record(input, bits_per_record, visit),
+        RecordFormat::R8 => for_each_r8_packed_record(input, bits_per_record, visit),
+        RecordFormat::Hits => for_each_hits_packed_record(input, bits_per_record, visit),
+        RecordFormat::Dets => {
             for_each_dets_packed_record(input, DetsLayout::measurement_only(bits_per_record), visit)
+        }
+        RecordFormat::Ptb64 => {
+            let mut packed = BitVec::zeros(bits_per_record);
+            for_each_ptb64_record_all(input, bits_per_record, |record| {
+                packed.clear();
+                for (index, bit) in record.iter().copied().enumerate() {
+                    if bit {
+                        packed.set(index, true).map_err(bit_error_to_format_error)?;
+                    }
+                }
+                visit(packed.as_bitslice())
+            })
         }
     }
 }
 
 pub fn try_for_each_packed_record<E, F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
     mut visit: F,
 ) -> Result<(), RecordStreamError<E>>
@@ -97,27 +110,41 @@ where
 
 pub fn for_each_sparse_record<F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
-    visit: F,
+    mut visit: F,
 ) -> RecordResult<()>
 where
     F: FnMut(&[u64]) -> RecordResult<()>,
 {
     match format {
-        SampleFormat::ZeroOne => for_each_zero_one_sparse_record(input, bits_per_record, visit),
-        SampleFormat::B8 => for_each_b8_sparse_record(input, bits_per_record, visit),
-        SampleFormat::R8 => for_each_r8_sparse_record(input, bits_per_record, visit),
-        SampleFormat::Hits => for_each_hits_sparse_record(input, bits_per_record, visit),
-        SampleFormat::Dets => {
+        RecordFormat::ZeroOne => for_each_zero_one_sparse_record(input, bits_per_record, visit),
+        RecordFormat::B8 => for_each_b8_sparse_record(input, bits_per_record, visit),
+        RecordFormat::R8 => for_each_r8_sparse_record(input, bits_per_record, visit),
+        RecordFormat::Hits => for_each_hits_sparse_record(input, bits_per_record, visit),
+        RecordFormat::Dets => {
             for_each_dets_sparse_record(input, DetsLayout::measurement_only(bits_per_record), visit)
+        }
+        RecordFormat::Ptb64 => {
+            let mut hits = Vec::new();
+            for_each_ptb64_record_all(input, bits_per_record, |record| {
+                hits.clear();
+                for (index, bit) in record.iter().copied().enumerate() {
+                    if bit {
+                        hits.push(u64::try_from(index).map_err(|_| {
+                            FormatError::invalid_data("ptb64 sparse index cannot fit in u64")
+                        })?);
+                    }
+                }
+                visit(&hits)
+            })
         }
     }
 }
 
 pub fn try_for_each_sparse_record<E, F>(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
     mut visit: F,
 ) -> Result<(), RecordStreamError<E>>
@@ -748,13 +775,14 @@ mod tests {
             })
             .collect::<Vec<_>>();
         for format in [
-            SampleFormat::ZeroOne,
-            SampleFormat::B8,
-            SampleFormat::R8,
-            SampleFormat::Hits,
-            SampleFormat::Dets,
+            RecordFormat::ZeroOne,
+            RecordFormat::B8,
+            RecordFormat::R8,
+            RecordFormat::Hits,
+            RecordFormat::Dets,
+            RecordFormat::Ptb64,
         ] {
-            let input = write_records(&records, format);
+            let input = write_records(&records, format).expect("encode records");
             let expected = read_records(&input, format, 9).unwrap();
             let mut dense = Vec::new();
             for_each_record(&input, format, 9, |record| {
@@ -864,23 +892,23 @@ mod tests {
             ]
         );
 
-        assert!(for_each_record(dets, SampleFormat::Dets, 2, ignore_record).is_err());
-        assert!(for_each_packed_record(dets, SampleFormat::Dets, 2, ignore_packed).is_err());
-        assert!(for_each_sparse_record(dets, SampleFormat::Dets, 2, ignore_sparse).is_err());
+        assert!(for_each_record(dets, RecordFormat::Dets, 2, ignore_record).is_err());
+        assert!(for_each_packed_record(dets, RecordFormat::Dets, 2, ignore_packed).is_err());
+        assert!(for_each_sparse_record(dets, RecordFormat::Dets, 2, ignore_sparse).is_err());
     }
 
     #[test]
     fn streaming_readers_reject_malformed_inputs() {
-        assert!(for_each_record(b"0x\n", SampleFormat::ZeroOne, 2, ignore_record).is_err());
-        assert!(for_each_record(&[0xff], SampleFormat::B8, 9, ignore_record).is_err());
-        assert!(for_each_record(&[3], SampleFormat::R8, 2, ignore_record).is_err());
-        assert!(for_each_record(b"3\n", SampleFormat::Hits, 3, ignore_record).is_err());
-        assert!(for_each_record(b"shot Q0\n", SampleFormat::Dets, 1, ignore_record).is_err());
+        assert!(for_each_record(b"0x\n", RecordFormat::ZeroOne, 2, ignore_record).is_err());
+        assert!(for_each_record(&[0xff], RecordFormat::B8, 9, ignore_record).is_err());
+        assert!(for_each_record(&[3], RecordFormat::R8, 2, ignore_record).is_err());
+        assert!(for_each_record(b"3\n", RecordFormat::Hits, 3, ignore_record).is_err());
+        assert!(for_each_record(b"shot Q0\n", RecordFormat::Dets, 1, ignore_record).is_err());
         assert!(
-            for_each_packed_record(b"shot Q0\n", SampleFormat::Dets, 1, ignore_packed).is_err()
+            for_each_packed_record(b"shot Q0\n", RecordFormat::Dets, 1, ignore_packed).is_err()
         );
         assert!(
-            for_each_sparse_record(b"shot Q0\n", SampleFormat::Dets, 1, ignore_sparse).is_err()
+            for_each_sparse_record(b"shot Q0\n", RecordFormat::Dets, 1, ignore_sparse).is_err()
         );
         assert!(for_each_ptb64_record_all(&[0; 7], 1, ignore_record).is_err());
         assert!(for_each_ptb64_record(&[], 0, 64, ignore_record).is_err());
@@ -899,7 +927,7 @@ mod tests {
 
         let mut visited = 0usize;
         assert_visitor_error(
-            try_for_each_record(dense, SampleFormat::ZeroOne, 2, |_| {
+            try_for_each_record(dense, RecordFormat::ZeroOne, 2, |_| {
                 visited += 1;
                 Err("sink stopped")
             }),
@@ -907,7 +935,7 @@ mod tests {
         );
         let mut visited = 0usize;
         assert_visitor_error(
-            try_for_each_packed_record(dense, SampleFormat::ZeroOne, 2, |_| {
+            try_for_each_packed_record(dense, RecordFormat::ZeroOne, 2, |_| {
                 visited += 1;
                 Err("sink stopped")
             }),
@@ -915,7 +943,7 @@ mod tests {
         );
         let mut visited = 0usize;
         assert_visitor_error(
-            try_for_each_sparse_record(sparse, SampleFormat::Hits, 2, |_| {
+            try_for_each_sparse_record(sparse, RecordFormat::Hits, 2, |_| {
                 visited += 1;
                 Err("sink stopped")
             }),
@@ -973,7 +1001,7 @@ mod tests {
         assert!(matches!(
             try_for_each_record(
                 b"0x\n",
-                SampleFormat::ZeroOne,
+                RecordFormat::ZeroOne,
                 2,
                 |_| -> Result<(), &'static str> { Ok(()) }
             ),

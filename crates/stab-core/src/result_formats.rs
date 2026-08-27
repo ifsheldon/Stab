@@ -7,13 +7,13 @@ pub use stab_records::{
     EncodedSizeEstimate, MeasureRecord, MeasureRecordBatch, MeasureRecordBatchWriter,
     MeasureRecordWriter, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
     MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
-    PackedShotBatchView, RecordEncoding, RecordFormat, SampleFormat, SampledErrorWidth, SparseShot,
+    PackedShotBatchView, RecordEncoding, RecordFormat, SampledErrorWidth, SparseShot,
 };
 
 pub(crate) use stab_records::codec_capabilities;
 
-pub fn write_records(records: &[Vec<bool>], format: SampleFormat) -> Vec<u8> {
-    stab_records::write_records(records, format)
+pub fn write_records(records: &[Vec<bool>], format: RecordFormat) -> CircuitResult<Vec<u8>> {
+    stab_records::write_records(records, format).map_err(record_error)
 }
 
 pub fn write_ptb64_records_checked(records: &[Vec<bool>]) -> CircuitResult<Vec<u8>> {
@@ -57,7 +57,7 @@ pub fn validate_ptb64_shot_count(shots: usize) -> CircuitResult<()> {
 
 pub fn read_records(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
 ) -> CircuitResult<Vec<Vec<bool>>> {
     stab_records::read_records(input, format, bits_per_record).map_err(record_error)
@@ -65,7 +65,7 @@ pub fn read_records(
 
 pub fn read_measurement_records(
     input: &[u8],
-    format: SampleFormat,
+    format: RecordFormat,
     bits_per_record: usize,
 ) -> CircuitResult<Vec<Vec<bool>>> {
     stab_records::read_measurement_records(input, format, bits_per_record).map_err(record_error)

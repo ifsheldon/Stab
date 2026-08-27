@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 and P1 are complete. P2 through P9 have not started.
+Status: Active. P0 and P1 are complete. P2 is in progress; P3 through P9 have not started.
 
 ## Objective
 
@@ -19,6 +19,7 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - `oracle/stim-v1.16-parity.toml` and its family fragments are the sole feature and evidence ledger. [stim-parity.md](../stim-parity.md) is generated from it.
 - Current family, implementation, divergence, and canonical-owner totals are generated in [stim-parity.md](../stim-parity.md); active prose does not duplicate those volatile counts.
 - P1 removed or consolidated per-export, structural-only, duplicate, exhaustive, and representation-specific tests while preserving compatibility, data-loss, process, statistical, and resource-boundary coverage.
+- P2 has consolidated all six result codecs on the canonical `RecordFormat`; the remaining P2 work is direct component ownership, domain errors, engine API cleanup, compatibility-adapter deletion, and executable consumer fixtures.
 - The historical correctness inventory remains only as a mechanically generated benchmark-prerequisite bridge. Add no semantic ownership to it; delete it when P7 replaces the inherited benchmark system.
 - New model-wide parse byte, instruction-count, and target-count policies belong to P3, not P1.
 - Historical timing remains historical. Formal evidence must wait for the final clean architecture and benchmark contracts.

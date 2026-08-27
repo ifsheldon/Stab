@@ -5,7 +5,7 @@
 )]
 
 use stab_core::{
-    CircuitError, CircuitResult, SampleFormat,
+    CircuitError, CircuitResult, RecordFormat,
     advanced::records::{
         DetsLayout, DetsResultType, DetsToken, SparseShot, read_dets_records,
         read_measurement_records, read_records,
@@ -44,19 +44,19 @@ fn dets_public_layout_and_token_value_contract() -> CircuitResult<()> {
 #[test]
 fn zero_one_requires_lf_or_crlf_after_every_record() -> CircuitResult<()> {
     for input in [b"01".as_slice(), b"01\r", b"01\rX"] {
-        assert_all_width_readers_reject(input, SampleFormat::ZeroOne, 2);
+        assert_all_width_readers_reject(input, RecordFormat::ZeroOne, 2);
     }
 
     assert_eq!(
-        read_records(b"01\n10\r\n", SampleFormat::ZeroOne, 2)?,
+        read_records(b"01\n10\r\n", RecordFormat::ZeroOne, 2)?,
         vec![vec![false, true], vec![true, false]]
     );
     assert_eq!(
-        read_records(b"\n\r\n", SampleFormat::ZeroOne, 0)?,
+        read_records(b"\n\r\n", RecordFormat::ZeroOne, 0)?,
         vec![Vec::<bool>::new(), Vec::new()]
     );
     assert_eq!(
-        read_records(b"", SampleFormat::ZeroOne, 0)?,
+        read_records(b"", RecordFormat::ZeroOne, 0)?,
         Vec::<Vec<bool>>::new()
     );
     Ok(())
@@ -75,19 +75,19 @@ fn hits_requires_strict_commas_and_terminated_records() -> CircuitResult<()> {
         b"18446744073709551616\n",
         b"3\n",
     ] {
-        assert_all_width_readers_reject(input, SampleFormat::Hits, 3);
+        assert_all_width_readers_reject(input, RecordFormat::Hits, 3);
     }
 
     assert_eq!(
-        read_records(b"1,1\r\n\n", SampleFormat::Hits, 3)?,
+        read_records(b"1,1\r\n\n", RecordFormat::Hits, 3)?,
         vec![vec![false, false, false], vec![false, false, false]]
     );
     assert_eq!(
-        read_records(b"1\r,3\n", SampleFormat::Hits, 4)?,
+        read_records(b"1\r,3\n", RecordFormat::Hits, 4)?,
         vec![vec![false, true, false, true]]
     );
     let mut sparse = Vec::new();
-    for_each_sparse_record(b"1,1\n", SampleFormat::Hits, 3, |hits| {
+    for_each_sparse_record(b"1,1\n", RecordFormat::Hits, 3, |hits| {
         sparse.push(hits.to_vec());
         Ok(())
     })?;
@@ -155,11 +155,11 @@ fn typed_dets_visitors_preserve_duplicates_and_sparse_shot_observable_parity() -
 #[test]
 fn width_based_dets_readers_are_measurement_only() -> CircuitResult<()> {
     assert_eq!(
-        read_records(b"shot M0 M0\n", SampleFormat::Dets, 1)?,
+        read_records(b"shot M0 M0\n", RecordFormat::Dets, 1)?,
         vec![vec![true]]
     );
     for input in [b"shot D0\n".as_slice(), b"shot L0\n"] {
-        assert_all_width_readers_reject(input, SampleFormat::Dets, 1);
+        assert_all_width_readers_reject(input, RecordFormat::Dets, 1);
     }
     Ok(())
 }
@@ -240,7 +240,7 @@ fn dets_visitors_stop_immediately_on_visitor_error() -> CircuitResult<()> {
     Ok(())
 }
 
-fn assert_all_width_readers_reject(input: &[u8], format: SampleFormat, width: usize) {
+fn assert_all_width_readers_reject(input: &[u8], format: RecordFormat, width: usize) {
     assert!(read_records(input, format, width).is_err());
     assert!(read_measurement_records(input, format, width).is_err());
     assert!(for_each_record(input, format, width, |_| Ok(())).is_err());

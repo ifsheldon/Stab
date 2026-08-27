@@ -16,7 +16,7 @@ use super::{
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::Probability;
-use stab_core::SampleFormat;
+use stab_core::RecordFormat;
 use stab_core::advanced::records::{write_ptb64_records_checked, write_records};
 use stab_engine::biased_randomize_bits;
 
@@ -219,11 +219,12 @@ fn measure_reader_preflights_reject_same_width_wrong_content() {
     *first = !*first;
 
     for mode in [MeasureReaderMode::Packed, MeasureReaderMode::Sparse] {
-        let input = write_records(std::slice::from_ref(&changed), SampleFormat::ZeroOne);
+        let input = write_records(std::slice::from_ref(&changed), RecordFormat::ZeroOne)
+            .expect("encode mutated reader fixture");
         let digest_error = validate_measure_reader_input_digest(
             "m8-measure-reader-01",
             &input,
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             10,
         )
         .expect_err("same-width encoded mutation must change the frozen digest");
@@ -231,7 +232,7 @@ fn measure_reader_preflights_reject_same_width_wrong_content() {
         let error = validate_measure_reader_preflight(
             "m8-measure-reader-01",
             &input,
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             mode,
             &expected,
         )
@@ -246,18 +247,19 @@ fn measure_reader_preflight_rejects_missing_and_extra_records() {
     let empty_error = validate_measure_reader_preflight(
         "m8-measure-reader-01",
         b"",
-        SampleFormat::ZeroOne,
+        RecordFormat::ZeroOne,
         MeasureReaderMode::Packed,
         &expected,
     )
     .expect_err("missing record must fail");
     assert!(empty_error.to_string().contains("wrong content"));
 
-    let input = write_records(&[expected.clone(), expected.clone()], SampleFormat::ZeroOne);
+    let input = write_records(&[expected.clone(), expected.clone()], RecordFormat::ZeroOne)
+        .expect("encode duplicate reader fixture");
     let extra_error = validate_measure_reader_preflight(
         "m8-measure-reader-01",
         &input,
-        SampleFormat::ZeroOne,
+        RecordFormat::ZeroOne,
         MeasureReaderMode::Sparse,
         &expected,
     )

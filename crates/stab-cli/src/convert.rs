@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use stab_core::{
-    Circuit, CircuitError, CircuitItem, DetectorErrorModel, RepeatBlock, SampleFormat,
+    Circuit, CircuitError, CircuitItem, DetectorErrorModel, RecordFormat, RepeatBlock,
     advanced::records::{DetsLayout, DetsResultType, MeasureRecordWriter, RecordStreamReader},
     detection_record_width, measurement_record_count,
 };
@@ -342,7 +342,7 @@ fn convert_record_reader<'a>(
         RecordFormatArg::Stim => return Err(CliError::UnsupportedConversion),
         _ => RecordStreamReader::measurements(
             input,
-            format.sample_format()?,
+            format.required_record_format()?,
             width,
             MAX_CONVERT_RECORD_BYTES,
         ),
@@ -541,8 +541,10 @@ impl ConvertOutput {
         if self.format == RecordFormatArg::Ptb64 {
             return self.write_ptb64_record(bits);
         }
-        let sample_format = self.format.sample_format()?;
-        let mut writer = MeasureRecordWriter::new(sample_format);
+        let record_format = self.format.required_record_format()?;
+        let mut writer = MeasureRecordWriter::try_new(record_format)
+            .map_err(CircuitError::from)
+            .map_err(CliError::from)?;
         writer.write_bits(&bits);
         writer.write_end();
         self.output.extend_from_slice(&writer.into_bytes());
@@ -553,7 +555,9 @@ impl ConvertOutput {
         &mut self,
         types: &[(DetsResultType, &[bool])],
     ) -> Result<(), CliError> {
-        let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
+        let mut writer = MeasureRecordWriter::try_new(RecordFormat::Dets)
+            .map_err(CircuitError::from)
+            .map_err(CliError::from)?;
         for (result_type, bits) in types {
             writer.begin_dets_result_type(*result_type);
             writer.write_bits(bits);

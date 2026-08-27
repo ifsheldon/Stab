@@ -21,7 +21,8 @@ fn measure_record_records_lookback_and_writes_unwritten_results() {
     }
     assert_eq!(record.storage_len(), 102);
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    let mut writer =
+        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
     record
         .write_unwritten_results_to(&mut writer)
         .expect("write unwritten results");
@@ -36,13 +37,13 @@ fn measure_record_records_lookback_and_writes_unwritten_results() {
 
 #[test]
 fn measure_record_writer_handles_empty_dets_records_and_long_r8_gaps() {
-    let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::Dets).expect("per-record format");
     writer.write_end();
     writer.write_end();
     writer.write_end();
     assert_eq!(writer.into_bytes(), b"shot\nshot\nshot\n");
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::R8);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::R8).expect("per-record format");
     for _ in 0..(8 * 64) {
         writer.write_bit(false);
     }
@@ -61,15 +62,15 @@ fn measure_record_writer_handles_empty_dets_records_and_long_r8_gaps() {
 fn begin_result_type_is_a_no_op_on_non_dets_writers_like_stim() {
     let bytes = [0xF8_u8];
     for (format, expected) in [
-        (SampleFormat::ZeroOne, b"000111110000111111\n".to_vec()),
-        (SampleFormat::B8, vec![0xF8, 0xF0, 0x03]),
+        (RecordFormat::ZeroOne, b"000111110000111111\n".to_vec()),
+        (RecordFormat::B8, vec![0xF8, 0xF0, 0x03]),
         (
-            SampleFormat::Hits,
+            RecordFormat::Hits,
             b"3,4,5,6,7,12,13,14,15,16,17\n".to_vec(),
         ),
-        (SampleFormat::R8, vec![3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]),
+        (RecordFormat::R8, vec![3, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0]),
     ] {
-        let mut writer = MeasureRecordWriter::new(format);
+        let mut writer = MeasureRecordWriter::try_new(format).expect("per-record format");
         writer.begin_result_type(b'D');
         writer.write_bytes(&bytes);
         writer.write_bit(false);
@@ -87,7 +88,7 @@ fn begin_result_type_is_a_no_op_on_non_dets_writers_like_stim() {
 #[test]
 fn begin_result_type_does_not_reset_hits_bit_position_mid_record() {
     let bytes = [0xF8_u8];
-    let mut writer = MeasureRecordWriter::new(SampleFormat::Hits);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::Hits).expect("per-record format");
     writer.write_bytes(&bytes);
     writer.write_bit(false);
     writer.begin_result_type(b'D');
@@ -102,7 +103,7 @@ fn begin_result_type_does_not_reset_hits_bit_position_mid_record() {
 #[test]
 fn begin_result_type_switches_namespace_and_resets_position_on_dets_writers() {
     let bytes = [0xF8_u8];
-    let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::Dets).expect("per-record format");
     writer.begin_result_type(b'D');
     writer.write_bytes(&bytes);
     writer.write_bit(false);
@@ -121,11 +122,11 @@ fn begin_result_type_switches_namespace_and_resets_position_on_dets_writers() {
 fn fallible_reservation_constructor_reserves_and_encodes_like_the_plain_writer() {
     let record = [true, false, true, true];
     for format in [
-        SampleFormat::ZeroOne,
-        SampleFormat::B8,
-        SampleFormat::R8,
-        SampleFormat::Hits,
-        SampleFormat::Dets,
+        RecordFormat::ZeroOne,
+        RecordFormat::B8,
+        RecordFormat::R8,
+        RecordFormat::Hits,
+        RecordFormat::Dets,
     ] {
         let mut writer =
             MeasureRecordWriter::try_with_capacity(format, 64).expect("reserve output");
@@ -133,10 +134,14 @@ fn fallible_reservation_constructor_reserves_and_encodes_like_the_plain_writer()
         writer.write_end();
         assert_eq!(
             writer.into_bytes(),
-            write_records(std::slice::from_ref(&record.to_vec()), format),
+            write_records(std::slice::from_ref(&record.to_vec()), format).expect("encode record"),
             "{format:?}"
         );
     }
+
+    let error = MeasureRecordWriter::try_new(RecordFormat::Ptb64)
+        .expect_err("ptb64 cannot be emitted one record at a time");
+    assert!(error.message().contains("64-record group"));
 }
 
 #[test]
@@ -146,16 +151,16 @@ fn codecs_and_strict_grammars_contract() {
         vec![false, true, false, true, false, true, false, true, false],
     ];
     for (format, expected) in [
-        (SampleFormat::ZeroOne, b"101010101\n010101010\n".as_slice()),
-        (SampleFormat::B8, &[0x55, 0x01, 0xAA, 0x00]),
-        (SampleFormat::R8, &[0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1]),
-        (SampleFormat::Hits, b"0,2,4,6,8\n1,3,5,7\n".as_slice()),
+        (RecordFormat::ZeroOne, b"101010101\n010101010\n".as_slice()),
+        (RecordFormat::B8, &[0x55, 0x01, 0xAA, 0x00]),
+        (RecordFormat::R8, &[0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1]),
+        (RecordFormat::Hits, b"0,2,4,6,8\n1,3,5,7\n".as_slice()),
         (
-            SampleFormat::Dets,
+            RecordFormat::Dets,
             b"shot M0 M2 M4 M6 M8\nshot M1 M3 M5 M7\n".as_slice(),
         ),
     ] {
-        let encoded = write_records(&records, format);
+        let encoded = write_records(&records, format).expect("encode records");
         assert_eq!(encoded, expected, "{format:?} byte contract");
         assert_eq!(
             read_records(&encoded, format, 9).unwrap(),
@@ -167,7 +172,7 @@ fn codecs_and_strict_grammars_contract() {
     let ptb64_records = (0usize..64)
         .map(|shot| vec![shot.is_multiple_of(2), shot < 5, shot == 63, false])
         .collect::<Vec<_>>();
-    let ptb64 = write_ptb64_records_checked(&ptb64_records).unwrap();
+    let ptb64 = write_records(&ptb64_records, RecordFormat::Ptb64).unwrap();
     assert_eq!(
         ptb64,
         [
@@ -175,44 +180,49 @@ fn codecs_and_strict_grammars_contract() {
             0, 0, 0, 0x80, 0, 0, 0, 0, 0, 0, 0, 0,
         ]
     );
+    assert_eq!(ptb64, write_ptb64_records_checked(&ptb64_records).unwrap());
+    assert_eq!(
+        read_records(&ptb64, RecordFormat::Ptb64, 4).unwrap(),
+        ptb64_records
+    );
     assert_eq!(read_ptb64_records(&ptb64, 4, 64).unwrap(), ptb64_records);
     assert_eq!(read_ptb64_records_all(&ptb64, 4).unwrap(), ptb64_records);
     assert_eq!(ptb64_record_count(&ptb64, 4).unwrap(), 64);
 
     assert_eq!(
-        read_records(b"01\r\n10\r\n", SampleFormat::ZeroOne, 2).unwrap(),
+        read_records(b"01\r\n10\r\n", RecordFormat::ZeroOne, 2).unwrap(),
         vec![vec![false, true], vec![true, false]]
     );
     assert_eq!(
-        read_records(b"1,1\r\n2\r\n", SampleFormat::Hits, 3).unwrap(),
+        read_records(b"1,1\r\n2\r\n", RecordFormat::Hits, 3).unwrap(),
         vec![vec![false, false, false], vec![false, false, true]]
     );
     assert_eq!(
-        read_measurement_records(b"   shot M1\r\nshot\r\n", SampleFormat::Dets, 2).unwrap(),
+        read_measurement_records(b"   shot M1\r\nshot\r\n", RecordFormat::Dets, 2).unwrap(),
         vec![vec![false, true], vec![false, false]]
     );
     assert_eq!(
-        read_measurement_records(b"shot M0 M0\n", SampleFormat::Dets, 1).unwrap(),
+        read_measurement_records(b"shot M0 M0\n", RecordFormat::Dets, 1).unwrap(),
         vec![vec![true]],
         "duplicate DETS tokens set dense bits instead of toggling them"
     );
 
     for (format, input, width) in [
-        (SampleFormat::ZeroOne, b"10".as_slice(), 2),
-        (SampleFormat::ZeroOne, b"0x\n".as_slice(), 2),
-        (SampleFormat::ZeroOne, b"0\n".as_slice(), 2),
-        (SampleFormat::B8, &[0x01], 9),
-        (SampleFormat::B8, &[], 0),
-        (SampleFormat::R8, &[3], 2),
-        (SampleFormat::Hits, b"1,,2\n".as_slice(), 3),
-        (SampleFormat::Hits, b"1,\n".as_slice(), 3),
-        (SampleFormat::Hits, b",1\n".as_slice(), 3),
-        (SampleFormat::Hits, b"1,2".as_slice(), 3),
-        (SampleFormat::Dets, b"shot  M0\n".as_slice(), 1),
-        (SampleFormat::Dets, b"shot M0 \n".as_slice(), 1),
-        (SampleFormat::Dets, b"shot\tM0\n".as_slice(), 1),
-        (SampleFormat::Dets, b"shot D0\n".as_slice(), 1),
-        (SampleFormat::Dets, b"shot L0\n".as_slice(), 1),
+        (RecordFormat::ZeroOne, b"10".as_slice(), 2),
+        (RecordFormat::ZeroOne, b"0x\n".as_slice(), 2),
+        (RecordFormat::ZeroOne, b"0\n".as_slice(), 2),
+        (RecordFormat::B8, &[0x01], 9),
+        (RecordFormat::B8, &[], 0),
+        (RecordFormat::R8, &[3], 2),
+        (RecordFormat::Hits, b"1,,2\n".as_slice(), 3),
+        (RecordFormat::Hits, b"1,\n".as_slice(), 3),
+        (RecordFormat::Hits, b",1\n".as_slice(), 3),
+        (RecordFormat::Hits, b"1,2".as_slice(), 3),
+        (RecordFormat::Dets, b"shot  M0\n".as_slice(), 1),
+        (RecordFormat::Dets, b"shot M0 \n".as_slice(), 1),
+        (RecordFormat::Dets, b"shot\tM0\n".as_slice(), 1),
+        (RecordFormat::Dets, b"shot D0\n".as_slice(), 1),
+        (RecordFormat::Dets, b"shot L0\n".as_slice(), 1),
     ] {
         assert!(
             read_records(input, format, width).is_err(),
@@ -243,11 +253,11 @@ fn measure_record_batch_writes_shot_major_01_records() {
     }
     assert_eq!(batch.unwritten(), 102);
 
-    let mut writer = MeasureRecordBatchWriter::new(5, SampleFormat::ZeroOne);
+    let mut writer = MeasureRecordBatchWriter::new(5, RecordFormat::ZeroOne);
     batch
         .final_write_unwritten_results_to(&mut writer, &[false; 5])
         .unwrap();
-    let output = writer.write_end();
+    let output = writer.write_end().expect("encode batch");
     for shot_index in 0..5 {
         for sample_index in 0..102 {
             assert_eq!(

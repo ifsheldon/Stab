@@ -132,7 +132,6 @@ ResourceLimitError
 ResourceOperation
 RoundCount
 RunError
-SampleFormat
 SampledErrorWidth
 SamplingCancellation
 SamplingCompileError

@@ -6,7 +6,7 @@
 use std::hint::black_box;
 
 use stab_records::{
-    DetsLayout, RecordResult, SampleFormat, for_each_dets_packed_record, for_each_dets_record,
+    DetsLayout, RecordFormat, RecordResult, for_each_dets_packed_record, for_each_dets_record,
     for_each_dets_sparse_shot, for_each_dets_token_record, for_each_packed_record,
     for_each_ptb64_record_all, for_each_record, for_each_sparse_record,
     write_ptb64_records_checked, write_records,
@@ -21,12 +21,12 @@ fn dense_and_packed_streaming_allocations_follow_width_not_record_count() -> Rec
         .collect::<Vec<_>>();
 
     for format in [
-        SampleFormat::ZeroOne,
-        SampleFormat::B8,
-        SampleFormat::R8,
-        SampleFormat::Hits,
+        RecordFormat::ZeroOne,
+        RecordFormat::B8,
+        RecordFormat::R8,
+        RecordFormat::Hits,
     ] {
-        let one = write_records(std::slice::from_ref(&record), format);
+        let one = write_records(std::slice::from_ref(&record), format)?;
         let many = one.repeat(RECORDS);
         assert_width_bounded(
             &format_name(format, "dense"),
@@ -71,14 +71,14 @@ fn dense_and_packed_streaming_allocations_follow_width_not_record_count() -> Rec
     assert_width_bounded(
         "HITS duplicate-heavy dense",
         1,
-        || for_each_record(one_hit, SampleFormat::Hits, 1, |_| Ok(())),
-        || for_each_record(&duplicate_hits, SampleFormat::Hits, 1, |_| Ok(())),
+        || for_each_record(one_hit, RecordFormat::Hits, 1, |_| Ok(())),
+        || for_each_record(&duplicate_hits, RecordFormat::Hits, 1, |_| Ok(())),
     );
     assert_width_bounded(
         "HITS duplicate-heavy packed",
         1,
-        || for_each_packed_record(one_hit, SampleFormat::Hits, 1, |_| Ok(())),
-        || for_each_packed_record(&duplicate_hits, SampleFormat::Hits, 1, |_| Ok(())),
+        || for_each_packed_record(one_hit, RecordFormat::Hits, 1, |_| Ok(())),
+        || for_each_packed_record(&duplicate_hits, RecordFormat::Hits, 1, |_| Ok(())),
     );
 
     let layout = DetsLayout::try_new(128, 64, 32)?;
@@ -151,13 +151,13 @@ fn sparse_and_token_streaming_allocations_follow_largest_record_not_record_count
         .collect::<Vec<_>>();
 
     for format in [
-        SampleFormat::ZeroOne,
-        SampleFormat::B8,
-        SampleFormat::R8,
-        SampleFormat::Hits,
-        SampleFormat::Dets,
+        RecordFormat::ZeroOne,
+        RecordFormat::B8,
+        RecordFormat::R8,
+        RecordFormat::Hits,
+        RecordFormat::Dets,
     ] {
-        let one = write_records(std::slice::from_ref(&record), format);
+        let one = write_records(std::slice::from_ref(&record), format)?;
         let many = one.repeat(RECORDS);
         assert_largest_record_bounded(
             &format_name(format, "sparse"),
@@ -186,8 +186,8 @@ fn sparse_and_token_streaming_allocations_follow_largest_record_not_record_count
     assert_largest_record_bounded(
         "HITS duplicate-heavy sparse",
         duplicate_hits.len(),
-        || for_each_sparse_record(&duplicate_hits, SampleFormat::Hits, 1, |_| Ok(())),
-        || for_each_sparse_record(&many_duplicate_hits, SampleFormat::Hits, 1, |_| Ok(())),
+        || for_each_sparse_record(&duplicate_hits, RecordFormat::Hits, 1, |_| Ok(())),
+        || for_each_sparse_record(&many_duplicate_hits, RecordFormat::Hits, 1, |_| Ok(())),
     );
 
     let layout = DetsLayout::try_new(128, 64, 32)?;
@@ -285,6 +285,6 @@ fn assert_width_bounded(
     );
 }
 
-fn format_name(format: SampleFormat, representation: &str) -> String {
+fn format_name(format: RecordFormat, representation: &str) -> String {
     format!("{format:?} {representation}")
 }

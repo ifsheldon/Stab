@@ -9,10 +9,7 @@ use stab_core::advanced::compat::CompiledSampler;
 use stab_core::{
     CapabilitySet, Circuit, CompilationOperation, CompilationRequestFingerprint,
     EncodedSizeEstimate, Estimate, Gate, ModelDialect, ParseLimits, RecordEncoding, RecordFormat,
-    SampleFormat,
-    advanced::records::{
-        read_ptb64_records_all, read_records, write_ptb64_records_checked, write_records,
-    },
+    advanced::records::{read_records, write_records},
     estimate_sampling_request,
 };
 
@@ -169,26 +166,9 @@ fn record_codec_descriptors_are_unique_and_structurally_truthful() {
         })
         .collect::<Vec<_>>();
     for codec in CapabilitySet::current().codecs() {
-        let decoded = match codec.format() {
-            RecordFormat::Ptb64 => {
-                let encoded =
-                    write_ptb64_records_checked(&records).expect("encode registered ptb64");
-                read_ptb64_records_all(&encoded, 9).expect("decode registered ptb64")
-            }
-            format => {
-                let sample_format = match format {
-                    RecordFormat::ZeroOne => SampleFormat::ZeroOne,
-                    RecordFormat::B8 => SampleFormat::B8,
-                    RecordFormat::R8 => SampleFormat::R8,
-                    RecordFormat::Hits => SampleFormat::Hits,
-                    RecordFormat::Dets => SampleFormat::Dets,
-                    RecordFormat::Ptb64 => unreachable!("ptb64 handled separately"),
-                    _ => unreachable!("new codec format needs an executable capability fixture"),
-                };
-                let encoded = write_records(&records, sample_format);
-                read_records(&encoded, sample_format, 9).expect("decode registered record format")
-            }
-        };
+        let format = codec.format();
+        let encoded = write_records(&records, format).expect("encode registered record format");
+        let decoded = read_records(&encoded, format, 9).expect("decode registered record format");
         assert_eq!(decoded, records, "codec {:?}", codec.format());
     }
 }

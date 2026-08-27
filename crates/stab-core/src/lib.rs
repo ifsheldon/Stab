@@ -119,7 +119,7 @@ pub use result_formats::{
     DemSampleSink, DetectionBatchView, DetectionSink, DetectorWidth, EncodedSizeEstimate,
     MeasurementBatchView, MeasurementSink, MeasurementWidth, ObservablePredictionBatch,
     ObservableWidth, PackedShotBatch, PackedShotBatchView, RecordEncoding, RecordFormat,
-    SampleFormat, SampledErrorWidth,
+    SampledErrorWidth,
 };
 pub use sampling_estimate::estimate_sampling_request;
 pub use stab_algebra::{

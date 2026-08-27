@@ -333,9 +333,8 @@ struct PackedRecordEncoder {
 
 impl PackedRecordEncoder {
     fn try_new(format: RecordFormat, width: usize) -> RecordResult<Self> {
-        let (record_writer, ptb64) = match format.sample_format() {
-            Some(format) => (Some(MeasureRecordWriter::new(format)), None),
-            None => (
+        let (record_writer, ptb64) = match format {
+            RecordFormat::Ptb64 => (
                 None,
                 Some(Ptb64Buffer {
                     records: PackedShotBatch::zeros(64, width)?,
@@ -343,6 +342,7 @@ impl PackedRecordEncoder {
                     output: Vec::new(),
                 }),
             ),
+            format => (Some(MeasureRecordWriter::try_new(format)?), None),
         };
         Ok(Self {
             format,

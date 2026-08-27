@@ -7,8 +7,7 @@ use std::collections::HashSet;
 
 use stab_records::{
     ByteSpan, DiagnosticSeverity, EncodedSizeEstimate, FormatError, FormatErrorCode,
-    FormatErrorContext, RecordEncoding, RecordFormat, SampleFormat, codec_capabilities,
-    read_records,
+    FormatErrorContext, RecordEncoding, RecordFormat, codec_capabilities, read_records,
 };
 
 #[test]
@@ -19,7 +18,7 @@ fn record_diagnostics_preserve_machine_readable_failure_context() {
     assert_eq!(span.byte_end(), 7);
     assert!(ByteSpan::try_new(usize::MAX, 1).is_none());
 
-    let error = read_records(b"0x\n", SampleFormat::ZeroOne, 2)
+    let error = read_records(b"0x\n", RecordFormat::ZeroOne, 2)
         .expect_err("invalid byte must be diagnosed");
     assert_eq!(error.code(), FormatErrorCode::InvalidByte);
     assert_eq!(error.severity(), DiagnosticSeverity::Error);

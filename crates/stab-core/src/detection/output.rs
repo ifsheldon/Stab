@@ -3,16 +3,19 @@ use super::{
     buffers::{try_clone_bool_slice, try_vec_with_capacity},
 };
 use crate::{
-    CircuitError, CircuitResult, SampleFormat,
+    CircuitError, CircuitResult, RecordFormat,
     result_formats::{DetsResultType, MeasureRecordWriter, write_ptb64_records_checked},
 };
 
 pub fn write_detection_records(
     output: &DetectionConversionOutput,
     observable_mode: DetectionObservableOutputMode,
-    format: SampleFormat,
+    format: RecordFormat,
 ) -> CircuitResult<Vec<u8>> {
-    let mut writer = MeasureRecordWriter::new(format);
+    if format == RecordFormat::Ptb64 {
+        return write_ptb64_detection_records(output, observable_mode);
+    }
+    let mut writer = MeasureRecordWriter::try_new(format).map_err(CircuitError::from)?;
     for record in &output.records {
         validate_record_widths(output, record)?;
         // `begin_dets_result_type` is a no-op on non-DETS writers, mirroring upstream Stim's
@@ -34,9 +37,12 @@ pub fn write_detection_records(
 
 pub fn write_observable_records(
     output: &DetectionConversionOutput,
-    format: SampleFormat,
+    format: RecordFormat,
 ) -> CircuitResult<Vec<u8>> {
-    let mut writer = MeasureRecordWriter::new(format);
+    if format == RecordFormat::Ptb64 {
+        return write_ptb64_observable_records(output);
+    }
+    let mut writer = MeasureRecordWriter::try_new(format).map_err(CircuitError::from)?;
     for record in &output.records {
         validate_record_widths(output, record)?;
         writer.begin_dets_result_type(DetsResultType::Observable);

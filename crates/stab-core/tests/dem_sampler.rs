@@ -7,7 +7,7 @@ use stab_core::advanced::compat::{
     CompiledDemSampler, DetectionEventRecord, DetectionObservableOutputMode,
     write_detection_records,
 };
-use stab_core::{CircuitError, DemRepeatBlock, DemRepeatCount, DetectorErrorModel, SampleFormat};
+use stab_core::{CircuitError, DemRepeatBlock, DemRepeatCount, DetectorErrorModel, RecordFormat};
 
 fn compile_dem(text: &str) -> CompiledDemSampler {
     let model = DetectorErrorModel::from_dem_str(text).expect("parse DEM");
@@ -118,7 +118,7 @@ fn dem_sampler_samples_deterministic_detector_error_each_shot() {
     let bytes = write_detection_records(
         &output,
         DetectionObservableOutputMode::DetectorsOnly,
-        SampleFormat::ZeroOne,
+        RecordFormat::ZeroOne,
     )
     .expect("write output");
     assert_eq!(bytes, b"1\n1\n1\n");
@@ -215,7 +215,7 @@ fn dem_sampler_writes_dense_bit_packed_detector_and_observable_output() {
     let bytes = write_detection_records(
         &output,
         DetectionObservableOutputMode::Append,
-        SampleFormat::B8,
+        RecordFormat::B8,
     )
     .expect("write bit-packed output");
     assert_eq!(bytes, [0xff, 0x03, 0xff, 0x03]);

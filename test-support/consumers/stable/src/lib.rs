@@ -13,8 +13,7 @@ use stab_engine::SamplingCompiler;
 use stab_model::{Circuit, DetectorErrorModel};
 use stab_records::{
     BitPlane64Batch, MeasurementBatchView, MeasurementCodecSink, MeasurementSink, MeasurementWidth,
-    ObservablePredictionBatch, PackedShotBatch, RecordFormat, SampleFormat,
-    read_measurement_records,
+    ObservablePredictionBatch, PackedShotBatch, RecordFormat, read_measurement_records,
 };
 
 const STRICT_ZERO_ONE_FIXTURE: &[u8] = b"101001\n010110\n111000\n";
@@ -34,7 +33,7 @@ pub fn exercise_stable_components(
     let stripped = circuit_without_tags(&circuit);
     let _plan = SamplingCompiler::new().compile(&stripped)?;
 
-    let records = read_measurement_records(STRICT_ZERO_ONE_FIXTURE, SampleFormat::ZeroOne, 6)?;
+    let records = read_measurement_records(STRICT_ZERO_ONE_FIXTURE, RecordFormat::ZeroOne, 6)?;
     let shot_major = PackedShotBatch::from_records(&records, 6)?;
     let bit_planes = BitPlane64Batch::from_shot_major(shot_major.view())?;
     let round_trip = bit_planes.to_shot_major()?.to_records()?;
@@ -109,7 +108,7 @@ impl DecoderSession for FirstDetectorSession {
 #[cfg(test)]
 mod tests {
     use super::{STRICT_ZERO_ONE_FIXTURE, exercise_stable_components};
-    use stab_records::{SampleFormat, read_measurement_records};
+    use stab_records::{RecordFormat, read_measurement_records};
 
     #[test]
     fn stable_records_parse_convert_and_encode_without_the_facade()
@@ -126,7 +125,7 @@ mod tests {
 
         let unterminated = &STRICT_ZERO_ONE_FIXTURE[..STRICT_ZERO_ONE_FIXTURE.len() - 1];
         assert!(
-            read_measurement_records(unterminated, SampleFormat::ZeroOne, 6).is_err(),
+            read_measurement_records(unterminated, RecordFormat::ZeroOne, 6).is_err(),
             "strict 01 parsing must reject an unterminated final record"
         );
         Ok(())

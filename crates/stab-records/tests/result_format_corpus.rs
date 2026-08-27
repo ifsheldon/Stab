@@ -8,17 +8,17 @@
 use stab_bits::BitSlice;
 use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, Layout, ResultFormat};
 use stab_records::{
-    DetsLayout, DetsResultType, DetsToken, RecordResult, SampleFormat, SparseShot,
+    DetsLayout, DetsResultType, DetsToken, RecordFormat, RecordResult, SparseShot,
     for_each_dets_packed_record, for_each_dets_record, for_each_dets_sparse_shot,
     for_each_dets_token_record, for_each_packed_record, for_each_record, for_each_sparse_record,
     read_dets_records, read_measurement_records, read_records,
 };
 
-const fn sample_format(format: ResultFormat) -> SampleFormat {
+const fn sample_format(format: ResultFormat) -> RecordFormat {
     match format {
-        ResultFormat::ZeroOne => SampleFormat::ZeroOne,
-        ResultFormat::Hits => SampleFormat::Hits,
-        ResultFormat::Dets => SampleFormat::Dets,
+        ResultFormat::ZeroOne => RecordFormat::ZeroOne,
+        ResultFormat::Hits => RecordFormat::Hits,
+        ResultFormat::Dets => RecordFormat::Dets,
     }
 }
 

@@ -1,11 +1,12 @@
 #![allow(
+    clippy::expect_used,
     clippy::indexing_slicing,
     clippy::unwrap_used,
     reason = "qualification tests use direct fixture assertions for compact diagnostics"
 )]
 
 use stab_core::{
-    SampleFormat,
+    RecordFormat,
     advanced::records::{
         DetsLayout, MeasureRecord, MeasureRecordBatch, MeasureRecordBatchWriter,
         MeasureRecordWriter, read_dets_records, read_records,
@@ -21,12 +22,12 @@ fn cq_result_hits_duplicate_tokens_toggle_dense_records() {
     let expected = vec![false, false, false, false];
 
     assert_eq!(
-        read_records(b"1,1\n", SampleFormat::Hits, 4).unwrap(),
+        read_records(b"1,1\n", RecordFormat::Hits, 4).unwrap(),
         vec![expected.clone()]
     );
 
     let mut dense = Vec::new();
-    for_each_record(b"1,1\n", SampleFormat::Hits, 4, |record| {
+    for_each_record(b"1,1\n", RecordFormat::Hits, 4, |record| {
         dense.push(record.to_vec());
         Ok(())
     })
@@ -59,7 +60,7 @@ fn cq_result_dets_duplicate_tokens_set_dense_records() {
 #[test]
 fn cq_result_sparse_visitors_preserve_token_order_and_duplicates() {
     let mut records = Vec::new();
-    for_each_sparse_record(b"3,1,1\n", SampleFormat::Hits, 4, |hits| {
+    for_each_sparse_record(b"3,1,1\n", RecordFormat::Hits, 4, |hits| {
         records.push(hits.to_vec());
         Ok(())
     })
@@ -110,14 +111,14 @@ fn cq_result_batch_intermediate_flushes_complete_chunks_once() {
     reference[255] = true;
     reference[256] = true;
 
-    let mut writer = MeasureRecordBatchWriter::new(3, SampleFormat::ZeroOne);
+    let mut writer = MeasureRecordBatchWriter::new(3, RecordFormat::ZeroOne);
     batch
         .intermediate_write_unwritten_results_to(&mut writer, &reference)
         .unwrap();
     assert_eq!(batch.unwritten(), 44);
     assert!(batch.stored() <= 49);
 
-    let first_output = writer.write_end();
+    let first_output = writer.write_end().expect("encode intermediate batch");
     for shot in first_output.split(|byte| *byte == b'\n').take(3) {
         assert_eq!(shot.len(), 256);
         assert_eq!(shot[0], b'1');
@@ -128,13 +129,16 @@ fn cq_result_batch_intermediate_flushes_complete_chunks_once() {
     batch
         .intermediate_write_unwritten_results_to(&mut writer, &reference)
         .unwrap();
-    assert_eq!(writer.write_end(), first_output);
+    assert_eq!(
+        writer.write_end().expect("re-encode intermediate batch"),
+        first_output
+    );
 
     batch
         .final_write_unwritten_results_to(&mut writer, &reference)
         .unwrap();
     assert_eq!(batch.unwritten(), 0);
-    let final_output = writer.write_end();
+    let final_output = writer.write_end().expect("encode final batch");
     for shot in final_output.split(|byte| *byte == b'\n').take(3) {
         assert_eq!(shot.len(), 300);
         assert_eq!(shot[256], b'1');
@@ -148,11 +152,11 @@ fn cq_result_batch_reference_sample_is_measurement_indexed_and_zero_padded() {
     batch.record_result(vec![false, false]).unwrap();
     batch.record_result(vec![false, false]).unwrap();
 
-    let mut writer = MeasureRecordBatchWriter::new(2, SampleFormat::ZeroOne);
+    let mut writer = MeasureRecordBatchWriter::new(2, RecordFormat::ZeroOne);
     batch
         .final_write_unwritten_results_to(&mut writer, &[true])
         .unwrap();
-    assert_eq!(writer.write_end(), b"10\n10\n");
+    assert_eq!(writer.write_end().expect("encode batch"), b"10\n10\n");
 }
 
 #[test]
@@ -165,7 +169,8 @@ fn cq_result_measure_record_basic_usage_and_value_contract_match_stim() {
     assert_eq!(record.lookback(1), Some(false));
     assert_eq!(record.lookback(2), Some(true));
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    let mut writer =
+        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("construct 01 writer");
     record.write_unwritten_results_to(&mut writer).unwrap();
     assert_eq!(
         writer.into_bytes(),
@@ -191,12 +196,18 @@ fn cq_result_batch_basic_usage_and_compaction_match_stim() {
             .unwrap();
     }
 
-    let mut writer = MeasureRecordBatchWriter::new(5, SampleFormat::ZeroOne);
+    let mut writer = MeasureRecordBatchWriter::new(5, RecordFormat::ZeroOne);
     batch
         .intermediate_write_unwritten_results_to(&mut writer, &[])
         .unwrap();
     assert_eq!(batch.unwritten(), 102);
-    assert!(writer.write_end().iter().all(|byte| *byte == b'\n'));
+    assert!(
+        writer
+            .write_end()
+            .expect("encode empty intermediate batch")
+            .iter()
+            .all(|byte| *byte == b'\n')
+    );
 
     for measurement in 102..1102 {
         batch
@@ -218,7 +229,7 @@ fn cq_result_batch_basic_usage_and_compaction_match_stim() {
     assert_eq!(batch.unwritten(), 0);
     assert!(batch.stored() < 100);
 
-    let output = writer.write_end();
+    let output = writer.write_end().expect("encode completed batch");
     for (shot, line) in output.split(|byte| *byte == b'\n').take(5).enumerate() {
         assert_eq!(line.len(), 1102);
         for (measurement, byte) in line.iter().enumerate() {

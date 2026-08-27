@@ -3,8 +3,8 @@ use std::hint::black_box;
 use stab_records::{
     BitPlane64Batch, DetectorWidth, DetsLayout, MeasurementBatchView, MeasurementCodecSink,
     MeasurementSink, MeasurementWidth, ObservableWidth, PackedShotBatch, RecordFormat,
-    SampleFormat, for_each_dets_packed_record, write_bit_plane_64_batch,
-    write_ptb64_records_checked, write_records,
+    for_each_dets_packed_record, write_bit_plane_64_batch, write_ptb64_records_checked,
+    write_records,
 };
 
 use crate::error::BenchError;
@@ -157,7 +157,8 @@ fn validate_writer_outputs(
     let actual_b8 = sink
         .into_bytes()
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let expected_b8 = write_records(&records, SampleFormat::B8);
+    let expected_b8 = write_records(&records, RecordFormat::B8)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
     if actual_b8 != expected_b8 {
         return Err(stab_runner_error(
             &row.id,

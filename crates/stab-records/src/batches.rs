@@ -842,23 +842,25 @@ mod tests {
         ];
         let batch = PackedShotBatch::from_records(&records, 5).unwrap();
         for format in [
-            crate::SampleFormat::ZeroOne,
-            crate::SampleFormat::B8,
-            crate::SampleFormat::R8,
-            crate::SampleFormat::Hits,
-            crate::SampleFormat::Dets,
+            crate::RecordFormat::ZeroOne,
+            crate::RecordFormat::B8,
+            crate::RecordFormat::R8,
+            crate::RecordFormat::Hits,
+            crate::RecordFormat::Dets,
         ] {
-            let mut bits_writer = crate::MeasureRecordWriter::new(format);
+            let mut bits_writer =
+                crate::MeasureRecordWriter::try_new(format).expect("per-record format");
             for record in &records {
                 bits_writer.write_bits(record);
                 bits_writer.write_end();
             }
             assert_eq!(
                 bits_writer.into_bytes(),
-                crate::write_records(&records, format)
+                crate::write_records(&records, format).expect("encode records")
             );
 
-            let mut writer = crate::MeasureRecordWriter::new(format);
+            let mut writer =
+                crate::MeasureRecordWriter::try_new(format).expect("per-record format");
             writer
                 .write_packed_record(batch.view().shot(0).unwrap())
                 .unwrap();
@@ -870,7 +872,10 @@ mod tests {
                         .view(),
                 )
                 .unwrap();
-            assert_eq!(writer.into_bytes(), crate::write_records(&records, format));
+            assert_eq!(
+                writer.into_bytes(),
+                crate::write_records(&records, format).expect("encode records")
+            );
         }
 
         let records_64 = (0..64)

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use stab_core::advanced::compat::try_for_each_sampled_detection_event;
 use stab_core::{
-    Circuit, CircuitError, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy, SampleFormat,
+    Circuit, CircuitError, Flow, MeasurementBatchView, PackedShotBatch, RandomPolicy, RecordFormat,
     Seed, ShotCount, advanced::records::read_records,
     advanced::records::write_ptb64_records_checked, check_if_circuit_has_unsigned_stabilizer_flows,
     circuit_has_all_unsigned_stabilizer_flows, circuit_with_inlined_feedback,
@@ -1131,7 +1131,7 @@ fn ensure_detection_phase_witness(
 fn m2d_measurements(row_id: &str, circuit: &Circuit) -> Result<Vec<Vec<bool>>, BenchError> {
     let width =
         measurement_record_count(circuit).map_err(|error| stab_runner_error(row_id, error))?;
-    read_records(M2D_BASIC_MEASUREMENTS, SampleFormat::ZeroOne, width)
+    read_records(M2D_BASIC_MEASUREMENTS, RecordFormat::ZeroOne, width)
         .map_err(|error| stab_runner_error(row_id, error))
 }
 

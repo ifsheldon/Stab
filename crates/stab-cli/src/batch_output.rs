@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use stab_core::{
     BitPlane64Batch, CircuitError, DemSampleBatchView, DetectionBatchView,
-    DetectionObservableOutputMode, PackedShotBatchView, RecordFormat, SampleFormat,
+    DetectionObservableOutputMode, PackedShotBatchView, RecordFormat,
     advanced::records::{DetsResultType, MeasureRecordWriter},
 };
 
@@ -225,7 +225,7 @@ impl DemSampleBatchEncoder {
 
 enum RecordBatchEncoder {
     Records {
-        format: SampleFormat,
+        format: RecordFormat,
         width: usize,
         writer: MeasureRecordWriter,
     },
@@ -244,20 +244,17 @@ impl RecordBatchEncoder {
                 pending_shots: 0,
             });
         }
-        match format.sample_format() {
-            Some(sample_format) => Ok(Self::records(sample_format, width)),
-            None => Err(invalid_result_format(
-                "record format is not supported by the CLI batch encoder",
-            )),
-        }
+        Self::records(format, width)
     }
 
-    fn records(format: SampleFormat, width: usize) -> Self {
-        Self::Records {
+    fn records(format: RecordFormat, width: usize) -> Result<Self, CliError> {
+        Ok(Self::Records {
             format,
             width,
-            writer: MeasureRecordWriter::new(format),
-        }
+            writer: MeasureRecordWriter::try_new(format)
+                .map_err(CircuitError::from)
+                .map_err(CliError::from)?,
+        })
     }
 
     fn write_detection_batch(
@@ -305,7 +302,7 @@ impl RecordBatchEncoder {
     ) -> io::Result<()> {
         match self {
             Self::Records { format, writer, .. } => {
-                if *format == SampleFormat::Dets {
+                if *format == RecordFormat::Dets {
                     writer.begin_dets_result_type(result_type);
                 }
                 writer.write_packed_record(bits).map_err(format_io)?;

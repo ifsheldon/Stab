@@ -10,7 +10,7 @@ use stab_records::{
     BitPlane64Batch, DemSampleBatchView, DemSampleCodecSink, DemSampleSink, DetectionBatchView,
     DetectionCodecSink, DetectionSink, DetectorWidth, DetsResultType, FormatErrorCode,
     MeasureRecordWriter, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
-    MeasurementWidth, ObservableWidth, PackedShotBatch, RecordFormat, RecordResult, SampleFormat,
+    MeasurementWidth, ObservableWidth, PackedShotBatch, RecordFormat, RecordResult,
     SampledErrorWidth, write_ptb64_records_checked, write_records,
 };
 
@@ -27,7 +27,7 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
         let batch = PackedShotBatch::from_records(&records, 17)?;
         let mut sink = MeasurementCodecSink::try_new(format, MeasurementWidth::new(17))?;
         sink.write_batch(MeasurementBatchView::new(batch.view()))?;
-        let expected = write_records(&records, sample_format(format));
+        let expected = write_records(&records, format)?;
         assert_eq!(sink.into_bytes()?, expected);
 
         let planes = BitPlane64Batch::from_shot_major(batch.view())?;
@@ -59,7 +59,8 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
 fn compatibility_writer_matches_stim_byte_layouts() {
     let bytes = [0xF8];
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    let mut writer =
+        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
     writer.write_bytes(&bytes);
     writer.write_bit(false);
     writer.write_bytes(&bytes);
@@ -67,7 +68,7 @@ fn compatibility_writer_matches_stim_byte_layouts() {
     writer.write_end();
     assert_eq!(writer.into_bytes(), b"000111110000111111\n");
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::B8);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::B8).expect("per-record format");
     writer.write_bytes(&bytes);
     writer.write_bit(false);
     writer.write_bytes(&bytes);
@@ -75,7 +76,7 @@ fn compatibility_writer_matches_stim_byte_layouts() {
     writer.write_end();
     assert_eq!(writer.into_bytes(), [0xF8, 0xF0, 0x03]);
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::Hits);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::Hits).expect("per-record format");
     writer.write_bytes(&bytes);
     writer.write_bit(false);
     writer.write_bytes(&bytes);
@@ -83,7 +84,7 @@ fn compatibility_writer_matches_stim_byte_layouts() {
     writer.write_end();
     assert_eq!(writer.into_bytes(), b"3,4,5,6,7,12,13,14,15,16,17\n");
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::Dets);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::Dets).expect("per-record format");
     writer.begin_dets_result_type(DetsResultType::Detector);
     writer.write_bytes(&bytes);
     writer.write_bit(false);
@@ -97,7 +98,7 @@ fn compatibility_writer_matches_stim_byte_layouts() {
         b"shot D3 D4 D5 D6 D7 D12 D13 D14 D15 D16 L1\n"
     );
 
-    let mut writer = MeasureRecordWriter::new(SampleFormat::R8);
+    let mut writer = MeasureRecordWriter::try_new(RecordFormat::R8).expect("per-record format");
     writer.write_bytes(&bytes);
     writer.write_bit(false);
     writer.write_bytes(&bytes);
@@ -110,20 +111,20 @@ fn compatibility_writer_matches_stim_byte_layouts() {
 fn compatibility_writer_can_drain_completed_chunks_and_continue() {
     for (format, first, second) in [
         (
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             b"101\n".as_slice(),
             b"010\n".as_slice(),
         ),
-        (SampleFormat::B8, &[0x05], &[0x02]),
-        (SampleFormat::R8, &[0, 1, 0], &[1, 1]),
-        (SampleFormat::Hits, b"0,2\n".as_slice(), b"1\n".as_slice()),
+        (RecordFormat::B8, &[0x05], &[0x02]),
+        (RecordFormat::R8, &[0, 1, 0], &[1, 1]),
+        (RecordFormat::Hits, b"0,2\n".as_slice(), b"1\n".as_slice()),
         (
-            SampleFormat::Dets,
+            RecordFormat::Dets,
             b"shot M0 M2\n".as_slice(),
             b"shot M1\n".as_slice(),
         ),
     ] {
-        let mut writer = MeasureRecordWriter::new(format);
+        let mut writer = MeasureRecordWriter::try_new(format).expect("per-record format");
         writer.write_bits(&[true, false, true]);
         writer.write_end();
         assert_eq!(writer.buffered_bytes(), first);
@@ -138,7 +139,7 @@ fn compatibility_writer_can_drain_completed_chunks_and_continue() {
         assert_eq!(writer.buffered_bytes(), second);
     }
 
-    let mut incomplete = MeasureRecordWriter::new(SampleFormat::B8);
+    let mut incomplete = MeasureRecordWriter::try_new(RecordFormat::B8).expect("per-record format");
     incomplete.write_bit(true);
     assert!(incomplete.clear_buffered_bytes().is_err());
 }
@@ -148,13 +149,15 @@ fn single_bit_zero_one_shortcuts_compose_with_incremental_writer_state() -> Reco
     let packed = PackedShotBatch::from_records(&[vec![false]], 1)?;
     let planes = BitPlane64Batch::from_shot_major(packed.view())?;
 
-    let mut packed_writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    let mut packed_writer =
+        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
     packed_writer.write_bit(true);
     packed_writer.write_packed_batch(packed.view())?;
     assert_eq!(packed_writer.buffered_bytes(), b"10\n");
     packed_writer.clear_buffered_bytes()?;
 
-    let mut plane_writer = MeasureRecordWriter::new(SampleFormat::ZeroOne);
+    let mut plane_writer =
+        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
     plane_writer.write_bit(true);
     plane_writer.write_bit_plane_batch(planes.view())?;
     assert_eq!(plane_writer.buffered_bytes(), b"10\n");
@@ -173,7 +176,7 @@ fn measurement_codec_reserves_known_record_counts_without_changing_bytes() -> Re
     assert!(sink.reserve_records(1).is_err());
     assert_eq!(
         sink.into_bytes()?,
-        write_records(&records, SampleFormat::ZeroOne)
+        write_records(&records, RecordFormat::ZeroOne)?
     );
     Ok(())
 }
@@ -210,7 +213,7 @@ fn detection_codec_keeps_dets_namespaces_until_encoding() -> RecordResult<()> {
         let expected = if format == RecordFormat::Ptb64 {
             write_ptb64_records_checked(&expected_merged)?
         } else {
-            write_records(&expected_merged, sample_format(format))
+            write_records(&expected_merged, format)?
         };
         assert_eq!(sink.into_bytes()?, expected);
     }
@@ -225,7 +228,7 @@ fn detection_codec_keeps_dets_namespaces_until_encoding() -> RecordResult<()> {
     )?;
     sink.write_batch(batch)?;
 
-    let mut expected = MeasureRecordWriter::new(SampleFormat::Dets);
+    let mut expected = MeasureRecordWriter::try_new(RecordFormat::Dets).expect("per-record format");
     for (detectors, observables) in detector_records[..2].iter().zip(&observable_records[..2]) {
         expected.begin_dets_result_type(stab_records::DetsResultType::Detector);
         expected.write_bits(detectors);
@@ -340,16 +343,4 @@ fn patterned_records(shots: usize, width: usize, stride: usize) -> Vec<Vec<bool>
                 .collect()
         })
         .collect()
-}
-
-fn sample_format(format: RecordFormat) -> SampleFormat {
-    match format {
-        RecordFormat::ZeroOne => SampleFormat::ZeroOne,
-        RecordFormat::B8 => SampleFormat::B8,
-        RecordFormat::R8 => SampleFormat::R8,
-        RecordFormat::Hits => SampleFormat::Hits,
-        RecordFormat::Dets => SampleFormat::Dets,
-        RecordFormat::Ptb64 => panic!("PTB64 has a dedicated grouped writer"),
-        _ => panic!("test helper does not support future record formats"),
-    }
 }

@@ -16,7 +16,7 @@ use stab_core::advanced::{
 };
 use stab_core::{
     Circuit, MeasurementBatchView, MeasurementSink, MeasurementWidth, PackedShotBatch,
-    RecordFormat, SampleFormat, SamplingCompiler,
+    RecordFormat, SamplingCompiler,
 };
 
 pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>> {
@@ -49,7 +49,7 @@ pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>>
 /// `FormatError`, without any direct `stab-records` dependency.
 fn encode_streamed_records(input: &[u8]) -> RecordResult<Vec<u8>> {
     let mut reader =
-        RecordStreamReader::measurements(input, SampleFormat::ZeroOne, 2, 1024);
+        RecordStreamReader::measurements(input, RecordFormat::ZeroOne, 2, 1024);
     let mut records = Vec::new();
     loop {
         match reader.next_record() {

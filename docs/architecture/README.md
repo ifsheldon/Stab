@@ -130,7 +130,7 @@ Every direct portable-SIMD import and feature gate belongs to `stab-kernels-simd
 
 Generic packed storage and scalar kernels live in Stable `stab-bits`, while quantum-specific scalar Clifford and Pauli-word kernels live in Stable `stab-algebra`. The former direct SIMD implementation has been removed from `stab-core`; the optional raw kernel crate accelerates only source-current measured leaf operations. It does not register a sampling backend because the engine has no distinct packed-frame plan yet.
 
-Strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs now live in Stable `stab-records`. `SampleFormat` remains the five-format compatibility enum used by legacy record-at-a-time APIs, while `RecordFormat` is the six-format component registry that also represents PTB64. The overlap is explicit migration debt rather than an assertion that the two enums are interchangeable.
+Strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs live in Stable `stab-records` behind one public `RecordFormat` type. Generic materialized and streaming readers accept all six formats. Record-at-a-time writers are fallible because PTB64 requires complete 64-record groups, while batch codecs own grouped finalization.
 
 The specialized `for_each_*` visitors remain bounded convenience adapters for callers already using records diagnostics. The generic `try_for_each_*` variants are the modular sink boundary because they preserve an arbitrary visitor error and stop immediately after the first callback failure; returning that error is the explicit cancellation mechanism.
 

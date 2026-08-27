@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 is complete; P2 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 is complete; P2 is in progress; P3 through P9 have not started.
 
 ## Summary
 
@@ -191,7 +191,7 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 1. Make `stab-cli` use the owning component crates directly.
 2. Move facade-owned algorithms to their proper component owners and leave `stab-core` as a thin re-export and composition layer.
 3. Replace catch-all errors with owning domain errors and typed context.
-4. Consolidate result-format naming on `RecordFormat`.
+4. Consolidate result-format naming on `RecordFormat`. Completed: the duplicate `SampleFormat` type and its conversions are removed, generic readers accept all six formats, and one-record writers reject grouped-only PTB64 construction.
 5. Replace legacy compiled/materialized/callback adapters with one compiler-plan-session-batch/sink model.
 6. Remove backend placeholders, unavailable backend choices, compatibility descriptors, duplicate exports, and forwarding-only modules.
 7. Keep consumer fixtures for direct component use, facade use, an external `CircuitPass`, a reusable `DecoderSession`, and SIMD-kernel isolation.

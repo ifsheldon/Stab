@@ -12,7 +12,6 @@ use sha2::{Digest as _, Sha256};
 use stab_core::advanced::records::MeasurementCodecSink;
 use stab_core::{
     BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementSink, Probability, RecordFormat,
-    SampleFormat,
 };
 use stab_engine::{
     BackendPreference, RandomPolicy, ReferenceSampleTree, SamplingCompiler, SamplingPlan,
@@ -129,7 +128,7 @@ pub(super) fn run_sample_compare_row(
     match row.id.as_str() {
         "m8-measure-reader-01" => run_measure_reader_format_row(
             row,
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             &[
                 ("stab_read_01_dense_per10", MeasureReaderMode::Packed, 10),
                 ("stab_read_01_sparse_per10", MeasureReaderMode::Sparse, 10),
@@ -138,7 +137,7 @@ pub(super) fn run_sample_compare_row(
         .map(Some),
         "m8-measure-reader-b8" => run_measure_reader_format_row(
             row,
-            SampleFormat::B8,
+            RecordFormat::B8,
             &[
                 ("stab_read_b8_dense_per10", MeasureReaderMode::Packed, 10),
                 ("stab_read_b8_sparse_per10", MeasureReaderMode::Sparse, 10),
@@ -147,7 +146,7 @@ pub(super) fn run_sample_compare_row(
         .map(Some),
         "m8-measure-reader-r8" => run_measure_reader_format_row(
             row,
-            SampleFormat::R8,
+            RecordFormat::R8,
             &[
                 ("stab_read_r8_dense_per10", MeasureReaderMode::Packed, 10),
                 ("stab_read_r8_dense_per100", MeasureReaderMode::Packed, 100),
@@ -158,7 +157,7 @@ pub(super) fn run_sample_compare_row(
         .map(Some),
         "m8-measure-reader-hits" => run_measure_reader_format_row(
             row,
-            SampleFormat::Hits,
+            RecordFormat::Hits,
             &[
                 ("stab_read_hits_dense_per10", MeasureReaderMode::Packed, 10),
                 (
@@ -177,7 +176,7 @@ pub(super) fn run_sample_compare_row(
         .map(Some),
         "m8-measure-reader-dets" => run_measure_reader_format_row(
             row,
-            SampleFormat::Dets,
+            RecordFormat::Dets,
             &[
                 ("stab_read_dets_dense_per10", MeasureReaderMode::Packed, 10),
                 (

@@ -4,7 +4,7 @@
 )]
 
 use super::*;
-use crate::SampleFormat;
+use crate::RecordFormat;
 
 #[test]
 fn facade_detection_writers_preserve_text_and_packed_formats() {
@@ -27,7 +27,7 @@ fn facade_detection_writers_preserve_text_and_packed_formats() {
         write_detection_records(
             &output,
             DetectionObservableOutputMode::Append,
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
         )
         .unwrap(),
         b"1001\n0110\n"
@@ -36,7 +36,7 @@ fn facade_detection_writers_preserve_text_and_packed_formats() {
         write_detection_records(
             &output,
             DetectionObservableOutputMode::Append,
-            SampleFormat::Dets,
+            RecordFormat::Dets,
         )
         .unwrap(),
         b"shot D0 L1\nshot D1 L0\n"
@@ -45,7 +45,7 @@ fn facade_detection_writers_preserve_text_and_packed_formats() {
         write_detection_records(
             &output,
             DetectionObservableOutputMode::Prepend,
-            SampleFormat::Dets,
+            RecordFormat::Dets,
         )
         .unwrap(),
         b"shot L1 D0\nshot L0 D1\n"
@@ -54,7 +54,7 @@ fn facade_detection_writers_preserve_text_and_packed_formats() {
         write_detection_records(
             &output,
             DetectionObservableOutputMode::Append,
-            SampleFormat::Hits,
+            RecordFormat::Hits,
         )
         .unwrap(),
         b"0,3\n1,2\n"
@@ -63,13 +63,13 @@ fn facade_detection_writers_preserve_text_and_packed_formats() {
         write_detection_records(
             &output,
             DetectionObservableOutputMode::Append,
-            SampleFormat::B8,
+            RecordFormat::B8,
         )
         .unwrap(),
         [0b0000_1001, 0b0000_0110]
     );
     assert_eq!(
-        write_observable_records(&output, SampleFormat::B8).unwrap(),
+        write_observable_records(&output, RecordFormat::B8).unwrap(),
         [0b0000_0010, 0b0000_0001]
     );
 }

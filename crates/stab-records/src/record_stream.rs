@@ -10,7 +10,7 @@ use std::io::Read;
 use thiserror::Error;
 
 use crate::{
-    FormatError, RecordResult, SampleFormat,
+    FormatError, RecordFormat, RecordResult,
     result_formats::DetsLayout,
     result_packed::{
         b8_length_multiple_error, b8_record_byte_width, decode_next_r8_record,
@@ -39,7 +39,7 @@ pub enum RecordStreamReadError {
 enum StreamDecoder {
     /// Line-framed text formats: `01`, HITS, and DETS.
     Text {
-        format: SampleFormat,
+        format: RecordFormat,
         layout: DetsLayout,
     },
     /// Fixed-width byte-packed records.
@@ -105,24 +105,28 @@ impl<R> RecordStreamReader<R> {
 impl<R: Read> RecordStreamReader<R> {
     /// Streams measurement-shaped records in the given per-record sample format.
     ///
-    /// [`SampleFormat::Dets`] input uses a measurement-only layout, mirroring
+    /// [`RecordFormat::Dets`] input uses a measurement-only layout, mirroring
     /// [`crate::read_records`]. `max_text_record_bytes` bounds one text record's framed bytes
     /// (including its newline) for the text formats and is ignored by the packed formats.
     pub fn measurements(
         source: R,
-        format: SampleFormat,
+        format: RecordFormat,
         bits_per_record: usize,
         max_text_record_bytes: usize,
     ) -> Self {
         let decoder = match format {
-            SampleFormat::B8 => StreamDecoder::B8,
-            SampleFormat::R8 => StreamDecoder::R8,
-            SampleFormat::ZeroOne | SampleFormat::Hits | SampleFormat::Dets => {
+            RecordFormat::B8 => StreamDecoder::B8,
+            RecordFormat::R8 => StreamDecoder::R8,
+            RecordFormat::ZeroOne | RecordFormat::Hits | RecordFormat::Dets => {
                 StreamDecoder::Text {
                     format,
                     layout: DetsLayout::measurement_only(bits_per_record),
                 }
             }
+            RecordFormat::Ptb64 => StreamDecoder::Ptb64 {
+                group_words: Vec::new(),
+                group_shots_served: 64,
+            },
         };
         Self::with_decoder(source, decoder, bits_per_record, max_text_record_bytes)
     }
@@ -132,7 +136,7 @@ impl<R: Read> RecordStreamReader<R> {
         Self::with_decoder(
             source,
             StreamDecoder::Text {
-                format: SampleFormat::Dets,
+                format: RecordFormat::Dets,
                 layout,
             },
             layout.total_bits(),
@@ -188,7 +192,7 @@ impl<R: Read> RecordStreamReader<R> {
     /// Returns the next raw byte-packed record frame without expanding it into dense bits.
     ///
     /// This representation-preserving path is available only when the reader was constructed for
-    /// [`SampleFormat::B8`]. The returned frame borrows the reader's input buffer and remains valid
+    /// [`RecordFormat::B8`]. The returned frame borrows the reader's input buffer and remains valid
     /// until the next mutable reader operation. Padding bits in the final byte are returned exactly
     /// as supplied; semantic consumers that emit canonical B8 must clear bits beyond the declared
     /// record width.
@@ -242,7 +246,7 @@ impl<R: Read> RecordStreamReader<R> {
                     Ok(())
                 };
                 let decoded = match format {
-                    SampleFormat::Dets => for_each_dets_record(line, *layout, visit),
+                    RecordFormat::Dets => for_each_dets_record(line, *layout, visit),
                     format => for_each_record(line, *format, layout.total_bits(), visit),
                 };
                 decoded.map_err(|error| error.with_span_offset(record_offset))?;
@@ -524,7 +528,7 @@ mod tests {
 
     fn drain_measurements(
         input: &[u8],
-        format: SampleFormat,
+        format: RecordFormat,
         width: usize,
         step: usize,
     ) -> Result<Vec<Vec<bool>>, RecordStreamReadError> {
@@ -559,13 +563,13 @@ mod tests {
             vec![true; 9],
         ];
         for format in [
-            SampleFormat::ZeroOne,
-            SampleFormat::B8,
-            SampleFormat::R8,
-            SampleFormat::Hits,
-            SampleFormat::Dets,
+            RecordFormat::ZeroOne,
+            RecordFormat::B8,
+            RecordFormat::R8,
+            RecordFormat::Hits,
+            RecordFormat::Dets,
         ] {
-            let input = write_records(&records, format);
+            let input = write_records(&records, format).expect("encode records");
             let expected = read_records(&input, format, 9).expect("whole-buffer read");
             for step in [1, 2, 7, input.len().max(1)] {
                 assert_eq!(
@@ -583,7 +587,7 @@ mod tests {
         for step in [1, 2, input.len()] {
             let mut reader = RecordStreamReader::measurements(
                 Trickle::new(&input, step),
-                SampleFormat::B8,
+                RecordFormat::B8,
                 9,
                 TEST_TEXT_LIMIT,
             );
@@ -603,10 +607,30 @@ mod tests {
     }
 
     #[test]
+    fn generic_measurement_stream_reads_ptb64_groups() {
+        let records = (0usize..64)
+            .map(|shot| {
+                (0usize..9)
+                    .map(|bit| (shot * 7 + bit * 11).is_multiple_of(13))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let input = write_records(&records, RecordFormat::Ptb64).expect("encode ptb64");
+
+        for step in [1, 7, input.len()] {
+            assert_eq!(
+                drain_measurements(&input, RecordFormat::Ptb64, 9, step).expect("stream ptb64"),
+                records,
+                "step {step}"
+            );
+        }
+    }
+
+    #[test]
     fn streamed_b8_packed_records_keep_validation_and_format_identity() {
         let mut truncated = RecordStreamReader::measurements(
             Trickle::new(&[0xab, 0x01, 0x34], 1),
-            SampleFormat::B8,
+            RecordFormat::B8,
             9,
             TEST_TEXT_LIMIT,
         );
@@ -617,7 +641,7 @@ mod tests {
                 .expect("leading record"),
             &[0xab, 0x01]
         );
-        let expected = read_records(&[0xab, 0x01, 0x34], SampleFormat::B8, 9)
+        let expected = read_records(&[0xab, 0x01, 0x34], RecordFormat::B8, 9)
             .expect_err("truncated whole-buffer b8 input");
         let actual = match truncated
             .next_b8_packed_record()
@@ -630,7 +654,7 @@ mod tests {
 
         let mut text = RecordStreamReader::measurements(
             Trickle::new(b"0\n", 1),
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             1,
             TEST_TEXT_LIMIT,
         );
@@ -641,7 +665,7 @@ mod tests {
 
         let mut zero_width = RecordStreamReader::measurements(
             Trickle::new(&[0xff], 1),
-            SampleFormat::B8,
+            RecordFormat::B8,
             0,
             TEST_TEXT_LIMIT,
         );
@@ -655,11 +679,11 @@ mod tests {
     #[test]
     fn streamed_text_records_accept_crlf_blank_dets_lines_and_eof_tails() {
         assert_eq!(
-            drain_measurements(b"01\r\n01\r\n", SampleFormat::ZeroOne, 2, 3).unwrap(),
+            drain_measurements(b"01\r\n01\r\n", RecordFormat::ZeroOne, 2, 3).unwrap(),
             vec![vec![false, true], vec![false, true]]
         );
         assert_eq!(
-            drain_measurements(b"3\r\n1\r\n", SampleFormat::Hits, 4, 1).unwrap(),
+            drain_measurements(b"3\r\n1\r\n", RecordFormat::Hits, 4, 1).unwrap(),
             vec![
                 vec![false, false, false, true],
                 vec![false, true, false, false],
@@ -668,7 +692,7 @@ mod tests {
         assert_eq!(
             drain_measurements(
                 b"shot M3\r\n\r\n\n   shot M1\r\n\n",
-                SampleFormat::Dets,
+                RecordFormat::Dets,
                 4,
                 2
             )
@@ -680,7 +704,7 @@ mod tests {
         );
         // A DETS record may end at end of input without a newline.
         assert_eq!(
-            drain_measurements(b"shot M1", SampleFormat::Dets, 2, 3).unwrap(),
+            drain_measurements(b"shot M1", RecordFormat::Dets, 2, 3).unwrap(),
             vec![vec![false, true]]
         );
     }
@@ -705,22 +729,22 @@ mod tests {
         // Malformed tails and mid-stream violations, per format. The whole-buffer readers
         // validate packed input lengths before decoding any record, so for those formats only
         // the error value (not the record prefix) is compared.
-        let cases: &[(SampleFormat, &[u8], usize)] = &[
-            (SampleFormat::ZeroOne, b"101\n1", 3),
-            (SampleFormat::ZeroOne, b"10\n", 3),
-            (SampleFormat::ZeroOne, b"1x1\n", 3),
-            (SampleFormat::ZeroOne, b"101\r", 3),
-            (SampleFormat::B8, &[0xAB], 9),
-            (SampleFormat::B8, &[0xAB, 0x01, 0x02], 9),
-            (SampleFormat::R8, &[4], 3),
-            (SampleFormat::R8, &[255], 300),
-            (SampleFormat::R8, &[1, 200], 3),
-            (SampleFormat::Hits, b"100,1\n", 3),
-            (SampleFormat::Hits, b"18446744073709551616\n", 3),
-            (SampleFormat::Hits, b"0\n3", 3),
-            (SampleFormat::Dets, b"D2\n", 3),
-            (SampleFormat::Dets, b"shot X2\n", 3),
-            (SampleFormat::Dets, b"shot M0\nshot M9\n", 3),
+        let cases: &[(RecordFormat, &[u8], usize)] = &[
+            (RecordFormat::ZeroOne, b"101\n1", 3),
+            (RecordFormat::ZeroOne, b"10\n", 3),
+            (RecordFormat::ZeroOne, b"1x1\n", 3),
+            (RecordFormat::ZeroOne, b"101\r", 3),
+            (RecordFormat::B8, &[0xAB], 9),
+            (RecordFormat::B8, &[0xAB, 0x01, 0x02], 9),
+            (RecordFormat::R8, &[4], 3),
+            (RecordFormat::R8, &[255], 300),
+            (RecordFormat::R8, &[1, 200], 3),
+            (RecordFormat::Hits, b"100,1\n", 3),
+            (RecordFormat::Hits, b"18446744073709551616\n", 3),
+            (RecordFormat::Hits, b"0\n3", 3),
+            (RecordFormat::Dets, b"D2\n", 3),
+            (RecordFormat::Dets, b"shot X2\n", 3),
+            (RecordFormat::Dets, b"shot M0\nshot M9\n", 3),
         ];
         for (format, input, width) in cases {
             let expected =
@@ -783,15 +807,15 @@ mod tests {
     fn streamed_reader_reports_frame_relative_spans_rebased_to_absolute_offsets() {
         // The second record's malformed byte sits at absolute offset 5.
         let input = b"101\n1x1\n";
-        let expected = read_records(input, SampleFormat::ZeroOne, 3).expect_err("bad byte");
-        let actual = expect_format_error(drain_measurements(input, SampleFormat::ZeroOne, 3, 2));
+        let expected = read_records(input, RecordFormat::ZeroOne, 3).expect_err("bad byte");
+        let actual = expect_format_error(drain_measurements(input, RecordFormat::ZeroOne, 3, 2));
         assert_eq!(actual, expected);
         assert_eq!(actual.span().expect("span").byte_start(), 5);
 
         // r8: overshoot inside the second record keeps its absolute one-byte span.
         let input: &[u8] = &[1, 1, 200];
-        let expected = read_records(input, SampleFormat::R8, 3).expect_err("overshoot");
-        let actual = expect_format_error(drain_measurements(input, SampleFormat::R8, 3, 1));
+        let expected = read_records(input, RecordFormat::R8, 3).expect_err("overshoot");
+        let actual = expect_format_error(drain_measurements(input, RecordFormat::R8, 3, 1));
         assert_eq!(actual, expected);
         assert_eq!(actual.span().expect("span").byte_start(), 2);
     }
@@ -801,7 +825,7 @@ mod tests {
         let input = b"101\n010\nbad\n";
         let mut reader = RecordStreamReader::measurements(
             Trickle::new(input, 3),
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             3,
             TEST_TEXT_LIMIT,
         );
@@ -818,7 +842,7 @@ mod tests {
             streamed,
             vec![vec![true, false, true], vec![false, true, false]]
         );
-        let expected = read_records(input, SampleFormat::ZeroOne, 3).expect_err("bad byte");
+        let expected = read_records(input, RecordFormat::ZeroOne, 3).expect_err("bad byte");
         assert_eq!(error, expected);
     }
 
@@ -826,7 +850,7 @@ mod tests {
     fn streamed_text_records_reject_frames_beyond_the_record_byte_limit() {
         let mut reader = RecordStreamReader::measurements(
             Trickle::new(b"0101010101", 1),
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             10,
             4,
         );
@@ -845,7 +869,7 @@ mod tests {
         }
         let mut reader = RecordStreamReader::measurements(
             FailingTransport,
-            SampleFormat::ZeroOne,
+            RecordFormat::ZeroOne,
             1,
             TEST_TEXT_LIMIT,
         );
