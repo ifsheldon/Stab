@@ -9,7 +9,8 @@ use std::mem::ManuallyDrop;
 use stab_engine::{
     DetectionCompileError, DetectionConversionLimits, DetectionError, DetectionRecordLimitSubject,
     DetectionResourceKind, DetectionResourceLimitError, MeasurementToDetectionCompiler,
-    ReferenceSampleMode, validate_detection_sampling_circuit_with_limits,
+    ReferenceSampleMode, circuit_reference_signs_with_limits,
+    validate_detection_sampling_circuit_with_limits,
 };
 use stab_model::{
     Circuit, CircuitInstruction, Gate, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
@@ -211,4 +212,65 @@ fn default_traversal_limits_accept_the_boundary_and_reject_the_next_unit() {
         (resource.actual(), resource.limit()),
         (1_000_001, 1_000_000)
     );
+}
+
+#[test]
+fn reference_sign_entrypoint_propagates_exact_resource_boundaries() {
+    let record =
+        Circuit::from_stim_str("M 0 1\nDETECTOR rec[-1]\n").expect("parse record-width fixture");
+    let record_limits = DetectionConversionLimits::default().with_max_record_bits(2);
+    circuit_reference_signs_with_limits(&record, record_limits)
+        .expect("admit exact measurement-record width");
+
+    let repeated = Circuit::from_stim_str("M 0\nREPEAT 3 {\nDETECTOR rec[-1]\n}\n")
+        .expect("parse repeated term fixture");
+    let vector_bytes = u64::try_from(std::mem::size_of::<Vec<usize>>()).expect("Vec size fits");
+    let usize_bytes = u64::try_from(std::mem::size_of::<usize>()).expect("usize size fits");
+    let exact_bytes = 3 * vector_bytes + 3 * usize_bytes;
+    let exact = DetectionConversionLimits::default()
+        .with_max_repeat_unroll(3)
+        .with_max_repeat_iterations(3)
+        .with_max_expanded_instructions(4)
+        .with_max_compiled_terms(3)
+        .with_max_compiled_bytes(exact_bytes);
+    circuit_reference_signs_with_limits(&repeated, exact)
+        .expect("admit exact repeat, term, and byte limits");
+
+    for (circuit, limits, kind, actual, limit) in [
+        (
+            &record,
+            record_limits.with_max_record_bits(1),
+            DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::MeasurementRecord),
+            2,
+            1,
+        ),
+        (
+            &repeated,
+            exact.with_max_repeat_unroll(2),
+            DetectionResourceKind::RepeatCount,
+            3,
+            2,
+        ),
+        (
+            &repeated,
+            exact.with_max_compiled_terms(2),
+            DetectionResourceKind::CompiledTerms,
+            3,
+            2,
+        ),
+        (
+            &repeated,
+            exact.with_max_compiled_bytes(exact_bytes - 1),
+            DetectionResourceKind::CompiledBytes,
+            exact_bytes,
+            exact_bytes - 1,
+        ),
+    ] {
+        let error = detection_resource(
+            circuit_reference_signs_with_limits(circuit, limits)
+                .expect_err("reject first excess reference-sign resource unit"),
+        );
+        assert_eq!(error.kind(), kind);
+        assert_eq!((error.actual(), error.limit()), (actual, limit));
+    }
 }

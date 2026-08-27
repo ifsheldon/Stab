@@ -20,15 +20,17 @@ pub use dem_sampling::{
 pub use descriptor::CompilationDescriptor;
 pub(crate) use detection::DetectionRecordBuffer;
 pub use detection::{
-    DETECTION_SAMPLING_COMPILATION_DESCRIPTOR, DetectionCompileError, DetectionConversionLimits,
-    DetectionError, DetectionExecutionError, DetectionRecordLimitSubject, DetectionResourceKind,
-    DetectionResourceLimitError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
-    DetectionSamplingSession, MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR,
-    MeasurementToDetectionCompiler, MeasurementToDetectionPlan, MeasurementToDetectionSession,
-    MeasurementToDetectionTransaction, detection_record_width, detection_record_width_with_limits,
-    measurement_record_count, measurement_record_count_with_limits,
-    validate_detection_sampling_circuit, validate_detection_sampling_circuit_with_limits,
+    CircuitReferenceSigns, DETECTION_SAMPLING_COMPILATION_DESCRIPTOR, DetectionCompileError,
+    DetectionConversionLimits, DetectionError, DetectionExecutionError,
+    DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
+    DetectionRunError, DetectionRunProgress, DetectionRunStatus, DetectionRunSummary,
+    DetectionSamplingCompiler, DetectionSamplingPlan, DetectionSamplingSession,
+    MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR, MeasurementToDetectionCompiler,
+    MeasurementToDetectionPlan, MeasurementToDetectionSession, MeasurementToDetectionTransaction,
+    circuit_reference_signs, circuit_reference_signs_with_limits, detection_record_width,
+    detection_record_width_with_limits, measurement_record_count,
+    measurement_record_count_with_limits, validate_detection_sampling_circuit,
+    validate_detection_sampling_circuit_with_limits,
 };
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use probability::biased_randomize_bits;

@@ -8,8 +8,8 @@ Pinned target: `v1.16.0` at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
 | Status | Families |
 | --- | ---: |
-| done | 78 |
-| missing | 22 |
+| done | 79 |
+| missing | 21 |
 | deferred | 12 |
 | divergence | 34 |
 
@@ -17,9 +17,9 @@ Status describes implementation only. A `done` row may still need a lean canonic
 
 | Evidence | Families |
 | --- | ---: |
-| verified | 112 |
+| verified | 113 |
 | needs-owner | 0 |
-| not-applicable | 34 |
+| not-applicable | 33 |
 
 ## Result Format Applicability
 
@@ -97,7 +97,7 @@ Status describes implementation only. A `done` row may still need a lean canonic
 | `circuit-model.equality-repeat-tags` | divergence | verified | `stab-model` | Exact and approximate circuit equality compare repeat-block tags instead of silently treating differently tagged repeats as equal. | Stim bug: Pinned Stim's repeat-specialized exact and approximate comparisons check count and body but omit the repeat tag, contradicting the documented all-other-details-exact contract and instruction-tag comparison. `cargo test -p stab-model --test approximate_equality -- circuit_equality_compares_repeat_tags_despite_pinned_stim_bug --exact --include-ignored`. Pinned reproduction: `cargo test -p stab-oracle --bin stab-oracle -- parity::tests::pinned_stim_circuit_equality_ignores_repeat_tags --exact --include-ignored`. | [`doc/stim.pyi`](../vendor/stim/doc/stim.pyi), [`src/stim/circuit/circuit.cc`](../vendor/stim/src/stim/circuit/circuit.cc), [`src/stim/circuit/circuit.pybind.cc`](../vendor/stim/src/stim/circuit/circuit.pybind.cc) |
 | `circuit-model.mutation-and-values` | done | verified | `stab-model` | Circuit instructions and repeat blocks support typed value inspection, append, insertion, removal, concatenation, repetition, and clear operations. | `cargo test -p stab-model --test lean_parity_contracts -- circuit_mutation_and_value_lifecycle_preserves_semantics --exact --include-ignored` (pr) | [`src/stim/circuit/circuit.test.cc`](../vendor/stim/src/stim/circuit/circuit.test.cc), [`src/stim/circuit/circuit_instruction.test.cc`](../vendor/stim/src/stim/circuit/circuit_instruction.test.cc) |
 | `circuit-model.reference-sample` | done | verified | `stab-engine` | Circuit reference sampling returns the noiseless measurement-indexed reference record used by compiled batch sampling. | `cargo test -p stab-engine --test circuit_api -- pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler --exact --include-ignored` (pr) | [`doc/stim.pyi`](../vendor/stim/doc/stim.pyi), [`src/stim/util_top/reference_sample_tree.test.cc`](../vendor/stim/src/stim/util_top/reference_sample_tree.test.cc) |
-| `circuit-model.reference-signs` | missing | not-applicable | `stab-analysis` | Reference detector and observable signs match Stim for noiseless circuits, including folded repeats and Pauli observables. | Finish in P3 | [`doc/stim.pyi`](../vendor/stim/doc/stim.pyi), [`src/stim/circuit/circuit_pybind_test.py`](../vendor/stim/src/stim/circuit/circuit_pybind_test.py) |
+| `circuit-model.reference-signs` | done | verified | `stab-engine` | Reference detector and observable signs match Stim over the accepted reference-sampling gate surface, including folded repeats, Pauli observables, sparse ids, and all-zero sweeps; complete gate execution is owned by the sampling parity families. | `cargo test -p stab-engine --test circuit_api -- circuit_reference_signs_match_stim_ordering_and_reference_semantics --exact --include-ignored` (pr) | [`doc/stim.pyi`](../vendor/stim/doc/stim.pyi), [`src/stim/circuit/circuit_pybind_test.py`](../vendor/stim/src/stim/circuit/circuit_pybind_test.py) |
 | `circuit-model.syntax-and-canonical-text` | done | verified | `stab-model` | The .stim dialect parses and canonically renders comments, tags, numeric arguments, targets, instructions, and nested nonzero repeats. | `cargo test -p stab-model --test lean_parity_contracts -- circuit_syntax_round_trips_to_canonical_stim_text --exact --include-ignored` (pr) | [`doc/file_format_stim_circuit.md`](../vendor/stim/doc/file_format_stim_circuit.md), [`src/stim/circuit/circuit.test.cc`](../vendor/stim/src/stim/circuit/circuit.test.cc) |
 | `circuit-model.target-grammar-and-validation` | done | verified | `stab-model` | Qubit, inverted, record, sweep, Pauli, and combiner targets preserve Stim parsing, grouping, bounds, and role validation. | `cargo test -p stab-model --test lean_parity_contracts -- circuit_target_grammar_and_gate_roles_are_enforced --exact --include-ignored` (pr) | [`src/stim/circuit/gate_target.test.cc`](../vendor/stim/src/stim/circuit/gate_target.test.cc), [`src/stim/circuit/circuit_instruction.test.cc`](../vendor/stim/src/stim/circuit/circuit_instruction.test.cc) |
 

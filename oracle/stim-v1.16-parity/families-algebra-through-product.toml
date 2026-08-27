@@ -460,12 +460,19 @@ minimum_tier = "pr"
 [[families]]
 id = "circuit-model.reference-signs"
 area = "circuit-model"
-contract = "Reference detector and observable signs match Stim for noiseless circuits, including folded repeats and Pauli observables."
+contract = "Reference detector and observable signs match Stim over the accepted reference-sampling gate surface, including folded repeats, Pauli observables, sparse ids, and all-zero sweeps; complete gate execution is owned by the sampling parity families."
 stim_refs = ["doc/stim.pyi", "src/stim/circuit/circuit_pybind_test.py"]
 coverage = ["capability:circuit-reference-signs"]
-status = "missing"
-owner = "stab-analysis"
-milestone = "P3"
+status = "done"
+owner = "stab-engine"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "circuit_api"
+name = "circuit_reference_signs_match_stim_ordering_and_reference_semantics"
+minimum_tier = "pr"
 
 [[families]]
 id = "circuit-model.syntax-and-canonical-text"

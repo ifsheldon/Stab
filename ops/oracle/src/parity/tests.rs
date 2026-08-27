@@ -276,7 +276,7 @@ fn pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug() {
 #[test]
 #[ignore = "builds and executes a probe against the pinned Stim library"]
 fn pinned_stim_circuit_equality_ignores_repeat_tags() {
-    run_pinned_stim_circuit_equality_probe(
+    run_pinned_stim_circuit_probe(
         "repeat-tag",
         br#"
 #include "stim/circuit/circuit.h"
@@ -293,7 +293,7 @@ int main() {
 #[test]
 #[ignore = "builds and executes a probe against the pinned Stim library"]
 fn pinned_stim_circuit_equality_retains_orphaned_repeat_storage() {
-    run_pinned_stim_circuit_equality_probe(
+    run_pinned_stim_circuit_probe(
         "orphaned-repeat-storage",
         br#"
 #include "stim/circuit/circuit.h"
@@ -308,7 +308,67 @@ int main() {
     );
 }
 
-fn run_pinned_stim_circuit_equality_probe(name: &str, source: &[u8]) {
+#[test]
+#[ignore = "builds and executes a probe against the pinned Stim library"]
+fn pinned_stim_reference_signs_cover_repeats_paulis_and_zero_sweeps() {
+    run_pinned_stim_circuit_probe(
+        "reference-signs",
+        br#"
+#include "stim/circuit/circuit.h"
+#include "stim/simulators/measurements_to_detection_events.h"
+
+stim::simd_bit_table<stim::MAX_BITWORD_WIDTH> signs(const stim::Circuit &circuit) {
+    stim::simd_bit_table<stim::MAX_BITWORD_WIDTH> measurements(circuit.count_measurements(), 1);
+    stim::simd_bit_table<stim::MAX_BITWORD_WIDTH> sweeps(0, 1);
+    return stim::measurements_to_detection_events(
+        measurements,
+        sweeps,
+        circuit,
+        true,
+        false);
+}
+
+int main() {
+    auto documented = signs(stim::Circuit(
+        "X 1\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n"
+        "OBSERVABLE_INCLUDE(3) rec[-1] rec[-2]\n"));
+    if (!documented[0][0] || documented[1][0] || documented[2][0] ||
+        documented[3][0] || documented[4][0] || !documented[5][0]) {
+        return 1;
+    }
+
+    auto folded = signs(stim::Circuit(
+        "X 0\nREPEAT 2 {\nM 0\nDETECTOR rec[-1]\n"
+        "OBSERVABLE_INCLUDE(2) X0 rec[-1]\nX 0\n}\n"));
+    if (!folded[0][0] || folded[1][0] || folded[2][0] || folded[3][0] ||
+        !folded[4][0]) {
+        return 2;
+    }
+
+    auto cancellation = signs(stim::Circuit(
+        "X 0\nX_ERROR(1) 0\nM(1) 0\nDETECTOR rec[-1] rec[-1]\n"
+        "OBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n"));
+    if (cancellation[0][0] || cancellation[1][0]) {
+        return 3;
+    }
+
+    auto sweep = signs(stim::Circuit(
+        "X 0\nCX sweep[2] 0\nM 0\nDETECTOR rec[-1]\n"));
+    if (!sweep[0][0]) {
+        return 4;
+    }
+
+    auto xcz = signs(stim::Circuit(
+        "RX 0\nXCZ 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n"));
+    auto ycz = signs(stim::Circuit(
+        "RX 0\nYCZ 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n"));
+    return !xcz[0][0] && !ycz[0][0] ? 0 : 5;
+}
+"#,
+    );
+}
+
+fn run_pinned_stim_circuit_probe(name: &str, source: &[u8]) {
     let root = RepoRoot::resolve(
         &Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")

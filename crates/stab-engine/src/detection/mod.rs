@@ -5,6 +5,7 @@ mod frame;
 mod limits;
 mod prepared;
 mod reference;
+mod reference_signs;
 mod requirements;
 
 pub use api::{
@@ -17,6 +18,9 @@ pub use error::{
     DetectionError, DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
 };
 pub use limits::DetectionConversionLimits;
+pub use reference_signs::{
+    CircuitReferenceSigns, circuit_reference_signs, circuit_reference_signs_with_limits,
+};
 
 use buffers::{resource_amount, try_false_vec, try_vec_with_capacity, validate_vector_capacity};
 use error::DetectionResult;

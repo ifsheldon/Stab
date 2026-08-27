@@ -21,18 +21,19 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - P2 left `stab-core` as a checked convenience facade, moved algorithms and semantic tests to component owners, removed compatibility adapters, and established owned plan/session/transaction boundaries.
 - The first P3 slice adds typed finite `AbsoluteTolerance` values and iterative circuit and DEM comparison over reachable compact trees. It records and reproduces Stim's repeat-tag and orphaned-repeat-storage bugs instead of copying them.
 - No approximate-equality benchmark is active because the comparator has no measured release-workflow cost or other evidence that it accounts for at least 10% of a user workflow.
-- P3 now has two missing contracts: `circuit-model.reference-signs` and `resource-safety.model-remaining-parse-limits`.
+- The second P3 slice computes typed circuit reference signs in `stab-engine` by reusing the existing sampling reference and repeat-aware measurement-to-detection plan. A focused Rust owner and pinned `libstim.a` conversion probe cover output order, sparse observable ids, folded repeats, duplicate cancellation, noise-free reference behavior, Pauli targets combined with `XCZ` and `YCZ` sweep controls, empty output, typed failure, and configurable resource admission.
+- Reference signs have no standalone benchmark because they are not a release E2E workflow and no profile attributes at least 10% of one to this API.
+- P3 now has one missing contract: `resource-safety.model-remaining-parse-limits`.
 - The historical correctness inventory is only a generated bridge for active benchmark prerequisites. Add no semantic ownership to it; P7 deletes it with the inherited benchmark system.
 - Historical timing remains historical. Formal evidence waits for the final clean architecture and benchmark contracts.
 - Development occurs directly on `main`; do not create a branch or linked worktree.
 
 ## Immediate Work
 
-1. Implement `circuit-model.reference-signs` in `stab-analysis` from the pinned Stim contract. Cover detector and observable signs, Pauli observables, empty and folded circuits, exact output ordering, and typed failures with one concise semantic owner plus an independent pinned comparator.
-2. Implement `resource-safety.model-remaining-parse-limits` in `stab-model`. Introduce typed byte, represented-instruction, and represented-target admission at the parser boundary, prove exact-limit acceptance and first-excess rejection for both dialects, and reject before proportional allocation.
-3. For each slice, start with failing owner tests, update the parity ledger only after behavior passes independently, regenerate `docs/stim-parity.md`, and keep shared syntax and policy in one production owner.
-4. Add a P3 benchmark candidate only when it represents a future E2E workflow or profiling attributes at least 10% of one workflow to the changed path. Otherwise record the no-benchmark rationale.
-5. Run the focused tests, parity PR owners, workspace checks, architecture checks, oracle contracts, benchmark smoke, `milestone-audit`, and `full-code-review`; fix confirmed findings and commit each bounded slice before continuing.
+1. Implement `resource-safety.model-remaining-parse-limits` in `stab-model`. Introduce typed byte, represented-instruction, and represented-target admission at the parser boundary, prove exact-limit acceptance and first-excess rejection for both dialects, and reject before proportional allocation.
+2. Start with failing owner tests, update the parity ledger only after behavior passes independently, regenerate `docs/stim-parity.md`, and keep shared syntax and policy in one production owner.
+3. Add a P3 benchmark candidate only when it represents a future E2E workflow or profiling attributes at least 10% of one workflow to the changed path. Otherwise record the no-benchmark rationale.
+4. Run the focused tests, parity PR owners, workspace checks, architecture checks, oracle contracts, benchmark smoke, `milestone-audit`, and `full-code-review`; fix confirmed findings and commit the bounded slice before continuing.
 
 ## Remaining Milestones
 

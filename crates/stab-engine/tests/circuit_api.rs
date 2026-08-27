@@ -1,13 +1,13 @@
 #![allow(
     clippy::expect_used,
-    reason = "PF1 circuit execution tests use direct assertions for compact diagnostics"
+    reason = "circuit execution tests use direct assertions for compact diagnostics"
 )]
 
 mod support;
 
 use stab_engine::{
-    ReferenceSampleTree, circuit_reference_sample, count_determined_measurements,
-    detection_record_width, measurement_record_count,
+    DetectionError, ReferenceSampleTree, circuit_reference_sample, circuit_reference_signs,
+    count_determined_measurements, detection_record_width, measurement_record_count,
 };
 use stab_model::Circuit;
 
@@ -85,6 +85,65 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
             .expect("measurement count fits usize")
     );
     assert!(expected.iter().any(|bit| *bit));
+}
+
+#[test]
+fn circuit_reference_signs_match_stim_ordering_and_reference_semantics() {
+    let cases: &[(&str, &str, &[bool], &[bool])] = &[
+        (
+            "documented sparse observable",
+            "X 1\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n\
+             OBSERVABLE_INCLUDE(3) rec[-1] rec[-2]\n",
+            &[true, false],
+            &[false, false, false, true],
+        ),
+        (
+            "folded order and Pauli term",
+            "X 0\nREPEAT 2 {\nM 0\nDETECTOR rec[-1]\n\
+             OBSERVABLE_INCLUDE(2) X0 rec[-1]\nX 0\n}\n",
+            &[true, false],
+            &[false, false, true],
+        ),
+        (
+            "duplicate cancellation and noiseless reference",
+            "X 0\nX_ERROR(1) 0\nM(1) 0\nDETECTOR rec[-1] rec[-1]\n\
+             OBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            &[false],
+            &[false],
+        ),
+        (
+            "all-zero sweep",
+            "X 0\nCX sweep[2] 0\nM 0\nDETECTOR rec[-1]\n",
+            &[true],
+            &[],
+        ),
+        (
+            "XCZ Pauli observable with sweep",
+            "RX 0\nXCZ 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n",
+            &[],
+            &[false],
+        ),
+        (
+            "YCZ Pauli observable with sweep",
+            "RX 0\nYCZ 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n",
+            &[],
+            &[false],
+        ),
+        ("empty circuit", "", &[], &[]),
+    ];
+    for (name, source, expected_detectors, expected_observables) in cases {
+        let circuit = Circuit::from_stim_str(source).expect("parse reference-sign case");
+        let signs = circuit_reference_signs(&circuit).expect("compute reference-sign case");
+        assert_eq!(signs.detector_signs(), *expected_detectors, "{name}");
+        assert_eq!(signs.observable_signs(), *expected_observables, "{name}");
+    }
+
+    let invalid =
+        Circuit::from_stim_str("DETECTOR rec[-1]\n").expect("parse unavailable record target");
+    assert!(matches!(
+        circuit_reference_signs(&invalid),
+        Err(DetectionError::InvalidResultFormat { .. })
+    ));
 }
 
 #[test]
