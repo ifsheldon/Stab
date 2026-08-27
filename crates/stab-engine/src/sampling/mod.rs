@@ -23,15 +23,12 @@ mod small_frame;
 mod stabilizer_frame;
 
 pub use api::{
-    BackendPreference, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
-    SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
-    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
+    PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError, SamplingBackend,
+    SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
+    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
     SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
 };
 pub(crate) use reference::ReferenceSampleScratch;
-
-/// Sampling backends registered by this build.
-pub const REGISTERED_BACKENDS: &[SamplingBackend] = &[SamplingBackend::Scalar];
 
 /// Sampling compiler descriptor consumed by facade capability aggregation.
 pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
@@ -40,7 +37,6 @@ pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor:
     CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
     Some(CompilationRequestFingerprint::SCHEMA_VERSION),
     false,
-    true,
 );
 
 impl SamplingCompiler {

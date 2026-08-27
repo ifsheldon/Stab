@@ -58,11 +58,6 @@ fn capability_set_is_generated_from_current_product_descriptors() {
             codec.format() == RecordFormat::Dets
         );
     }
-    assert_eq!(
-        capabilities.selectable_backend_ids().collect::<Vec<_>>(),
-        vec!["scalar"]
-    );
-
     let operations = capabilities
         .compilation_operations()
         .map(|compiler| {
@@ -72,7 +67,6 @@ fn capability_set_is_generated_from_current_product_descriptors() {
                 compiler.compiler_schema_version(),
                 compiler.request_fingerprint_schema_version(),
                 compiler.has_configurable_limits(),
-                compiler.supports_backend_selection(),
             )
         })
         .collect::<Vec<_>>();
@@ -85,7 +79,6 @@ fn capability_set_is_generated_from_current_product_descriptors() {
                 CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
                 Some(CompilationRequestFingerprint::SCHEMA_VERSION),
                 false,
-                true,
             ),
             (
                 CompilationOperation::MeasurementToDetection,
@@ -93,7 +86,6 @@ fn capability_set_is_generated_from_current_product_descriptors() {
                 1,
                 None,
                 true,
-                false,
             ),
             (
                 CompilationOperation::DetectionSampling,
@@ -101,14 +93,12 @@ fn capability_set_is_generated_from_current_product_descriptors() {
                 1,
                 None,
                 true,
-                false,
             ),
             (
                 CompilationOperation::DemSampling,
                 ModelDialect::DetectorErrorModel,
                 1,
                 None,
-                false,
                 false,
             ),
         ]

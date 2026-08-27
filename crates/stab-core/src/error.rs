@@ -49,13 +49,6 @@ pub enum CircuitError {
     #[error(transparent)]
     ResourceLimit(#[from] ResourceLimitError),
 
-    #[error("failed to {operation} circuit file: {message}")]
-    CircuitIo {
-        operation: &'static str,
-        kind: std::io::ErrorKind,
-        message: String,
-    },
-
     #[error("invalid detector error model: {message}")]
     InvalidDetectorErrorModel { message: String },
 }
@@ -145,12 +138,6 @@ impl From<stab_engine::SamplingCompileError> for CircuitError {
             stab_engine::SamplingCompileError::Analysis(error) => error.into(),
             stab_engine::SamplingCompileError::InvalidCircuit { message } => {
                 Self::invalid_sampler_compilation(message)
-            }
-            stab_engine::SamplingCompileError::BackendUnavailable { requested } => {
-                Self::invalid_sampler_compilation(format!(
-                    "sampling backend {} is unavailable",
-                    requested.as_str()
-                ))
             }
         }
     }
@@ -264,13 +251,6 @@ impl From<stab_engine::ReferenceSampleTreeError> for CircuitError {
 }
 
 impl CircuitError {
-    pub(crate) fn invalid_domain_value(kind: &'static str, value: impl ToString) -> Self {
-        Self::InvalidDomainValue {
-            kind,
-            value: value.to_string(),
-        }
-    }
-
     pub(crate) fn invalid_sampler_compilation(message: impl Into<String>) -> Self {
         Self::InvalidSamplerCompilation {
             message: message.into(),
@@ -299,14 +279,6 @@ impl CircuitError {
         match self {
             Self::ResourceLimit(error) => Some(error),
             _ => None,
-        }
-    }
-
-    pub(crate) fn circuit_io(operation: &'static str, error: std::io::Error) -> Self {
-        Self::CircuitIo {
-            operation,
-            kind: error.kind(),
-            message: error.to_string(),
         }
     }
 

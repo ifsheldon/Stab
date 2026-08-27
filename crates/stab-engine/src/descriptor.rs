@@ -10,7 +10,6 @@ pub struct CompilationDescriptor {
     compiler_schema_version: u16,
     request_fingerprint_schema_version: Option<u16>,
     configurable_limits: bool,
-    backend_selection: bool,
 }
 
 impl CompilationDescriptor {
@@ -20,7 +19,6 @@ impl CompilationDescriptor {
         compiler_schema_version: u16,
         request_fingerprint_schema_version: Option<u16>,
         configurable_limits: bool,
-        backend_selection: bool,
     ) -> Self {
         Self {
             operation,
@@ -28,7 +26,6 @@ impl CompilationDescriptor {
             compiler_schema_version,
             request_fingerprint_schema_version,
             configurable_limits,
-            backend_selection,
         }
     }
 
@@ -52,11 +49,4 @@ impl CompilationDescriptor {
     pub const fn has_configurable_limits(self) -> bool {
         self.configurable_limits
     }
-
-    pub const fn supports_backend_selection(self) -> bool {
-        self.backend_selection
-    }
 }
-
-/// Compatibility name for the sampling descriptor type.
-pub type SamplingCompilationDescriptor = CompilationDescriptor;

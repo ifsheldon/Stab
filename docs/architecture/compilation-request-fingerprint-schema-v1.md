@@ -6,7 +6,7 @@ It complements the [model fingerprint schema](model-fingerprint-schema-v1.md).
 
 ## Purpose
 
-A compilation request fingerprint identifies the semantic input to one compiler before backend selection.
+A compilation request fingerprint identifies the semantic input to one compiler independently of the executable implementation recorded by the resulting plan.
 
 It binds:
 

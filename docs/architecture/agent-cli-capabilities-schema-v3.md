@@ -1,10 +1,10 @@
 # Agent CLI Capabilities Schema Version 3
 
-This document defines the current successful machine-output contract for `stab capabilities`.
+This historical document records the schema-version-3 contract. Stab now emits [capabilities schema version 4](agent-cli-capabilities-schema-v4.md) and does not provide a version-3 compatibility view.
 
 The command is an additive Stab extension and does not claim a matching Stim v1.16.0 command name or output bytes.
 
-Capabilities schema version 3 supersedes the capabilities portion of [agent CLI schema version 2](agent-cli-schema-v2.md). The `stab inspect` and `stab plan sample` commands continue to emit schema-version-2 documents.
+Capabilities schema version 3 superseded the capabilities portion of [agent CLI schema version 2](agent-cli-schema-v2.md).
 
 ## Invocation And Streams
 
@@ -76,7 +76,7 @@ Version 3 adds the `m2d`, `detect`, and `sample_dem` compiler families and chang
 
 Consumers must select a capabilities decoder from the top-level `schema_version`. Stab does not emit a schema-version-2 compatibility view.
 
-No `inspect` or `plan sample` field changed during this migration, so those commands continue to emit schema version 2.
+No `inspect` or `plan sample` field changed during this historical migration, so both commands emitted schema version 2 at that checkpoint.
 
 ## Schema Evolution
 

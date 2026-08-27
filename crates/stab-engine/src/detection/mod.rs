@@ -49,7 +49,6 @@ pub const MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR: CompilationDescriptor
         1,
         None,
         true,
-        false,
     );
 
 /// Circuit detection-sampling compiler registration.
@@ -60,7 +59,6 @@ pub const DETECTION_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor =
         1,
         None,
         true,
-        false,
     );
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

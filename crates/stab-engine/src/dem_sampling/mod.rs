@@ -25,7 +25,6 @@ pub const DEM_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor = Compilati
     1,
     None,
     false,
-    false,
 );
 
 #[cfg(test)]

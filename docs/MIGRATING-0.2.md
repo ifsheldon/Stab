@@ -34,7 +34,6 @@ Use a component crate directly when only one layer is needed. Use `stab-core` fo
 | `stab_core::execution::...` | Supported simulator-backed facade functions and plan/session types |
 | `stab_core::advanced::storage::...` | Explicit packed storage |
 | `stab_core::advanced::records::...` | Explicit layouts, concrete codecs, materialized helpers, and bounded visitors |
-| `stab_core::advanced::backend::...` | Explicit backend selection and descriptors |
 | `stab_core::advanced::traversal::...` | Flattened and folded traversal primitives |
 | `stab_core::advanced::algebra::...` | Algebra iterators and admitted unchecked constructors |
 | `stab_core::advanced::compat::...` | Pre-0.2 materialized and callback-oriented adapters |
@@ -54,13 +53,14 @@ The supported `analysis` and `execution` namespaces remain because they describe
 | `stab_core::stabilizers::CliffordString` | `stab_core::CliffordString` or `stab_algebra::CliffordString` |
 | `stab_core::result_formats::DetsLayout` | `stab_core::advanced::records::DetsLayout` or `stab_records::DetsLayout` |
 | `stab_core::result_streaming::for_each_record` | `stab_core::advanced::records::for_each_record` or `stab_records::try_for_each_record` |
-| `stab_core::BackendPreference` | `stab_core::advanced::backend::BackendPreference` or `stab_engine::BackendPreference` |
 | No circuit-pass facade | `stab_core::experimental::{CircuitPass, run_circuit_pass, CircuitPassContext, CircuitPassLimits, CircuitPassResources, CircuitPassStage}` or canonical `stab_analysis` paths |
 | `stab_core::CompiledSampler` | `stab_core::advanced::compat::CompiledSampler`; new code should use `SamplingCompiler`, `SamplingPlan`, and `SamplingSession` |
 | `stab_core::CompiledDetectionConverter` | `stab_core::advanced::compat::CompiledDetectionConverter`; new code should use the measurement-to-detection compiler, plan, session, and sink adapter |
 | `stab_core::CompiledDemSampler` | `stab_core::advanced::compat::CompiledDemSampler`; new code should use `DemSamplingCompiler`, `DemSamplingPlan`, and a sampling or replay session |
 
 Common model, algebra-value, plan, session, batch, diagnostic, and policy names remain available from the facade root.
+
+Sampling has one executable scalar backend. `SamplingPlan::backend` and `PlanFingerprint::backend` report that actual implementation identity; there is no caller-selectable backend preference, registry, or unavailable-backend placeholder. The additive `portable-simd` feature accelerates leaf kernels and does not create a second sampling plan.
 
 Execution compilers, plans, sessions, progress values, summaries, and run errors exposed through `stab_core::execution` are direct reexports of their `stab_engine` owners. Values can move between those paths without wrapper conversion. Code that previously called a facade-only `into_circuit_error` method on a detection or DEM execution error should use `CircuitError::from(error)` when it needs the aggregate facade diagnostic.
 

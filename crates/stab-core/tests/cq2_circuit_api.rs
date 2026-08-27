@@ -5,7 +5,6 @@
 )]
 
 use std::collections::{BTreeSet, HashSet};
-use std::io::ErrorKind;
 
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
@@ -549,14 +548,6 @@ fn cq2_circuit_api_error_value_contract_is_exhaustive() {
             "failed to parse line 1: circuit input has more than 0 lines",
         ),
         (
-            CircuitError::CircuitIo {
-                operation: "read",
-                kind: ErrorKind::NotFound,
-                message: "missing".to_string(),
-            },
-            "failed to read circuit file: missing",
-        ),
-        (
             CircuitError::InvalidDetectorErrorModel {
                 message: "bad target".to_string(),
             },
@@ -584,7 +575,6 @@ fn assert_circuit_error_variant_is_covered(error: &CircuitError) {
         | CircuitError::InvalidSamplerCompilation { .. }
         | CircuitError::InvalidResultFormat(_)
         | CircuitError::ResourceLimit(_)
-        | CircuitError::CircuitIo { .. }
         | CircuitError::InvalidDetectorErrorModel { .. } => {}
     }
 }

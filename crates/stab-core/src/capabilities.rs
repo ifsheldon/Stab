@@ -11,7 +11,6 @@ pub struct CompilationCapability {
     compiler_schema_version: u16,
     request_fingerprint_schema_version: Option<u16>,
     configurable_limits: bool,
-    backend_selection: bool,
 }
 
 impl CompilationCapability {
@@ -21,7 +20,6 @@ impl CompilationCapability {
         compiler_schema_version: u16,
         request_fingerprint_schema_version: Option<u16>,
         configurable_limits: bool,
-        backend_selection: bool,
     ) -> Self {
         Self {
             operation,
@@ -29,7 +27,6 @@ impl CompilationCapability {
             compiler_schema_version,
             request_fingerprint_schema_version,
             configurable_limits,
-            backend_selection,
         }
     }
 
@@ -52,11 +49,6 @@ impl CompilationCapability {
     /// Whether this compiler currently exposes a configurable resource budget.
     pub const fn has_configurable_limits(self) -> bool {
         self.configurable_limits
-    }
-
-    /// Whether callers can currently select an execution backend during compilation.
-    pub const fn supports_backend_selection(self) -> bool {
-        self.backend_selection
     }
 }
 
@@ -105,17 +97,8 @@ impl CapabilitySet {
                     descriptor.compiler_schema_version(),
                     descriptor.request_fingerprint_schema_version(),
                     descriptor.has_configurable_limits(),
-                    descriptor.supports_backend_selection(),
                 )
             })
-    }
-
-    /// Selectable backend identifiers registered by current compilers.
-    pub fn selectable_backend_ids(self) -> impl ExactSizeIterator<Item = &'static str> {
-        stab_engine::REGISTERED_BACKENDS
-            .iter()
-            .copied()
-            .map(stab_engine::SamplingBackend::as_str)
     }
 
     pub const fn default_parse_limits(self, _dialect: ModelDialect) -> ParseLimits {

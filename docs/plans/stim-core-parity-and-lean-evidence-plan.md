@@ -193,7 +193,7 @@ Only untimed correctness smoke may run. Tests must not contain timing assertions
 3. Replace catch-all errors with owning domain errors and typed context.
 4. Consolidate result-format naming on `RecordFormat`. Completed: the duplicate `SampleFormat` type and its conversions are removed, generic readers accept all six formats, and one-record writers reject grouped-only PTB64 construction.
 5. Replace legacy compiled/materialized/callback adapters with one compiler-plan-session-batch/sink model.
-6. Remove backend placeholders, unavailable backend choices, compatibility descriptors, duplicate exports, and forwarding-only modules.
+6. Remove backend placeholders, unavailable backend choices, compatibility descriptors, duplicate exports, and forwarding-only modules. Completed for sampling backend choice, descriptor metadata, the one-element registry, circuit path helpers, and empty facade forwarding files; broader compatibility-adapter deletion remains under task 5.
 7. Keep consumer fixtures for direct component use, facade use, an external `CircuitPass`, a reusable `DecoderSession`, and SIMD-kernel isolation.
 8. Update API, migration, architecture, and generated documentation in the same changes.
 

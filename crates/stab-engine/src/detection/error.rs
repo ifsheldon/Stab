@@ -244,12 +244,6 @@ impl From<SamplingCompileError> for DetectionError {
             SamplingCompileError::InvalidCircuit { message } => {
                 Self::invalid_sampler_compilation(message)
             }
-            SamplingCompileError::BackendUnavailable { requested } => {
-                Self::invalid_sampler_compilation(format!(
-                    "sampling backend {} is unavailable",
-                    requested.as_str()
-                ))
-            }
         }
     }
 }

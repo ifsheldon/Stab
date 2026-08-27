@@ -16,7 +16,7 @@ The stable byte contract for backend-neutral compiler inputs is defined by [comp
 
 The stable byte contract for backend-bearing executable identities is defined by [plan fingerprint schema version 1](plan-fingerprint-schema-v1.md).
 
-The current successful machine-output contract for `stab capabilities` is defined by [capabilities schema version 3](agent-cli-capabilities-schema-v3.md). `stab inspect` and `stab plan sample` continue to use [agent CLI schema version 2](agent-cli-schema-v2.md), while [schema version 1](agent-cli-schema-v1.md) remains historical.
+The current successful machine-output contracts are [capabilities schema version 4](agent-cli-capabilities-schema-v4.md), [plan schema version 3](agent-cli-plan-schema-v3.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Older schema documents are historical and are not emitted as compatibility views.
 
 The A2 decision for each caller-selectable, fixed, semantic, representational, and implementation resource boundary is recorded in [the A2 resource policy inventory](a2-resource-policy-inventory.md).
 
@@ -175,7 +175,7 @@ The first supported extension seams are:
 - typed circuit passes that admit conservative output projections before lowering and return validated Stim-compatible circuits;
 - packed measurement and detection sinks;
 - decoder sessions consuming detection batches;
-- compile-time backend selection.
+- compile-time leaf-kernel selection.
 
 Dynamic Rust libraries, runtime gate registration, serialized executable plans, and unimplemented backend placeholders are forbidden.
 

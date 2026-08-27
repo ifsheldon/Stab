@@ -45,7 +45,7 @@ stab convert --in shots.01 --in_format 01 --out shots.b8 --out_format b8 --circu
 # Discover capabilities, inspect the model, and validate a sampling request without executing it.
 stab capabilities --format=json
 stab inspect surface_d3.stim --format=json
-stab plan sample surface_d3.stim --shots 1000 --seed 42 --out_format b8 --backend=auto --format=json
+stab plan sample surface_d3.stim --shots 1000 --seed 42 --out_format b8 --format=json
 ```
 
 Every command above finishes in well under a second at distance 3.
@@ -53,7 +53,7 @@ Larger distances exercise much bigger simulations; Stab enforces documented reso
 
 Use `stab help commands`, `stab help formats`, and `stab help gates` to explore the supported surface.
 Human-readable diagnostics remain the default; add `--error-format=json` to any command when an agent or tool needs one schema-version-1 JSON object per warning or error.
-The Stab-native `capabilities`, `inspect`, and `plan sample` extensions use `--format=json` for one successful machine-readable document on stdout; planning validates compilation and explicit backend selection but never executes a shot.
+The Stab-native `capabilities`, `inspect`, and `plan sample` extensions use `--format=json` for one successful machine-readable document on stdout; planning validates the scalar execution plan but never executes a shot.
 
 ## Supported Platforms
 

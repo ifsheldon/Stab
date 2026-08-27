@@ -3,21 +3,9 @@
     reason = "resource regressions use direct fixture assertions for precise failures"
 )]
 
-use std::fs;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::io;
 
-use stab_core::{Circuit, CircuitInstruction, Gate, QubitId, Target, write_stim_circuit_file};
-
-static TEMP_ID: AtomicU64 = AtomicU64::new(0);
-
-fn temp_output(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!(
-        "stab-circuit-printing-{}-{}-{name}.stim",
-        std::process::id(),
-        TEMP_ID.fetch_add(1, Ordering::Relaxed)
-    ))
-}
+use stab_core::{Circuit, CircuitInstruction, Gate, QubitId, Target};
 
 #[test]
 fn canonical_printer_qualification_cycle_uses_one_retained_allocation() {
@@ -76,7 +64,7 @@ fn float_heavy_printer_uses_one_exactly_sized_output_allocation() {
 }
 
 #[test]
-fn streaming_file_writer_allocations_do_not_scale_with_target_count() {
+fn streaming_io_writer_allocations_do_not_scale_with_target_count() {
     let gate = Gate::from_name("H").expect("H gate");
     let make_circuit = |target_count: u32| {
         let targets = (0..target_count)
@@ -95,14 +83,15 @@ fn streaming_file_writer_allocations_do_not_scale_with_target_count() {
     };
     let small = make_circuit(1);
     let large = make_circuit(4_096);
-    let small_path = temp_output("small");
-    let large_path = temp_output("large");
-
     let small_allocations = allocation_counter::measure(|| {
-        write_stim_circuit_file(&small, &small_path).expect("write small circuit");
+        small
+            .write_stim_io(&mut io::sink())
+            .expect("write small circuit");
     });
     let large_allocations = allocation_counter::measure(|| {
-        write_stim_circuit_file(&large, &large_path).expect("write large circuit");
+        large
+            .write_stim_io(&mut io::sink())
+            .expect("write large circuit");
     });
 
     assert_eq!(
@@ -113,14 +102,4 @@ fn streaming_file_writer_allocations_do_not_scale_with_target_count() {
         large_allocations.count_max, small_allocations.count_max,
         "small={small_allocations:?} large={large_allocations:?}"
     );
-    assert_eq!(
-        fs::read_to_string(&small_path).expect("read small"),
-        "H 0\n"
-    );
-    let large_text = fs::read_to_string(&large_path).expect("read large");
-    assert!(large_text.starts_with("H 0 1 2 3 "));
-    assert!(large_text.ends_with(" 4095\n"));
-
-    fs::remove_file(small_path).expect("remove small output");
-    fs::remove_file(large_path).expect("remove large output");
 }

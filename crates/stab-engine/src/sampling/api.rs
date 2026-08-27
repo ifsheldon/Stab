@@ -29,29 +29,6 @@ pub(super) const MAX_SAMPLING_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
 const PLAN_FINGERPRINT_DOMAIN: &[u8] = b"stab:plan-fingerprint\0";
 const EXECUTABLE_CONTRACT_DOMAIN: &[u8] = b"stab:sampling-executable-contract\0";
 
-/// Requested sampling backend.
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub enum BackendPreference {
-    /// Select the best registered backend for this build.
-    #[default]
-    Auto,
-    /// Select the scalar sampling backend.
-    Scalar,
-    /// Select the portable-SIMD sampling backend.
-    PortableSimd,
-}
-
-impl BackendPreference {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Auto => "auto",
-            Self::Scalar => "scalar",
-            Self::PortableSimd => "portable-simd",
-        }
-    }
-}
-
 /// Backend selected for an immutable sampling plan.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -78,14 +55,12 @@ impl SamplingBackend {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SamplingCompileErrorCode {
     InvalidCircuit,
-    BackendUnavailable,
 }
 
 impl SamplingCompileErrorCode {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::InvalidCircuit => "invalid-circuit",
-            Self::BackendUnavailable => "backend-unavailable",
         }
     }
 }
@@ -101,9 +76,6 @@ pub enum SamplingCompileError {
 
     #[error("{message}")]
     InvalidCircuit { message: String },
-
-    #[error("sampling backend {} is not available in this build", requested.as_str())]
-    BackendUnavailable { requested: BackendPreference },
 }
 
 impl SamplingCompileError {
@@ -114,12 +86,7 @@ impl SamplingCompileError {
     }
 
     pub const fn code(&self) -> SamplingCompileErrorCode {
-        match self {
-            Self::Model(_) | Self::Analysis(_) | Self::InvalidCircuit { .. } => {
-                SamplingCompileErrorCode::InvalidCircuit
-            }
-            Self::BackendUnavailable { .. } => SamplingCompileErrorCode::BackendUnavailable,
-        }
+        SamplingCompileErrorCode::InvalidCircuit
     }
 }
 
@@ -192,21 +159,11 @@ pub enum ReferenceSampleMode {
 
 /// Builder for immutable sampling plans.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct SamplingCompiler {
-    backend: BackendPreference,
-}
+pub struct SamplingCompiler;
 
 impl SamplingCompiler {
     pub const fn new() -> Self {
-        Self {
-            backend: BackendPreference::Auto,
-        }
-    }
-
-    #[must_use]
-    pub const fn backend(mut self, backend: BackendPreference) -> Self {
-        self.backend = backend;
-        self
+        Self
     }
 
     pub fn compile(self, circuit: &Circuit) -> Result<SamplingPlan, SamplingCompileError> {
@@ -225,7 +182,7 @@ impl SamplingCompiler {
         circuit: &Circuit,
         sweep_compilation: SweepCompilation,
     ) -> Result<SamplingPlan, SamplingCompileError> {
-        let backend = select_backend(self.backend)?;
+        let backend = SamplingBackend::Scalar;
         let request_fingerprint = CompilationRequestFingerprint::for_sampling(circuit);
         let mut operations = Vec::new();
         let counts = compile_circuit(circuit, &mut operations, sweep_compilation)?;
@@ -248,20 +205,6 @@ impl SamplingCompiler {
                 fingerprint,
             }),
         })
-    }
-}
-
-fn select_backend(preference: BackendPreference) -> Result<SamplingBackend, SamplingCompileError> {
-    let selected = match preference {
-        BackendPreference::Auto => super::REGISTERED_BACKENDS.first().copied(),
-        BackendPreference::Scalar => Some(SamplingBackend::Scalar),
-        BackendPreference::PortableSimd => None,
-    };
-    match selected.filter(|backend| super::REGISTERED_BACKENDS.contains(backend)) {
-        Some(backend) => Ok(backend),
-        None => Err(SamplingCompileError::BackendUnavailable {
-            requested: preference,
-        }),
     }
 }
 

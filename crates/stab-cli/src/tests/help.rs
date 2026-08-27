@@ -68,9 +68,9 @@ fn help_topics_cover_commands_formats_and_gates() {
 #[test]
 fn agent_command_help_names_the_current_success_schema() {
     for (topic, schema) in [
-        ("capabilities", "schema-version-3"),
+        ("capabilities", "schema-version-4"),
         ("inspect", "schema-version-2"),
-        ("plan", "schema-version-2"),
+        ("plan", "schema-version-3"),
     ] {
         let (status, stdout, stderr) = run_cli(&["stab", "help", topic]);
         assert_eq!(status, 0, "{topic}");

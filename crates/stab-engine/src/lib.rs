@@ -15,7 +15,7 @@ pub use dem_sampling::{
     DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError,
     DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession,
 };
-pub use descriptor::{CompilationDescriptor, SamplingCompilationDescriptor};
+pub use descriptor::CompilationDescriptor;
 pub use detection::{
     CompiledDetectionConverter, DETECTION_SAMPLING_COMPILATION_DESCRIPTOR, DetectionCompileError,
     DetectionConversionLimits, DetectionConversionOptions, DetectionError, DetectionEventRecord,
@@ -32,14 +32,14 @@ pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use probability::biased_randomize_bits;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
 pub use sampled_flow::{SampledFlowError, sample_if_circuit_has_stabilizer_flows};
+pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{
-    BackendPreference, CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy,
-    ReferenceSampleMode, RunError, SamplingBackend, SamplingCancellation, SamplingCompileError,
-    SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError, SamplingPlan,
-    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
-    SinkFailurePhase, count_determined_measurements,
+    CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
+    SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
+    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
+    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
+    count_determined_measurements,
 };
-pub use sampling::{COMPILATION_DESCRIPTOR, REGISTERED_BACKENDS};
 
 /// Compiler registrations exposed through product capability discovery.
 pub const COMPILATION_DESCRIPTORS: &[CompilationDescriptor] = &[

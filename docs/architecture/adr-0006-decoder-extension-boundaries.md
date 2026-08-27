@@ -28,7 +28,7 @@ The pass boundary accepts and returns `Circuit`. It does not add extension instr
 
 The `stab-core::experimental` facade tier reexports only the externally proven pass contract and built-in pass. The canonical Stable owner remains `stab-analysis`.
 
-Sampling backend discovery and selection continue to use engine-owned descriptors and `BackendPreference`. `plan sample --backend` is an agent-facing adapter over that resolver. `auto` and explicit `scalar` currently resolve to the same scalar plan, while explicit `portable-simd` fails as unavailable until a genuinely distinct executable backend exists.
+Sampling compilation produces the sole scalar plan and exposes its implementation identity through the plan fingerprint. Agent discovery does not advertise a selection policy or an unavailable implementation.
 
 The future decoder process boundary is specified as requirements only in [External Decoder Process Protocol Requirements](external-decoder-process-protocol-requirements.md). Stab 0.2 does not implement the transport or promise wire compatibility.
 
@@ -39,4 +39,4 @@ The future decoder process boundary is specified as requirements only in [Extern
 - Python and external processes can later use a versioned protocol without freezing a Rust ABI.
 - Independent circuit-pass crates can compose statically through public Stable model and analysis APIs.
 - Pass output remains ordinary Stim-compatible circuit data, so downstream analysis and execution require no extension-aware branch.
-- Backend requests cannot advertise or select an implementation that is absent from the executable registry.
+- Backend discovery cannot advertise an implementation that does not exist.

@@ -180,7 +180,7 @@ Any helper that samples, constructs a mutable execution frame, or depends on `st
 | `dem_sampler.rs`, `dem_sampler/*` | `dem_sampling/*` | Own DEM compilation, sampling, replay, sessions, compatibility adapter, and limits. |
 | `probability_util.rs` | `probability.rs` | Own execution-side randomization helpers. |
 | `compilation_fingerprint.rs` | `fingerprint.rs` | Own backend-neutral request fingerprints. |
-| Engine-owned portions of `capabilities.rs` | `capabilities.rs` | Own compiler and backend descriptors. |
+| Engine-owned portions of `capabilities.rs` | `capabilities.rs` | Own compiler descriptors and actual plan implementation identity. |
 
 The crate depends on exact-version `stab-model`, `stab-records`, `stab-algebra`, and `stab-analysis`.
 
@@ -304,7 +304,7 @@ Move or retarget every transform, flow, generation, circuit-to-DEM, graphlike, h
 
 ### Engine
 
-Retarget every A4 and A5 compiler, plan, session, cancellation, poisoning, sink-lifecycle, replay, direct-frame, fused-conversion, seeded partitioning, deterministic, and statistical test. Preserve exact unavailable-backend behavior for `PortableSimd`; private sampling-plan equivalence is deferred until two real engine implementations exist.
+Retarget every A4 and A5 compiler, plan, session, cancellation, poisoning, sink-lifecycle, replay, direct-frame, fused-conversion, seeded partitioning, deterministic, and statistical test. P2 later removed unavailable-backend behavior and the one-element registry; implementation selection must not return until two real engine plans exist.
 
 ### Facade And Features
 

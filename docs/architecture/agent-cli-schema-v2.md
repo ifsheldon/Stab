@@ -1,12 +1,12 @@
 # Agent CLI Schema Version 2
 
-This document defines the current successful machine-output contract for the Stab-native `inspect` and `plan sample` commands and preserves the historical schema-version-2 contract for `capabilities`.
+This document defines the current `inspect` machine-output contract and preserves the historical schema-version-2 contracts for `plan sample` and `capabilities`.
 
 These commands are additive Stab extensions and do not claim matching Stim v1.16.0 command names or output bytes.
 
-Schema version 2 supersedes [schema version 1](agent-cli-schema-v1.md).
+Schema version 2 supersedes [schema version 1](agent-cli-schema-v1.md). It remains current for `stab inspect`; its `plan sample` section is historical because planning now emits [schema version 3](agent-cli-plan-schema-v3.md).
 
-`stab capabilities` now emits [capabilities schema version 3](agent-cli-capabilities-schema-v3.md). That change does not alter the schema version emitted by `inspect` or `plan sample`.
+`stab capabilities` now emits [capabilities schema version 4](agent-cli-capabilities-schema-v4.md).
 
 ## Invocation And Streams
 
@@ -14,7 +14,7 @@ Each command uses `--format=human|json`.
 
 Human output is the default.
 
-JSON mode for `inspect` and `plan sample` writes one complete schema-version-2 JSON document followed by LF to stdout.
+JSON mode writes one complete document followed by LF to stdout. `inspect` emits schema version 2; `plan sample` now emits [schema version 3](agent-cli-plan-schema-v3.md).
 
 The historical schema-version-2 `capabilities` command used the same framing.
 
@@ -208,6 +208,6 @@ Changes to any fingerprint digest bytes require the corresponding fingerprint sc
 
 Adding a genuinely registered backend changes capability values but not the JSON shape. It must also produce a distinct plan fingerprint under the plan-fingerprint contract.
 
-Capabilities schema version 3 changed `request_fingerprint_schema_version` from an unsigned integer to an unsigned integer or `null` and added three compiler families. `inspect` and `plan sample` remain on schema version 2 because their machine-output contracts did not change.
+Capabilities schema version 3 changed `request_fingerprint_schema_version` from an unsigned integer to an unsigned integer or `null` and added three compiler families. Capabilities later moved to version 4, and planning moved to version 3 when fictitious backend selection was removed. `inspect` remains on schema version 2.
 
 Human output is structural documentation, not a byte-stable compatibility format.

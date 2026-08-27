@@ -398,7 +398,6 @@ fn circuit_error_code(error: &CircuitError) -> &'static str {
         CircuitError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
         CircuitError::InvalidResultFormat(error) => error.code().as_str(),
         CircuitError::ResourceLimit(error) => error.code(),
-        CircuitError::CircuitIo { .. } => "circuit-io-failed",
         CircuitError::InvalidDetectorErrorModel { .. } => "invalid-detector-error-model",
     }
 }
@@ -586,12 +585,6 @@ fn circuit_error_context(error: &CircuitError) -> Value {
         | CircuitError::InvalidDetectorErrorModel { .. } => json!({}),
         CircuitError::InvalidResultFormat(error) => format_error_context(error),
         CircuitError::ResourceLimit(error) => resource_error_context(error),
-        CircuitError::CircuitIo {
-            operation, kind, ..
-        } => json!({
-            "operation": operation,
-            "io_error_kind": io_error_kind_name(*kind),
-        }),
     }
 }
 
@@ -680,31 +673,6 @@ fn resource_error_context(error: &ResourceLimitError) -> Value {
 
 fn model_dialect_name(dialect: ModelDialect) -> &'static str {
     dialect.as_str()
-}
-
-fn io_error_kind_name(kind: io::ErrorKind) -> &'static str {
-    match kind {
-        io::ErrorKind::NotFound => "not-found",
-        io::ErrorKind::PermissionDenied => "permission-denied",
-        io::ErrorKind::ConnectionRefused => "connection-refused",
-        io::ErrorKind::ConnectionReset => "connection-reset",
-        io::ErrorKind::ConnectionAborted => "connection-aborted",
-        io::ErrorKind::NotConnected => "not-connected",
-        io::ErrorKind::AddrInUse => "address-in-use",
-        io::ErrorKind::AddrNotAvailable => "address-not-available",
-        io::ErrorKind::BrokenPipe => "broken-pipe",
-        io::ErrorKind::AlreadyExists => "already-exists",
-        io::ErrorKind::WouldBlock => "would-block",
-        io::ErrorKind::InvalidInput => "invalid-input",
-        io::ErrorKind::InvalidData => "invalid-data",
-        io::ErrorKind::TimedOut => "timed-out",
-        io::ErrorKind::WriteZero => "write-zero",
-        io::ErrorKind::Interrupted => "interrupted",
-        io::ErrorKind::Unsupported => "unsupported",
-        io::ErrorKind::UnexpectedEof => "unexpected-eof",
-        io::ErrorKind::OutOfMemory => "out-of-memory",
-        _ => "other",
-    }
 }
 
 fn format_error_context(error: &FormatError) -> Value {

@@ -8,16 +8,13 @@ use std::convert::Infallible;
 use std::thread;
 
 use sha2::{Digest as _, Sha256};
-use stab_core::advanced::{
-    backend::{BackendPreference, SamplingBackend},
-    compat::CompiledSampler,
-    records::MeasurementCodecSink,
-};
+use stab_core::advanced::{compat::CompiledSampler, records::MeasurementCodecSink};
 use stab_core::{
     Circuit, CircuitError, MeasurementBatchView, MeasurementSink, RandomPolicy, RecordFormat,
     RunError, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
     SamplingExecutionError, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
 };
+use stab_engine::SamplingBackend;
 
 #[derive(Debug, Default)]
 struct CollectSink {
@@ -137,42 +134,21 @@ fn collect(
 }
 
 #[test]
-fn compiler_selects_only_registered_backends_and_fingerprints_the_plan() {
+fn compiler_uses_scalar_backend_and_fingerprints_the_plan() {
     let circuit = Circuit::from_stim_str("M 0\n").expect("parse circuit");
     let first = SamplingCompiler::new()
-        .backend(BackendPreference::Auto)
         .compile(&circuit)
-        .expect("compile automatic backend");
-    let second = SamplingCompiler::new()
-        .backend(BackendPreference::Scalar)
-        .compile(&circuit)
-        .expect("compile scalar backend");
+        .expect("compile sampling plan");
     let legacy = CompiledSampler::compile(&circuit).expect("compile migration adapter");
 
     assert_eq!(first.backend(), SamplingBackend::Scalar);
-    assert_eq!(second.backend(), SamplingBackend::Scalar);
-    assert_eq!(stab_engine::REGISTERED_BACKENDS, &[SamplingBackend::Scalar]);
-    assert_eq!(BackendPreference::Auto.as_str(), "auto");
-    assert_eq!(BackendPreference::Scalar.as_str(), "scalar");
-    assert_eq!(BackendPreference::PortableSimd.as_str(), "portable-simd");
     assert_eq!(SamplingBackend::Scalar.as_str(), "scalar");
-    assert_eq!(first.request_fingerprint(), second.request_fingerprint());
-    assert_eq!(first.fingerprint(), second.fingerprint());
     assert_eq!(legacy.plan().fingerprint(), first.fingerprint());
     assert_eq!(
         first.fingerprint().request_fingerprint(),
         first.request_fingerprint()
     );
     assert_eq!(first.fingerprint().backend(), SamplingBackend::Scalar);
-
-    assert!(matches!(
-        SamplingCompiler::new()
-            .backend(BackendPreference::PortableSimd)
-            .compile(&circuit),
-        Err(SamplingCompileError::BackendUnavailable {
-            requested: BackendPreference::PortableSimd
-        })
-    ));
 }
 
 #[test]
@@ -194,7 +170,6 @@ fn compiled_sampler_equality_preserves_lowered_execution_compatibility() {
 fn plan_fingerprint_schema_one_has_an_independently_reconstructed_vector() {
     let circuit = Circuit::from_stim_str("M 0\n").expect("parse frozen circuit");
     let plan = SamplingCompiler::new()
-        .backend(BackendPreference::Scalar)
         .compile(&circuit)
         .expect("compile frozen plan");
     let fingerprint = plan.fingerprint();
@@ -244,7 +219,7 @@ fn plan_fingerprint_schema_one_has_an_independently_reconstructed_vector() {
 }
 
 #[test]
-fn compilation_failures_keep_invalid_circuits_distinct_from_missing_backends() {
+fn compilation_failures_preserve_invalid_circuit_diagnostics() {
     let sweep_circuit =
         Circuit::from_stim_str("CX sweep[0] 0\nM 0\n").expect("parse sweep circuit");
     let invalid = SamplingCompiler::new()
@@ -261,22 +236,6 @@ fn compilation_failures_keep_invalid_circuits_distinct_from_missing_backends() {
         CircuitError::InvalidSamplerCompilation {
             message: "M8 sampler subset does not support CX".to_owned()
         }
-    );
-
-    let ordinary = Circuit::from_stim_str("M 0\n").expect("parse ordinary circuit");
-    let unavailable = SamplingCompiler::new()
-        .backend(BackendPreference::PortableSimd)
-        .compile(&ordinary)
-        .expect_err("portable SIMD sampling is not registered in A6");
-    assert_eq!(
-        unavailable.code(),
-        SamplingCompileErrorCode::BackendUnavailable
-    );
-    assert_eq!(unavailable.code().as_str(), "backend-unavailable");
-    assert!(
-        CircuitError::from(unavailable)
-            .to_string()
-            .contains("portable-simd")
     );
 }
 

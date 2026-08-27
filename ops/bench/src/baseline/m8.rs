@@ -14,8 +14,8 @@ use stab_core::{
     BitPlane64Batch, Circuit, MeasurementBatchView, MeasurementSink, Probability, RecordFormat,
 };
 use stab_engine::{
-    BackendPreference, RandomPolicy, ReferenceSampleTree, SamplingCompiler, SamplingPlan,
-    SamplingSession, Seed, ShotCount, biased_randomize_bits,
+    RandomPolicy, ReferenceSampleTree, SamplingCompiler, SamplingPlan, SamplingSession, Seed,
+    ShotCount, biased_randomize_bits,
 };
 
 use crate::error::BenchError;
@@ -410,7 +410,6 @@ fn run_sample_analysis_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Bench
         })?,
         measure_stab("stab_sample_compile_plan_scalar_noisy_1q", || {
             let compiled = SamplingCompiler::new()
-                .backend(BackendPreference::Scalar)
                 .compile(&circuit)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(compiled);

@@ -10,16 +10,15 @@ use std::thread;
 
 use sha2::{Digest as _, Sha256};
 use stab_engine::{
-    BackendPreference, COMPILATION_DESCRIPTOR, COMPILATION_DESCRIPTORS, CompilationOperation,
+    COMPILATION_DESCRIPTOR, COMPILATION_DESCRIPTORS, CompilationOperation,
     CompilationRequestFingerprint, CompiledDetectionConverter, DemError, DemResourceKind,
     DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError, DemSamplingRunError,
     DetectionCompileError, DetectionConversionLimits, DetectionConversionOptions, DetectionError,
     DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
     DetectionSamplingCompiler, MeasurementToDetectionCompiler, PlanFingerprint, RandomPolicy,
-    ReferenceSampleMode, RunError, SamplingBackend, SamplingCompilationDescriptor,
-    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
-    SamplingPlan, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
-    detection_record_width_with_limits, measurement_record_count_with_limits,
+    ReferenceSampleMode, RunError, SamplingBackend, SamplingCompileError, SamplingCompileErrorCode,
+    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunStatus, Seed, ShotCount,
+    SinkFailurePhase, detection_record_width_with_limits, measurement_record_count_with_limits,
     validate_detection_sampling_circuit_with_limits,
 };
 use stab_model::{Circuit, DetectorErrorModel, ModelDialect};
@@ -65,7 +64,7 @@ fn expect_detection_compile_resource(error: DetectionCompileError) -> DetectionR
 
 #[test]
 fn a6_compilation_descriptors_are_complete_and_executable() {
-    let descriptor: SamplingCompilationDescriptor = COMPILATION_DESCRIPTOR;
+    let descriptor = COMPILATION_DESCRIPTOR;
     assert_eq!(
         COMPILATION_DESCRIPTORS,
         &[
@@ -84,7 +83,6 @@ fn a6_compilation_descriptors_are_complete_and_executable() {
                 descriptor.compiler_schema_version(),
                 descriptor.request_fingerprint_schema_version(),
                 descriptor.has_configurable_limits(),
-                descriptor.supports_backend_selection(),
             )
         })
         .collect::<Vec<_>>();
@@ -97,7 +95,6 @@ fn a6_compilation_descriptors_are_complete_and_executable() {
                 CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
                 Some(CompilationRequestFingerprint::SCHEMA_VERSION),
                 false,
-                true,
             ),
             (
                 CompilationOperation::MeasurementToDetection,
@@ -105,7 +102,6 @@ fn a6_compilation_descriptors_are_complete_and_executable() {
                 1,
                 None,
                 true,
-                false,
             ),
             (
                 CompilationOperation::DetectionSampling,
@@ -113,14 +109,12 @@ fn a6_compilation_descriptors_are_complete_and_executable() {
                 1,
                 None,
                 true,
-                false,
             ),
             (
                 CompilationOperation::DemSampling,
                 ModelDialect::DetectorErrorModel,
                 1,
                 None,
-                false,
                 false,
             ),
         ]
@@ -609,58 +603,23 @@ fn a4_sampling_compile_diagnostic_contract() {
         }
         other => panic!("expected an invalid-circuit diagnostic, got {other:?}"),
     }
-
-    let unavailable = SamplingCompiler::new()
-        .backend(BackendPreference::PortableSimd)
-        .compile(&circuit("M 0\n"))
-        .expect_err("unregistered portable-SIMD backend must remain distinct");
-    assert_eq!(
-        unavailable.code(),
-        SamplingCompileErrorCode::BackendUnavailable
-    );
-    assert!(matches!(
-        unavailable,
-        SamplingCompileError::BackendUnavailable {
-            requested: BackendPreference::PortableSimd
-        }
-    ));
 }
 
 #[test]
-fn a4_sampling_compiler_backend_contract() {
+fn a4_sampling_compiler_uses_scalar_backend_contract() {
     let circuit = circuit("H 0\nM(0.125) 0\n");
-    let automatic = SamplingCompiler::new()
-        .backend(BackendPreference::Auto)
+    let plan = SamplingCompiler::new()
         .compile(&circuit)
-        .expect("compile automatic backend");
-    let scalar = SamplingCompiler::new()
-        .backend(BackendPreference::Scalar)
-        .compile(&circuit)
-        .expect("compile scalar backend");
+        .expect("compile sampling plan");
 
-    assert_eq!(automatic.backend(), SamplingBackend::Scalar);
-    assert_eq!(scalar.backend(), SamplingBackend::Scalar);
-    assert_eq!(stab_engine::REGISTERED_BACKENDS, &[SamplingBackend::Scalar]);
-    assert_eq!(automatic.fingerprint(), scalar.fingerprint());
-    assert_eq!(
-        collect_measurements(&automatic, 17, 129).records,
-        collect_measurements(&scalar, 17, 129).records
-    );
-
-    assert!(matches!(
-        SamplingCompiler::new()
-            .backend(BackendPreference::PortableSimd)
-            .compile(&circuit),
-        Err(SamplingCompileError::BackendUnavailable {
-            requested: BackendPreference::PortableSimd
-        })
-    ));
+    assert_eq!(plan.backend(), SamplingBackend::Scalar);
+    assert_eq!(plan.fingerprint().backend(), SamplingBackend::Scalar);
+    assert_eq!(collect_measurements(&plan, 17, 129).records.len(), 129);
 }
 
 #[test]
 fn a4_sampling_plan_fingerprint_contract() {
     let plan = SamplingCompiler::new()
-        .backend(BackendPreference::Scalar)
         .compile(&circuit("M 0\n"))
         .expect("compile frozen fingerprint fixture");
     let fingerprint = plan.fingerprint();

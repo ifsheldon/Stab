@@ -199,7 +199,6 @@ mbqc_decomposition
 measurement_record_count
 measurement_record_count_with_limits
 missing_detectors
-read_stim_circuit_file
 sample_if_circuit_has_stabilizer_flows
 shortest_error_sat_problem
 shortest_error_sat_problem_with_limits
@@ -213,4 +212,3 @@ try_disjoint_to_independent_xyz_errors
 unitary_to_tableau
 validate_detection_sampling_circuit
 validate_detection_sampling_circuit_with_limits
-write_stim_circuit_file

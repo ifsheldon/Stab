@@ -4,7 +4,7 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "rust_toolchain": "nightly-2026-06-20",
   "python_ast_version": "3.14.6",
-  "semantic_digest": "9608ad9adf3392317efc0056e1e2633c84627e0576da9c7d66b73dd7380da54a",
+  "semantic_digest": "16f40c7c03f62a4552c45feb3d8d360a7f8d3fe289a671eb42758d227b6bd919",
   "features": [
     {
       "id": "CQ-STIM-FORMAT",
@@ -1406,7 +1406,7 @@
           "stab-engine",
           "--test",
           "canonical_owner_evidence",
-          "a4_sampling_compiler_backend_contract",
+          "a4_sampling_compiler_uses_scalar_backend_contract",
           "--quiet",
           "--exact"
         ]
@@ -1414,12 +1414,10 @@
       "supporting_selectors": [],
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "One bounded circuit proves deterministic Auto-to-scalar selection, explicit scalar selection, identical immutable plan identity, and typed rejection of the not-yet-registered portable-SIMD backend before execution."
+        "detail": "One bounded circuit proves deterministic scalar compilation, actual backend identity in the immutable plan fingerprint, and execution through the resulting plan."
       },
       "negative_axes": [
-        "automatic-backend-drift",
-        "explicit-backend-drift",
-        "unavailable-backend-advertisement",
+        "scalar-backend-identity-drift",
         "request-plan-identity-confusion"
       ],
       "performance_groups": [

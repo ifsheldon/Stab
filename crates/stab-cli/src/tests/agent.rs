@@ -53,7 +53,6 @@ fn assert_capability_schema(report: &Value) {
             "gates",
             "codecs",
             "compilers",
-            "selectable_backends",
         ],
     );
     for command in pointer(report, "/commands")
@@ -118,7 +117,6 @@ fn assert_capability_schema(report: &Value) {
                 "compiler_schema_version",
                 "request_fingerprint_schema_version",
                 "configurable_limits",
-                "backend_selection",
             ],
         );
     }
@@ -194,7 +192,6 @@ fn assert_sample_plan_schema(report: &Value) {
             "compiler_schema_version",
             "normalized_options",
             "configurable_limits",
-            "selected_backend",
             "validated",
         ],
     );
@@ -248,7 +245,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
 
     let report = json_stdout(&stdout);
     assert_capability_schema(&report);
-    assert_eq!(pointer(&report, "/schema_version"), 3);
+    assert_eq!(pointer(&report, "/schema_version"), 4);
     assert_eq!(
         pointer(&report, "/stim_compatibility_version"),
         CapabilitySet::STIM_COMPATIBILITY_VERSION
@@ -312,38 +309,30 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
                 "input_dialect": "stim-circuit",
                 "compiler_schema_version": 1,
                 "request_fingerprint_schema_version": 1,
-                "configurable_limits": false,
-                "backend_selection": true
+                "configurable_limits": false
             },
             {
                 "operation": "m2d",
                 "input_dialect": "stim-circuit",
                 "compiler_schema_version": 1,
                 "request_fingerprint_schema_version": null,
-                "configurable_limits": true,
-                "backend_selection": false
+                "configurable_limits": true
             },
             {
                 "operation": "detect",
                 "input_dialect": "stim-circuit",
                 "compiler_schema_version": 1,
                 "request_fingerprint_schema_version": null,
-                "configurable_limits": true,
-                "backend_selection": false
+                "configurable_limits": true
             },
             {
                 "operation": "sample_dem",
                 "input_dialect": "detector-error-model",
                 "compiler_schema_version": 1,
                 "request_fingerprint_schema_version": null,
-                "configurable_limits": false,
-                "backend_selection": false
+                "configurable_limits": false
             }
         ])
-    );
-    assert_eq!(
-        pointer(&report, "/selectable_backends"),
-        &serde_json::json!(["scalar"])
     );
 }
 
@@ -358,7 +347,7 @@ fn capabilities_human_output_is_concise_and_structural() {
         "commands:",
         "gates:",
         "result codecs: 6",
-        "selectable backends: 1",
+        "compilers: 4",
     ] {
         assert!(output.contains(expected), "{output}");
     }
@@ -597,8 +586,8 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
     let second = json_stdout(&second_stdout);
     assert_sample_plan_schema(&first);
     assert_sample_plan_schema(&second);
-    assert_eq!(pointer(&first, "/schema_version"), 2);
-    assert_eq!(pointer(&second, "/schema_version"), 2);
+    assert_eq!(pointer(&first, "/schema_version"), 3);
+    assert_eq!(pointer(&second, "/schema_version"), 3);
 
     assert_eq!(
         pointer(&first, "/compilation/request_fingerprint/digest"),
@@ -620,7 +609,6 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
         pointer(&first, "/compilation/configurable_limits"),
         &serde_json::json!([])
     );
-    assert_eq!(pointer(&first, "/compilation/selected_backend"), "scalar");
     assert_eq!(
         pointer(&first, "/compilation/plan_fingerprint/backend"),
         "scalar"
@@ -638,81 +626,28 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
 }
 
 #[test]
-fn plan_sample_backend_selection_matches_advertised_capabilities() {
-    let (status, capabilities_stdout, capabilities_stderr) =
-        run_cli(["stab", "capabilities", "--format=json"], b"");
+fn plan_sample_reports_scalar_identity_without_backend_selection() {
+    let (status, stdout, stderr) =
+        run_cli(["stab", "plan", "sample", "--format=json"], b"H 0\nM 0\n");
     assert_eq!(status, 0);
-    assert_eq!(capabilities_stderr, b"");
-    let capabilities = json_stdout(&capabilities_stdout);
-    let selectable_backends = pointer(&capabilities, "/selectable_backends")
-        .as_array()
-        .expect("selectable backends are an array");
-
-    let plan_for = |requested| {
-        let (status, stdout, stderr) = run_cli(
-            [
-                "stab",
-                "plan",
-                "sample",
-                "--backend",
-                requested,
-                "--format=json",
-            ],
-            b"H 0\nM 0\n",
-        );
-        assert_eq!(status, 0, "requested backend {requested}");
-        assert_eq!(stderr, b"", "requested backend {requested}");
-        let report = json_stdout(&stdout);
-        assert_sample_plan_schema(&report);
-        assert_eq!(pointer(&report, "/schema_version"), 2);
-
-        let selected = pointer(&report, "/compilation/selected_backend");
-        assert_eq!(selected, "scalar");
-        assert!(
-            selectable_backends.contains(selected),
-            "selected backend must be advertised by capabilities"
-        );
-        assert_eq!(
-            pointer(&report, "/compilation/plan_fingerprint/backend"),
-            selected
-        );
-        report
-    };
-
-    let automatic = plan_for("auto");
-    let scalar = plan_for("scalar");
+    assert_eq!(stderr, b"");
+    let report = json_stdout(&stdout);
+    assert_sample_plan_schema(&report);
     assert_eq!(
-        pointer(&automatic, "/compilation/request_fingerprint/digest"),
-        pointer(&scalar, "/compilation/request_fingerprint/digest")
-    );
-    assert_eq!(
-        pointer(&automatic, "/compilation/plan_fingerprint/digest"),
-        pointer(&scalar, "/compilation/plan_fingerprint/digest")
-    );
-}
-
-#[test]
-fn plan_sample_reports_an_unavailable_explicit_backend() {
-    let (status, stdout, stderr) = run_cli(
-        [
-            "stab",
-            "plan",
-            "sample",
-            "--backend=portable-simd",
-            "--format=json",
-            "--error-format=json",
-        ],
-        b"M 0\n",
+        pointer(&report, "/compilation/plan_fingerprint/backend"),
+        "scalar"
     );
 
+    let (status, help_stdout, help_stderr) = run_cli(["stab", "plan", "sample", "--help"], b"");
+    assert_eq!(status, 0);
+    assert_eq!(help_stderr, b"");
+    assert!(!String::from_utf8_lossy(&help_stdout).contains("--backend"));
+
+    let (status, stdout, stderr) =
+        run_cli(["stab", "plan", "sample", "--backend=scalar"], b"M 0\n");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
-    let diagnostic = json_stdout(&stderr);
-    assert_eq!(pointer(&diagnostic, "/code"), "invalid-sampler-compilation");
-    assert_eq!(
-        pointer(&diagnostic, "/message"),
-        "cannot compile circuit sampler: sampling backend portable-simd is unavailable"
-    );
+    assert!(String::from_utf8_lossy(&stderr).contains("--backend"));
 }
 
 #[test]

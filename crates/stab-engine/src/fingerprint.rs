@@ -37,11 +37,11 @@ impl CompilationOperation {
 ///
 /// Schema one binds the model fingerprint, compiler schema, operation, normalized compile
 /// options, and effective configurable limits. The current public sampling compiler rejects sweep
-/// controls and exposes no configurable compile limit. Backend preference and selected backend are
-/// deliberately excluded because this identity describes the lowering request before selection.
+/// controls and exposes no configurable compile limit. The executable backend is deliberately
+/// excluded because this identity describes the lowering request instead of the compiled plan.
 ///
-/// This identity does not include shots, random seed, output encoding, or a selected execution
-/// backend. It is not a compiled-plan identity.
+/// This identity does not include shots, random seed, output encoding, or the execution backend. It
+/// is not a compiled-plan identity.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct CompilationRequestFingerprint {
     schema_version: u16,

@@ -3,10 +3,8 @@
 pub mod advanced;
 pub mod analysis;
 mod capabilities;
-mod circuit;
 mod circuit_detecting_regions;
 mod circuit_feedback;
-mod circuit_file;
 mod circuit_flow;
 mod circuit_generation;
 mod circuit_inverse;
@@ -14,7 +12,6 @@ mod circuit_missing_detectors;
 mod circuit_simplify;
 mod circuit_tableau;
 mod circuit_transforms;
-mod compilation_fingerprint;
 mod dem;
 mod dem_sampler;
 mod detection;
@@ -24,17 +21,14 @@ mod error_matcher;
 pub mod execution;
 pub mod experimental;
 mod gate;
-mod ids;
 mod matched_error;
 mod mbqc_decomposition;
-mod probability_util;
 mod resources;
 mod result_formats;
 mod result_streaming;
 mod sampling;
 mod sampling_estimate;
 mod sampling_output_compat;
-mod target;
 
 pub use analysis::{
     GateUnitaryMatrix, InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,
@@ -44,13 +38,11 @@ pub use analysis::{
     single_qubit_clifford_for_gate,
 };
 pub use capabilities::{CapabilitySet, CompilationCapability};
-pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 pub use circuit_detecting_regions::{
     DetectingRegionMap, DetectingRegionOptions, DetectingRegionTargetMap,
     DetectingRegionTargetOptions, all_detecting_region_targets, all_detecting_region_ticks,
     circuit_detecting_regions, circuit_detecting_regions_for_targets,
 };
-pub use circuit_file::{read_stim_circuit_file, write_stim_circuit_file};
 pub use circuit_flow::{
     UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,
@@ -65,7 +57,6 @@ pub use circuit_generation::{
 };
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
 pub use circuit_transforms::CircuitFlattenLimits;
-pub use compilation_fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use dem::{
     DemDetectorId, DemFlattenLimits, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
     DemRepeatBlock, DemTarget, DetectorErrorModel, DisjointPauliProbabilities,
@@ -101,16 +92,11 @@ pub use execution::{
     SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
     count_determined_measurements, sample_if_circuit_has_stabilizer_flows,
 };
-pub use ids::{
-    CircuitDetectorId, DemRepeatCount, MeasureRecordOffset, ObservableId, Probability,
-    ProbabilityStimText, QubitId, RepeatCount,
-};
 pub use matched_error::{
     CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,
     DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
 };
 pub use mbqc_decomposition::mbqc_decomposition;
-pub use probability_util::biased_randomize_bits;
 pub use resources::{
     Estimate, EstimateClass, ResourceEstimate, ResourceKind, ResourceLimitError, ResourceOperation,
 };
@@ -133,12 +119,14 @@ pub use stab_decoder::{
     DecoderLayout, DecoderModelView, DecoderModelViewError, DecoderSession, ValidatedDecodeBatch,
     decode_batch,
 };
-pub use stab_model::ModelFingerprint;
+pub use stab_engine::{CompilationOperation, CompilationRequestFingerprint, biased_randomize_bits};
 pub use stab_model::{
-    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
-    ModelDialect, ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, SourceLineLimit,
+    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, DemRepeatCount, Gate,
+    GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
+    MeasureRecordOffset, ModelDialect, ModelFingerprint, ObservableId, ParseLimits, Pauli,
+    Probability, ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
+    RepeatNestingLimitError, SourceLineLimit, Target,
 };
-pub use target::{Pauli, Target};
 
 pub(crate) use detection::{DetectionConversionOutput, DetectionEventRecord};
 pub(crate) use result_formats::{DetsLayout, DetsToken, MeasurementCodecSink};

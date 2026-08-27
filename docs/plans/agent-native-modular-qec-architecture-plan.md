@@ -1,6 +1,6 @@
 # Agent-Native Modular QEC Architecture Plan
 
-Durable architecture rationale as of 2026-07-27. The crate boundaries and extension seams remain design input, while [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) owns the current execution sequence and feature status.
+Durable architecture rationale as of 2026-07-27. The crate boundaries and extension seams remain design input, while [the Stim core parity and lean evidence plan](stim-core-parity-and-lean-evidence-plan.md) owns the current execution sequence and feature status. This historical proposal's `BackendPreference`, unavailable-backend, and `plan sample --backend` details were explicitly superseded by P2: sampling now has one scalar implementation identity and no caller-selectable placeholder.
 
 ## Summary
 

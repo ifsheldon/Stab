@@ -7,8 +7,7 @@ use stab_core::{
     CapabilitySet, Circuit, CompilationRequestFingerprint, DetectorErrorModel, EncodedSizeEstimate,
     Estimate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule,
     ModelFingerprint, ParseLimits, PlanFingerprint, RecordFormat, ResourceEstimate,
-    SamplingCompiler, advanced::backend::BackendPreference,
-    advanced::records::validate_ptb64_shot_count, estimate_sampling_request,
+    SamplingCompiler, advanced::records::validate_ptb64_shot_count, estimate_sampling_request,
 };
 
 use crate::{
@@ -17,8 +16,9 @@ use crate::{
     read_limited_input_file, read_limited_stdin,
 };
 
-const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 3;
-const INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION: u16 = 2;
+const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 4;
+const INSPECT_OUTPUT_SCHEMA_VERSION: u16 = 2;
+const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 3;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
 pub(crate) enum AgentOutputFormatArg {
@@ -69,27 +69,6 @@ enum PlanCommand {
     Sample(PlanSampleArgs),
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
-enum PlanSampleBackendArg {
-    /// Select the best registered sampling backend for this build.
-    #[default]
-    Auto,
-    /// Require the scalar sampling backend.
-    Scalar,
-    /// Require the portable-SIMD sampling backend.
-    PortableSimd,
-}
-
-impl From<PlanSampleBackendArg> for BackendPreference {
-    fn from(value: PlanSampleBackendArg) -> Self {
-        match value {
-            PlanSampleBackendArg::Auto => Self::Auto,
-            PlanSampleBackendArg::Scalar => Self::Scalar,
-            PlanSampleBackendArg::PortableSimd => Self::PortableSimd,
-        }
-    }
-}
-
 #[derive(Debug, Args)]
 struct PlanSampleArgs {
     /// Circuit path. Defaults to stdin.
@@ -115,10 +94,6 @@ struct PlanSampleArgs {
     /// Accepted compatibility no-op, reported separately from compilation identity.
     #[arg(long = "skip_loop_folding")]
     skip_loop_folding: bool,
-
-    /// Sampling backend selection policy.
-    #[arg(long, value_enum, default_value_t = PlanSampleBackendArg::Auto)]
-    backend: PlanSampleBackendArg,
 
     /// Selects concise human text or schema-version-2 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
@@ -180,7 +155,6 @@ where
     R: Read,
     W: Write,
 {
-    let backend = BackendPreference::from(args.backend);
     let output_format = args.out_format.record_format();
     if output_format == RecordFormat::Ptb64 {
         validate_ptb64_shot_count(args.shots)?;
@@ -196,7 +170,6 @@ where
 
     // Compilation is intentionally performed for validation. No sampling method is called.
     let plan = SamplingCompiler::new()
-        .backend(backend)
         .compile(&circuit)
         .map_err(|error| CliError::Circuit(stab_core::CircuitError::from(error)))?;
     let request_fingerprint = plan.request_fingerprint();
@@ -221,7 +194,7 @@ where
     }
 
     let report = SamplePlanReport {
-        schema_version: INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION,
+        schema_version: PLAN_OUTPUT_SCHEMA_VERSION,
         operation: "sample",
         executes: false,
         source: SourceReport::new(&input),
@@ -232,7 +205,6 @@ where
             compiler_schema_version: request_fingerprint.compiler_schema_version(),
             normalized_options: Vec::new(),
             configurable_limits: Vec::new(),
-            selected_backend: plan.backend().as_str(),
             validated: true,
         },
         run: SampleRunReport {
@@ -348,7 +320,6 @@ struct CapabilitiesReport {
     gates: Vec<GateReport>,
     codecs: Vec<CodecReport>,
     compilers: Vec<CompilerReport>,
-    selectable_backends: Vec<&'static str>,
 }
 
 impl CapabilitiesReport {
@@ -407,10 +378,8 @@ impl CapabilitiesReport {
                     request_fingerprint_schema_version: compiler
                         .request_fingerprint_schema_version(),
                     configurable_limits: compiler.has_configurable_limits(),
-                    backend_selection: compiler.supports_backend_selection(),
                 })
                 .collect(),
-            selectable_backends: capabilities.selectable_backend_ids().collect(),
         }
     }
 }
@@ -498,7 +467,6 @@ struct CompilerReport {
     compiler_schema_version: u16,
     request_fingerprint_schema_version: Option<u16>,
     configurable_limits: bool,
-    backend_selection: bool,
 }
 
 #[derive(Serialize)]
@@ -514,7 +482,7 @@ impl InspectReport {
     fn for_circuit(input: &[u8]) -> Result<Self, CliError> {
         let circuit = Circuit::from_stim_bytes(input)?;
         Ok(Self {
-            schema_version: INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION,
+            schema_version: INSPECT_OUTPUT_SCHEMA_VERSION,
             executes: false,
             source: SourceReport::new(input),
             parse_estimate: ResourceEstimateReport::from(
@@ -535,7 +503,7 @@ impl InspectReport {
     fn for_dem(input: &[u8]) -> Result<Self, CliError> {
         let model = DetectorErrorModel::from_dem_bytes(input)?;
         Ok(Self {
-            schema_version: INSPECT_AND_PLAN_OUTPUT_SCHEMA_VERSION,
+            schema_version: INSPECT_OUTPUT_SCHEMA_VERSION,
             executes: false,
             source: SourceReport::new(input),
             parse_estimate: ResourceEstimateReport::from(
@@ -629,7 +597,6 @@ struct CompilationReport {
     compiler_schema_version: u16,
     normalized_options: Vec<&'static str>,
     configurable_limits: Vec<&'static str>,
-    selected_backend: &'static str,
     validated: bool,
 }
 
@@ -761,15 +728,14 @@ where
 
 fn render_capabilities_human(report: &CapabilitiesReport) -> String {
     format!(
-        "Stab {} capabilities (Stim {})\ncommands: {}\ndialects: {}\ngates: {}\nresult codecs: {}\ncompilers: {}\nselectable backends: {}\n",
+        "Stab {} capabilities (Stim {})\ncommands: {}\ndialects: {}\ngates: {}\nresult codecs: {}\ncompilers: {}\n",
         report.stab_version,
         report.stim_compatibility_version,
         report.commands.len(),
         report.dialects.len(),
         report.gates.len(),
         report.codecs.len(),
-        report.compilers.len(),
-        report.selectable_backends.len()
+        report.compilers.len()
     )
 }
 
@@ -814,11 +780,11 @@ fn render_inspect_human(report: &InspectReport) -> String {
 
 fn render_sample_plan_human(report: &SamplePlanReport) -> String {
     format!(
-        "sample plan\nmodel fingerprint: {}\nrequest fingerprint: {}\nplan fingerprint: {}\nselected backend: {}\nvalidated: yes\nexecutes: no\nshots: {}\noutput format: {}\nreference mode: {}\noutput bytes: {}{}\n",
+        "sample plan\nmodel fingerprint: {}\nrequest fingerprint: {}\nplan fingerprint: {}\nbackend: {}\nvalidated: yes\nexecutes: no\nshots: {}\noutput format: {}\nreference mode: {}\noutput bytes: {}{}\n",
         report.model.digest,
         report.compilation.request_fingerprint.digest,
         report.compilation.plan_fingerprint.digest,
-        report.compilation.selected_backend,
+        report.compilation.plan_fingerprint.backend,
         report.run.shots,
         report.run.output_format,
         report.run.reference_mode,

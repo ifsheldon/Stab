@@ -327,19 +327,17 @@
           "stab-engine",
           "--test",
           "canonical_owner_evidence",
-          "a4_sampling_compiler_backend_contract",
+          "a4_sampling_compiler_uses_scalar_backend_contract",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "One bounded circuit proves deterministic Auto-to-scalar selection, explicit scalar selection, identical immutable plan identity, and typed rejection of the not-yet-registered portable-SIMD backend before execution."
+        "detail": "One bounded circuit proves deterministic scalar compilation, actual backend identity in the immutable plan fingerprint, and execution through the resulting plan."
       },
       "negative_axes": [
-        "automatic-backend-drift",
-        "explicit-backend-drift",
-        "unavailable-backend-advertisement",
+        "scalar-backend-identity-drift",
         "request-plan-identity-confusion"
       ],
       "standalone": true

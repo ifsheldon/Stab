@@ -40,14 +40,6 @@ pub mod records {
     pub use stab_records::{RecordStreamReadError, RecordStreamReader};
 }
 
-/// Explicit backend selection and backend capability descriptors.
-pub mod backend {
-    pub use stab_engine::{
-        BackendPreference, COMPILATION_DESCRIPTOR, REGISTERED_BACKENDS, SamplingBackend,
-        SamplingCompilationDescriptor,
-    };
-}
-
 /// Bounded and folded model traversal primitives.
 pub mod traversal {
     pub use stab_model::advanced::{

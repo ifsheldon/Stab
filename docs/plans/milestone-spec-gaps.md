@@ -876,6 +876,8 @@ Gap: `Circuit::write_stim_file` can stream canonical output through an `io::Writ
 Proposed amendment: keep path-based Rust file helpers in PF1 with the documented 64 MiB read cap, and add a later parser milestone before claiming unbounded streaming `.stim` file-read parity for Rust APIs or future bindings.
 Resolution: Resolved for the current Rust PF1 scope by the selected file-helper evidence. `Circuit::from_stim_file` keeps the documented 64 MiB path-read cap while the `.stim` parser remains string-backed, `Circuit::write_stim_file` writes canonical text through an IO writer, `pf1_circuit_file_helpers_read_and_write_canonical_stim_text` proves canonical read/write behavior with tags and repeats, `pf1_circuit_file_helpers_report_read_and_write_errors` proves missing-file, parse-error, oversized-file, and write-error reporting, oracle row `pf1-circuit-file-helpers` selects those tests, and `docs/plans/pf1-circuit-api-progress-report.md`, `docs/plans/partial-feature-inventory.md`, and `docs/stab-feature-checklist.md` document bounded path reads. Unbounded streaming `.stim` file-read parity remains future parser work and is not part of the current non-deferred PF1 closure.
 
+Current status: P2 later removed the facade-owned path helpers after confirming they had no product or external consumer. Callers now own filesystem admission and use `Circuit::from_stim_bytes` and `Circuit::write_stim_io`; the PF1 report above remains historical evidence for the retired API.
+
 ## 2026-07-04 - PF1: Rust Coordinate Query Non-Finite Results
 
 Status: Resolved

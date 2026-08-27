@@ -5,7 +5,6 @@ use std::error::Error;
 pub use stab_core::experimental;
 
 use stab_core::advanced::{
-    backend::BackendPreference,
     compat::CompiledSampler,
     records::{
         DetsLayout, FormatError as RecordFormatError, MeasurementCodecSink, RecordResult,
@@ -27,9 +26,7 @@ pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>>
     let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n")?;
     let _: CircuitFlattenedInstructionIter<'_> = circuit.iter_flattened_instructions();
     let layout = DetsLayout::try_new(1, 1, 0)?;
-    let plan = SamplingCompiler::new()
-        .backend(BackendPreference::Scalar)
-        .compile(&circuit)?;
+    let plan = SamplingCompiler::new().compile(&circuit)?;
     let adapter = CompiledSampler::compile(&circuit)?;
 
     let encoded = encode_streamed_records(b"10\n01\n")?;
@@ -48,8 +45,7 @@ pub fn exercise_scalar_facade() -> Result<(usize, usize, usize), Box<dyn Error>>
 /// sink's associated `Error` type is the facade-re-exported `stab_core::advanced::records`
 /// `FormatError`, without any direct `stab-records` dependency.
 fn encode_streamed_records(input: &[u8]) -> RecordResult<Vec<u8>> {
-    let mut reader =
-        RecordStreamReader::measurements(input, RecordFormat::ZeroOne, 2, 1024);
+    let mut reader = RecordStreamReader::measurements(input, RecordFormat::ZeroOne, 2, 1024);
     let mut records = Vec::new();
     loop {
         match reader.next_record() {
@@ -71,12 +67,10 @@ fn stream_error_to_sink_error(
 ) -> RecordFormatError {
     match error {
         stab_core::advanced::records::RecordStreamReadError::Format(error) => error,
-        stab_core::advanced::records::RecordStreamReadError::Io(error) => {
-            RecordFormatError::new(
-                stab_core::advanced::records::FormatErrorCode::UnexpectedEndOfInput,
-                error.to_string(),
-                None,
-            )
-        }
+        stab_core::advanced::records::RecordStreamReadError::Io(error) => RecordFormatError::new(
+            stab_core::advanced::records::FormatErrorCode::UnexpectedEndOfInput,
+            error.to_string(),
+            None,
+        ),
     }
 }

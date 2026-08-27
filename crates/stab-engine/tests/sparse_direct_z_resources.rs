@@ -20,7 +20,7 @@ fn sparse_direct_z_circuit() -> Circuit {
 }
 
 #[test]
-fn maximum_id_direct_z_reference_operations_use_the_selected_backend() {
+fn maximum_id_direct_z_reference_operations_use_the_scalar_plan() {
     let circuit = sparse_direct_z_circuit();
     let plan = SamplingCompiler::new()
         .compile(&circuit)

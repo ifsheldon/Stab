@@ -26,13 +26,11 @@ Making the default engine Nightly-only would prevent Stable decoder and orchestr
 
 Scalar behavior is the absence of the additive `portable-simd` feature.
 
-Backend requests occur during compilation through `Auto`, `Scalar`, and `PortableSimd`. Selected-backend values describe registered implementations only.
-
-A4 registers only the scalar implementation: `Auto` selects scalar, explicit scalar succeeds, and explicit portable SIMD returns a typed unavailable-backend diagnostic before lowering.
+Sampling compilation has no backend request. The compiler constructs the sole scalar implementation, while `SamplingPlan::backend` and `PlanFingerprint::backend` report that actual executable identity.
 
 A6 does not register portable SIMD as a sampling backend. Build-time bit and algebra acceleration cannot represent two runtime backends after Cargo feature unification, and the current sampling plans do not execute through these raw kernels.
 
-A later packed-frame milestone may register portable SIMD only after the engine owns a distinct executable plan, a distinct plan fingerprint, semantic equivalence for each affected plan family, and phase-specific performance evidence.
+A future packed-frame or device implementation may introduce selection only after the engine owns two real executable plans, distinct plan fingerprints, semantic equivalence for each affected plan family, and phase-specific performance evidence. No placeholder enum, registry, or unavailable choice is published beforehand.
 
 Public plans wrap private backend-specific variants.
 
