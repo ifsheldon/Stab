@@ -648,16 +648,6 @@ fn gate_surface_contract_classical_controls() {
                     .decision(surface, *pattern)
                     .expect("declared classical-control decision");
                 let result = run_surface(&text, surface);
-                if surface == GateSurface::MeasurementSampler
-                    && Circuit::from_stim_str(&text)
-                        .expect("parse generated classical-control circuit")
-                        .count_sweep_bits()
-                        .expect("count generated sweep bits")
-                        != 0
-                {
-                    result.expect_err("measurement sampling requires explicit sweep input support");
-                    continue;
-                }
                 match decision.behavior {
                     GateSurfaceBehavior::UnsupportedShape => {
                         result.expect_err("unsupported classical-control role must reject");
@@ -669,9 +659,23 @@ fn gate_surface_contract_classical_controls() {
                         assert_eq!(actual, expected, "{gate_name} {pattern:?} on {surface:?}");
                     }
                     GateSurfaceBehavior::Execute => {
-                        result.unwrap_or_else(|error| {
+                        let actual = result.unwrap_or_else(|error| {
                             panic!("{gate_name} {pattern:?} on {surface:?}: {error}")
                         });
+                        if surface == GateSurface::MeasurementSampler
+                            && Circuit::from_stim_str(&text)
+                                .expect("parse generated classical-control circuit")
+                                .count_sweep_bits()
+                                .expect("count generated sweep bits")
+                                != 0
+                        {
+                            let expected = run_surface(&baseline, surface)
+                                .expect("all-false sweep baseline must execute");
+                            assert_eq!(
+                                actual, expected,
+                                "{gate_name} {pattern:?} omitted sweep on {surface:?}"
+                            );
+                        }
                     }
                     other => panic!(
                         "classical-control contract unexpectedly uses {other:?} for {gate_name} {pattern:?} on {surface:?}"
@@ -691,6 +695,16 @@ fn gate_surface_contract_classical_controls() {
     ] {
         assert_sweep_reference(text, &false_reference, &true_reference);
     }
+
+    let nested_sweep =
+        "REPEAT 2 {\n    REPEAT 3 {\n        CX sweep[5] 0\n        X 0\n        M 0\n    }\n}\n";
+    let nested_baseline = "REPEAT 2 {\n    REPEAT 3 {\n        X 0\n        M 0\n    }\n}\n";
+    assert_eq!(
+        run_surface(nested_sweep, GateSurface::MeasurementSampler)
+            .expect("nested omitted-sweep sampling"),
+        run_surface(nested_baseline, GateSurface::MeasurementSampler)
+            .expect("nested all-false baseline"),
+    );
 }
 
 #[test]
@@ -826,11 +840,7 @@ fn run_surface(text: &str, surface: GateSurface) -> TestResult<SurfaceFingerprin
 }
 
 fn assert_all_semantic_surfaces_execute(text: &str) {
-    let has_sweep_bits = circuit(text).count_sweep_bits().expect("count sweep bits") != 0;
     for surface in GateSurface::ALL {
-        if has_sweep_bits && surface == GateSurface::MeasurementSampler {
-            continue;
-        }
         run_surface(text, surface)
             .unwrap_or_else(|error| panic!("{surface:?} rejected {text:?}: {error}"));
     }

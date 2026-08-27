@@ -686,9 +686,16 @@ id = "sampling.circuit-sweep-controls"
 area = "sampling"
 contract = "Ordinary circuit sampling accepts legal sweep-controlled Pauli operations and treats omitted sweep data as all false."
 stim_refs = ["src/stim/simulators/tableau_simulator.test.cc", "src/stim/simulators/frame_simulator.test.cc"]
-status = "missing"
+status = "done"
 owner = "stab-engine"
-milestone = "P4"
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "gate_semantic_contract"
+name = "gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls"
+minimum_tier = "pr"
 
 [[families]]
 id = "sampling.dem-sampling-and-replay"

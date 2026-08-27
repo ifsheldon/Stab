@@ -53,11 +53,11 @@ The model dialect discriminators are shared with model fingerprint schema versio
 | Stim circuit | `1` |
 | Detector error model | `2` |
 
-## Sampling Compiler Schema 1
+## Sampling Compiler Schemas
 
-Sampling uses operation discriminator `1` and compiler schema version `1`.
+Sampling uses operation discriminator `1`.
 
-The public sampling compiler has one fixed lowering mode:
+Historical compiler schema version `1` used one fixed lowering mode:
 
 - sweep-controlled instructions are rejected;
 - representability and semantic validation remain mandatory;
@@ -66,12 +66,20 @@ The public sampling compiler has one fixed lowering mode:
 
 Fixed compiler behavior belongs to the compiler schema, not to the normalized caller-option list.
 
-Sampling compiler schema 1 therefore encodes:
+Current compiler schema version `2` changes only sweep admission:
+
+- every legal sweep-controlled Pauli operation lowers into the same typed execution representation used by reference sampling and detection;
+- sampling calls have no sweep-input parameter, so every omitted sweep bit is false;
+- representability and semantic validation remain mandatory;
+- no compile resource budget is caller-configurable;
+- backend preference and selection remain excluded.
+
+Both sampling compiler schemas encode:
 
 - normalized option count `0`;
 - effective configurable-limit count `0`.
 
-Changing sweep admission, adding a caller-selectable lowering option, or adding a configurable compile limit requires a new sampling compiler schema and a corresponding request-fingerprint schema review.
+Changing sweep admission again, adding a caller-selectable lowering option, or adding a configurable compile limit requires a new sampling compiler schema and a corresponding request-fingerprint schema review.
 
 Adding or changing a backend registration does not by itself change this request schema. It changes the separate backend-bearing plan identity.
 
@@ -99,7 +107,7 @@ Its model fingerprint is:
 Its sampling compilation request fingerprint is:
 
 ```text
-7d8879179ed9fe0f4cbc4717a228037951248185f668a84599d293776809dc33
+415e1325fa707cec735f26140635e825e379a81a62205f681b8d03cad5901afb
 ```
 
 The request digest was independently reconstructed from the table above with Perl `Digest::SHA` and binary `pack`, rather than copied from the Rust implementation.

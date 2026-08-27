@@ -36,8 +36,8 @@ impl CompilationOperation {
 /// Versioned SHA-256 identity of a backend-neutral compilation request.
 ///
 /// Schema one binds the model fingerprint, compiler schema, operation, normalized compile
-/// options, and effective configurable limits. The current public sampling compiler rejects sweep
-/// controls and exposes no configurable compile limit. The executable backend is deliberately
+/// options, and effective configurable limits. The current public sampling compiler treats omitted
+/// sweep data as all false and exposes no configurable compile limit. The executable backend is deliberately
 /// excluded because this identity describes the lowering request instead of the compiled plan.
 ///
 /// This identity does not include shots, random seed, output encoding, or the execution backend. It
@@ -53,7 +53,7 @@ pub struct CompilationRequestFingerprint {
 
 impl CompilationRequestFingerprint {
     pub const SCHEMA_VERSION: u16 = 1;
-    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 1;
+    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 2;
     pub const ALGORITHM: &'static str = "sha256";
 
     pub fn for_sampling(circuit: &Circuit) -> Self {
@@ -156,7 +156,7 @@ REPEAT[loop] 3 {\n\
             CompilationRequestFingerprint::for_sampling(&changed)
         );
         assert_eq!(fingerprint.schema_version(), 1);
-        assert_eq!(fingerprint.compiler_schema_version(), 1);
+        assert_eq!(fingerprint.compiler_schema_version(), 2);
         assert_eq!(fingerprint.operation(), CompilationOperation::Sampling);
         assert_eq!(fingerprint.operation().as_str(), "sample");
         assert_eq!(fingerprint.model_fingerprint(), canonical.fingerprint());
@@ -168,7 +168,7 @@ REPEAT[loop] 3 {\n\
         );
         assert_eq!(
             frozen.digest_hex(),
-            "7d8879179ed9fe0f4cbc4717a228037951248185f668a84599d293776809dc33"
+            "415e1325fa707cec735f26140635e825e379a81a62205f681b8d03cad5901afb"
         );
     }
 

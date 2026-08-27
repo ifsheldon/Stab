@@ -323,7 +323,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             {
                 "operation": "sample",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 1,
+                "compiler_schema_version": 2,
                 "request_fingerprint_schema_version": 1,
                 "configurable_limits": false
             },
@@ -531,7 +531,7 @@ fn agent_commands_route_parse_and_compile_failures_through_json_diagnostics() {
 
     let (status, stdout, stderr) = run_cli(
         ["stab", "plan", "sample", "--error-format=json"],
-        b"CX sweep[0] 0\nM 0\n",
+        b"M 0\nCX 1 rec[-1]\n",
     );
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
@@ -734,7 +734,7 @@ fn plan_sample_rejects_invalid_output_groups_and_uncompilable_circuits() {
             .contains("multiple of 64")
     );
 
-    let (status, stdout, stderr) = run_cli(["stab", "plan", "sample"], b"CX sweep[0] 0\nM 0\n");
+    let (status, stdout, stderr) = run_cli(["stab", "plan", "sample"], b"M 0\nCX 1 rec[-1]\n");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert!(

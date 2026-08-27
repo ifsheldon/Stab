@@ -18,10 +18,7 @@ use super::execute::{ExecutionBuffers, execute_operations};
 use super::operation::SampleOperation;
 use super::small_frame::SmallStabilizerFrame;
 use super::stabilizer_frame::StabilizerFrame;
-use super::{
-    ExecutionMode, SweepCompilation, compile_circuit, direct_z_measurement, sampler_rng,
-    small_frame,
-};
+use super::{ExecutionMode, compile_circuit, direct_z_measurement, sampler_rng, small_frame};
 use crate::CompilationRequestFingerprint;
 
 const MAX_BATCH_SHOTS: usize = 64;
@@ -167,25 +164,10 @@ impl SamplingCompiler {
     }
 
     pub fn compile(self, circuit: &Circuit) -> Result<SamplingPlan, SamplingCompileError> {
-        self.compile_with_sweep_policy(circuit, SweepCompilation::Reject)
-    }
-
-    pub(crate) fn compile_allowing_sweep(
-        self,
-        circuit: &Circuit,
-    ) -> Result<SamplingPlan, SamplingCompileError> {
-        self.compile_with_sweep_policy(circuit, SweepCompilation::Allow)
-    }
-
-    fn compile_with_sweep_policy(
-        self,
-        circuit: &Circuit,
-        sweep_compilation: SweepCompilation,
-    ) -> Result<SamplingPlan, SamplingCompileError> {
         let backend = SamplingBackend::Scalar;
         let request_fingerprint = CompilationRequestFingerprint::for_sampling(circuit);
         let mut operations = Vec::new();
-        let counts = compile_circuit(circuit, &mut operations, sweep_compilation)?;
+        let counts = compile_circuit(circuit, &mut operations)?;
         let kind = select_plan_kind(circuit.count_qubits(), counts.measurements, &operations);
         let fingerprint = PlanFingerprint::for_sampling(
             request_fingerprint,

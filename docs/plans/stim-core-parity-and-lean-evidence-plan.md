@@ -298,6 +298,8 @@ Execution-adapter checkpoint: `CompiledSampler`, `CompiledDetectionConverter`, `
 6. Cover heralded and correlated errors, inversion, `MPAD`, `MPP`, pair measurements, resets, and noisy measure-reset families.
 7. Keep exact Stim random streams out of scope while requiring deterministic semantic and statistical equivalence under Stab-owned seeds.
 
+Execution checkpoint: ordinary sampling now uses the sole public sampling compiler for sweep-conditioned and non-sweep circuits. Legal `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` sweep target orientations lower into the existing typed `SweepPauli` IR, omitted sweep data is all false through nested repeats, and compiler schema version 2 plus derived fingerprints identify the admission change. The generated classical-control semantic matrix owns the row across every accepted target pattern and real execution surface. No per-control benchmark was added because the existing release CLI sampling workflows already measure this lowering and execution architecture without creating a distinct user hot path.
+
 ### Tests
 
 - Deterministic differential tests for every gate family and target orientation where noise is absent or forced to probability 0 or 1.

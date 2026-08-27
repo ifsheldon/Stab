@@ -16,10 +16,9 @@ use stab_engine::{
     DetectionConversionLimits, DetectionError, DetectionRecordLimitSubject, DetectionResourceKind,
     DetectionResourceLimitError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
     MeasurementToDetectionPlan, PlanFingerprint, RandomPolicy, ReferenceSampleMode, RunError,
-    SamplingBackend, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
-    SamplingExecutionError, SamplingPlan, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
-    detection_record_width_with_limits, measurement_record_count_with_limits,
-    validate_detection_sampling_circuit_with_limits,
+    SamplingBackend, SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunStatus,
+    Seed, ShotCount, SinkFailurePhase, detection_record_width_with_limits,
+    measurement_record_count_with_limits, validate_detection_sampling_circuit_with_limits,
 };
 use stab_model::{Circuit, DetectorErrorModel, ModelDialect};
 use stab_records::{
@@ -541,21 +540,6 @@ fn a2_detection_work_policy_admission() {
 }
 
 #[test]
-fn a4_sampling_compile_diagnostic_contract() {
-    let sweep_circuit = circuit("CX sweep[0] 0\nM 0\n");
-    let invalid = SamplingCompiler::new()
-        .compile(&sweep_circuit)
-        .expect_err("ordinary sampling must reject sweep-controlled execution");
-    assert_eq!(invalid.code(), SamplingCompileErrorCode::InvalidCircuit);
-    match invalid {
-        SamplingCompileError::InvalidCircuit { message } => {
-            assert_eq!(message, "M8 sampler subset does not support CX");
-        }
-        other => panic!("expected an invalid-circuit diagnostic, got {other:?}"),
-    }
-}
-
-#[test]
 fn a4_sampling_compiler_uses_scalar_backend_contract() {
     let circuit = circuit("H 0\nM(0.125) 0\n");
     let plan = SamplingCompiler::new()
@@ -592,13 +576,13 @@ fn a4_sampling_plan_fingerprint_contract() {
 
     assert_eq!(
         plan.request_fingerprint().digest_hex(),
-        "f8b6f8896556955fd436ad8e1f1700eb031cd04bc910accbf549195102384e79"
+        "5bc21c6c2e62180747536ee72f3c28895ee2402ca0bf3672d1f4c4a4feba925f"
     );
     assert_eq!(fingerprint.executable_contract_digest(), executable_digest);
     assert_eq!(fingerprint.digest(), reconstructed_digest);
     assert_eq!(
         fingerprint.digest_hex(),
-        "6211d411207f181cf93ee7a6cac4a862d3167bc9e7c471a2484e5f16b08909d8"
+        "ef6a395691925e222a43896dbd0a988491c80cf93bb1bd85d914386c0ada9844"
     );
 }
 

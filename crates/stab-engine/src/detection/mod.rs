@@ -88,7 +88,7 @@ impl PreparedMeasurementToDetection {
         ) {
             ReferenceSampleSource::Zero
         } else if plan.sweep_bit_count > 0 {
-            let sampling = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
+            let sampling = SamplingCompiler::new().compile(circuit)?;
             if sampling.sweep_bit_count() != plan.sweep_bit_count {
                 return Err(DetectionError::invalid_result_format(format!(
                     "sweep reference sampler has {} sweep bits but detection conversion expected {}",

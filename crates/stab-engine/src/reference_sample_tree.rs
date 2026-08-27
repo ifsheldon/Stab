@@ -85,7 +85,7 @@ impl ReferenceSampleTree {
     pub fn from_circuit_reference_sample(
         circuit: &Circuit,
     ) -> Result<Self, ReferenceSampleTreeError> {
-        let sampler = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
+        let sampler = SamplingCompiler::new().compile(circuit)?;
         let mut sweep_record = try_bool_buffer(
             sampler.sweep_bit_count(),
             "reference sample tree sweep record",

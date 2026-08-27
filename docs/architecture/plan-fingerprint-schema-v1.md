@@ -83,7 +83,7 @@ M 0
 Its sampling compilation request fingerprint is:
 
 ```text
-f8b6f8896556955fd436ad8e1f1700eb031cd04bc910accbf549195102384e79
+5bc21c6c2e62180747536ee72f3c28895ee2402ca0bf3672d1f4c4a4feba925f
 ```
 
 Scalar compilation selects the direct Z measurement variant.
@@ -97,7 +97,7 @@ The executable-contract digest is:
 The final plan fingerprint is:
 
 ```text
-6211d411207f181cf93ee7a6cac4a862d3167bc9e7c471a2484e5f16b08909d8
+ef6a395691925e222a43896dbd0a988491c80cf93bb1bd85d914386c0ada9844
 ```
 
 The test reconstructs both digests independently from the tables above instead of calling the production fingerprint constructor.

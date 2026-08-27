@@ -158,7 +158,7 @@ pub enum CircuitReferenceSampleError {
 pub fn circuit_reference_sample(
     circuit: &Circuit,
 ) -> Result<Vec<bool>, CircuitReferenceSampleError> {
-    let plan = SamplingCompiler::new().compile_allowing_sweep(circuit)?;
+    let plan = SamplingCompiler::new().compile(circuit)?;
     let mut sweep_record = api::try_bool_buffer(plan.sweep_bit_count(), "reference sweep record")?;
     sweep_record.resize(plan.sweep_bit_count(), false);
     let mut output = api::try_bool_buffer(
@@ -174,7 +174,7 @@ pub fn count_determined_measurements(
     unknown_input: bool,
 ) -> Result<u64, CountDeterminedMeasurementsError> {
     Ok(SamplingCompiler::new()
-        .compile_allowing_sweep(circuit)?
+        .compile(circuit)?
         .try_count_determined_measurements(unknown_input)?)
 }
 
@@ -205,13 +205,6 @@ fn sampler_rng(seed: Option<u64>) -> SmallRng {
 struct CompileState {
     measurement_count: u64,
     sweep_bit_count: u64,
-    sweep_compilation: SweepCompilation,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SweepCompilation {
-    Reject,
-    Allow,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -221,11 +214,10 @@ struct CompiledCounts {
 }
 
 impl CompileState {
-    fn new(sweep_compilation: SweepCompilation) -> Self {
+    fn new() -> Self {
         Self {
             measurement_count: 0,
             sweep_bit_count: 0,
-            sweep_compilation,
         }
     }
 
@@ -302,9 +294,8 @@ impl CompileState {
 fn compile_circuit(
     circuit: &Circuit,
     operations: &mut Vec<SampleOperation>,
-    sweep_compilation: SweepCompilation,
 ) -> Result<CompiledCounts, SamplingCompileError> {
-    let mut state = CompileState::new(sweep_compilation);
+    let mut state = CompileState::new();
     compile_circuit_with_state(circuit, operations, &mut state)?;
     elide_leading_z_resets(operations);
     let measurements = usize::try_from(state.measurement_count).map_err(|_| {
@@ -694,9 +685,6 @@ fn compile_sweep_pauli_group(
     basis: PauliBasis,
     target_group: &[Target],
 ) -> Result<(), SamplingCompileError> {
-    if state.sweep_compilation == SweepCompilation::Reject {
-        return Err(unsupported_sampler_instruction(instruction));
-    }
     let [first, second] = target_group else {
         return Err(unsupported_sampler_instruction(instruction));
     };
@@ -1018,7 +1006,7 @@ fn qubit_index(
 
 fn unsupported_sampler_instruction(instruction: &CircuitInstruction) -> SamplingCompileError {
     SamplingCompileError::invalid_circuit(format!(
-        "M8 sampler subset does not support {}",
+        "sampling execution does not support the {} target shape",
         instruction.gate().canonical_name()
     ))
 }
