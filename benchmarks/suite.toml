@@ -7,7 +7,7 @@ version = "v1.16.0"
 commit = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07"
 
 [policy]
-timing_boundary = "e2e-user-workflow-v1"
+timing_boundary = "e2e-user-workflow-v2"
 parity_max_ratio = 1.25
 self_regression_max_ratio = 1.15
 bootstrap_seed = 6004497137074745393

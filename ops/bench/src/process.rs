@@ -216,6 +216,7 @@ fn run_bounded_process_with_cancellation(
         source,
     })?;
     let mut child = ManagedChild::new(child, request.program.clone());
+    child.open_completion_fd()?;
     if let Some(cpu) = request.affinity_cpu
         && let Err(source) = set_child_affinity(child.id(), cpu)
     {
@@ -238,21 +239,12 @@ fn run_bounded_process_with_cancellation(
     }
     let pid = child.id();
     child.start_io(request)?;
-    let mut status = None;
+    let mut completed = None;
     let mut peak_rss = None;
 
     loop {
         if let Some(rss) = process_rss_bytes(pid)? {
             peak_rss = Some(peak_rss.map_or(rss, |peak: u64| peak.max(rss)));
-        }
-        if status.is_none()
-            && let Some(completed) = child.try_wait()?
-        {
-            peak_rss = Some(peak_rss.map_or(completed.peak_rss_bytes, |peak: u64| {
-                peak.max(completed.peak_rss_bytes)
-            }));
-            status = Some(completed.status);
-            child.close_group()?;
         }
         if cancellation.is_cancelled() {
             child.close_group()?;
@@ -307,14 +299,28 @@ fn run_bounded_process_with_cancellation(
                 stderr_diagnostic,
             })));
         }
-        if status.is_some() && child.io_finished()? {
+        if completed.is_some() && child.io_finished()? {
             break;
         }
-        std::thread::sleep(POLL_INTERVAL.min(deadline.duration_since(now)));
+        if completed.is_none()
+            && child.wait_for_completion(POLL_INTERVAL.min(deadline.duration_since(now)))?
+        {
+            let observed = child.wait_with_rusage()?;
+            peak_rss = Some(peak_rss.map_or(observed.peak_rss_bytes, |peak: u64| {
+                peak.max(observed.peak_rss_bytes)
+            }));
+            completed = Some(observed);
+            child.close_group()?;
+        } else if completed.is_some() {
+            std::thread::sleep(POLL_INTERVAL.min(deadline.duration_since(now)));
+        }
     }
 
     let captured = child.join_io()?;
-    let wall_elapsed = wall_started.elapsed();
+    let completed =
+        completed.ok_or_else(|| ProcessError::MissingStatus(request.program.clone()))?;
+    let wall_elapsed =
+        measured_wall_elapsed(wall_started, completed.completed_at, &request.program)?;
     if wall_elapsed > request.limits.timeout {
         let (stdout_diagnostic, stderr_diagnostic) = diagnostics(&captured);
         return Err(ProcessError::TimedOut(Box::new(TimedOutError {
@@ -326,7 +332,7 @@ fn run_bounded_process_with_cancellation(
             stderr_diagnostic,
         })));
     }
-    let status = status.ok_or_else(|| ProcessError::MissingStatus(request.program.clone()))?;
+    let status = completed.status;
     #[cfg(unix)]
     {
         use std::os::unix::process::ExitStatusExt as _;
@@ -355,12 +361,23 @@ fn run_bounded_process_with_cancellation(
     })
 }
 
+fn measured_wall_elapsed(
+    started_at: Instant,
+    completed_at: Instant,
+    program: &Path,
+) -> Result<Duration, ProcessError> {
+    completed_at
+        .checked_duration_since(started_at)
+        .ok_or_else(|| ProcessError::CompletionClock(program.to_path_buf()))
+}
+
 struct ManagedChild {
     child: std::process::Child,
     program: PathBuf,
     stdin: Option<Writer>,
     stdout: Option<OutputReader>,
     stderr: Option<OutputReader>,
+    completion_fd: Option<std::os::fd::OwnedFd>,
     reaped: bool,
     group_closed: bool,
 }
@@ -373,6 +390,7 @@ impl ManagedChild {
             stdin: None,
             stdout: None,
             stderr: None,
+            completion_fd: None,
             reaped: false,
             group_closed: false,
         }
@@ -404,15 +422,53 @@ impl ManagedChild {
         Ok(())
     }
 
-    fn try_wait(&mut self) -> Result<Option<CompletedChild>, ProcessError> {
-        let completed =
-            try_wait_with_rusage(self.child.id()).map_err(|source| ProcessError::Wait {
+    fn open_completion_fd(&mut self) -> Result<(), ProcessError> {
+        let pid = rustix::process::Pid::from_child(&self.child);
+        let completion_fd = rustix::process::pidfd_open(pid, rustix::process::PidfdFlags::NONBLOCK)
+            .map_err(|source| ProcessError::OpenCompletionFd {
                 program: self.program.clone(),
-                source,
+                source: source.into(),
             })?;
-        if completed.is_some() {
-            self.reaped = true;
+        self.completion_fd = Some(completion_fd);
+        Ok(())
+    }
+
+    fn wait_for_completion(&self, timeout: Duration) -> Result<bool, ProcessError> {
+        use rustix::event::{PollFd, PollFlags, Timespec, poll};
+
+        let completion_fd = self
+            .completion_fd
+            .as_ref()
+            .ok_or_else(|| ProcessError::MissingCompletionFd(self.program.clone()))?;
+        let timeout =
+            Timespec::try_from(timeout).map_err(|source| ProcessError::PollCompletion {
+                program: self.program.clone(),
+                source: std::io::Error::new(std::io::ErrorKind::InvalidInput, source),
+            })?;
+        let mut descriptors = [PollFd::new(completion_fd, PollFlags::IN)];
+        match poll(&mut descriptors, Some(&timeout)) {
+            Ok(0) => Ok(false),
+            Ok(_) if descriptors[0].revents().contains(PollFlags::NVAL) => {
+                Err(ProcessError::PollCompletion {
+                    program: self.program.clone(),
+                    source: std::io::Error::other("child completion descriptor is invalid"),
+                })
+            }
+            Ok(_) => Ok(true),
+            Err(rustix::io::Errno::INTR) => Ok(false),
+            Err(source) => Err(ProcessError::PollCompletion {
+                program: self.program.clone(),
+                source: source.into(),
+            }),
         }
+    }
+
+    fn wait_with_rusage(&mut self) -> Result<CompletedChild, ProcessError> {
+        let completed = wait_with_rusage(self.child.id()).map_err(|source| ProcessError::Wait {
+            program: self.program.clone(),
+            source,
+        })?;
+        self.reaped = true;
         Ok(completed)
     }
 
@@ -492,13 +548,14 @@ impl ManagedChild {
 struct CompletedChild {
     status: ExitStatus,
     peak_rss_bytes: u64,
+    completed_at: Instant,
 }
 
 #[allow(
     unsafe_code,
     reason = "Linux wait4 is the only per-child peak-RSS source that survives fast process exit"
 )]
-fn try_wait_with_rusage(pid: u32) -> Result<Option<CompletedChild>, std::io::Error> {
+fn wait_with_rusage(pid: u32) -> Result<CompletedChild, std::io::Error> {
     use std::mem::MaybeUninit;
     use std::os::unix::process::ExitStatusExt as _;
 
@@ -511,14 +568,13 @@ fn try_wait_with_rusage(pid: u32) -> Result<Option<CompletedChild>, std::io::Err
     let mut status = 0;
     let mut usage = MaybeUninit::<libc::rusage>::zeroed();
     // SAFETY: wait4 receives the known child PID and valid writable pointers. A positive
-    // return initializes both outputs; zero leaves `usage` unread; negative returns errno.
-    let waited = unsafe { libc::wait4(raw_pid, &mut status, libc::WNOHANG, usage.as_mut_ptr()) };
-    if waited == 0 {
-        return Ok(None);
-    }
+    // return initializes both outputs; negative returns errno. The pidfd readiness event proves
+    // that this blocking reap will return promptly without adding monitor-poll latency.
+    let waited = unsafe { libc::wait4(raw_pid, &mut status, 0, usage.as_mut_ptr()) };
     if waited < 0 {
         return Err(std::io::Error::last_os_error());
     }
+    let completed_at = Instant::now();
     // SAFETY: a positive wait4 return initialized the rusage value.
     let usage = unsafe { usage.assume_init() };
     let peak_kib = u64::try_from(usage.ru_maxrss)
@@ -526,10 +582,11 @@ fn try_wait_with_rusage(pid: u32) -> Result<Option<CompletedChild>, std::io::Err
     let peak_rss_bytes = peak_kib
         .checked_mul(1024)
         .ok_or_else(|| std::io::Error::other("wait4 peak RSS overflows bytes"))?;
-    Ok(Some(CompletedChild {
+    Ok(CompletedChild {
         status: ExitStatus::from_raw(status),
         peak_rss_bytes,
-    }))
+        completed_at,
+    })
 }
 
 impl Drop for ManagedChild {
@@ -1001,6 +1058,18 @@ pub(crate) enum ProcessError {
         program: PathBuf,
         source: std::io::Error,
     },
+    #[error("failed to open a completion descriptor for {program}: {source}")]
+    OpenCompletionFd {
+        program: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("failed to poll completion of {program}: {source}")]
+    PollCompletion {
+        program: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("spawned process {0} is missing its completion descriptor")]
+    MissingCompletionFd(PathBuf),
     #[error("failed to pin {program} to CPU {cpu}: {source}")]
     SetAffinity {
         program: PathBuf,
@@ -1044,6 +1113,8 @@ pub(crate) enum ProcessError {
     InvalidPid(u32),
     #[error("{0} completed without an observable exit status")]
     MissingStatus(PathBuf),
+    #[error("completion time for {0} preceded its start time")]
+    CompletionClock(PathBuf),
     #[error("failed to terminate the process group for {program}: {source}")]
     Kill {
         program: PathBuf,

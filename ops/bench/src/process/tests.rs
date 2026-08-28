@@ -56,6 +56,18 @@ fn captures_peak_rss_from_a_short_lived_child() {
 }
 
 #[test]
+fn measured_wall_time_stops_at_child_completion() {
+    let started_at = Instant::now();
+    let completed_at = started_at + Duration::from_millis(2);
+
+    assert_eq!(
+        measured_wall_elapsed(started_at, completed_at, Path::new("helper"))
+            .expect("ordered completion clock"),
+        Duration::from_millis(2)
+    );
+}
+
+#[test]
 fn rejects_missing_binary_and_all_stream_limits() {
     let mut missing = request("success");
     missing.program = PathBuf::from("/definitely/missing/stab-bench-worker");

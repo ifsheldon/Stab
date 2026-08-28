@@ -6,6 +6,7 @@
 - Compare CLI workflows process to process using release binaries, identical inputs, equivalent sinks, and fully consumed output. Keep reusable Rust workflows on stable component APIs.
 - Validate correctness before timing. Exact outputs must match exactly; stochastic outputs need format, shape, count, and source-owned semantic witnesses.
 - Preserve paired alternating samples, fixed-seed bootstrap intervals, all retained observations, raw semantic work, and kernel-reported child peak RSS.
+- Start CLI timing immediately before spawn and stop it at pidfd-signaled child completion after `wait4`; keep monitor polling, final pipe drain, and output validation outside the interval. Sum those child intervals for CLI pipelines.
 - Keep the Stim parity ceiling exactly `1.25x` and the seeded Stab self-regression ceiling exactly `1.15x`. Missing baselines are `unseeded`. Do not add waivers or shrink work to pass.
 - Bump the explicit timing-boundary identity whenever controller work moves into or out of a timed region. Baselines must also match architecture, CPU, Rust target, Rust toolchain, and case digest.
 - Use the shared bounded process supervisor. Preserve concurrent I/O, process-group termination, cancellation, output limits, timeouts, and tested child-RSS accounting.

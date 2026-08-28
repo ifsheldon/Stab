@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use clap::Args;
 use sha2::{Digest as _, Sha256};
@@ -711,7 +711,7 @@ impl<'a> PreparedCase<'a> {
                 self.policy,
             )?,
             Workload::CliPipeline { steps, .. } => {
-                let started = Instant::now();
+                let mut elapsed = Duration::ZERO;
                 let mut previous = Vec::new();
                 let mut peak = 0_u64;
                 let mut final_result = None;
@@ -731,6 +731,9 @@ impl<'a> PreparedCase<'a> {
                         self.cpu,
                         self.policy,
                     )?;
+                    elapsed = elapsed.checked_add(result.wall_elapsed).ok_or_else(|| {
+                        BenchError::E2e(format!("{} pipeline wall time overflowed", self.id))
+                    })?;
                     peak = peak.max(result.parent_observed_peak_rss_bytes.ok_or_else(|| {
                         BenchError::E2e(format!("{} pipeline RSS was not observed", self.id))
                     })?);
@@ -746,7 +749,7 @@ impl<'a> PreparedCase<'a> {
                 let mut final_result = final_result.ok_or_else(|| {
                     BenchError::E2e(format!("{} pipeline has no final step", self.id))
                 })?;
-                final_result.wall_elapsed = started.elapsed();
+                final_result.wall_elapsed = elapsed;
                 final_result.parent_observed_peak_rss_bytes = Some(peak);
                 final_result
             }
