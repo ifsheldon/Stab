@@ -44,7 +44,7 @@ pub enum BitError {
     #[error("matrix size {rows}x{cols} overflows addressable storage")]
     MatrixSizeOverflow { rows: usize, cols: usize },
 
-    #[error("word-row transpose supports at most {maximum} columns, got {actual}")]
+    #[error("word-row transpose supports at most {maximum} rows, got {actual}")]
     WordRowTransposeTooWide { actual: usize, maximum: usize },
 
     #[error("matrix-to-word-row transpose supports at most {maximum} rows, got {actual}")]
