@@ -78,6 +78,10 @@ unicode-general-category = "1.1.0"
 ureq = "3.3.0"
 yaml-rust2 = "0.11.0"
 
+[profile.release]
+codegen-units = 1
+lto = "thin"
+
 [workspace.lints.rust]
 let_underscore_drop = "warn"
 linker_messages = "allow"
