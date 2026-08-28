@@ -14,23 +14,13 @@ mod hex_payload;
 mod milestone;
 mod outputs;
 mod paths;
-mod qualification;
 mod reverse_flow;
 mod statistical;
 
-pub(crate) use direct_rust::cargo_test_passed_test_count;
-use direct_rust::{
-    check_direct_rust_fixture_executed_tests, is_direct_rust_fixture, run_direct_rust_fixture,
-};
+use direct_rust::{is_direct_rust_fixture, run_direct_rust_fixture};
 pub(crate) use milestone::Milestone;
 use paths::{fixture_file, validate_fixture_path};
-pub(crate) use qualification::{
-    QualificationFixtureFailure, QualificationFixtureRunner, qualification_exact_cargo_selectors,
-    qualification_expected_statuses, qualification_statistical_plan_summaries,
-    run_qualification_core_worker,
-};
 use reverse_flow::core_time_reverse_flows_output;
-pub(crate) use statistical::FixtureStatisticalPlanSummary;
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
 
@@ -314,9 +304,6 @@ pub(crate) enum FixtureError {
         comparator: &'static str,
         reason: String,
     },
-
-    #[error("qualification fixture {id} cannot run: {reason}")]
-    QualificationCase { id: String, reason: String },
 }
 
 impl FixtureManifest {
@@ -383,23 +370,6 @@ impl FixtureManifest {
             );
             if is_direct_rust_fixture(row) && row.argv_tokens().len() < 2 {
                 violations.push(format!("{} cargo-test row has no cargo arguments", row.id));
-            }
-            match crate::blocker_ledger::selector::CargoTestSelector::normalize_fixture_argv(
-                &row.argv,
-            ) {
-                Ok(Some(parts)) => {
-                    match crate::blocker_ledger::selector::CargoTestSelector::parse(&parts) {
-                        Ok(selector) if selector.is_exact() => {}
-                        Ok(_) => violations.push(format!(
-                            "{} exact cargo-test row does not select one exact test",
-                            row.id
-                        )),
-                        Err(reason) => violations
-                            .push(format!("{} exact cargo-test row selector {reason}", row.id)),
-                    }
-                }
-                Ok(None) => {}
-                Err(reason) => violations.push(format!("{} {reason}", row.id)),
             }
             if row.comparator == FixtureComparator::ExactOutput
                 && row.status != FixtureStatus::ManifestOnly

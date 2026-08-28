@@ -1,11 +1,7 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::io::Read;
-#[cfg(target_os = "linux")]
-use std::os::fd::AsRawFd as _;
-use std::path::{Path, PathBuf};
-#[cfg(target_os = "linux")]
-use std::sync::Arc;
+use std::path::Path;
 
 use super::paths::{fixture_file, validate_fixture_path};
 use super::statistical::{self, StatisticalSource};
@@ -17,8 +13,6 @@ use super::{
 const FIXTURE_INPUT_TOKEN_PREFIX: &str = "{fixture_input:";
 const FIXTURE_OUTPUT_TOKEN_PREFIX: &str = "{fixture_output:";
 const FIXTURE_TOKEN_SUFFIX: &str = "}";
-#[cfg(target_os = "linux")]
-const FIXTURE_OUTPUT_PARENT: &str = "/tmp";
 pub(super) const AUXILIARY_OUTPUT_LIMIT_BYTES: u64 = 1024 * 1024;
 
 #[derive(Debug)]
@@ -30,27 +24,7 @@ pub(super) struct PreparedFixtureCommand {
 
 #[derive(Debug)]
 struct ScratchRunDirectory {
-    #[cfg(target_os = "linux")]
-    parent: std::fs::File,
-    #[cfg(target_os = "linux")]
-    directory: Arc<std::fs::File>,
-    #[cfg(target_os = "linux")]
-    name: OsString,
-    #[cfg(not(target_os = "linux"))]
     temporary: tempfile::TempDir,
-}
-
-impl Drop for ScratchRunDirectory {
-    fn drop(&mut self) {
-        #[cfg(target_os = "linux")]
-        {
-            drop(crate::qualification::artifact::cleanup_owned_directory(
-                &self.parent,
-                &self.name,
-                &self.directory,
-            ));
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -69,7 +43,10 @@ impl FixtureOutput {
     }
 
     #[cfg(test)]
-    pub(super) fn from_path(expected_relative: impl Into<String>, actual_path: PathBuf) -> Self {
+    pub(super) fn from_path(
+        expected_relative: impl Into<String>,
+        actual_path: std::path::PathBuf,
+    ) -> Self {
         Self {
             expected_relative: expected_relative.into(),
             actual: crate::safe_file::SafeFileLocation::path(actual_path),
@@ -254,86 +231,18 @@ impl ScratchRunDirectory {
             ".stab-oracle-{}-",
             safe_fixture_output_component(process_label)
         );
-        #[cfg(target_os = "linux")]
-        {
-            let temporary = tempfile::Builder::new()
-                .prefix(&prefix)
-                .tempdir_in(FIXTURE_OUTPUT_PARENT)
-                .map_err(|source| FixtureError::CreateOutputDir {
-                    path: PathBuf::from(FIXTURE_OUTPUT_PARENT),
-                    source,
-                })?;
-            let temporary_path = temporary.path().to_path_buf();
-            let name = temporary_path
-                .file_name()
-                .ok_or_else(|| FixtureError::CreateOutputDir {
-                    path: temporary_path.clone(),
-                    source: std::io::Error::other(
-                        "temporary fixture output directory has no final component",
-                    ),
-                })?
-                .to_owned();
-            let parent = crate::safe_file::open_directory(Path::new(FIXTURE_OUTPUT_PARENT))
-                .map_err(|source| FixtureError::CreateOutputDir {
-                    path: PathBuf::from(FIXTURE_OUTPUT_PARENT),
-                    source: std::io::Error::other(source),
-                })?;
-            let directory = crate::qualification::artifact::open_directory_at(&parent, &name)
-                .map_err(|source| FixtureError::CreateOutputDir {
-                    path: temporary_path.clone(),
-                    source: source.into(),
-                })?;
-            rustix::io::fcntl_setfd(&directory, rustix::io::FdFlags::empty()).map_err(
-                |source| FixtureError::CreateOutputDir {
-                    path: temporary_path.clone(),
-                    source: source.into(),
-                },
-            )?;
-            drop(temporary.keep());
-            let scratch = Self {
-                parent,
-                directory: Arc::new(directory),
-                name,
-            };
-            rustix::fs::fsync(&scratch.parent).map_err(|source| FixtureError::CreateOutputDir {
-                path: temporary_path,
-                source: source.into(),
+        let temporary = tempfile::Builder::new()
+            .prefix(&prefix)
+            .tempdir()
+            .map_err(|source| FixtureError::CreateOutputDir {
+                path: std::env::temp_dir(),
+                source,
             })?;
-            Ok(scratch)
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let temporary =
-                tempfile::Builder::new()
-                    .prefix(&prefix)
-                    .tempdir()
-                    .map_err(|source| FixtureError::CreateOutputDir {
-                        path: std::env::temp_dir(),
-                        source,
-                    })?;
-            Ok(Self { temporary })
-        }
+        Ok(Self { temporary })
     }
 
     fn output_location(&self, name: OsString) -> crate::safe_file::SafeFileLocation {
-        #[cfg(target_os = "linux")]
-        {
-            let child_path = PathBuf::from(format!(
-                "/proc/self/fd/{}/{}",
-                self.directory.as_raw_fd(),
-                name.to_string_lossy()
-            ));
-            crate::safe_file::SafeFileLocation::directory_entry(
-                Arc::clone(&self.directory),
-                name,
-                child_path,
-            )
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let path = self.temporary.path().join(name);
-            crate::safe_file::SafeFileLocation::path(path)
-        }
+        crate::safe_file::SafeFileLocation::path(self.temporary.path().join(name))
     }
 }
 
@@ -484,17 +393,6 @@ fn compare_statistical_fixture_output(
         });
     }
     Ok(())
-}
-
-pub(super) fn completed_statistical_shots_for_output(
-    row: &FixtureRow,
-    outputs: &[FixtureOutput],
-) -> Option<u64> {
-    let [output] = outputs else {
-        return None;
-    };
-    let bytes = read_actual_fixture_output(row, output).ok()?;
-    statistical::completed_shots(&row.statistical_plan, &bytes)
 }
 
 pub(super) fn read_actual_fixture_output(

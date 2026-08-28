@@ -1,7 +1,5 @@
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
-#[cfg(target_os = "linux")]
-use std::sync::Arc;
 #[cfg(not(windows))]
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -25,39 +23,11 @@ pub(crate) enum SafeFileError {
 #[derive(Clone, Debug)]
 pub(crate) struct SafeFileLocation {
     display_path: PathBuf,
-    kind: SafeFileLocationKind,
-}
-
-#[derive(Clone, Debug)]
-enum SafeFileLocationKind {
-    #[cfg(any(test, not(target_os = "linux")))]
-    Path,
-    #[cfg(target_os = "linux")]
-    DirectoryEntry {
-        directory: Arc<std::fs::File>,
-        name: std::ffi::OsString,
-    },
 }
 
 impl SafeFileLocation {
-    #[cfg(any(test, not(target_os = "linux")))]
     pub(crate) fn path(path: PathBuf) -> Self {
-        Self {
-            display_path: path,
-            kind: SafeFileLocationKind::Path,
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    pub(crate) fn directory_entry(
-        directory: Arc<std::fs::File>,
-        name: std::ffi::OsString,
-        display_path: PathBuf,
-    ) -> Self {
-        Self {
-            display_path,
-            kind: SafeFileLocationKind::DirectoryEntry { directory, name },
-        }
+        Self { display_path: path }
     }
 
     pub(crate) fn display_path(&self) -> &Path {
@@ -65,14 +35,7 @@ impl SafeFileLocation {
     }
 
     pub(crate) fn open_regular_file(&self) -> Result<std::fs::File, SafeFileError> {
-        match &self.kind {
-            #[cfg(any(test, not(target_os = "linux")))]
-            SafeFileLocationKind::Path => open_regular_file(&self.display_path),
-            #[cfg(target_os = "linux")]
-            SafeFileLocationKind::DirectoryEntry { directory, name } => {
-                open_regular_file_at(directory, name)
-            }
-        }
+        open_regular_file(&self.display_path)
     }
 }
 
@@ -85,27 +48,6 @@ pub(crate) fn open_regular_file(path: &Path) -> Result<std::fs::File, SafeFileEr
     {
         open_regular_file_fallback(path)
     }
-}
-
-#[cfg(target_os = "linux")]
-fn open_regular_file_at(
-    directory: &std::fs::File,
-    name: &std::ffi::OsStr,
-) -> Result<std::fs::File, SafeFileError> {
-    use rustix::fs::{Mode, OFlags};
-
-    let descriptor = rustix::fs::openat(
-        directory,
-        name,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
-        Mode::empty(),
-    )
-    .map_err(std::io::Error::from)?;
-    let file = std::fs::File::from(descriptor);
-    if !file.metadata()?.is_file() {
-        return Err(SafeFileError::NotRegular);
-    }
-    Ok(file)
 }
 
 pub(crate) fn read_regular_file_bounded(
@@ -150,19 +92,6 @@ pub(crate) fn open_directory(path: &Path) -> Result<std::fs::File, SafeFileError
     {
         validate_existing_components(path, true)?;
         Ok(std::fs::File::open(path)?)
-    }
-}
-
-pub(crate) fn create_directory_all(path: &Path) -> Result<(), SafeFileError> {
-    #[cfg(unix)]
-    {
-        let components = absolute_normal_components(path)?;
-        drop(open_or_create_directory_components(components)?);
-        Ok(())
-    }
-    #[cfg(not(unix))]
-    {
-        ensure_directory_fallback(path)
     }
 }
 

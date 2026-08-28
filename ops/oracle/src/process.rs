@@ -125,99 +125,12 @@ where
     let cancellation = ProcessCancellation::for_signals()?;
     run_process_with_control(
         program,
-        None,
         args,
         stdin,
         working_dir,
         timeout,
         monitored_files,
         file_limit,
-        None,
-        &cancellation,
-    )
-}
-
-pub(super) fn run_qualification_process_with_timeout<I, S>(
-    program: &Path,
-    args: I,
-    stdin: &[u8],
-    working_dir: Option<&Path>,
-    timeout: Duration,
-    environment: &[(std::ffi::OsString, std::ffi::OsString)],
-) -> Result<ProcessOutput, OracleError>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    run_qualification_process_with_timeout_and_monitored_files(
-        program,
-        args,
-        stdin,
-        working_dir,
-        timeout,
-        &[],
-        u64::MAX,
-        environment,
-    )
-}
-
-pub(super) fn run_qualification_process_with_timeout_and_arg0<I, S>(
-    program: &Path,
-    arg0: &OsStr,
-    args: I,
-    stdin: &[u8],
-    working_dir: Option<&Path>,
-    timeout: Duration,
-    environment: &[(std::ffi::OsString, std::ffi::OsString)],
-) -> Result<ProcessOutput, OracleError>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let cancellation = ProcessCancellation::for_signals()?;
-    run_process_with_control(
-        program,
-        Some(arg0),
-        args,
-        stdin,
-        working_dir,
-        timeout,
-        &[],
-        u64::MAX,
-        Some(environment),
-        &cancellation,
-    )
-}
-
-#[allow(
-    clippy::too_many_arguments,
-    reason = "qualification process contract is explicit"
-)]
-pub(super) fn run_qualification_process_with_timeout_and_monitored_files<I, S>(
-    program: &Path,
-    args: I,
-    stdin: &[u8],
-    working_dir: Option<&Path>,
-    timeout: Duration,
-    monitored_files: &[SafeFileLocation],
-    file_limit: u64,
-    environment: &[(std::ffi::OsString, std::ffi::OsString)],
-) -> Result<ProcessOutput, OracleError>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let cancellation = ProcessCancellation::for_signals()?;
-    run_process_with_control(
-        program,
-        None,
-        args,
-        stdin,
-        working_dir,
-        timeout,
-        monitored_files,
-        file_limit,
-        Some(environment),
         &cancellation,
     )
 }
@@ -228,14 +141,12 @@ where
 )]
 fn run_process_with_control<I, S>(
     program: &Path,
-    arg0: Option<&OsStr>,
     args: I,
     stdin: &[u8],
     working_dir: Option<&Path>,
     timeout: Duration,
     monitored_files: &[SafeFileLocation],
     file_limit: u64,
-    environment: Option<&[(std::ffi::OsString, std::ffi::OsString)]>,
     cancellation: &ProcessCancellation,
 ) -> Result<ProcessOutput, OracleError>
 where
@@ -246,21 +157,9 @@ where
         return Err(interrupted_without_output(program));
     }
     let mut command = std::process::Command::new(program);
-    #[cfg(unix)]
-    if let Some(arg0) = arg0 {
-        use std::os::unix::process::CommandExt as _;
-
-        command.arg0(arg0);
-    }
-    #[cfg(not(unix))]
-    let _ = arg0;
     command.args(args);
     if let Some(working_dir) = working_dir {
         command.current_dir(working_dir);
-    }
-    if let Some(environment) = environment {
-        command.env_clear();
-        command.envs(environment.iter().map(|(key, value)| (key, value)));
     }
     command
         .stdin(Stdio::piped())
@@ -454,16 +353,6 @@ impl ProcessCancellation {
     fn is_cancelled(&self) -> bool {
         self.cancelled.load(Ordering::Acquire)
     }
-}
-
-pub(crate) fn ensure_qualification_active() -> Result<(), OracleError> {
-    let cancellation = ProcessCancellation::for_signals()?;
-    if cancellation.is_cancelled() {
-        return Err(interrupted_without_output(Path::new(
-            "qualification controller",
-        )));
-    }
-    Ok(())
 }
 
 fn interrupted_without_output(program: &Path) -> OracleError {
@@ -728,7 +617,6 @@ mod tests {
     use super::{
         OUTPUT_LIMIT_BYTES, ProcessCancellation, run_process_with_control,
         run_process_with_timeout, run_process_with_timeout_and_monitored_files,
-        run_qualification_process_with_timeout,
     };
     #[cfg(unix)]
     use crate::OracleError;
@@ -824,14 +712,12 @@ mod tests {
 
         let error = run_process_with_control(
             Path::new("/bin/sh"),
-            None,
             ["-c", "sleep 30 & wait"],
             &[],
             None,
             Duration::from_secs(30),
             &[],
             u64::MAX,
-            None,
             &cancellation,
         )
         .expect_err("controller cancellation must terminate the child tree");
@@ -850,7 +736,6 @@ mod tests {
 
         let error = run_process_with_control(
             Path::new("/bin/sh"),
-            None,
             [
                 OsString::from("-c"),
                 OsString::from("printf started > \"$1\""),
@@ -862,34 +747,12 @@ mod tests {
             Duration::from_secs(2),
             &[],
             u64::MAX,
-            None,
             &cancellation,
         )
         .expect_err("sticky cancellation must reject a later spawn");
 
         assert!(matches!(error, OracleError::Interrupted { .. }));
         assert!(!marker.exists());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn qualification_process_inherits_only_the_explicit_environment() {
-        let environment = vec![(OsString::from("CQ_VISIBLE"), OsString::from("bound"))];
-
-        let output = run_qualification_process_with_timeout(
-            Path::new("/bin/sh"),
-            [
-                "-c",
-                "printf '%s:%s' \"${CQ_VISIBLE-unset}\" \"${HOME-unset}\"",
-            ],
-            &[],
-            None,
-            Duration::from_secs(2),
-            &environment,
-        )
-        .expect("qualification environment probe");
-
-        assert_eq!(output.stdout.bytes, b"bound:unset");
     }
 
     #[cfg(unix)]

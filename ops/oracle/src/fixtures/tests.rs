@@ -1,12 +1,13 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunFilter, RunMode, cargo_test_passed_test_count, check_direct_rust_fixture_executed_tests,
-    compare_fixture,
+    RunFilter, RunMode, compare_fixture,
     hex_payload::decode as decode_hex_payload,
     is_recordable,
     outputs::{self, FixtureArgToken},
     run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
 };
+
+use super::direct_rust::{cargo_test_passed_test_count, check_direct_rust_fixture_executed_tests};
 
 mod extracted_packages;
 
@@ -424,9 +425,8 @@ fn repository_fixture_placeholder_files_exist() {
     }
 }
 
-#[cfg(target_os = "linux")]
 #[test]
-fn fixture_output_placeholders_use_inherited_descriptor_paths() {
+fn fixture_output_placeholders_use_owned_temporary_storage() {
     let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -447,12 +447,11 @@ fn fixture_output_placeholders_use_inherited_descriptor_paths() {
         output.expected_relative,
         "expected/m11_sample_dem_observable_obs.stdout"
     );
-    assert!(output.actual_path().starts_with("/proc/self/fd/"));
     assert!(
         command
             .argv
             .iter()
-            .any(|token| token.to_string_lossy().starts_with("/proc/self/fd/"))
+            .any(|token| token == output.actual_path().as_os_str())
     );
     let run_dir = output
         .actual_path()
@@ -460,18 +459,14 @@ fn fixture_output_placeholders_use_inherited_descriptor_paths() {
         .expect("fixture run directory")
         .to_path_buf();
     assert!(run_dir.is_dir());
-    let owned_run_dir = std::fs::read_link(&run_dir).expect("descriptor-owned run directory");
-    assert!(owned_run_dir.starts_with("/tmp"));
-    std::fs::write(output.actual_path(), b"descriptor-owned").expect("write side output");
+    assert!(run_dir.starts_with(std::env::temp_dir()));
+    std::fs::write(output.actual_path(), b"owned").expect("write side output");
     assert_eq!(
         outputs::read_actual_fixture_output(row, output).expect("read side output"),
-        b"descriptor-owned"
+        b"owned"
     );
     drop(command);
-    assert!(
-        !owned_run_dir.exists(),
-        "scratch run directory must be removed"
-    );
+    assert!(!run_dir.exists(), "scratch run directory must be removed");
 }
 
 #[cfg(target_os = "linux")]
@@ -602,30 +597,6 @@ fn statistical_plan_source_rejects_unknown_values() {
             .expect_err("unknown source should fail")
             .contains("unknown statistical source")
     );
-}
-
-#[test]
-fn two_sided_statistical_completion_retains_the_completed_side() {
-    let csv = format!(
-        "{HEADER}partial,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|4|--seed|5,inputs/sample_noisy.stim,,0,empty,implemented,\"sample_count=4; fixed_seed=5; tolerate binomial p=0.5 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
-    );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let row = manifest.rows.first().expect("one row");
-    let complete = process_output(Some(0), b"0\n0\n1\n1\n", b"");
-    let short = process_output(Some(1), b"0\n1\n", b"rejected");
-
-    let completion = super::qualification::completed_statistical_work(
-        row,
-        Some(&complete),
-        Some(&short),
-        &[],
-        &[],
-    )
-    .expect("partial statistical completion");
-
-    assert_eq!(completion.shots, 4);
-    assert_eq!(completion.comparisons, 1);
-    assert_eq!(completion.batches, 1);
 }
 
 #[test]
@@ -765,7 +736,6 @@ fn binomial_statistical_comparator_accepts_samples_within_tolerance() {
     stdout.extend(std::iter::repeat_n(b"0\n", 750).flatten());
 
     assert_eq!(statistical::compare_statistical_plan(plan, &stdout), None);
-    assert_eq!(statistical::completed_shots(plan, &stdout), Some(1_000));
 }
 
 #[test]
@@ -780,7 +750,6 @@ fn binomial_statistical_comparator_rejects_samples_outside_tolerance() {
             .expect("statistical rejection")
             .contains("outside the accepted integer range")
     );
-    assert_eq!(statistical::completed_shots(plan, &stdout), Some(1_000));
 }
 
 #[test]
@@ -792,7 +761,6 @@ fn binomial_statistical_comparator_rejects_non_bit_output() {
             .expect("statistical rejection")
             .contains("expected one 0/1 bit per shot")
     );
-    assert_eq!(statistical::completed_shots(plan, b"shot M0\n"), None);
 }
 
 #[test]
@@ -804,7 +772,6 @@ fn binomial_statistical_comparator_rejects_sample_count_mismatch() {
             .expect("statistical rejection")
             .contains("expected 2 samples")
     );
-    assert_eq!(statistical::completed_shots(plan, b"0\n"), None);
 }
 
 #[test]
@@ -1019,8 +986,8 @@ fn fixture_output_scratch_ignores_repository_symlink() {
         .expect("repository scratch symlink is outside the descriptor-owned output path");
     let output = command.outputs.first().expect("one output");
 
-    assert!(output.actual_path().starts_with("/proc/self/fd/"));
-    std::fs::write(output.actual_path(), b"inside").expect("write descriptor-owned output");
+    assert!(!output.actual_path().starts_with(&oracle_target));
+    std::fs::write(output.actual_path(), b"inside").expect("write temporary output");
     assert_eq!(
         std::fs::read_dir(&outside)
             .expect("outside directory")

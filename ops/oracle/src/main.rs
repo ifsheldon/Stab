@@ -9,13 +9,11 @@
     )
 )]
 
-mod blocker_ledger;
 mod fixtures;
 mod gate_catalog;
 mod matrix;
 mod parity;
 mod process;
-mod qualification;
 mod result_format_corpus;
 mod safe_file;
 mod statistical_contract;
@@ -28,7 +26,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand, ValueEnum};
 use thiserror::Error;
 
-use process::{render_bytes_for_diagnostics, run_checked, run_checked_path, run_process};
+use process::{render_bytes_for_diagnostics, run_checked, run_process};
 
 const PREFIX: &str = "stab-oracle";
 const STIM_TAG: &str = "v1.16.0";
@@ -125,17 +123,6 @@ enum Command {
         milestone: Option<String>,
     },
 
-    /// Validate and inspect the historical non-deferred blocker closure ledger.
-    Blockers {
-        /// Print every owned subcase after validation.
-        #[arg(long)]
-        list: bool,
-
-        /// Resolve every claimed existing Cargo test selector and reject zero matches.
-        #[arg(long)]
-        check_selectors: bool,
-    },
-
     /// Validate the pinned Stim result-format compatibility corpus.
     ResultFormats {
         /// Execute every corpus case against pinned Stim and Stab.
@@ -159,12 +146,6 @@ enum Command {
         #[command(subcommand)]
         command: parity::Command,
     },
-
-    /// Build, inspect, or validate comprehensive qualification inventories.
-    Qualification {
-        #[command(subcommand)]
-        command: qualification::Command,
-    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -181,9 +162,6 @@ enum OracleCase {
 #[derive(Debug, Error)]
 enum OracleError {
     #[error(transparent)]
-    BlockerLedger(#[from] blocker_ledger::BlockerLedgerError),
-
-    #[error(transparent)]
     Fixture(#[from] fixtures::FixtureError),
 
     #[error(transparent)]
@@ -191,9 +169,6 @@ enum OracleError {
 
     #[error(transparent)]
     Matrix(#[from] matrix::MatrixError),
-
-    #[error(transparent)]
-    Qualification(#[from] qualification::QualificationError),
 
     #[error(transparent)]
     ResultFormatCorpus(#[from] result_format_corpus::ResultFormatCorpusError),
@@ -208,12 +183,6 @@ enum OracleError {
     ResolveRoot {
         path: PathBuf,
         source: std::io::Error,
-    },
-
-    #[error("failed to resolve executable {program}: {reason}")]
-    ResolveExecutable {
-        program: &'static str,
-        reason: Box<str>,
     },
 
     #[error("Stim source directory does not exist at {0}")]
@@ -406,25 +375,6 @@ impl RepoRoot {
             .join("manifest.csv")
     }
 
-    fn blocker_ledger(&self) -> PathBuf {
-        self.path
-            .join("docs")
-            .join("plans")
-            .join("blocker-closure-ledger.json")
-    }
-
-    fn qualification_manifest(&self) -> PathBuf {
-        self.path.join("oracle").join("qualification-manifest.json")
-    }
-
-    fn qualification_cases(&self) -> PathBuf {
-        self.path.join("oracle").join("qualification-cases.json")
-    }
-
-    fn benchmark_manifest(&self) -> PathBuf {
-        self.path.join("benchmarks").join("manifest.csv")
-    }
-
     fn stab_cli_binary(&self) -> PathBuf {
         self.path
             .join("target")
@@ -462,17 +412,6 @@ impl CapturedOutput {
 impl fmt::Display for CapturedOutput {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.render_for_diagnostics())
-    }
-}
-
-impl OracleError {
-    fn captured_streams(&self) -> Option<(&CapturedOutput, &CapturedOutput)> {
-        match self {
-            Self::OutputLimitExceeded { stdout, stderr, .. }
-            | Self::TimedOut { stdout, stderr, .. }
-            | Self::Interrupted { stdout, stderr, .. } => Some((stdout, stderr)),
-            _ => None,
-        }
     }
 }
 
@@ -574,13 +513,6 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         Command::Matrix { check, milestone } => {
             run_matrix_command(&root, check, milestone.as_deref())?;
         }
-        Command::Blockers {
-            list,
-            check_selectors,
-        } => {
-            validate_stim_source(&root)?;
-            blocker_ledger::validate_and_print(&root, list, check_selectors)?;
-        }
         Command::ResultFormats {
             check,
             rebuild_stim,
@@ -595,10 +527,6 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         Command::Parity { command } => {
             validate_stim_source(&root)?;
             parity::run(&root, command)?;
-        }
-        Command::Qualification { command } => {
-            validate_stim_source(&root)?;
-            qualification::run(&root, command)?;
         }
     }
     Ok(())
@@ -744,13 +672,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let git = qualification::executables::resolve_from_path("git").map_err(|source| {
-        OracleError::ResolveExecutable {
-            program: "git",
-            reason: source.to_string().into_boxed_str(),
-        }
-    })?;
-    let output = run_checked_path(&git, args, b"", Some(working_dir))?;
+    let output = run_checked("git", args, b"", Some(working_dir))?;
     Ok(String::from_utf8_lossy(&output.stdout.bytes)
         .trim()
         .to_string())
