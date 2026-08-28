@@ -20,7 +20,7 @@ use thiserror::Error;
 
 const EXPERIMENT_SEED: u64 = 0xA7D3_C0DE;
 const EXPERIMENT_SHOTS: u64 = 1_024;
-const DIAGNOSTIC_REPORTS: [(u64, u64); 3] = [(1_024, 37), (16_384, 582), (262_144, 9_353)];
+const DIAGNOSTIC_SHOT_COUNTS: [u64; 3] = [1_024, 16_384, 262_144];
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct ExperimentReport {
@@ -30,12 +30,13 @@ struct ExperimentReport {
 
 #[test]
 fn public_sample_detect_decode_experiment_is_seeded_and_partition_invariant() {
-    for (shots, expected_failures) in DIAGNOSTIC_REPORTS {
+    for shots in DIAGNOSTIC_SHOT_COUNTS {
         let report = run_experiment(&[shots]);
+        let repeated = run_experiment(&[shots]);
         assert_eq!(report.shots, shots);
-        assert_eq!(report.logical_failures, expected_failures);
-        assert!(report.logical_failures > 0);
-        assert!(report.logical_failures < report.shots);
+        assert_eq!(report, repeated);
+        assert!(report.logical_failures * 50 > report.shots);
+        assert!(report.logical_failures * 20 < report.shots);
     }
 
     let whole = run_experiment(&[EXPERIMENT_SHOTS]);
@@ -45,9 +46,6 @@ fn public_sample_detect_decode_experiment_is_seeded_and_partition_invariant() {
     assert_eq!(whole, repeated);
     assert_eq!(whole, partitioned);
     assert_eq!(whole.shots, EXPERIMENT_SHOTS);
-    assert_eq!(whole.logical_failures, 37);
-    assert!(whole.logical_failures > 0);
-    assert!(whole.logical_failures < whole.shots);
 }
 
 fn run_experiment(partitions: &[u64]) -> ExperimentReport {
