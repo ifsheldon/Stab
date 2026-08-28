@@ -27,6 +27,9 @@ pub enum BitError {
     #[error("bit length mismatch: left={left} right={right}")]
     LengthMismatch { left: usize, right: usize },
 
+    #[error("packed byte length mismatch: expected {expected}, got {actual}")]
+    ByteLengthMismatch { actual: usize, expected: usize },
+
     #[error("bit index {index} is outside length {len}")]
     BitIndexOutOfRange { index: usize, len: usize },
 
@@ -41,6 +44,12 @@ pub enum BitError {
 
     #[error("word-row transpose supports at most {maximum} columns, got {actual}")]
     WordRowTransposeTooWide { actual: usize, maximum: usize },
+
+    #[error("matrix-to-word-row transpose supports at most {maximum} rows, got {actual}")]
+    MatrixToWordRowsTooTall { actual: usize, maximum: usize },
+
+    #[error("matrix row prefix {requested} exceeds the available {available} rows")]
+    MatrixRowPrefixOutOfRange { requested: usize, available: usize },
 
     #[error("could not allocate packed storage for {words} words")]
     StorageAllocationFailed { words: usize },
@@ -473,6 +482,34 @@ impl BitMatrix {
         Ok(())
     }
 
+    /// Replaces one row from little-endian packed bytes.
+    pub fn copy_row_from_le_bytes(&mut self, row: usize, bytes: &[u8]) -> BitResult<()> {
+        let expected = self.cols().div_ceil(u8::BITS as usize);
+        if bytes.len() != expected {
+            return Err(BitError::ByteLengthMismatch {
+                actual: bytes.len(),
+                expected,
+            });
+        }
+        let bit_len = self.cols.get();
+        let tail_mask = self.cols.last_word_mask();
+        let row_words = self.row_words_mut(row)?;
+        row_words.fill(0);
+        for (byte_index, byte) in bytes.iter().copied().enumerate() {
+            let word = row_words.get_mut(byte_index / size_of::<u64>()).ok_or(
+                BitError::BitIndexOutOfRange {
+                    index: byte_index.saturating_mul(u8::BITS as usize),
+                    len: bit_len,
+                },
+            )?;
+            *word |= u64::from(byte) << ((byte_index % size_of::<u64>()) * u8::BITS as usize);
+        }
+        if let Some(last) = row_words.last_mut() {
+            *last &= tail_mask;
+        }
+        Ok(())
+    }
+
     pub fn row(&self, row: usize) -> BitResult<BitSlice<'_>> {
         self.ensure_row(row)?;
         let range = self.row_range(row).ok_or(BitError::RowIndexOutOfRange {
@@ -555,6 +592,37 @@ impl BitMatrix {
             });
         }
         transpose::word_rows_into(source_rows, self);
+        Ok(())
+    }
+
+    /// Copies the transpose of a row prefix into one packed word per matrix column.
+    ///
+    /// At most 64 source rows may be selected. Bits beyond `row_count` in each target word are
+    /// cleared, so callers can safely reuse the target storage for shorter batches.
+    pub fn copy_transpose_prefix_into_word_rows(
+        &self,
+        row_count: usize,
+        target_rows: &mut [u64],
+    ) -> BitResult<()> {
+        if target_rows.len() != self.cols() {
+            return Err(BitError::LengthMismatch {
+                left: target_rows.len(),
+                right: self.cols(),
+            });
+        }
+        if row_count > self.rows {
+            return Err(BitError::MatrixRowPrefixOutOfRange {
+                requested: row_count,
+                available: self.rows,
+            });
+        }
+        if row_count > WORD_BITS {
+            return Err(BitError::MatrixToWordRowsTooTall {
+                actual: row_count,
+                maximum: WORD_BITS,
+            });
+        }
+        transpose::matrix_rows_into_word_rows(self, row_count, target_rows);
         Ok(())
     }
 

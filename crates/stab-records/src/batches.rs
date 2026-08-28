@@ -95,6 +95,13 @@ impl PackedShotBatch {
             .map_err(bit_storage_error)
     }
 
+    /// Replaces one shot from a B8-format little-endian packed record.
+    pub fn copy_shot_from_b8(&mut self, shot_index: usize, record: &[u8]) -> RecordResult<()> {
+        self.storage
+            .copy_row_from_le_bytes(shot_index, record)
+            .map_err(bit_storage_error)
+    }
+
     pub fn shot(&self, shot_index: usize) -> RecordResult<BitSlice<'_>> {
         self.storage.row(shot_index).map_err(bit_storage_error)
     }
@@ -170,6 +177,16 @@ impl<'a> PackedShotBatchView<'a> {
         }
         self.storage.row(shot_index).map_err(bit_storage_error)
     }
+
+    /// Copies this shot-major batch into one packed word per result-bit plane.
+    ///
+    /// The view may contain at most 64 shots. Reused target words are fully replaced and inactive
+    /// high lanes are cleared.
+    pub fn copy_into_bit_plane_words(self, target: &mut [u64]) -> RecordResult<()> {
+        self.storage
+            .copy_transpose_prefix_into_word_rows(self.shot_count, target)
+            .map_err(bit_storage_error)
+    }
 }
 
 /// Owned bit planes for at most 64 shots.
@@ -200,16 +217,7 @@ impl BitPlane64Batch {
     pub fn from_shot_major(batch: PackedShotBatchView<'_>) -> RecordResult<Self> {
         validate_bit_plane_shots(batch.shot_count())?;
         let mut planes = Self::zeros(batch.shot_count(), batch.bits_per_shot())?;
-        for shot_index in 0..batch.shot_count() {
-            for bit_index in 0..batch.bits_per_shot() {
-                let value = batch.get(shot_index, bit_index).ok_or_else(|| {
-                    FormatError::invalid_data("packed shot prefix escaped its declared dimensions")
-                })?;
-                if value {
-                    planes.set(bit_index, shot_index, true)?;
-                }
-            }
-        }
+        batch.copy_into_bit_plane_words(&mut planes.planes)?;
         Ok(planes)
     }
 
@@ -386,6 +394,22 @@ impl<'a> BitPlane64BatchView<'a> {
             return BitSlice::new(&[], 0).map_err(bit_storage_error);
         }
         BitSlice::new(std::slice::from_ref(word), self.shot_count).map_err(bit_storage_error)
+    }
+
+    /// Copies the logical planes into reusable word storage and clears inactive high lanes.
+    pub fn copy_words_into(self, target: &mut [u64]) -> RecordResult<()> {
+        if target.len() != self.bits_per_shot {
+            return Err(batch_width_mismatch(
+                "bit-plane target storage",
+                target.len(),
+                self.bits_per_shot,
+            ));
+        }
+        let mask = low_bits_mask(self.shot_count);
+        for (target, source) in target.iter_mut().zip(self.planes) {
+            *target = *source & mask;
+        }
+        Ok(())
     }
 }
 
@@ -784,6 +808,21 @@ mod tests {
                 .copy_shot_from_bools(2, &[false, true, true, false])
                 .is_err()
         );
+
+        let mut packed_bytes = PackedShotBatch::zeros(2, 10).unwrap();
+        packed_bytes.copy_shot_from_b8(0, &[0xff, 0xff]).unwrap();
+        assert!((0..10).all(|bit| packed_bytes.get(0, bit) == Some(true)));
+        packed_bytes.copy_shot_from_b8(0, &[0x01, 0x02]).unwrap();
+        assert_eq!(
+            (0..10)
+                .map(|bit| packed_bytes.get(0, bit).unwrap())
+                .collect::<Vec<_>>(),
+            [
+                true, false, false, false, false, false, false, false, false, true
+            ]
+        );
+        assert!(packed_bytes.copy_shot_from_b8(0, &[0]).is_err());
+        assert!(packed_bytes.copy_shot_from_b8(2, &[0, 0]).is_err());
     }
 
     #[test]
@@ -809,6 +848,38 @@ mod tests {
     }
 
     #[test]
+    fn packed_and_bit_plane_bulk_copies_are_exact_for_partial_batches() {
+        for shots in [0, 1, 17, 63, 64] {
+            for width in [0, 1, 7, 8, 9, 63, 64, 65, 256] {
+                let mut packed = PackedShotBatch::zeros(64, width).unwrap();
+                for shot in 0..64 {
+                    for bit in 0..width {
+                        if (shot * 5 + bit * 3) % 11 < 4 {
+                            packed.set(shot, bit, true).unwrap();
+                        }
+                    }
+                }
+                let prefix = packed.view_prefix(shots).unwrap();
+                let mut words = vec![u64::MAX; width];
+                prefix.copy_into_bit_plane_words(&mut words).unwrap();
+                let borrowed = BitPlane64BatchView::try_from_words(&words, shots, width).unwrap();
+                let mut copied = vec![u64::MAX; width];
+                borrowed.copy_words_into(&mut copied).unwrap();
+                assert_eq!(copied, words);
+
+                let round_trip = PackedShotBatch::from_bit_planes(borrowed).unwrap();
+                assert_eq!(round_trip.shot_count(), shots);
+                assert_eq!(round_trip.bits_per_shot(), width);
+                for shot in 0..shots {
+                    for bit in 0..width {
+                        assert_eq!(round_trip.get(shot, bit), packed.get(shot, bit));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn borrowed_bit_plane_words_validate_layout_and_hide_tail_bits() {
         let words = [u64::MAX, 0b10];
         let view = BitPlane64BatchView::try_from_words(&words, 2, 2).unwrap();
@@ -823,9 +894,13 @@ mod tests {
         let plane = view.plane(0).unwrap();
         assert_eq!(plane.popcount(), 2);
         assert_eq!(plane.words(), &[u64::MAX]);
+        let mut copied = [u64::MAX; 2];
+        view.copy_words_into(&mut copied).unwrap();
+        assert_eq!(copied, [0b11, 0b10]);
 
         assert!(BitPlane64BatchView::try_from_words(&words, 65, 2).is_err());
         assert!(BitPlane64BatchView::try_from_words(&words, 2, 1).is_err());
+        assert!(view.copy_words_into(&mut copied[..1]).is_err());
     }
 
     #[test]

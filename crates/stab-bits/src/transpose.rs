@@ -62,6 +62,25 @@ pub(super) fn word_rows_into(source_rows: &[u64], target: &mut BitMatrix) {
     }
 }
 
+pub(super) fn matrix_rows_into_word_rows(
+    source: &BitMatrix,
+    row_count: usize,
+    target_rows: &mut [u64],
+) {
+    target_rows.fill(0);
+    if row_count == 0 || source.cols() == 0 {
+        return;
+    }
+    let row_mask = low_bits_mask(row_count);
+    for (column_base, target_chunk) in target_rows.chunks_mut(TILE_BITS).enumerate() {
+        let mut tile = load_tile(source, 0, column_base * TILE_BITS);
+        transpose_tile(&mut tile);
+        for (target, word) in target_chunk.iter_mut().zip(tile) {
+            *target = word & row_mask;
+        }
+    }
+}
+
 fn load_tile(matrix: &BitMatrix, row_base: usize, col_base: usize) -> [u64; 64] {
     let mut tile = [0_u64; TILE_BITS];
     let row_count = TILE_BITS.min(matrix.rows.saturating_sub(row_base));
@@ -196,5 +215,56 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn packed_matrix_prefix_transposes_into_reusable_word_rows() {
+        for row_count in [0, 1, 17, 64] {
+            for width in [0, 1, 63, 64, 65, 129] {
+                let mut source = BitMatrix::zeros(64, width).expect("source matrix");
+                for row in 0..64 {
+                    for column in 0..width {
+                        if (row * 7 + column * 11) % 13 < 5 {
+                            source.set(row, column, true).expect("source bit");
+                        }
+                    }
+                }
+                let mut target = vec![u64::MAX; width];
+                source
+                    .copy_transpose_prefix_into_word_rows(row_count, &mut target)
+                    .expect("transpose matrix prefix");
+                for (column, word) in target.iter().copied().enumerate() {
+                    for row in 0..64 {
+                        let expected =
+                            row < row_count && source.get(row, column).expect("source dimensions");
+                        assert_eq!((word >> row) & 1 != 0, expected);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn packed_matrix_prefix_transpose_rejects_invalid_dimensions() {
+        let source = BitMatrix::zeros(65, 7).expect("source matrix");
+        let mut target = [0_u64; 7];
+        assert!(matches!(
+            source.copy_transpose_prefix_into_word_rows(66, &mut target),
+            Err(super::super::BitError::MatrixRowPrefixOutOfRange {
+                requested: 66,
+                available: 65
+            })
+        ));
+        assert!(matches!(
+            source.copy_transpose_prefix_into_word_rows(65, &mut target),
+            Err(super::super::BitError::MatrixToWordRowsTooTall {
+                actual: 65,
+                maximum: 64
+            })
+        ));
+        assert!(matches!(
+            source.copy_transpose_prefix_into_word_rows(64, &mut target[..6]),
+            Err(super::super::BitError::LengthMismatch { left: 6, right: 7 })
+        ));
     }
 }
