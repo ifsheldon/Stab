@@ -37,7 +37,7 @@ just bench::e2e-release-check
 
 Every run writes to a previously absent child under `target/benchmarks/`. A bundle contains the exact suite, run identity, correctness witnesses, raw samples, derived JSON and Markdown reports, and a digest manifest. `e2e-replay` rejects extra files or changed bytes and reconstructs the report deterministically without executing a workload.
 
-The current controlled AArch64 full and soak bundles are named by [current-aarch64-evidence.toml](current-aarch64-evidence.toml). Both pass Stim parity, memory, correctness witnesses, and offline replay. They remain explicitly `unseeded`; the current suite contains exactly the first self-regression baseline derived from that pair, so no retroactive self-regression pass is claimed.
+The current controlled AArch64 full and soak bundles are named by [current-aarch64-evidence.toml](current-aarch64-evidence.toml). Both pass Stim parity, seeded Stab self-regression, memory, correctness witnesses, and offline replay. The historical `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` pair remains the explicitly `unseeded` source of the first reviewed baseline; no retroactive self-regression pass is claimed for that seeding evidence.
 
 `e2e-release-check` validates that pointer, both immutable bundles, the exact measured ancestor, and the narrow evidence-only descendant. It requires either a passing seeded self-regression result or the exact first baseline derived from an unseeded full-and-soak pair.
 
