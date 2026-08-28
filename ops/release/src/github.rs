@@ -57,7 +57,7 @@ pub(crate) fn create_verified_draft(
     let target = target::PRODUCTION;
     target.require_tag(tag)?;
     let cancellation = ReleaseCancellation::for_signals()?;
-    authorization::require_a9_release(root, &cancellation)?;
+    authorization::require_release_evidence(root, &cancellation)?;
     reviewed.revalidate()?;
     repository::require_unchanged(root, &commit)?;
 
@@ -136,7 +136,7 @@ pub(crate) fn verify_remote_release(
     let target = target::PRODUCTION;
     target.require_tag(tag)?;
     let cancellation = ReleaseCancellation::for_signals()?;
-    authorization::require_a9_release(root, &cancellation)?;
+    authorization::require_release_evidence(root, &cancellation)?;
     reviewed.revalidate()?;
     repository::require_unchanged(root, &commit)?;
 

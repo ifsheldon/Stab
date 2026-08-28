@@ -27,7 +27,7 @@ pub(crate) fn publish_reviewed(
     let reviewed_packages = preflight_directory.open_directory(OsStr::new("packages"))?;
     let reviewed_metadata = preflight_directory.open_directory(OsStr::new("registry-metadata"))?;
     let cancellation = crate::cancellation::ReleaseCancellation::for_signals()?;
-    authorization::require_a9_release(root, &cancellation)?;
+    authorization::require_release_evidence(root, &cancellation)?;
     preflight_directory.revalidate()?;
     reviewed_packages.revalidate()?;
     reviewed_metadata.revalidate()?;

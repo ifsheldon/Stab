@@ -9,15 +9,15 @@ const MAX_AUTHORIZATION_OUTPUT_BYTES: usize = 8 << 20;
 const AUTHORIZATION_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 static AUTHORIZATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-pub(crate) fn require_a9_release(
+pub(crate) fn require_release_evidence(
     root: &Path,
     cancellation: &ReleaseCancellation,
 ) -> Result<(), ReleaseError> {
     require(
         root,
         cancellation,
-        "A9 release authorization",
-        &[qualification_status_arguments(root)],
+        "E2E release authorization",
+        &[e2e_release_check_arguments(root)],
     )
 }
 
@@ -57,7 +57,7 @@ fn require(
     cancellation.check(operation)
 }
 
-fn qualification_status_arguments(root: &Path) -> Vec<OsString> {
+fn e2e_release_check_arguments(root: &Path) -> Vec<OsString> {
     let mut arguments = [
         "run",
         "--quiet",
@@ -70,9 +70,7 @@ fn qualification_status_arguments(root: &Path) -> Vec<OsString> {
     .map(OsString::from)
     .to_vec();
     arguments.push(root.as_os_str().to_os_string());
-    arguments.push(OsString::from("qualification-status"));
-    arguments.push(OsString::from("--check"));
-    arguments.push(OsString::from("--require-release-completion"));
+    arguments.push(OsString::from("e2e-release-check"));
     arguments
 }
 
@@ -81,10 +79,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn authorization_uses_the_checked_a9_status_contract() {
+    fn authorization_uses_the_checked_e2e_evidence_contract() {
         let root = Path::new("/source");
         assert_eq!(
-            qualification_status_arguments(root),
+            e2e_release_check_arguments(root),
             [
                 "run",
                 "--quiet",
@@ -94,9 +92,7 @@ mod tests {
                 "--",
                 "--root",
                 "/source",
-                "qualification-status",
-                "--check",
-                "--require-release-completion",
+                "e2e-release-check",
             ]
             .map(OsString::from)
         );
