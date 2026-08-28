@@ -13,6 +13,10 @@ keywords.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+portable-simd = ["stab-bits/portable-simd"]
+
 [dependencies]
 arrayvec = { workspace = true }
 hex = { workspace = true }
@@ -20,6 +24,7 @@ rand = { workspace = true }
 sha2 = { workspace = true }
 stab-algebra = { workspace = true }
 stab-analysis = { workspace = true }
+stab-bits = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }
 thiserror = { workspace = true }

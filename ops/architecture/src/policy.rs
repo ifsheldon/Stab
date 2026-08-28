@@ -44,6 +44,7 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
         &[
             "stab-algebra",
             "stab-analysis",
+            "stab-bits",
             "stab-model",
             "stab-records",
         ],

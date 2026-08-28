@@ -11,7 +11,9 @@ use portable as selected;
 use scalar as selected;
 
 use std::fmt::{Display, Formatter};
-use std::ops::{Deref, DerefMut, Range};
+use std::ops::{
+    BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Deref, DerefMut, Not, Range,
+};
 
 use thiserror::Error;
 
@@ -108,23 +110,29 @@ impl From<usize> for BitLen {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct BitBlock {
     words: [u64; BIT_BLOCK_WORDS],
 }
 
 impl BitBlock {
-    pub fn zero() -> Self {
-        Self {
-            words: [0; BIT_BLOCK_WORDS],
-        }
+    pub const ZERO: Self = Self {
+        words: [0; BIT_BLOCK_WORDS],
+    };
+
+    pub const ONES: Self = Self {
+        words: [u64::MAX; BIT_BLOCK_WORDS],
+    };
+
+    pub const fn zero() -> Self {
+        Self::ZERO
     }
 
-    pub fn from_words(words: [u64; BIT_BLOCK_WORDS]) -> Self {
+    pub const fn from_words(words: [u64; BIT_BLOCK_WORDS]) -> Self {
         Self { words }
     }
 
-    pub fn words(self) -> [u64; BIT_BLOCK_WORDS] {
+    pub const fn words(self) -> [u64; BIT_BLOCK_WORDS] {
         self.words
     }
 
@@ -142,6 +150,56 @@ impl BitBlock {
 
     pub fn popcount(self) -> usize {
         scalar::popcount_words(&self.words)
+    }
+}
+
+impl BitXor for BitBlock {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        self.xor(rhs)
+    }
+}
+
+impl BitXorAssign for BitBlock {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = self.xor(rhs);
+    }
+}
+
+impl BitAnd for BitBlock {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        self.and(rhs)
+    }
+}
+
+impl BitAndAssign for BitBlock {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = self.and(rhs);
+    }
+}
+
+impl BitOr for BitBlock {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self.or(rhs)
+    }
+}
+
+impl BitOrAssign for BitBlock {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = self.or(rhs);
+    }
+}
+
+impl Not for BitBlock {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self::from_words(self.words.map(Not::not))
     }
 }
 

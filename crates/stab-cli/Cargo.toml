@@ -14,7 +14,7 @@ workspace = true
 
 [features]
 default = []
-portable-simd = ["stab-bits/portable-simd"]
+portable-simd = ["stab-bits/portable-simd", "stab-engine/portable-simd"]
 
 [dependencies]
 clap = { workspace = true }

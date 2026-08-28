@@ -115,6 +115,22 @@ fn bits_bit_block_word_ops_match_scalar_reference() {
         left.or(right).popcount(),
         reference_popcount_words(&left.or(right).words())
     );
+    assert_eq!((left ^ right).words(), left.xor(right).words());
+    assert_eq!((left & right).words(), left.and(right).words());
+    assert_eq!((left | right).words(), left.or(right).words());
+    assert_eq!((!left).words(), left.words().map(|word| !word));
+
+    let mut assigned = left;
+    assigned ^= right;
+    assert_eq!(assigned, left.xor(right));
+    assigned = left;
+    assigned &= right;
+    assert_eq!(assigned, left.and(right));
+    assigned = left;
+    assigned |= right;
+    assert_eq!(assigned, left.or(right));
+    assert_eq!(BitBlock::default(), BitBlock::ZERO);
+    assert_eq!(BitBlock::ONES.popcount(), 256);
 }
 
 #[test]

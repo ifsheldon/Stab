@@ -104,7 +104,7 @@ fn zero_shot_run_leaves_sink_and_random_stream_untouched() {
 #[test]
 fn cancellation_between_batches_preserves_the_resumable_random_stream() {
     let plan = noisy_plan();
-    let requested = 130_u64;
+    let requested = 386_u64;
     let expected = clean_records(&plan, 31, requested);
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(31)))

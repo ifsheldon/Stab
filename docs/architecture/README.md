@@ -77,7 +77,7 @@ stab-reference-decoder -> stab-decoder + stab-model + stab-records
 stab-reference-noise-pass -> stab-analysis + stab-model
 stab-decoder -> stab-model + stab-records
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-records + stab-decoder
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-bits
 stab-analysis -> stab-model + stab-algebra
 stab-model -> no Stab crate
 stab-algebra -> stab-bits
@@ -95,7 +95,7 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-bits
 stab-decoder -> stab-model + stab-records
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-records + stab-decoder
 stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records

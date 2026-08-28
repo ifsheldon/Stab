@@ -1,12 +1,16 @@
 use rand::Rng;
+use stab_bits::{BIT_BLOCK_WORDS, BitBlock};
 use stab_model::Circuit;
 
 use super::program::{FrameProgram, FrameProgramAdmission};
-use super::{BitPlaneDetectionFrame, FrameExecutionMode, batch_active_mask};
+use super::word::FrameWord;
+use super::{BitPlaneDetectionFrame, FrameExecutionMode};
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
 use crate::detection::{ConversionPlan, DetectionConversionLimits};
+
+pub(crate) const PAULI_FRAME_BATCH_SHOTS: usize = BIT_BLOCK_WORDS * u64::BITS as usize;
 
 #[derive(Clone, Debug)]
 pub(in crate::detection) struct DirectDetectorFramePlan {
@@ -79,7 +83,7 @@ impl DirectDetectorFramePlan {
         shot_count: usize,
     ) -> DetectionResult<()> {
         let mode = FrameExecutionMode::Sample {
-            active_mask: batch_active_mask(shot_count),
+            active_lanes: shot_count,
         };
         state.frame.reset(rng, mode);
         state.frame.execute_program(&self.executable, rng, mode)?;
@@ -131,7 +135,7 @@ impl PauliFrameSamplingPlan {
         rng: &mut impl Rng,
     ) -> DetectionResult<()> {
         let mode = FrameExecutionMode::Sample {
-            active_mask: u64::MAX,
+            active_lanes: PAULI_FRAME_BATCH_SHOTS,
         };
         state.frame.reset(rng, mode);
         state.frame.execute_program(&self.executable, rng, mode)?;
@@ -145,21 +149,41 @@ impl PauliFrameSamplingPlan {
         Ok(())
     }
 
-    pub(crate) fn measurement_planes<'a>(&self, state: &'a PauliFrameSamplingState) -> &'a [u64] {
-        &state.frame.measurements
+    pub(crate) const fn measurement_count(&self) -> usize {
+        self.measurement_count
+    }
+
+    pub(crate) fn measurement_segment(
+        &self,
+        state: &PauliFrameSamplingState,
+        bit_index: usize,
+        start: usize,
+        count: usize,
+    ) -> DetectionResult<u64> {
+        state
+            .frame
+            .measurements
+            .get(bit_index)
+            .copied()
+            .map(|plane| plane.extract_u64(start, count))
+            .ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "Pauli-frame measurement plane escaped its compiled width",
+                )
+            })
     }
 
     pub(crate) fn state_storage_bytes(&self) -> u128 {
         (self.executable.qubit_count() as u128)
             .saturating_mul(2)
             .saturating_add(self.measurement_count as u128)
-            .saturating_mul(size_of::<u64>() as u128)
+            .saturating_mul(size_of::<BitBlock>() as u128)
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct PauliFrameSamplingState {
-    frame: BitPlaneDetectionFrame,
+    frame: BitPlaneDetectionFrame<BitBlock>,
 }
 
 #[derive(Clone, Debug)]
@@ -242,7 +266,7 @@ impl SweepCorrectionPlan {
         }
         let mode = FrameExecutionMode::SweepCorrection {
             sweep_planes,
-            active_mask: batch_active_mask(shot_count),
+            active_lanes: shot_count,
         };
         state.frame.reset(rng, mode);
         state.frame.execute_program(&self.executable, rng, mode)?;
@@ -261,7 +285,7 @@ impl SweepCorrectionPlan {
 
 #[derive(Debug)]
 pub(in crate::detection) struct DetectorFrameState {
-    pub(super) frame: BitPlaneDetectionFrame,
+    pub(super) frame: BitPlaneDetectionFrame<u64>,
     detector_planes: Vec<u64>,
     observable_planes: Vec<u64>,
 }

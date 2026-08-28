@@ -7,7 +7,7 @@ use thiserror::Error;
 
 const PREFIX: &str = "stab-architecture";
 const STABLE_TOOLCHAIN: &str = "+1.97.1";
-const FEATURE_CONTRACTS: [FeatureContract; 6] = [
+const FEATURE_CONTRACTS: [FeatureContract; 7] = [
     FeatureContract {
         package: "stab-bits",
         default: &[],
@@ -21,10 +21,15 @@ const FEATURE_CONTRACTS: [FeatureContract; 6] = [
     FeatureContract {
         package: "stab-core",
         default: &[],
-        portable: &["stab-algebra/portable-simd"],
+        portable: &["stab-algebra/portable-simd", "stab-engine/portable-simd"],
     },
     FeatureContract {
         package: "stab-cli",
+        default: &[],
+        portable: &["stab-bits/portable-simd", "stab-engine/portable-simd"],
+    },
+    FeatureContract {
+        package: "stab-engine",
         default: &[],
         portable: &["stab-bits/portable-simd"],
     },
@@ -36,7 +41,11 @@ const FEATURE_CONTRACTS: [FeatureContract; 6] = [
     FeatureContract {
         package: "stab-bench",
         default: &[],
-        portable: &["stab-algebra/portable-simd", "stab-bits/portable-simd"],
+        portable: &[
+            "stab-algebra/portable-simd",
+            "stab-bits/portable-simd",
+            "stab-engine/portable-simd",
+        ],
     },
 ];
 

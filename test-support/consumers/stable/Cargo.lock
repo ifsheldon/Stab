@@ -260,6 +260,7 @@ dependencies = [
  "sha2",
  "stab-algebra",
  "stab-analysis",
+ "stab-bits",
  "stab-model",
  "stab-records",
  "thiserror",

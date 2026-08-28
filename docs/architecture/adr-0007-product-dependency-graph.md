@@ -23,7 +23,7 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-bits
 stab-decoder -> stab-model + stab-records
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-records + stab-decoder
 stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
@@ -34,7 +34,9 @@ product crates -X-> ops
 
 The `stab-decoder` edges are active after A7 adds the physical package and the public external-decoder proof. Architecture policy continues to reject every dependency outside the graph.
 
-`stab-model` owns closed Stim circuit and detector-error-model syntax and structure. `stab-analysis` may depend on model and algebra semantics, while `stab-engine` may depend on analysis lowering; the inverse engine-to-analysis edge is forbidden. Records know packed result layouts but not circuits. SIMD kernels accept raw words and have no Stab dependency. `stab-cli` composes the owning components directly, while `stab-core` is an ergonomic facade for external consumers and not an internal service locator.
+`stab-model` owns closed Stim circuit and detector-error-model syntax and structure. `stab-analysis` may depend on model and algebra semantics, while `stab-engine` may depend on analysis lowering and packed bit storage; the inverse engine-to-analysis edge is forbidden. Records know packed result layouts but not circuits. SIMD kernels accept raw words and have no Stab dependency. `stab-cli` composes the owning components directly, while `stab-core` is an ergonomic facade for external consumers and not an internal service locator.
+
+The engine's direct `stab-bits` edge lets one generic Pauli-frame implementation use scalar `u64` lanes for detection and a wider `BitBlock` for circuit sampling. The engine remains Stable by default. Its `portable-simd` feature only forwards the explicit `stab-bits/portable-simd` opt-in, whose implementation remains isolated in `stab-kernels-simd`.
 
 Stable components declare Rust 1.97.1 as their minimum supported version and must not reach `stab-kernels-simd` through default features or development dependencies. Nightly is explicit for the SIMD leaf, facade, CLI, and operational consumers that deliberately enable portable SIMD.
 

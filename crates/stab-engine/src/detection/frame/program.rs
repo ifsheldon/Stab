@@ -6,6 +6,7 @@ use super::helpers::{
     measurement_flip_probability, probability_list, single_probability_argument,
     zero_probability_noise,
 };
+use super::word::FrameWord;
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
@@ -97,19 +98,16 @@ impl FrameTableauTransform {
         self.target_count as usize
     }
 
-    pub(super) fn apply_word_planes(
+    pub(super) fn apply_word_planes<W: FrameWord>(
         self,
-        input_xs: &[u64],
-        input_zs: &[u64],
-    ) -> Option<(
-        [u64; MAX_LOCAL_TABLEAU_QUBITS],
-        [u64; MAX_LOCAL_TABLEAU_QUBITS],
-    )> {
+        input_xs: &[W],
+        input_zs: &[W],
+    ) -> Option<([W; MAX_LOCAL_TABLEAU_QUBITS], [W; MAX_LOCAL_TABLEAU_QUBITS])> {
         if input_xs.len() != self.target_count() || input_zs.len() != self.target_count() {
             return None;
         }
-        let mut output_xs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
-        let mut output_zs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
+        let mut output_xs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
+        let mut output_zs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
         for (input_index, (&input_x, &input_z)) in input_xs.iter().zip(input_zs).enumerate() {
             let x_output = *self.x_outputs.get(input_index)?;
             let z_output = *self.z_outputs.get(input_index)?;

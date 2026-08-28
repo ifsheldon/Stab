@@ -33,7 +33,7 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-bits
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records
 stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 ```

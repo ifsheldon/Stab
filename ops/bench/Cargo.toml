@@ -13,6 +13,7 @@ default = []
 portable-simd = [
     "stab-algebra/portable-simd",
     "stab-bits/portable-simd",
+    "stab-engine/portable-simd",
 ]
 
 [lints]

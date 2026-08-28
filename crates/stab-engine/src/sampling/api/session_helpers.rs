@@ -2,10 +2,10 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng as _};
 
 use super::{
-    MAX_BATCH_SHOTS, MAX_SAMPLING_SESSION_STORAGE_BYTES, ReferenceSampleMode,
-    SamplingExecutionError, SamplingPlanInner, SamplingPlanKind, SessionBatch, SessionFrame,
+    MAX_SAMPLING_SESSION_STORAGE_BYTES, ReferenceSampleMode, SamplingExecutionError,
+    SamplingPlanInner, SamplingPlanKind, SessionBatch, SessionFrame,
 };
-use crate::detection::frame::PauliFrameSamplingPlan;
+use crate::detection::frame::{PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingPlan};
 use crate::sampling::ExecutionMode;
 use crate::sampling::execute::{
     ExecutionBuffers, execute_operations, execute_reference_operations,
@@ -160,16 +160,20 @@ pub(super) fn fill_pauli_frame_batch(
                 }
             })?;
             *pending_start = 0;
-            *pending_count = MAX_BATCH_SHOTS;
+            *pending_count = PAULI_FRAME_BATCH_SHOTS;
         }
         let take = (*pending_count).min(shot_count - output_start);
-        let source_mask = low_bits_mask(take) << *pending_start;
-        for (bit_index, &source_word) in plan.measurement_planes(state).iter().enumerate() {
+        for bit_index in 0..plan.measurement_count() {
             let reference_mask = reference
                 .and_then(|sample| sample.get(bit_index))
                 .copied()
                 .map_or(0, |bit| if bit { u64::MAX } else { 0 });
-            let segment = ((source_word ^ reference_mask) & source_mask) >> *pending_start;
+            let segment = plan
+                .measurement_segment(state, bit_index, *pending_start, take)
+                .map_err(|error| SamplingExecutionError::InternalInvariant {
+                    message: error.to_string(),
+                })?
+                ^ (reference_mask & low_bits_mask(take));
             let existing = if output_start == 0 {
                 0
             } else {

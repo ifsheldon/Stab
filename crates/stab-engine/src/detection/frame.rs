@@ -14,12 +14,12 @@ mod helpers;
 mod noise;
 mod plan;
 mod program;
+mod word;
 
 use helpers::{
-    TWO_QUBIT_FRAME_BASES, frame_word, measurement_flip_probability, measurement_record_word,
-    pauli_basis, probability_list, qubit_id_index, qubit_index, set_frame_word,
-    single_probability_argument, try_zero_words, unsupported_frame_instruction,
-    unsupported_frame_target, xor_frame_word, zero_probability_noise,
+    TWO_QUBIT_FRAME_BASES, measurement_flip_probability, measurement_record_word, pauli_basis,
+    probability_list, qubit_id_index, qubit_index, single_probability_argument, try_zero_words,
+    unsupported_frame_instruction, unsupported_frame_target, zero_probability_noise,
 };
 pub(in crate::detection) use noise::batch_active_mask;
 use noise::{
@@ -31,21 +31,22 @@ pub(super) use plan::{
     DetectorFrameState, DirectDetectorFramePlan, SweepCorrectionPlan,
     admit_combined_compiled_storage,
 };
-pub(crate) use plan::{PauliFrameSamplingPlan, PauliFrameSamplingState};
+pub(crate) use plan::{PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingPlan, PauliFrameSamplingState};
 use program::{
     FastFrameInstruction, FastFrameOperation, FrameInstruction, FrameProgram, FrameTableauTransform,
 };
+use word::FrameWord;
 
 #[derive(Debug)]
-pub(in crate::detection) struct BitPlaneDetectionFrame {
-    xs: Vec<u64>,
-    zs: Vec<u64>,
-    pub(in crate::detection) measurements: Vec<u64>,
-    pub(in crate::detection) observables: Vec<u64>,
-    correlated_error_occurred: u64,
+pub(in crate::detection) struct BitPlaneDetectionFrame<W: FrameWord = u64> {
+    xs: Vec<W>,
+    zs: Vec<W>,
+    pub(in crate::detection) measurements: Vec<W>,
+    pub(in crate::detection) observables: Vec<W>,
+    correlated_error_occurred: W,
 }
 
-impl BitPlaneDetectionFrame {
+impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     pub(in crate::detection) fn try_reusable(
         qubit_count: usize,
         measurement_count: usize,
@@ -59,18 +60,18 @@ impl BitPlaneDetectionFrame {
                 "detection frame measurement record",
             )?,
             observables: try_zero_words(observable_count, "detection frame observable record")?,
-            correlated_error_occurred: 0,
+            correlated_error_occurred: W::default(),
         })
     }
 
     fn reset(&mut self, rng: &mut impl Rng, mode: FrameExecutionMode<'_>) {
-        self.xs.fill(0);
+        self.xs.fill(W::default());
         for bit in &mut self.zs {
             *bit = mode.random_mask(rng, 0.5);
         }
         self.measurements.clear();
-        self.observables.fill(0);
-        self.correlated_error_occurred = 0;
+        self.observables.fill(W::default());
+        self.correlated_error_occurred = W::default();
     }
 
     fn execute_program(
@@ -151,7 +152,7 @@ impl BitPlaneDetectionFrame {
             }
             FastFrameOperation::ResetZ => {
                 for &qubit in &instruction.targets {
-                    self.set_x_word(qubit, 0)?;
+                    self.set_x_word(qubit, W::default())?;
                     self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
                 }
                 Ok(())
@@ -166,7 +167,7 @@ impl BitPlaneDetectionFrame {
                 for &qubit in &instruction.targets {
                     self.measurements.push(self.x_word(qubit)?);
                     if instruction.operation == FastFrameOperation::MeasureResetZ {
-                        self.set_x_word(qubit, 0)?;
+                        self.set_x_word(qubit, W::default())?;
                     }
                     self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
                 }
@@ -497,7 +498,7 @@ impl BitPlaneDetectionFrame {
                 "observable id {observable_id} was not initialized"
             )));
         }
-        let mut bit = 0;
+        let mut bit = W::default();
         for target in instruction.targets() {
             if target.measurement_record_offset().is_some() {
                 continue;
@@ -742,8 +743,8 @@ impl BitPlaneDetectionFrame {
             )));
         }
         let mut qubits = [0_usize; MAX_LOCAL_TABLEAU_QUBITS];
-        let mut input_xs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
-        let mut input_zs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
+        let mut input_xs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
+        let mut input_zs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
         for (((qubit_slot, x_slot), z_slot), target) in qubits
             .iter_mut()
             .zip(input_xs.iter_mut())
@@ -808,8 +809,8 @@ impl BitPlaneDetectionFrame {
                 "compiled tableau transform rejected its resolved target count",
             ));
         }
-        let mut input_xs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
-        let mut input_zs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
+        let mut input_xs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
+        let mut input_zs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
         for ((x_slot, z_slot), &qubit) in input_xs.iter_mut().zip(input_zs.iter_mut()).zip(targets)
         {
             *x_slot = self.x_word(qubit)?;
@@ -970,16 +971,16 @@ impl BitPlaneDetectionFrame {
     ) -> DetectionResult<()> {
         if !mode.samples_noise() {
             if !else_branch {
-                self.correlated_error_occurred = 0;
+                self.correlated_error_occurred = W::default();
             }
             return Ok(());
         }
         if !else_branch {
-            self.correlated_error_occurred = 0;
+            self.correlated_error_occurred = W::default();
         }
-        let eligible = mode.active_mask() & !self.correlated_error_occurred;
+        let eligible = mode.active_mask::<W>() & !self.correlated_error_occurred;
         let occurred =
-            mode.random_mask(rng, single_probability_argument(instruction)?.get()) & eligible;
+            mode.random_mask::<W>(rng, single_probability_argument(instruction)?.get()) & eligible;
         self.correlated_error_occurred |= occurred;
         for target in instruction.targets() {
             // Pinned Stim consults only the Pauli X/Z bits here, so combiner
@@ -1008,17 +1009,19 @@ impl BitPlaneDetectionFrame {
     ) -> DetectionResult<()> {
         let probability = single_probability_argument(instruction)?.get();
         if !mode.samples_noise() {
-            self.measurements
-                .extend(std::iter::repeat_n(0, instruction.targets().len()));
+            self.measurements.extend(std::iter::repeat_n(
+                W::default(),
+                instruction.targets().len(),
+            ));
             return Ok(());
         }
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
             let occurred = mode.random_mask(rng, probability);
             self.measurements.push(occurred);
-            let mut x_mask = 0;
-            let mut y_mask = 0;
-            let mut z_mask = 0;
+            let mut x_mask = W::default();
+            let mut y_mask = W::default();
+            let mut z_mask = W::default();
             for_each_set_lane(occurred, |lane_mask| match rng.random::<u8>() & 3 {
                 1 => x_mask |= lane_mask,
                 2 => z_mask |= lane_mask,
@@ -1040,8 +1043,10 @@ impl BitPlaneDetectionFrame {
     ) -> DetectionResult<()> {
         let probabilities = probability_list::<4>(instruction)?;
         if !mode.samples_noise() {
-            self.measurements
-                .extend(std::iter::repeat_n(0, instruction.targets().len()));
+            self.measurements.extend(std::iter::repeat_n(
+                W::default(),
+                instruction.targets().len(),
+            ));
             return Ok(());
         }
         for target in instruction.targets() {
@@ -1067,7 +1072,7 @@ impl BitPlaneDetectionFrame {
         match basis {
             PauliBasis::I => {}
             PauliBasis::X => {
-                self.set_z_word(qubit, 0)?;
+                self.set_z_word(qubit, W::default())?;
                 self.set_x_word(qubit, mode.random_mask(rng, 0.5))?;
             }
             PauliBasis::Y => {
@@ -1076,7 +1081,7 @@ impl BitPlaneDetectionFrame {
                 self.set_x_word(qubit, bit)?;
             }
             PauliBasis::Z => {
-                self.set_x_word(qubit, 0)?;
+                self.set_x_word(qubit, W::default())?;
                 self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
             }
         }
@@ -1089,15 +1094,15 @@ impl BitPlaneDetectionFrame {
         basis: PauliBasis,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_>,
-    ) -> DetectionResult<u64> {
+    ) -> DetectionResult<W> {
         let result = self.frame_measurement_bit(qubit, basis)?;
         self.randomize_measured_basis(qubit, basis, rng, mode)?;
         Ok(result)
     }
 
-    fn frame_measurement_bit(&self, qubit: usize, basis: PauliBasis) -> DetectionResult<u64> {
+    fn frame_measurement_bit(&self, qubit: usize, basis: PauliBasis) -> DetectionResult<W> {
         match basis {
-            PauliBasis::I => Ok(0),
+            PauliBasis::I => Ok(W::default()),
             PauliBasis::X => self.z_word(qubit),
             PauliBasis::Y => Ok(self.x_word(qubit)? ^ self.z_word(qubit)?),
             PauliBasis::Z => self.x_word(qubit),
@@ -1129,7 +1134,7 @@ impl BitPlaneDetectionFrame {
         &mut self,
         qubit: usize,
         basis: PauliBasis,
-        mask: u64,
+        mask: W,
     ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
@@ -1143,7 +1148,7 @@ impl BitPlaneDetectionFrame {
         Ok(())
     }
 
-    fn pauli_target_frame_bit(&self, target: &Target) -> DetectionResult<u64> {
+    fn pauli_target_frame_bit(&self, target: &Target) -> DetectionResult<W> {
         let qubit = target.qubit_id().ok_or_else(|| {
             DetectionError::invalid_result_format(format!(
                 "OBSERVABLE_INCLUDE Pauli target {target} has no qubit id"
@@ -1163,35 +1168,5 @@ impl BitPlaneDetectionFrame {
                 "OBSERVABLE_INCLUDE target {target} is not a Pauli target"
             ))),
         }
-    }
-
-    #[inline(always)]
-    fn x_word(&self, qubit: usize) -> DetectionResult<u64> {
-        frame_word(&self.xs, qubit)
-    }
-
-    #[inline(always)]
-    fn z_word(&self, qubit: usize) -> DetectionResult<u64> {
-        frame_word(&self.zs, qubit)
-    }
-
-    #[inline(always)]
-    fn set_x_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
-        set_frame_word(&mut self.xs, qubit, value)
-    }
-
-    #[inline(always)]
-    fn set_z_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
-        set_frame_word(&mut self.zs, qubit, value)
-    }
-
-    #[inline(always)]
-    fn xor_x_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
-        xor_frame_word(&mut self.xs, qubit, value)
-    }
-
-    #[inline(always)]
-    fn xor_z_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
-        xor_frame_word(&mut self.zs, qubit, value)
     }
 }

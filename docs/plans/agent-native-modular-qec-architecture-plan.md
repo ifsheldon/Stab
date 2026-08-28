@@ -115,7 +115,7 @@ stab-algebra -> stab-bits
 stab-algebra --portable-simd--> stab-kernels-simd
 stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
-stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis
+stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-bits
 stab-decoder -> stab-model + stab-records
 stab-core -> stab-engine + stab-analysis + stab-model + stab-algebra + stab-bits + stab-records + stab-decoder
 stab-cli -> stab-core
@@ -124,7 +124,7 @@ product crates -X-> ops
 ops -> product crates
 ```
 
-`stab-engine` depends on `stab-analysis` for shared gate tableau, decomposition, and canonical lowering semantics.
+`stab-engine` depends on `stab-analysis` for shared gate tableau, decomposition, and canonical lowering semantics and on `stab-bits` for the packed frame words used by sampling execution. The default engine graph remains Stable; portable SIMD is reached only through the explicit forwarded feature.
 
 The inverse edge is forbidden.
 

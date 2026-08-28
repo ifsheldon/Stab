@@ -7,22 +7,30 @@ use super::super::{
     error::{DetectionError, DetectionResult},
     try_vec_with_capacity,
 };
+use super::word::FrameWord;
 
-pub(super) fn try_zero_words(len: usize, context: &'static str) -> DetectionResult<Vec<u64>> {
+pub(super) fn try_zero_words<W: FrameWord>(
+    len: usize,
+    context: &'static str,
+) -> DetectionResult<Vec<W>> {
     let mut words = try_vec_with_capacity(len, context)?;
-    words.resize(len, 0);
+    words.resize(len, W::default());
     Ok(words)
 }
 
 #[inline(always)]
-pub(super) fn frame_word(bits: &[u64], qubit: usize) -> DetectionResult<u64> {
+pub(super) fn frame_word<W: FrameWord>(bits: &[W], qubit: usize) -> DetectionResult<W> {
     bits.get(qubit)
         .copied()
         .ok_or_else(|| frame_qubit_out_of_range(qubit))
 }
 
 #[inline(always)]
-pub(super) fn set_frame_word(bits: &mut [u64], qubit: usize, value: u64) -> DetectionResult<()> {
+pub(super) fn set_frame_word<W: FrameWord>(
+    bits: &mut [W],
+    qubit: usize,
+    value: W,
+) -> DetectionResult<()> {
     let bit = bits
         .get_mut(qubit)
         .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
@@ -31,7 +39,11 @@ pub(super) fn set_frame_word(bits: &mut [u64], qubit: usize, value: u64) -> Dete
 }
 
 #[inline(always)]
-pub(super) fn xor_frame_word(bits: &mut [u64], qubit: usize, value: u64) -> DetectionResult<()> {
+pub(super) fn xor_frame_word<W: FrameWord>(
+    bits: &mut [W],
+    qubit: usize,
+    value: W,
+) -> DetectionResult<()> {
     let bit = bits
         .get_mut(qubit)
         .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
@@ -45,10 +57,10 @@ fn frame_qubit_out_of_range(qubit: usize) -> DetectionError {
     ))
 }
 
-pub(super) fn measurement_record_word(
-    measurements: &[u64],
+pub(super) fn measurement_record_word<W: FrameWord>(
+    measurements: &[W],
     offset: MeasureRecordOffset,
-) -> DetectionResult<u64> {
+) -> DetectionResult<W> {
     let len = i64::try_from(measurements.len())
         .map_err(|_| DetectionError::invalid_result_format("measurement count does not fit i64"))?;
     let index = len + i64::from(offset.get());
