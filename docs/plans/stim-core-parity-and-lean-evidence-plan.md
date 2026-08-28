@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 is next.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 source preparation is in progress.
 
 ## Summary
 
@@ -558,6 +558,13 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 - Public documentation contains no stale status count or superseded qualification procedure.
 - The worktree is clean, no benchmark process remains, swap state matches its pre-run state, and CI passes the exact source commit.
 - The selected core Rust and CLI ledger has no `missing` entry.
+
+### Source-Preparation Checkpoint
+
+- Superseded plans, progress reports, feature checklists, qualification dashboards, migration ledgers, and obsolete machine-output schemas have been removed from the active tree. Their historical contents remain available through Git history.
+- Durable component, resource, extension, migration, release, and schema decisions remain under `docs/architecture/`, `docs/MIGRATING-0.2.md`, and `docs/RELEASING.md`; `docs/plans/` now contains only this plan and the short goal.
+- The stale Markdown gate-support table and the tests that parsed its duplicated metadata have been removed. Canonical model metadata, semantic owner tests, and pinned-Stim differential owners remain the executable contracts.
+- Formal timing has not started from this checkpoint. The source-preparation changes must pass the complete deterministic suite and be committed before selecting the measured revision.
 
 ## Test Suite Contract
 

@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P8 are complete. P9 is next.
+Status: Active. P0 through P8 are complete. P9 source preparation is in progress.
 
 ## Objective
 
@@ -22,11 +22,11 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - [Architecture rules](../architecture/README.md) own durable component boundaries.
 - `benchmarks/suite.toml` is the sole active performance source; [the generated suite view](../../benchmarks/SUITE.md) must match it.
 
-Historical plans, progress reports, qualification inventories, and benchmark manifests are context only. They must not create parallel requirements or promote current claims.
+Superseded plans, progress reports, qualification inventories, and benchmark manifests remain available through Git history. They do not create parallel requirements or promote current claims.
 
 ## Current Milestone: P9
 
-1. Freeze one clean committed measured revision after the P8 checkpoint. Run formatting, strict workspace Clippy, workspace tests, architecture and external-consumer checks, generated docs, the live result-format corpus, all implemented fixtures, and the full and soak parity tiers from that revision.
+1. Freeze one clean committed measured revision after the P8 checkpoint and completed history retirement. Run formatting, strict workspace Clippy, workspace tests, architecture and external-consumer checks, generated docs, the live result-format corpus, all implemented fixtures, and the full and soak parity tiers from that revision.
 2. Run the complete 29-case E2E suite at full and soak tiers on controlled AArch64 CPU 0. Use unique absent bundle paths, require temperature below `100 C`, record configured swap before and after, reject any swap page-in or page-out movement, and leave the prior swap configuration unchanged.
 3. Require every Stim-comparable case to pass paired median and confidence upper bound `<= 1.25x`, every case to pass memory, exact semantic witnesses to pass, and both bundles to replay offline. Preserve failed paths and never rerun into them.
 4. Because no AArch64 self baseline exists, retain the first full and soak reports as explicitly `unseeded`. Generate exactly one baseline candidate from that pair, review it, and add those exact identities to `benchmarks/suite.toml`; do not claim that the seeding run passed self-regression.

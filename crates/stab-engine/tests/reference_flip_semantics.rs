@@ -9,8 +9,7 @@
 //! Pinned Stim builds its reference sample from `aliased_noiseless_circuit`, which drops
 //! result-flip probabilities before the reference run, so a `p == 1` measurement flip inverts
 //! every sampled shot and fires detect/m2d detectors on every shot instead of never.
-//! These tests fail against the pre-fix reference semantics that applied the flip
-//! (docs/plans/post-review-remediation-plan.md, WS1).
+//! These tests fail against the pre-fix reference semantics that applied the flip.
 
 mod support;
 

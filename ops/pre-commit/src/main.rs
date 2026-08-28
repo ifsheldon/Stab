@@ -721,7 +721,7 @@ mod tests {
         let staged = vec![
             change("crates/stab-core/src/lib.rs", ChangeKind::Modified, false),
             change(
-                "docs/plans/rust-stim-drop-in-rewrite.md",
+                "docs/plans/stim-core-parity-and-lean-evidence-plan.md",
                 ChangeKind::Modified,
                 false,
             ),

@@ -26,7 +26,7 @@ Claims to make, because they are verified or documented:
 
 - `stab gen` produces byte-identical circuits to `stim gen` for the same arguments, including the comment header.
 - The implemented CLI surface includes `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem`, and accepts the selected `.stim`, `.dem`, `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` format surfaces recorded in the checklist.
-- The exact implemented scope and the deliberate deferrals (Python bindings, WASM, diagrams, `explain_errors`) are recorded in `docs/stab-feature-checklist.md`.
+- The exact implemented scope and deliberate deferrals are now generated in `docs/stim-parity.md`.
 - Selected compatibility evidence is machine-checkable and committed, with cryptographic provenance on qualification reports; reopened result-format claims are identified explicitly and are not presented as qualification-complete.
 
 Claims to avoid, because a judge can falsify them:
@@ -56,7 +56,7 @@ Claims to avoid, because a judge can falsify them:
 >
 > The entire implementation was built with OpenAI Codex, and the test, oracle, and benchmark qualification harnesses were built with GPT-5.6, working plan-first from committed milestone documents (`docs/plans/`) and agent operating rules (`AGENTS.md`). The Codex `/feedback` session ID is provided in this submission form.
 >
-> Try it in two minutes: prebuilt binaries are attached to the repository's Releases, the README quickstart runs the full pipeline (`gen`, `sample`, `detect`, `analyze_errors`, `sample_dem`, `convert`) against the sample data in `examples/`, and `docs/stab-feature-checklist.md` records the exact implemented scope. Qualified on Linux x86-64 and AArch64.
+> Try it in two minutes: prebuilt binaries are attached to the repository's Releases, the README quickstart runs the full pipeline (`gen`, `sample`, `detect`, `analyze_errors`, `sample_dem`, `convert`) against the sample data in `examples/`, and `docs/stim-parity.md` records the source-current implemented scope. The historical submission claimed qualification on Linux x86-64 and AArch64 at its recorded checkpoint.
 
 ## Repository State And Commit Plan
 
@@ -100,4 +100,4 @@ Before recording the demo, rebuild the release binary from the published commit 
 - [ ] Record the video per the shot list; upload public YouTube.
 - [ ] Submit the Devpost form: description above, Developer tools track, repository URL, video URL, Codex `/feedback` session ID, testing instructions pointing to the README quickstart and the Release binaries.
 - [ ] Keep the repository and video public through the judging period ending August 7.
-- [ ] After the deadline: update `docs/plans/rust-stim-drop-in-rewrite.md` with the composable-components direction, and resume `wip/pq2-clifford-qualification` with the root-cause note above.
+- [x] After the deadline: the component architecture and lean parity program superseded the original rewrite plan and temporary qualification branch.

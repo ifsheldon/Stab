@@ -3,8 +3,7 @@
     reason = "grammar remediation regressions extract required failure payloads directly"
 )]
 
-//! Regression pins for the WS3 `.stim` grammar repairs
-//! (docs/plans/post-review-remediation-plan.md).
+//! Regression pins for strict `.stim` grammar behavior previously accepted incorrectly.
 //!
 //! Pinned Stim v1.16.0 rejects a braceless `REPEAT` at parse time ("Missing '{' at start of
 //! REPEAT block", circuit.cc:218), tokenizes `*` as a combiner whether attached or spaced, and

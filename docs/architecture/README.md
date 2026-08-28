@@ -4,11 +4,7 @@ This directory defines Stab's active product architecture.
 
 The active migration sequence, tests, benchmarks, and release criteria live in [the Stim core parity and lean evidence plan](../plans/stim-core-parity-and-lean-evidence-plan.md).
 
-The completed A6 extraction contract is preserved as historical rationale in [the A6 physical component extraction map](a6-component-extraction-map.md).
-
-The starting package graph and public inventory are frozen in [the pre-0.2 baseline](pre-0.2-api-baseline.md).
-
-The source-current public Rust migration guide is [Migrating to Stab 0.2](../MIGRATING-0.2.md). The earlier [Stab 0.2 API migration inventory](0.2-api-migration-inventory.md) is a historical ledger of the incremental extraction, not the final facade contract.
+The source-current public Rust migration guide is [Migrating to Stab 0.2](../MIGRATING-0.2.md). Superseded extraction maps, migration ledgers, and package baselines remain available in Git history.
 
 The stable byte contract for source-model identities is defined by [model fingerprint schema version 1](model-fingerprint-schema-v1.md).
 
@@ -16,7 +12,7 @@ The stable byte contract for backend-neutral compiler inputs is defined by [comp
 
 The stable byte contract for backend-bearing executable identities is defined by [plan fingerprint schema version 1](plan-fingerprint-schema-v1.md).
 
-The current successful machine-output contracts are [capabilities schema version 5](agent-cli-capabilities-schema-v5.md), [plan schema version 4](agent-cli-plan-schema-v4.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Older schema documents are historical and are not emitted as compatibility views.
+The current successful machine-output contracts are [capabilities schema version 5](agent-cli-capabilities-schema-v5.md), [plan schema version 4](agent-cli-plan-schema-v4.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Superseded schemas remain available in Git history and are not emitted as compatibility views.
 
 The A2 decision for each caller-selectable, fixed, semantic, representational, and implementation resource boundary is recorded in [the A2 resource policy inventory](a2-resource-policy-inventory.md).
 

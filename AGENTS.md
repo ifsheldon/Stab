@@ -38,7 +38,7 @@
 
 - Treat this as a Cargo workspace project, even while the repository is still small.
 - When adding a new dependency, search for its latest stable version on crates.io before adding it. Do not recall a version from your memory.
-- Use the workspace structure described in `docs/plans/rust-stim-drop-in-rewrite.md` unless the plan is deliberately revised.
+- Use the component ownership and dependency graph described in `docs/architecture/README.md` unless an architecture decision deliberately revises it.
 - Pin Nightly Rust in `rust-toolchain.toml` before using `portable_simd`.
 - This workspace currently pins `nightly-2026-06-20` so local and CI checks use the same toolchain.
 - Keep direct `std::simd` usage isolated in bit-kernel modules, with scalar reference implementations available for tests.

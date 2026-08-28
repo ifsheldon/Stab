@@ -4,7 +4,7 @@ This document defines the current `inspect` machine-output contract and preserve
 
 These commands are additive Stab extensions and do not claim matching Stim v1.16.0 command names or output bytes.
 
-Schema version 2 supersedes [schema version 1](agent-cli-schema-v1.md). It remains current for `stab inspect`; its `plan sample` section is historical because planning now emits [schema version 4](agent-cli-plan-schema-v4.md).
+Schema version 2 supersedes the historical version 1 contract retained in Git history. It remains current for `stab inspect`; its `plan sample` section is historical because planning now emits [schema version 4](agent-cli-plan-schema-v4.md).
 
 `stab capabilities` now emits [capabilities schema version 5](agent-cli-capabilities-schema-v5.md).
 

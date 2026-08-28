@@ -681,8 +681,7 @@ fn convert_preserves_successful_record_prefix_before_later_parse_error() {
 #[test]
 fn convert_requires_explicit_in_format_like_stim() {
     // Pinned Stim rejects convert without --in_format ("Must specify a value for enum flag
-    // '--in_format'."); the previous silent 01 default turned that error into output
-    // (docs/plans/post-review-remediation-plan.md, WS3).
+    // '--in_format'."); the previous silent 01 default turned that error into output.
     let (status, stdout, stderr) = run_cli(
         &[
             "stab",

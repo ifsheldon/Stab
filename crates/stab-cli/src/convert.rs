@@ -19,9 +19,9 @@ use crate::{
 
 /// Upper bound on one framed text record's bytes while streaming conversion input.
 ///
-/// Decision D5 (docs/plans/post-review-remediation-plan.md) replaced the whole-input 64 MiB cap
-/// with streaming conversion; this per-record bound keeps memory bounded without rejecting any
-/// input the capped route accepted, because no record in a cap-compliant input could exceed it.
+/// Streaming conversion replaces the former whole-input 64 MiB cap. This per-record bound keeps
+/// memory bounded without rejecting any input that route accepted, because no record in a
+/// cap-compliant input could exceed it.
 const MAX_CONVERT_RECORD_BYTES: usize = 64 * 1024 * 1024;
 
 /// Bounded encoder output retained between transport writes.

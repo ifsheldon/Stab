@@ -205,9 +205,9 @@ fn sample_rejects_oversized_circuit_input() {
     );
 }
 
-/// Decision D5 (docs/plans/post-review-remediation-plan.md): the shared streaming record reader
-/// replaced convert's whole-input 64 MiB cap, so an input past the retired cap must now convert
-/// successfully. The fixture is synthesized by the test instead of committed.
+/// The shared streaming record reader replaced convert's whole-input 64 MiB cap, so an input past
+/// the retired cap must now convert successfully. The fixture is synthesized by the test instead
+/// of committed.
 #[test]
 fn convert_streams_inputs_past_the_retired_whole_input_cap() {
     let input_len =

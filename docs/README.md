@@ -12,7 +12,7 @@ This directory contains Stab's active plans, architecture records, generated par
 - [RELEASING.md](RELEASING.md) covers coordinated crate and binary releases.
 - [../benchmarks/SUITE.md](../benchmarks/SUITE.md) is the generated active performance matrix.
 
-Older implementation, correctness-qualification, performance-qualification, progress, checklist, and feature-inventory documents are historical records. Embedded words such as "active" or "current" apply to their recorded revision and do not create parallel requirements.
+Superseded plans, progress reports, qualification dashboards, and feature inventories are retained in Git history instead of remaining beside the active contracts.
 
 ## Correctness
 

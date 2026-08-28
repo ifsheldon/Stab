@@ -75,7 +75,7 @@ Add a persistent benchmark only for a user workflow. Add a diagnostic only after
 
 ## Documentation
 
-[docs/plans/GOAL.md](docs/plans/GOAL.md) is the short active execution contract. [docs/plans/stim-core-parity-and-lean-evidence-plan.md](docs/plans/stim-core-parity-and-lean-evidence-plan.md) owns the current program. Historical plans and reports preserve context but do not create additional acceptance gates.
+[docs/plans/GOAL.md](docs/plans/GOAL.md) is the short active execution contract. [docs/plans/stim-core-parity-and-lean-evidence-plan.md](docs/plans/stim-core-parity-and-lean-evidence-plan.md) owns the current program. Superseded plans and reports remain available through Git history and do not create additional acceptance gates.
 
 Update public documentation in the same change as public behavior, APIs, CLI flags, formats, operational commands, or performance policy. Regenerate derived files instead of editing them by hand.
 
