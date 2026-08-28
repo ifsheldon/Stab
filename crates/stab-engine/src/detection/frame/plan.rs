@@ -166,6 +166,7 @@ pub(crate) struct PauliFrameSamplingState {
 pub(in crate::detection) struct SweepCorrectionPlan {
     executable: FrameProgram,
     measurement_count: usize,
+    sweep_bit_count: usize,
     detector_count: usize,
     observable_count: usize,
 }
@@ -183,12 +184,14 @@ impl SweepCorrectionPlan {
         circuit: &Circuit,
         admission: FrameProgramAdmission,
         measurement_count: usize,
+        sweep_bit_count: usize,
         detector_count: usize,
         observable_count: usize,
     ) -> DetectionResult<Self> {
         Ok(Self {
             executable: FrameProgram::materialize(circuit, admission, true)?,
             measurement_count,
+            sweep_bit_count,
             detector_count,
             observable_count,
         })
@@ -206,23 +209,41 @@ impl SweepCorrectionPlan {
     pub(in crate::detection) fn state_storage_bytes(&self) -> u128 {
         (self.executable.qubit_count() as u128)
             .saturating_mul(2)
-            .saturating_add((self.measurement_count as u128).saturating_mul(2))
+            .saturating_add(self.measurement_count as u128)
             .saturating_add(self.detector_count as u128)
             .saturating_add((self.observable_count as u128).saturating_mul(2))
+            .saturating_mul(size_of::<u64>() as u128)
     }
 
     pub(in crate::detection) const fn retained_bytes(&self) -> u64 {
         self.executable.retained_bytes()
     }
 
-    pub(in crate::detection) fn correct<'a>(
+    pub(in crate::detection) fn correct_batch<'a>(
         &self,
         conversion: &ConversionPlan,
-        sweep_record: &'a [bool],
+        sweep_planes: &[u64],
+        shot_count: usize,
         state: &'a mut DetectorFrameState,
         rng: &mut impl Rng,
-    ) -> DetectionResult<(&'a [bool], &'a [bool])> {
-        let mode = FrameExecutionMode::SweepCorrection(sweep_record);
+    ) -> DetectionResult<(&'a [u64], &'a [u64])> {
+        if sweep_planes.len() != self.sweep_bit_count {
+            return Err(DetectionError::invalid_result_format(format!(
+                "sweep plane count {} does not match the compiled width {}",
+                sweep_planes.len(),
+                self.sweep_bit_count
+            )));
+        }
+        if shot_count > u64::BITS as usize {
+            return Err(DetectionError::invalid_result_format(format!(
+                "sweep correction batches contain at most {} shots, got {shot_count}",
+                u64::BITS
+            )));
+        }
+        let mode = FrameExecutionMode::SweepCorrection {
+            sweep_planes,
+            active_mask: batch_active_mask(shot_count),
+        };
         state.frame.reset(rng, mode);
         state.frame.execute_program(&self.executable, rng, mode)?;
         if conversion.measurement_count != self.measurement_count
@@ -233,8 +254,8 @@ impl SweepCorrectionPlan {
                 "sweep correction conversion dimensions disagree with its admitted plan",
             ));
         }
-        state.convert_lane(conversion, 0)?;
-        Ok((&state.record.detectors, &state.record.observables))
+        state.convert_batch(conversion)?;
+        Ok((&state.detector_planes, &state.observable_planes))
     }
 }
 
@@ -243,9 +264,6 @@ pub(in crate::detection) struct DetectorFrameState {
     pub(super) frame: BitPlaneDetectionFrame,
     detector_planes: Vec<u64>,
     observable_planes: Vec<u64>,
-    measurement_bits: Vec<bool>,
-    zero_reference: Vec<bool>,
-    record: crate::detection::DetectionRecordBuffer,
 }
 
 impl DetectorFrameState {
@@ -269,24 +287,6 @@ impl DetectorFrameState {
                 observable_count,
                 "detection frame observable planes",
             )?,
-            measurement_bits: crate::detection::try_false_vec(
-                measurement_count,
-                "detection frame scalar measurement view",
-            )?,
-            zero_reference: crate::detection::try_false_vec(
-                measurement_count,
-                "detection frame zero reference",
-            )?,
-            record: crate::detection::DetectionRecordBuffer {
-                detectors: crate::detection::try_false_vec(
-                    detector_count,
-                    "detection frame detector output",
-                )?,
-                observables: crate::detection::try_false_vec(
-                    observable_count,
-                    "detection frame observable output",
-                )?,
-            },
         })
     }
 
@@ -309,44 +309,6 @@ impl DetectorFrameState {
             .zip(&self.frame.observables)
         {
             *plane ^= *frame_observable;
-        }
-        Ok(())
-    }
-
-    fn convert_lane(&mut self, plan: &ConversionPlan, lane: usize) -> DetectionResult<()> {
-        if lane >= u64::BITS as usize {
-            return Err(DetectionError::invalid_result_format(format!(
-                "detector frame lane {lane} is out of range"
-            )));
-        }
-        if self.frame.measurements.len() != plan.measurement_count
-            || self.frame.observables.len() != plan.observable_count
-            || self.measurement_bits.len() != plan.measurement_count
-            || self.zero_reference.len() != plan.measurement_count
-        {
-            return Err(DetectionError::invalid_result_format(
-                "detector frame dimensions disagree with its compiled conversion plan",
-            ));
-        }
-        for (bit, word) in self
-            .measurement_bits
-            .iter_mut()
-            .zip(&self.frame.measurements)
-        {
-            *bit = (word >> lane) & 1 != 0;
-        }
-        plan.convert_record_into(
-            &self.measurement_bits,
-            &self.zero_reference,
-            &mut self.record,
-        )?;
-        for (bit, word) in self
-            .record
-            .observables
-            .iter_mut()
-            .zip(&self.frame.observables)
-        {
-            *bit ^= (word >> lane) & 1 != 0;
         }
         Ok(())
     }

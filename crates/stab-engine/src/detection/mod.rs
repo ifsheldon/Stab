@@ -98,6 +98,7 @@ impl PreparedMeasurementToDetection {
                     circuit,
                     admission,
                     plan.measurement_count,
+                    plan.sweep_bit_count,
                     plan.detector_count,
                     plan.observable_count,
                 )?;
@@ -188,27 +189,46 @@ impl PreparedMeasurementToDetection {
             .map_or(0, SweepCorrectionPlan::state_storage_bytes)
     }
 
-    fn convert_record_with_sweep_into(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the reusable input, output, and correction buffers are independent bounded resources"
+    )]
+    fn convert_word_planes_with_sweep_into(
         &self,
-        measurement_record: &[bool],
-        sweep_record: &[bool],
-        reference_sample: &mut Vec<bool>,
-        record: &mut DetectionRecordBuffer,
+        measurement_planes: &mut [u64],
+        sweep_planes: &[u64],
+        shot_count: usize,
+        reference_sample: &[bool],
+        detector_planes: &mut Vec<u64>,
+        observable_planes: &mut Vec<u64>,
         correction_state: Option<&mut DetectorFrameState>,
         correction_rng: &mut impl rand::Rng,
     ) -> DetectionResult<()> {
-        self.validate_measurement_record_width(measurement_record)?;
-        self.validate_sweep_record_width(sweep_record)?;
-        self.reference_sample
-            .fill(self.measurement_count(), reference_sample)?;
-        self.plan
-            .convert_record_into(measurement_record, reference_sample, record)?;
+        self.validate_word_plane_widths(measurement_planes, sweep_planes)?;
+        reference::validate_reference_sample_len(reference_sample, self.measurement_count())?;
+        let active_mask = frame::batch_active_mask(shot_count);
+        for (plane, reference_bit) in measurement_planes.iter_mut().zip(reference_sample) {
+            if *reference_bit {
+                *plane ^= active_mask;
+            }
+            *plane &= active_mask;
+        }
+        self.plan.convert_word_planes_into(
+            measurement_planes,
+            detector_planes,
+            observable_planes,
+        )?;
         match (&self.sweep_correction, correction_state) {
             (Some(correction), Some(state)) => {
-                let (detectors, observables) =
-                    correction.correct(&self.plan, sweep_record, state, correction_rng)?;
-                xor_bits(&mut record.detectors, detectors, "detector")?;
-                xor_bits(&mut record.observables, observables, "observable")?;
+                let (detectors, observables) = correction.correct_batch(
+                    &self.plan,
+                    sweep_planes,
+                    shot_count,
+                    state,
+                    correction_rng,
+                )?;
+                xor_words(detector_planes, detectors, "detector")?;
+                xor_words(observable_planes, observables, "observable")?;
                 Ok(())
             }
             (None, None) => Ok(()),
@@ -233,33 +253,30 @@ impl PreparedMeasurementToDetection {
         })
     }
 
-    fn validate_measurement_record_width(
+    fn validate_word_plane_widths(
         &self,
-        measurement_record: &[bool],
+        measurement_planes: &[u64],
+        sweep_planes: &[u64],
     ) -> DetectionResult<()> {
-        if measurement_record.len() == self.plan.measurement_count {
-            return Ok(());
+        if measurement_planes.len() != self.plan.measurement_count {
+            return Err(DetectionError::invalid_result_format(format!(
+                "measurement plane count {} does not match the compiled width {}",
+                measurement_planes.len(),
+                self.plan.measurement_count
+            )));
         }
-        Err(DetectionError::invalid_result_format(format!(
-            "measurement record expected {} bits, got {}",
-            self.plan.measurement_count,
-            measurement_record.len()
-        )))
-    }
-
-    fn validate_sweep_record_width(&self, sweep_record: &[bool]) -> DetectionResult<()> {
-        if sweep_record.len() == self.plan.sweep_bit_count {
-            return Ok(());
+        if sweep_planes.len() != self.plan.sweep_bit_count {
+            return Err(DetectionError::invalid_result_format(format!(
+                "sweep plane count {} does not match the compiled width {}",
+                sweep_planes.len(),
+                self.plan.sweep_bit_count
+            )));
         }
-        Err(DetectionError::invalid_result_format(format!(
-            "sweep record expected {} bits, got {}",
-            self.plan.sweep_bit_count,
-            sweep_record.len()
-        )))
+        Ok(())
     }
 }
 
-fn xor_bits(output: &mut [bool], correction: &[bool], kind: &str) -> DetectionResult<()> {
+fn xor_words(output: &mut [u64], correction: &[u64], kind: &str) -> DetectionResult<()> {
     if output.len() != correction.len() {
         return Err(DetectionError::invalid_result_format(format!(
             "sweep {kind} correction has {} bits but output has {}",

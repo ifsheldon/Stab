@@ -955,19 +955,6 @@ impl ConversionPlan {
         compiled_storage_bytes(operation_count, term_count)
     }
 
-    pub(super) fn convert_record_into(
-        &self,
-        measurement_record: &[bool],
-        reference_sample: &[bool],
-        record: &mut DetectionRecordBuffer,
-    ) -> DetectionResult<()> {
-        self.execute_record(
-            RecordValues::Values(measurement_record),
-            RecordValues::Values(reference_sample),
-            record,
-        )
-    }
-
     pub(super) fn reference_signs_into(
         &self,
         reference_sample: &[bool],

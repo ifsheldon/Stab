@@ -1,6 +1,6 @@
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_records::{DetectionSink, MeasurementBatchView};
+use stab_records::DetectionSink;
 
 use super::{
     DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
@@ -112,24 +112,6 @@ where
     })
 }
 
-pub(super) fn copy_record(
-    batch: MeasurementBatchView<'_>,
-    shot_index: usize,
-    output: &mut [bool],
-    kind: &'static str,
-) -> Result<(), DetectionExecutionError> {
-    for (bit_index, slot) in output.iter_mut().enumerate() {
-        *slot = batch.get(shot_index, bit_index).ok_or_else(|| {
-            DetectionExecutionError::InternalInvariant {
-                message: format!(
-                    "{kind} batch escaped its declared dimensions at shot {shot_index}, bit {bit_index}"
-                ),
-            }
-        })?;
-    }
-    Ok(())
-}
-
 pub(super) fn validate_conversion_session_storage(
     plan: &MeasurementToDetectionPlan,
 ) -> Result<(), DetectionExecutionError> {
@@ -147,9 +129,9 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
         .saturating_add(7)
         / 8;
     measurements
-        .saturating_mul(2)
-        .saturating_add(sweeps)
-        .saturating_add(records)
+        .saturating_add(measurements.saturating_mul(size_of::<u64>() as u128))
+        .saturating_add(sweeps.saturating_mul(size_of::<u64>() as u128))
+        .saturating_add(records.saturating_mul(size_of::<u64>() as u128))
         .saturating_add(packed_batch_bytes)
         .saturating_add(plan.inner.converter.sweep_correction_storage_bytes())
 }

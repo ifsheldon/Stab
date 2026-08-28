@@ -14,9 +14,7 @@ use stab_records::{
 
 use super::error::DetectionError;
 use super::frame::{DetectorFrameState, DirectDetectorFramePlan};
-use super::{
-    DetectionConversionLimits, DetectionRecordBuffer, PreparedMeasurementToDetection, try_false_vec,
-};
+use super::{DetectionConversionLimits, PreparedMeasurementToDetection};
 use crate::{RandomPolicy, ReferenceSampleMode, SamplingCancellation, ShotCount, SinkFailurePhase};
 
 mod contracts;
@@ -29,8 +27,8 @@ pub use contracts::{
 };
 pub use delivery::MeasurementToDetectionTransaction;
 use execution::{
-    copy_record, detection_rng, invariant_error, run_direct, storage_error,
-    validate_conversion_session_storage, validate_direct_session_storage,
+    detection_rng, invariant_error, run_direct, storage_error, validate_conversion_session_storage,
+    validate_direct_session_storage,
 };
 
 const MAX_BATCH_SHOTS: usize = 64;
@@ -249,9 +247,10 @@ pub struct MeasurementToDetectionSession {
     reference_sample: Vec<bool>,
     sweep_correction: Option<DetectorFrameState>,
     correction_rng: SmallRng,
-    measurement_record: Vec<bool>,
-    sweep_record: Vec<bool>,
-    detection_record: DetectionRecordBuffer,
+    measurement_planes: Vec<u64>,
+    sweep_planes: Vec<u64>,
+    detector_planes: Vec<u64>,
+    observable_planes: Vec<u64>,
     batch: DetectionBatchBuffers,
     cancellation: OnceLock<SamplingCancellation>,
     total_committed_shots: u64,
@@ -283,27 +282,35 @@ impl MeasurementToDetectionSession {
     fn new(plan: MeasurementToDetectionPlan) -> Result<Self, DetectionExecutionError> {
         validate_conversion_session_storage(&plan)?;
         let converter = &plan.inner.converter;
+        let mut reference_sample = converter
+            .try_reusable_reference_sample()
+            .map_err(DetectionExecutionError::Conversion)?;
+        converter
+            .reference_sample
+            .fill(converter.measurement_count(), &mut reference_sample)
+            .map_err(DetectionExecutionError::Conversion)?;
         Ok(Self {
-            reference_sample: converter
-                .try_reusable_reference_sample()
-                .map_err(DetectionExecutionError::Conversion)?,
+            reference_sample,
             sweep_correction: converter
                 .try_reusable_sweep_correction()
                 .map_err(DetectionExecutionError::Conversion)?,
             correction_rng: SmallRng::seed_from_u64(0),
-            measurement_record: try_false_vec(
+            measurement_planes: try_zero_word_planes(
                 converter.measurement_count(),
-                "measurement-to-detection input record",
-            )
-            .map_err(DetectionExecutionError::Conversion)?,
-            sweep_record: try_false_vec(
+                "measurement-to-detection input planes",
+            )?,
+            sweep_planes: try_zero_word_planes(
                 converter.sweep_bit_count(),
-                "measurement-to-detection sweep record",
-            )
-            .map_err(DetectionExecutionError::Conversion)?,
-            detection_record: converter
-                .try_reusable_detection_record()
-                .map_err(DetectionExecutionError::Conversion)?,
+                "measurement-to-detection sweep planes",
+            )?,
+            detector_planes: try_zero_word_planes(
+                converter.detector_count(),
+                "measurement-to-detection detector planes",
+            )?,
+            observable_planes: try_zero_word_planes(
+                converter.observable_count(),
+                "measurement-to-detection observable planes",
+            )?,
             batch: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
             plan,
             cancellation: OnceLock::new(),
@@ -533,38 +540,26 @@ impl MeasurementToDetectionSession {
         shot_count: usize,
     ) -> Result<(), DetectionExecutionError> {
         let converter = &self.plan.inner.converter;
-        for shot_index in 0..shot_count {
-            copy_record(
-                measurements,
-                shot_index,
-                &mut self.measurement_record,
-                "measurement",
-            )?;
-            if let Some(sweeps) = sweeps {
-                copy_record(sweeps, shot_index, &mut self.sweep_record, "sweep")?;
-            } else {
-                self.sweep_record.fill(false);
-            }
-            converter
-                .convert_record_with_sweep_into(
-                    &self.measurement_record,
-                    &self.sweep_record,
-                    &mut self.reference_sample,
-                    &mut self.detection_record,
-                    self.sweep_correction.as_mut(),
-                    &mut self.correction_rng,
-                )
-                .map_err(DetectionExecutionError::Conversion)?;
-            self.batch
-                .detectors
-                .copy_shot_from_bools(shot_index, &self.detection_record.detectors)
-                .map_err(invariant_error)?;
-            self.batch
-                .observables
-                .copy_shot_from_bools(shot_index, &self.detection_record.observables)
-                .map_err(invariant_error)?;
+        copy_batch_into_word_planes(measurements, &mut self.measurement_planes, "measurement")?;
+        if let Some(sweeps) = sweeps {
+            copy_batch_into_word_planes(sweeps, &mut self.sweep_planes, "sweep")?;
+        } else {
+            self.sweep_planes.fill(0);
         }
-        Ok(())
+        converter
+            .convert_word_planes_with_sweep_into(
+                &mut self.measurement_planes,
+                &self.sweep_planes,
+                shot_count,
+                &self.reference_sample,
+                &mut self.detector_planes,
+                &mut self.observable_planes,
+                self.sweep_correction.as_mut(),
+                &mut self.correction_rng,
+            )
+            .map_err(DetectionExecutionError::Conversion)?;
+        self.batch
+            .copy_from_planes(&self.detector_planes, &self.observable_planes)
     }
 
     const fn summary(
@@ -580,6 +575,37 @@ impl MeasurementToDetectionSession {
             total_committed_shots: ShotCount::new(self.total_committed_shots),
         }
     }
+}
+
+fn try_zero_word_planes(
+    width: usize,
+    context: &'static str,
+) -> Result<Vec<u64>, DetectionExecutionError> {
+    let mut planes = Vec::new();
+    planes.try_reserve_exact(width).map_err(|error| {
+        DetectionExecutionError::SessionStorageAllocation {
+            message: format!("could not reserve {width} words for {context}: {error}"),
+        }
+    })?;
+    planes.resize(width, 0);
+    Ok(planes)
+}
+
+fn copy_batch_into_word_planes(
+    batch: MeasurementBatchView<'_>,
+    target: &mut [u64],
+    kind: &'static str,
+) -> Result<(), DetectionExecutionError> {
+    let result = if let Some(records) = batch.shot_major_records() {
+        records.copy_into_bit_plane_words(target)
+    } else if let Some(planes) = batch.bit_planes() {
+        planes.copy_words_into(target)
+    } else {
+        return Err(DetectionExecutionError::InternalInvariant {
+            message: format!("{kind} batch has no recognized storage representation"),
+        });
+    };
+    result.map_err(invariant_error)
 }
 
 /// Builder for immutable circuit detection-sampling plans.

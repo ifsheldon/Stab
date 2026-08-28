@@ -4,15 +4,20 @@ use crate::detection::error::{DetectionError, DetectionResult};
 
 #[derive(Clone, Copy)]
 pub(super) enum FrameExecutionMode<'a> {
-    Sample { active_mask: u64 },
-    SweepCorrection(&'a [bool]),
+    Sample {
+        active_mask: u64,
+    },
+    SweepCorrection {
+        sweep_planes: &'a [u64],
+        active_mask: u64,
+    },
 }
 
 impl FrameExecutionMode<'_> {
     pub(super) fn random_mask(self, rng: &mut impl Rng, probability: f64) -> u64 {
         match self {
             Self::Sample { active_mask } => sample_bernoulli_mask(probability, active_mask, rng),
-            Self::SweepCorrection(_) => 0,
+            Self::SweepCorrection { .. } => 0,
         }
     }
 
@@ -23,19 +28,24 @@ impl FrameExecutionMode<'_> {
     pub(super) fn sweep_mask(self, id: u32) -> u64 {
         match self {
             Self::Sample { .. } => 0,
-            Self::SweepCorrection(sweep_record) => usize::try_from(id)
-                .ok()
-                .and_then(|index| sweep_record.get(index))
-                .copied()
-                .map(u64::from)
-                .unwrap_or(0),
+            Self::SweepCorrection {
+                sweep_planes,
+                active_mask,
+            } => {
+                usize::try_from(id)
+                    .ok()
+                    .and_then(|index| sweep_planes.get(index))
+                    .copied()
+                    .unwrap_or(0)
+                    & active_mask
+            }
         }
     }
 
     pub(super) const fn active_mask(self) -> u64 {
         match self {
             Self::Sample { active_mask } => active_mask,
-            Self::SweepCorrection(_) => 1,
+            Self::SweepCorrection { active_mask, .. } => active_mask,
         }
     }
 }

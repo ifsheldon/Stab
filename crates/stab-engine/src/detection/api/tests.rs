@@ -8,13 +8,14 @@
 
 use std::convert::Infallible;
 
-use stab_records::MeasurementSink;
+use stab_records::{BitPlane64Batch, MeasurementSink};
 
 use super::super::test_support::{
     convert_measurements_to_detection_events, convert_measurements_to_detection_events_with_sweep,
     sample_detection_events,
 };
 use super::*;
+use crate::detection::DetectionRecordBuffer;
 use crate::{DetectionResourceKind, Seed};
 
 #[derive(Default)]
@@ -338,6 +339,66 @@ fn sweep_batches_and_reference_modes_match_materialized_conversion() {
             )
             .expect("stream sweep conversion");
         assert_eq!(sink.records, expected.records);
+    }
+}
+
+#[test]
+fn packed_and_bit_plane_batches_match_scalar_conversion_at_batch_boundaries() {
+    let circuit = circuit(
+        "X 1\nCX sweep[0] 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n",
+    );
+    for shot_count in [1, 17, 63, 64] {
+        let measurements = (0..shot_count)
+            .map(|shot| vec![shot % 3 == 0, shot % 5 < 2])
+            .collect::<Vec<_>>();
+        let sweeps = (0..shot_count)
+            .map(|shot| vec![shot % 2 == 0])
+            .collect::<Vec<_>>();
+        let packed_measurements = packed(&measurements, 2);
+        let packed_sweeps = packed(&sweeps, 1);
+        let plane_measurements = BitPlane64Batch::from_shot_major(packed_measurements.view())
+            .expect("transpose measurements");
+        let plane_sweeps =
+            BitPlane64Batch::from_shot_major(packed_sweeps.view()).expect("transpose sweeps");
+
+        for mode in [
+            ReferenceSampleMode::UseReferenceSample,
+            ReferenceSampleMode::SkipReferenceSample,
+        ] {
+            let expected = convert_measurements_to_detection_events_with_sweep(
+                &circuit,
+                &measurements,
+                &sweeps,
+                mode,
+            )
+            .expect("materialize scalar conversion");
+            let plan = MeasurementToDetectionCompiler::new()
+                .reference_sample_mode(mode)
+                .compile(&circuit)
+                .expect("compile batch conversion");
+
+            let mut packed_session = plan.session().expect("create packed session");
+            let mut packed_sink = CollectSink::default();
+            packed_session
+                .run(
+                    MeasurementBatchView::new(packed_measurements.view()),
+                    Some(MeasurementBatchView::new(packed_sweeps.view())),
+                    &mut packed_sink,
+                )
+                .expect("convert packed batch");
+            assert_eq!(packed_sink.records, expected.records);
+
+            let mut plane_session = plan.session().expect("create bit-plane session");
+            let mut plane_sink = CollectSink::default();
+            plane_session
+                .run(
+                    MeasurementBatchView::from_bit_planes(plane_measurements.view()),
+                    Some(MeasurementBatchView::from_bit_planes(plane_sweeps.view())),
+                    &mut plane_sink,
+                )
+                .expect("convert bit-plane batch");
+            assert_eq!(plane_sink.records, expected.records);
+        }
     }
 }
 
