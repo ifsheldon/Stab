@@ -574,6 +574,7 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 - Both bundles replay offline, run on CPU 0, stay below `62 C`, retain the configured `/swap.img`, and observe unchanged swap page-in and page-out counters within each formal run.
 - Both reports remain correctly `unseeded`. One generated 29-entry candidate records the worse full-and-soak Stab median and upper bound for each exact case identity; `benchmarks/suite.toml` contains that candidate without reclassifying the seeding evidence as a regression pass.
 - Narrow evidence descendant `992bd1b5d109b2e0cd673556366d06b0e912a50d` contains no product or benchmark-runner change, passes `e2e-release-check`, and replays fresh copies of both committed bundles. Required GitHub CI on the final documentation descendant remains the only external acceptance step.
+- The circuit-to-DEM catalog owner compares parsed model values across architectures because pinned Stim's DEM decimal width follows the host C++ `long double` precision, while Stab's canonical DEM printer is architecture-stable. Model-owned DEM printer tests remain byte exact.
 
 ### Audit Checkpoint
 

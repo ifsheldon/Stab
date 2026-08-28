@@ -9,7 +9,9 @@ use stab_analysis::{
     circuit_to_detector_error_model, decomposed_circuit, gate_has_h_s_cx_m_r_decomposition,
     gate_has_tableau, missing_detectors,
 };
-use stab_model::{Circuit, Gate, GateArgumentRule, GateCategory, GateTargetRule, Probability};
+use stab_model::{
+    Circuit, DetectorErrorModel, Gate, GateArgumentRule, GateCategory, GateTargetRule, Probability,
+};
 
 use super::support::PinnedStimProgram;
 
@@ -444,7 +446,7 @@ fn compare_catalog_matrix_with_probe(
                 CatalogExpectation::Canonical,
                 Ok(stab),
                 PinnedOutcome::Canonical(pinned),
-            ) if stab != pinned => {
+            ) if !canonical_outputs_match(behavior, &stab, &pinned) => {
                 failures.push(format!(
                     "{behavior}/{}: canonical output mismatch\nsource:\n{}\nStab:\n{}\npinned Stim:\n{}",
                     case.id, case.source, stab, pinned
@@ -476,6 +478,32 @@ fn compare_catalog_matrix_with_probe(
         failures.len(),
         failures.join("\n\n")
     );
+}
+
+fn canonical_outputs_match(behavior: &str, stab: &str, pinned: &str) -> bool {
+    if behavior != "dem" {
+        return stab == pinned;
+    }
+    let Ok(stab) = DetectorErrorModel::from_dem_str(stab) else {
+        return false;
+    };
+    let Ok(pinned) = DetectorErrorModel::from_dem_str(pinned) else {
+        return false;
+    };
+    stab == pinned
+}
+
+#[test]
+fn dem_catalog_comparison_is_independent_of_host_long_double_print_width() {
+    let stable = "error(0.1874999999999999722444243843710865) D0";
+    let x86_stim = "error(0.1874999999999999722) D0";
+    assert!(canonical_outputs_match("dem", stable, x86_stim));
+    assert!(!canonical_outputs_match(
+        "dem",
+        stable,
+        "error(0.1874999999999999722) D1"
+    ));
+    assert!(!canonical_outputs_match("flows", stable, x86_stim));
 }
 
 fn validate_matrix(cases: &[CatalogCase]) {
