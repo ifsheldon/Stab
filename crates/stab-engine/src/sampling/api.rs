@@ -24,9 +24,7 @@ mod session_helpers;
 
 pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
 pub(super) use session_helpers::{compute_reference_sample, try_bool_buffer};
-use session_helpers::{
-    fill_pauli_frame_batch, sample_general_into, session_storage_bytes, validate_session_storage,
-};
+use session_helpers::{fill_pauli_frame_batch, sample_general_into, validate_session_storage};
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_EXPANDED_OPERATIONS_PER_SHOT: u64 = 1_000_000;
@@ -389,13 +387,6 @@ impl SamplingPlan {
         reference_mode: ReferenceSampleMode,
     ) -> Result<SamplingSession, SamplingExecutionError> {
         SamplingSession::new(self.clone(), random_policy, reference_mode)
-    }
-
-    pub(crate) fn estimated_session_storage_bytes(
-        &self,
-        reference_mode: ReferenceSampleMode,
-    ) -> u128 {
-        session_storage_bytes(&self.inner, reference_mode)
     }
 }
 

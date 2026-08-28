@@ -515,7 +515,7 @@ fn forgotten_incremental_transaction_cannot_rebind_another_sink() {
 }
 
 #[test]
-fn automatic_fused_and_direct_sampling_match_legacy_materialization() {
+fn direct_detection_sampling_matches_materialized_conversion() {
     for (circuit_text, measurements, detectors, observables) in [
         ("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n", 1, 1, 0),
         ("RX 0\nZ_ERROR(0.25) 0\nOBSERVABLE_INCLUDE(0) X0\n", 0, 0, 1),
@@ -537,103 +537,59 @@ fn automatic_fused_and_direct_sampling_match_legacy_materialization() {
 }
 
 #[test]
-fn automatic_detection_sampling_uses_the_direct_frame_for_ordinary_circuits() {
-    let circuit = circuit("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n");
+fn seeded_same_session_partitioning_is_exact() {
+    let circuit = circuit("X_ERROR(0.375) 0\nM 0\nDETECTOR rec[-1]\n");
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit)
-        .expect("compile detection sampling");
-
-    assert!(matches!(
-        plan.inner.kind,
-        DetectionSamplingPlanKind::DirectDetectorFrame(_)
-    ));
-}
-
-#[test]
-fn private_direct_and_fused_variants_agree_on_deterministic_circuit() {
-    let circuit = circuit("R 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n");
-    let compiler = DetectionSamplingCompiler::new();
-    let direct = compiler
-        .compile_direct_for_test(&circuit)
-        .expect("compile direct variant");
-    let fused = compiler
-        .compile_fused_for_test(&circuit)
-        .expect("compile fused variant");
-
-    assert_eq!(
-        run_plan(&direct, 65, 9).records,
-        run_plan(&fused, 65, 9).records
-    );
-}
-
-#[test]
-fn seeded_same_session_partitioning_is_exact_for_both_private_variants() {
-    let circuit = circuit("X_ERROR(0.375) 0\nM 0\nDETECTOR rec[-1]\n");
-    let compiler = DetectionSamplingCompiler::new();
-    for plan in [
-        compiler
-            .compile_direct_for_test(&circuit)
-            .expect("compile direct variant"),
-        compiler
-            .compile_fused_for_test(&circuit)
-            .expect("compile fused variant"),
-    ] {
-        let combined = run_plan(&plan, 130, 44).records;
-        let mut session = plan
-            .session(RandomPolicy::Seeded(Seed::new(44)))
-            .expect("create partitioned session");
-        let mut first = CollectSink::default();
-        let mut second = CollectSink::default();
-        session
-            .run(ShotCount::new(17), &mut first)
-            .expect("run first partition");
-        session
-            .run(ShotCount::new(113), &mut second)
-            .expect("run second partition");
-        first.records.extend(second.records);
-        assert_eq!(first.records, combined);
-        assert_eq!(session.total_committed_shots(), ShotCount::new(130));
-    }
+        .expect("compile detection plan");
+    let combined = run_plan(&plan, 130, 44).records;
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(44)))
+        .expect("create partitioned session");
+    let mut first = CollectSink::default();
+    let mut second = CollectSink::default();
+    session
+        .run(ShotCount::new(17), &mut first)
+        .expect("run first partition");
+    session
+        .run(ShotCount::new(113), &mut second)
+        .expect("run second partition");
+    first.records.extend(second.records);
+    assert_eq!(first.records, combined);
+    assert_eq!(session.total_committed_shots(), ShotCount::new(130));
 }
 
 #[test]
 fn cancellation_stops_between_bounded_batches_and_finalizes_sink() {
     let circuit = circuit("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n");
-    let compiler = DetectionSamplingCompiler::new();
-    for plan in [
-        compiler
-            .compile_direct_for_test(&circuit)
-            .expect("compile direct variant"),
-        compiler
-            .compile_fused_for_test(&circuit)
-            .expect("compile fused variant"),
-    ] {
-        let mut session = plan
-            .session(RandomPolicy::Seeded(Seed::new(7)))
-            .expect("create cancellable session");
-        let cancellation = session.cancellation();
-        let mut sink = CancellingSink {
-            inner: CollectSink::default(),
-            cancellation: cancellation.clone(),
-        };
-        let summary = session
-            .run(ShotCount::new(130), &mut sink)
-            .expect("cancel detection run");
-        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
-        assert_eq!(summary.requested_shots(), ShotCount::new(130));
-        assert_eq!(summary.committed_shots(), ShotCount::new(64));
-        assert_eq!(summary.total_committed_shots(), ShotCount::new(64));
-        assert_eq!(sink.inner.batch_sizes, vec![64]);
-        assert_eq!(sink.inner.finish_count, 1);
-        assert!(!session.is_poisoned());
-        cancellation.reset();
-        let mut resumed = CollectSink::default();
-        session
-            .run(ShotCount::new(1), &mut resumed)
-            .expect("resume cancelled session");
-        assert_eq!(resumed.records.len(), 1);
-        assert_eq!(session.total_committed_shots(), ShotCount::new(65));
-    }
+    let plan = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile detection plan");
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(7)))
+        .expect("create cancellable session");
+    let cancellation = session.cancellation();
+    let mut sink = CancellingSink {
+        inner: CollectSink::default(),
+        cancellation: cancellation.clone(),
+    };
+    let summary = session
+        .run(ShotCount::new(130), &mut sink)
+        .expect("cancel detection run");
+    assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+    assert_eq!(summary.requested_shots(), ShotCount::new(130));
+    assert_eq!(summary.committed_shots(), ShotCount::new(64));
+    assert_eq!(summary.total_committed_shots(), ShotCount::new(64));
+    assert_eq!(sink.inner.batch_sizes, vec![64]);
+    assert_eq!(sink.inner.finish_count, 1);
+    assert!(!session.is_poisoned());
+    cancellation.reset();
+    let mut resumed = CollectSink::default();
+    session
+        .run(ShotCount::new(1), &mut resumed)
+        .expect("resume cancelled session");
+    assert_eq!(resumed.records.len(), 1);
+    assert_eq!(session.total_committed_shots(), ShotCount::new(65));
 }
 
 #[test]
@@ -801,10 +757,10 @@ fn direct_frame_compilation_charges_executable_targets_before_materialization() 
     let untagged = circuit(&format!("OBSERVABLE_INCLUDE(0) {targets}\n"));
     let compiler = DetectionSamplingCompiler::new();
     let tagged_plan = compiler
-        .compile_direct_for_test(&tagged)
+        .compile(&tagged)
         .expect("compile tagged direct frame");
     let untagged_plan = compiler
-        .compile_direct_for_test(&untagged)
+        .compile(&untagged)
         .expect("compile untagged direct frame");
     let exact_bytes = direct_compiled_bytes(&tagged_plan);
     assert_eq!(
@@ -815,11 +771,11 @@ fn direct_frame_compilation_charges_executable_targets_before_materialization() 
 
     DetectionSamplingCompiler::new()
         .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes))
-        .compile_direct_for_test(&tagged)
+        .compile(&tagged)
         .expect("accept exact combined direct-plan byte boundary");
     let error = DetectionSamplingCompiler::new()
         .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes - 1))
-        .compile_direct_for_test(&tagged)
+        .compile(&tagged)
         .expect_err("reject the first byte above the direct-plan boundary");
     let DetectionCompileError::InvalidCircuit(DetectionError::ResourceLimit(resource)) = error
     else {
@@ -851,19 +807,19 @@ fn direct_frame_compilation_admits_repeats_and_filtered_targets_before_materiali
     let baseline = circuit("OBSERVABLE_INCLUDE(0) X0\n");
     let baseline_exact = direct_compiled_bytes(
         &DetectionSamplingCompiler::new()
-            .compile_direct_for_test(&baseline)
+            .compile(&baseline)
             .expect("compile rejection-overhead baseline"),
     );
     let baseline_allocations = rejected_direct_frame_allocations(&baseline, baseline_exact);
 
     for circuit in [&repeated, &filtered] {
         let exact_plan = DetectionSamplingCompiler::new()
-            .compile_direct_for_test(circuit)
+            .compile(circuit)
             .expect("compile exact-byte probe");
         let exact_bytes = direct_compiled_bytes(&exact_plan);
         DetectionSamplingCompiler::new()
             .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes))
-            .compile_direct_for_test(circuit)
+            .compile(circuit)
             .expect("accept exact combined direct-plan byte boundary");
 
         let measured = rejected_direct_frame_allocations(circuit, exact_bytes);
@@ -886,7 +842,7 @@ fn rejected_direct_frame_allocations(
     let measured = allocation_counter::measure(|| {
         rejected = DetectionSamplingCompiler::new()
             .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes - 1))
-            .compile_direct_for_test(circuit)
+            .compile(circuit)
             .is_err();
     });
     assert!(rejected, "reject first byte beyond retained-plan limit");
@@ -894,10 +850,8 @@ fn rejected_direct_frame_allocations(
 }
 
 fn direct_compiled_bytes(plan: &DetectionSamplingPlan) -> u64 {
-    let DetectionSamplingPlanKind::DirectDetectorFrame(direct) = &plan.inner.kind else {
-        panic!("test compiler must select the direct detector frame");
-    };
-    direct
+    plan.inner
+        .direct
         .compiled_bytes()
         .expect("compute retained direct-plan bytes")
 }
@@ -939,7 +893,7 @@ fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
 }
 
 #[test]
-fn warmed_detection_variants_reuse_session_and_batch_storage() {
+fn warmed_detection_session_reuses_batch_storage() {
     let spp = (0..32)
         .map(|qubit| format!("X{qubit}"))
         .collect::<Vec<_>>()
@@ -947,83 +901,37 @@ fn warmed_detection_variants_reuse_session_and_batch_storage() {
     let circuit = circuit(&format!(
         "SPP {spp}\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n"
     ));
-    let compiler = DetectionSamplingCompiler::new();
-    for plan in [
-        compiler
-            .compile_direct_for_test(&circuit)
-            .expect("compile direct variant"),
-        compiler
-            .compile_fused_for_test(&circuit)
-            .expect("compile fused variant"),
-    ] {
-        let mut session = plan
-            .session(RandomPolicy::Seeded(Seed::new(91)))
-            .expect("create reusable detection session");
-        let mut sink = NullSink::default();
-        session
-            .run(ShotCount::new(64), &mut sink)
-            .expect("warm detection session");
-        let measured = allocation_counter::measure(|| {
-            for _ in 0..128 {
-                session
-                    .run(ShotCount::new(64), &mut sink)
-                    .expect("reuse detection session");
-            }
-        });
-        assert_eq!(
-            measured.count_total, 0,
-            "warmed detection session allocated while reusing bounded state: {measured:?}"
-        );
-        assert_eq!(sink.shots, 64 * 129);
-    }
+    let plan = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile detection plan");
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(91)))
+        .expect("create reusable detection session");
+    let mut sink = NullSink::default();
+    session
+        .run(ShotCount::new(64), &mut sink)
+        .expect("warm detection session");
+    let measured = allocation_counter::measure(|| {
+        for _ in 0..128 {
+            session
+                .run(ShotCount::new(64), &mut sink)
+                .expect("reuse detection session");
+        }
+    });
+    assert_eq!(
+        measured.count_total, 0,
+        "warmed detection session allocated while reusing bounded state: {measured:?}"
+    );
+    assert_eq!(sink.shots, 64 * 129);
 }
 
 #[test]
 fn direct_frame_rejects_anti_hermitian_spp_during_compilation() {
     let circuit = circuit("SPP X0*Z0\nM 0\nDETECTOR rec[-1]\n");
     let error = DetectionSamplingCompiler::new()
-        .compile_direct_for_test(&circuit)
+        .compile(&circuit)
         .expect_err("reject anti-Hermitian SPP before a session exists");
 
     assert!(matches!(error, DetectionCompileError::InvalidCircuit(_)));
     assert!(error.to_string().contains("anti-Hermitian"));
-}
-
-#[test]
-fn fused_detection_storage_admission_uses_the_combined_session_estimate() {
-    let construction_started = Cell::new(false);
-    let error = construct_fused_state_after_admission(
-        u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) - 1,
-        2,
-        || {
-            construction_started.set(true);
-            Ok(())
-        },
-    )
-    .expect_err("two individually admissible components must fail their combined envelope");
-    assert_eq!(
-        error,
-        DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes: u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) + 1,
-            limit_bytes: MAX_DETECTION_SESSION_STORAGE_BYTES,
-        }
-    );
-    assert!(
-        !construction_started.get(),
-        "aggregate admission must reject before constructing either mutable component"
-    );
-
-    construct_fused_state_after_admission(
-        u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) - 2,
-        2,
-        || {
-            construction_started.set(true);
-            Ok(())
-        },
-    )
-    .expect("the exact combined storage maximum is admitted");
-    assert!(
-        construction_started.get(),
-        "exact-limit admission must continue into component construction"
-    );
 }

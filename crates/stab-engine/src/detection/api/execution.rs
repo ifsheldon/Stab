@@ -4,17 +4,13 @@ use stab_records::{DetectionSink, MeasurementBatchView};
 
 use super::{
     DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DetectionSamplingPlan, DetectionSamplingPlanKind, DirectDetectionState,
-    DirectDetectorFramePlan, MAX_BATCH_SHOTS, MAX_DETECTION_SESSION_STORAGE_BYTES,
-    MeasurementToDetectionPlan, MeasurementToDetectionSession,
+    DetectionRunSummary, DirectDetectionState, DirectDetectorFramePlan, MAX_BATCH_SHOTS,
+    MAX_DETECTION_SESSION_STORAGE_BYTES, MeasurementToDetectionPlan,
 };
-use crate::{
-    RandomPolicy, RunError, SamplingCancellation, SamplingRunStatus, SamplingSession, ShotCount,
-    SinkFailurePhase,
-};
+use crate::{RandomPolicy, SamplingCancellation, ShotCount, SinkFailurePhase};
 
 pub(super) fn run_direct<Sink>(
-    plan: &DetectionSamplingPlan,
+    direct: &DirectDetectorFramePlan,
     state: &mut DirectDetectionState,
     shots: ShotCount,
     sink: &mut Sink,
@@ -31,14 +27,6 @@ where
         pending_count,
         cancellation,
     } = state;
-    let DetectionSamplingPlanKind::DirectDetectorFrame(direct) = &plan.inner.kind else {
-        return Err(DetectionRunError::Engine {
-            source: DetectionExecutionError::InternalInvariant {
-                message: "direct detection session did not own a direct plan".to_owned(),
-            },
-            progress: DetectionRunProgress::new(0, 0),
-        });
-    };
     let mut remaining = shots.get();
     let mut committed = 0_u64;
     while remaining > 0 {
@@ -124,63 +112,6 @@ where
     })
 }
 
-pub(super) fn run_fused<Sink>(
-    sampling: &mut SamplingSession,
-    conversion: &mut MeasurementToDetectionSession,
-    shots: ShotCount,
-    sink: &mut Sink,
-) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
-where
-    Sink: DetectionSink,
-{
-    let mut transaction =
-        conversion
-            .start_transaction(sink)
-            .map_err(|source| DetectionRunError::Engine {
-                source,
-                progress: DetectionRunProgress::new(0, 0),
-            })?;
-    match sampling.run(shots, &mut transaction) {
-        Ok(summary) => Ok(DetectionRunSummary {
-            status: match summary.status() {
-                SamplingRunStatus::Completed => DetectionRunStatus::Completed,
-                SamplingRunStatus::Cancelled => DetectionRunStatus::Cancelled,
-            },
-            requested_shots: shots,
-            committed_shots: summary.committed_shots(),
-            total_committed_shots: summary.total_committed_shots(),
-        }),
-        Err(RunError::Engine { source, progress }) => Err(DetectionRunError::Engine {
-            source: DetectionExecutionError::Sampling(source),
-            progress: DetectionRunProgress::new(
-                progress.committed_shots().get(),
-                progress.attempted_batch_shots().get(),
-            ),
-        }),
-        Err(RunError::Sink {
-            source, progress, ..
-        }) => flatten_transaction_error(source, progress),
-    }
-}
-
-fn flatten_transaction_error<SinkError>(
-    error: DetectionRunError<SinkError>,
-    sampling_progress: crate::SamplingRunProgress,
-) -> Result<DetectionRunSummary, DetectionRunError<SinkError>> {
-    let progress = DetectionRunProgress::new(
-        sampling_progress.committed_shots().get(),
-        sampling_progress.attempted_batch_shots().get(),
-    );
-    Err(match error {
-        DetectionRunError::Engine { source, .. } => DetectionRunError::Engine { source, progress },
-        DetectionRunError::Sink { phase, source, .. } => DetectionRunError::Sink {
-            phase,
-            source,
-            progress,
-        },
-    })
-}
-
 pub(super) fn copy_record(
     batch: MeasurementBatchView<'_>,
     shot_index: usize,
@@ -221,22 +152,6 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
         .saturating_add(records)
         .saturating_add(packed_batch_bytes)
         .saturating_add(plan.inner.converter.sweep_correction_storage_bytes())
-}
-
-pub(super) fn construct_fused_state_after_admission<T>(
-    sampling_bytes: u128,
-    conversion_bytes: u128,
-    construct: impl FnOnce() -> Result<T, DetectionExecutionError>,
-) -> Result<T, DetectionExecutionError> {
-    validate_combined_session_storage(sampling_bytes, conversion_bytes)?;
-    construct()
-}
-
-pub(super) fn validate_combined_session_storage(
-    first_component_bytes: u128,
-    second_component_bytes: u128,
-) -> Result<(), DetectionExecutionError> {
-    validate_session_storage(first_component_bytes.saturating_add(second_component_bytes))
 }
 
 pub(super) fn validate_direct_session_storage(

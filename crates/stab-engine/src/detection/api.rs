@@ -15,13 +15,9 @@ use stab_records::{
 use super::error::DetectionError;
 use super::frame::{DetectorFrameState, DirectDetectorFramePlan};
 use super::{
-    DetectionConversionLimits, DetectionRecordBuffer, PreparedDetectionSampling,
-    PreparedMeasurementToDetection, try_false_vec,
+    DetectionConversionLimits, DetectionRecordBuffer, PreparedMeasurementToDetection, try_false_vec,
 };
-use crate::{
-    RandomPolicy, ReferenceSampleMode, SamplingCancellation, SamplingSession, ShotCount,
-    SinkFailurePhase,
-};
+use crate::{RandomPolicy, ReferenceSampleMode, SamplingCancellation, ShotCount, SinkFailurePhase};
 
 mod contracts;
 mod delivery;
@@ -33,8 +29,7 @@ pub use contracts::{
 };
 pub use delivery::MeasurementToDetectionTransaction;
 use execution::{
-    construct_fused_state_after_admission, conversion_session_storage_bytes, copy_record,
-    detection_rng, invariant_error, run_direct, run_fused, storage_error,
+    copy_record, detection_rng, invariant_error, run_direct, storage_error,
     validate_conversion_session_storage, validate_direct_session_storage,
 };
 
@@ -610,55 +605,10 @@ impl DetectionSamplingCompiler {
         self,
         circuit: &Circuit,
     ) -> Result<DetectionSamplingPlan, DetectionCompileError> {
-        self.compile_variant(circuit, DetectionSamplingVariant::Auto)
-    }
-
-    fn compile_variant(
-        self,
-        circuit: &Circuit,
-        variant: DetectionSamplingVariant,
-    ) -> Result<DetectionSamplingPlan, DetectionCompileError> {
-        let use_direct = match variant {
-            DetectionSamplingVariant::Auto => true,
-            #[cfg(test)]
-            DetectionSamplingVariant::DirectDetectorFrame => true,
-            #[cfg(test)]
-            DetectionSamplingVariant::FusedSamplingConversion => false,
-        };
-        let kind = if use_direct {
-            DetectionSamplingPlanKind::DirectDetectorFrame(DirectDetectorFramePlan::compile(
-                circuit,
-                self.limits,
-            )?)
-        } else {
-            let PreparedDetectionSampling {
-                converter,
-                sampling,
-            } = PreparedDetectionSampling::compile(circuit, self.limits)?;
-            DetectionSamplingPlanKind::FusedSamplingConversion {
-                sampling,
-                conversion: MeasurementToDetectionPlan::from_converter(converter),
-            }
-        };
+        let direct = DirectDetectorFramePlan::compile(circuit, self.limits)?;
         Ok(DetectionSamplingPlan {
-            inner: Arc::new(DetectionSamplingPlanInner { kind }),
+            inner: Arc::new(DetectionSamplingPlanInner { direct }),
         })
-    }
-
-    #[cfg(test)]
-    fn compile_direct_for_test(
-        self,
-        circuit: &Circuit,
-    ) -> Result<DetectionSamplingPlan, DetectionCompileError> {
-        self.compile_variant(circuit, DetectionSamplingVariant::DirectDetectorFrame)
-    }
-
-    #[cfg(test)]
-    fn compile_fused_for_test(
-        self,
-        circuit: &Circuit,
-    ) -> Result<DetectionSamplingPlan, DetectionCompileError> {
-        self.compile_variant(circuit, DetectionSamplingVariant::FusedSamplingConversion)
     }
 }
 
@@ -668,15 +618,6 @@ impl Default for DetectionSamplingCompiler {
     }
 }
 
-#[derive(Clone, Copy)]
-enum DetectionSamplingVariant {
-    Auto,
-    #[cfg(test)]
-    DirectDetectorFrame,
-    #[cfg(test)]
-    FusedSamplingConversion,
-}
-
 /// Immutable, shareable circuit detection-sampling plan.
 #[derive(Clone)]
 pub struct DetectionSamplingPlan {
@@ -684,20 +625,7 @@ pub struct DetectionSamplingPlan {
 }
 
 struct DetectionSamplingPlanInner {
-    kind: DetectionSamplingPlanKind,
-}
-
-#[derive(Clone)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "the private plan kind is already behind one Arc and avoids a second allocation"
-)]
-enum DetectionSamplingPlanKind {
-    DirectDetectorFrame(DirectDetectorFramePlan),
-    FusedSamplingConversion {
-        sampling: crate::SamplingPlan,
-        conversion: MeasurementToDetectionPlan,
-    },
+    direct: DirectDetectorFramePlan,
 }
 
 impl fmt::Debug for DetectionSamplingPlan {
@@ -713,36 +641,15 @@ impl fmt::Debug for DetectionSamplingPlan {
 
 impl DetectionSamplingPlan {
     pub fn measurement_width(&self) -> MeasurementWidth {
-        match &self.inner.kind {
-            DetectionSamplingPlanKind::DirectDetectorFrame(plan) => {
-                MeasurementWidth::new(plan.measurement_count())
-            }
-            DetectionSamplingPlanKind::FusedSamplingConversion { conversion, .. } => {
-                conversion.measurement_width()
-            }
-        }
+        MeasurementWidth::new(self.inner.direct.measurement_count())
     }
 
     pub fn detector_width(&self) -> DetectorWidth {
-        match &self.inner.kind {
-            DetectionSamplingPlanKind::DirectDetectorFrame(plan) => {
-                DetectorWidth::new(plan.detector_count())
-            }
-            DetectionSamplingPlanKind::FusedSamplingConversion { conversion, .. } => {
-                conversion.detector_width()
-            }
-        }
+        DetectorWidth::new(self.inner.direct.detector_count())
     }
 
     pub fn observable_width(&self) -> ObservableWidth {
-        match &self.inner.kind {
-            DetectionSamplingPlanKind::DirectDetectorFrame(plan) => {
-                ObservableWidth::new(plan.observable_count())
-            }
-            DetectionSamplingPlanKind::FusedSamplingConversion { conversion, .. } => {
-                conversion.observable_width()
-            }
-        }
+        ObservableWidth::new(self.inner.direct.observable_count())
     }
 
     pub fn session(
@@ -751,18 +658,6 @@ impl DetectionSamplingPlan {
     ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
         DetectionSamplingSession::new(self.clone(), random_policy)
     }
-}
-
-#[allow(
-    clippy::large_enum_variant,
-    reason = "both private variants own already-admitted fallible session storage without a second allocation layer"
-)]
-enum DetectionSamplingState {
-    DirectDetectorFrame(DirectDetectionState),
-    FusedSamplingConversion {
-        sampling: SamplingSession,
-        conversion: MeasurementToDetectionSession,
-    },
 }
 
 struct DirectDetectionState {
@@ -778,7 +673,7 @@ struct DirectDetectionState {
 /// Mutable reusable state for circuit detection sampling.
 pub struct DetectionSamplingSession {
     plan: DetectionSamplingPlan,
-    state: DetectionSamplingState,
+    state: DirectDetectionState,
     total_committed_shots: u64,
     poisoned: bool,
     not_sync: PhantomData<Cell<()>>,
@@ -800,42 +695,19 @@ impl DetectionSamplingSession {
         plan: DetectionSamplingPlan,
         random_policy: RandomPolicy,
     ) -> Result<Self, DetectionExecutionError> {
-        let state = match &plan.inner.kind {
-            DetectionSamplingPlanKind::DirectDetectorFrame(direct) => {
-                validate_direct_session_storage(direct)?;
-                DetectionSamplingState::DirectDetectorFrame(DirectDetectionState {
-                    rng: detection_rng(random_policy),
-                    frame: direct
-                        .state()
-                        .map_err(DetectionExecutionError::Conversion)?,
-                    batch: DetectionBatchBuffers::new(
-                        plan.detector_width(),
-                        plan.observable_width(),
-                    )?,
-                    delivery: DetectionBatchBuffers::new(
-                        plan.detector_width(),
-                        plan.observable_width(),
-                    )?,
-                    pending_start: 0,
-                    pending_count: 0,
-                    cancellation: OnceLock::new(),
-                })
-            }
-            DetectionSamplingPlanKind::FusedSamplingConversion {
-                sampling,
-                conversion,
-            } => construct_fused_state_after_admission(
-                sampling.estimated_session_storage_bytes(ReferenceSampleMode::UseReferenceSample),
-                conversion_session_storage_bytes(conversion),
-                || {
-                    Ok(DetectionSamplingState::FusedSamplingConversion {
-                        sampling: sampling
-                            .session(random_policy)
-                            .map_err(DetectionExecutionError::Sampling)?,
-                        conversion: conversion.session()?,
-                    })
-                },
-            )?,
+        validate_direct_session_storage(&plan.inner.direct)?;
+        let state = DirectDetectionState {
+            rng: detection_rng(random_policy),
+            frame: plan
+                .inner
+                .direct
+                .state()
+                .map_err(DetectionExecutionError::Conversion)?,
+            batch: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
+            delivery: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
+            pending_start: 0,
+            pending_count: 0,
+            cancellation: OnceLock::new(),
         };
         Ok(Self {
             plan,
@@ -847,26 +719,14 @@ impl DetectionSamplingSession {
     }
 
     pub fn cancellation(&self) -> SamplingCancellation {
-        match &self.state {
-            DetectionSamplingState::DirectDetectorFrame(state) => state
-                .cancellation
-                .get_or_init(SamplingCancellation::default)
-                .clone(),
-            DetectionSamplingState::FusedSamplingConversion { sampling, .. } => {
-                sampling.cancellation()
-            }
-        }
+        self.state
+            .cancellation
+            .get_or_init(SamplingCancellation::default)
+            .clone()
     }
 
     pub fn is_poisoned(&self) -> bool {
         self.poisoned
-            || match &self.state {
-                DetectionSamplingState::DirectDetectorFrame(_) => false,
-                DetectionSamplingState::FusedSamplingConversion {
-                    sampling,
-                    conversion,
-                } => sampling.is_poisoned() || conversion.is_poisoned(),
-            }
     }
 
     pub const fn total_committed_shots(&self) -> ShotCount {
@@ -901,15 +761,7 @@ impl DetectionSamplingSession {
             return Ok(self.summary(DetectionRunStatus::Completed, shots, 0));
         }
 
-        let result = match &mut self.state {
-            DetectionSamplingState::DirectDetectorFrame(state) => {
-                run_direct(&self.plan, state, shots, sink)
-            }
-            DetectionSamplingState::FusedSamplingConversion {
-                sampling,
-                conversion,
-            } => run_fused(sampling, conversion, shots, sink),
-        };
+        let result = run_direct(&self.plan.inner.direct, &mut self.state, shots, sink);
 
         match result {
             Ok(summary) => {

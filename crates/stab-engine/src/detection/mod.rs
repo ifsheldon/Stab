@@ -4,7 +4,6 @@ mod conversion_plan;
 mod error;
 pub(crate) mod frame;
 mod limits;
-mod prepared;
 mod reference;
 mod reference_signs;
 
@@ -26,7 +25,6 @@ use buffers::{try_false_vec, try_vec_with_capacity};
 use conversion_plan::ConversionPlan;
 use error::DetectionResult;
 use frame::{DetectorFrameState, SweepCorrectionPlan, admit_combined_compiled_storage};
-use prepared::PreparedDetectionSampling;
 use reference::ReferenceSampleSource;
 use stab_model::Circuit;
 
@@ -218,13 +216,6 @@ impl PreparedMeasurementToDetection {
                 "sweep correction state does not match the compiled conversion plan",
             )),
         }
-    }
-
-    fn from_plan_and_reference_sample(
-        plan: ConversionPlan,
-        reference_sample: ReferenceSampleSource,
-    ) -> DetectionResult<Self> {
-        Self::from_plan_reference_and_correction(plan, reference_sample, None)
     }
 
     fn from_plan_reference_and_correction(
