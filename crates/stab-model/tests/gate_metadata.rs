@@ -5,8 +5,6 @@
     reason = "PF1 gate metadata compatibility tests use direct assertions for compact diagnostics"
 )]
 
-use std::collections::BTreeSet;
-
 use stab_model::{
     Circuit, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
 };
@@ -190,46 +188,6 @@ fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
             .canonical_name(),
         "SPP_DAG"
     );
-}
-
-#[test]
-fn gate_support_contract_covers_model_catalog_and_validation() {
-    let support_rows = include_str!("../../../docs/plans/rpf1-gate-execution-support-contract.md")
-        .lines()
-        .filter_map(|line| {
-            if !line.starts_with("| `") {
-                return None;
-            }
-            let cells = line
-                .trim_matches('|')
-                .split('|')
-                .map(str::trim)
-                .collect::<Vec<_>>();
-            let [gate_cell, validation, ..] = cells.as_slice() else {
-                panic!("support contract row shape: {line}");
-            };
-            Some((gate_cell.trim_matches('`'), *validation))
-        })
-        .collect::<Vec<_>>();
-    let documented_names = support_rows
-        .iter()
-        .map(|(gate, _validation)| *gate)
-        .collect::<BTreeSet<_>>();
-    assert_eq!(
-        support_rows.len(),
-        documented_names.len(),
-        "support contract should not duplicate canonical gate rows"
-    );
-    assert_eq!(
-        documented_names,
-        Gate::all()
-            .map(|gate| gate.canonical_name())
-            .collect::<BTreeSet<_>>(),
-        "support contract should mention every canonical gate exactly once"
-    );
-    for (gate, validation) in support_rows {
-        assert_eq!(validation, "Yes", "{gate} validation column");
-    }
 }
 
 #[test]

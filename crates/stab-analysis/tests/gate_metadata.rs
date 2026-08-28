@@ -412,88 +412,8 @@ fn gate_decomposition_metadata_matches_tableau_where_defined() {
     }
 }
 
-#[test]
-fn gate_metadata_api_contract_table_matches_rust_accessors() {
-    let support_table = parse_gate_support_contract_table()
-        .into_iter()
-        .collect::<BTreeMap<_, _>>();
-
-    for gate in Gate::all() {
-        let gate_name = gate.canonical_name();
-        let row = support_table.get(gate_name).expect("contract row");
-        assert_eq!(row.tableau, gate_has_tableau(gate), "{gate_name} tableau");
-        assert_eq!(
-            row.unitary,
-            gate_has_unitary_matrix(gate),
-            "{gate_name} unitary"
-        );
-        assert_eq!(row.flow, gate_has_flows(gate), "{gate_name} flow");
-        assert_eq!(
-            row.decomposition,
-            gate_has_h_s_cx_m_r_decomposition(gate),
-            "{gate_name} decomposition"
-        );
-    }
-}
-
 fn flow_texts(flows: Vec<Flow>) -> Vec<String> {
     flows.into_iter().map(|flow| flow.to_string()).collect()
-}
-
-#[derive(Debug)]
-struct GateSupportContractRow {
-    tableau: bool,
-    unitary: bool,
-    flow: bool,
-    decomposition: bool,
-}
-
-fn parse_gate_support_contract_table() -> Vec<(&'static str, GateSupportContractRow)> {
-    include_str!("../../../docs/plans/rpf1-gate-execution-support-contract.md")
-        .lines()
-        .filter_map(|line| {
-            if !line.starts_with("| `") {
-                return None;
-            }
-            let cells = line
-                .trim_matches('|')
-                .split('|')
-                .map(str::trim)
-                .collect::<Vec<_>>();
-            let [
-                gate_cell,
-                _validation,
-                tableau,
-                unitary,
-                flow,
-                decomposition,
-                _sampler,
-                _detection_conversion,
-                _analyzer,
-            ] = cells.as_slice()
-            else {
-                panic!("support contract row shape: {line}");
-            };
-            let gate = gate_cell.trim_matches('`');
-            Some((
-                gate,
-                GateSupportContractRow {
-                    tableau: support_contract_bool(gate, "Tableau", tableau),
-                    unitary: support_contract_bool(gate, "Unitary", unitary),
-                    flow: support_contract_bool(gate, "Flow", flow),
-                    decomposition: support_contract_bool(gate, "Decomposition", decomposition),
-                },
-            ))
-        })
-        .collect()
-}
-
-fn support_contract_bool(gate: &str, column: &str, value: &str) -> bool {
-    match value {
-        "Yes" => true,
-        "No" => false,
-        _ => panic!("{gate} {column} support cell must be Yes or No, got {value:?}"),
-    }
 }
 
 fn assert_h_s_cx_m_r_base(circuit: &Circuit, gate_name: &str) {

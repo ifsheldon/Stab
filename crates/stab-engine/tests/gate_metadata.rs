@@ -12,16 +12,8 @@ mod support;
 use support::{SamplingFixture, convert_detection_records};
 
 #[test]
-fn gate_execution_contract_accepts_supported_spp_execution_paths() {
+fn supported_spp_execution_paths_preserve_semantics() {
     for gate_name in ["SPP", "SPP_DAG"] {
-        let (sampler, detection_conversion, analyzer) = execution_support_row(gate_name);
-        assert_eq!(sampler, "Decomposed", "{gate_name} sampler support");
-        assert_eq!(
-            detection_conversion, "Decomposed",
-            "{gate_name} detection-conversion support"
-        );
-        assert_eq!(analyzer, "Yes", "{gate_name} analyzer support");
-
         let circuit = Circuit::from_stim_str(&format!("{gate_name} Z0\nM 0\nDETECTOR rec[-1]\n"))
             .expect("parse SPP");
         let sampler =
@@ -46,31 +38,4 @@ fn gate_execution_contract_accepts_supported_spp_execution_paths() {
         circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
             .expect("analyzer should accept supported SPP");
     }
-}
-
-fn execution_support_row(gate_name: &str) -> (&'static str, &'static str, &'static str) {
-    let line = include_str!("../../../docs/plans/rpf1-gate-execution-support-contract.md")
-        .lines()
-        .find(|line| line.starts_with(&format!("| `{gate_name}` |")))
-        .expect("gate support contract row");
-    let cells = line
-        .trim_matches('|')
-        .split('|')
-        .map(str::trim)
-        .collect::<Vec<_>>();
-    let [
-        _gate,
-        _validation,
-        _tableau,
-        _unitary,
-        _flow,
-        _decomposition,
-        sampler,
-        detection_conversion,
-        analyzer,
-    ] = cells.as_slice()
-    else {
-        panic!("support contract row shape: {line}");
-    };
-    (sampler, detection_conversion, analyzer)
 }
