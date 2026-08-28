@@ -111,6 +111,9 @@ jobs:
       - name: Check Stim parity ledger and all evidence selectors
         run: just oracle::parity-check
 
+      - name: Build and check pinned Stim gate oracle
+        run: just oracle::gates
+
       - name: Run PR-tier parity owners
         run: just oracle::parity-run --tier pr
 

@@ -38,19 +38,19 @@ The pre-commit hook is a Rust binary. It checks staged Rust-affecting paths, ove
 The atomic source ledger is `oracle/stim-v1.16-parity.toml` plus its named family fragments. [docs/stim-parity.md](docs/stim-parity.md) is generated from it.
 
 ```text
+just oracle::gates
 just oracle::parity-check
 just oracle::parity-run --tier pr
 just oracle::parity-run --tier full
 just oracle::parity-render --check
 ```
 
-Each completed parity family names one meaningful semantic owner. Keep exact output, statistical behavior, CLI behavior, hostile-input handling, and resource contracts in the crate or process boundary that owns them. Round trips are supporting evidence, not an independent compatibility oracle.
+On a fresh checkout, run the gate comparison before the parity owners so the pinned Stim library and gate helper are built outside the per-owner execution timeout. Each completed parity family names one meaningful semantic owner. Keep exact output, statistical behavior, CLI behavior, hostile-input handling, and resource contracts in the crate or process boundary that owns them. Round trips are supporting evidence, not an independent compatibility oracle.
 
 Additional pinned checks are:
 
 ```text
 just oracle::result-formats --check
-just oracle::gates
 just oracle::run --implemented-only
 just oracle::matrix --check
 ```
