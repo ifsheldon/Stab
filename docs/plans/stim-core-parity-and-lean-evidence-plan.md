@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 is locally complete and awaits exact-descendant GitHub CI.
+Status: Complete. P0 completed in `07ebf4c8`; P1 through P9 are complete. Release validity remains conditional on required GitHub CI passing the exact proposed release revision.
 
 ## Summary
 
@@ -529,7 +529,7 @@ Clean revision `94f9121bb07716c76e02271183f95a2a8776cb65` passed formatting, str
 
 Milestone audit and full code review found and repaired two false exact-RNG test assumptions, a transpose-dimension diagnostic, stale standalone-consumer lockfiles, and a stale direct-Rust oracle selector in `9f1d145e`, `a242ad02`, `56594785`, `a3a58ba0`, and `94f9121b`. No blocking implementation, compatibility, evidence, or specification finding remains for P8.
 
-## Milestone P9: Produce One Formal Evidence Bundle And Retire History
+## Milestone P9: Produce One Formal Evidence Pair And Retire History (Complete)
 
 ### Tasks
 
@@ -537,8 +537,8 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 2. Run full and soak E2E evidence on the controlled AArch64 host.
 3. Require fixed toolchains and build flags, CPU affinity, no competing benchmark process, host temperature below `100 C`, and no swap I/O during measured samples.
 4. Restore the exact prior swap configuration after the run, including failure paths.
-5. Publish one immutable run bundle containing `run.json`, raw samples, derived report, correctness result, host profile, source and Stim identities, toolchain and build identities, input and output digests, accepted self-baseline identities, memory results, and offline replay metadata.
-6. Maintain one current AArch64 evidence pointer. Keep prior bundles and failed runs as Git or artifact history instead of copying their state into current documents.
+5. Publish one immutable full bundle and one immutable soak bundle, each containing `run.json`, raw samples, derived report, correctness result, host profile, source and Stim identities, toolchain and build identities, input and output digests, accepted self-baseline identities, memory results, and offline replay metadata.
+6. Maintain one current AArch64 evidence pointer naming exactly that full-and-soak pair. Keep prior bundles and failed runs as Git or artifact history instead of copying their state into current documents.
 7. Seed the first AArch64 Stab self-regression baseline from the accepted full and soak samples; the seeding run proves parity but is `unseeded` for self-regression.
 8. Leave x86-64 explicitly unqualified until a controlled host is available; this is not a blocker for the selected AArch64 release claim.
 9. Extract durable decisions into architecture records, then delete superseded plans, progress reports, dashboards, ledgers, old benchmark schemas, and obsolete operational commands.
@@ -547,13 +547,13 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 
 ### Tests And Verification
 
-- Replay the bundle offline and require byte-identical derived results.
+- Replay both bundles offline and require byte-identical derived results.
 - Reject dirty source, wrong Stim identity, mismatched inputs, existing output paths, incomplete samples, failed correctness prerequisites, altered thresholds, and unseeded regression claims.
 - Run formatting, workspace Clippy, workspace tests, parity check and rendering, the full pinned oracle tier, E2E manifest validation, E2E smoke, documentation checks, and pre-commit.
 
 ### Done Criteria
 
-- The AArch64 evidence bundle replays from raw samples and exact identities.
+- The AArch64 full-and-soak evidence pair replays from raw samples and exact identities.
 - Existing accepted baselines pass the `1.15x` self-regression gate; when no baseline exists, the first full-and-soak pair remains explicitly `unseeded` and the evidence descendant contains exactly the baseline candidate derived from that pair.
 - Public documentation contains no stale status count or superseded qualification procedure.
 - The worktree is clean, no benchmark process remains, swap state matches its pre-run state, and CI passes the exact source commit.
@@ -568,18 +568,18 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 
 ### Formal Evidence Checkpoint
 
-- Clean measured revision `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` passes formatting, warnings-denied workspace Clippy, all workspace tests, architecture and four external-consumer checks, API and Markdown documentation checks, the generated parity and E2E contracts, the live 62-case result-format differential, every implemented fixture, and all 138 canonical owners in both full and soak tiers.
-- The immutable controlled AArch64 full and soak bundles live under `benchmarks/evidence/aarch64/a8b56db319410f1d52bc64bfb7ee6a63c01c490f/`. Each covers all 29 cases, validates correctness and memory, and passes the paired Stim parity gate.
-- Full-tier worst median and confidence upper ratios are `sample-dem.medium` at `1.138453x` and `detect-observables.medium` at `1.224350x`; maximum Stab peak RSS is `51,601,408` bytes. Soak-tier worst median and upper ratios are both `detect-observables.medium` at `1.170504x` and `1.189167x`; maximum Stab peak RSS is `49,692,672` bytes.
-- Both bundles replay offline, run on CPU 0, stay below `62 C`, retain the configured `/swap.img`, and observe unchanged swap page-in and page-out counters within each formal run.
-- Both reports remain correctly `unseeded`. One generated 29-entry candidate records the worse full-and-soak Stab median and upper bound for each exact case identity; `benchmarks/suite.toml` contains that candidate without reclassifying the seeding evidence as a regression pass.
-- Narrow evidence descendant `992bd1b5d109b2e0cd673556366d06b0e912a50d` contains no product or benchmark-runner change, passes `e2e-release-check`, and replays fresh copies of both committed bundles. Required GitHub CI on the final documentation descendant remains the only external acceptance step.
-- The circuit-to-DEM catalog owner compares parsed model values across architectures because pinned Stim's DEM decimal width follows the host C++ `long double` precision, while Stab's canonical DEM printer is architecture-stable. Model-owned DEM printer tests remain byte exact.
+- Clean measured revision `ef9866324640a744208e862a9a918f9fa16d4953` passes exact-revision GitHub CI in run `33150313661`, including formatting, warnings-denied workspace Clippy, workspace tests, generated contracts, the live 62-case result-format differential, and all 138 pull-request parity owners.
+- The immutable controlled AArch64 full and soak bundles live under `benchmarks/evidence/aarch64/ef9866324640a744208e862a9a918f9fa16d4953/`. Each covers all 29 cases and passes correctness, memory, paired Stim parity, and seeded Stab self-regression.
+- Full-tier worst median and confidence upper ratios are `sample-dem.medium` at `1.156535x` and `detect-observables.medium` at `1.176857x`; maximum Stab peak RSS is `47,050,752` bytes. Soak-tier worst median and upper ratios are both `sample-dem.medium` at `1.153531x` and `1.170063x`; maximum Stab peak RSS is `50,065,408` bytes.
+- Both bundles replay offline, run on CPU 0, stay below `39 C`, use one controlled interval with no configured swap, and observe unchanged page-in and page-out counters. The prior `/swap.img` configuration was restored immediately afterward at priority `-2`.
+- The historical `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` pair remains correctly `unseeded` and is the reviewed source of the first 29-entry self-regression baseline. The current `ef986632` pair is the first source-current pair to pass that seeded `1.15x` gate; the seeding evidence is not retroactively promoted.
+- Evidence publication commit `04b012ab` contains no product, oracle, benchmark-runner, or workflow change and passes `e2e-release-check`. Required GitHub CI must also pass the exact final descendant before release use.
+- The circuit-to-DEM catalog owner compares parsed model values across architectures because pinned Stim's DEM decimal width follows host C++ `long double` precision, while Stab's canonical DEM printer is architecture-stable. Model-owned DEM printer tests remain byte exact.
 
 ### Audit Checkpoint
 
-- The milestone audit maps every P9 task and done criterion to the clean source checks, immutable bundles, host transitions, baseline candidate, evidence pointer, history retirement, release check, or remaining exact-revision CI requirement. It found no implementation defect or specification loophole.
-- The full code review covered product ownership, Stim parity, result formats, CLI and filesystem safety, process supervision, SIMD isolation, E2E methodology, evidence publication, tests, operations, and documentation. It found no release-blocking issue; the only source-current finding was the stale pre-P9 inventory-retention sentence corrected above.
+- The final milestone audit maps every P9 task and done criterion to clean source checks, immutable bundles, host transitions, the seeded baseline, the current pointer, history retirement, release checking, and exact-revision CI. It found no implementation defect; the only wording ambiguity was the former singular `bundle` label for the required full-and-soak pair, corrected above.
+- The final full code review covered product ownership, Stim parity, result formats, CLI and filesystem safety, bounded process supervision, SIMD isolation, the cross-architecture DEM comparator, CI ordering, E2E methodology, evidence publication, tests, operations, and documentation. It found no confirmed release blocker or follow-up defect.
 - The large-file review found no product Rust file at or above 1,200 lines. The largest repository-owned Rust files remain watch-list items below that limit, led by `ops/oracle/src/parity.rs` at 1,196 lines; this milestone adds no code to them.
 - No shell script exists outside vendored Stim, direct portable SIMD remains isolated in `stab-kernels-simd`, and the only production `unsafe` boundary is the documented bounded `wait4` supervisor path in benchmark operations.
 
@@ -624,7 +624,7 @@ Complex logic remains in Rust operations binaries. The old qualification and ben
 
 ## Final Acceptance
 
-The program is complete when every nondeprecated, nondeferred core Rust and CLI behavior in the frozen Stim v1.16.0 ledger is `done` or an approved bug/resource divergence; every surviving test protects meaningful behavior; the architecture has one owner and one public route per capability; the 29-case E2E suite is the only active performance system; controlled AArch64 evidence passes correctness, `1.25x` Stim parity, memory, and seeded `1.15x` self-regression where a prior baseline exists; the evidence bundle replays offline; and superseded compatibility and qualification machinery has been deleted.
+The program is complete when every nondeprecated, nondeferred core Rust and CLI behavior in the frozen Stim v1.16.0 ledger is `done` or an approved bug/resource divergence; every surviving test protects meaningful behavior; the architecture has one owner and one public route per capability; the 29-case E2E suite is the only active performance system; controlled AArch64 evidence passes correctness, `1.25x` Stim parity, memory, and seeded `1.15x` self-regression where a prior baseline exists; the full-and-soak evidence pair replays offline; and superseded compatibility and qualification machinery has been deleted.
 
 ## Assumptions
 
