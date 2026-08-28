@@ -10,8 +10,8 @@
 
 ## Documentation
 
-- Correctness qualification contracts and oracle corpus workflows live in `docs/AGENTS.md` (served by `docs/README.md`); performance qualification contracts and benchmark workflows live in `benchmarks/AGENTS.md`. Read the matching file before qualification, oracle-ledger, or benchmark-inventory work.
-- During the qualification program, do not promote a correctness claim from file-level or broad shared evidence, and do not promote a Stim performance ratio until its exact correctness prerequisites and equivalent semantic work pass.
+- Parity-ledger and oracle workflows live in `docs/AGENTS.md` (served by `docs/README.md`); the single E2E performance contract lives in `benchmarks/AGENTS.md`. Read the matching file before correctness or benchmark work.
+- Do not promote a correctness claim from file-level or broad shared evidence, and do not promote a Stim performance ratio until the exact parity prerequisites and equivalent semantic work pass.
 - When changing implemented behavior, public APIs, CLI flags, supported file formats, operational workflows, or developer workflows, update the matching documentation in the same change set.
 - If generated documentation, schemas, API references, or compatibility matrices are introduced, regenerate them when changing the source of truth.
 - When editing Markdown prose, do not insert hard line breaks in the middle of a sentence; keep each sentence on one physical line unless a table, list, code block, quoted source, or other format requires line breaks.
@@ -58,7 +58,7 @@
 - Complex logic includes branching workflows, path validation, downloads, report generation, compatibility orchestration, benchmark orchestration, release checks, and any workflow that would otherwise become a multiline shell script.
 - Use `just maintenance::setup-hooks` to install the staged-aware Rust pre-commit hook into `.git/hooks/pre-commit`.
 - Use `just maintenance::pre-commit` to run the hook manually against the staged index.
-- The full oracle, qualification, and benchmark command surface is documented in `CONTRIBUTE.md`; correctness-evidence workflows follow `docs/AGENTS.md` and benchmark workflows follow `benchmarks/AGENTS.md`.
+- The oracle, parity, and E2E benchmark command surface is documented in `CONTRIBUTE.md`; correctness workflows follow `docs/AGENTS.md` and benchmark workflows follow `benchmarks/AGENTS.md`.
 - The pre-commit hook must stay shell-script-free in this repository: build and install the Rust binary instead of adding a tracked shell launcher.
 - The hook should treat submodules as pointer updates, run Rust checks only for staged Rust-affecting paths, scan staged source blobs for oversized files, and check Stab's instruction-document policy only when instruction docs or `.gitmodules` change.
 - Every scanned `README.md` must have a colocated `AGENTS.md`, and every effective `AGENTS.md` source must have at least one `CLAUDE.md` symlink pointing to it.

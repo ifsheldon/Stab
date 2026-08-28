@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P6 are complete. P7 is next. P8 and P9 have not started.
+Status: Active. P0 through P7 are complete. P8 is next. P9 has not started.
 
 ## Objective
 
@@ -20,24 +20,23 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - `oracle/stim-v1.16-parity.toml` and its family fragments own feature and evidence status.
 - [Generated parity view](../stim-parity.md) owns volatile counts and must match the ledger.
 - [Architecture rules](../architecture/README.md) own durable component boundaries.
-- P7 introduces `benchmarks/suite.toml` as the sole active performance source before deleting both superseded benchmark systems.
+- `benchmarks/suite.toml` is the sole active performance source; [the generated suite view](../../benchmarks/SUITE.md) must match it.
 
 Historical plans, progress reports, qualification inventories, and benchmark manifests are context only. They must not create parallel requirements or promote current claims.
 
-## Current Milestone: P7
+## Current Milestone: P8
 
-1. Create one `benchmarks/suite.toml` containing the fixed 12 workflow families and 29 family-scale cases from the active plan, with exact arguments, deterministic inputs, semantic work, output validation, memory policy, Stim parity policy, and Stab regression policy.
-2. Run CLI families process-to-process through release binaries and the Rust pipeline through its stable component APIs. Include startup, parsing, compilation, execution, codecs, and I/O in E2E timings.
-3. Reuse the bounded process supervisor and paired alternating sampler. Report wall time, semantic throughput, peak RSS, output size, paired median, and fixed-seed bootstrap confidence interval without deleting samples or subtracting startup.
-4. Require exact correctness prerequisites before timing. Validate deterministic output exactly and stochastic output through fixed semantic or statistical witnesses outside timed regions.
-5. Preserve the `1.25x` Stim parity and `1.15x` seeded self-regression gates. Missing baselines remain unseeded, and no waiver, reduced work, or relaxed threshold can produce a pass.
-6. Retire each legacy benchmark and qualification route as its conclusion moves into the new suite. End P7 with one runner, one policy source, at most 30 release cases, and at most 15 profile-justified diagnostics.
+1. Use a fresh smoke or full diagnostic run to reproduce each comparable case that exceeds the unchanged `1.25x` Stim gate. Validate semantic work, output witnesses, and peak RSS before profiling.
+2. Prioritize the largest user-visible losses: `sample-surface`, `detect-observables`, `sample-folded-ptb64`, `m2d-packed-sweep`, `sample-dem`, and `qec-cli-pipeline`. Treat one-sample P7 ratios only as triage signals, not claims.
+3. Profile the complete workflow and attribute the dominant cost to startup, parsing, compilation, execution, conversion, encoding, allocation, or I/O. Add a temporary focused probe only when the profile cannot isolate the owner directly.
+4. Optimize the canonical production owner without duplicating representations, weakening resource limits, changing semantic work, adding waivers, or relaxing thresholds.
+5. After each change, run the semantic owner tests, affected pinned differentials, the exact E2E cases, and peak-RSS checks. Remove temporary probes unless a profile proves they explain at least 10% of a release workflow or isolate a confirmed regression.
+6. Record accepted changes and rejected experiments in the P8 checkpoint of the active plan. Do not promote dirty, smoke-tier, or shared-host measurements into release evidence.
 
-P7 closes only after schema and rejection tests, process-supervisor adversarial tests, output-witness tests, a deterministic dry run of every case, generated documentation, benchmark smoke, workspace checks, milestone audit, full code review, and deletion of the superseded active machinery.
+P8 closes only when every Stim-comparable release case passes both paired median and confidence-upper-bound `<= 1.25x`, memory passes, seeded cases satisfy `<= 1.15x`, milestone audit and full code review have no unresolved finding, and the suite still has exactly one workload and policy owner.
 
 ## Remaining Sequence
 
-- P7 replaces both benchmark systems with one capped E2E suite of user workflows.
 - P8 profiles and fixes failing E2E cases without weakening work or thresholds.
 - P9 produces one replayable controlled-host evidence bundle and deletes superseded machinery and status prose.
 

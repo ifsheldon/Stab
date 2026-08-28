@@ -63,12 +63,12 @@ The prebuilt Linux and macOS AArch64 binaries are convenience artifacts built by
 
 ## Built with Codex and Agent Friendly
 
-Stab is an agent-built codebase: the implementation was developed with OpenAI Codex, and the test, oracle, and benchmark qualification harnesses were developed with GPT-5.6 Sol and previously GPT 5.5.
+Stab is an agent-built codebase: the implementation, oracle, and performance tooling were developed with OpenAI Codex.
 
-The working style is plan-first and evidence-first, and the workflow artifacts are committed in this repository: milestone plans and qualification contracts in [docs/plans/](docs/plans/), agent operating rules in [AGENTS.md](AGENTS.md), the pinned Stim v1.16.0 reference sources in [vendor/stim](vendor/stim), and the frozen correctness and performance inventories under [oracle/](oracle/) and [benchmarks/](benchmarks/). For our specialized review skills, see [the skill inventory](.agents/skills/).
+The working style is plan-first and evidence-first. The active goal lives in [docs/plans/GOAL.md](docs/plans/GOAL.md), current parity status is generated from the ledger under [oracle/](oracle/), and user-visible performance workflows live in [benchmarks/suite.toml](benchmarks/suite.toml). For specialized review skills, see [the skill inventory](.agents/skills/).
 
-Key decisions, including the portable-SIMD bit kernels, the streaming CLI architecture, and the machine-checkable qualification program, are documented in the milestone and progress reports under [docs/plans/](docs/plans/).
+Durable component and extension decisions are documented under [docs/architecture/](docs/architecture/); the active parity and lean-evidence rationale is in [docs/plans/stim-core-parity-and-lean-evidence-plan.md](docs/plans/stim-core-parity-and-lean-evidence-plan.md).
 
 ## Development
 
-Development setup, the staged pre-commit hook, oracle and compatibility-matrix workflows, correctness and performance qualification commands, and benchmark contracts are documented in [CONTRIBUTE.md](CONTRIBUTE.md).
+Development setup, the staged pre-commit hook, pinned-oracle workflows, parity owners, and the E2E performance suite are documented in [CONTRIBUTE.md](CONTRIBUTE.md).

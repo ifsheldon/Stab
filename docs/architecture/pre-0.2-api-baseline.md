@@ -14,7 +14,7 @@ This snapshot records the architecture that the Stab 0.2 migration starts from.
 - Correctness evidence parents: 1,759
 - Upstream cases: 2,886
 
-The checked owner inventory is `oracle/qualification-manifest.json`.
+At the recorded revision, the checked owner inventory was `oracle/qualification-manifest.json`. It was retired after the 0.2 component migration and remains available in Git history.
 
 This document does not duplicate its item-level ledger.
 
@@ -70,10 +70,4 @@ Later documentation and benchmark-harness commits do not retroactively change th
 
 The architecture migration must regenerate affected correctness and performance evidence from its own clean source revision before Stab 0.2 release claims.
 
-## Regeneration Commands
-
-```text
-just qualification::correctness-check
-just bench::qualification-check
-just qualification::status --check
-```
+This is an immutable migration snapshot, not a regenerable current contract. Current feature ownership lives in `oracle/stim-v1.16-parity.toml`; current performance ownership lives in `benchmarks/suite.toml`.

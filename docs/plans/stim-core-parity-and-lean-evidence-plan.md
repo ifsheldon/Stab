@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P6 are complete; P7 through P9 have not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P7 are complete; P8 is next; P9 has not started.
 
 ## Summary
 
@@ -477,6 +477,16 @@ The initial diagnostic candidates are circuit parse, circuit print, DEM parse, D
 - Every release case represents an actual CLI or Rust user workflow.
 - Microbenchmarks are profile-justified diagnostics, not release claims.
 - The replacement suite reproduces or supersedes every still-relevant current timing and memory conclusion before the old system is deleted.
+
+### Implementation Checkpoint
+
+P7 completed in `6532fb41`, `f57828e2`, `92d991f3`, and `b4ca064b`. `benchmarks/suite.toml` is the sole active performance source and generates `benchmarks/SUITE.md`; schema 1 contains 12 release families and 29 executable cases under contract digest `5c9ec74d809b167c4bea9014d66fa49920009715914f18648a82f14a8ae26b24`. The replacement keeps actual release processes, one stable Rust pipeline, paired alternating samples, fixed-seed bootstrap intervals, fully consumed and semantically validated outputs, kernel-reported per-child peak RSS, bounded process supervision, immutable new bundle paths, offline replay, the `1.25x` Stim parity policy, and the `1.15x` seeded Stab regression policy.
+
+The old milestone benchmark manifest, qualification runtime inventory, C++ microbenchmark adapter, thresholds, waivers, receipt and completion trees, scheduled shared-host timing workflow, correctness qualification inventory, and blocker ledger were deleted instead of retained behind aliases. Release authorization now fails closed on the new controlled-host evidence pointer. Pull-request CI validates the compact parity owners, live result-format corpus, fixture matrix, and untimed E2E contract.
+
+The persistent diagnostic inventory starts empty. The candidates above remain guidance, not declaration-only schema entries; a probe becomes persistent only after a profile proves the stated value. Startup remains inside every CLI E2E interval. It is not published as a separate field because obtaining an independent startup value would introduce a microbenchmark that does not itself represent the user workflow; P8 may add a temporary startup probe when a failing profile justifies it.
+
+Verification passed workspace formatting, Clippy, and tests; all architecture and external-consumer checks; 138 independently executed parity owners; the live 62-case result-format corpus; all implemented fixtures; the 313-row compatibility matrix; E2E schema validation; and a fresh 29-case smoke bundle at `target/benchmarks/p7-current-suite-smoke` that replayed under the exact current digest. Smoke timing is diagnostic only and makes no parity or regression claim. Its value is complete workflow execution, witness validation, memory enforcement, and deterministic replay before P8 profiling.
 
 ## Milestone P8: Optimize User-Visible Regressions
 

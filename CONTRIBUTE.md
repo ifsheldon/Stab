@@ -1,254 +1,84 @@
-# Contributing to Stab
+# Contributing To Stab
 
-This workspace is pinned to Rust Nightly `nightly-2026-06-20` in `rust-toolchain.toml`.
-The full workspace and `stab-core` use the pinned Nightly toolchain. The extracted `stab-bits`, `stab-records`, scalar-default `stab-algebra`, `stab-model`, `stab-analysis`, current scalar `stab-engine`, and `stab-decoder` packages form a Stable Rust 1.97.1 component stack. The unpublished `stab-reference-decoder` and `stab-reference-noise-pass` crates independently prove the public decoder and circuit-pass seams on the same Stable toolchain. The CLI and operational binaries also default to scalar behavior. Optional portable-SIMD XOR and Clifford kernels live only in dependency-free `stab-kernels-simd`; they are build-time leaf acceleration, not a registered sampling backend.
+Stab targets semantic compatibility with pinned Stim v1.16.0 while keeping the Rust architecture, tests, and performance evidence small enough to understand. Current work happens directly on `main`; do not create a branch or linked worktree unless the user explicitly changes that policy.
 
-Check the Stable component directly with:
+## Setup
 
-```sh
-cargo +1.97.1 test --locked -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine -p stab-decoder -p stab-reference-decoder -p stab-reference-noise-pass --all-targets
-cargo test --locked -p stab-bits -p stab-algebra --no-default-features --features portable-simd
+Install the Rust toolchain pinned by `rust-toolchain.toml`, CMake with a C++ compiler for the Stim oracle, and `just`. Initialize the submodule and install the staged pre-commit hook:
+
+```text
+git submodule update --init --recursive
+just maintenance::setup-hooks
+just oracle::version
+```
+
+## Development Checks
+
+Prefer targeted crate tests during iteration. Before a requested commit, run the checks appropriate to the touched surface and finish with:
+
+```text
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+just maintenance::pre-commit
+```
+
+Architecture changes also require:
+
+```text
+just architecture::check
 just architecture::consumer-check
 just architecture::docs-check
 ```
 
-CI runs the three architecture commands and both component test commands before the Nightly workspace suite. The main architecture check parses every workflow under `.github/workflows` and rejects remote actions or reusable workflows that are not pinned to full 40-character commit SHAs, while repository-local actions remain bound to the checked-out Stab commit and Docker actions require a `sha256` digest. Keep the reviewed release tag in a trailing comment beside each immutable SHA so dependency updates remain auditable. The consumer check compiles standalone Stable component, scalar facade, portable Nightly facade, and mixed feature-unification fixtures. It also verifies that scalar fixtures do not resolve `stab-kernels-simd` and that each portable fixture resolves exactly one kernel package. The documentation check parses repository-owned Markdown, validates local paths and heading anchors, rejects repository escapes, and skips generated, build, vendor, and Git trees.
+The pre-commit hook is a Rust binary. It checks staged Rust-affecting paths, oversized source blobs, submodule pointers, and the repository instruction-document policy without adding shell launchers.
 
-The oracle and benchmark workflows require Git, CMake, a C and C++ toolchain, and Make on the controlled system path.
-Clone with tags and initialize `vendor/stim` with its tags because pinned Stim validation requires both commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` and exact tag `v1.16.0`.
-The correctness qualification extractor also requires `uv` on the controlled system path for bounded parsing of pinned Python tests.
+## Stim Compatibility
 
-Install the local staged-aware Git hook with:
+The atomic source ledger is `oracle/stim-v1.16-parity.toml` plus its named family fragments. [docs/stim-parity.md](docs/stim-parity.md) is generated from it.
 
-```sh
-just maintenance::setup-hooks
-```
-
-Run the same checks manually with:
-
-```sh
-just maintenance::pre-commit
-```
-
-The hook reads staged Git index entries, treats `vendor/stim` as a submodule pointer, runs Rust formatting and Clippy only for staged Rust-affecting changes, scans staged source blobs for oversized files, and checks instruction-document structure when `README.md`, `AGENTS.md`, `CLAUDE.md`, or `.gitmodules` changes.
-Every scanned `README.md` needs a colocated `AGENTS.md`, and every effective `AGENTS.md` source needs at least one `CLAUDE.md` symlink pointing to it.
-
-Generate Rust API documentation with:
-
-```sh
-just docs::api
-```
-
-The generated Rust API reference is written under `target/doc/`, including `target/doc/stab_core/index.html`.
-Run the stricter documentation check before changing public Rust APIs:
-
-```sh
-just docs::api-check
-```
-
-This check runs rustdoc for the workspace with warnings denied.
-
-Validate the pinned Stim oracle with:
-
-```sh
-just oracle::version
-```
-
-Validate and execute the atomic Stim v1.16.0 core parity ledger with:
-
-```sh
+```text
 just oracle::parity-check
 just oracle::parity-run --tier pr
+just oracle::parity-run --tier full
 just oracle::parity-render --check
+```
+
+Each completed parity family names one meaningful semantic owner. Keep exact output, statistical behavior, CLI behavior, hostile-input handling, and resource contracts in the crate or process boundary that owns them. Round trips are supporting evidence, not an independent compatibility oracle.
+
+Additional pinned checks are:
+
+```text
+just oracle::result-formats --check
 just oracle::gates
-```
-
-`oracle/stim-v1.16-parity.toml` is the current source of feature status. The check proves the finite dialect, format, command, format-route, canonical-instruction, and alias partition and resolves each completed semantic owner to exactly one Cargo test. The run command executes each eligible owner independently; `full` and `soak` include all lower tiers. The renderer owns [docs/stim-parity.md](docs/stim-parity.md), which must not be edited directly. The gate command compares `stab-model`'s canonical metadata directly against a helper linked to pinned `libstim`.
-
-Run the M0 oracle smoke cases with:
-
-```sh
-just oracle::run --case smoke/help
-just oracle::run --case smoke/tiny-circuit
-```
-
-The tiny-circuit smoke case now runs through the public `stab sample` command.
-M7 early CLI compatibility includes `stab gen` for `repetition_code memory`, `surface_code rotated_memory_x`, `surface_code rotated_memory_z`, `surface_code unrotated_memory_x`, `surface_code unrotated_memory_z`, and `color_code memory_xyz`.
-The supported `gen` flags are `--code`, `--task`, `--distance`, `--rounds`, `--after_clifford_depolarization`, `--after_reset_flip_probability`, `--before_measure_flip_probability`, `--before_round_data_depolarization`, `--out`, and Stim's accepted no-op `--in`; the deprecated `--gen` spelling is accepted for Stim v1.16.0 compatibility.
-Stab preflights materialized generated circuits against a limit of 131,072 projected physical qubits before allocating or opening an output file. This accepts every repetition-code distance through the CLI maximum 2047, rotated surface-code distances through 256, unrotated surface-code distances through 181, and valid odd color-code distances through 341; larger otherwise-valid surface and color requests fail with the projected size and limit instead of risking quadratic allocation. Pinned Stim accepts nominal distances through 2047, so this is a deliberate Stab resource-safety bound rather than exact acceptance parity.
-`stab convert --in_format=stim --out_format=stim` reads from stdin or `--in`, writes to stdout or `--out`, and emits canonical `.stim` text through the M4 parser/printer.
-The result-data conversion surface supports `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` input and output formats with layouts from explicit `--num_measurements`, `--num_detectors`, and `--num_observables` counts, `--dem`, or `--circuit` plus unique `--types` letters from `M`, `D`, and `L`.
-`convert` also supports `--obs_out`, `--obs_out_format`, the legacy top-level `--convert` alias, and 64-record grouping checks for `ptb64` output; `--in_format` is required like pinned Stim, with no implicit default.
-Result-data conversion streams records through the shared per-record streaming reader (decision D5 of [docs/plans/post-review-remediation-plan.md](docs/plans/post-review-remediation-plan.md)), so the former whole-input 64 MiB cap is gone: total input length is unbounded, memory stays bounded by one record frame, each framed text record is bounded at 64 MiB, and the `--in_format=stim` circuit route keeps the 64 MiB circuit-input cap. A `b8` to `b8` conversion without observable side output keeps each record packed through that same reader, validates complete frame boundaries, and clears unused padding bits in non-byte-aligned records.
-`convert --bits_per_shot ... --out_format=dets` is rejected like Stim because raw bit width does not identify measurement, detector, or observable record types.
-`stab help [topic]` and top-level `stab --help [topic]` provide Stab-native structural help for implemented commands, result formats, and gate names without claiming byte-for-byte Stim help text.
-`stab capabilities`, `stab inspect`, and `stab plan sample` are Stab-native agent extensions. `capabilities` renders source-owned command, gate-syntax, codec, compiler, and parse-limit descriptors; `inspect` parses and fingerprints a `.stim` circuit or `.dem` detector error model without compilation or execution; `plan sample` compiles the sole scalar plan for validation and reports request identity, plan identity, run configuration, and resource estimates without sampling. The current successful contracts are [capabilities schema version 5](docs/architecture/agent-cli-capabilities-schema-v5.md), [plan schema version 4](docs/architecture/agent-cli-plan-schema-v4.md), and inspect in [agent CLI schema version 2](docs/architecture/agent-cli-schema-v2.md).
-`--error-format=human|json` is a global Stab extension. Human output remains the default and preserves existing stderr text, warning order, exit status, and help/version routing. JSON mode emits schema-version-1 JSON Lines with stable code, severity, message, optional byte span, labels, optional help, and typed context; each warning precedes the eventual error as a separate object. Resource amounts above the diagnostic's exact `u64` range use the capped value plus `actual_is_lower_bound: true` instead of claiming that the cap is exact. The pre-parser selects JSON for Clap failures only when exactly one valid `--error-format=json` request appears before `--`, while Clap remains authoritative for malformed or duplicate options.
-The historical M8 program recorded sampling compatibility as done for its selected Rust and CLI surface, including deterministic `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` output, count-determined measurement and reference-sample-tree helpers, basis, pair, and Pauli-product measurements, feedback, entangling Clifford sampling, repeat handling, and seeded supported noise channels. Current implementation and evidence status comes from [docs/stim-parity.md](docs/stim-parity.md); exact random-stream parity and public interactive simulator products remain deferred.
-The sampling compiler accepts legal sweep-controlled Pauli operations through the same typed execution plan used by reference and detection workflows. The Rust and `sample` CLI run surfaces have no sweep-input parameter, so omitted sweep bits use Stim's all-false semantics.
-Compiled samplers expose heralded-noise measurement records. For Stim v1.16.0 CLI compatibility, `stab sample` omits those columns only on the default one-shot tableau path; multi-shot and `--skip_reference_sample` paths emit them.
-M9 detection compatibility includes public `stab detect` and `stab m2d` rows for deterministic detector conversion, observable routing, reference-sample subtraction, text and bit-packed detection records, and M9 benchmark compare runners.
-The historical M10 program recorded DEM compatibility as done for its selected Rust and CLI analyzer surface, including `.dem` parsing and canonical printing, supported noise and measurement analysis, gauge handling, decomposition controls, generated and folded-loop cases, graphlike and hypergraph search, SAT/WCNF output, sparse reverse tracking, and matched-error values. Current implementation and evidence status comes from [docs/stim-parity.md](docs/stim-parity.md); full ErrorMatcher provenance and `explain_errors` remain deferred.
-M11/M12 DEM sampling compatibility includes deterministic and statistical sampling, detector and observable streams, sampled-error output and replay, supported result formats, bounded parsing, and streaming CLI writers backed by reusable engine sessions and typed batch sinks. `DemSamplingPlan::session` creates RNG-bearing sampling state and `DemSamplingPlan::replay_session` creates owned replay state. Complete replay borrows a sink for one `run`; incremental replay uses a short-lived `DemReplayTransaction` so all writes and finalization target exactly one sink. The 0.2 library API removes whole-output and callback compatibility adapters; encoded in-memory collection belongs in `stab-records` codec sinks, while inherently expanded sampled-error inputs retain documented caps. Exact Python API shape remains deferred.
-
-Inspect and check the M2 fixture corpus with:
-
-```sh
-just oracle::list
-just oracle::list --milestone M4
-just oracle::blockers
-just oracle::blockers --list
-just oracle::blockers --check-selectors
-just oracle::record --check-clean
 just oracle::run --implemented-only
-just oracle::run --milestone M4
-just oracle::run --all
-```
-
-The fixture manifest lives at `oracle/fixtures/manifest.csv`.
-It records fixture ids, upstream sources, command shapes, parity modes, comparator types, expected statuses, implementation status, statistical plans, and source-license notes.
-Fixture input or expected-output paths ending in `.hex` contain reviewable hexadecimal payload text; ASCII whitespace is ignored, malformed or odd-length payloads fail closed, and oracle execution decodes the bytes before invoking Stim or Stab. Recording writes canonical lowercase hexadecimal plus one terminal newline.
-Manifest validation also requires every planned M4 through M11 P0/P1 C++ source from the compatibility matrix to have an explicit fixture row with the matching milestone and parity mode.
-Manifest `argv` tokens may use `{fixture_input:inputs/name.ext}` for validated fixture-relative side inputs and `{fixture_output:expected/name.ext}` for exact-output side files written by Stim and Stab during comparison.
-Both placeholder forms reject absolute paths, parent-directory traversal, symlinks in fixture paths, and missing fixture inputs; fixture-output placeholders require committed expected files during normal validation and `just oracle::record --check-clean` unless the row is a statistical fixture with `source=fixture_output`.
-Statistical fixture rows default to `source=stdout`; `source=fixture_output` requires exactly one `{fixture_output:...}` placeholder, uses that fixture-relative path as a validated scratch label, exact-compares stdout and stderr against pinned Stim, and applies the row's statistical plan to both pinned Stim and Stab side-output bytes.
-On Linux oracle runs, fixture-output placeholders are rewritten to inherited `/proc/self/fd/...` paths backed by a fresh private directory under `/tmp`; the controller monitors and reads each side output relative to the retained directory descriptor with `NOFOLLOW`, performs bounded descriptor-relative cleanup, and compares exact-output row side-output bytes in addition to stdout.
-`just oracle::run --milestone Mx` scopes execution to implemented fixture rows for that milestone and reports pending red, ignored, or manifest-only rows in the same milestone.
-`just oracle::record --check-clean` checks runnable exact-output rows against pinned Stim; library-only parser/printer rows are run in-process by `stab-oracle` and are skipped by recording because they do not have a Stim CLI command.
-`just oracle::blockers` validates the historical blocker closure ledger for migration and audit work. It is read-only operational history, not a current feature-status or test-ownership source; use `just oracle::parity-check` and the generated parity view for current claims.
-`just oracle::blockers --check-selectors` additionally runs allowlisted `cargo test ... -- --list` commands through timed, bounded process capture and rejects claimed existing selectors that match no tests.
-The blocker-ledger validator currently requires Unix file-identity support and fails closed on other targets instead of accepting a symlink race.
-
-Validate the M1 compatibility matrix with:
-
-```sh
 just oracle::matrix --check
-just oracle::matrix --milestone M4
 ```
 
-The matrix lives at `oracle/compatibility-matrix.csv` and records the historical M1 fixture-routing inventory. Its status column remains operational input to the transitional oracle commands but does not define current feature status; use `oracle/stim-v1.16-parity.toml` and generated `docs/stim-parity.md` for current parity.
+The result-format corpus and gate helper run the actual pinned Stim source. The fixture corpus and compatibility matrix are supporting coverage maps; they do not own current feature status.
 
-The active product and evidence migration is the [Stim core parity and lean evidence plan](docs/plans/stim-core-parity-and-lean-evidence-plan.md), with execution rules in [GOAL.md](docs/plans/GOAL.md). The [agent-native modular QEC architecture plan](docs/plans/agent-native-modular-qec-architecture-plan.md) remains durable design input, not a parallel execution roadmap.
-The comprehensive correctness and performance qualification systems below are transitional historical tooling. Keep them working only until the active plan's lean replacements prove the same durable semantic, process-safety, timing, and memory contracts; do not add current feature status to their ledgers.
-CQ0, CQ1, CQ2, PQ0, and PQ1 artifacts retain exact historical evidence. Their commands remain documented here while operational, but their inventories and progress reports do not define current scope or completion.
+## Performance
 
-CQ0 inventory discovery is implemented through:
+`benchmarks/suite.toml` is the only active performance contract. Its generated matrix is [benchmarks/SUITE.md](benchmarks/SUITE.md).
 
-```sh
-just qualification::correctness-list
-just qualification::correctness-list --feature CQ-RESULT-FORMATS
-just qualification::correctness-check
+```text
+just bench::e2e-check
+just bench::e2e-run --tier smoke --out target/benchmarks/<unique-name>
+just bench::e2e-replay --input target/benchmarks/<bundle>
 ```
 
-These commands validate or deterministically regenerate `oracle/qualification-manifest.json` directly from the finite benchmark prerequisite bridge in `oracle/qualification-cases.json`. The bridge contains only exact standalone Cargo tests required by active runtime groups; feature status and semantic evidence ownership live in `oracle/stim-v1.16-parity.toml`, and upstream-test, rustdoc, fixture, and public-API discovery are deliberately outside this transitional manifest. Regeneration rejects duplicate, nonexact, nonstandalone, wrong-pin, or retired ownership entries, and benchmark validation requires the runtime ledger and bridge to cover exactly the same prerequisite IDs.
-CQ1 correctness execution and report commands are implemented through:
+Smoke timing is diagnostic. Formal full and soak evidence requires a clean commit, controlled host, release binaries, fixed CPU affinity, temperature below `100 C`, and no swap I/O during measured samples. Every output path must be new. Do not delete samples, waive a failed ratio, relax the `1.25x` Stim parity gate, relax the `1.15x` self-regression gate, or reduce semantic work to obtain a pass.
 
-```sh
-just qualification::correctness-provenance-probe
-just qualification::correctness-run --tier pr
-just qualification::correctness-run --tier full
-just qualification::correctness-run --tier soak
-just qualification::correctness-report --out target/qualification/correctness/latest
-just qualification::correctness-preflight --out target/qualification/correctness/latest --case <qualification-case-id> --request-sha256 <run-request-sha256> --completion-sha256 <run-completion-sha256>
-```
+Formal runs use `--tier full|soak --affinity-cpu <cpu>`. Release authorization is `just bench::e2e-release-check`; it remains intentionally unavailable until P9 records the checked AArch64 evidence pointer.
 
-Qualification runs require a pinned Stim checkout with no tracked or untracked modifications, build fresh private Release binaries for Stab and Stim with Cargo invoked from `/` using absolute manifest paths, execute exact source-owned selectors through immutable sealed copies of direct tools under a config-free explicit child environment, enforce bounded output with process-group cleanup, publish complete run directories atomically, and print the request, report, and completion digests needed by downstream controllers.
-The provenance probe rebuilds both binaries, runs one real source-owned exact case through the normal qualification runner, and reads back the request, execution, report, completion, and preflight artifacts to prove their executable, environment, selector, output, and digest bindings agree.
-Git metadata inspection uses a config-free private Git view whose index is reconstructed from `HEAD`, so caller index flags cannot hide tracked modifications; CMake modules and compiler include or support trees are copied into read-only content-bound snapshots, and compiler subordinate programs are sealed before the build; support-tree digests are included in the hashed execution environment and rechecked after every compiler-consuming case and before publication.
-Private build scratch uses fixed private directories under `/tmp`, Cargo's working directory is `/` so source or scratch ancestors cannot contribute `.cargo` configuration, and retained parent and root descriptors drive bounded cleanup of read-only support snapshots without following replacement paths; an over-budget cleanup is quarantined instead of falling through to unbounded path removal.
-`request.json` fixes the intended selection, canonical direct-executable role/hash/size ledger, and hashed execution environment before execution; each schema-version-3 case execution receipt fixes that same provenance together with process status, output framing, exact Cargo test count, exact statistical completion, and retained artifacts; and `completion.json` fixes the canonical report plus all case receipts after execution.
-Fixed Cargo statistical selectors must emit one source-owned completion marker per declared comparison after its structurally valid shot batches finish and before probabilistic acceptance; each marker must contain exactly the frozen batches per comparison, a malformed suffix retains only the validated marker prefix, and two-sided fixtures retain exact completed-side work on a failed attempt without allowing a partial attempt to pass.
-Staged evidence uses descriptor-relative artifact I/O, newly created receipt directories and their parents are synchronized before publication, publication is serialized by a lock anchored to the retained repository directory, cancellation is rechecked after acquiring that lock, and report regeneration reopens and identity-checks the complete output parent chain before accepting derived evidence.
-Preflight requires controller-approved request and completion digests and rejects stale, partial, failed, deferred, modified, executable-mismatched, directory-swapped, or selector-mismatched evidence.
-Dirty reports can be inspected with explicit `--allow-dirty` preflight permission but are never promotable completion evidence.
-CQ1 execution currently fails closed outside Linux because its evidence contract requires Linux process-group termination and atomic directory exchange.
-Promotable CQ1 evidence still assumes a controlled host: the outer `cargo run` bootstrap, Linux kernel, procfs, process and dynamic-loader semantics, system shared libraries, and dependency-cache contents remain in the trust root, while recorded SHA-256 identities provide reproducibility and tamper evidence rather than third-party authenticity.
-Cargo cases consume the live checkout after request publication, so promotable runs also require that no concurrent same-UID process transiently mutates and restores source files, Git refs or objects, or support-tree aliases during the run; pre-run and pre-publication validation detects persistent changes but is not an authenticated defense against a malicious local operator.
+Add a persistent benchmark only for a user workflow. Add a diagnostic only after a profile attributes at least 10 percent of such a workflow to the measured component.
 
-PQ0 performance-ledger discovery is implemented through:
+## Documentation
 
-```sh
-just bench::qualification-list
-just bench::qualification-list --feature PERF-RESULT-IO
-just bench::qualification-check
-```
+[docs/plans/GOAL.md](docs/plans/GOAL.md) is the short active execution contract. [docs/plans/stim-core-parity-and-lean-evidence-plan.md](docs/plans/stim-core-parity-and-lean-evidence-plan.md) owns the current program. Historical plans and reports preserve context but do not create additional acceptance gates.
 
-These commands validate or deterministically regenerate `benchmarks/stim-qualification-suite.json` from the frozen CQ0 digest, Stab feature checklist, current benchmark manifest, primary thresholds and waivers, and all pinned upstream perf sources and symbols.
-The PQ1 process and adapter contracts can be reproduced independently, and the paired controller can publish PR, full, or soak evidence through:
+Update public documentation in the same change as public behavior, APIs, CLI flags, formats, operational commands, or performance policy. Regenerate derived files instead of editing them by hand.
 
-```sh
-just bench::qualification-probe --group pq1-process-contract-smoke
-just bench::qualification-probe --group pq1-adapter-protocol-smoke
-just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-pr
-just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-full
-just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-soak
-just bench::qualification-report --input target/benchmarks/qualification/pq1-full
-just bench::qualification-parity --input target/benchmarks/qualification/pq1-full
-```
+## Releases
 
-Run source-owned Stab-only product diagnostics separately:
-
-```sh
-just bench::diagnostic-run --group PERFQ-A2-CIRCUIT-MODEL-FINGERPRINT --all-scales --tier pr --allow-unverified-host --out target/benchmarks/qualification/a2-model-fingerprint-REVISION
-just bench::diagnostic-run --group PERFQ-A8-EXTERNAL-NOISE-PASS --all-scales --tier pr --allow-unverified-host --out target/benchmarks/qualification/a8-external-noise-pass-REVISION
-```
-
-`qualification-diagnostic` accepts only runtime groups with claim class `product-diagnostic`. It uses isolated clean-source builds, bounded workers, host capture, immutable output paths, `raw-work-v2`, and a source-owned 600-second monotonic measurement-suite deadline that caps every child by the remaining time, but it deliberately produces no Stim ratio, parity outcome, self-regression outcome, release rollup, or formal completion evidence. Runtime-group schema 11 requires every product-diagnostic scale to name an owning correctness case, freeze an output digest that calibration cannot redefine, and select calibrated-repeat or single-pass execution; one scale may additionally own an accepted-maximum worker peak-RSS cap. The runtime ledger also owns each executable group's feature, origin, API, and checklist relationships. The controller proves the frozen witness once in `contract` mode at one iteration before calibration, uses `timing` mode only for calibration and retained timing, and runs capped memory separately at one iteration. `PERFQ-A8-EXTERNAL-NOISE-PASS` measures complete public `run_circuit_pass` calls over 64, 4,096, and 65,536 represented input instructions, black-boxes the typed circuit and report, and releases every result before the finish clock; its independently frozen canonical-output and report witness is checked outside timing. Reports expose host verification and violations plus the exact memory verdict instead of hiding them in JSON.
-
-Compare the two explicit A6 leaf-kernel builds from one clean revision with:
-
-```sh
-just bench::simd-compare --tier full --allow-unverified-host --out target/benchmarks/qualification/a6-simd-compare-REVISION
-just bench::simd-report --input target/benchmarks/qualification/a6-simd-compare-REVISION
-```
-
-The source-owned matrix is fixed to the medium and large scales of `PERFQ-M5-SIMD-BITS` and `PERFQ-M6-CLIFFORD-STRING-NON-IDENTITY`. The controller builds `stab-bench` once with `--no-default-features` and once with `--no-default-features --features portable-simd`, binds each choice into a schema-version-7 private build receipt, independently calibrates the workers, selects one common iteration count, requires exact output identity, alternates scalar-first and portable-first pairs, and reports portable-SIMD seconds per work item divided by scalar seconds per work item. The replay command validates the source identities and runtime contracts, reconstructs calibration, rederives every paired sample from raw invocation rows, and recomputes the summary and Markdown. A confidence-interval upper bound below `1.0` is reported as a material benefit. This diagnostic does not make a Stim parity, Stab self-regression, release-rollup, or sampling-backend claim.
-
-The earlier A6 complete-matrix, predecessor-backport, profile-receipt, and focused-evidence publication workflow is historical. Its executable producers, readers, tests, hidden commands, and `just` recipes are removed; only the byte-identical measurement and predecessor contracts remain archived under `benchmarks/archive/a6/` for provenance. Do not use that workflow to close current A6 work. The active A6 contract uses the scalar-versus-SIMD diagnostic above, current paired qualification groups for focused Stim continuity, and only diagnostics whose executed paths changed; see [the architecture plan](docs/plans/agent-native-modular-qec-architecture-plan.md).
-
-The following contracts apply to the general Stim-versus-Stab qualification controller invoked by `bench::qualification-run`, not to the preceding Stab-only SIMD diagnostic.
-
-The controller validates `benchmarks/qualification-host-policy.json`, acquires an exclusive profile-and-CPU qualification lease before host capture or private builds, pins both workers to the selected CPU, requires stable thermal probes at or below 100000 millidegrees Celsius, targets 350-millisecond calibration batches with a 250-millisecond revalidation floor and a 2-second ceiling, retains three warmups and every interleaved pair, computes fixed-seed bootstrap intervals, records setup and peak RSS separately from timing, and atomically publishes `report.json`, `preflight.json`, and `report.md`. The thermal limit is an evidence-admissibility ceiling rather than a hardware-safety claim; firmware trips, thermal throttling, and all other host-policy violations still reject the run. The lease remains held through final host capture, report validation, and atomic publication. The parent derives every expected work count, uses work-bound calibration probes to select one common batch shape, performs semantic preflight at that exact shape, binds every subsequent validation, warmup, sample, and memory digest to the preflight, and audits the revision through a config-free private Git view reconstructed from an exact captured commit. Each run materializes committed Stab and pinned-Stim source into private `/tmp` trees, performs fresh controlled Cargo and CMake release builds, records canonical tools, arguments, environments, source inputs, build fingerprints, and binary digests, and invokes both workers from sealed executable copies. Child stdin, stdout, stderr, runtime, process trees, and regular-file growth are bounded; file-writing qualification adapters must wait on the controller start barrier so the Linux file-size limit is installed before output begins.
-Strict runs reject host-policy violations. `--allow-unverified-host` preserves local diagnostic evidence with `host_verified=false`, but that evidence cannot be promoted. Offline report refresh, preflight, and parity commands reload the current source-owned host policy and checked inventories, replay the current pinned Rust toolchain, require the same host CPU identity and affinity set, bind the report to its exact output directory and regenerated preflight, and reconstruct the exact violations and verification outcome from the recorded probes. Report refresh uses compare-and-swap publication so stale validation cannot overwrite newer evidence. The PQ1 protocol-smoke group is report-only in `benchmarks/qualification-parity-policy.json`, does not accept CQ evidence, and must not be cited as Stab-versus-Stim product speed evidence.
-Offline validation also replays the source-owned calibration algorithm and requires every semantic preflight, common validation, warmup, retained sample, and memory invocation to use the exact workload, measurement, implementation, evidence mode, calibrated iteration count, derived work count, CPU, build identity, and required preflight output digest. Repeated memory summaries must reproduce the raw worker and parent-observed RSS receipts.
-Noise classification uses paired-ratio relative MAD only. An initial attempt above the 10 percent noise limit triggers exactly one complete second timing attempt with three new warmups and the full retained pair count; both attempts remain in the report, and the second attempt is authoritative regardless of whether it passes, fails, or remains noisy. Stim parity evaluation rejects failed and noisy authoritative outcomes before applying numeric thresholds.
-`benchmarks/qualification-runtime-groups.json` is the sole detailed source of truth for executable runtime groups and binds each group to its feature, origin, API and checklist ownership, claim class, parity eligibility, worker workload, exact measurement set, correctness cases, families, size classes, and frozen performance inventory. `benchmarks/qualification-parity-policy.json` must contain one matching disposition for every paired-worker runtime group: infrastructure diagnostics require an explicit report-only entry with no thresholds, while parity-eligible groups require an exact complete measurement-rule set. Stab-only product diagnostics are absent from the parity and self-regression policies by construction. `benchmarks/qualification-regression-policy.json` and `benchmarks/qualification-regression-baselines.json` separately govern promotable Stab self-regression. Future promotable groups take their CQ case IDs only from the runtime ledger and require controller-approved CQ request and completion digests; report refresh independently reconstructs the canonical request, report, completion, preflight, and per-case execution receipts before accepting the performance report.
-Use `just bench::qualification-self-regression --full <rollup> --soak <rollup>` to compare one accepted architecture-specific group family against its reviewed Stab baseline. An absent or identity-mismatched baseline is `unseeded`. Use `just bench::qualification-baseline-candidate --full <rollup> --soak <rollup> --out <new-directory>` to generate an immutable candidate from accepted full and soak evidence; review and commit accepted entries separately. Regression checks and candidate generation reconstruct sealed rollups without refreshing them, so a newer clean review commit may consume an older evidence revision when the checked inventories and recorded source identities still match.
-Historical DEM reconstruction uses `just bench::qualification-completion --scope dem-r6 --rollup <parse-full> --rollup <parse-soak> --rollup <print-full> --rollup <print-soak> --memory-receipt <parse-memory> --memory-receipt <print-memory> --out <new-directory>`. Stab 0.2 release qualification uses `--scope a9-release` with one full and one soak rollup for every promotable runtime group plus the exact parse and print accepted-maximum memory receipts. The schema-version-4 producer derives this matrix and its shared correctness prerequisite sets from the checked runtime contracts, rejects diagnostic groups, authenticates the process's soft `RLIMIT_NOFILE`, and binds source reports, memory observations and receipts, parity outcomes, and passed or unseeded self-regression outcomes into one revision manifest. The generated [transitional qualification dashboard](docs/qualification-status.md) owns only the old matrix and evidence counts; it does not define current feature status. Run release-scope creation, offline replay, and checkpoint replay through `prlimit --nofile=1024:1024 --`; a higher limit is diagnostic only. Replay a current scope with `just bench::qualification-completion-report --input <completion-directory>`. Historical completion schemas 1 through 3 remain readable but have no active producer.
-Record report-only accepted-maximum DEM memory on the clean formal revision with one parse and one print probe: add `--evidence-mode memory --out target/benchmarks/qualification/<unique-name>` to each direct DEM probe. Memory-receipt schema version 3 contains setup and peak RSS for Stim and Stab across all three DEM families and binds the verified host, clean repository, timing boundary, and exact worker source, build, and binary identities later required by completion; schema version 2 remains historical and nonpromotable. An existing output path, dirty repository, changed revision, host-policy violation, non-DEM group, or non-memory mode is rejected.
-Stab allocation counts remain a separate Rust-only regression signal through `just bench::compare-allocations`; they are not mixed into paired timing or cross-implementation process-RSS claims.
-PQ1 qualification execution is Linux-only because affinity, process groups, procfs RSS, regular-file limits, and atomic directory exchange are part of its evidence contract. Final product performance qualification targets controlled Linux x86-64 and Linux AArch64 hosts independently.
-
-Benchmark contracts live at `benchmarks/manifest.csv`.
-Each benchmark row owns its runner, threshold class, and comparability class; `just bench::list` prints all three, and manifest validation requires the comparability field to agree with the source-owned compare-note prefix.
-The M3 benchmark workflow validates those contracts, records pinned C++ Stim baseline results, and writes generated reports under `target/benchmarks/`.
-Any explicit `--out` path must be repository-relative and under `target/benchmarks/`.
-`--only` filters use exact benchmark row ids or milestone names such as `M7` on both baseline and compare commands.
-
-```sh
-just bench::list
-just bench::smoke
-just bench::baseline --stim vendor/stim --primary
-just bench::baseline --only m7-convert-01-to-b8 --out target/benchmarks/convert-probe-baseline
-just bench::compare --milestone M4
-just bench::compare --only m7-convert-01-to-b8 --baseline target/benchmarks/convert-probe-baseline/baseline.json --report target/benchmarks/convert-probe-compare
-just bench::compare --profile release --primary --report target/benchmarks/latest --require-beta-gate --require-profiler-notes
-just bench::compare-allocations --primary --report target/benchmarks/latest-allocations
-```
-
-`just bench::baseline` writes `baseline.json` and `report.md` to `target/benchmarks/baseline/latest` by default.
-Use `--primary` when recording the M12 baseline consumed by `just bench::compare --primary`.
-Use a small `--target-seconds` value for quick local smoke runs, and increase it when recording durable baseline artifacts.
-`just bench::compare` runs the benchmark ops binary with Cargo's release profile, reads `target/benchmarks/baseline/latest/baseline.json` by default, and can write `compare.json` plus `report.md` to a repository-relative directory under `target/benchmarks/`.
-Baseline and compare reports are published through descriptor-relative, no-symlink atomic file operations. Compare reports record the executing benchmark binary digest and the source identity captured before warmup, and the command rejects source or executable changes observed before or after report publication.
-Use `--require-beta-gate` for completion-style runs where every selected row must prove a Stab median no slower than 1.25x pinned Stim.
-Profiler notes for rows slower than 1.5x pinned Stim live under the report directory's `profiler-notes/` folder and must include `Dominant cost:` and `Next owner action:` lines when `--require-profiler-notes` is used. Repeat `--profiler-notes-dir <source-directory>` when a cross-milestone compare reads multiple source-owned note roots; required validation rejects duplicate selected row identities across roots regardless of the current ratio. Strict comparison still requires every executable contract to produce a measurement, while an explicit `baseline-metadata` row validates provenance without pretending to be a runtime workload.
-Use `--thresholds <path>` once regression thresholds exist to fail selected rows that exceed their configured maximum relative ratio or cannot produce a comparable ratio.
-`just bench::primary-regression` checks the source-owned M12 threshold file with a Stab-side warmup pass and three recorded measurement runs; the scheduled M12 benchmark workflow compiles the Rust runner with `-C target-cpu=native` to match pinned Stim's CMake-selected `-march=native` target, runs against a fresh primary pinned-Stim baseline, and uploads the generated reports.
-The native target is limited to machine-local benchmark evidence and does not change generic release binaries.
-`just bench::compare-allocations` builds `stab-bench` with the optional `count-allocations` feature and adds Stab-side allocation counts plus resident-memory samples to the compare report. The report retains raw timing ratios for context but marks parity timing as `not-evaluated-instrumented`; combining allocation tracking with beta or regression timing gates is rejected. Keep timing-gate runs on plain `just bench::compare`.
-Use `--require-memory-gate --memory-baseline <compare.json>` with `just bench::compare-allocations` once the first complete memory report exists to fail rows whose peak live allocation bytes or sampled resident bytes exceed the M12 25 percent regression budget.
-
-## Release Operations
-
-Use `just release::publish-order` to validate and print the coordinated product-crate order. From the final clean reviewed release revision, use `just release::check --out target/releases/<unique-preflight-name>` to assemble all ten crates, preserve immutable reviewed archives and canonical crates.io metadata, and record source, toolchain, and bounded payload identities through an isolated Cargo environment. After review, run publication from an isolated user session and provide `CARGO_REGISTRY_TOKEN` only in the publication environment. `just release::publish-reviewed --preflight <path> --confirm-version 0.2.0` shell-quotes typed option values, builds `stab-release` in a fresh owner-only target with every publication-token variable removed, executes that unique operator without another Cargo process while stripping every unrelated recognized release credential, requires the checked A9 completion, performs a byte-identical package rebuild in its private token-free Cargo sandbox, uploads the exact retained metadata and archive through the crates.io protocol, and verifies that the visible registry version has the reviewed checksum and is not yanked. Direct operator invocations reject unrelated release credentials without exposing their values. The release workflow must be dispatched with `--ref v0.2.0`; both jobs check out immutable `github.sha` with full history and credential persistence disabled, and the final job builds a SHA-scoped operator immediately before giving a step-local `GITHUB_TOKEN` binding only to its exact final `create-draft` command. That command retains all six validated assets, validates complete target-aware pinned-toolchain identities, checks the annotated tag before and after remote mutation, creates only a private draft, and verifies remote asset digests. `just release::verify-assets` remains the non-publishing local asset check. Architecture policy recursively rejects aliased release-token expressions as well as credentials inherited by a workflow or job, placed on Cargo or an action step, combined with another publication token, or attached to any other shell command. Reviewed full-SHA actions and their declared GitHub job permissions remain a separate trusted workflow boundary. Complex release logic must not move back into workflow shell steps. The complete irreversible publication, partial-failure recovery, tag, draft, and GitHub verification procedure is in [docs/RELEASING.md](docs/RELEASING.md).
+Follow [docs/RELEASING.md](docs/RELEASING.md). Use `just release::publish-order` and `just release::check --out target/releases/<unique-name>` before any irreversible action. Publication and GitHub draft creation remain credential-isolated operations and require the source-current release evidence check.
