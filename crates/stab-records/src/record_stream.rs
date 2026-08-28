@@ -17,7 +17,7 @@ use crate::{
         extend_ptb64_group_words, fill_record_from_ptb64_words, ptb64_bytes_per_group,
         ptb64_length_multiple_error, ptb64_zero_width_count_error, unpack_b8_chunk_into,
     },
-    result_streaming::{for_each_dets_record, for_each_record},
+    result_streaming::for_each_dense_text_record_into,
 };
 
 /// Bytes requested from the transport per refill; doubles while one record keeps spanning refills.
@@ -229,26 +229,24 @@ impl<R: Read> RecordStreamReader<R> {
                     return Err(internal_decoder_mismatch().into());
                 };
                 let mut produced = false;
-                let record = &mut self.record;
+                let record_len = self.record.len();
                 let visit = |bits: &[bool]| {
                     if produced {
                         return Err(FormatError::invalid_data(
                             "text record frame decoded into multiple records",
                         ));
                     }
-                    if bits.len() != record.len() {
-                        return Err(FormatError::invalid_data(
-                            "decoded record width disagreed with the stream record buffer",
-                        ));
-                    }
-                    record.copy_from_slice(bits);
+                    debug_assert_eq!(bits.len(), record_len);
                     produced = true;
                     Ok(())
                 };
-                let decoded = match format {
-                    RecordFormat::Dets => for_each_dets_record(line, *layout, visit),
-                    format => for_each_record(line, *format, layout.total_bits(), visit),
-                };
+                let decoded = for_each_dense_text_record_into(
+                    line,
+                    *format,
+                    *layout,
+                    &mut self.record,
+                    visit,
+                );
                 decoded.map_err(|error| error.with_span_offset(record_offset))?;
                 produced
             };

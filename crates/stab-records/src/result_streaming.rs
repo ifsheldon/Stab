@@ -233,22 +233,18 @@ fn ptb64_record_count(input: &[u8], bits_per_record: usize) -> RecordResult<usiz
     materialized_ptb64_record_count(input, bits_per_record)
 }
 
-fn for_each_zero_one_record<F>(
-    input: &[u8],
-    bits_per_record: usize,
-    mut visit: F,
-) -> RecordResult<()>
+fn for_each_zero_one_record<F>(input: &[u8], bits_per_record: usize, visit: F) -> RecordResult<()>
 where
     F: FnMut(&[bool]) -> RecordResult<()>,
 {
     let mut record = vec![false; bits_per_record];
-    crate::result_text::for_each_zero_one_line(input, bits_per_record, |line| {
-        record.fill(false);
-        for (bit, byte) in record.iter_mut().zip(line) {
-            *bit = *byte == b'1';
-        }
-        visit(&record)
-    })
+    for_each_dense_text_record_into(
+        input,
+        RecordFormat::ZeroOne,
+        DetsLayout::measurement_only(bits_per_record),
+        &mut record,
+        visit,
+    )
 }
 
 fn for_each_b8_record<F>(input: &[u8], bits_per_record: usize, mut visit: F) -> RecordResult<()>
@@ -286,54 +282,95 @@ where
     Ok(())
 }
 
-fn for_each_hits_record<F>(input: &[u8], bits_per_record: usize, mut visit: F) -> RecordResult<()>
+fn for_each_hits_record<F>(input: &[u8], bits_per_record: usize, visit: F) -> RecordResult<()>
 where
     F: FnMut(&[bool]) -> RecordResult<()>,
 {
     let mut record = vec![false; bits_per_record];
-    crate::result_text::for_each_hits_event(input, bits_per_record, |event| match event {
-        HitsEvent::RecordStart => {
-            record.fill(false);
-            Ok(())
-        }
-        HitsEvent::Hit(index) => {
-            let index = usize::try_from(index).map_err(|_| {
-                FormatError::invalid_result_format(format!("HITS index {index} does not fit usize"))
-            })?;
-            let bit = record.get_mut(index).ok_or_else(|| {
-                FormatError::invalid_result_format(format!(
-                    "HITS index {index} exceeds record width {bits_per_record}"
-                ))
-            })?;
-            *bit = !*bit;
-            Ok(())
-        }
-        HitsEvent::RecordEnd => visit(&record),
-    })
+    for_each_dense_text_record_into(
+        input,
+        RecordFormat::Hits,
+        DetsLayout::measurement_only(bits_per_record),
+        &mut record,
+        visit,
+    )
 }
 
-pub fn for_each_dets_record<F>(input: &[u8], layout: DetsLayout, mut visit: F) -> RecordResult<()>
+pub fn for_each_dets_record<F>(input: &[u8], layout: DetsLayout, visit: F) -> RecordResult<()>
 where
     F: FnMut(&[bool]) -> RecordResult<()>,
 {
     let mut record = vec![false; layout.total_bits()];
-    crate::result_text::for_each_dets_event(input, layout, |event| match event {
-        DetsEvent::RecordStart => {
-            record.fill(false);
-            Ok(())
+    for_each_dense_text_record_into(input, RecordFormat::Dets, layout, &mut record, visit)
+}
+
+pub(crate) fn for_each_dense_text_record_into<F>(
+    input: &[u8],
+    format: RecordFormat,
+    layout: DetsLayout,
+    record: &mut [bool],
+    mut visit: F,
+) -> RecordResult<()>
+where
+    F: FnMut(&[bool]) -> RecordResult<()>,
+{
+    if record.len() != layout.total_bits() {
+        return Err(FormatError::invalid_result_format(
+            "dense text record buffer width disagreed with its layout",
+        ));
+    }
+    match format {
+        RecordFormat::ZeroOne => {
+            crate::result_text::for_each_zero_one_line(input, layout.total_bits(), |line| {
+                for (bit, byte) in record.iter_mut().zip(line) {
+                    *bit = *byte == b'1';
+                }
+                visit(record)
+            })
         }
-        DetsEvent::Token(token) => {
-            let index = layout.resolve(token.result_type(), token.index())?;
-            let bit = record.get_mut(index).ok_or_else(|| {
-                FormatError::invalid_result_format(
-                    "DETS token resolved beyond the layout's total width",
-                )
-            })?;
-            *bit = true;
-            Ok(())
+        RecordFormat::Hits => {
+            crate::result_text::for_each_hits_event(input, layout.total_bits(), |event| {
+                match event {
+                    HitsEvent::RecordStart => record.fill(false),
+                    HitsEvent::Hit(index) => {
+                        let index = usize::try_from(index).map_err(|_| {
+                            FormatError::invalid_result_format(format!(
+                                "HITS index {index} does not fit usize"
+                            ))
+                        })?;
+                        let bit = record.get_mut(index).ok_or_else(|| {
+                            FormatError::invalid_result_format(format!(
+                                "HITS index {index} exceeds record width {}",
+                                layout.total_bits()
+                            ))
+                        })?;
+                        *bit = !*bit;
+                    }
+                    HitsEvent::RecordEnd => return visit(record),
+                }
+                Ok(())
+            })
         }
-        DetsEvent::RecordEnd => visit(&record),
-    })
+        RecordFormat::Dets => crate::result_text::for_each_dets_event(input, layout, |event| {
+            match event {
+                DetsEvent::RecordStart => record.fill(false),
+                DetsEvent::Token(token) => {
+                    let index = layout.resolve(token.result_type(), token.index())?;
+                    let bit = record.get_mut(index).ok_or_else(|| {
+                        FormatError::invalid_result_format(
+                            "DETS token resolved beyond the layout's total width",
+                        )
+                    })?;
+                    *bit = true;
+                }
+                DetsEvent::RecordEnd => return visit(record),
+            }
+            Ok(())
+        }),
+        RecordFormat::B8 | RecordFormat::R8 | RecordFormat::Ptb64 => Err(
+            FormatError::invalid_result_format("dense text decoder requires a text format"),
+        ),
+    }
 }
 
 pub fn try_for_each_dets_record<E, F>(
