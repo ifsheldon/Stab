@@ -495,14 +495,28 @@ impl BitMatrix {
         let tail_mask = self.cols.last_word_mask();
         let row_words = self.row_words_mut(row)?;
         row_words.fill(0);
-        for (byte_index, byte) in bytes.iter().copied().enumerate() {
-            let word = row_words.get_mut(byte_index / size_of::<u64>()).ok_or(
-                BitError::BitIndexOutOfRange {
-                    index: byte_index.saturating_mul(u8::BITS as usize),
-                    len: bit_len,
-                },
-            )?;
-            *word |= u64::from(byte) << ((byte_index % size_of::<u64>()) * u8::BITS as usize);
+        let mut chunks = bytes.chunks_exact(size_of::<u64>());
+        let mut words = row_words.iter_mut();
+        for chunk in chunks.by_ref() {
+            let word = words.next().ok_or(BitError::BitIndexOutOfRange {
+                index: bytes.len().saturating_mul(u8::BITS as usize),
+                len: bit_len,
+            })?;
+            let mut packed = [0_u8; size_of::<u64>()];
+            packed.copy_from_slice(chunk);
+            *word = u64::from_le_bytes(packed);
+        }
+        let remainder = chunks.remainder();
+        if !remainder.is_empty() {
+            let word = words.next().ok_or(BitError::BitIndexOutOfRange {
+                index: bytes.len().saturating_mul(u8::BITS as usize),
+                len: bit_len,
+            })?;
+            let mut packed = [0_u8; size_of::<u64>()];
+            for (target, source) in packed.iter_mut().zip(remainder) {
+                *target = *source;
+            }
+            *word = u64::from_le_bytes(packed);
         }
         if let Some(last) = row_words.last_mut() {
             *last &= tail_mask;

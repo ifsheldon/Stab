@@ -448,6 +448,37 @@ fn bits_bit_matrix_copies_complete_rows_and_rejects_width_mismatches() {
 }
 
 #[test]
+fn bits_bit_matrix_copies_packed_bytes_at_word_boundaries() {
+    for cols in [1_usize, 7, 8, 9, 63, 64, 65, 127, 128, 129, 257] {
+        let bytes = (0..cols.div_ceil(8))
+            .map(|index| {
+                u8::try_from(index)
+                    .expect("fixture byte index fits u8")
+                    .wrapping_mul(37)
+                    .wrapping_add(0xa5)
+            })
+            .collect::<Vec<_>>();
+        let mut matrix = BitMatrix::zeros(2, cols).expect("packed matrix");
+        matrix
+            .copy_row_from_le_bytes(1, &bytes)
+            .expect("copy packed row");
+        for bit_index in 0..cols {
+            let expected = bytes[bit_index / 8] & (1 << (bit_index % 8)) != 0;
+            assert_eq!(
+                matrix.get(1, bit_index),
+                Some(expected),
+                "{cols}:{bit_index}"
+            );
+        }
+
+        matrix
+            .copy_row_from_le_bytes(1, &vec![0; bytes.len()])
+            .expect("replace packed row");
+        assert!((0..cols).all(|bit_index| matrix.get(1, bit_index) == Some(false)));
+    }
+}
+
+#[test]
 fn bits_sparse_xor_vec_ports_stim_examples() {
     // Adapted from Stim v1.16.0 src/stim/mem/sparse_xor_vec.test.cc.
     let mut left = SparseXorVec::new();
