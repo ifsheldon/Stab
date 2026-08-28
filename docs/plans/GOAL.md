@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P7 are complete. P8 is next. P9 has not started.
+Status: Active. P0 through P8 are complete. P9 is next.
 
 ## Objective
 
@@ -24,21 +24,18 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 
 Historical plans, progress reports, qualification inventories, and benchmark manifests are context only. They must not create parallel requirements or promote current claims.
 
-## Current Milestone: P8
+## Current Milestone: P9
 
-1. Use a fresh smoke or full diagnostic run to reproduce each comparable case that exceeds the unchanged `1.25x` Stim gate. Validate semantic work, output witnesses, and peak RSS before profiling.
-2. Prioritize the largest user-visible losses: `sample-surface`, `detect-observables`, `sample-folded-ptb64`, `m2d-packed-sweep`, `sample-dem`, and `qec-cli-pipeline`. Treat one-sample P7 ratios only as triage signals, not claims.
-3. Profile the complete workflow and attribute the dominant cost to startup, parsing, compilation, execution, conversion, encoding, allocation, or I/O. Add a temporary focused probe only when the profile cannot isolate the owner directly.
-4. Optimize the canonical production owner without duplicating representations, weakening resource limits, changing semantic work, adding waivers, or relaxing thresholds.
-5. After each change, run the semantic owner tests, affected pinned differentials, the exact E2E cases, and peak-RSS checks. Remove temporary probes unless a profile proves they explain at least 10% of a release workflow or isolate a confirmed regression.
-6. Record accepted changes and rejected experiments in the P8 checkpoint of the active plan. Do not promote dirty, smoke-tier, or shared-host measurements into release evidence.
-
-P8 closes only when every Stim-comparable release case passes both paired median and confidence-upper-bound `<= 1.25x`, memory passes, seeded cases satisfy `<= 1.15x`, milestone audit and full code review have no unresolved finding, and the suite still has exactly one workload and policy owner.
+1. Freeze one clean committed measured revision after the P8 checkpoint. Run formatting, strict workspace Clippy, workspace tests, architecture and external-consumer checks, generated docs, the live result-format corpus, all implemented fixtures, and the full and soak parity tiers from that revision.
+2. Run the complete 29-case E2E suite at full and soak tiers on controlled AArch64 CPU 0. Use unique absent bundle paths, require temperature below `100 C`, record configured swap before and after, reject any swap page-in or page-out movement, and leave the prior swap configuration unchanged.
+3. Require every Stim-comparable case to pass paired median and confidence upper bound `<= 1.25x`, every case to pass memory, exact semantic witnesses to pass, and both bundles to replay offline. Preserve failed paths and never rerun into them.
+4. Because no AArch64 self baseline exists, retain the first full and soak reports as explicitly `unseeded`. Generate exactly one baseline candidate from that pair, review it, and add those exact identities to `benchmarks/suite.toml`; do not claim that the seeding run passed self-regression.
+5. Create the narrow evidence descendant allowed by `docs/RELEASING.md`: add the immutable full and soak bundles under `benchmarks/evidence/aarch64/`, the current evidence pointer, generated suite view, reviewed baseline, and synchronized named status prose. Change no product or runner code in that descendant.
+6. Run `just bench::e2e-release-check`, offline replay, milestone audit, full code review, and the final verification commands. Verify the worktree is clean, no benchmark process remains, swap state is unchanged, and required GitHub CI passes the exact evidence descendant before making a release claim.
 
 ## Remaining Sequence
 
-- P8 profiles and fixes failing E2E cases without weakening work or thresholds.
-- P9 produces one replayable controlled-host evidence bundle and deletes superseded machinery and status prose.
+- P9 produces the replayable controlled-host evidence, seeds the first self baseline without retroactive claims, and retires superseded machinery and status prose.
 
 ## Non-Negotiable Gates
 
@@ -53,4 +50,4 @@ P8 closes only when every Stim-comparable release case passes both paired median
 
 ## Completion
 
-This goal is complete when every nondeprecated, nondeferred selected behavior is implemented or an approved divergence; every completed behavior has one meaningful owner; each capability has one production representation and one public route; the single E2E suite passes correctness, memory, Stim parity, and seeded self-regression gates on controlled AArch64; the evidence replays offline; superseded compatibility and qualification machinery is deleted; CI passes the exact evidence commit; and the worktree is clean.
+This goal is complete when every nondeprecated, nondeferred selected behavior is implemented or an approved divergence; every completed behavior has one meaningful owner; each capability has one production representation and one public route; the single E2E suite passes correctness, memory, and Stim parity on controlled AArch64; existing self baselines pass regression or the first unseeded pair seeds exactly one reviewed baseline without a retroactive pass claim; the evidence replays offline; superseded compatibility and qualification machinery is deleted; CI passes the exact evidence descendant; and the worktree is clean.

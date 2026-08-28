@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P7 are complete; P8 is next; P9 has not started.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 is next.
 
 ## Summary
 
@@ -519,6 +519,16 @@ For each failing E2E case:
 - Every seeded case satisfies the unchanged `1.15x` Stab self-regression gate.
 - No waiver, hidden workload reduction, or duplicate representation was introduced to obtain the result.
 
+### Implementation Checkpoint
+
+P8 completed in `7529205f` through `b32f5b12`, with audit repairs through `94f9121b`. Profiles of the complete workflows attributed the initial losses to shot-major result encoding, duplicated Pauli-frame execution, narrow sampling lanes, per-record conversion work, DEM scalar traversal, general-tableau reference sampling, and process-completion polling. The accepted changes moved those costs into the canonical bits, records, engine, CLI, and process-supervisor owners: reusable bit-plane transposes and encoders, one shared Pauli-frame executor with wider sampling lanes, packed `m2d` batches, counter-keyed DEM planes, a bounded CSS reference-tableau path with the general simulator as fallback, and `pidfd`/`wait4` completion timing. The obsolete fused detector path was deleted. No persistent microbenchmark or second production representation was added.
+
+A temporary raw packed-slice accessor was rejected and removed because it exposed storage layout without a reliable E2E improvement. The accepted optimizations retain exact same-session seeded partitioning, scalar or semantic reference coverage, bounded storage, cancellation and sink-failure behavior, strict result formats, and the existing public 64-shot delivery boundary.
+
+Clean revision `94f9121bb07716c76e02271183f95a2a8776cb65` passed formatting, strict workspace Clippy, all workspace tests, architecture and external-consumer checks, API documentation, the live 62-case result-format corpus, all implemented oracle fixtures, and 138 independently executed full-tier parity owners. Its immutable diagnostic full bundle is `target/benchmarks/p8-all-94f9121b-full-v1`; offline replay passed all 29 cases. All 27 Stim-comparable cases passed parity, and all 29 cases passed memory. The worst median was `sample-dem.medium` at `1.146415x`; the worst confidence upper bound was `detect-observables.medium` at `1.189147x`; the maximum Stab peak RSS was `49,721,344` bytes. Temperature remained below `41 C`, and configured swap plus page-in/page-out counters were unchanged. Self-regression was correctly `unseeded`, so P8 makes no self-regression claim and P9 must seed the first reviewed baseline from full and soak evidence.
+
+Milestone audit and full code review found and repaired two false exact-RNG test assumptions, a transpose-dimension diagnostic, stale standalone-consumer lockfiles, and a stale direct-Rust oracle selector in `9f1d145e`, `a242ad02`, `56594785`, `a3a58ba0`, and `94f9121b`. No blocking implementation, compatibility, evidence, or specification finding remains for P8.
+
 ## Milestone P9: Produce One Formal Evidence Bundle And Retire History
 
 ### Tasks
@@ -544,6 +554,7 @@ For each failing E2E case:
 ### Done Criteria
 
 - The AArch64 evidence bundle replays from raw samples and exact identities.
+- Existing accepted baselines pass the `1.15x` self-regression gate; when no baseline exists, the first full-and-soak pair remains explicitly `unseeded` and the evidence descendant contains exactly the baseline candidate derived from that pair.
 - Public documentation contains no stale status count or superseded qualification procedure.
 - The worktree is clean, no benchmark process remains, swap state matches its pre-run state, and CI passes the exact source commit.
 - The selected core Rust and CLI ledger has no `missing` entry.
