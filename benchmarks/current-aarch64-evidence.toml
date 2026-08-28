@@ -1,0 +1,4 @@
+schema_version = 1
+measured_source_commit = "a8b56db319410f1d52bc64bfb7ee6a63c01c490f"
+full_bundle = "benchmarks/evidence/aarch64/a8b56db319410f1d52bc64bfb7ee6a63c01c490f/full"
+soak_bundle = "benchmarks/evidence/aarch64/a8b56db319410f1d52bc64bfb7ee6a63c01c490f/soak"

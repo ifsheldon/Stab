@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P8 are complete. P9 source preparation is in progress.
+Status: Active. P0 through P8 are complete. P9 evidence is assembled and awaiting descendant verification.
 
 ## Objective
 
@@ -26,16 +26,16 @@ Superseded plans, progress reports, qualification inventories, and benchmark man
 
 ## Current Milestone: P9
 
-1. Freeze one clean committed measured revision after the P8 checkpoint and completed history retirement. Run formatting, strict workspace Clippy, workspace tests, architecture and external-consumer checks, generated docs, the live result-format corpus, all implemented fixtures, and the full and soak parity tiers from that revision.
-2. Run the complete 29-case E2E suite at full and soak tiers on controlled AArch64 CPU 0. Use unique absent bundle paths, require temperature below `100 C`, record configured swap before and after, reject any swap page-in or page-out movement, and leave the prior swap configuration unchanged.
-3. Require every Stim-comparable case to pass paired median and confidence upper bound `<= 1.25x`, every case to pass memory, exact semantic witnesses to pass, and both bundles to replay offline. Preserve failed paths and never rerun into them.
-4. Because no AArch64 self baseline exists, retain the first full and soak reports as explicitly `unseeded`. Generate exactly one baseline candidate from that pair, review it, and add those exact identities to `benchmarks/suite.toml`; do not claim that the seeding run passed self-regression.
-5. Create the narrow evidence descendant allowed by `docs/RELEASING.md`: add the immutable full and soak bundles under `benchmarks/evidence/aarch64/`, the current evidence pointer, generated suite view, reviewed baseline, and synchronized named status prose. Change no product or runner code in that descendant.
-6. Run `just bench::e2e-release-check`, offline replay, milestone audit, full code review, and the final verification commands. Verify the worktree is clean, no benchmark process remains, swap state is unchanged, and required GitHub CI passes the exact evidence descendant before making a release claim.
+1. Clean measured revision `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` passes formatting, strict workspace Clippy, workspace tests, architecture and external-consumer checks, API and link checks, the live 62-case result-format corpus, all implemented fixtures, and all 138 canonical owners in full and soak tiers.
+2. The 29-case controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/a8b56db319410f1d52bc64bfb7ee6a63c01c490f/` pass correctness, memory, and Stim parity. Full worst median and upper ratios are `1.1385x` and `1.2244x`; soak values are `1.1705x` and `1.1892x`.
+3. Both bundles replay offline. They used CPU 0, stayed below `62 C`, retained `/swap.img`, and observed no page-in or page-out movement within either run.
+4. Both reports remain correctly `unseeded`. The suite contains exactly the reviewed 29-entry self-regression candidate derived from the worse full and soak bounds; the seeding pair does not claim a regression pass.
+5. Commit the narrow evidence descendant, run `just bench::e2e-release-check`, replay both committed bundles, run milestone audit and full code review, and finish all verification commands without changing product or runner code.
+6. Required GitHub CI must pass the exact evidence descendant before making the release claim. Controlled x86-64 remains explicitly unqualified.
 
 ## Remaining Sequence
 
-- P9 produces the replayable controlled-host evidence, seeds the first self baseline without retroactive claims, and retires superseded machinery and status prose.
+- P9 closes after local descendant verification and exact-revision GitHub CI pass.
 
 ## Non-Negotiable Gates
 

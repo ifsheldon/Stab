@@ -50,4 +50,4 @@ Timing boundary: `e2e-user-workflow-v2`. Stim parity requires median and confide
 - `qec-cli-pipeline`: `generation.surface-code-memory`, `analysis.circuit-to-dem-selected-gate-surface`, `sampling.dem-sampling-and-replay`, `cli.gen`, `cli.analyze-errors`, `cli.sample-dem`
 - `qec-rust-pipeline`: `sampling.circuit-common-measurement-and-reset`, `sampling.circuit-core-gates`, `detection.common-frame-gate-surface`
 
-Accepted self-regression baselines: 0.
+Accepted self-regression baselines: 29.

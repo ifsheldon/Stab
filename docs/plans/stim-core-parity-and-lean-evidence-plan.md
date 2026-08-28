@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 source preparation is in progress.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 evidence is assembled and awaiting descendant verification.
 
 ## Summary
 
@@ -565,6 +565,15 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 - Durable component, resource, extension, migration, release, and schema decisions remain under `docs/architecture/`, `docs/MIGRATING-0.2.md`, and `docs/RELEASING.md`; `docs/plans/` now contains only this plan and the short goal.
 - The stale Markdown gate-support table and the tests that parsed its duplicated metadata have been removed. Canonical model metadata, semantic owner tests, and pinned-Stim differential owners remain the executable contracts.
 - Formal timing has not started from this checkpoint. The source-preparation changes must pass the complete deterministic suite and be committed before selecting the measured revision.
+
+### Formal Evidence Checkpoint
+
+- Clean measured revision `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` passes formatting, warnings-denied workspace Clippy, all workspace tests, architecture and four external-consumer checks, API and Markdown documentation checks, the generated parity and E2E contracts, the live 62-case result-format differential, every implemented fixture, and all 138 canonical owners in both full and soak tiers.
+- The immutable controlled AArch64 full and soak bundles live under `benchmarks/evidence/aarch64/a8b56db319410f1d52bc64bfb7ee6a63c01c490f/`. Each covers all 29 cases, validates correctness and memory, and passes the paired Stim parity gate.
+- Full-tier worst median and confidence upper ratios are `sample-dem.medium` at `1.138453x` and `detect-observables.medium` at `1.224350x`; maximum Stab peak RSS is `51,601,408` bytes. Soak-tier worst median and upper ratios are both `detect-observables.medium` at `1.170504x` and `1.189167x`; maximum Stab peak RSS is `49,692,672` bytes.
+- Both bundles replay offline, run on CPU 0, stay below `62 C`, retain the configured `/swap.img`, and observe unchanged swap page-in and page-out counters within each formal run.
+- Both reports remain correctly `unseeded`. One generated 29-entry candidate records the worse full-and-soak Stab median and upper bound for each exact case identity; `benchmarks/suite.toml` contains that candidate without reclassifying the seeding evidence as a regression pass.
+- The narrow evidence descendant contains no product or benchmark-runner change. P9 still requires a clean committed descendant, `e2e-release-check`, committed-bundle replay, final audits and checks, and required GitHub CI on the exact descendant.
 
 ## Test Suite Contract
 

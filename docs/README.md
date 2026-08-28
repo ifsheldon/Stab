@@ -11,6 +11,7 @@ This directory contains Stab's active plans, architecture records, generated par
 - [MIGRATING-0.2.md](MIGRATING-0.2.md) covers the component-crate and public-path migration.
 - [RELEASING.md](RELEASING.md) covers coordinated crate and binary releases.
 - [../benchmarks/SUITE.md](../benchmarks/SUITE.md) is the generated active performance matrix.
+- [../benchmarks/current-aarch64-evidence.toml](../benchmarks/current-aarch64-evidence.toml) names the current controlled-host full and soak evidence.
 
 Superseded plans, progress reports, qualification dashboards, and feature inventories are retained in Git history instead of remaining beside the active contracts.
 

@@ -2,10 +2,10 @@
 
 Stab(ilizer) is an agent-native toolkit for quantum error correction (QEC) research: a safe-Rust codebase that researchers and their AI agents can safely modify and extend.
 
-Its first milestone is a drop-in replacement for [Stim](https://github.com/quantumlib/Stim), the standard simulator and analysis tool for QEC research. Selected implemented Stab surfaces have pinned Stim v1.16.0 compatibility evidence; the generated current parity view is [docs/stim-parity.md](docs/stim-parity.md), and the active execution contract is [docs/plans/GOAL.md](docs/plans/GOAL.md).
-Stab currently implements selected `.stim`, `.dem`, `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, `sample_dem`, and result-format surfaces. The generated parity view separates completed, missing, deferred, and deliberately divergent behavior; implementation alone does not imply compatibility qualification.
+Its first milestone is a drop-in replacement for [Stim](https://github.com/quantumlib/Stim), the standard simulator and analysis tool for QEC research. Every selected nondeprecated and nondeferred Stab behavior is implemented or recorded as a deliberate bug or resource divergence; the generated current parity view is [docs/stim-parity.md](docs/stim-parity.md), and the active execution contract is [docs/plans/GOAL.md](docs/plans/GOAL.md).
+The selected `.stim`, `.dem`, `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, `sample_dem`, and result-format surfaces have pinned correctness owners. The controlled AArch64 end-to-end suite passes its `1.25x` Stim parity and memory gates; its first full-and-soak pair seeds the self-regression baseline without retroactively claiming a regression pass.
 
-> Compatibility: Selected implemented surfaces are checked against the real Stim through pinned parity tests and benchmark comparisons. The pinned Stim v1.16.0 sources are committed in [vendor/stim](vendor/stim). The generated parity view is the current feature source of truth; the older feature inventory and checklist are historical inputs. Please report discrepancies so they can be reproduced against the pinned target.
+> Compatibility: Selected implemented surfaces are checked against the real Stim through pinned parity tests and benchmark comparisons. The pinned Stim v1.16.0 sources are committed in [vendor/stim](vendor/stim). The generated parity view is the current feature source of truth; superseded inventories remain available through Git history. Please report discrepancies so they can be reproduced against the pinned target.
 
 The longer-term vision is composable Rust components for QEC tooling.
 

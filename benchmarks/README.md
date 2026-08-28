@@ -37,6 +37,8 @@ just bench::e2e-release-check
 
 Every run writes to a previously absent child under `target/benchmarks/`. A bundle contains the exact suite, run identity, correctness witnesses, raw samples, derived JSON and Markdown reports, and a digest manifest. `e2e-replay` rejects extra files or changed bytes and reconstructs the report deterministically without executing a workload.
 
-`e2e-release-check` fails closed until P9 records reviewed full and soak bundles under `benchmarks/evidence/aarch64/` and writes `benchmarks/current-aarch64-evidence.toml`. It permits only evidence and named status-document changes after the measured source revision, and it requires either a passing seeded self-regression result or the exact first baseline derived from an unseeded full-and-soak pair.
+The current controlled AArch64 full and soak bundles are named by [current-aarch64-evidence.toml](current-aarch64-evidence.toml). Both pass Stim parity, memory, correctness witnesses, and offline replay. They remain explicitly `unseeded`; the current suite contains exactly the first self-regression baseline derived from that pair, so no retroactive self-regression pass is claimed.
+
+`e2e-release-check` validates that pointer, both immutable bundles, the exact measured ancestor, and the narrow evidence-only descendant. It requires either a passing seeded self-regression result or the exact first baseline derived from an unseeded full-and-soak pair.
 
 The removed milestone and qualification benchmark systems remain visible through Git history and [archive/](archive/) only. They are not active gates or alternate sources of truth.
