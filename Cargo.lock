@@ -2621,6 +2621,7 @@ dependencies = [
  "hex",
  "rand 0.10.1",
  "sha2",
+ "smallvec",
  "stab-algebra",
  "stab-analysis",
  "stab-bits",

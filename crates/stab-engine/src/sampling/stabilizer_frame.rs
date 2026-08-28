@@ -1,6 +1,7 @@
 use std::fmt;
 
 use rand::{Rng, RngExt as _};
+use smallvec::{SmallVec, smallvec};
 use stab_algebra::{PauliBasis, PauliSign, StabilizerError, Tableau};
 
 use super::SamplingCompileError;
@@ -500,8 +501,8 @@ fn random_measurement_bit(rng: &mut impl Rng, randomness: MeasurementRandomness)
 struct StabilizerGenerator {
     negative: bool,
     qubit_count: usize,
-    xs: Vec<u64>,
-    zs: Vec<u64>,
+    xs: SmallVec<[u64; 4]>,
+    zs: SmallVec<[u64; 4]>,
 }
 
 impl StabilizerGenerator {
@@ -509,18 +510,18 @@ impl StabilizerGenerator {
         Self {
             negative: false,
             qubit_count,
-            xs: vec![0; word_count(qubit_count)],
-            zs: vec![0; word_count(qubit_count)],
+            xs: smallvec![0; word_count(qubit_count)],
+            zs: smallvec![0; word_count(qubit_count)],
         }
     }
 
     fn try_identity(qubit_count: usize) -> Result<Self, FrameStorageError> {
         let words = word_count(qubit_count);
-        let mut xs = Vec::new();
+        let mut xs = SmallVec::<[u64; 4]>::new();
         xs.try_reserve_exact(words)
             .map_err(|_| FrameStorageError::new("stabilizer generator X words", words))?;
         xs.resize(words, 0);
-        let mut zs = Vec::new();
+        let mut zs = SmallVec::<[u64; 4]>::new();
         zs.try_reserve_exact(words)
             .map_err(|_| FrameStorageError::new("stabilizer generator Z words", words))?;
         zs.resize(words, 0);
