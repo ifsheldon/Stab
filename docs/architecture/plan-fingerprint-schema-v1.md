@@ -33,7 +33,7 @@ Schema version 1 first calculates an executable-contract SHA-256 digest from:
 | Order | Field | Encoding |
 | --- | --- | --- |
 | 1 | domain | exact bytes `stab:sampling-executable-contract\0` |
-| 2 | executable-contract schema | big-endian `u16`, current value `4` |
+| 2 | executable-contract schema | big-endian `u16`, current value `5` |
 | 3 | backend | one discriminator byte |
 | 4 | private executable variant | one discriminator byte |
 | 5 | reference-sample loop policy | one discriminator byte |
@@ -50,8 +50,9 @@ Private executable-variant discriminators are:
 | Variant | Discriminator |
 | --- | --- |
 | Direct Z measurement | `1` |
-| Small stabilizer frame | `2` |
+| Small stabilizer frame, historical schemas 1 through 4 | `2` |
 | General stabilizer frame | `3` |
+| Bit-plane Pauli frame | `4` |
 
 The variant remains private even though its discriminator participates in identity.
 
@@ -70,9 +71,11 @@ Historical executable-contract schema version `1` used separate record-feedback 
 
 Executable-contract schema version `2` uses one classically controlled Pauli operation for record and sweep controls, recognizes all-classical `CZ` pairs as unconditional no-ops, and permits the small-frame executor to retain omitted all-false sweeps.
 
-Current executable-contract schema version `3` retains repeats in one validated flat operation tape and binds the reference-sample loop policy. `Fold` may reuse a repeat's output pattern only after proving exact stabilizer-state recurrence and only when its optional snapshot fits the existing admitted session-storage ceiling; otherwise it executes every represented iteration. `Iterate` always executes every represented iteration. These policies preserve semantic output but authorize different executable work and therefore have different plan identities even when a particular `Fold` plan conservatively iterates.
+Executable-contract schema version `3` retains repeats in one validated flat operation tape and binds the reference-sample loop policy. `Fold` may reuse a repeat's output pattern only after proving exact stabilizer-state recurrence and only when its optional snapshot fits the existing admitted session-storage ceiling; otherwise it executes every represented iteration. `Iterate` always executes every represented iteration. These policies preserve semantic output but authorize different executable work and therefore have different plan identities even when a particular `Fold` plan conservatively iterates.
 
-Current executable-contract schema version `4` gives zero-width sampling a constant-work execution path and removes frame allocation for that path. Measurement-bearing plans retain schema `3` execution after compiler-schema-5 aggregate work admission.
+Executable-contract schema version `4` gives zero-width sampling a constant-work execution path and removes frame allocation for that path. Measurement-bearing plans retain schema `3` execution after compiler-schema-5 aggregate work admission.
+
+Current executable-contract schema version `5` replaces the redundant per-shot small-frame executor with a reusable 64-shot bit-plane Pauli frame for general compatible Clifford circuits. Unconsumed lanes remain in the session so partitioning a seeded run does not change its output stream. The existing scalar operation program remains the reference-sample and analysis representation, while unsupported circuits retain the general stabilizer-frame fallback.
 
 ## Plan Fingerprint Encoding
 
@@ -109,13 +112,13 @@ Scalar compilation selects the direct Z measurement variant.
 The executable-contract digest is:
 
 ```text
-c5b307d191e680380b460708207728a44436e82335d64d39e9fde3fadcf97748
+c80923552aa640482af211b7f6de03580b9311f42685c971f7b0f53355d4bbdf
 ```
 
 The final plan fingerprint is:
 
 ```text
-9baed273f3279679a5572f62379bba12f44ff4100961112c55a32255a92690bc
+12d6f2077cf0e77f15690476071bb5c1a2a56e1039956c4c62a71b71961911d0
 ```
 
 The test reconstructs both digests independently from the tables above instead of calling the production fingerprint constructor.
