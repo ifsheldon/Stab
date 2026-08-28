@@ -39,6 +39,9 @@ pub enum BitError {
     #[error("matrix size {rows}x{cols} overflows addressable storage")]
     MatrixSizeOverflow { rows: usize, cols: usize },
 
+    #[error("word-row transpose supports at most {maximum} columns, got {actual}")]
+    WordRowTransposeTooWide { actual: usize, maximum: usize },
+
     #[error("could not allocate packed storage for {words} words")]
     StorageAllocationFailed { words: usize },
 
@@ -532,6 +535,27 @@ impl BitMatrix {
         let mut transposed = Self::zeros(self.cols(), self.rows)?;
         transpose::out_of_place(self, &mut transposed);
         Ok(transposed)
+    }
+
+    /// Replaces this matrix with the transpose of one packed word per source row.
+    ///
+    /// `source_rows.len()` must equal this matrix's column count and this matrix may contain at
+    /// most 64 rows. Bits beyond the target row count are ignored.
+    pub fn copy_transpose_from_word_rows(&mut self, source_rows: &[u64]) -> BitResult<()> {
+        if source_rows.len() != self.cols() {
+            return Err(BitError::LengthMismatch {
+                left: source_rows.len(),
+                right: self.cols(),
+            });
+        }
+        if self.rows > WORD_BITS {
+            return Err(BitError::WordRowTransposeTooWide {
+                actual: self.rows,
+                maximum: WORD_BITS,
+            });
+        }
+        transpose::word_rows_into(source_rows, self);
+        Ok(())
     }
 
     pub fn transpose_square_in_place(&mut self) -> BitResult<()> {

@@ -50,19 +50,25 @@ impl PackedShotBatch {
 
     pub fn from_bit_planes(batch: BitPlane64BatchView<'_>) -> RecordResult<Self> {
         let mut records = Self::zeros(batch.shot_count(), batch.bits_per_shot())?;
-        for shot_index in 0..batch.shot_count() {
-            for bit_index in 0..batch.bits_per_shot() {
-                let value = batch.get(bit_index, shot_index).ok_or_else(|| {
-                    FormatError::invalid_data(
-                        "bit-plane record escaped its declared dimensions while transposing",
-                    )
-                })?;
-                if value {
-                    records.set(shot_index, bit_index, true)?;
-                }
-            }
-        }
+        records.copy_from_bit_planes(batch)?;
         Ok(records)
+    }
+
+    /// Replaces every record with the transpose of a borrowed bit-plane batch.
+    pub fn copy_from_bit_planes(&mut self, batch: BitPlane64BatchView<'_>) -> RecordResult<()> {
+        if self.shot_count() != batch.shot_count() || self.bits_per_shot() != batch.bits_per_shot()
+        {
+            return Err(FormatError::invalid_data(format!(
+                "packed output is {}x{} but bit-plane input is {}x{}",
+                self.shot_count(),
+                self.bits_per_shot(),
+                batch.shot_count(),
+                batch.bits_per_shot()
+            )));
+        }
+        self.storage
+            .copy_transpose_from_word_rows(batch.planes)
+            .map_err(bit_storage_error)
     }
 
     pub const fn shot_count(&self) -> usize {

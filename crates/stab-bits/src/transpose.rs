@@ -47,6 +47,21 @@ pub(super) fn square_in_place(matrix: &mut BitMatrix) {
     }
 }
 
+pub(super) fn word_rows_into(source_rows: &[u64], target: &mut BitMatrix) {
+    if source_rows.is_empty() || target.rows == 0 {
+        return;
+    }
+    let source_tail_mask = low_bits_mask(target.rows);
+    for (column_base, source_chunk) in source_rows.chunks(TILE_BITS).enumerate() {
+        let mut tile = [0_u64; TILE_BITS];
+        for (slot, source) in tile.iter_mut().zip(source_chunk) {
+            *slot = *source & source_tail_mask;
+        }
+        transpose_tile(&mut tile);
+        write_tile(target, 0, column_base * TILE_BITS, &tile);
+    }
+}
+
 fn load_tile(matrix: &BitMatrix, row_base: usize, col_base: usize) -> [u64; 64] {
     let mut tile = [0_u64; TILE_BITS];
     let row_count = TILE_BITS.min(matrix.rows.saturating_sub(row_base));
@@ -155,5 +170,31 @@ mod tests {
             }
         }
         assert!(target.words.chunks_exact(2).all(|row| row[1] <= 1));
+    }
+
+    #[test]
+    fn packed_word_rows_transpose_into_reusable_shot_major_storage() {
+        for (shots, bits) in [(0, 0), (1, 1), (17, 65), (64, 130)] {
+            let source = (0..bits)
+                .map(|bit| {
+                    (0..64)
+                        .filter(|shot| (shot + bit * 3) % 7 == 0)
+                        .fold(0_u64, |word, shot| word | (1_u64 << shot))
+                })
+                .collect::<Vec<_>>();
+            let mut target = BitMatrix::zeros(shots, bits).expect("target");
+            target
+                .copy_transpose_from_word_rows(&source)
+                .expect("transpose word rows");
+            for shot in 0..shots {
+                for bit in 0..bits {
+                    assert_eq!(
+                        target.get(shot, bit),
+                        Some((shot + bit * 3) % 7 == 0),
+                        "shots={shots} bits={bits} shot={shot} bit={bit}"
+                    );
+                }
+            }
+        }
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    BitPlane64BatchView, FormatError, PackedShotBatchView, RecordResult,
+    BitPlane64BatchView, FormatError, PackedShotBatch, PackedShotBatchView, RecordResult,
     result_packed::{
         b8_bytes_per_record, decode_next_r8_record, ptb64_prefix_layout,
         ptb64_record_count as packed_ptb64_record_count,
@@ -409,6 +409,7 @@ pub struct MeasureRecordWriter {
     hits_first: bool,
     dets_started: bool,
     dets_type: u8,
+    b8_transpose: Option<PackedShotBatch>,
 }
 
 impl MeasureRecordWriter {
@@ -427,6 +428,7 @@ impl MeasureRecordWriter {
             hits_first: true,
             dets_started: false,
             dets_type: b'M',
+            b8_transpose: None,
         };
         writer.reserve_output(capacity)?;
         Ok(writer)
@@ -469,6 +471,10 @@ impl MeasureRecordWriter {
     }
 
     pub fn write_packed_record(&mut self, record: BitSlice<'_>) -> RecordResult<()> {
+        if self.format == PerRecordFormat::B8 && self.b8_bit_index == 0 {
+            self.write_byte_aligned_b8_record(record)?;
+            return Ok(());
+        }
         for bit_index in 0..record.len() {
             let bit = record.get(bit_index).ok_or_else(|| {
                 FormatError::invalid_result_format(
@@ -477,6 +483,53 @@ impl MeasureRecordWriter {
             })?;
             self.write_bit(bit);
         }
+        Ok(())
+    }
+
+    fn write_byte_aligned_b8_record(&mut self, record: BitSlice<'_>) -> RecordResult<()> {
+        let full_bytes = record.len() / 8;
+        let tail_bits = record.len() % 8;
+        let mut remaining = full_bytes;
+        for word in record.words() {
+            let bytes = word.to_le_bytes();
+            let copy_count = remaining.min(bytes.len());
+            self.output
+                .extend_from_slice(bytes.get(..copy_count).ok_or_else(|| {
+                    FormatError::invalid_result_format(
+                        "packed B8 word escaped its fixed byte representation",
+                    )
+                })?);
+            remaining -= copy_count;
+            if remaining == 0 {
+                break;
+            }
+        }
+        if remaining != 0 {
+            return Err(FormatError::invalid_result_format(
+                "packed record omitted bytes inside its declared width",
+            ));
+        }
+        if tail_bits != 0 {
+            let word_index = full_bytes / size_of::<u64>();
+            let byte_index = full_bytes % size_of::<u64>();
+            let tail = record
+                .words()
+                .get(word_index)
+                .map(|word| word.to_le_bytes())
+                .and_then(|bytes| bytes.get(byte_index).copied())
+                .ok_or_else(|| {
+                    FormatError::invalid_result_format(
+                        "packed record omitted its declared tail byte",
+                    )
+                })?;
+            self.b8_byte = tail & ((1_u8 << tail_bits) - 1);
+            self.b8_bit_index = u8::try_from(tail_bits).map_err(|_| {
+                FormatError::invalid_result_format("B8 tail width did not fit its writer state")
+            })?;
+        }
+        self.index = self.index.checked_add(record.len()).ok_or_else(|| {
+            FormatError::invalid_result_format("packed B8 record index overflowed")
+        })?;
         Ok(())
     }
 
@@ -505,6 +558,21 @@ impl MeasureRecordWriter {
 
     #[inline]
     pub fn write_bit_plane_batch(&mut self, batch: BitPlane64BatchView<'_>) -> RecordResult<()> {
+        if self.format == PerRecordFormat::B8 && self.is_at_record_boundary() {
+            let mut packed = match self.b8_transpose.take() {
+                Some(packed)
+                    if packed.shot_count() == batch.shot_count()
+                        && packed.bits_per_shot() == batch.bits_per_shot() =>
+                {
+                    packed
+                }
+                _ => PackedShotBatch::zeros(batch.shot_count(), batch.bits_per_shot())?,
+            };
+            packed.copy_from_bit_planes(batch)?;
+            let result = self.write_packed_batch(packed.view());
+            self.b8_transpose = Some(packed);
+            return result;
+        }
         if self.format == PerRecordFormat::ZeroOne
             && batch.bits_per_shot() == 1
             && self.is_at_record_boundary()

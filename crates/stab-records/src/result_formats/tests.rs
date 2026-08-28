@@ -6,6 +6,7 @@
 )]
 
 use super::*;
+use crate::BitPlane64Batch;
 
 #[test]
 fn measure_record_records_lookback_and_writes_unwritten_results() {
@@ -53,6 +54,67 @@ fn measure_record_writer_handles_empty_dets_records_and_long_r8_gaps() {
     }
     writer.write_end();
     assert_eq!(writer.into_bytes(), [255, 255, 2, 32]);
+}
+
+#[test]
+fn packed_b8_writes_match_scalar_bits_across_word_and_tail_boundaries() {
+    for width in [0, 1, 7, 8, 9, 63, 64, 65, 257] {
+        let bits = (0..width)
+            .map(|index| (index * 11 + 3) % 17 < 5)
+            .collect::<Vec<_>>();
+        let batch = crate::PackedShotBatch::from_records(std::slice::from_ref(&bits), width)
+            .expect("packed fixture");
+
+        let mut packed = MeasureRecordWriter::try_new(RecordFormat::B8).expect("packed writer");
+        packed.write_bits(&[true; 8]);
+        packed
+            .write_packed_record(batch.view().shot(0).expect("packed row"))
+            .expect("write packed row");
+        packed.write_end();
+
+        let mut scalar = MeasureRecordWriter::try_new(RecordFormat::B8).expect("scalar writer");
+        scalar.write_bits(&[true; 8]);
+        scalar.write_bits(&bits);
+        scalar.write_end();
+        assert_eq!(packed.into_bytes(), scalar.into_bytes(), "width={width}");
+    }
+}
+
+#[test]
+fn bit_plane_b8_writes_transpose_exactly_and_reuse_storage() {
+    for width in [1, 7, 8, 9, 63, 64, 65, 257, 1_009] {
+        let records = (0_usize..64)
+            .map(|shot| {
+                (0_usize..width)
+                    .map(|bit| (shot * 17 + bit * 31).is_multiple_of(43))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let packed = PackedShotBatch::from_records(&records, width).expect("pack records");
+        let planes = BitPlane64Batch::from_shot_major(packed.view()).expect("transpose records");
+        let expected = write_records(&records, RecordFormat::B8).expect("encode scalar records");
+        let mut writer = MeasureRecordWriter::try_with_capacity(RecordFormat::B8, expected.len())
+            .expect("construct writer");
+        writer
+            .write_bit_plane_batch(planes.view())
+            .expect("encode bit planes");
+        assert_eq!(writer.buffered_bytes(), expected);
+        writer.clear_buffered_bytes().expect("clear complete batch");
+
+        writer
+            .write_bit_plane_batch(planes.view())
+            .expect("warm transpose storage");
+        writer.clear_buffered_bytes().expect("clear warm batch");
+        let allocations = allocation_counter::measure(|| {
+            for _ in 0..8 {
+                writer
+                    .write_bit_plane_batch(planes.view())
+                    .expect("reuse transpose storage");
+                writer.clear_buffered_bytes().expect("clear reused batch");
+            }
+        });
+        assert_eq!(allocations.count_total, 0, "width {width}: {allocations:?}");
+    }
 }
 
 /// Ported from Stim's `MeasureRecordWriter` writer-contract tests
