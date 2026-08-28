@@ -23,6 +23,8 @@ mod compile_error;
 mod session_helpers;
 
 pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
+#[cfg(test)]
+pub(super) use session_helpers::compute_reference_sample_without_fast_path;
 pub(super) use session_helpers::{compute_reference_sample, try_bool_buffer};
 use session_helpers::{fill_pauli_frame_batch, sample_general_into, validate_session_storage};
 
@@ -192,6 +194,7 @@ impl SamplingCompiler {
                 qubit_count,
                 measurement_count: counts.measurements,
                 sweep_bit_count: counts.sweep_bits,
+                expanded_operation_count: counts.expanded_operations,
                 operations,
                 kind,
                 reference_sample_loop_policy: self.reference_sample_loop_policy,
@@ -395,6 +398,7 @@ pub(super) struct SamplingPlanInner {
     pub(super) qubit_count: usize,
     pub(super) measurement_count: usize,
     pub(super) sweep_bit_count: usize,
+    pub(super) expanded_operation_count: u128,
     pub(super) operations: SampleProgram,
     pub(super) kind: SamplingPlanKind,
     pub(super) reference_sample_loop_policy: ReferenceSampleLoopPolicy,

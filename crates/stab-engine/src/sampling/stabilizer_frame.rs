@@ -498,7 +498,7 @@ fn random_measurement_bit(rng: &mut impl Rng, randomness: MeasurementRandomness)
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct StabilizerGenerator {
+pub(super) struct StabilizerGenerator {
     negative: bool,
     qubit_count: usize,
     xs: SmallVec<[u64; 4]>,
@@ -540,7 +540,7 @@ impl StabilizerGenerator {
         generator
     }
 
-    fn try_single(
+    pub(super) fn try_single(
         qubit_count: usize,
         qubit: usize,
         basis: PauliBasis,
@@ -597,7 +597,7 @@ impl StabilizerGenerator {
     }
 
     #[inline(always)]
-    fn basis(&self, qubit: usize) -> PauliBasis {
+    pub(super) fn basis(&self, qubit: usize) -> PauliBasis {
         if qubit >= self.qubit_count {
             return PauliBasis::I;
         }
@@ -663,7 +663,7 @@ impl StabilizerGenerator {
     }
 
     #[inline(always)]
-    fn apply_hadamard(&mut self, qubit: usize) {
+    pub(super) fn apply_hadamard(&mut self, qubit: usize) {
         if qubit >= self.qubit_count {
             return;
         }
@@ -687,7 +687,7 @@ impl StabilizerGenerator {
     }
 
     #[inline(always)]
-    fn apply_controlled_x(&mut self, control: usize, target: usize) {
+    pub(super) fn apply_controlled_x(&mut self, control: usize, target: usize) {
         if control >= self.qubit_count || target >= self.qubit_count {
             return;
         }
@@ -722,7 +722,7 @@ impl StabilizerGenerator {
         }
     }
 
-    fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
+    pub(super) fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
         if anticommutes(self.basis(qubit), basis) {
             self.negative = !self.negative;
         }
@@ -743,7 +743,7 @@ impl StabilizerGenerator {
         self.qubit_count == rhs.qubit_count && self.xs == rhs.xs && self.zs == rhs.zs
     }
 
-    fn multiply_assign(&mut self, rhs: &Self) {
+    pub(super) fn multiply_assign(&mut self, rhs: &Self) {
         self.qubit_count = self.qubit_count.max(rhs.qubit_count);
         self.xs.resize(rhs.xs.len().max(self.xs.len()), 0);
         self.zs.resize(rhs.zs.len().max(self.zs.len()), 0);
@@ -769,6 +769,22 @@ impl StabilizerGenerator {
         log_i ^= popcount_mod_4(count_bit_1);
         log_i ^= popcount_mod_4(count_bit_2) << 1;
         self.negative = (log_i & 2) != 0;
+    }
+
+    pub(super) fn is_negative(&self) -> bool {
+        self.negative
+    }
+
+    pub(super) fn set_negative(&mut self, negative: bool) {
+        self.negative = negative;
+    }
+
+    pub(super) fn flip_sign(&mut self) {
+        self.negative = !self.negative;
+    }
+
+    pub(super) fn has_x_terms(&self) -> bool {
+        self.xs.iter().any(|word| *word != 0)
     }
 
     fn local_input_index(&self, targets: &[usize]) -> usize {

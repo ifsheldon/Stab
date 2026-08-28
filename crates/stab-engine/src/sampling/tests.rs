@@ -9,6 +9,9 @@ use super::execute::{
 };
 use super::stabilizer_frame::StabilizerStateSnapshot;
 use super::*;
+use stab_analysis::{
+    CodeDistance, RoundCount, SurfaceCodeParams, SurfaceCodeTask, generate_surface_code_circuit,
+};
 use stab_model::Gate;
 use stab_records::{MeasurementBatchView, MeasurementSink};
 use std::fmt::Write as _;
@@ -87,6 +90,86 @@ impl MeasurementSink for RecordSink {
     fn finish(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
+}
+
+#[test]
+fn css_reference_tableau_matches_general_sampling_and_declines_other_cliffords() {
+    let probability = Probability::try_new(0.001).expect("valid generated-circuit noise");
+    let params = SurfaceCodeParams::new(
+        RoundCount::try_new(20).expect("valid round count"),
+        CodeDistance::try_new(7).expect("valid code distance"),
+        SurfaceCodeTask::RotatedMemoryZ,
+    )
+    .expect("valid surface-code parameters")
+    .with_before_round_data_depolarization(probability)
+    .with_before_measure_flip_probability(probability)
+    .with_after_reset_flip_probability(probability)
+    .with_after_clifford_depolarization(probability);
+    let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+    let plan = SamplingCompiler::new()
+        .compile(generated.circuit())
+        .expect("compile generated surface circuit");
+    let mut record = Vec::with_capacity(plan.inner.measurement_count);
+    let mut fast = Vec::with_capacity(plan.inner.measurement_count);
+    assert!(
+        super::reference_tableau::try_compute_reference_sample(
+            &plan.inner.operations,
+            plan.inner.qubit_count,
+            plan.inner.measurement_count,
+            plan.inner.expanded_operation_count,
+            &mut record,
+            &mut fast,
+        )
+        .expect("execute CSS reference tableau")
+    );
+    assert_eq!(
+        fast,
+        super::api::compute_reference_sample_without_fast_path(&plan.inner)
+            .expect("execute general reference tableau")
+    );
+
+    let feedback = SamplingCompiler::new()
+        .compile(
+            &Circuit::from_stim_str("H 0\nCX 0 1\nM !0\nCX rec[-1] 1\nM 1\nMR !1\nM 1\n")
+                .expect("parse CSS feedback circuit"),
+        )
+        .expect("compile CSS feedback circuit");
+    record.clear();
+    fast.clear();
+    assert!(
+        super::reference_tableau::try_compute_reference_sample(
+            &feedback.inner.operations,
+            feedback.inner.qubit_count,
+            feedback.inner.measurement_count,
+            feedback.inner.expanded_operation_count,
+            &mut record,
+            &mut fast,
+        )
+        .expect("execute CSS feedback reference tableau")
+    );
+    assert_eq!(fast, vec![true, true, false, false]);
+    assert_eq!(
+        fast,
+        super::api::compute_reference_sample_without_fast_path(&feedback.inner)
+            .expect("execute general feedback reference tableau")
+    );
+
+    let non_css = SamplingCompiler::new()
+        .compile(&Circuit::from_stim_str("S 0\nM 0\n").expect("parse non-CSS circuit"))
+        .expect("compile non-CSS circuit");
+    record.clear();
+    fast.clear();
+    assert!(
+        !super::reference_tableau::try_compute_reference_sample(
+            &non_css.inner.operations,
+            non_css.inner.qubit_count,
+            non_css.inner.measurement_count,
+            non_css.inner.expanded_operation_count,
+            &mut record,
+            &mut fast,
+        )
+        .expect("decline non-CSS reference tableau")
+    );
 }
 
 fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {

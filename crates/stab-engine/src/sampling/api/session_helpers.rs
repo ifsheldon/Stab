@@ -95,6 +95,31 @@ pub(in crate::sampling) fn compute_reference_sample(
         plan.measurement_count,
         needs_snapshot,
     )?;
+    let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
+    let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
+    if crate::sampling::reference_tableau::try_compute_reference_sample(
+        &plan.operations,
+        plan.qubit_count,
+        plan.measurement_count,
+        plan.expanded_operation_count,
+        &mut record,
+        &mut output,
+    )? {
+        return Ok(output);
+    }
+
+    compute_general_reference_sample(plan, needs_snapshot, record, output)
+}
+
+fn compute_general_reference_sample(
+    plan: &SamplingPlanInner,
+    needs_snapshot: bool,
+    mut record: Vec<bool>,
+    mut output: Vec<bool>,
+) -> Result<Vec<bool>, SamplingExecutionError> {
+    record.clear();
+    output.clear();
+
     let mut rng = SmallRng::seed_from_u64(0);
     let mut frame = StabilizerFrame::try_new(plan.qubit_count).map_err(|error| {
         SamplingExecutionError::SessionStorageAllocation {
@@ -107,8 +132,6 @@ pub(in crate::sampling) fn compute_reference_sample(
         .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
             message: error.to_string(),
         })?;
-    let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
-    let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
     frame.reset_to_z_basis();
     let mut correlated_error_occurred = false;
     let mut buffers = ExecutionBuffers {
@@ -126,6 +149,24 @@ pub(in crate::sampling) fn compute_reference_sample(
         snapshot.as_mut(),
     )?;
     Ok(output)
+}
+
+#[cfg(test)]
+pub(in crate::sampling) fn compute_reference_sample_without_fast_path(
+    plan: &SamplingPlanInner,
+) -> Result<Vec<bool>, SamplingExecutionError> {
+    let needs_snapshot = plan.uses_reference_state_snapshot();
+    crate::sampling::validate_general_frame_work_storage(
+        plan.qubit_count,
+        plan.measurement_count,
+        needs_snapshot,
+    )?;
+    compute_general_reference_sample(
+        plan,
+        needs_snapshot,
+        try_bool_buffer(plan.measurement_count, "reference measurement record")?,
+        try_bool_buffer(plan.measurement_count, "reference measurement output")?,
+    )
 }
 
 pub(super) fn fill_pauli_frame_batch(

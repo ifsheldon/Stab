@@ -26,6 +26,7 @@ mod noise;
 mod operation;
 pub(crate) mod pauli_product;
 mod reference;
+mod reference_tableau;
 mod stabilizer_frame;
 
 pub use api::{
