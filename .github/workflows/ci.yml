@@ -76,11 +76,11 @@ jobs:
       - name: Oracle tiny circuit smoke
         run: just oracle::run --case smoke/tiny-circuit
 
-      - name: Benchmark smoke
-        run: just bench::smoke
+      - name: E2E benchmark contract
+        run: just bench::e2e-check
 
   contracts:
-    name: Qualification Contracts
+    name: Compatibility Contracts
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -105,9 +105,6 @@ jobs:
       - name: Install just
         run: cargo install just --version 1.58.0 --locked
 
-      - name: Check correctness inventory
-        run: just qualification::correctness-check
-
       - name: Check generated Stim parity view
         run: just oracle::parity-render --check
 
@@ -117,11 +114,8 @@ jobs:
       - name: Run PR-tier parity owners
         run: just oracle::parity-run --tier pr
 
-      - name: Check performance inventory
-        run: just bench::qualification-check
-
-      - name: Check generated qualification status
-        run: just qualification::status --check
+      - name: Check E2E performance contract
+        run: just bench::e2e-check
 
       - name: Check oracle fixture matrix
         run: just oracle::matrix --check

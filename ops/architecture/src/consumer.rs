@@ -36,12 +36,7 @@ const FEATURE_CONTRACTS: [FeatureContract; 6] = [
     FeatureContract {
         package: "stab-bench",
         default: &[],
-        portable: &[
-            "stab-algebra/portable-simd",
-            "stab-bits/portable-simd",
-            "stab-cli/portable-simd",
-            "stab-core/portable-simd",
-        ],
+        portable: &["stab-algebra/portable-simd", "stab-bits/portable-simd"],
     },
 ];
 
