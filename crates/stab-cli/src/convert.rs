@@ -377,6 +377,17 @@ where
             &mut primary_sink,
         );
     }
+    if args.in_format == RecordFormatArg::B8
+        && args.out_format == RecordFormatArg::ZeroOne
+        && args.obs_output.is_none()
+    {
+        return stream_b8_to_zero_one_records(
+            &mut reader,
+            input_path,
+            layout.input_width()?,
+            &mut primary_sink,
+        );
+    }
     let mut observable_sink = args
         .obs_output
         .as_ref()
@@ -444,6 +455,38 @@ where
     };
     primary_flush_result?;
     observable_flush_result?;
+    conversion_result
+}
+
+fn stream_b8_to_zero_one_records<R, W>(
+    reader: &mut RecordStreamReader<R>,
+    input_path: Option<&Path>,
+    bits_per_record: usize,
+    output: &mut OutputSink<'_, W>,
+) -> Result<(), CliError>
+where
+    R: Read,
+    W: Write,
+{
+    let mut encoded = ConvertOutput::new(RecordFormatArg::ZeroOne)?;
+    let conversion_result = (|| -> Result<(), CliError> {
+        loop {
+            let record = match reader.next_b8_packed_record() {
+                Ok(Some(record)) => record,
+                Ok(None) => break,
+                Err(error) => return Err(record_stream_error(error, input_path)),
+            };
+            encoded.write_b8_zero_one_record(record, bits_per_record)?;
+            encoded.flush_ready(false, |ready| {
+                output.write_with(|writer| writer.write_all(ready))
+            })?;
+        }
+        Ok(())
+    })();
+    let flush_result = encoded.flush_ready(true, |ready| {
+        output.write_with(|writer| writer.write_all(ready))
+    });
+    flush_result?;
     conversion_result
 }
 
@@ -579,6 +622,36 @@ impl ConvertOutput {
         }
         let writer = self.writer_mut()?;
         writer.write_bits(bits);
+        writer.write_end();
+        Ok(())
+    }
+
+    fn write_b8_zero_one_record(
+        &mut self,
+        packed: &[u8],
+        bits_per_record: usize,
+    ) -> Result<(), CliError> {
+        if self.format != RecordFormatArg::ZeroOne {
+            return Err(CliError::IoPlanInvariant {
+                message: "packed b8 fast path requires a 01 output encoder",
+            });
+        }
+        let full_bytes = bits_per_record / 8;
+        let tail_bits = bits_per_record % 8;
+        let writer = self.writer_mut()?;
+        let prefix = packed.get(..full_bytes).ok_or_else(|| {
+            invalid_result_format("b8 record omitted bytes inside its declared width")
+        })?;
+        writer.write_bytes(prefix);
+        if tail_bits != 0 {
+            let tail = packed
+                .get(full_bytes)
+                .copied()
+                .ok_or_else(|| invalid_result_format("b8 record omitted its declared tail byte"))?;
+            for bit_index in 0..tail_bits {
+                writer.write_bit(tail & (1 << bit_index) != 0);
+            }
+        }
         writer.write_end();
         Ok(())
     }

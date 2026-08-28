@@ -42,6 +42,25 @@ impl TryFrom<RecordFormat> for PerRecordFormat {
 }
 
 const ZERO_ONE_LINES_BY_BYTE: [[u8; 16]; 256] = zero_one_lines_by_byte();
+const ZERO_ONE_BITS_BY_BYTE: [[u8; 8]; 256] = zero_one_bits_by_byte();
+
+#[allow(
+    clippy::indexing_slicing,
+    reason = "const table indices are bounded by the byte and bit loop limits"
+)]
+const fn zero_one_bits_by_byte() -> [[u8; 8]; 256] {
+    let mut table = [[0_u8; 8]; 256];
+    let mut byte = 0;
+    while byte < 256 {
+        let mut bit = 0;
+        while bit < 8 {
+            table[byte][bit] = if byte & (1 << bit) == 0 { b'0' } else { b'1' };
+            bit += 1;
+        }
+        byte += 1;
+    }
+    table
+}
 
 #[allow(
     clippy::indexing_slicing,
@@ -634,7 +653,19 @@ impl MeasureRecordWriter {
         Ok(())
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "every u8 value is a valid index into the 256-entry encoding table"
+    )]
     pub fn write_bytes(&mut self, bytes: &[u8]) {
+        if self.format == PerRecordFormat::ZeroOne {
+            for byte in bytes {
+                self.output
+                    .extend_from_slice(&ZERO_ONE_BITS_BY_BYTE[usize::from(*byte)]);
+                self.index += 8;
+            }
+            return;
+        }
         for byte in bytes {
             for bit_index in 0..8 {
                 self.write_bit(byte & (1u8 << bit_index) != 0);

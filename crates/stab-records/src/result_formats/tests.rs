@@ -81,6 +81,23 @@ fn packed_b8_writes_match_scalar_bits_across_word_and_tail_boundaries() {
 }
 
 #[test]
+fn packed_bytes_write_exact_zero_one_bits_for_every_byte_value() {
+    let bytes = (u8::MIN..=u8::MAX).collect::<Vec<_>>();
+    let mut packed = MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("packed writer");
+    packed.write_bytes(&bytes);
+    packed.write_end();
+
+    let mut scalar = MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("scalar writer");
+    for byte in &bytes {
+        for bit_index in 0..8 {
+            scalar.write_bit(byte & (1 << bit_index) != 0);
+        }
+    }
+    scalar.write_end();
+    assert_eq!(packed.into_bytes(), scalar.into_bytes());
+}
+
+#[test]
 fn bit_plane_b8_writes_transpose_exactly_and_reuse_storage() {
     for width in [1, 7, 8, 9, 63, 64, 65, 257, 1_009] {
         let records = (0_usize..64)
