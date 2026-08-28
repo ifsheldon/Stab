@@ -1,2 +1,0 @@
-Dominant cost: the scheduled x86-64 comparison previously compiled pinned Stim with its CMake-selected `-march=native` target but compiled the Rust runner for the generic target, leaving native popcount instructions unavailable to Stab and producing an unequal-target ratio.
-Next owner action: keep scheduled M12 comparisons on one native machine target while retaining portable Rust source and generic release binaries, then replace this legacy row with receipt-bound architecture-specific PQ2 evidence.

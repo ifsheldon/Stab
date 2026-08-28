@@ -43,6 +43,19 @@ fn captures_success_nonzero_and_signal_status() {
 }
 
 #[test]
+fn captures_peak_rss_from_a_short_lived_child() {
+    let output = run_bounded_process(&request("peak-rss")).expect("short allocation succeeds");
+    assert_eq!(output.status, Some(0));
+    assert!(
+        output
+            .parent_observed_peak_rss_bytes
+            .is_some_and(|bytes| bytes >= 16 << 20),
+        "kernel peak RSS was {:?}",
+        output.parent_observed_peak_rss_bytes
+    );
+}
+
+#[test]
 fn rejects_missing_binary_and_all_stream_limits() {
     let mut missing = request("success");
     missing.program = PathBuf::from("/definitely/missing/stab-bench-worker");
@@ -424,6 +437,13 @@ fn process_helper() {
         }
         "panic" => {
             std::env::var_os("STAB_BENCH_INTENTIONALLY_MISSING").expect("process helper panic");
+        }
+        "peak-rss" => {
+            let mut allocation = vec![0_u8; 32 << 20];
+            for byte in allocation.iter_mut().step_by(4096) {
+                *byte = 1;
+            }
+            std::hint::black_box(&allocation);
         }
         "sleep" => std::thread::sleep(Duration::from_secs(30)),
         "child-tree" => {

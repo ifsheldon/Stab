@@ -80,15 +80,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "approx"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "arc-swap"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1915,16 +1906,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memory-stats"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c73f5c649995a115e1a0220b35e4df0a1294500477f97a91d0660fb5abeb574a"
-dependencies = [
- "libc",
- "windows-sys 0.52.0",
-]
-
-[[package]]
 name = "miniz_oxide"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2549,11 +2530,9 @@ dependencies = [
 name = "stab-bench"
 version = "0.2.0"
 dependencies = [
- "allocation-counter",
  "clap",
- "csv",
  "hex",
- "memory-stats",
+ "libc",
  "rand 0.10.1",
  "rustix",
  "serde",
@@ -2563,16 +2542,14 @@ dependencies = [
  "stab-algebra",
  "stab-analysis",
  "stab-bits",
- "stab-cli",
- "stab-core",
  "stab-decoder",
  "stab-engine",
  "stab-model",
  "stab-records",
  "stab-reference-decoder",
- "stab-reference-noise-pass",
  "tempfile",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -2685,7 +2662,6 @@ dependencies = [
  "stab-core",
  "stab-model",
  "stab-records",
- "statrs",
  "tempfile",
  "thiserror",
  "toml",
@@ -2769,16 +2745,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "statrs"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a3fe7c28c6512e766b0874335db33c94ad7b8f9054228ae1c2abd47ce7d335e"
-dependencies = [
- "approx",
- "num-traits",
-]
 
 [[package]]
 name = "strsim"

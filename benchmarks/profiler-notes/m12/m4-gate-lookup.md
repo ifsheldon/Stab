@@ -1,2 +1,0 @@
-Dominant cost: the strict M4 pair is now the pinned Stim `gate_data_hash_all_gate_names` filter matched by Stab's `stab_gate_data_hash_all_gate_names` hash loop, while alias, lowercase, and invalid lookup measurements remain separate Stab-only contract extras.
-Next owner action: keep the canonical hash pair guarded by the schema-version-2 threshold while final clean evidence remains below 1.25x, and keep alias, lowercase, and invalid lookup contract measurements outside strict Stim-relative thresholds unless pinned Stim adds faithful matching filters.

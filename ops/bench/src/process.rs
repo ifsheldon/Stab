@@ -1,7 +1,7 @@
 use std::ffi::{OsStr, OsString};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -89,6 +89,8 @@ pub(crate) struct ProcessResult {
     pub(crate) status: Option<i32>,
     pub(crate) stdout: Vec<u8>,
     pub(crate) stderr: Vec<u8>,
+    pub(crate) stdout_bytes: u64,
+    pub(crate) stderr_bytes: u64,
     pub(crate) parent_observed_peak_rss_bytes: Option<u64>,
     pub(crate) wall_elapsed: Duration,
 }
@@ -243,11 +245,14 @@ fn run_bounded_process_with_cancellation(
         if let Some(rss) = process_rss_bytes(pid)? {
             peak_rss = Some(peak_rss.map_or(rss, |peak: u64| peak.max(rss)));
         }
-        if status.is_none() {
-            status = child.try_wait()?;
-            if status.is_some() {
-                child.close_group()?;
-            }
+        if status.is_none()
+            && let Some(completed) = child.try_wait()?
+        {
+            peak_rss = Some(peak_rss.map_or(completed.peak_rss_bytes, |peak: u64| {
+                peak.max(completed.peak_rss_bytes)
+            }));
+            status = Some(completed.status);
+            child.close_group()?;
         }
         if cancellation.is_cancelled() {
             child.close_group()?;
@@ -343,6 +348,8 @@ fn run_bounded_process_with_cancellation(
         status: status.code(),
         stdout: captured.stdout,
         stderr: captured.stderr,
+        stdout_bytes: captured.stdout_bytes,
+        stderr_bytes: captured.stderr_bytes,
         parent_observed_peak_rss_bytes: peak_rss,
         wall_elapsed,
     })
@@ -397,15 +404,16 @@ impl ManagedChild {
         Ok(())
     }
 
-    fn try_wait(&mut self) -> Result<Option<std::process::ExitStatus>, ProcessError> {
-        let status = self.child.try_wait().map_err(|source| ProcessError::Wait {
-            program: self.program.clone(),
-            source,
-        })?;
-        if status.is_some() {
+    fn try_wait(&mut self) -> Result<Option<CompletedChild>, ProcessError> {
+        let completed =
+            try_wait_with_rusage(self.child.id()).map_err(|source| ProcessError::Wait {
+                program: self.program.clone(),
+                source,
+            })?;
+        if completed.is_some() {
             self.reaped = true;
         }
-        Ok(status)
+        Ok(completed)
     }
 
     fn close_group(&mut self) -> Result<(), ProcessError> {
@@ -481,6 +489,49 @@ impl ManagedChild {
     }
 }
 
+struct CompletedChild {
+    status: ExitStatus,
+    peak_rss_bytes: u64,
+}
+
+#[allow(
+    unsafe_code,
+    reason = "Linux wait4 is the only per-child peak-RSS source that survives fast process exit"
+)]
+fn try_wait_with_rusage(pid: u32) -> Result<Option<CompletedChild>, std::io::Error> {
+    use std::mem::MaybeUninit;
+    use std::os::unix::process::ExitStatusExt as _;
+
+    let raw_pid = libc::pid_t::try_from(pid).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("child process id {pid} exceeds pid_t"),
+        )
+    })?;
+    let mut status = 0;
+    let mut usage = MaybeUninit::<libc::rusage>::zeroed();
+    // SAFETY: wait4 receives the known child PID and valid writable pointers. A positive
+    // return initializes both outputs; zero leaves `usage` unread; negative returns errno.
+    let waited = unsafe { libc::wait4(raw_pid, &mut status, libc::WNOHANG, usage.as_mut_ptr()) };
+    if waited == 0 {
+        return Ok(None);
+    }
+    if waited < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // SAFETY: a positive wait4 return initialized the rusage value.
+    let usage = unsafe { usage.assume_init() };
+    let peak_kib = u64::try_from(usage.ru_maxrss)
+        .map_err(|_| std::io::Error::other("wait4 returned negative peak RSS"))?;
+    let peak_rss_bytes = peak_kib
+        .checked_mul(1024)
+        .ok_or_else(|| std::io::Error::other("wait4 peak RSS overflows bytes"))?;
+    Ok(Some(CompletedChild {
+        status: ExitStatus::from_raw(status),
+        peak_rss_bytes,
+    }))
+}
+
 impl Drop for ManagedChild {
     fn drop(&mut self) {
         if !self.group_closed {
@@ -504,6 +555,8 @@ impl Drop for ManagedChild {
 struct JoinedOutput {
     stdout: Vec<u8>,
     stderr: Vec<u8>,
+    stdout_bytes: u64,
+    stderr_bytes: u64,
 }
 
 fn diagnostics(output: &JoinedOutput) -> (Box<str>, Box<str>) {
@@ -540,6 +593,8 @@ fn join_all(
     Ok(JoinedOutput {
         stdout: stdout.bytes,
         stderr: stderr.bytes,
+        stdout_bytes: stdout.total_bytes,
+        stderr_bytes: stderr.total_bytes,
     })
 }
 
@@ -608,6 +663,7 @@ fn join_writer(program: &std::path::Path, writer: Writer) -> Result<(), ProcessE
 
 struct CapturedOutput {
     bytes: Vec<u8>,
+    total_bytes: u64,
 }
 
 struct OutputReader {
@@ -630,12 +686,19 @@ fn spawn_reader(mut pipe: impl Read + Send + 'static, policy: OutputPolicy) -> O
     let reader_exceeded = Arc::clone(&exceeded);
     let handle = std::thread::spawn(move || {
         let mut bytes = Vec::new();
+        let mut total_bytes = 0_u64;
         let mut buffer = [0_u8; 8192];
         loop {
             let count = pipe.read(&mut buffer)?;
             if count == 0 {
                 break;
             }
+            total_bytes =
+                total_bytes
+                    .checked_add(u64::try_from(count).map_err(|_| {
+                        std::io::Error::other("pipe byte count does not fit in u64")
+                    })?)
+                    .ok_or_else(|| std::io::Error::other("pipe byte count overflow"))?;
             let chunk = buffer
                 .get(..count)
                 .ok_or_else(|| std::io::Error::other("pipe read exceeded buffer bounds"))?;
@@ -652,7 +715,7 @@ fn spawn_reader(mut pipe: impl Read + Send + 'static, policy: OutputPolicy) -> O
                 }
             }
         }
-        Ok(CapturedOutput { bytes })
+        Ok(CapturedOutput { bytes, total_bytes })
     });
     OutputReader { handle, exceeded }
 }
@@ -921,7 +984,7 @@ pub(crate) struct InterruptedError {
 
 #[derive(Debug, Error)]
 pub(crate) enum ProcessError {
-    #[error("performance qualification process control requires Linux")]
+    #[error("benchmark process control requires Linux")]
     UnsupportedHost,
     #[error("process stdin is {actual} bytes, exceeding {maximum}")]
     StdinLimit { actual: usize, maximum: usize },
@@ -931,7 +994,7 @@ pub(crate) enum ProcessError {
     ZeroFileLimit,
     #[error("process timeout exceeds the monotonic clock range")]
     DeadlineOverflow,
-    #[error("failed to install qualification signal handlers: {0}")]
+    #[error("failed to install benchmark signal handlers: {0}")]
     InstallSignals(String),
     #[error("failed to spawn {program}: {source}")]
     Spawn {

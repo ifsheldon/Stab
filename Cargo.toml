@@ -45,7 +45,7 @@ gix = "0.85.0"
 hashbrown = "0.17.1"
 hex = "0.4.3"
 ignore = "0.4.26"
-memory-stats = "1.2.0"
+libc = "0.2.186"
 num-complex = "0.4.6"
 object = { version = "0.40.0", default-features = false, features = ["read", "std"] }
 proptest = "1.11.0"
@@ -64,15 +64,11 @@ syn = { version = "3.0.3", default-features = false, features = ["full", "parsin
 stab-algebra = { path = "crates/stab-algebra", version = "=0.2.0" }
 stab-analysis = { path = "crates/stab-analysis", version = "=0.2.0" }
 stab-bits = { path = "crates/stab-bits", version = "=0.2.0" }
-stab-cli = { path = "crates/stab-cli", version = "=0.2.0" }
-stab-core = { path = "crates/stab-core", version = "=0.2.0", default-features = false }
 stab-decoder = { path = "crates/stab-decoder", version = "=0.2.0" }
 stab-engine = { path = "crates/stab-engine", version = "=0.2.0" }
 stab-kernels-simd = { path = "crates/stab-kernels-simd", version = "=0.2.0" }
 stab-model = { path = "crates/stab-model", version = "=0.2.0" }
 stab-records = { path = "crates/stab-records", version = "=0.2.0" }
-stab-architecture = { path = "ops/architecture" }
-statrs = { version = "0.18.0", default-features = false }
 tar = "0.4.46"
 tempfile = "3.27.0"
 thiserror = "2.0.18"

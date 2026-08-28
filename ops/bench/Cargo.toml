@@ -10,23 +10,18 @@ publish = false
 
 [features]
 default = []
-count-allocations = ["dep:allocation-counter"]
 portable-simd = [
     "stab-algebra/portable-simd",
     "stab-bits/portable-simd",
-    "stab-cli/portable-simd",
-    "stab-core/portable-simd",
 ]
 
 [lints]
 workspace = true
 
 [dependencies]
-allocation-counter = { workspace = true, optional = true }
 clap = { workspace = true }
-csv = { workspace = true }
 hex = { workspace = true }
-memory-stats = { workspace = true }
+libc = { workspace = true }
 rand = { workspace = true }
 rustix = { workspace = true }
 serde = { workspace = true }
@@ -36,13 +31,11 @@ signal-hook = { workspace = true }
 stab-algebra = { workspace = true }
 stab-analysis = { workspace = true }
 stab-bits = { workspace = true }
-stab-cli = { path = "../../crates/stab-cli", default-features = false }
-stab-core = { path = "../../crates/stab-core", default-features = false }
 stab-decoder = { workspace = true }
 stab-engine = { workspace = true }
 stab-model = { workspace = true }
 stab-records = { workspace = true }
 stab-reference-decoder = { path = "../../test-support/reference-decoder" }
-stab-reference-noise-pass = { path = "../../test-support/reference-noise-pass" }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
+toml = { workspace = true }

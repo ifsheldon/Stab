@@ -1,0 +1,346 @@
+schema_version = 1
+expected_release_families = 12
+expected_release_cases = 29
+
+[stim]
+version = "v1.16.0"
+commit = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07"
+
+[policy]
+timing_boundary = "e2e-user-workflow-v1"
+parity_max_ratio = 1.25
+self_regression_max_ratio = 1.15
+bootstrap_seed = 6004497137074745393
+bootstrap_resamples = 10000
+confidence_level = 0.95
+maximum_temperature_millidegrees = 100000
+maximum_output_bytes = 67108864
+command_timeout_seconds = 600
+
+[tiers.smoke]
+warmups = 0
+samples = 1
+
+[tiers.full]
+warmups = 2
+samples = 9
+
+[tiers.soak]
+warmups = 3
+samples = 21
+
+[[families]]
+id = "generate-surface"
+description = "Generate and serialize noisy rotated surface-code circuits."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["generation.surface-code-memory", "generation.parameters-and-noise", "cli.gen"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 16
+work = { amount = 7689, unit = "generated-bytes" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = { kind = "empty" }, stdout = { kind = "exact", minimum_bytes = 7000 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 4
+work = { amount = 100738, unit = "generated-bytes" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "17", "--rounds", "100", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = { kind = "empty" }, stdout = { kind = "exact", minimum_bytes = 100000 } }
+
+[[families]]
+id = "convert-sparse"
+description = "Convert sparse result records into packed bytes at practical widths."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["result-formats.codecs-and-strict-grammars", "result-formats.routes-convert", "cli.convert"]
+
+[[families.cases]]
+id = "hits-narrow"
+size_class = "narrow"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "hits", "--out_format", "b8", "--bits_per_shot", "1024"], stdin = { kind = "records", format = "hits", records = 4096, bits = 1024, pattern = "sparse" }, stdout = { kind = "exact", minimum_bytes = 524288 } }
+
+[[families.cases]]
+id = "r8-wide"
+size_class = "wide"
+batch = 1
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "r8", "--out_format", "b8", "--bits_per_shot", "4096"], stdin = { kind = "records", format = "r8", records = 4096, bits = 4096, pattern = "sparse" }, stdout = { kind = "exact", minimum_bytes = 2097152 } }
+
+[[families]]
+id = "convert-dense"
+description = "Convert dense text and packed records in both useful width classes."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["result-formats.codecs-and-strict-grammars", "result-formats.routes-convert", "cli.convert"]
+
+[[families.cases]]
+id = "01-to-b8"
+size_class = "narrow"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "01", "--out_format", "b8", "--bits_per_shot", "128"], stdin = { kind = "records", format = "zeroone", records = 4096, bits = 128, pattern = "alternating" }, stdout = { kind = "exact", minimum_bytes = 65536 } }
+
+[[families.cases]]
+id = "b8-to-01"
+size_class = "wide"
+batch = 1
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "b8", "--out_format", "01", "--bits_per_shot", "2048"], stdin = { kind = "records", format = "b8", records = 4096, bits = 2048, pattern = "alternating" }, stdout = { kind = "exact", minimum_bytes = 8388608 } }
+
+[[families]]
+id = "convert-typed-dets"
+description = "Split typed detector and observable records into packed primary and side outputs."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["result-formats.codecs-and-strict-grammars", "result-formats.streaming-and-typed-dets", "result-formats.routes-convert", "cli.convert"]
+
+[[families.cases]]
+id = "narrow"
+size_class = "narrow"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "dets", "--out_format", "b8", "--num_detectors", "64", "--num_observables", "8", "--obs_out", "{file:obs}", "--obs_out_format", "b8"], stdin = { kind = "typed-dets", records = 4096, detectors = 64, observables = 8, detector_hits = 4, observable_hits = 2 }, files = [{ name = "obs", role = "output", output = { kind = "exact", minimum_bytes = 4096 } }], stdout = { kind = "exact", minimum_bytes = 32768 } }
+
+[[families.cases]]
+id = "wide"
+size_class = "wide"
+batch = 1
+work = { amount = 8192, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "dets", "--out_format", "b8", "--num_detectors", "512", "--num_observables", "32", "--obs_out", "{file:obs}", "--obs_out_format", "b8"], stdin = { kind = "typed-dets", records = 8192, detectors = 512, observables = 32, detector_hits = 8, observable_hits = 2 }, files = [{ name = "obs", role = "output", output = { kind = "exact", minimum_bytes = 32768 } }], stdout = { kind = "exact", minimum_bytes = 524288 } }
+
+[[families]]
+id = "sample-surface"
+description = "Sample noisy rotated surface-code circuits into packed measurement records."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["sampling.circuit-common-measurement-and-reset", "sampling.circuit-core-gates", "sampling.noise-complete", "result-formats.routes-sample", "cli.sample"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "4096", "--out_format", "b8", "--seed", "5"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "3", "--rounds", "5", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 49, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "8192", "--out_format", "b8", "--seed", "5"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 8192, bits = 265, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "4096", "--out_format", "b8", "--seed", "5"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "7", "--rounds", "20", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 1009, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families]]
+id = "sample-folded-ptb64"
+description = "Sample compact repeated circuits directly into PTB64 batches."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["circuit-model.syntax-and-canonical-text", "sampling.loop-folding-selection", "result-formats.routes-sample", "cli.sample"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "4096", "--out_format", "ptb64", "--seed", "7"], stdin = { kind = "folded-circuit", qubits = 4, repeat_blocks = 1, repeat_count = 64, error_probability = 0.01 }, stdout = { kind = "records", format = "ptb64", records = 4096, bits = 256, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "8192", "--out_format", "ptb64", "--seed", "7"], stdin = { kind = "folded-circuit", qubits = 4, repeat_blocks = 1, repeat_count = 256, error_probability = 0.01 }, stdout = { kind = "records", format = "ptb64", records = 8192, bits = 1024, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families]]
+id = "detect-observables"
+description = "Sample detector events and appended observables from noisy surface-code circuits."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["detection.common-frame-gate-surface", "detection.reference-correction", "result-formats.routes-detect", "cli.detect"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["detect", "--shots", "4096", "--out_format", "b8", "--append_observables", "--seed", "11"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "3", "--rounds", "5", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 41, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["detect", "--shots", "8192", "--out_format", "b8", "--append_observables", "--seed", "11"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 8192, bits = 241, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["detect", "--shots", "4096", "--out_format", "b8", "--append_observables", "--seed", "11"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "7", "--rounds", "20", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 961, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families]]
+id = "m2d-packed-sweep"
+description = "Convert packed measurements and sweep data into packed detections and observables."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["detection.reference-correction", "detection.sweep-feedback-and-folded-conversion", "result-formats.routes-m2d", "cli.m2d"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["m2d", "--circuit", "{file:circuit}", "--in_format", "b8", "--sweep", "{file:sweep}", "--sweep_format", "b8", "--out_format", "b8", "--append_observables"], stdin = { kind = "records", format = "b8", records = 4096, bits = 8, pattern = "alternating" }, files = [{ name = "circuit", role = "input", data = { kind = "m2d-circuit", bits = 8 } }, { name = "sweep", role = "input", data = { kind = "records", format = "b8", records = 4096, bits = 8, pattern = "alternating" } }], stdout = { kind = "exact", minimum_bytes = 8192 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 2
+work = { amount = 8192, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["m2d", "--circuit", "{file:circuit}", "--in_format", "b8", "--sweep", "{file:sweep}", "--sweep_format", "b8", "--out_format", "b8", "--append_observables"], stdin = { kind = "records", format = "b8", records = 8192, bits = 64, pattern = "alternating" }, files = [{ name = "circuit", role = "input", data = { kind = "m2d-circuit", bits = 64 } }, { name = "sweep", role = "input", data = { kind = "records", format = "b8", records = 8192, bits = 64, pattern = "alternating" } }], stdout = { kind = "exact", minimum_bytes = 73728 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 16384, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["m2d", "--circuit", "{file:circuit}", "--in_format", "b8", "--sweep", "{file:sweep}", "--sweep_format", "b8", "--out_format", "b8", "--append_observables"], stdin = { kind = "records", format = "b8", records = 16384, bits = 256, pattern = "alternating" }, files = [{ name = "circuit", role = "input", data = { kind = "m2d-circuit", bits = 256 } }, { name = "sweep", role = "input", data = { kind = "records", format = "b8", records = 16384, bits = 256, pattern = "alternating" } }], stdout = { kind = "exact", minimum_bytes = 540672 } }
+
+[[families]]
+id = "analyze-folded"
+description = "Lower compact repeated noisy circuits into folded detector error models."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["analysis.circuit-to-dem-selected-gate-surface", "analysis.loop-folding-common", "cli.analyze-errors"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 4
+work = { amount = 3204, unit = "input-bytes" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["analyze_errors", "--fold_loops"], stdin = { kind = "folded-circuit", qubits = 1, repeat_blocks = 32, repeat_count = 1000000, error_probability = 0.001 }, stdout = { kind = "exact", minimum_bytes = 1000 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 2
+work = { amount = 16262, unit = "input-bytes" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["analyze_errors", "--fold_loops"], stdin = { kind = "folded-circuit", qubits = 2, repeat_blocks = 128, repeat_count = 1000000, error_probability = 0.001 }, stdout = { kind = "exact", minimum_bytes = 4000 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 92682, unit = "input-bytes" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["analyze_errors", "--fold_loops"], stdin = { kind = "folded-circuit", qubits = 4, repeat_blocks = 512, repeat_count = 1000000, error_probability = 0.001 }, stdout = { kind = "exact", minimum_bytes = 16000 } }
+
+[[families]]
+id = "sample-dem"
+description = "Sample detector events from repeated sparse detector error models."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["dem-model.syntax-and-canonical-text", "sampling.dem-sampling-and-replay", "result-formats.routes-sample-dem", "result-formats.routes-sample-dem-replay", "cli.sample-dem"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample_dem", "--shots", "4096", "--out_format", "b8", "--seed", "13"], stdin = { kind = "dem", detectors = 64, mechanisms = 256, repeat_count = 1, error_probability = 0.001 }, stdout = { kind = "records", format = "b8", records = 4096, bits = 64, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample_dem", "--shots", "8192", "--out_format", "b8", "--seed", "13"], stdin = { kind = "dem", detectors = 512, mechanisms = 1024, repeat_count = 4, error_probability = 0.001 }, stdout = { kind = "records", format = "b8", records = 8192, bits = 2048, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample_dem", "--shots", "4096", "--out_format", "b8", "--seed", "13"], stdin = { kind = "dem", detectors = 2048, mechanisms = 2048, repeat_count = 4, error_probability = 0.001 }, stdout = { kind = "records", format = "b8", records = 4096, bits = 8192, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families]]
+id = "qec-cli-pipeline"
+description = "Generate a surface-code circuit, lower it, and sample its detector error model."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["generation.surface-code-memory", "analysis.circuit-to-dem-selected-gate-surface", "sampling.dem-sampling-and-replay", "cli.gen", "cli.analyze-errors", "cli.sample-dem"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli-pipeline", steps = [{ args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "3", "--rounds", "5", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = "empty" }, { args = ["analyze_errors", "--fold_loops"], stdin = "previous" }, { args = ["sample_dem", "--shots", "4096", "--out_format", "b8", "--seed", "17"], stdin = "previous" }], stdout = { kind = "records", format = "b8", records = 4096, bits = 40, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli-pipeline", steps = [{ args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = "empty" }, { args = ["analyze_errors", "--fold_loops"], stdin = "previous" }, { args = ["sample_dem", "--shots", "8192", "--out_format", "b8", "--seed", "17"], stdin = "previous" }], stdout = { kind = "records", format = "b8", records = 8192, bits = 240, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families]]
+id = "qec-rust-pipeline"
+description = "Reuse compiled sampling, detection-conversion, and decoder sessions."
+runner = "rust"
+comparator = "self-only"
+prerequisites = ["sampling.circuit-common-measurement-and-reset", "sampling.circuit-core-gates", "detection.common-frame-gate-surface"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 16384, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "rust-pipeline", shots = 16384, minimum_logical_failures = 327, maximum_logical_failures = 819, seed = 2815672542 }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 262144, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "rust-pipeline", shots = 262144, minimum_logical_failures = 5242, maximum_logical_failures = 13107, seed = 2815672542 }

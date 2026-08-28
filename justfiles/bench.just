@@ -1,129 +1,24 @@
-# Validate benchmark contracts without running long benchmark workloads.
+# Validate the sole source-owned E2E performance suite without timing it.
 [working-directory: '..']
-smoke *args:
-    cargo run -q -p stab-bench -- smoke {{args}}
+e2e-check *args:
+    cargo run -q -p stab-bench --features portable-simd -- e2e-check {{args}}
 
-# Print planned benchmark contracts grouped by milestone and threshold class.
+# Run release-built E2E workflows and publish one replayable bundle.
 [working-directory: '..']
-list *args:
-    cargo run -q -p stab-bench -- list {{args}}
+e2e-run *args:
+    cargo run -q -p stab-bench --features portable-simd --profile release -- e2e-run {{args}}
 
-# Validate the comprehensive performance qualification ledger.
+# Reconstruct an E2E report from the raw bundle without executing workloads.
 [working-directory: '..']
-qualification-check *args:
-    cargo run -q -p stab-bench -- qualification-check {{args}}
+e2e-replay *args:
+    cargo run -q -p stab-bench --features portable-simd --profile release -- e2e-replay {{args}}
 
-# List comprehensive performance qualification coverage.
+# Generate a reviewed self-regression baseline candidate from full and soak bundles.
 [working-directory: '..']
-qualification-list *args:
-    cargo run -q -p stab-bench -- qualification-list {{args}}
+e2e-baseline-candidate *args:
+    cargo run -q -p stab-bench --features portable-simd --profile release -- e2e-baseline-candidate {{args}}
 
-# Regenerate the comprehensive performance qualification ledger.
+# Validate current controlled-host evidence before release.
 [working-directory: '..']
-qualification-regenerate:
-    cargo run -q -p stab-bench -- qualification-regenerate
-
-# Regenerate or verify the frozen cross-language Clifford qualification vectors.
-[working-directory: '..']
-qualification-clifford-vectors *args:
-    cargo run -q -p stab-bench -- qualification-clifford-vectors {{args}}
-
-# Reproduce one bounded paired-runner or product-adapter qualification probe.
-[working-directory: '..']
-qualification-probe *args:
-    cargo run -q -p stab-bench --profile release -- qualification-probe {{args}}
-
-# From one clean commit, rebuild both workers twice and prove identity and cap handshakes.
-[working-directory: '..']
-qualification-worker-reproducibility:
-    cargo run -q -p stab-bench --profile release -- qualification-worker-reproducibility
-
-# Execute one source-owned paired qualification group and publish validated evidence.
-[working-directory: '..']
-qualification-run *args:
-    cargo run -q -p stab-bench --profile release -- qualification-run {{args}}
-
-# Execute one Stab-only product diagnostic without paired or parity evidence.
-[working-directory: '..']
-diagnostic-run *args:
-    cargo run -q -p stab-bench --profile release -- qualification-diagnostic {{args}}
-
-# Compare explicit scalar and portable-SIMD builds on the A6 kernel workloads.
-[working-directory: '..']
-simd-compare *args:
-    cargo run -q -p stab-bench --profile release -- qualification-simd-compare {{args}}
-
-# Replay one scalar-versus-portable-SIMD report from its raw invocation rows.
-[working-directory: '..']
-simd-report *args:
-    cargo run -q -p stab-bench --profile release -- qualification-simd-report {{args}}
-
-# Validate a paired qualification report and regenerate its derived artifacts.
-[working-directory: '..']
-qualification-report *args:
-    cargo run -q -p stab-bench --profile release -- qualification-report {{args}}
-
-# Publish one architecture/revision completion manifest from source-owned rollups.
-[working-directory: '..']
-qualification-completion *args:
-    cargo run -q -p stab-bench --profile release -- qualification-completion {{args}}
-
-# Reconstruct a completion manifest offline from its exact rollups and reports.
-[working-directory: '..']
-qualification-completion-report *args:
-    cargo run -q -p stab-bench --profile release -- qualification-completion-report {{args}}
-
-# Check promotable qualification evidence against source-owned Stim parity thresholds.
-[working-directory: '..']
-qualification-parity *args:
-    cargo run -q -p stab-bench --profile release -- qualification-parity {{args}}
-
-# Check accepted full and soak evidence against Stab's architecture-specific baseline.
-[working-directory: '..']
-qualification-self-regression *args:
-    cargo run -q -p stab-bench --profile release -- qualification-self-regression {{args}}
-
-# Generate an immutable architecture-specific Stab regression baseline candidate.
-[working-directory: '..']
-qualification-baseline-candidate *args:
-    cargo run -q -p stab-bench --profile release -- qualification-baseline-candidate {{args}}
-
-# Bind one complete architecture-scoped qualification scale family.
-[working-directory: '..']
-qualification-rollup *args:
-    cargo run -q -p stab-bench --profile release -- qualification-rollup {{args}}
-
-# Replay a qualification scale-family rollup from its sealed source reports.
-[working-directory: '..']
-qualification-rollup-report *args:
-    cargo run -q -p stab-bench --profile release -- qualification-rollup-report {{args}}
-
-# Record pinned C++ Stim baseline benchmark results.
-[working-directory: '..']
-baseline *args:
-    cargo run -q -p stab-bench -- baseline {{args}}
-
-# Report planned Stab-vs-Stim benchmark comparisons.
-[working-directory: '..']
-compare *args:
-    cargo run -q -p stab-bench --profile release -- compare {{args}}
-
-# Report Stab-vs-Stim comparisons with Stab-side allocation tracking enabled.
-[working-directory: '..']
-compare-allocations *args:
-    cargo run -q -p stab-bench --features count-allocations --profile release -- compare --track-allocations {{args}}
-
-# Check source-owned M12 primary timing-regression thresholds.
-[working-directory: '..']
-primary-regression *args:
-    cargo run -q -p stab-bench --profile release -- compare --primary --warmup --measurement-runs 3 --thresholds benchmarks/m12-primary-thresholds.json --regression-waivers benchmarks/m12-primary-regression-waivers.json --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 {{args}}
-
-# Check the M12 primary beta timing gate with source-owned contract-only waivers.
-[working-directory: '..']
-primary-beta *args:
-    cargo run -q -p stab-bench --profile release -- compare --primary --warmup --measurement-runs 3 --require-beta-gate --beta-waivers benchmarks/m12-primary-beta-waivers.json --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 --report target/benchmarks/m12-primary-beta {{args}}
-
-# Check source-owned M12 primary memory-regression baseline.
-[working-directory: '..']
-primary-memory-regression *args:
-    cargo run -q -p stab-bench --features count-allocations --profile release -- compare --track-allocations --primary --require-memory-gate --memory-baseline benchmarks/m12-primary-memory-baseline.json --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 --report target/benchmarks/m12-primary-memory-regression {{args}}
+e2e-release-check:
+    cargo run -q -p stab-bench --features portable-simd --profile release -- e2e-release-check

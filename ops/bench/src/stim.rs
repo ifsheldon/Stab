@@ -1,33 +1,30 @@
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 
-use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
 use crate::process::{check_success, run_checked_status, run_process};
 use crate::root::RepoRoot;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct StimSourceVersion {
-    pub(crate) commit: String,
-    pub(crate) tag: String,
-}
-
-pub(crate) fn validate_stim_source(stim_source: &Path) -> Result<StimSourceVersion, BenchError> {
+pub(crate) fn validate_stim_source(
+    stim_source: &Path,
+    expected_tag: &str,
+    expected_commit: &str,
+) -> Result<(), BenchError> {
     if !stim_source.is_dir() {
         return Err(BenchError::MissingStimSource(stim_source.to_path_buf()));
     }
     let commit = git_output(stim_source, ["rev-parse", "HEAD"])?;
-    if commit != STIM_COMMIT {
+    if commit != expected_commit {
         return Err(BenchError::WrongStimCommit {
             actual: commit,
-            expected: STIM_COMMIT.to_string(),
+            expected: expected_commit.to_string(),
         });
     }
     let tag = git_output(stim_source, ["describe", "--tags", "--exact-match"])?;
-    if tag != STIM_TAG {
+    if tag != expected_tag {
         return Err(BenchError::WrongStimTag {
             actual: tag,
-            expected: STIM_TAG.to_string(),
+            expected: expected_tag.to_string(),
         });
     }
     let status = git_output(
@@ -39,19 +36,10 @@ pub(crate) fn validate_stim_source(stim_source: &Path) -> Result<StimSourceVersi
             status: status.into_boxed_str(),
         });
     }
-    Ok(StimSourceVersion {
-        commit: STIM_COMMIT.to_string(),
-        tag: STIM_TAG.to_string(),
-    })
+    Ok(())
 }
 
-pub(crate) fn ensure_stim_binaries(
-    root: &RepoRoot,
-    stim_source: &Path,
-    needs_stim_perf: bool,
-    needs_stim_cli: bool,
-    _rebuild: bool,
-) -> Result<(), BenchError> {
+pub(crate) fn ensure_stim_cli(root: &RepoRoot, stim_source: &Path) -> Result<(), BenchError> {
     let build_dir = root.build_dir();
     std::fs::create_dir_all(&build_dir).map_err(|source| BenchError::CreateOutputDir {
         path: build_dir.clone(),
@@ -68,37 +56,19 @@ pub(crate) fn ensure_stim_binaries(
         ],
         &root.path,
     )?;
-    if needs_stim_cli {
-        run_checked_status(
-            "cmake",
-            [
-                OsString::from("--build"),
-                build_dir.as_os_str().to_os_string(),
-                OsString::from("--target"),
-                OsString::from("stim"),
-                OsString::from("--parallel"),
-            ],
-            &root.path,
-        )?;
-        if !root.stim_binary().is_file() {
-            return Err(BenchError::MissingStimBinary(root.stim_binary()));
-        }
-    }
-    if needs_stim_perf {
-        run_checked_status(
-            "cmake",
-            [
-                OsString::from("--build"),
-                build_dir.as_os_str().to_os_string(),
-                OsString::from("--target"),
-                OsString::from("stim_perf"),
-                OsString::from("--parallel"),
-            ],
-            &root.path,
-        )?;
-        if !root.stim_perf_binary().is_file() {
-            return Err(BenchError::MissingStimBinary(root.stim_perf_binary()));
-        }
+    run_checked_status(
+        "cmake",
+        [
+            OsString::from("--build"),
+            build_dir.as_os_str().to_os_string(),
+            OsString::from("--target"),
+            OsString::from("stim"),
+            OsString::from("--parallel"),
+        ],
+        &root.path,
+    )?;
+    if !root.stim_binary().is_file() {
+        return Err(BenchError::MissingStimBinary(root.stim_binary()));
     }
     Ok(())
 }
