@@ -258,6 +258,7 @@ dependencies = [
  "hex",
  "rand",
  "sha2",
+ "smallvec",
  "stab-algebra",
  "stab-analysis",
  "stab-bits",
