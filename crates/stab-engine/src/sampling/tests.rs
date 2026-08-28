@@ -7,7 +7,6 @@ use super::execute::{
     ReferenceExecutionStats, execute_reference_operations, reset_reference_execution_stats,
     take_reference_execution_stats,
 };
-use super::small_frame::SmallStabilizerFrame;
 use super::stabilizer_frame::StabilizerStateSnapshot;
 use super::*;
 use stab_model::Gate;
@@ -241,7 +240,7 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
         u64::try_from(base).expect("small base reference estimate"),
     ));
 
-    let fallback_qubits = (SmallStabilizerFrame::MAX_QUBITS + 1..20_000)
+    let fallback_qubits = (65..20_000)
         .find(|qubits| {
             let base = general_frame_work_storage_bytes(*qubits, 1, false);
             base <= u128::from(api::MAX_SAMPLING_SESSION_STORAGE_BYTES)

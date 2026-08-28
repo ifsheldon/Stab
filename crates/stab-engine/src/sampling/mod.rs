@@ -26,7 +26,6 @@ mod noise;
 mod operation;
 pub(crate) mod pauli_product;
 mod reference;
-mod small_frame;
 mod stabilizer_frame;
 
 pub use api::{
@@ -54,7 +53,7 @@ impl SamplingPlan {
         if self.inner.measurement_count == 0 {
             return Ok(0);
         }
-        if let api::SamplingPlanKind::DirectZ(direct) = self.inner.kind {
+        if let api::SamplingPlanKind::DirectZ(direct) = &self.inner.kind {
             return Ok(direct.determined_measurement_count(unknown_input));
         }
         validate_general_frame_work_storage(

@@ -8,8 +8,8 @@ use rand::rngs::SmallRng;
 
 use stab_model::Circuit;
 use stab_records::{
-    DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView, MeasurementWidth,
-    ObservableWidth, PackedShotBatch,
+    BitPlane64BatchView, DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView,
+    MeasurementWidth, ObservableWidth, PackedShotBatch,
 };
 
 use super::error::DetectionError;
@@ -19,18 +19,24 @@ use super::{
     PreparedMeasurementToDetection, try_false_vec,
 };
 use crate::{
-    RandomPolicy, ReferenceSampleMode, RunError, SamplingCancellation, SamplingRunStatus,
-    SamplingSession, ShotCount, SinkFailurePhase,
+    RandomPolicy, ReferenceSampleMode, SamplingCancellation, SamplingSession, ShotCount,
+    SinkFailurePhase,
 };
 
 mod contracts;
 mod delivery;
+mod execution;
 
 pub use contracts::{
     DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
     DetectionRunStatus, DetectionRunSummary,
 };
 pub use delivery::MeasurementToDetectionTransaction;
+use execution::{
+    construct_fused_state_after_admission, conversion_session_storage_bytes, copy_record,
+    detection_rng, invariant_error, run_direct, run_fused, storage_error,
+    validate_conversion_session_storage, validate_direct_session_storage,
+};
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_DETECTION_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
@@ -161,6 +167,85 @@ impl DetectionBatchBuffers {
             .map_err(invariant_error)?;
         DetectionBatchView::try_new(detectors, observables).map_err(invariant_error)
     }
+
+    fn copy_range_from(
+        &mut self,
+        source: &Self,
+        source_start: usize,
+        shot_count: usize,
+    ) -> Result<(), DetectionExecutionError> {
+        copy_packed_range(
+            &mut self.detectors,
+            &source.detectors,
+            source_start,
+            shot_count,
+        )?;
+        copy_packed_range(
+            &mut self.observables,
+            &source.observables,
+            source_start,
+            shot_count,
+        )
+    }
+
+    fn copy_from_planes(
+        &mut self,
+        detector_planes: &[u64],
+        observable_planes: &[u64],
+    ) -> Result<(), DetectionExecutionError> {
+        copy_planes_into_packed(&mut self.detectors, detector_planes)?;
+        copy_planes_into_packed(&mut self.observables, observable_planes)
+    }
+}
+
+fn copy_planes_into_packed(
+    target: &mut PackedShotBatch,
+    planes: &[u64],
+) -> Result<(), DetectionExecutionError> {
+    if target.shot_count() != MAX_BATCH_SHOTS || target.bits_per_shot() != planes.len() {
+        return Err(DetectionExecutionError::InternalInvariant {
+            message: "detection output planes disagree with packed batch dimensions".to_owned(),
+        });
+    }
+    let source = BitPlane64BatchView::try_from_words(planes, MAX_BATCH_SHOTS, planes.len())
+        .map_err(invariant_error)?;
+    target.copy_from_bit_planes(source).map_err(invariant_error)
+}
+
+fn copy_packed_range(
+    target: &mut PackedShotBatch,
+    source: &PackedShotBatch,
+    source_start: usize,
+    shot_count: usize,
+) -> Result<(), DetectionExecutionError> {
+    if target.bits_per_shot() != source.bits_per_shot()
+        || shot_count > target.shot_count()
+        || source_start
+            .checked_add(shot_count)
+            .is_none_or(|end| end > source.shot_count())
+    {
+        return Err(DetectionExecutionError::InternalInvariant {
+            message: "pending detection batch dimensions disagree".to_owned(),
+        });
+    }
+    for target_shot in 0..shot_count {
+        let source_shot = source_start.checked_add(target_shot).ok_or_else(|| {
+            DetectionExecutionError::InternalInvariant {
+                message: "pending detection shot index overflowed".to_owned(),
+            }
+        })?;
+        for bit_index in 0..source.bits_per_shot() {
+            let bit = source.get(source_shot, bit_index).ok_or_else(|| {
+                DetectionExecutionError::InternalInvariant {
+                    message: "pending detection source escaped its dimensions".to_owned(),
+                }
+            })?;
+            target
+                .set(target_shot, bit_index, bit)
+                .map_err(invariant_error)?;
+        }
+    }
+    Ok(())
 }
 
 /// Mutable reusable state for measurement-to-detection conversion.
@@ -534,7 +619,7 @@ impl DetectionSamplingCompiler {
         variant: DetectionSamplingVariant,
     ) -> Result<DetectionSamplingPlan, DetectionCompileError> {
         let use_direct = match variant {
-            DetectionSamplingVariant::Auto => super::circuit_requires_detector_frame(circuit)?,
+            DetectionSamplingVariant::Auto => true,
             #[cfg(test)]
             DetectionSamplingVariant::DirectDetectorFrame => true,
             #[cfg(test)]
@@ -673,16 +758,21 @@ impl DetectionSamplingPlan {
     reason = "both private variants own already-admitted fallible session storage without a second allocation layer"
 )]
 enum DetectionSamplingState {
-    DirectDetectorFrame {
-        rng: SmallRng,
-        frame: DetectorFrameState,
-        batch: DetectionBatchBuffers,
-        cancellation: OnceLock<SamplingCancellation>,
-    },
+    DirectDetectorFrame(DirectDetectionState),
     FusedSamplingConversion {
         sampling: SamplingSession,
         conversion: MeasurementToDetectionSession,
     },
+}
+
+struct DirectDetectionState {
+    rng: SmallRng,
+    frame: DetectorFrameState,
+    batch: DetectionBatchBuffers,
+    delivery: DetectionBatchBuffers,
+    pending_start: usize,
+    pending_count: usize,
+    cancellation: OnceLock<SamplingCancellation>,
 }
 
 /// Mutable reusable state for circuit detection sampling.
@@ -713,7 +803,7 @@ impl DetectionSamplingSession {
         let state = match &plan.inner.kind {
             DetectionSamplingPlanKind::DirectDetectorFrame(direct) => {
                 validate_direct_session_storage(direct)?;
-                DetectionSamplingState::DirectDetectorFrame {
+                DetectionSamplingState::DirectDetectorFrame(DirectDetectionState {
                     rng: detection_rng(random_policy),
                     frame: direct
                         .state()
@@ -722,8 +812,14 @@ impl DetectionSamplingSession {
                         plan.detector_width(),
                         plan.observable_width(),
                     )?,
+                    delivery: DetectionBatchBuffers::new(
+                        plan.detector_width(),
+                        plan.observable_width(),
+                    )?,
+                    pending_start: 0,
+                    pending_count: 0,
                     cancellation: OnceLock::new(),
-                }
+                })
             }
             DetectionSamplingPlanKind::FusedSamplingConversion {
                 sampling,
@@ -752,7 +848,8 @@ impl DetectionSamplingSession {
 
     pub fn cancellation(&self) -> SamplingCancellation {
         match &self.state {
-            DetectionSamplingState::DirectDetectorFrame { cancellation, .. } => cancellation
+            DetectionSamplingState::DirectDetectorFrame(state) => state
+                .cancellation
                 .get_or_init(SamplingCancellation::default)
                 .clone(),
             DetectionSamplingState::FusedSamplingConversion { sampling, .. } => {
@@ -764,7 +861,7 @@ impl DetectionSamplingSession {
     pub fn is_poisoned(&self) -> bool {
         self.poisoned
             || match &self.state {
-                DetectionSamplingState::DirectDetectorFrame { .. } => false,
+                DetectionSamplingState::DirectDetectorFrame(_) => false,
                 DetectionSamplingState::FusedSamplingConversion {
                     sampling,
                     conversion,
@@ -805,12 +902,9 @@ impl DetectionSamplingSession {
         }
 
         let result = match &mut self.state {
-            DetectionSamplingState::DirectDetectorFrame {
-                rng,
-                frame,
-                batch,
-                cancellation,
-            } => run_direct(&self.plan, rng, frame, batch, cancellation, shots, sink),
+            DetectionSamplingState::DirectDetectorFrame(state) => {
+                run_direct(&self.plan, state, shots, sink)
+            }
             DetectionSamplingState::FusedSamplingConversion {
                 sampling,
                 conversion,
@@ -856,264 +950,6 @@ impl DetectionSamplingSession {
             committed_shots: ShotCount::new(committed_shots),
             total_committed_shots: ShotCount::new(self.total_committed_shots),
         }
-    }
-}
-
-fn run_direct<Sink>(
-    plan: &DetectionSamplingPlan,
-    rng: &mut SmallRng,
-    frame: &mut DetectorFrameState,
-    batch: &mut DetectionBatchBuffers,
-    cancellation: &OnceLock<SamplingCancellation>,
-    shots: ShotCount,
-    sink: &mut Sink,
-) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
-where
-    Sink: DetectionSink,
-{
-    let DetectionSamplingPlanKind::DirectDetectorFrame(direct) = &plan.inner.kind else {
-        return Err(DetectionRunError::Engine {
-            source: DetectionExecutionError::InternalInvariant {
-                message: "direct detection session did not own a direct plan".to_owned(),
-            },
-            progress: DetectionRunProgress::new(0, 0),
-        });
-    };
-    let mut remaining = shots.get();
-    let mut committed = 0_u64;
-    while remaining > 0 {
-        if cancellation
-            .get()
-            .is_some_and(SamplingCancellation::is_cancelled)
-        {
-            break;
-        }
-        let batch_shots_u64 = remaining.min(MAX_BATCH_SHOTS as u64);
-        let batch_shots =
-            usize::try_from(batch_shots_u64).map_err(|_| DetectionRunError::Engine {
-                source: DetectionExecutionError::InternalInvariant {
-                    message: "bounded direct-detection batch did not fit usize".to_owned(),
-                },
-                progress: DetectionRunProgress::new(committed, batch_shots_u64),
-            })?;
-        for shot_index in 0..batch_shots {
-            let (detectors, observables) =
-                direct
-                    .sample(frame, rng)
-                    .map_err(|source| DetectionRunError::Engine {
-                        source: DetectionExecutionError::Conversion(source),
-                        progress: DetectionRunProgress::new(committed, batch_shots_u64),
-                    })?;
-            batch
-                .detectors
-                .copy_shot_from_bools(shot_index, detectors)
-                .map_err(|source| DetectionRunError::Engine {
-                    source: invariant_error(source),
-                    progress: DetectionRunProgress::new(committed, batch_shots_u64),
-                })?;
-            batch
-                .observables
-                .copy_shot_from_bools(shot_index, observables)
-                .map_err(|source| DetectionRunError::Engine {
-                    source: invariant_error(source),
-                    progress: DetectionRunProgress::new(committed, batch_shots_u64),
-                })?;
-        }
-        let view = batch
-            .view(batch_shots)
-            .map_err(|source| DetectionRunError::Engine {
-                source,
-                progress: DetectionRunProgress::new(committed, batch_shots_u64),
-            })?;
-        if let Err(source) = sink.write_batch(view) {
-            return Err(DetectionRunError::Sink {
-                phase: SinkFailurePhase::WriteBatch,
-                source,
-                progress: DetectionRunProgress::new(committed, batch_shots_u64),
-            });
-        }
-        committed += batch_shots_u64;
-        remaining -= batch_shots_u64;
-    }
-    if let Err(source) = sink.finish() {
-        return Err(DetectionRunError::Sink {
-            phase: SinkFailurePhase::Finish,
-            source,
-            progress: DetectionRunProgress::new(committed, 0),
-        });
-    }
-    Ok(DetectionRunSummary {
-        status: if remaining == 0 {
-            DetectionRunStatus::Completed
-        } else {
-            DetectionRunStatus::Cancelled
-        },
-        requested_shots: shots,
-        committed_shots: ShotCount::new(committed),
-        total_committed_shots: ShotCount::new(committed),
-    })
-}
-
-fn run_fused<Sink>(
-    sampling: &mut SamplingSession,
-    conversion: &mut MeasurementToDetectionSession,
-    shots: ShotCount,
-    sink: &mut Sink,
-) -> Result<DetectionRunSummary, DetectionRunError<Sink::Error>>
-where
-    Sink: DetectionSink,
-{
-    let mut transaction =
-        conversion
-            .start_transaction(sink)
-            .map_err(|source| DetectionRunError::Engine {
-                source,
-                progress: DetectionRunProgress::new(0, 0),
-            })?;
-    match sampling.run(shots, &mut transaction) {
-        Ok(summary) => Ok(DetectionRunSummary {
-            status: match summary.status() {
-                SamplingRunStatus::Completed => DetectionRunStatus::Completed,
-                SamplingRunStatus::Cancelled => DetectionRunStatus::Cancelled,
-            },
-            requested_shots: shots,
-            committed_shots: summary.committed_shots(),
-            total_committed_shots: summary.total_committed_shots(),
-        }),
-        Err(RunError::Engine { source, progress }) => Err(DetectionRunError::Engine {
-            source: DetectionExecutionError::Sampling(source),
-            progress: DetectionRunProgress::new(
-                progress.committed_shots().get(),
-                progress.attempted_batch_shots().get(),
-            ),
-        }),
-        Err(RunError::Sink {
-            source, progress, ..
-        }) => flatten_transaction_error(source, progress),
-    }
-}
-
-fn flatten_transaction_error<SinkError>(
-    error: DetectionRunError<SinkError>,
-    sampling_progress: crate::SamplingRunProgress,
-) -> Result<DetectionRunSummary, DetectionRunError<SinkError>> {
-    let progress = DetectionRunProgress::new(
-        sampling_progress.committed_shots().get(),
-        sampling_progress.attempted_batch_shots().get(),
-    );
-    Err(match error {
-        DetectionRunError::Engine { source, .. } => DetectionRunError::Engine { source, progress },
-        DetectionRunError::Sink { phase, source, .. } => DetectionRunError::Sink {
-            phase,
-            source,
-            progress,
-        },
-    })
-}
-
-fn copy_record(
-    batch: MeasurementBatchView<'_>,
-    shot_index: usize,
-    output: &mut [bool],
-    kind: &'static str,
-) -> Result<(), DetectionExecutionError> {
-    for (bit_index, slot) in output.iter_mut().enumerate() {
-        *slot = batch.get(shot_index, bit_index).ok_or_else(|| {
-            DetectionExecutionError::InternalInvariant {
-                message: format!(
-                    "{kind} batch escaped its declared dimensions at shot {shot_index}, bit {bit_index}"
-                ),
-            }
-        })?;
-    }
-    Ok(())
-}
-
-fn validate_conversion_session_storage(
-    plan: &MeasurementToDetectionPlan,
-) -> Result<(), DetectionExecutionError> {
-    validate_session_storage(conversion_session_storage_bytes(plan))
-}
-
-fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan) -> u128 {
-    let measurements = plan.measurement_width().get() as u128;
-    let sweeps = plan.sweep_width().get() as u128;
-    let detectors = plan.detector_width().get() as u128;
-    let observables = plan.observable_width().get() as u128;
-    let records = detectors.saturating_add(observables);
-    let packed_batch_bytes = records
-        .saturating_mul(MAX_BATCH_SHOTS as u128)
-        .saturating_add(7)
-        / 8;
-    measurements
-        .saturating_mul(2)
-        .saturating_add(sweeps)
-        .saturating_add(records)
-        .saturating_add(packed_batch_bytes)
-        .saturating_add(plan.inner.converter.sweep_correction_storage_bytes())
-}
-
-fn construct_fused_state_after_admission<T>(
-    sampling_bytes: u128,
-    conversion_bytes: u128,
-    construct: impl FnOnce() -> Result<T, DetectionExecutionError>,
-) -> Result<T, DetectionExecutionError> {
-    validate_combined_session_storage(sampling_bytes, conversion_bytes)?;
-    construct()
-}
-
-fn validate_combined_session_storage(
-    first_component_bytes: u128,
-    second_component_bytes: u128,
-) -> Result<(), DetectionExecutionError> {
-    validate_session_storage(first_component_bytes.saturating_add(second_component_bytes))
-}
-
-fn validate_direct_session_storage(
-    plan: &DirectDetectorFramePlan,
-) -> Result<(), DetectionExecutionError> {
-    let qubits = plan.qubit_count() as u128;
-    let measurements = plan.measurement_count() as u128;
-    let detectors = plan.detector_count() as u128;
-    let observables = plan.observable_count() as u128;
-    let records = detectors.saturating_add(observables);
-    let packed_batch_bytes = records
-        .saturating_mul(MAX_BATCH_SHOTS as u128)
-        .saturating_add(7)
-        / 8;
-    validate_session_storage(
-        qubits
-            .saturating_mul(2)
-            .saturating_add(measurements.saturating_mul(2))
-            .saturating_add(detectors)
-            .saturating_add(observables.saturating_mul(2))
-            .saturating_add(packed_batch_bytes),
-    )
-}
-
-fn validate_session_storage(estimated_bytes: u128) -> Result<(), DetectionExecutionError> {
-    if estimated_bytes > u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) {
-        return Err(DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: MAX_DETECTION_SESSION_STORAGE_BYTES,
-        });
-    }
-    Ok(())
-}
-
-fn detection_rng(policy: RandomPolicy) -> SmallRng {
-    SmallRng::seed_from_u64(policy.seed().map_or_else(rand::random, |seed| seed.get()))
-}
-
-fn storage_error(error: stab_records::FormatError) -> DetectionExecutionError {
-    DetectionExecutionError::SessionStorageAllocation {
-        message: error.to_string(),
-    }
-}
-
-fn invariant_error(error: stab_records::FormatError) -> DetectionExecutionError {
-    DetectionExecutionError::InternalInvariant {
-        message: error.to_string(),
     }
 }
 

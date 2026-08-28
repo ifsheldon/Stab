@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
 use stab_model::Circuit;
@@ -14,16 +13,20 @@ use stab_records::{
 use thiserror::Error;
 
 use super::direct_z_measurement::DirectZMeasurementPlan;
-use super::execute::{ExecutionBuffers, execute_operations, execute_reference_operations};
 use super::operation::SampleProgram;
-use super::small_frame::SmallStabilizerFrame;
-use super::stabilizer_frame::{StabilizerFrame, StabilizerStateSnapshot};
-use super::{ExecutionMode, compile_circuit, direct_z_measurement, sampler_rng, small_frame};
+use super::stabilizer_frame::StabilizerFrame;
+use super::{compile_circuit, direct_z_measurement, sampler_rng};
+use crate::detection::frame::{PauliFrameSamplingPlan, PauliFrameSamplingState};
 use crate::{CompilationRequestFingerprint, ResourceAmount};
 
 mod compile_error;
+mod session_helpers;
 
 pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
+pub(super) use session_helpers::{compute_reference_sample, try_bool_buffer};
+use session_helpers::{
+    fill_pauli_frame_batch, sample_general_into, session_storage_bytes, validate_session_storage,
+};
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_EXPANDED_OPERATIONS_PER_SHOT: u64 = 1_000_000;
@@ -178,7 +181,7 @@ impl SamplingCompiler {
             });
         }
         let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
-        let kind = select_plan_kind(qubit_count, counts.measurements, &operations);
+        let kind = select_plan_kind(circuit, counts.measurements, &operations);
         let fingerprint = PlanFingerprint::for_sampling(
             request_fingerprint,
             backend,
@@ -203,17 +206,19 @@ impl SamplingCompiler {
 }
 
 fn select_plan_kind(
-    qubit_count: usize,
+    circuit: &Circuit,
     measurement_count: usize,
     operations: &SampleProgram,
 ) -> SamplingPlanKind {
     if let Some(plan) = direct_z_measurement::compile(operations, measurement_count) {
         return SamplingPlanKind::DirectZ(plan);
     }
-    if qubit_count <= SmallStabilizerFrame::MAX_QUBITS
-        && small_frame::supports_operations(operations)
-    {
-        return SamplingPlanKind::SmallFrame;
+    if let Ok(plan) = PauliFrameSamplingPlan::try_compile(
+        circuit,
+        measurement_count,
+        MAX_SAMPLING_SESSION_STORAGE_BYTES,
+    ) {
+        return SamplingPlanKind::PauliFrame(plan);
     }
     SamplingPlanKind::GeneralFrame
 }
@@ -343,7 +348,7 @@ impl fmt::Debug for SamplingPlan {
 }
 
 impl SamplingPlan {
-    pub const EXECUTABLE_CONTRACT_SCHEMA_VERSION: u16 = 4;
+    pub const EXECUTABLE_CONTRACT_SCHEMA_VERSION: u16 = 5;
 
     pub fn backend(&self) -> SamplingBackend {
         self.inner.backend
@@ -394,7 +399,7 @@ impl SamplingPlan {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(super) struct SamplingPlanInner {
     pub(super) qubit_count: usize,
     pub(super) measurement_count: usize,
@@ -425,19 +430,19 @@ impl SamplingPlanInner {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(super) enum SamplingPlanKind {
     DirectZ(DirectZMeasurementPlan),
-    SmallFrame,
+    PauliFrame(PauliFrameSamplingPlan),
     GeneralFrame,
 }
 
 impl SamplingPlanKind {
-    const fn executable_discriminator(self) -> u8 {
+    const fn executable_discriminator(&self) -> u8 {
         match self {
             Self::DirectZ(_) => 1,
-            Self::SmallFrame => 2,
             Self::GeneralFrame => 3,
+            Self::PauliFrame(_) => 4,
         }
     }
 }
@@ -446,7 +451,11 @@ impl SamplingPlanKind {
 enum SessionFrame {
     Empty,
     DirectZ,
-    Small(Vec<SmallStabilizerFrame>),
+    Pauli {
+        state: PauliFrameSamplingState,
+        pending_start: usize,
+        pending_count: usize,
+    },
     General(Vec<StabilizerFrame>),
 }
 
@@ -684,33 +693,30 @@ impl SamplingSession {
             RandomPolicy::Entropy => sampler_rng(None),
             RandomPolicy::Seeded(seed) => sampler_rng(Some(seed.get())),
         };
-        let reference_sample = match reference_mode {
-            ReferenceSampleMode::UseReferenceSample => None,
-            ReferenceSampleMode::SkipReferenceSample => {
+        let reference_sample = match (&plan.inner.kind, reference_mode) {
+            (SamplingPlanKind::PauliFrame(_), ReferenceSampleMode::UseReferenceSample) => {
+                Some(compute_reference_sample(&plan.inner)?)
+            }
+            (SamplingPlanKind::PauliFrame(_), ReferenceSampleMode::SkipReferenceSample)
+            | (_, ReferenceSampleMode::UseReferenceSample) => None,
+            (_, ReferenceSampleMode::SkipReferenceSample) => {
                 Some(compute_reference_sample(&plan.inner)?)
             }
         };
         let frame = if plan.inner.measurement_count == 0 {
             SessionFrame::Empty
         } else {
-            match plan.inner.kind {
+            match &plan.inner.kind {
                 SamplingPlanKind::DirectZ(_) => SessionFrame::DirectZ,
-                SamplingPlanKind::SmallFrame => {
-                    let mut frames = Vec::new();
-                    frames.try_reserve_exact(1).map_err(|error| {
+                SamplingPlanKind::PauliFrame(pauli) => SessionFrame::Pauli {
+                    state: pauli.state().map_err(|error| {
                         SamplingExecutionError::SessionStorageAllocation {
-                            message: format!("small stabilizer frame owner: {error}"),
+                            message: error.to_string(),
                         }
-                    })?;
-                    frames.push(
-                        SmallStabilizerFrame::try_new(plan.inner.qubit_count).map_err(|error| {
-                            SamplingExecutionError::SessionStorageAllocation {
-                                message: error.to_string(),
-                            }
-                        })?,
-                    );
-                    SessionFrame::Small(frames)
-                }
+                    })?,
+                    pending_start: 0,
+                    pending_count: 0,
+                },
                 SamplingPlanKind::GeneralFrame => {
                     let mut frames = Vec::new();
                     frames.try_reserve_exact(1).map_err(|error| {
@@ -738,7 +744,10 @@ impl SamplingSession {
                 )?,
             )
         };
-        let (record, output) = if matches!(plan.inner.kind, SamplingPlanKind::DirectZ(_)) {
+        let (record, output) = if matches!(
+            plan.inner.kind,
+            SamplingPlanKind::DirectZ(_) | SamplingPlanKind::PauliFrame(_)
+        ) {
             (Vec::new(), Vec::new())
         } else {
             (
@@ -890,7 +899,7 @@ impl SamplingSession {
         if self.plan.inner.measurement_count == 0 {
             return Ok(());
         }
-        if let SamplingPlanKind::DirectZ(plan) = self.plan.inner.kind {
+        if let SamplingPlanKind::DirectZ(plan) = &self.plan.inner.kind {
             let reference_bit = self
                 .reference_sample
                 .as_deref()
@@ -918,6 +927,16 @@ impl SamplingSession {
                     message: "direct sampling plan did not own direct batch storage".to_owned(),
                 }),
             };
+        }
+        if let SamplingPlanKind::PauliFrame(plan) = &self.plan.inner.kind {
+            return fill_pauli_frame_batch(
+                plan,
+                &mut self.frame,
+                &mut self.batch,
+                self.reference_sample.as_deref(),
+                &mut self.rng,
+                shot_count,
+            );
         }
         for shot_index in 0..shot_count {
             self.sample_shot()?;
@@ -975,21 +994,11 @@ impl SamplingSession {
                 self.output.push(bit);
                 Ok(())
             }
-            (SamplingPlanKind::SmallFrame, SessionFrame::Small(frame)) => {
-                let frame =
-                    frame
-                        .first_mut()
-                        .ok_or_else(|| SamplingExecutionError::InternalInvariant {
-                            message: "small sampling session lost its admitted frame".to_owned(),
-                        })?;
-                small_frame::sample_shot_into(
-                    operations,
-                    frame,
-                    &mut self.record,
-                    &mut self.output,
-                    reference,
-                    &mut self.rng,
-                )
+            (SamplingPlanKind::PauliFrame(_), SessionFrame::Pauli { .. }) => {
+                Err(SamplingExecutionError::InternalInvariant {
+                    message: "Pauli-frame sampling must execute through the bit-plane batch path"
+                        .to_owned(),
+                })
             }
             (SamplingPlanKind::GeneralFrame, SessionFrame::General(frame)) => {
                 let frame =
@@ -1026,134 +1035,6 @@ impl SamplingSession {
             total_committed_shots: ShotCount::new(self.total_committed_shots),
         }
     }
-}
-
-fn validate_session_storage(
-    plan: &SamplingPlanInner,
-    reference_mode: ReferenceSampleMode,
-) -> Result<(), SamplingExecutionError> {
-    let estimated_bytes = session_storage_bytes(plan, reference_mode);
-    if estimated_bytes > u128::from(MAX_SAMPLING_SESSION_STORAGE_BYTES) {
-        return Err(SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: MAX_SAMPLING_SESSION_STORAGE_BYTES,
-        });
-    }
-    Ok(())
-}
-
-fn session_storage_bytes(plan: &SamplingPlanInner, reference_mode: ReferenceSampleMode) -> u128 {
-    if plan.measurement_count == 0 {
-        return 0;
-    }
-    let measurements = plan.measurement_count as u128;
-    let mut estimated_bytes = measurements.saturating_mul(size_of::<u64>() as u128);
-    if !matches!(plan.kind, SamplingPlanKind::DirectZ(_)) {
-        estimated_bytes = estimated_bytes.saturating_add(measurements.saturating_mul(2));
-    }
-    if reference_mode == ReferenceSampleMode::SkipReferenceSample {
-        estimated_bytes = estimated_bytes.saturating_add(measurements);
-    }
-    if matches!(plan.kind, SamplingPlanKind::GeneralFrame)
-        || (reference_mode == ReferenceSampleMode::SkipReferenceSample
-            && !matches!(plan.kind, SamplingPlanKind::DirectZ(_)))
-    {
-        let qubits = plan.qubit_count as u128;
-        estimated_bytes = estimated_bytes
-            .saturating_add(qubits.saturating_mul(qubits).saturating_mul(4))
-            .saturating_add(qubits.saturating_mul(256));
-    }
-    estimated_bytes
-}
-
-pub(super) fn try_bool_buffer(
-    capacity: usize,
-    label: &'static str,
-) -> Result<Vec<bool>, SamplingExecutionError> {
-    let mut buffer = Vec::new();
-    buffer.try_reserve_exact(capacity).map_err(|error| {
-        SamplingExecutionError::SessionStorageAllocation {
-            message: format!("{label} capacity {capacity}: {error}"),
-        }
-    })?;
-    Ok(buffer)
-}
-
-pub(super) fn compute_reference_sample(
-    plan: &SamplingPlanInner,
-) -> Result<Vec<bool>, SamplingExecutionError> {
-    if plan.measurement_count == 0 {
-        return Ok(Vec::new());
-    }
-    if let SamplingPlanKind::DirectZ(direct) = plan.kind {
-        let mut output = try_bool_buffer(1, "direct reference sample")?;
-        output.push(direct.reference_bit());
-        return Ok(output);
-    }
-    let needs_snapshot = plan.uses_reference_state_snapshot();
-    super::validate_general_frame_work_storage(
-        plan.qubit_count,
-        plan.measurement_count,
-        needs_snapshot,
-    )?;
-    let mut rng = SmallRng::seed_from_u64(0);
-    let mut frame = StabilizerFrame::try_new(plan.qubit_count).map_err(|error| {
-        SamplingExecutionError::SessionStorageAllocation {
-            message: error.to_string(),
-        }
-    })?;
-    let mut snapshot = needs_snapshot
-        .then(|| StabilizerStateSnapshot::try_new(plan.qubit_count))
-        .transpose()
-        .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
-            message: error.to_string(),
-        })?;
-    let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
-    let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
-    frame.reset_to_z_basis();
-    let mut correlated_error_occurred = false;
-    let mut buffers = ExecutionBuffers {
-        frame: &mut frame,
-        record: &mut record,
-        output: &mut output,
-        correlated_error_occurred: &mut correlated_error_occurred,
-    };
-    execute_reference_operations(
-        &plan.operations,
-        &mut buffers,
-        &mut rng,
-        &[],
-        plan.reference_sample_loop_policy,
-        snapshot.as_mut(),
-    )?;
-    Ok(output)
-}
-
-fn sample_general_into(
-    operations: &SampleProgram,
-    frame: &mut StabilizerFrame,
-    record: &mut Vec<bool>,
-    output: &mut Vec<bool>,
-    reference: Option<&[bool]>,
-    rng: &mut impl rand::Rng,
-) -> Result<(), SamplingExecutionError> {
-    frame.reset_to_z_basis();
-    record.clear();
-    output.clear();
-    let mut correlated_error_occurred = false;
-    let mut buffers = ExecutionBuffers {
-        frame,
-        record,
-        output,
-        correlated_error_occurred: &mut correlated_error_occurred,
-    };
-    execute_operations(operations, &mut buffers, rng, ExecutionMode::Sample, &[])?;
-    if let Some(reference) = reference {
-        for (bit, reference_bit) in output.iter_mut().zip(reference) {
-            *bit ^= *reference_bit;
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

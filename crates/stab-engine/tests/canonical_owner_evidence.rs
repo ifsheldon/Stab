@@ -595,7 +595,7 @@ fn a4_sampling_plan_fingerprint_contract() {
 
     let mut executable = Sha256::new();
     executable.update(b"stab:sampling-executable-contract\0");
-    executable.update(4_u16.to_be_bytes());
+    executable.update(5_u16.to_be_bytes());
     executable.update([1_u8, 1_u8, 1_u8]);
     let executable_digest: [u8; 32] = executable.finalize().into();
 
@@ -617,7 +617,7 @@ fn a4_sampling_plan_fingerprint_contract() {
     assert_eq!(fingerprint.digest(), reconstructed_digest);
     assert_eq!(
         fingerprint.digest_hex(),
-        "9baed273f3279679a5572f62379bba12f44ff4100961112c55a32255a92690bc"
+        "12d6f2077cf0e77f15690476071bb5c1a2a56e1039956c4c62a71b71961911d0"
     );
 }
 

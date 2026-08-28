@@ -8,90 +8,69 @@ use stab_model::{
 };
 
 use super::error::{DetectionError, DetectionResult};
-use super::{try_false_vec, try_vec_with_capacity};
+use super::try_vec_with_capacity;
 
 mod helpers;
+mod noise;
 mod plan;
 mod program;
 
 use helpers::{
-    frame_bit, measurement_flip_probability, measurement_record_bit, pauli_basis, probability_list,
-    qubit_id_index, qubit_index, sample_flip, sample_single_pauli, sample_two_qubit_pauli,
-    set_frame_bit, single_probability_argument, unsupported_frame_instruction,
-    unsupported_frame_target, xor_frame_bit, zero_probability_noise,
+    TWO_QUBIT_FRAME_BASES, frame_word, measurement_flip_probability, measurement_record_word,
+    pauli_basis, probability_list, qubit_id_index, qubit_index, set_frame_word,
+    single_probability_argument, try_zero_words, unsupported_frame_instruction,
+    unsupported_frame_target, xor_frame_word, zero_probability_noise,
+};
+pub(in crate::detection) use noise::batch_active_mask;
+use noise::{
+    FrameExecutionMode, for_each_set_lane, sample_categorical_masks,
+    visit_sparse_categorical_events,
 };
 
 pub(super) use plan::{
     DetectorFrameState, DirectDetectorFramePlan, SweepCorrectionPlan,
     admit_combined_compiled_storage,
 };
-use program::{FrameProgram, FrameTableauTransform};
-
-#[derive(Clone, Copy)]
-enum FrameExecutionMode<'a> {
-    Sample,
-    SweepCorrection(&'a [bool]),
-}
-
-impl FrameExecutionMode<'_> {
-    fn random_bool(self, rng: &mut impl Rng, probability: f64) -> bool {
-        match self {
-            Self::Sample => rng.random_bool(probability),
-            Self::SweepCorrection(_) => false,
-        }
-    }
-
-    const fn samples_noise(self) -> bool {
-        matches!(self, Self::Sample)
-    }
-
-    fn sweep_bit(self, id: u32) -> bool {
-        match self {
-            Self::Sample => false,
-            Self::SweepCorrection(sweep_record) => usize::try_from(id)
-                .ok()
-                .and_then(|index| sweep_record.get(index))
-                .copied()
-                .unwrap_or(false),
-        }
-    }
-}
+pub(crate) use plan::{PauliFrameSamplingPlan, PauliFrameSamplingState};
+use program::{
+    FastFrameInstruction, FastFrameOperation, FrameInstruction, FrameProgram, FrameTableauTransform,
+};
 
 #[derive(Debug)]
-struct ScalarDetectionFrame {
-    xs: Vec<bool>,
-    zs: Vec<bool>,
-    measurements: Vec<bool>,
-    observables: Vec<bool>,
-    correlated_error_occurred: bool,
+pub(in crate::detection) struct BitPlaneDetectionFrame {
+    xs: Vec<u64>,
+    zs: Vec<u64>,
+    pub(in crate::detection) measurements: Vec<u64>,
+    pub(in crate::detection) observables: Vec<u64>,
+    correlated_error_occurred: u64,
 }
 
-impl ScalarDetectionFrame {
-    fn try_reusable(
+impl BitPlaneDetectionFrame {
+    pub(in crate::detection) fn try_reusable(
         qubit_count: usize,
         measurement_count: usize,
         observable_count: usize,
     ) -> DetectionResult<Self> {
         Ok(Self {
-            xs: try_false_vec(qubit_count, "detection frame X state")?,
-            zs: try_false_vec(qubit_count, "detection frame Z state")?,
+            xs: try_zero_words(qubit_count, "detection frame X state")?,
+            zs: try_zero_words(qubit_count, "detection frame Z state")?,
             measurements: try_vec_with_capacity(
                 measurement_count,
                 "detection frame measurement record",
             )?,
-            observables: try_false_vec(observable_count, "detection frame observable record")?,
-            correlated_error_occurred: false,
+            observables: try_zero_words(observable_count, "detection frame observable record")?,
+            correlated_error_occurred: 0,
         })
     }
 
     fn reset(&mut self, rng: &mut impl Rng, mode: FrameExecutionMode<'_>) {
-        self.xs.fill(false);
+        self.xs.fill(0);
         for bit in &mut self.zs {
-            *bit = mode.random_bool(rng, 0.5);
+            *bit = mode.random_mask(rng, 0.5);
         }
         self.measurements.clear();
-        self.observables.fill(false);
-        self.correlated_error_occurred = false;
+        self.observables.fill(0);
+        self.correlated_error_occurred = 0;
     }
 
     fn execute_program(
@@ -102,12 +81,328 @@ impl ScalarDetectionFrame {
     ) -> DetectionResult<()> {
         let mut cursor = program.cursor();
         while let Some(step) = cursor.next_instruction()? {
-            self.execute_instruction(step.instruction, step.tableau, rng, mode)?;
+            match step {
+                FrameInstruction::Execute {
+                    instruction,
+                    tableau,
+                } => self.execute_instruction(instruction, tableau, rng, mode)?,
+                FrameInstruction::Fast(instruction) => {
+                    self.execute_fast_instruction(instruction, rng, mode)?
+                }
+            }
         }
         Ok(())
     }
 
-    pub(super) fn execute_instruction(
+    fn execute_fast_instruction(
+        &mut self,
+        instruction: &FastFrameInstruction,
+        rng: &mut impl Rng,
+        mode: FrameExecutionMode<'_>,
+    ) -> DetectionResult<()> {
+        match instruction.operation {
+            FastFrameOperation::Hadamard => {
+                for &qubit in &instruction.targets {
+                    let x = self.x_word(qubit)?;
+                    let z = self.z_word(qubit)?;
+                    self.set_x_word(qubit, z)?;
+                    self.set_z_word(qubit, x)?;
+                }
+                Ok(())
+            }
+            FastFrameOperation::ControlledNot => {
+                for targets in instruction.targets.chunks_exact(2) {
+                    let &[control, target] = targets else {
+                        return Err(DetectionError::invalid_sampler_compilation(
+                            "resolved CX target list was not paired",
+                        ));
+                    };
+                    let control_x = self.x_word(control)?;
+                    let target_z = self.z_word(target)?;
+                    self.xor_x_word(target, control_x)?;
+                    self.xor_z_word(control, target_z)?;
+                }
+                Ok(())
+            }
+            FastFrameOperation::Tableau => {
+                let transform = instruction.tableau.ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(
+                        "compiled tableau operation omitted its transform",
+                    )
+                })?;
+                let group_size = transform.target_count();
+                if group_size == 0 {
+                    return instruction.targets.is_empty().then_some(()).ok_or_else(|| {
+                        DetectionError::invalid_sampler_compilation(
+                            "compiled zero-width tableau retained qubit targets",
+                        )
+                    });
+                }
+                let groups = instruction.targets.chunks_exact(group_size);
+                if !groups.remainder().is_empty() {
+                    return Err(DetectionError::invalid_sampler_compilation(
+                        "compiled tableau target list was not grouped",
+                    ));
+                }
+                for targets in groups {
+                    self.apply_resolved_tableau_targets(targets, transform)?;
+                }
+                Ok(())
+            }
+            FastFrameOperation::ResetZ => {
+                for &qubit in &instruction.targets {
+                    self.set_x_word(qubit, 0)?;
+                    self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
+                }
+                Ok(())
+            }
+            FastFrameOperation::MeasureZ | FastFrameOperation::MeasureResetZ => {
+                let probability = instruction.probabilities.first().copied().ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(
+                        "compiled Z measurement omitted its flip probability",
+                    )
+                })?;
+                let measurement_start = self.measurements.len();
+                for &qubit in &instruction.targets {
+                    self.measurements.push(self.x_word(qubit)?);
+                    if instruction.operation == FastFrameOperation::MeasureResetZ {
+                        self.set_x_word(qubit, 0)?;
+                    }
+                    self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
+                }
+                if mode.samples_noise()
+                    && !visit_sparse_categorical_events(
+                        [probability],
+                        instruction.targets.len(),
+                        mode.active_mask(),
+                        rng,
+                        |target_index, _, lane_mask| {
+                            let measurement = self
+                                .measurements
+                                .get_mut(measurement_start + target_index)
+                                .ok_or_else(|| {
+                                    DetectionError::invalid_sampler_compilation(
+                                        "compiled Z measurement escaped its output record",
+                                    )
+                                })?;
+                            *measurement ^= lane_mask;
+                            Ok(())
+                        },
+                    )?
+                {
+                    for measurement in self
+                        .measurements
+                        .iter_mut()
+                        .skip(measurement_start)
+                        .take(instruction.targets.len())
+                    {
+                        *measurement ^= mode.random_mask(rng, probability);
+                    }
+                }
+                Ok(())
+            }
+            FastFrameOperation::MeasureXX
+            | FastFrameOperation::MeasureYY
+            | FastFrameOperation::MeasureZZ => {
+                let probability = instruction.probabilities.first().copied().ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(
+                        "compiled pair measurement omitted its flip probability",
+                    )
+                })?;
+                let basis = match instruction.operation {
+                    FastFrameOperation::MeasureXX => PauliBasis::X,
+                    FastFrameOperation::MeasureYY => PauliBasis::Y,
+                    FastFrameOperation::MeasureZZ => PauliBasis::Z,
+                    _ => {
+                        return Err(DetectionError::invalid_sampler_compilation(
+                            "compiled pair measurement used a non-pair operation",
+                        ));
+                    }
+                };
+                let pairs = instruction.targets.chunks_exact(2);
+                if !pairs.remainder().is_empty() {
+                    return Err(DetectionError::invalid_sampler_compilation(
+                        "compiled pair measurement target list was not paired",
+                    ));
+                }
+                for pair in pairs {
+                    let &[left, right] = pair else {
+                        return Err(DetectionError::invalid_sampler_compilation(
+                            "compiled pair measurement target list was not paired",
+                        ));
+                    };
+                    if left == right {
+                        self.measure_pauli_product_terms(&[], probability, rng, mode)?;
+                    } else {
+                        self.measure_pauli_product_terms(
+                            &[(left, basis), (right, basis)],
+                            probability,
+                            rng,
+                            mode,
+                        )?;
+                    }
+                }
+                Ok(())
+            }
+            FastFrameOperation::SinglePauliNoise => {
+                let probabilities: [f64; 3] = instruction
+                    .probabilities
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| {
+                        DetectionError::invalid_sampler_compilation(
+                            "compiled single-qubit noise has the wrong probability count",
+                        )
+                    })?;
+                self.apply_resolved_single_pauli_noise(
+                    &instruction.targets,
+                    probabilities,
+                    rng,
+                    mode,
+                )
+            }
+            FastFrameOperation::TwoQubitPauliNoise => {
+                let probabilities: [f64; 15] = instruction
+                    .probabilities
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| {
+                        DetectionError::invalid_sampler_compilation(
+                            "compiled two-qubit noise has the wrong probability count",
+                        )
+                    })?;
+                self.apply_resolved_two_qubit_pauli_noise(
+                    &instruction.targets,
+                    probabilities,
+                    rng,
+                    mode,
+                )
+            }
+        }
+    }
+
+    fn apply_resolved_single_pauli_noise(
+        &mut self,
+        targets: &[usize],
+        probabilities: [f64; 3],
+        rng: &mut impl Rng,
+        mode: FrameExecutionMode<'_>,
+    ) -> DetectionResult<()> {
+        if !mode.samples_noise() {
+            return Ok(());
+        }
+        if visit_sparse_categorical_events(
+            probabilities,
+            targets.len(),
+            mode.active_mask(),
+            rng,
+            |target_index, category, lane_mask| {
+                let qubit = targets.get(target_index).copied().ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(
+                        "compiled single-qubit noise target is out of range",
+                    )
+                })?;
+                let basis = match category {
+                    0 => PauliBasis::X,
+                    1 => PauliBasis::Y,
+                    2 => PauliBasis::Z,
+                    _ => {
+                        return Err(DetectionError::invalid_sampler_compilation(
+                            "compiled single-qubit noise category is out of range",
+                        ));
+                    }
+                };
+                self.apply_pauli_mask(qubit, basis, lane_mask)
+            },
+        )? {
+            return Ok(());
+        }
+        for &qubit in targets {
+            let [x_mask, y_mask, z_mask] =
+                sample_categorical_masks(probabilities, mode.active_mask(), rng);
+            self.apply_pauli_mask(qubit, PauliBasis::X, x_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Y, y_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Z, z_mask)?;
+        }
+        Ok(())
+    }
+
+    fn apply_resolved_two_qubit_pauli_noise(
+        &mut self,
+        targets: &[usize],
+        probabilities: [f64; 15],
+        rng: &mut impl Rng,
+        mode: FrameExecutionMode<'_>,
+    ) -> DetectionResult<()> {
+        if !mode.samples_noise() {
+            return Ok(());
+        }
+        let pairs = targets.chunks_exact(2);
+        if !pairs.remainder().is_empty() {
+            return Err(DetectionError::invalid_sampler_compilation(
+                "compiled two-qubit noise target list is not paired",
+            ));
+        }
+        if visit_sparse_categorical_events(
+            probabilities,
+            pairs.len(),
+            mode.active_mask(),
+            rng,
+            |target_index, category, lane_mask| {
+                let start = target_index.checked_mul(2).ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(
+                        "compiled two-qubit noise target index overflowed",
+                    )
+                })?;
+                let &[left, right] = targets.get(start..start + 2).ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(
+                        "compiled two-qubit noise target is out of range",
+                    )
+                })?
+                else {
+                    return Err(DetectionError::invalid_sampler_compilation(
+                        "compiled two-qubit noise target list is not paired",
+                    ));
+                };
+                let (left_basis, right_basis) = TWO_QUBIT_FRAME_BASES
+                    .get(category)
+                    .copied()
+                    .ok_or_else(|| {
+                        DetectionError::invalid_sampler_compilation(
+                            "compiled two-qubit noise category is out of range",
+                        )
+                    })?;
+                if let Some(basis) = left_basis {
+                    self.apply_pauli_mask(left, basis, lane_mask)?;
+                }
+                if let Some(basis) = right_basis {
+                    self.apply_pauli_mask(right, basis, lane_mask)?;
+                }
+                Ok(())
+            },
+        )? {
+            return Ok(());
+        }
+        for pair in targets.chunks_exact(2) {
+            let &[left, right] = pair else {
+                return Err(DetectionError::invalid_sampler_compilation(
+                    "compiled two-qubit noise target list is not paired",
+                ));
+            };
+            let masks = sample_categorical_masks(probabilities, mode.active_mask(), rng);
+            for ((left_basis, right_basis), mask) in TWO_QUBIT_FRAME_BASES.into_iter().zip(masks) {
+                if let Some(basis) = left_basis {
+                    self.apply_pauli_mask(left, basis, mask)?;
+                }
+                if let Some(basis) = right_basis {
+                    self.apply_pauli_mask(right, basis, mask)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn execute_instruction(
         &mut self,
         instruction: &CircuitInstruction,
         tableau: Option<&FrameTableauTransform>,
@@ -202,7 +497,7 @@ impl ScalarDetectionFrame {
                 "observable id {observable_id} was not initialized"
             )));
         }
-        let mut bit = false;
+        let mut bit = 0;
         for target in instruction.targets() {
             if target.measurement_record_offset().is_some() {
                 continue;
@@ -215,14 +510,12 @@ impl ScalarDetectionFrame {
                 )));
             }
         }
-        if bit {
-            let observable = self.observables.get_mut(observable_id).ok_or_else(|| {
-                DetectionError::invalid_result_format(format!(
-                    "observable id {observable_id} was not initialized"
-                ))
-            })?;
-            *observable ^= true;
-        }
+        let observable = self.observables.get_mut(observable_id).ok_or_else(|| {
+            DetectionError::invalid_result_format(format!(
+                "observable id {observable_id} was not initialized"
+            ))
+        })?;
+        *observable ^= bit;
         Ok(())
     }
 
@@ -251,7 +544,7 @@ impl ScalarDetectionFrame {
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
             let result = self.measure_qubit_frame(qubit, basis, rng, mode)?
-                ^ mode.random_bool(rng, flip_probability);
+                ^ mode.random_mask(rng, flip_probability);
             self.measurements.push(result);
             if reset {
                 self.reset_qubit(qubit, basis, rng, mode)?;
@@ -272,7 +565,7 @@ impl ScalarDetectionFrame {
                 return Err(unsupported_frame_instruction(instruction));
             }
             self.measurements
-                .push(mode.random_bool(rng, flip_probability));
+                .push(mode.random_mask(rng, flip_probability));
         }
         Ok(())
     }
@@ -331,7 +624,7 @@ impl ScalarDetectionFrame {
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_>,
     ) -> DetectionResult<()> {
-        let mut result = mode.random_bool(rng, flip_probability);
+        let mut result = mode.random_mask(rng, flip_probability);
         for (qubit, basis) in terms {
             result ^= self.frame_measurement_bit(*qubit, *basis)?;
         }
@@ -356,17 +649,15 @@ impl ScalarDetectionFrame {
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_>,
     ) -> DetectionResult<()> {
-        if !mode.random_bool(rng, 0.5) {
-            return Ok(());
-        }
+        let mask = mode.random_mask(rng, 0.5);
         for (qubit, basis) in terms {
             match basis {
                 PauliBasis::I => {}
-                PauliBasis::X => self.xor_x_bit(*qubit, true)?,
-                PauliBasis::Z => self.xor_z_bit(*qubit, true)?,
+                PauliBasis::X => self.xor_x_word(*qubit, mask)?,
+                PauliBasis::Z => self.xor_z_word(*qubit, mask)?,
                 PauliBasis::Y => {
-                    self.xor_x_bit(*qubit, true)?;
-                    self.xor_z_bit(*qubit, true)?;
+                    self.xor_x_word(*qubit, mask)?;
+                    self.xor_z_word(*qubit, mask)?;
                 }
             }
         }
@@ -393,13 +684,11 @@ impl ScalarDetectionFrame {
                 ControlledPauliTargetPair::Classical { control, target } => {
                     let active = match control {
                         ClassicalControl::Record(offset) => {
-                            measurement_record_bit(&self.measurements, offset)?
+                            measurement_record_word(&self.measurements, offset)?
                         }
-                        ClassicalControl::Sweep(id) => mode.sweep_bit(id),
+                        ClassicalControl::Sweep(id) => mode.sweep_mask(id),
                     };
-                    if active {
-                        self.apply_pauli(qubit_id_index(target)?, basis)?;
-                    }
+                    self.apply_pauli_mask(qubit_id_index(target)?, basis, active)?;
                 }
                 ControlledPauliTargetPair::ClassicalNoop { .. } => {}
                 ControlledPauliTargetPair::Unsupported => {
@@ -453,9 +742,13 @@ impl ScalarDetectionFrame {
             )));
         }
         let mut qubits = [0_usize; MAX_LOCAL_TABLEAU_QUBITS];
-        let mut input_bases = [PauliBasis::I; MAX_LOCAL_TABLEAU_QUBITS];
-        for ((qubit_slot, basis_slot), target) in
-            qubits.iter_mut().zip(input_bases.iter_mut()).zip(targets)
+        let mut input_xs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
+        let mut input_zs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
+        for (((qubit_slot, x_slot), z_slot), target) in qubits
+            .iter_mut()
+            .zip(input_xs.iter_mut())
+            .zip(input_zs.iter_mut())
+            .zip(targets)
         {
             let qubit = target
                 .qubit_id()
@@ -467,24 +760,91 @@ impl ScalarDetectionFrame {
                 ))
             })?;
             *qubit_slot = qubit;
-            *basis_slot = self.qubit_basis(qubit)?;
+            *x_slot = self.x_word(qubit)?;
+            *z_slot = self.z_word(qubit)?;
         }
-        let admitted_bases = input_bases.get(..targets.len()).ok_or_else(|| {
+        let admitted_xs = input_xs.get(..targets.len()).ok_or_else(|| {
             DetectionError::invalid_sampler_compilation(
                 "compiled detector-frame tableau exceeded its inline target storage",
             )
         })?;
-        let output = transform.output_mask(admitted_bases).ok_or_else(|| {
+        let admitted_zs = input_zs.get(..targets.len()).ok_or_else(|| {
             DetectionError::invalid_sampler_compilation(
-                "compiled detector-frame tableau rejected its admitted target count",
+                "compiled detector-frame tableau exceeded its inline target storage",
             )
         })?;
+        let (output_xs, output_zs) = transform
+            .apply_word_planes(admitted_xs, admitted_zs)
+            .ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled detector-frame tableau rejected its admitted target count",
+                )
+            })?;
         for (output_index, qubit) in qubits.iter().copied().take(targets.len()).enumerate() {
-            self.set_x_bit(qubit, ((output >> output_index) & 1) != 0)?;
-            self.set_z_bit(
-                qubit,
-                ((output >> (MAX_LOCAL_TABLEAU_QUBITS + output_index)) & 1) != 0,
-            )?;
+            let output_x = output_xs.get(output_index).copied().ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled detector-frame X output escaped inline storage",
+                )
+            })?;
+            let output_z = output_zs.get(output_index).copied().ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled detector-frame Z output escaped inline storage",
+                )
+            })?;
+            self.set_x_word(qubit, output_x)?;
+            self.set_z_word(qubit, output_z)?;
+        }
+        Ok(())
+    }
+
+    fn apply_resolved_tableau_targets(
+        &mut self,
+        targets: &[usize],
+        transform: FrameTableauTransform,
+    ) -> DetectionResult<()> {
+        const MAX_LOCAL_TABLEAU_QUBITS: usize = 8;
+        if targets.len() != transform.target_count() {
+            return Err(DetectionError::invalid_sampler_compilation(
+                "compiled tableau transform rejected its resolved target count",
+            ));
+        }
+        let mut input_xs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
+        let mut input_zs = [0_u64; MAX_LOCAL_TABLEAU_QUBITS];
+        for ((x_slot, z_slot), &qubit) in input_xs.iter_mut().zip(input_zs.iter_mut()).zip(targets)
+        {
+            *x_slot = self.x_word(qubit)?;
+            *z_slot = self.z_word(qubit)?;
+        }
+        let admitted_xs = input_xs.get(..targets.len()).ok_or_else(|| {
+            DetectionError::invalid_sampler_compilation(
+                "compiled detector-frame tableau exceeded its inline target storage",
+            )
+        })?;
+        let admitted_zs = input_zs.get(..targets.len()).ok_or_else(|| {
+            DetectionError::invalid_sampler_compilation(
+                "compiled detector-frame tableau exceeded its inline target storage",
+            )
+        })?;
+        let (output_xs, output_zs) = transform
+            .apply_word_planes(admitted_xs, admitted_zs)
+            .ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled tableau transform rejected resolved word planes",
+                )
+            })?;
+        for (index, &qubit) in targets.iter().enumerate() {
+            let output_x = output_xs.get(index).copied().ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled detector-frame X output escaped inline storage",
+                )
+            })?;
+            let output_z = output_zs.get(index).copied().ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled detector-frame Z output escaped inline storage",
+                )
+            })?;
+            self.set_x_word(qubit, output_x)?;
+            self.set_z_word(qubit, output_z)?;
         }
         Ok(())
     }
@@ -499,11 +859,35 @@ impl ScalarDetectionFrame {
         if !mode.samples_noise() {
             return Ok(());
         }
+        let targets = instruction.targets();
+        if visit_sparse_categorical_events(
+            probabilities,
+            targets.len(),
+            mode.active_mask(),
+            rng,
+            |target_index, category, lane_mask| {
+                let target = targets
+                    .get(target_index)
+                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
+                let qubit = qubit_index(instruction, target)?;
+                let basis = match category {
+                    0 => PauliBasis::X,
+                    1 => PauliBasis::Y,
+                    2 => PauliBasis::Z,
+                    _ => return Err(unsupported_frame_instruction(instruction)),
+                };
+                self.apply_pauli_mask(qubit, basis, lane_mask)
+            },
+        )? {
+            return Ok(());
+        }
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
-            if let Some(basis) = sample_single_pauli(probabilities, rng) {
-                self.apply_pauli(qubit, basis)?;
-            }
+            let [x_mask, y_mask, z_mask] =
+                sample_categorical_masks(probabilities, mode.active_mask(), rng);
+            self.apply_pauli_mask(qubit, PauliBasis::X, x_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Y, y_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Z, z_mask)?;
         }
         Ok(())
     }
@@ -518,18 +902,59 @@ impl ScalarDetectionFrame {
         if !mode.samples_noise() {
             return Ok(());
         }
+        let target_groups = instruction.targets().chunks_exact(2);
+        if !target_groups.remainder().is_empty() {
+            return Err(unsupported_frame_instruction(instruction));
+        }
+        if visit_sparse_categorical_events(
+            probabilities,
+            target_groups.len(),
+            mode.active_mask(),
+            rng,
+            |target_index, category, lane_mask| {
+                let start = target_index
+                    .checked_mul(2)
+                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
+                let end = start
+                    .checked_add(2)
+                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
+                let target_group = instruction
+                    .targets()
+                    .get(start..end)
+                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
+                let [left, right] = target_group else {
+                    return Err(unsupported_frame_instruction(instruction));
+                };
+                let left = qubit_index(instruction, left)?;
+                let right = qubit_index(instruction, right)?;
+                let (left_basis, right_basis) = TWO_QUBIT_FRAME_BASES
+                    .get(category)
+                    .copied()
+                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
+                if let Some(basis) = left_basis {
+                    self.apply_pauli_mask(left, basis, lane_mask)?;
+                }
+                if let Some(basis) = right_basis {
+                    self.apply_pauli_mask(right, basis, lane_mask)?;
+                }
+                Ok(())
+            },
+        )? {
+            return Ok(());
+        }
         for target_group in instruction.targets().chunks(2) {
             let [left, right] = target_group else {
                 return Err(unsupported_frame_instruction(instruction));
             };
             let left = qubit_index(instruction, left)?;
             let right = qubit_index(instruction, right)?;
-            if let Some((left_basis, right_basis)) = sample_two_qubit_pauli(probabilities, rng) {
+            let masks = sample_categorical_masks(probabilities, mode.active_mask(), rng);
+            for ((left_basis, right_basis), mask) in TWO_QUBIT_FRAME_BASES.into_iter().zip(masks) {
                 if let Some(basis) = left_basis {
-                    self.apply_pauli(left, basis)?;
+                    self.apply_pauli_mask(left, basis, mask)?;
                 }
                 if let Some(basis) = right_basis {
-                    self.apply_pauli(right, basis)?;
+                    self.apply_pauli_mask(right, basis, mask)?;
                 }
             }
         }
@@ -545,20 +970,17 @@ impl ScalarDetectionFrame {
     ) -> DetectionResult<()> {
         if !mode.samples_noise() {
             if !else_branch {
-                self.correlated_error_occurred = false;
+                self.correlated_error_occurred = 0;
             }
             return Ok(());
         }
-        if else_branch && self.correlated_error_occurred {
-            return Ok(());
-        }
         if !else_branch {
-            self.correlated_error_occurred = false;
+            self.correlated_error_occurred = 0;
         }
-        if !sample_flip(single_probability_argument(instruction)?.get(), rng) {
-            return Ok(());
-        }
-        self.correlated_error_occurred = true;
+        let eligible = mode.active_mask() & !self.correlated_error_occurred;
+        let occurred =
+            mode.random_mask(rng, single_probability_argument(instruction)?.get()) & eligible;
+        self.correlated_error_occurred |= occurred;
         for target in instruction.targets() {
             // Pinned Stim consults only the Pauli X/Z bits here, so combiner
             // targets and inversion bits are ignored decoration
@@ -569,7 +991,11 @@ impl ScalarDetectionFrame {
             let Some(pauli) = target.pauli_type() else {
                 return Err(unsupported_frame_instruction(instruction));
             };
-            self.apply_pauli(qubit_index(instruction, target)?, pauli_basis(pauli))?;
+            self.apply_pauli_mask(
+                qubit_index(instruction, target)?,
+                pauli_basis(pauli),
+                occurred,
+            )?;
         }
         Ok(())
     }
@@ -583,21 +1009,25 @@ impl ScalarDetectionFrame {
         let probability = single_probability_argument(instruction)?.get();
         if !mode.samples_noise() {
             self.measurements
-                .extend(std::iter::repeat_n(false, instruction.targets().len()));
+                .extend(std::iter::repeat_n(0, instruction.targets().len()));
             return Ok(());
         }
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
-            let occurred = sample_flip(probability, rng);
+            let occurred = mode.random_mask(rng, probability);
             self.measurements.push(occurred);
-            if occurred {
-                match rng.random::<u8>() & 3 {
-                    1 => self.apply_pauli(qubit, PauliBasis::X)?,
-                    2 => self.apply_pauli(qubit, PauliBasis::Z)?,
-                    3 => self.apply_pauli(qubit, PauliBasis::Y)?,
-                    _ => {}
-                }
-            }
+            let mut x_mask = 0;
+            let mut y_mask = 0;
+            let mut z_mask = 0;
+            for_each_set_lane(occurred, |lane_mask| match rng.random::<u8>() & 3 {
+                1 => x_mask |= lane_mask,
+                2 => z_mask |= lane_mask,
+                3 => y_mask |= lane_mask,
+                _ => {}
+            });
+            self.apply_pauli_mask(qubit, PauliBasis::X, x_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Y, y_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Z, z_mask)?;
         }
         Ok(())
     }
@@ -611,31 +1041,18 @@ impl ScalarDetectionFrame {
         let probabilities = probability_list::<4>(instruction)?;
         if !mode.samples_noise() {
             self.measurements
-                .extend(std::iter::repeat_n(false, instruction.targets().len()));
+                .extend(std::iter::repeat_n(0, instruction.targets().len()));
             return Ok(());
         }
         for target in instruction.targets() {
             let qubit = qubit_index(instruction, target)?;
-            let mut sampled_probability = rng.random::<f64>();
-            let mut occurred = false;
-            if sampled_probability < probabilities[0] {
-                occurred = true;
-            } else {
-                sampled_probability -= probabilities[0];
-                for (basis, probability) in [
-                    (PauliBasis::X, probabilities[1]),
-                    (PauliBasis::Y, probabilities[2]),
-                    (PauliBasis::Z, probabilities[3]),
-                ] {
-                    if sampled_probability < probability {
-                        occurred = true;
-                        self.apply_pauli(qubit, basis)?;
-                        break;
-                    }
-                    sampled_probability -= probability;
-                }
-            }
+            let [identity_mask, x_mask, y_mask, z_mask] =
+                sample_categorical_masks(probabilities, mode.active_mask(), rng);
+            let occurred = identity_mask | x_mask | y_mask | z_mask;
             self.measurements.push(occurred);
+            self.apply_pauli_mask(qubit, PauliBasis::X, x_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Y, y_mask)?;
+            self.apply_pauli_mask(qubit, PauliBasis::Z, z_mask)?;
         }
         Ok(())
     }
@@ -650,17 +1067,17 @@ impl ScalarDetectionFrame {
         match basis {
             PauliBasis::I => {}
             PauliBasis::X => {
-                self.set_z_bit(qubit, false)?;
-                self.set_x_bit(qubit, mode.random_bool(rng, 0.5))?;
+                self.set_z_word(qubit, 0)?;
+                self.set_x_word(qubit, mode.random_mask(rng, 0.5))?;
             }
             PauliBasis::Y => {
-                let bit = mode.random_bool(rng, 0.5);
-                self.set_z_bit(qubit, bit)?;
-                self.set_x_bit(qubit, bit)?;
+                let bit = mode.random_mask(rng, 0.5);
+                self.set_z_word(qubit, bit)?;
+                self.set_x_word(qubit, bit)?;
             }
             PauliBasis::Z => {
-                self.set_x_bit(qubit, false)?;
-                self.set_z_bit(qubit, mode.random_bool(rng, 0.5))?;
+                self.set_x_word(qubit, 0)?;
+                self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
             }
         }
         Ok(())
@@ -672,18 +1089,18 @@ impl ScalarDetectionFrame {
         basis: PauliBasis,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_>,
-    ) -> DetectionResult<bool> {
+    ) -> DetectionResult<u64> {
         let result = self.frame_measurement_bit(qubit, basis)?;
         self.randomize_measured_basis(qubit, basis, rng, mode)?;
         Ok(result)
     }
 
-    fn frame_measurement_bit(&self, qubit: usize, basis: PauliBasis) -> DetectionResult<bool> {
+    fn frame_measurement_bit(&self, qubit: usize, basis: PauliBasis) -> DetectionResult<u64> {
         match basis {
-            PauliBasis::I => Ok(false),
-            PauliBasis::X => self.z_bit(qubit),
-            PauliBasis::Y => Ok(self.x_bit(qubit)? ^ self.z_bit(qubit)?),
-            PauliBasis::Z => self.x_bit(qubit),
+            PauliBasis::I => Ok(0),
+            PauliBasis::X => self.z_word(qubit),
+            PauliBasis::Y => Ok(self.x_word(qubit)? ^ self.z_word(qubit)?),
+            PauliBasis::Z => self.x_word(qubit),
         }
     }
 
@@ -696,32 +1113,37 @@ impl ScalarDetectionFrame {
     ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
-            PauliBasis::X => self.set_x_bit(qubit, mode.random_bool(rng, 0.5))?,
+            PauliBasis::X => self.set_x_word(qubit, mode.random_mask(rng, 0.5))?,
             PauliBasis::Y => {
-                let result = self.x_bit(qubit)? ^ self.z_bit(qubit)?;
-                let z = mode.random_bool(rng, 0.5);
-                self.set_z_bit(qubit, z)?;
-                self.set_x_bit(qubit, result ^ z)?;
+                let result = self.x_word(qubit)? ^ self.z_word(qubit)?;
+                let z = mode.random_mask(rng, 0.5);
+                self.set_z_word(qubit, z)?;
+                self.set_x_word(qubit, result ^ z)?;
             }
-            PauliBasis::Z => self.set_z_bit(qubit, mode.random_bool(rng, 0.5))?,
+            PauliBasis::Z => self.set_z_word(qubit, mode.random_mask(rng, 0.5))?,
         }
         Ok(())
     }
 
-    fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) -> DetectionResult<()> {
+    fn apply_pauli_mask(
+        &mut self,
+        qubit: usize,
+        basis: PauliBasis,
+        mask: u64,
+    ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
-            PauliBasis::X => self.xor_x_bit(qubit, true)?,
+            PauliBasis::X => self.xor_x_word(qubit, mask)?,
             PauliBasis::Y => {
-                self.xor_x_bit(qubit, true)?;
-                self.xor_z_bit(qubit, true)?;
+                self.xor_x_word(qubit, mask)?;
+                self.xor_z_word(qubit, mask)?;
             }
-            PauliBasis::Z => self.xor_z_bit(qubit, true)?,
+            PauliBasis::Z => self.xor_z_word(qubit, mask)?,
         }
         Ok(())
     }
 
-    fn pauli_target_frame_bit(&self, target: &Target) -> DetectionResult<bool> {
+    fn pauli_target_frame_bit(&self, target: &Target) -> DetectionResult<u64> {
         let qubit = target.qubit_id().ok_or_else(|| {
             DetectionError::invalid_result_format(format!(
                 "OBSERVABLE_INCLUDE Pauli target {target} has no qubit id"
@@ -734,40 +1156,42 @@ impl ScalarDetectionFrame {
             ))
         })?;
         match target.pauli_type() {
-            Some(Pauli::X) => self.z_bit(qubit),
-            Some(Pauli::Y) => Ok(self.x_bit(qubit)? ^ self.z_bit(qubit)?),
-            Some(Pauli::Z) => self.x_bit(qubit),
+            Some(Pauli::X) => self.z_word(qubit),
+            Some(Pauli::Y) => Ok(self.x_word(qubit)? ^ self.z_word(qubit)?),
+            Some(Pauli::Z) => self.x_word(qubit),
             None => Err(DetectionError::invalid_result_format(format!(
                 "OBSERVABLE_INCLUDE target {target} is not a Pauli target"
             ))),
         }
     }
 
-    fn qubit_basis(&self, qubit: usize) -> DetectionResult<PauliBasis> {
-        Ok(PauliBasis::from_xz(self.x_bit(qubit)?, self.z_bit(qubit)?))
+    #[inline(always)]
+    fn x_word(&self, qubit: usize) -> DetectionResult<u64> {
+        frame_word(&self.xs, qubit)
     }
 
-    fn x_bit(&self, qubit: usize) -> DetectionResult<bool> {
-        frame_bit(&self.xs, qubit)
+    #[inline(always)]
+    fn z_word(&self, qubit: usize) -> DetectionResult<u64> {
+        frame_word(&self.zs, qubit)
     }
 
-    fn z_bit(&self, qubit: usize) -> DetectionResult<bool> {
-        frame_bit(&self.zs, qubit)
+    #[inline(always)]
+    fn set_x_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
+        set_frame_word(&mut self.xs, qubit, value)
     }
 
-    fn set_x_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
-        set_frame_bit(&mut self.xs, qubit, value)
+    #[inline(always)]
+    fn set_z_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
+        set_frame_word(&mut self.zs, qubit, value)
     }
 
-    fn set_z_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
-        set_frame_bit(&mut self.zs, qubit, value)
+    #[inline(always)]
+    fn xor_x_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
+        xor_frame_word(&mut self.xs, qubit, value)
     }
 
-    fn xor_x_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
-        xor_frame_bit(&mut self.xs, qubit, value)
-    }
-
-    fn xor_z_bit(&mut self, qubit: usize, value: bool) -> DetectionResult<()> {
-        xor_frame_bit(&mut self.zs, qubit, value)
+    #[inline(always)]
+    fn xor_z_word(&mut self, qubit: usize, value: u64) -> DetectionResult<()> {
+        xor_frame_word(&mut self.zs, qubit, value)
     }
 }

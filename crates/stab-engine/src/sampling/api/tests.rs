@@ -150,13 +150,8 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
 }
 
 #[test]
-fn direct_small_and_general_variants_match_the_previous_general_frame_stream() {
-    let fixtures = [
-        ("X_ERROR(0.25) 0\nM(0.125) 0\n", 1),
-        ("H 0\nCX 0 1\nM 0 1\n", 2),
-        ("H 0\nH 0\nM !0\n", 2),
-        ("SWAP 0 1\nH 0\nM 0 1\n", 3),
-    ];
+fn direct_z_variant_matches_the_general_frame_stream() {
+    let fixtures = [("X_ERROR(0.25) 0\nM(0.125) 0\n", 1)];
 
     for (source, expected_discriminator) in fixtures {
         let circuit = Circuit::from_stim_str(source).expect("parse fixture");
@@ -205,6 +200,77 @@ fn direct_small_and_general_variants_match_the_previous_general_frame_stream() {
             assert_eq!(sink.records, expected, "{source:?} {reference_mode:?}");
         }
     }
+}
+
+#[test]
+fn pauli_frame_preserves_reference_modes_and_seeded_partitions() {
+    let circuit = Circuit::from_stim_str("X 9\nM 9\nR 9\nH 9\nX_ERROR(0.25) 9\nM 9\n")
+        .expect("parse fixture");
+    let plan = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile fixture");
+    assert_eq!(plan.inner.kind.executable_discriminator(), 4);
+
+    let mut with_reference = plan
+        .session_with_reference_mode(
+            RandomPolicy::Seeded(Seed::new(43)),
+            ReferenceSampleMode::UseReferenceSample,
+        )
+        .expect("construct reference session");
+    let mut without_reference = plan
+        .session_with_reference_mode(
+            RandomPolicy::Seeded(Seed::new(43)),
+            ReferenceSampleMode::SkipReferenceSample,
+        )
+        .expect("construct skip-reference session");
+    let mut physical = RecordSink::default();
+    let mut deviations = RecordSink::default();
+    with_reference
+        .run(ShotCount::new(130), &mut physical)
+        .expect("sample physical records");
+    without_reference
+        .run(ShotCount::new(130), &mut deviations)
+        .expect("sample deviation records");
+    assert!(
+        physical
+            .records
+            .iter()
+            .all(|record| record.first().copied() == Some(true))
+    );
+    assert!(
+        deviations
+            .records
+            .iter()
+            .all(|record| record.first().copied() == Some(false))
+    );
+    assert!(physical.records.iter().zip(&deviations.records).all(
+        |(physical, deviation)| matches!(
+            (physical.get(1), deviation.get(1)),
+            (Some(physical), Some(deviation)) if physical == deviation
+        )
+    ));
+
+    let mut combined_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(47)))
+        .expect("construct combined session");
+    let mut partitioned_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(47)))
+        .expect("construct partitioned session");
+    let mut combined = RecordSink::default();
+    combined_session
+        .run(ShotCount::new(130), &mut combined)
+        .expect("sample combined stream");
+    let mut first = RecordSink::default();
+    let mut second = RecordSink::default();
+    partitioned_session
+        .run(ShotCount::new(17), &mut first)
+        .expect("sample first partition");
+    partitioned_session
+        .run(ShotCount::new(113), &mut second)
+        .expect("sample second partition");
+    first.records.extend(second.records);
+    assert_eq!(partitioned_session.total_committed_shots().get(), 130);
+    assert_eq!(combined.records, first.records);
 }
 
 #[test]

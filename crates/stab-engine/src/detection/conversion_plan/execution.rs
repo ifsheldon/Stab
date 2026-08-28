@@ -1,6 +1,7 @@
 use stab_model::{MeasureRecordOffset, RepeatNestingLimit};
+use std::ops::{BitXor, BitXorAssign};
 
-use crate::detection::{DetectionError, DetectionRecordBuffer, DetectionResult};
+use crate::detection::{DetectionError, DetectionResult};
 
 use super::{
     ConversionOperation, compilation_overflow, compilation_shape_mismatch,
@@ -8,8 +9,8 @@ use super::{
 };
 
 #[derive(Clone, Copy)]
-pub(super) enum MeasurementValues<'a> {
-    Difference(&'a [bool]),
+pub(super) enum RecordValues<'a, Value> {
+    Values(&'a [Value]),
     Zero,
 }
 
@@ -34,13 +35,17 @@ impl RepeatExecutionFrame {
     };
 }
 
-pub(super) fn execute_program(
+pub(super) fn execute_program<Value>(
     program: &[ConversionOperation],
-    measurements: MeasurementValues<'_>,
-    reference_sample: &[bool],
-    record: &mut DetectionRecordBuffer,
+    measurements: RecordValues<'_, Value>,
+    reference_sample: RecordValues<'_, Value>,
+    detectors: &mut [Value],
+    observables: &mut [Value],
     cursor: &mut ConversionCursor,
-) -> DetectionResult<()> {
+) -> DetectionResult<()>
+where
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+{
     let mut repeat_stack = [RepeatExecutionFrame::EMPTY; RepeatNestingLimit::HARD_MAX];
     let mut repeat_depth = 0_usize;
     let mut program_counter = 0_usize;
@@ -56,7 +61,7 @@ pub(super) fn execute_program(
             ConversionOperation::Detector(terms) => {
                 let value =
                     parity_of_terms(terms, cursor.measurement, measurements, reference_sample)?;
-                let detector = record.detectors.get_mut(cursor.detector).ok_or_else(|| {
+                let detector = detectors.get_mut(cursor.detector).ok_or_else(|| {
                     DetectionError::invalid_sampler_compilation(format!(
                         "compact conversion detector index {} is out of range",
                         cursor.detector
@@ -72,7 +77,7 @@ pub(super) fn execute_program(
             ConversionOperation::Observable { id, terms } => {
                 let value =
                     parity_of_terms(terms, cursor.measurement, measurements, reference_sample)?;
-                let observable = record.observables.get_mut(*id).ok_or_else(|| {
+                let observable = observables.get_mut(*id).ok_or_else(|| {
                     DetectionError::invalid_sampler_compilation(format!(
                         "compact conversion observable index {id} is out of range"
                     ))
@@ -171,29 +176,33 @@ fn next_program_counter(program_counter: usize) -> DetectionResult<usize> {
         .ok_or_else(compilation_overflow)
 }
 
-fn parity_of_terms(
+fn parity_of_terms<Value>(
     terms: &[MeasureRecordOffset],
     measurement_cursor: usize,
-    measurements: MeasurementValues<'_>,
-    reference_sample: &[bool],
-) -> DetectionResult<bool> {
-    let mut parity = false;
+    measurements: RecordValues<'_, Value>,
+    reference_sample: RecordValues<'_, Value>,
+) -> DetectionResult<Value>
+where
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+{
+    let mut parity = Value::default();
     for offset in terms {
         let index = measurement_index_from_offset(measurement_cursor, *offset)?;
-        let reference = reference_sample.get(index).copied().ok_or_else(|| {
-            DetectionError::invalid_result_format(format!(
-                "reference sample index {index} is out of range"
-            ))
-        })?;
+        let reference = match reference_sample {
+            RecordValues::Values(record) => record.get(index).copied().ok_or_else(|| {
+                DetectionError::invalid_result_format(format!(
+                    "reference sample index {index} is out of range"
+                ))
+            })?,
+            RecordValues::Zero => Value::default(),
+        };
         let measurement = match measurements {
-            MeasurementValues::Difference(record) => {
-                record.get(index).copied().ok_or_else(|| {
-                    DetectionError::invalid_result_format(format!(
-                        "measurement index {index} is out of range"
-                    ))
-                })?
-            }
-            MeasurementValues::Zero => false,
+            RecordValues::Values(record) => record.get(index).copied().ok_or_else(|| {
+                DetectionError::invalid_result_format(format!(
+                    "measurement index {index} is out of range"
+                ))
+            })?,
+            RecordValues::Zero => Value::default(),
         };
         parity ^= measurement ^ reference;
     }

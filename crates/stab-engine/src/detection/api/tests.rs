@@ -537,6 +537,19 @@ fn automatic_fused_and_direct_sampling_match_legacy_materialization() {
 }
 
 #[test]
+fn automatic_detection_sampling_uses_the_direct_frame_for_ordinary_circuits() {
+    let circuit = circuit("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n");
+    let plan = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile detection sampling");
+
+    assert!(matches!(
+        plan.inner.kind,
+        DetectionSamplingPlanKind::DirectDetectorFrame(_)
+    ));
+}
+
+#[test]
 fn private_direct_and_fused_variants_agree_on_deterministic_circuit() {
     let circuit = circuit("R 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n");
     let compiler = DetectionSamplingCompiler::new();

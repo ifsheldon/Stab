@@ -13,9 +13,7 @@ use super::{
 
 mod execution;
 
-use self::execution::{
-    ConversionCursor, MeasurementValues, execute_program, validate_repeat_marker,
-};
+use self::execution::{ConversionCursor, RecordValues, execute_program, validate_repeat_marker};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ConversionOperation {
@@ -94,7 +92,6 @@ impl ConversionPlan {
         circuit: &Circuit,
         limits: DetectionConversionLimits,
     ) -> DetectionResult<Self> {
-        super::circuit_requires_detector_frame(circuit)?;
         Self::admission_from_visitor(limits, |plan| plan.visit_circuit(circuit, 0))
     }
 
@@ -965,8 +962,8 @@ impl ConversionPlan {
         record: &mut DetectionRecordBuffer,
     ) -> DetectionResult<()> {
         self.execute_record(
-            MeasurementValues::Difference(measurement_record),
-            reference_sample,
+            RecordValues::Values(measurement_record),
+            RecordValues::Values(reference_sample),
             record,
         )
     }
@@ -977,13 +974,17 @@ impl ConversionPlan {
         record: &mut DetectionRecordBuffer,
     ) -> DetectionResult<()> {
         super::reference::validate_reference_sample_len(reference_sample, self.measurement_count)?;
-        self.execute_record(MeasurementValues::Zero, reference_sample, record)
+        self.execute_record(
+            RecordValues::Zero,
+            RecordValues::Values(reference_sample),
+            record,
+        )
     }
 
     fn execute_record(
         &self,
-        measurements: MeasurementValues<'_>,
-        reference_sample: &[bool],
+        measurements: RecordValues<'_, bool>,
+        reference_sample: RecordValues<'_, bool>,
         record: &mut DetectionRecordBuffer,
     ) -> DetectionResult<()> {
         record.detectors.resize(self.detector_count, false);
@@ -995,12 +996,48 @@ impl ConversionPlan {
             &self.program,
             measurements,
             reference_sample,
-            record,
+            &mut record.detectors,
+            &mut record.observables,
             &mut cursor,
         )?;
         if cursor.measurement != self.measurement_count || cursor.detector != self.detector_count {
             return Err(DetectionError::invalid_sampler_compilation(format!(
                 "compact conversion finished at measurement {} and detector {}, expected {} and {}",
+                cursor.measurement, cursor.detector, self.measurement_count, self.detector_count
+            )));
+        }
+        Ok(())
+    }
+
+    pub(super) fn convert_word_planes_into(
+        &self,
+        measurement_planes: &[u64],
+        detector_planes: &mut Vec<u64>,
+        observable_planes: &mut Vec<u64>,
+    ) -> DetectionResult<()> {
+        if measurement_planes.len() != self.measurement_count {
+            return Err(DetectionError::invalid_result_format(format!(
+                "measurement plane count {} does not match the compiled width {}",
+                measurement_planes.len(),
+                self.measurement_count
+            )));
+        }
+        detector_planes.resize(self.detector_count, 0);
+        detector_planes.fill(0);
+        observable_planes.resize(self.observable_count, 0);
+        observable_planes.fill(0);
+        let mut cursor = ConversionCursor::default();
+        execute_program(
+            &self.program,
+            RecordValues::Values(measurement_planes),
+            RecordValues::Zero,
+            detector_planes,
+            observable_planes,
+            &mut cursor,
+        )?;
+        if cursor.measurement != self.measurement_count || cursor.detector != self.detector_count {
+            return Err(DetectionError::invalid_sampler_compilation(format!(
+                "compact word conversion finished at measurement {} and detector {}, expected {} and {}",
                 cursor.measurement, cursor.detector, self.measurement_count, self.detector_count
             )));
         }

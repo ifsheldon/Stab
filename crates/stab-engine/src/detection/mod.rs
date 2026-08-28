@@ -2,12 +2,11 @@ mod api;
 mod buffers;
 mod conversion_plan;
 mod error;
-mod frame;
+pub(crate) mod frame;
 mod limits;
 mod prepared;
 mod reference;
 mod reference_signs;
-mod requirements;
 
 pub use api::{
     DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
@@ -29,7 +28,6 @@ use error::DetectionResult;
 use frame::{DetectorFrameState, SweepCorrectionPlan, admit_combined_compiled_storage};
 use prepared::PreparedDetectionSampling;
 use reference::ReferenceSampleSource;
-use requirements::circuit_requires_detector_frame;
 use stab_model::Circuit;
 
 use crate::{CompilationDescriptor, CompilationOperation, SamplingCompiler};

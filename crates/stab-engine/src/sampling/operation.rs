@@ -159,13 +159,6 @@ impl SampleProgram {
         self.entries.len()
     }
 
-    pub(super) fn executable_operations(&self) -> impl Iterator<Item = &SampleOperation> {
-        self.entries.iter().filter_map(|entry| match entry {
-            SampleProgramEntry::Execute(operation) => Some(operation),
-            SampleProgramEntry::Repeat { .. } | SampleProgramEntry::EndRepeat => None,
-        })
-    }
-
     pub(super) fn cursor(&self) -> SampleProgramCursor<'_> {
         SampleProgramCursor::new(&self.entries, 0, self.entries.len())
     }

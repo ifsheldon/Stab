@@ -115,7 +115,7 @@ impl SamplingPlan {
                 record.push(direct.reference_bit());
             }
             (
-                SamplingPlanKind::SmallFrame | SamplingPlanKind::GeneralFrame,
+                SamplingPlanKind::PauliFrame(_) | SamplingPlanKind::GeneralFrame,
                 ReferenceSampleScratchKind::General {
                     rng,
                     frame,

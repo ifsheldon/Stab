@@ -1,18 +1,28 @@
-use rand::{Rng, RngExt as _};
 use stab_algebra::PauliBasis;
 use stab_model::{
     CircuitInstruction, GateCategory, MeasureRecordOffset, Pauli, Probability, QubitId, Target,
 };
 
-use super::super::error::{DetectionError, DetectionResult};
+use super::super::{
+    error::{DetectionError, DetectionResult},
+    try_vec_with_capacity,
+};
 
-pub(super) fn frame_bit(bits: &[bool], qubit: usize) -> DetectionResult<bool> {
+pub(super) fn try_zero_words(len: usize, context: &'static str) -> DetectionResult<Vec<u64>> {
+    let mut words = try_vec_with_capacity(len, context)?;
+    words.resize(len, 0);
+    Ok(words)
+}
+
+#[inline(always)]
+pub(super) fn frame_word(bits: &[u64], qubit: usize) -> DetectionResult<u64> {
     bits.get(qubit)
         .copied()
         .ok_or_else(|| frame_qubit_out_of_range(qubit))
 }
 
-pub(super) fn set_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> DetectionResult<()> {
+#[inline(always)]
+pub(super) fn set_frame_word(bits: &mut [u64], qubit: usize, value: u64) -> DetectionResult<()> {
     let bit = bits
         .get_mut(qubit)
         .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
@@ -20,7 +30,8 @@ pub(super) fn set_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> Det
     Ok(())
 }
 
-pub(super) fn xor_frame_bit(bits: &mut [bool], qubit: usize, value: bool) -> DetectionResult<()> {
+#[inline(always)]
+pub(super) fn xor_frame_word(bits: &mut [u64], qubit: usize, value: u64) -> DetectionResult<()> {
     let bit = bits
         .get_mut(qubit)
         .ok_or_else(|| frame_qubit_out_of_range(qubit))?;
@@ -34,10 +45,10 @@ fn frame_qubit_out_of_range(qubit: usize) -> DetectionError {
     ))
 }
 
-pub(super) fn measurement_record_bit(
-    measurements: &[bool],
+pub(super) fn measurement_record_word(
+    measurements: &[u64],
     offset: MeasureRecordOffset,
-) -> DetectionResult<bool> {
+) -> DetectionResult<u64> {
     let len = i64::try_from(measurements.len())
         .map_err(|_| DetectionError::invalid_result_format("measurement count does not fit i64"))?;
     let index = len + i64::from(offset.get());
@@ -53,10 +64,6 @@ pub(super) fn measurement_record_bit(
             offset.stim_text()
         ))
     })
-}
-
-pub(super) fn sample_flip(probability: f64, rng: &mut impl Rng) -> bool {
-    rng.random::<f64>() < probability
 }
 
 pub(super) fn single_probability_argument(
@@ -130,39 +137,7 @@ pub(super) fn pauli_basis(pauli: Pauli) -> PauliBasis {
     }
 }
 
-pub(super) fn sample_single_pauli(
-    probabilities: [f64; 3],
-    rng: &mut impl Rng,
-) -> Option<PauliBasis> {
-    let mut sampled_probability = rng.random::<f64>();
-    for (basis, probability) in [
-        (PauliBasis::X, probabilities[0]),
-        (PauliBasis::Y, probabilities[1]),
-        (PauliBasis::Z, probabilities[2]),
-    ] {
-        if sampled_probability < probability {
-            return Some(basis);
-        }
-        sampled_probability -= probability;
-    }
-    None
-}
-
-pub(super) fn sample_two_qubit_pauli(
-    probabilities: [f64; 15],
-    rng: &mut impl Rng,
-) -> Option<(Option<PauliBasis>, Option<PauliBasis>)> {
-    let mut sampled_probability = rng.random::<f64>();
-    for (bases, probability) in TWO_QUBIT_FRAME_BASES.into_iter().zip(probabilities) {
-        if sampled_probability < probability {
-            return Some(bases);
-        }
-        sampled_probability -= probability;
-    }
-    None
-}
-
-const TWO_QUBIT_FRAME_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
+pub(super) const TWO_QUBIT_FRAME_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
     (None, Some(PauliBasis::X)),
     (None, Some(PauliBasis::Y)),
     (None, Some(PauliBasis::Z)),

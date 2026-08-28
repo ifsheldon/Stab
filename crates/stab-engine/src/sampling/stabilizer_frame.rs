@@ -59,6 +59,7 @@ struct LocalTableauOutput {
 #[derive(Clone, Debug)]
 pub(super) struct StabilizerFrame {
     qubit_count: usize,
+    destabilizers: Vec<StabilizerGenerator>,
     generators: Vec<StabilizerGenerator>,
     observable_scratch: StabilizerGenerator,
     pivot_scratch: StabilizerGenerator,
@@ -155,8 +156,12 @@ impl StabilizerFrame {
         let generators = (0..qubit_count)
             .map(|qubit| StabilizerGenerator::single(qubit_count, qubit, PauliBasis::Z, false))
             .collect();
+        let destabilizers = (0..qubit_count)
+            .map(|qubit| StabilizerGenerator::single(qubit_count, qubit, PauliBasis::X, false))
+            .collect();
         Self {
             qubit_count,
+            destabilizers,
             generators,
             observable_scratch: StabilizerGenerator::identity(qubit_count),
             pivot_scratch: StabilizerGenerator::identity(qubit_count),
@@ -178,8 +183,21 @@ impl StabilizerFrame {
                 false,
             )?);
         }
+        let mut destabilizers = Vec::new();
+        destabilizers
+            .try_reserve_exact(qubit_count)
+            .map_err(|_| FrameStorageError::new("destabilizer generators", qubit_count))?;
+        for qubit in 0..qubit_count {
+            destabilizers.push(StabilizerGenerator::try_single(
+                qubit_count,
+                qubit,
+                PauliBasis::X,
+                false,
+            )?);
+        }
         Ok(Self {
             qubit_count,
+            destabilizers,
             generators,
             observable_scratch: StabilizerGenerator::try_identity(qubit_count)?,
             pivot_scratch: StabilizerGenerator::try_identity(qubit_count)?,
@@ -191,6 +209,7 @@ impl StabilizerFrame {
     pub(super) fn try_new_unknown(qubit_count: usize) -> Result<Self, FrameStorageError> {
         Ok(Self {
             qubit_count,
+            destabilizers: Vec::new(),
             generators: Vec::new(),
             observable_scratch: StabilizerGenerator::try_identity(qubit_count)?,
             pivot_scratch: StabilizerGenerator::try_identity(qubit_count)?,
@@ -214,6 +233,17 @@ impl StabilizerFrame {
         for (qubit, generator) in self.generators.iter_mut().enumerate() {
             generator.reset_to_single(self.qubit_count, qubit, PauliBasis::Z, false);
         }
+        if self.destabilizers.len() != self.qubit_count {
+            self.destabilizers = (0..self.qubit_count)
+                .map(|qubit| {
+                    StabilizerGenerator::single(self.qubit_count, qubit, PauliBasis::X, false)
+                })
+                .collect();
+        } else {
+            for (qubit, generator) in self.destabilizers.iter_mut().enumerate() {
+                generator.reset_to_single(self.qubit_count, qubit, PauliBasis::X, false);
+            }
+        }
     }
 
     pub(super) fn apply_tableau(&mut self, targets: &[usize], transform: &LocalTableauTransform) {
@@ -225,10 +255,16 @@ impl StabilizerFrame {
                 for generator in &mut self.generators {
                     generator.apply_single_qubit_tableau(*target, transform);
                 }
+                for generator in &mut self.destabilizers {
+                    generator.apply_single_qubit_tableau(*target, transform);
+                }
                 return;
             }
             [left, right] => {
                 for generator in &mut self.generators {
+                    generator.apply_two_qubit_tableau(*left, *right, transform);
+                }
+                for generator in &mut self.destabilizers {
                     generator.apply_two_qubit_tableau(*left, *right, transform);
                 }
                 return;
@@ -238,10 +274,16 @@ impl StabilizerFrame {
         for generator in &mut self.generators {
             generator.apply_tableau(targets, transform);
         }
+        for generator in &mut self.destabilizers {
+            generator.apply_tableau(targets, transform);
+        }
     }
 
     pub(super) fn apply_hadamard(&mut self, qubit: usize) {
         for generator in &mut self.generators {
+            generator.apply_hadamard(qubit);
+        }
+        for generator in &mut self.destabilizers {
             generator.apply_hadamard(qubit);
         }
     }
@@ -250,10 +292,16 @@ impl StabilizerFrame {
         for generator in &mut self.generators {
             generator.apply_controlled_x(control, target);
         }
+        for generator in &mut self.destabilizers {
+            generator.apply_controlled_x(control, target);
+        }
     }
 
     pub(super) fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
         for generator in &mut self.generators {
+            generator.apply_pauli(qubit, basis);
+        }
+        for generator in &mut self.destabilizers {
             generator.apply_pauli(qubit, basis);
         }
     }
@@ -352,6 +400,14 @@ impl StabilizerFrame {
                     generator.multiply_assign(&pivot);
                 }
             }
+            for (index, destabilizer) in self.destabilizers.iter_mut().enumerate() {
+                if index != pivot_index && !destabilizer.commutes_with(observable) {
+                    destabilizer.multiply_assign(&pivot);
+                }
+            }
+            if let Some(destabilizer) = self.destabilizers.get_mut(pivot_index) {
+                destabilizer.copy_from_generator(&pivot);
+            }
             if let Some(generator) = self.generators.get_mut(pivot_index) {
                 generator.copy_from_generator(observable);
                 generator.negative ^= sampled;
@@ -359,6 +415,7 @@ impl StabilizerFrame {
             pivot.reset_to_identity(self.qubit_count);
             self.pivot_scratch = pivot;
         } else {
+            self.destabilizers.clear();
             let mut collapsed = std::mem::take(&mut self.collapsed_scratch);
             collapsed.copy_from_generator(observable);
             collapsed.negative ^= sampled;
@@ -393,11 +450,36 @@ impl StabilizerFrame {
             };
         }
 
-        let Some(product_negative) =
-            self.span_scratch
-                .solve_negative(&self.generators, observable, self.qubit_count)
-        else {
-            return MeasurementOutcome::Random { pivot_index: None };
+        let dual_basis_result = if self.generators.len() == self.qubit_count
+            && self.destabilizers.len() == self.qubit_count
+        {
+            let mut product = std::mem::take(&mut self.collapsed_scratch);
+            product.reset_to_identity(self.qubit_count);
+            for (destabilizer, generator) in self.destabilizers.iter().zip(&self.generators) {
+                if !destabilizer.commutes_with(observable) {
+                    product.multiply_assign(generator);
+                }
+            }
+            let matches = product.same_bases_as(observable);
+            let negative = product.negative;
+            product.reset_to_identity(self.qubit_count);
+            self.collapsed_scratch = product;
+            matches.then_some(negative)
+        } else {
+            None
+        };
+        let product_negative = match dual_basis_result {
+            Some(product_negative) => product_negative,
+            None => {
+                let Some(product_negative) = self.span_scratch.solve_negative(
+                    &self.generators,
+                    observable,
+                    self.qubit_count,
+                ) else {
+                    return MeasurementOutcome::Random { pivot_index: None };
+                };
+                product_negative
+            }
         };
         MeasurementOutcome::Deterministic(product_negative ^ observable.negative)
     }
@@ -417,26 +499,36 @@ fn random_measurement_bit(rng: &mut impl Rng, randomness: MeasurementRandomness)
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct StabilizerGenerator {
     negative: bool,
-    bases: Vec<PauliBasis>,
+    qubit_count: usize,
+    xs: Vec<u64>,
+    zs: Vec<u64>,
 }
 
 impl StabilizerGenerator {
     fn identity(qubit_count: usize) -> Self {
         Self {
             negative: false,
-            bases: vec![PauliBasis::I; qubit_count],
+            qubit_count,
+            xs: vec![0; word_count(qubit_count)],
+            zs: vec![0; word_count(qubit_count)],
         }
     }
 
     fn try_identity(qubit_count: usize) -> Result<Self, FrameStorageError> {
-        let mut bases = Vec::new();
-        bases
-            .try_reserve_exact(qubit_count)
-            .map_err(|_| FrameStorageError::new("stabilizer generator bases", qubit_count))?;
-        bases.resize(qubit_count, PauliBasis::I);
+        let words = word_count(qubit_count);
+        let mut xs = Vec::new();
+        xs.try_reserve_exact(words)
+            .map_err(|_| FrameStorageError::new("stabilizer generator X words", words))?;
+        xs.resize(words, 0);
+        let mut zs = Vec::new();
+        zs.try_reserve_exact(words)
+            .map_err(|_| FrameStorageError::new("stabilizer generator Z words", words))?;
+        zs.resize(words, 0);
         Ok(Self {
             negative: false,
-            bases,
+            qubit_count,
+            xs,
+            zs,
         })
     }
 
@@ -467,21 +559,30 @@ impl StabilizerGenerator {
         negative: bool,
     ) {
         self.negative = negative;
-        self.bases.resize(qubit_count, PauliBasis::I);
-        self.bases.fill(PauliBasis::I);
+        self.qubit_count = qubit_count;
+        self.xs.resize(word_count(qubit_count), 0);
+        self.zs.resize(word_count(qubit_count), 0);
+        self.xs.fill(0);
+        self.zs.fill(0);
         self.set_basis(qubit, basis);
     }
 
     fn reset_to_identity(&mut self, qubit_count: usize) {
         self.negative = false;
-        self.bases.resize(qubit_count, PauliBasis::I);
-        self.bases.fill(PauliBasis::I);
+        self.qubit_count = qubit_count;
+        self.xs.resize(word_count(qubit_count), 0);
+        self.zs.resize(word_count(qubit_count), 0);
+        self.xs.fill(0);
+        self.zs.fill(0);
     }
 
     fn copy_from_generator(&mut self, source: &Self) {
         self.negative = source.negative;
-        self.bases.resize(source.bases.len(), PauliBasis::I);
-        self.bases.copy_from_slice(&source.bases);
+        self.qubit_count = source.qubit_count;
+        self.xs.resize(source.xs.len(), 0);
+        self.zs.resize(source.zs.len(), 0);
+        self.xs.copy_from_slice(&source.xs);
+        self.zs.copy_from_slice(&source.zs);
     }
 
     fn multiply_single_assign(&mut self, qubit: usize, basis: PauliBasis) {
@@ -494,14 +595,28 @@ impl StabilizerGenerator {
         self.negative = (log_i & 2) != 0;
     }
 
+    #[inline(always)]
     fn basis(&self, qubit: usize) -> PauliBasis {
-        self.bases.get(qubit).copied().unwrap_or(PauliBasis::I)
+        if qubit >= self.qubit_count {
+            return PauliBasis::I;
+        }
+        let word = qubit / u64::BITS as usize;
+        let mask = 1_u64 << (qubit % u64::BITS as usize);
+        PauliBasis::from_xz(
+            self.xs.get(word).is_some_and(|bits| bits & mask != 0),
+            self.zs.get(word).is_some_and(|bits| bits & mask != 0),
+        )
     }
 
+    #[inline(always)]
     fn set_basis(&mut self, qubit: usize, basis: PauliBasis) {
-        if let Some(slot) = self.bases.get_mut(qubit) {
-            *slot = basis;
+        if qubit >= self.qubit_count {
+            return;
         }
+        let word = qubit / u64::BITS as usize;
+        let mask = 1_u64 << (qubit % u64::BITS as usize);
+        set_word_bit(&mut self.xs, word, mask, basis.x_bit());
+        set_word_bit(&mut self.zs, word, mask, basis.z_bit());
     }
 
     fn apply_tableau(&mut self, targets: &[usize], transform: &LocalTableauTransform) {
@@ -546,29 +661,64 @@ impl StabilizerGenerator {
         }
     }
 
+    #[inline(always)]
     fn apply_hadamard(&mut self, qubit: usize) {
-        let basis = self.basis(qubit);
-        if basis == PauliBasis::Y {
+        if qubit >= self.qubit_count {
+            return;
+        }
+        let word = qubit / u64::BITS as usize;
+        let mask = 1_u64 << (qubit % u64::BITS as usize);
+        let Some(x_word) = self.xs.get_mut(word) else {
+            return;
+        };
+        let Some(z_word) = self.zs.get_mut(word) else {
+            return;
+        };
+        let x = *x_word & mask != 0;
+        let z = *z_word & mask != 0;
+        if x && z {
             self.negative = !self.negative;
         }
-        self.set_basis(qubit, PauliBasis::from_xz(basis.z_bit(), basis.x_bit()));
+        if x != z {
+            *x_word ^= mask;
+            *z_word ^= mask;
+        }
     }
 
+    #[inline(always)]
     fn apply_controlled_x(&mut self, control: usize, target: usize) {
-        let control_basis = self.basis(control);
-        let target_basis = self.basis(target);
-        let control_x = control_basis.x_bit();
-        let control_z = control_basis.z_bit();
-        let target_x = target_basis.x_bit();
-        let target_z = target_basis.z_bit();
+        if control >= self.qubit_count || target >= self.qubit_count {
+            return;
+        }
+        let control_word = control / u64::BITS as usize;
+        let target_word = target / u64::BITS as usize;
+        let control_mask = 1_u64 << (control % u64::BITS as usize);
+        let target_mask = 1_u64 << (target % u64::BITS as usize);
+        let control_x = self
+            .xs
+            .get(control_word)
+            .is_some_and(|word| word & control_mask != 0);
+        let control_z = self
+            .zs
+            .get(control_word)
+            .is_some_and(|word| word & control_mask != 0);
+        let target_x = self
+            .xs
+            .get(target_word)
+            .is_some_and(|word| word & target_mask != 0);
+        let target_z = self
+            .zs
+            .get(target_word)
+            .is_some_and(|word| word & target_mask != 0);
         if control_x && target_z && !(target_x ^ control_z) {
             self.negative = !self.negative;
         }
-        self.set_basis(
-            control,
-            PauliBasis::from_xz(control_x, control_z ^ target_z),
-        );
-        self.set_basis(target, PauliBasis::from_xz(target_x ^ control_x, target_z));
+        if target_z && let Some(word) = self.zs.get_mut(control_word) {
+            *word ^= control_mask;
+        }
+        if control_x && let Some(word) = self.xs.get_mut(target_word) {
+            *word ^= target_mask;
+        }
     }
 
     fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
@@ -578,34 +728,45 @@ impl StabilizerGenerator {
     }
 
     fn commutes_with(&self, rhs: &Self) -> bool {
-        self.bases
+        self.xs
             .iter()
-            .copied()
-            .zip(rhs.bases.iter().copied())
-            .filter(|(left, right)| anticommutes(*left, *right))
-            .count()
+            .zip(&self.zs)
+            .zip(rhs.xs.iter().zip(&rhs.zs))
+            .fold(0_u32, |parity, ((left_x, left_z), (right_x, right_z))| {
+                parity ^ ((left_x & right_z) ^ (left_z & right_x)).count_ones()
+            })
             .is_multiple_of(2)
     }
 
     fn same_bases_as(&self, rhs: &Self) -> bool {
-        self.bases == rhs.bases
+        self.qubit_count == rhs.qubit_count && self.xs == rhs.xs && self.zs == rhs.zs
     }
 
     fn multiply_assign(&mut self, rhs: &Self) {
+        self.qubit_count = self.qubit_count.max(rhs.qubit_count);
+        self.xs.resize(rhs.xs.len().max(self.xs.len()), 0);
+        self.zs.resize(rhs.zs.len().max(self.zs.len()), 0);
+        let mut count_bit_1 = 0_u64;
+        let mut count_bit_2 = 0_u64;
+        for (((left_x, left_z), right_x), right_z) in self
+            .xs
+            .iter_mut()
+            .zip(&mut self.zs)
+            .zip(&rhs.xs)
+            .zip(&rhs.zs)
+        {
+            let old_left_x = *left_x;
+            let old_left_z = *left_z;
+            *left_x ^= *right_x;
+            *left_z ^= *right_z;
+            let old_x_new_z = old_left_x & *right_z;
+            let anti_commutes = (*right_x & old_left_z) ^ old_x_new_z;
+            count_bit_2 ^= (count_bit_1 ^ *left_x ^ *left_z ^ old_x_new_z) & anti_commutes;
+            count_bit_1 ^= anti_commutes;
+        }
         let mut log_i = sign_log_i(self.negative).wrapping_add(sign_log_i(rhs.negative));
-        let len = self.bases.len().max(rhs.bases.len());
-        if self.bases.len() < len {
-            self.bases.resize(len, PauliBasis::I);
-        }
-        for index in 0..len {
-            let left = self.basis(index);
-            let right = rhs.basis(index);
-            log_i = log_i.wrapping_add(left.log_i_scalar_byproduct(right));
-            self.set_basis(
-                index,
-                PauliBasis::from_xz(left.x_bit() ^ right.x_bit(), left.z_bit() ^ right.z_bit()),
-            );
-        }
+        log_i ^= popcount_mod_4(count_bit_1);
+        log_i ^= popcount_mod_4(count_bit_2) << 1;
         self.negative = (log_i & 2) != 0;
     }
 
@@ -618,6 +779,25 @@ impl StabilizerGenerator {
         }
         index
     }
+}
+
+const fn word_count(bit_count: usize) -> usize {
+    bit_count.div_ceil(u64::BITS as usize)
+}
+
+fn set_word_bit(words: &mut [u64], word: usize, mask: u64, value: bool) {
+    let Some(bits) = words.get_mut(word) else {
+        return;
+    };
+    if value {
+        *bits |= mask;
+    } else {
+        *bits &= !mask;
+    }
+}
+
+fn popcount_mod_4(word: u64) -> u8 {
+    (word.count_ones() & 3) as u8
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -650,7 +830,8 @@ impl SpanRow {
     ) {
         self.bits.resize(qubit_count.saturating_mul(2), false);
         self.bits.fill(false);
-        for (qubit, basis) in generator.bases.iter().copied().enumerate() {
+        for qubit in 0..generator.qubit_count {
+            let basis = generator.basis(qubit);
             if let Some(bit) = self.bits.get_mut(qubit) {
                 *bit = basis.x_bit();
             }
