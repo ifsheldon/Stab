@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Active. P0 through P8 are complete. P9 evidence is assembled and awaiting descendant verification.
+Status: Active. P0 through P8 are complete. P9 is locally complete; exact-descendant GitHub CI is pending.
 
 ## Objective
 
@@ -30,12 +30,12 @@ Superseded plans, progress reports, qualification inventories, and benchmark man
 2. The 29-case controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/a8b56db319410f1d52bc64bfb7ee6a63c01c490f/` pass correctness, memory, and Stim parity. Full worst median and upper ratios are `1.1385x` and `1.2244x`; soak values are `1.1705x` and `1.1892x`.
 3. Both bundles replay offline. They used CPU 0, stayed below `62 C`, retained `/swap.img`, and observed no page-in or page-out movement within either run.
 4. Both reports remain correctly `unseeded`. The suite contains exactly the reviewed 29-entry self-regression candidate derived from the worse full and soak bounds; the seeding pair does not claim a regression pass.
-5. Commit the narrow evidence descendant, run `just bench::e2e-release-check`, replay both committed bundles, run milestone audit and full code review, and finish all verification commands without changing product or runner code.
-6. Required GitHub CI must pass the exact evidence descendant before making the release claim. Controlled x86-64 remains explicitly unqualified.
+5. Evidence descendant `992bd1b5d109b2e0cd673556366d06b0e912a50d` passes `just bench::e2e-release-check`; fresh copies of both committed bundles replay all 29 cases. Milestone audit and full code review found no remaining blocker after one stale P9 sentence was corrected.
+6. Run the final verification commands from the final documentation descendant. Required GitHub CI must then pass that exact commit before making the release claim. Controlled x86-64 remains explicitly unqualified.
 
 ## Remaining Sequence
 
-- P9 closes after local descendant verification and exact-revision GitHub CI pass.
+- P9 closes after final local verification and exact-revision GitHub CI pass.
 
 ## Non-Negotiable Gates
 

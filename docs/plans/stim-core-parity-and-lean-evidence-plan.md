@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 evidence is assembled and awaiting descendant verification.
+Status: Active. P0 completed in `07ebf4c8`; P1 through P8 are complete; P9 is locally complete and awaits exact-descendant GitHub CI.
 
 ## Summary
 
@@ -107,7 +107,7 @@ P0 introduces `oracle/stim-v1.16-parity.toml` as the sole current feature-parity
 
 There is no `partial` status. A broad row that contains both implemented and missing behavior must be split until every row has one honest implementation status. Missing canonical evidence never changes an implemented row back to `missing`; it changes only the evidence state. Entries describe behavior families, not every Rust export, every upstream test file, or every fixture.
 
-The ledger generates `docs/stim-parity.md`. That generated document replaces `docs/stim-feature-list.md`, `docs/stab-feature-checklist.md`, the blocker ledger, and hand-maintained feature counts as the current status view. Historical files remain until P9, when their durable rationale is extracted and the superseded files are deleted.
+The ledger generates `docs/stim-parity.md`. That generated document replaced `docs/stim-feature-list.md`, `docs/stab-feature-checklist.md`, the blocker ledger, and hand-maintained feature counts as the current status view. P9 retained their durable rationale in architecture and migration records, then removed the superseded files from the active tree; Git history preserves them.
 
 ## Milestone P0: Freeze Scope And Replace Status Ledgers (Complete)
 
@@ -525,7 +525,7 @@ P8 completed in `7529205f` through `b32f5b12`, with audit repairs through `94f91
 
 A temporary raw packed-slice accessor was rejected and removed because it exposed storage layout without a reliable E2E improvement. The accepted optimizations retain exact same-session seeded partitioning, scalar or semantic reference coverage, bounded storage, cancellation and sink-failure behavior, strict result formats, and the existing public 64-shot delivery boundary.
 
-Clean revision `94f9121bb07716c76e02271183f95a2a8776cb65` passed formatting, strict workspace Clippy, all workspace tests, architecture and external-consumer checks, API documentation, the live 62-case result-format corpus, all implemented oracle fixtures, and 138 independently executed full-tier parity owners. Its immutable diagnostic full bundle is `target/benchmarks/p8-all-94f9121b-full-v1`; offline replay passed all 29 cases. All 27 Stim-comparable cases passed parity, and all 29 cases passed memory. The worst median was `sample-dem.medium` at `1.146415x`; the worst confidence upper bound was `detect-observables.medium` at `1.189147x`; the maximum Stab peak RSS was `49,721,344` bytes. Temperature remained below `41 C`, and configured swap plus page-in/page-out counters were unchanged. Self-regression was correctly `unseeded`, so P8 makes no self-regression claim and P9 must seed the first reviewed baseline from full and soak evidence.
+Clean revision `94f9121bb07716c76e02271183f95a2a8776cb65` passed formatting, strict workspace Clippy, all workspace tests, architecture and external-consumer checks, API documentation, the live 62-case result-format corpus, all implemented oracle fixtures, and 138 independently executed full-tier parity owners. Its immutable diagnostic full bundle is `target/benchmarks/p8-all-94f9121b-full-v1`; offline replay passed all 29 cases. All 27 Stim-comparable cases passed parity, and all 29 cases passed memory. The worst median was `sample-dem.medium` at `1.146415x`; the worst confidence upper bound was `detect-observables.medium` at `1.189147x`; the maximum Stab peak RSS was `49,721,344` bytes. Temperature remained below `41 C`, and configured swap plus page-in/page-out counters were unchanged. Self-regression was correctly `unseeded`; P9 subsequently seeded the first reviewed baseline from full and soak evidence without changing that historical outcome.
 
 Milestone audit and full code review found and repaired two false exact-RNG test assumptions, a transpose-dimension diagnostic, stale standalone-consumer lockfiles, and a stale direct-Rust oracle selector in `9f1d145e`, `a242ad02`, `56594785`, `a3a58ba0`, and `94f9121b`. No blocking implementation, compatibility, evidence, or specification finding remains for P8.
 
@@ -573,7 +573,14 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 - Full-tier worst median and confidence upper ratios are `sample-dem.medium` at `1.138453x` and `detect-observables.medium` at `1.224350x`; maximum Stab peak RSS is `51,601,408` bytes. Soak-tier worst median and upper ratios are both `detect-observables.medium` at `1.170504x` and `1.189167x`; maximum Stab peak RSS is `49,692,672` bytes.
 - Both bundles replay offline, run on CPU 0, stay below `62 C`, retain the configured `/swap.img`, and observe unchanged swap page-in and page-out counters within each formal run.
 - Both reports remain correctly `unseeded`. One generated 29-entry candidate records the worse full-and-soak Stab median and upper bound for each exact case identity; `benchmarks/suite.toml` contains that candidate without reclassifying the seeding evidence as a regression pass.
-- The narrow evidence descendant contains no product or benchmark-runner change. P9 still requires a clean committed descendant, `e2e-release-check`, committed-bundle replay, final audits and checks, and required GitHub CI on the exact descendant.
+- Narrow evidence descendant `992bd1b5d109b2e0cd673556366d06b0e912a50d` contains no product or benchmark-runner change, passes `e2e-release-check`, and replays fresh copies of both committed bundles. Required GitHub CI on the final documentation descendant remains the only external acceptance step.
+
+### Audit Checkpoint
+
+- The milestone audit maps every P9 task and done criterion to the clean source checks, immutable bundles, host transitions, baseline candidate, evidence pointer, history retirement, release check, or remaining exact-revision CI requirement. It found no implementation defect or specification loophole.
+- The full code review covered product ownership, Stim parity, result formats, CLI and filesystem safety, process supervision, SIMD isolation, E2E methodology, evidence publication, tests, operations, and documentation. It found no release-blocking issue; the only source-current finding was the stale pre-P9 inventory-retention sentence corrected above.
+- The large-file review found no product Rust file at or above 1,200 lines. The largest repository-owned Rust files remain watch-list items below that limit, led by `ops/oracle/src/parity.rs` at 1,196 lines; this milestone adds no code to them.
+- No shell script exists outside vendored Stim, direct portable SIMD remains isolated in `stab-kernels-simd`, and the only production `unsafe` boundary is the documented bounded `wait4` supervisor path in benchmark operations.
 
 ## Test Suite Contract
 
