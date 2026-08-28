@@ -1,3 +1,4 @@
+mod bit_plane;
 mod buffers;
 mod error;
 mod limits;

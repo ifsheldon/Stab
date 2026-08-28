@@ -1,5 +1,6 @@
 //! Backend-neutral engine foundations for Stab.
 
+mod bernoulli;
 mod dem_sampling;
 mod descriptor;
 mod detection;

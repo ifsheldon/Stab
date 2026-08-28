@@ -20,7 +20,7 @@ use thiserror::Error;
 
 const EXPERIMENT_SEED: u64 = 0xA7D3_C0DE;
 const EXPERIMENT_SHOTS: u64 = 1_024;
-const DIAGNOSTIC_REPORTS: [(u64, u64); 3] = [(1_024, 37), (16_384, 586), (262_144, 9_294)];
+const DIAGNOSTIC_REPORTS: [(u64, u64); 3] = [(1_024, 37), (16_384, 582), (262_144, 9_353)];
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct ExperimentReport {

@@ -4,20 +4,20 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use rand::rngs::SmallRng;
-use stab_records::{
-    DemSampleBatchView, DemSampleSink, DetectionBatchView, FormatError as RecordsFormatError,
-    PackedShotBatch,
-};
+use stab_records::{DemSampleSink, FormatError as RecordsFormatError};
 use thiserror::Error;
 
+use super::buffers::try_zero_words;
 use super::plan::DemSamplingPlan;
-use super::program::dem_sampler_rng;
-use super::{DemError, DemResourceLimitError, DemSamplerLimits};
+use super::{DemError, DemSamplerLimits};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount, SinkFailurePhase};
 
 const MAX_BATCH_SHOTS: usize = 64;
 const MAX_DEM_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
+
+mod batch;
+
+use batch::{SessionBatch, initial_capacities, validate_session_storage};
 
 /// Cooperative cancellation state checked between bounded DEM sampling batches.
 #[derive(Clone, Debug, Default)]
@@ -208,10 +208,13 @@ impl DemSamplingRunSummary {
 pub struct DemSamplingSession {
     plan: DemSamplingPlan,
     limits: DemSamplerLimits,
-    rng: SmallRng,
+    sampling_seed: u64,
     record: DetectionRecordBuffer,
-    error_record: Option<Vec<bool>>,
+    detector_planes: Vec<u64>,
+    observable_planes: Vec<u64>,
+    error_planes: Option<Vec<u64>>,
     batch: SessionBatch,
+    sample_capacity: usize,
     cancellation: OnceLock<Arc<AtomicBool>>,
     total_committed_shots: u64,
     poisoned: bool,
@@ -242,21 +245,36 @@ impl DemSamplingSession {
         random_policy: RandomPolicy,
         limits: DemSamplerLimits,
     ) -> Result<Self, DemSamplingExecutionError> {
-        let batch_capacity = initial_batch_capacity(&plan, limits)?;
+        let capacities = initial_capacities(&plan, limits)?;
         let record = plan.try_reusable_detection_record().map_err(|source| {
             DemSamplingExecutionError::SessionStorageAllocation {
                 message: source.to_string(),
             }
         })?;
-        let batch = SessionBatch::try_new(&plan, batch_capacity)?;
-        let rng = dem_sampler_rng(random_policy.seed().map(|seed| seed.get()));
+        let batch = SessionBatch::try_new(&plan, capacities.output)?;
+        let detector_planes = try_zero_words(
+            sample_plane_len(plan.detector_count(), capacities.sample)?,
+            "DEM detector planes",
+        )
+        .map_err(storage_dem_error)?;
+        let observable_planes = try_zero_words(
+            sample_plane_len(plan.observable_count(), capacities.sample)?,
+            "DEM observable planes",
+        )
+        .map_err(storage_dem_error)?;
+        let sampling_seed = random_policy
+            .seed()
+            .map_or_else(rand::random, |seed| seed.get());
         Ok(Self {
             plan,
             limits,
-            rng,
+            sampling_seed,
             record,
-            error_record: None,
+            detector_planes,
+            observable_planes,
+            error_planes: None,
             batch,
+            sample_capacity: capacities.sample,
             cancellation: OnceLock::new(),
             total_committed_shots: 0,
             poisoned: false,
@@ -340,29 +358,58 @@ impl DemSamplingSession {
 
         let mut remaining = shots.get();
         let mut committed = 0_u64;
-        while remaining > 0 {
+        'sampling: while remaining > 0 {
             if self.is_cancelled() {
                 break;
             }
-            let batch_shots_u64 = remaining.min(self.batch.capacity as u64);
-            let batch_shots =
-                usize::try_from(batch_shots_u64).map_err(|_| DemSamplingRunError::Engine {
+            let sample_shots_u64 = remaining.min(self.sample_capacity as u64);
+            let sample_shots =
+                usize::try_from(sample_shots_u64).map_err(|_| DemSamplingRunError::Engine {
                     source: DemSamplingExecutionError::InternalInvariant {
-                        message: "bounded DEM batch shot count did not fit usize".to_owned(),
+                        message: "bounded DEM sample window did not fit usize".to_owned(),
                     },
-                    progress: DemSamplingRunProgress::new(committed, batch_shots_u64),
+                    progress: DemSamplingRunProgress::new(committed, sample_shots_u64),
                 })?;
-            if let Err(source) = self.fill_sample_batch(batch_shots, mode) {
+            if let Err(source) = self.fill_sample_planes(sample_shots, mode) {
                 self.poisoned = true;
                 return Err(DemSamplingRunError::Engine {
                     source,
-                    progress: DemSamplingRunProgress::new(committed, batch_shots_u64),
+                    progress: DemSamplingRunProgress::new(committed, sample_shots_u64),
                 });
             }
-            self.write_active_batch(batch_shots, mode.includes_sampled_errors(), sink, committed)?;
-            committed += batch_shots_u64;
-            self.total_committed_shots += batch_shots_u64;
-            remaining -= batch_shots_u64;
+            let mut sample_offset = 0_usize;
+            while sample_offset < sample_shots {
+                if self.is_cancelled() {
+                    break 'sampling;
+                }
+                let batch_shots = self
+                    .batch
+                    .capacity()
+                    .min(sample_shots.saturating_sub(sample_offset));
+                let plane_word_index = sample_offset / u64::BITS as usize;
+                if let Err(source) = self.copy_sample_chunk(
+                    plane_word_index,
+                    batch_shots,
+                    mode.includes_sampled_errors(),
+                ) {
+                    self.poisoned = true;
+                    return Err(DemSamplingRunError::Engine {
+                        source,
+                        progress: DemSamplingRunProgress::new(committed, batch_shots as u64),
+                    });
+                }
+                self.write_active_batch(
+                    batch_shots,
+                    mode.includes_sampled_errors(),
+                    sink,
+                    committed,
+                )?;
+                let batch_shots_u64 = batch_shots as u64;
+                sample_offset += batch_shots;
+                committed += batch_shots_u64;
+                self.total_committed_shots += batch_shots_u64;
+                remaining -= batch_shots_u64;
+            }
         }
         self.finish_run(sink, shots, committed, remaining == 0)
     }
@@ -381,61 +428,57 @@ impl DemSamplingSession {
         Ok(())
     }
 
-    fn fill_sample_batch(
+    fn fill_sample_planes(
         &mut self,
         shot_count: usize,
         mode: RunMode,
     ) -> Result<(), DemSamplingExecutionError> {
-        for shot_index in 0..shot_count {
-            match mode {
-                RunMode::DetectorOnly => self
-                    .plan
-                    .sample_detection_record_into(&mut self.rng, &mut self.record)
-                    .map_err(DemSamplingExecutionError::InvalidRequest)?,
-                RunMode::WithSampledErrors => {
-                    let error_record = self.error_record.as_mut().ok_or_else(|| {
-                        DemSamplingExecutionError::InternalInvariant {
-                            message: "sampled-error run omitted its reusable error record"
-                                .to_owned(),
-                        }
-                    })?;
-                    self.plan
-                        .sample_detection_record_and_error_record_into(
-                            &mut self.rng,
-                            &mut self.record,
-                            error_record,
-                        )
-                        .map_err(DemSamplingExecutionError::InvalidRequest)?;
-                    if error_record.len() != self.plan.error_count() {
-                        return Err(DemSamplingExecutionError::InternalInvariant {
-                            message: format!(
-                                "DEM sampled-error engine produced {} bits for declared width {}",
-                                error_record.len(),
-                                self.plan.error_count()
-                            ),
-                        });
+        match mode {
+            RunMode::DetectorOnly => self
+                .plan
+                .sample_detection_planes_into(
+                    self.sampling_seed,
+                    self.total_committed_shots,
+                    shot_count,
+                    &mut self.detector_planes,
+                    &mut self.observable_planes,
+                )
+                .map_err(DemSamplingExecutionError::InvalidRequest)?,
+            RunMode::WithSampledErrors => {
+                let error_planes = self.error_planes.as_mut().ok_or_else(|| {
+                    DemSamplingExecutionError::InternalInvariant {
+                        message: "sampled-error run omitted its reusable error planes".to_owned(),
                     }
-                    let error_batch = self.batch.sampled_errors.as_mut().ok_or_else(|| {
-                        DemSamplingExecutionError::InternalInvariant {
-                            message: "sampled-error run omitted its reusable error batch"
-                                .to_owned(),
-                        }
-                    })?;
-                    error_batch
-                        .copy_shot_from_bools(shot_index, error_record)
-                        .map_err(internal_format_error)?;
-                }
+                })?;
+                self.plan
+                    .sample_detection_and_error_planes_into(
+                        self.sampling_seed,
+                        self.total_committed_shots,
+                        shot_count,
+                        &mut self.detector_planes,
+                        &mut self.observable_planes,
+                        error_planes,
+                    )
+                    .map_err(DemSamplingExecutionError::InvalidRequest)?;
             }
-            self.batch
-                .detectors
-                .copy_shot_from_bools(shot_index, &self.record.detectors)
-                .map_err(internal_format_error)?;
-            self.batch
-                .observables
-                .copy_shot_from_bools(shot_index, &self.record.observables)
-                .map_err(internal_format_error)?;
         }
         Ok(())
+    }
+
+    fn copy_sample_chunk(
+        &mut self,
+        plane_word_index: usize,
+        shot_count: usize,
+        include_sampled_errors: bool,
+    ) -> Result<(), DemSamplingExecutionError> {
+        self.batch.copy_from_plane_chunk(
+            &self.detector_planes,
+            &self.observable_planes,
+            self.error_planes.as_deref(),
+            plane_word_index,
+            shot_count,
+            include_sampled_errors,
+        )
     }
 
     fn fill_replay_batch(
@@ -447,21 +490,7 @@ impl DemSamplingSession {
                 .detection_record_from_error_record_into(error_record, &mut self.record)
                 .map_err(DemSamplingExecutionError::InvalidRequest)?;
             self.batch
-                .detectors
-                .copy_shot_from_bools(shot_index, &self.record.detectors)
-                .map_err(internal_format_error)?;
-            self.batch
-                .observables
-                .copy_shot_from_bools(shot_index, &self.record.observables)
-                .map_err(internal_format_error)?;
-            self.batch
-                .sampled_errors
-                .as_mut()
-                .ok_or_else(|| DemSamplingExecutionError::InternalInvariant {
-                    message: "DEM replay omitted its reusable sampled-error batch".to_owned(),
-                })?
-                .copy_shot_from_bools(shot_index, error_record)
-                .map_err(internal_format_error)?;
+                .copy_replay_record(shot_index, &self.record, error_record)?;
         }
         Ok(())
     }
@@ -524,23 +553,23 @@ impl DemSamplingSession {
     }
 
     fn ensure_sampled_error_storage(&mut self) -> Result<(), DemSamplingExecutionError> {
-        if self.batch.sampled_errors.is_some() {
+        if self.batch.has_sampled_errors() {
             return Ok(());
         }
-        validate_session_storage(&self.plan, self.batch.capacity, true, self.limits)?;
-        let error_record = self.plan.try_reusable_error_record().map_err(|source| {
-            DemSamplingExecutionError::SessionStorageAllocation {
-                message: source.to_string(),
-            }
-        })?;
-        let sampled_errors = PackedShotBatch::zeros(self.batch.capacity, self.plan.error_count())
-            .map_err(|source| {
-            DemSamplingExecutionError::SessionStorageAllocation {
-                message: source.to_string(),
-            }
-        })?;
-        self.error_record = Some(error_record);
-        self.batch.sampled_errors = Some(sampled_errors);
+        validate_session_storage(
+            &self.plan,
+            self.batch.capacity(),
+            self.sample_capacity,
+            true,
+            self.limits,
+        )?;
+        let error_planes = try_zero_words(
+            sample_plane_len(self.plan.error_count(), self.sample_capacity)?,
+            "DEM sampled-error planes",
+        )
+        .map_err(storage_dem_error)?;
+        self.batch.ensure_sampled_errors(self.plan.error_count())?;
+        self.error_planes = Some(error_planes);
         Ok(())
     }
 
@@ -812,7 +841,7 @@ impl DemReplaySession {
                 })?;
         }
 
-        for records in error_records.chunks(self.session.batch.capacity) {
+        for records in error_records.chunks(self.session.batch.capacity()) {
             if self.session.is_cancelled() {
                 self.cancelled = true;
                 return Ok(DemReplayBatchStatus::Cancelled);
@@ -1001,140 +1030,20 @@ impl RunMode {
     }
 }
 
-#[derive(Debug)]
-struct SessionBatch {
-    detectors: PackedShotBatch,
-    observables: PackedShotBatch,
-    sampled_errors: Option<PackedShotBatch>,
-    capacity: usize,
-}
-
-impl SessionBatch {
-    fn try_new(plan: &DemSamplingPlan, capacity: usize) -> Result<Self, DemSamplingExecutionError> {
-        let detectors = PackedShotBatch::zeros(capacity, plan.detector_count())
-            .map_err(storage_format_error)?;
-        let observables = PackedShotBatch::zeros(capacity, plan.observable_count())
-            .map_err(storage_format_error)?;
-        Ok(Self {
-            detectors,
-            observables,
-            sampled_errors: None,
-            capacity,
-        })
-    }
-
-    fn view(
-        &self,
-        shot_count: usize,
-        include_sampled_errors: bool,
-    ) -> Result<DemSampleBatchView<'_>, DemSamplingExecutionError> {
-        let detectors = self
-            .detectors
-            .view_prefix(shot_count)
-            .map_err(internal_format_error)?;
-        let observables = self
-            .observables
-            .view_prefix(shot_count)
-            .map_err(internal_format_error)?;
-        let detection =
-            DetectionBatchView::try_new(detectors, observables).map_err(internal_format_error)?;
-        let sampled_errors = if include_sampled_errors {
-            Some(
-                self.sampled_errors
-                    .as_ref()
-                    .ok_or_else(|| DemSamplingExecutionError::InternalInvariant {
-                        message: "DEM batch omitted requested sampled-error storage".to_owned(),
-                    })?
-                    .view_prefix(shot_count)
-                    .map_err(internal_format_error)?,
-            )
-        } else {
-            None
-        };
-        DemSampleBatchView::try_new(detection, sampled_errors).map_err(internal_format_error)
-    }
-}
-
-fn initial_batch_capacity(
-    plan: &DemSamplingPlan,
-    limits: DemSamplerLimits,
+fn sample_plane_len(
+    width: usize,
+    sample_capacity: usize,
 ) -> Result<usize, DemSamplingExecutionError> {
-    let combined_fits = validate_session_storage(plan, 1, true, limits).is_ok();
-    let include_sampled_errors = combined_fits;
-    for capacity in (1..=MAX_BATCH_SHOTS).rev() {
-        if validate_session_storage(plan, capacity, include_sampled_errors, limits).is_ok() {
-            return Ok(capacity);
-        }
-    }
-    validate_session_storage(plan, 1, false, limits)?;
-    Err(DemSamplingExecutionError::InternalInvariant {
-        message: "one-shot DEM session storage passed admission but no batch capacity was selected"
-            .to_owned(),
-    })
-}
-
-fn validate_session_storage(
-    plan: &DemSamplingPlan,
-    shot_count: usize,
-    include_sampled_errors: bool,
-    limits: DemSamplerLimits,
-) -> Result<(), DemSamplingExecutionError> {
-    let estimated_bytes = session_storage_bytes(plan, shot_count, include_sampled_errors);
-    if estimated_bytes > limits.max_active_batch_bytes() as u128 {
-        let actual = usize::try_from(estimated_bytes).map_err(|_| {
+    width
+        .checked_mul(sample_capacity.div_ceil(u64::BITS as usize))
+        .ok_or_else(|| {
             DemSamplingExecutionError::InvalidRequest(DemError::invalid_sampler_compilation(
-                "DEM sampling session active byte estimate overflowed usize",
+                "DEM sample plane storage size overflowed",
             ))
-        })?;
-        return Err(DemSamplingExecutionError::InvalidRequest(
-            DemResourceLimitError::active_batch_bytes(actual, limits.max_active_batch_bytes())
-                .into(),
-        ));
-    }
-    if estimated_bytes > u128::from(MAX_DEM_SESSION_STORAGE_BYTES) {
-        return Err(DemSamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: MAX_DEM_SESSION_STORAGE_BYTES,
-        });
-    }
-    Ok(())
+        })
 }
 
-fn session_storage_bytes(
-    plan: &DemSamplingPlan,
-    shot_count: usize,
-    include_sampled_errors: bool,
-) -> u128 {
-    let detector_width = plan.detector_count() as u128;
-    let observable_width = plan.observable_count() as u128;
-    let sampled_error_width = if include_sampled_errors {
-        plan.error_count() as u128
-    } else {
-        0
-    };
-    let scratch = (std::mem::size_of::<DetectionRecordBuffer>() as u128)
-        .saturating_add(detector_width)
-        .saturating_add(observable_width)
-        .saturating_add(if include_sampled_errors {
-            (std::mem::size_of::<Vec<bool>>() as u128).saturating_add(sampled_error_width)
-        } else {
-            0
-        });
-    let packed_rows = packed_row_bytes(plan.detector_count())
-        .saturating_add(packed_row_bytes(plan.observable_count()))
-        .saturating_add(if include_sampled_errors {
-            packed_row_bytes(plan.error_count())
-        } else {
-            0
-        });
-    scratch.saturating_add(packed_rows.saturating_mul(shot_count as u128))
-}
-
-fn packed_row_bytes(width: usize) -> u128 {
-    (width.div_ceil(u64::BITS as usize) as u128).saturating_mul(std::mem::size_of::<u64>() as u128)
-}
-
-fn storage_format_error(source: RecordsFormatError) -> DemSamplingExecutionError {
+fn storage_dem_error(source: DemError) -> DemSamplingExecutionError {
     DemSamplingExecutionError::SessionStorageAllocation {
         message: source.to_string(),
     }

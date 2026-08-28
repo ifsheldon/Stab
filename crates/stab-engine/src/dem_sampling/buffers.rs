@@ -26,3 +26,9 @@ pub(super) fn try_false_vec(len: usize, context: &'static str) -> DemResult<Vec<
     values.resize(len, false);
     Ok(values)
 }
+
+pub(super) fn try_zero_words(len: usize, context: &'static str) -> DemResult<Vec<u64>> {
+    let mut values = try_vec_with_capacity(len, context)?;
+    values.resize(len, 0);
+    Ok(values)
+}

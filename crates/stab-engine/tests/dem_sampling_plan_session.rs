@@ -439,7 +439,7 @@ fn streamed_sessions_match_materialized_sampling_across_dem_families() {
 }
 
 #[test]
-fn seeded_sessions_partition_exactly_for_both_sampling_algorithms() {
+fn seeded_sessions_partition_exactly_across_the_indexed_block_boundary() {
     let sampler = compile_dem("repeat 4 {\n  error(0.25) D0 L0\n  shift_detectors 1\n}\n");
     for sampled_errors in [false, true] {
         let mut partitioned = sampler
@@ -452,14 +452,14 @@ fn seeded_sessions_partition_exactly_for_both_sampling_algorithms() {
                 .run_with_sampled_errors(ShotCount::new(17), &mut first)
                 .expect("first sampled-error partition");
             partitioned
-                .run_with_sampled_errors(ShotCount::new(48), &mut second)
+                .run_with_sampled_errors(ShotCount::new(1_008), &mut second)
                 .expect("second sampled-error partition");
         } else {
             partitioned
                 .run(ShotCount::new(17), &mut first)
                 .expect("first detector-only partition");
             partitioned
-                .run(ShotCount::new(48), &mut second)
+                .run(ShotCount::new(1_008), &mut second)
                 .expect("second detector-only partition");
         }
 
@@ -469,11 +469,11 @@ fn seeded_sessions_partition_exactly_for_both_sampling_algorithms() {
         let mut expected = CollectSink::default();
         if sampled_errors {
             whole
-                .run_with_sampled_errors(ShotCount::new(65), &mut expected)
+                .run_with_sampled_errors(ShotCount::new(1_025), &mut expected)
                 .expect("whole sampled-error run");
         } else {
             whole
-                .run(ShotCount::new(65), &mut expected)
+                .run(ShotCount::new(1_025), &mut expected)
                 .expect("whole detector-only run");
         }
 
@@ -483,7 +483,7 @@ fn seeded_sessions_partition_exactly_for_both_sampling_algorithms() {
         assert_eq!(first.detectors, expected.detectors);
         assert_eq!(first.observables, expected.observables);
         assert_eq!(first.sampled_errors, expected.sampled_errors);
-        assert_eq!(partitioned.total_committed_shots().get(), 65);
+        assert_eq!(partitioned.total_committed_shots().get(), 1_025);
     }
 }
 
@@ -774,8 +774,9 @@ fn cancellation_commits_only_complete_batches_and_session_resumes() {
 fn session_batch_capacity_obeys_the_caller_active_byte_budget() {
     let sampler = compile_dem("error(1) D0\n");
     let detector_record_bytes = std::mem::size_of::<TestDetectionRecord>() + 1;
-    let limits =
-        DemSamplerLimits::default().with_max_active_batch_bytes(detector_record_bytes + 16);
+    let detector_plane_bytes = std::mem::size_of::<u64>();
+    let active_scratch_bytes = detector_record_bytes + detector_plane_bytes;
+    let limits = DemSamplerLimits::default().with_max_active_batch_bytes(active_scratch_bytes + 16);
     let mut session = sampler
         .session_with_limits(RandomPolicy::Seeded(Seed::new(3)), limits)
         .expect("two-shot detector-only batch fits the active byte budget");
@@ -787,7 +788,7 @@ fn session_batch_capacity_obeys_the_caller_active_byte_budget() {
     assert_eq!(sink.finish_calls, 1);
 
     let rejected =
-        DemSamplerLimits::default().with_max_active_batch_bytes(detector_record_bytes + 7);
+        DemSamplerLimits::default().with_max_active_batch_bytes(active_scratch_bytes + 7);
     let error = sampler
         .session_with_limits(RandomPolicy::Seeded(Seed::new(3)), rejected)
         .expect_err("one record plus one packed shot exceeds the active byte budget");

@@ -1,5 +1,3 @@
-use rand::rngs::SmallRng;
-use rand::{Rng, RngExt as _, SeedableRng as _};
 use stab_model::advanced::{FoldedDemBlock, FoldedDemItem, dem_instruction_detector_shift};
 use stab_model::{DemInstruction, DemInstructionKind, DemTarget};
 
@@ -35,21 +33,6 @@ pub(super) struct DemSampleRepeat {
     pub(super) repeat_count: u64,
     pub(super) body: DemSampleBlock,
     pub(super) folded_zero_shift_errors: Option<Vec<DemSampleError>>,
-}
-
-impl DemSampleError {
-    fn sample_occurs<R>(&self, rng: &mut R) -> bool
-    where
-        R: Rng,
-    {
-        if self.probability <= 0.0 {
-            return false;
-        }
-        if self.probability >= 1.0 {
-            return true;
-        }
-        rng.random::<f64>() < self.probability
-    }
 }
 
 pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleBlock> {
@@ -195,95 +178,6 @@ fn compile_instruction(
         block.direct_sample_has_stochastic_error = true;
     }
     block.operations.push(DemSampleOperation::Error(operation));
-    Ok(())
-}
-
-pub(super) enum SampledErrorOutput<'a> {
-    Discard,
-    Record(&'a mut Vec<bool>),
-}
-
-impl SampledErrorOutput<'_> {
-    fn is_discard(&self) -> bool {
-        matches!(self, Self::Discard)
-    }
-}
-
-pub(super) fn sample_block_into<R>(
-    block: &DemSampleBlock,
-    detector_shift: u64,
-    rng: &mut R,
-    record: &mut DetectionRecordBuffer,
-    mut error_output: SampledErrorOutput<'_>,
-) -> DemResult<()>
-where
-    R: Rng,
-{
-    for operation in &block.operations {
-        match operation {
-            DemSampleOperation::Error(error) => {
-                let occurred = error.sample_occurs(rng);
-                if let SampledErrorOutput::Record(error_record) = &mut error_output {
-                    error_record.push(occurred);
-                }
-                if occurred {
-                    apply_error_to_record(error, detector_shift, record)?;
-                }
-            }
-            DemSampleOperation::Repeat(repeat) => {
-                if error_output.is_discard() {
-                    if repeat.body.direct_sample_effect_count == 0 {
-                        continue;
-                    }
-                    if repeat.body.detector_shift == 0
-                        && !repeat.body.direct_sample_has_stochastic_error
-                    {
-                        if repeat.repeat_count.is_multiple_of(2) {
-                            continue;
-                        }
-                        let iteration_shift = detector_shift
-                            .checked_add(repeat.start_detector_shift)
-                            .ok_or_else(detector_shift_overflow_error)?;
-                        sample_block_into(
-                            &repeat.body,
-                            iteration_shift,
-                            rng,
-                            record,
-                            SampledErrorOutput::Discard,
-                        )?;
-                        continue;
-                    }
-                    if let Some(folded_errors) = repeat.folded_zero_shift_errors.as_deref() {
-                        let iteration_shift = detector_shift
-                            .checked_add(repeat.start_detector_shift)
-                            .ok_or_else(detector_shift_overflow_error)?;
-                        sample_folded_repeat_errors(folded_errors, iteration_shift, rng, record)?;
-                        continue;
-                    }
-                }
-                let mut iteration_shift = detector_shift
-                    .checked_add(repeat.start_detector_shift)
-                    .ok_or_else(detector_shift_overflow_error)?;
-                for _ in 0..repeat.repeat_count {
-                    sample_block_into(
-                        &repeat.body,
-                        iteration_shift,
-                        rng,
-                        record,
-                        match &mut error_output {
-                            SampledErrorOutput::Discard => SampledErrorOutput::Discard,
-                            SampledErrorOutput::Record(error_record) => {
-                                SampledErrorOutput::Record(error_record)
-                            }
-                        },
-                    )?;
-                    iteration_shift = iteration_shift
-                        .checked_add(repeat.body.detector_shift)
-                        .ok_or_else(detector_shift_overflow_error)?;
-                }
-            }
-        }
-    }
     Ok(())
 }
 
@@ -483,23 +377,6 @@ fn shifted_sample_error(error: &DemSampleError, detector_offset: u64) -> DemResu
     })
 }
 
-fn sample_folded_repeat_errors<R>(
-    errors: &[DemSampleError],
-    detector_shift: u64,
-    rng: &mut R,
-    record: &mut DetectionRecordBuffer,
-) -> DemResult<()>
-where
-    R: Rng,
-{
-    for error in errors {
-        if sample_probability(error.probability, rng) {
-            apply_error_to_record(error, detector_shift, record)?;
-        }
-    }
-    Ok(())
-}
-
 pub(super) fn odd_parity_probability(probability: f64, repeat_count: u64) -> f64 {
     if repeat_count == 0 || probability <= 0.0 {
         return 0.0;
@@ -527,19 +404,6 @@ pub(super) fn odd_parity_probability(probability: f64, repeat_count: u64) -> f64
     } else {
         (1.0 + 0.5 * log_magnitude.exp_m1()).clamp(0.5, 1.0)
     }
-}
-
-fn sample_probability<R>(probability: f64, rng: &mut R) -> bool
-where
-    R: Rng,
-{
-    if probability <= 0.0 {
-        return false;
-    }
-    if probability >= 1.0 {
-        return true;
-    }
-    rng.random::<f64>() < probability
 }
 
 pub(super) fn reset_detection_record(
@@ -573,8 +437,4 @@ fn detector_index_overflow_error(kind: &'static str) -> DemError {
 
 fn detector_shift_overflow_error() -> DemError {
     DemError::invalid_sampler_compilation("DEM sampler detector shift overflowed")
-}
-
-pub(super) fn dem_sampler_rng(seed: Option<u64>) -> SmallRng {
-    SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
 }

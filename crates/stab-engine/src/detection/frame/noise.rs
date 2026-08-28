@@ -1,5 +1,6 @@
 use rand::{Rng, RngExt as _};
 
+use crate::bernoulli::sample_mask as sample_bernoulli_mask;
 use crate::detection::error::{DetectionError, DetectionResult};
 
 #[derive(Clone, Copy)]
@@ -58,45 +59,6 @@ fn active_mask(shot_count: usize) -> u64 {
     } else {
         (1_u64 << shot_count) - 1
     }
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "the finite nonnegative geometric gap is bounded by the remaining lane count before conversion"
-)]
-pub(super) fn sample_bernoulli_mask(probability: f64, lanes: u64, rng: &mut impl Rng) -> u64 {
-    if probability <= 0.0 || lanes == 0 {
-        return 0;
-    }
-    if probability >= 1.0 {
-        return lanes;
-    }
-    if probability == 0.5 {
-        return rng.random::<u64>() & lanes;
-    }
-    if probability > 0.5 {
-        return lanes & !sample_bernoulli_mask(1.0 - probability, lanes, rng);
-    }
-
-    let lane_count = (u64::BITS - lanes.leading_zeros()) as usize;
-    let log_failure = (-probability).ln_1p();
-    let mut result = 0_u64;
-    let mut lane = 0_usize;
-    while lane < lane_count {
-        let uniform = 1.0 - rng.random::<f64>();
-        let gap = (uniform.ln() / log_failure).floor();
-        if !gap.is_finite() || gap >= lane_count.saturating_sub(lane) as f64 {
-            break;
-        }
-        lane = lane.saturating_add(gap as usize);
-        if lane >= lane_count {
-            break;
-        }
-        result |= 1_u64 << lane;
-        lane = lane.saturating_add(1);
-    }
-    result & lanes
 }
 
 pub(super) fn sample_categorical_masks<const N: usize>(

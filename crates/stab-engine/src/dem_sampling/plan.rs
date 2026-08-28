@@ -1,15 +1,14 @@
 use std::fmt;
 use std::sync::Arc;
 
-use rand::Rng;
 use stab_model::DetectorErrorModel;
 use stab_model::advanced::{FoldedDemTraversal, MAX_DEM_REPEAT_NESTING};
 use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 
-use super::buffers::{try_false_vec, try_vec_with_capacity};
+use super::bit_plane::{SampledErrorPlanes, sample_into_planes};
+use super::buffers::try_false_vec;
 use super::program::{
-    DemSampleBlock, SampledErrorOutput, apply_error_record_block, compile_block,
-    reset_detection_record, sample_block_into, usize_from_u64,
+    DemSampleBlock, apply_error_record_block, compile_block, reset_detection_record, usize_from_u64,
 };
 use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
 use super::{DemError, DemResourceLimitError, DemResult, DemSamplerLimits};
@@ -202,45 +201,54 @@ impl DemSamplingPlan {
         })
     }
 
-    pub(super) fn try_reusable_error_record(&self) -> DemResult<Vec<bool>> {
-        try_vec_with_capacity(self.error_count(), "DEM sampled-error record")
-    }
-
-    pub(super) fn sample_detection_record_into<R>(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the deterministic shot range and reusable output planes are independent inputs"
+    )]
+    pub(super) fn sample_detection_planes_into(
         &self,
-        rng: &mut R,
-        record: &mut DetectionRecordBuffer,
-    ) -> DemResult<()>
-    where
-        R: Rng,
-    {
-        reset_detection_record(record, self.detector_count(), self.observable_count());
-        sample_block_into(
+        seed: u64,
+        first_shot: u64,
+        shot_count: usize,
+        detector_planes: &mut Vec<u64>,
+        observable_planes: &mut Vec<u64>,
+    ) -> DemResult<()> {
+        sample_into_planes(
             &self.inner.operations,
-            0,
-            rng,
-            record,
-            SampledErrorOutput::Discard,
+            self.detector_count(),
+            self.observable_count(),
+            seed,
+            first_shot,
+            shot_count,
+            detector_planes,
+            observable_planes,
+            SampledErrorPlanes::Discard,
         )
     }
 
-    pub(super) fn sample_detection_record_and_error_record_into<R>(
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the deterministic shot range and three reusable output planes are independent inputs"
+    )]
+    pub(super) fn sample_detection_and_error_planes_into(
         &self,
-        rng: &mut R,
-        record: &mut DetectionRecordBuffer,
-        error_record: &mut Vec<bool>,
-    ) -> DemResult<()>
-    where
-        R: Rng,
-    {
-        reset_detection_record(record, self.detector_count(), self.observable_count());
-        error_record.clear();
-        sample_block_into(
+        seed: u64,
+        first_shot: u64,
+        shot_count: usize,
+        detector_planes: &mut Vec<u64>,
+        observable_planes: &mut Vec<u64>,
+        error_planes: &mut Vec<u64>,
+    ) -> DemResult<()> {
+        sample_into_planes(
             &self.inner.operations,
-            0,
-            rng,
-            record,
-            SampledErrorOutput::Record(error_record),
+            self.detector_count(),
+            self.observable_count(),
+            seed,
+            first_shot,
+            shot_count,
+            detector_planes,
+            observable_planes,
+            SampledErrorPlanes::Record(error_planes),
         )
     }
 
