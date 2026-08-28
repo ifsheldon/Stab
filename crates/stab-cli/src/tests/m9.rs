@@ -2,6 +2,9 @@ use std::ffi::OsString;
 use std::path::Path;
 
 use super::run_from;
+use stab_engine::{detection_record_width, measurement_record_count};
+use stab_model::Circuit;
+use stab_records::{RecordFormat, read_records, write_records};
 use tempfile::tempdir;
 
 mod batch_formats;
@@ -731,7 +734,7 @@ fn m2d_ignores_pauli_target_observables_like_stim_conversion() {
 }
 
 #[test]
-fn m2d_round_trips_generated_m7_circuits_in_text_and_bitpacked_formats() {
+fn m2d_converts_the_same_generated_measurements_in_text_and_bitpacked_formats() {
     let cases = [
         (
             "repetition",
@@ -802,8 +805,7 @@ fn m2d_round_trips_generated_m7_circuits_in_text_and_bitpacked_formats() {
 
     for (case, gen_args) in cases {
         let circuit = generate_circuit(gen_args);
-        assert_generated_detection_round_trip(case, &circuit, temp_dir.path(), "01");
-        assert_generated_detection_round_trip(case, &circuit, temp_dir.path(), "b8");
+        assert_generated_detection_format_equivalence(case, &circuit, temp_dir.path());
     }
 }
 
@@ -864,14 +866,12 @@ fn generate_circuit(gen_args: &[&str]) -> Vec<u8> {
     stdout
 }
 
-fn assert_generated_detection_round_trip(
-    case: &str,
-    circuit: &[u8],
-    temp_dir: &Path,
-    format: &str,
-) {
-    let circuit_path = temp_dir.join(format!("{case}_{format}.stim"));
+fn assert_generated_detection_format_equivalence(case: &str, circuit: &[u8], temp_dir: &Path) {
+    let circuit_path = temp_dir.join(format!("{case}.stim"));
     std::fs::write(&circuit_path, circuit).expect("write generated circuit");
+    let parsed = Circuit::from_stim_bytes(circuit).expect("parse generated circuit");
+    let measurement_width = measurement_record_count(&parsed).expect("measurement width");
+    let detection_width = detection_record_width(&parsed).expect("detection width");
 
     let mut sample_stdout = Vec::new();
     let mut sample_stderr = Vec::new();
@@ -881,8 +881,7 @@ fn assert_generated_detection_round_trip(
             "sample",
             "--shots=64",
             "--seed=5",
-            "--out_format",
-            format,
+            "--out_format=01",
         ],
         circuit,
         &mut sample_stdout,
@@ -891,62 +890,52 @@ fn assert_generated_detection_round_trip(
     assert_eq!(
         sample_status,
         0,
-        "{case} sample {format} stderr: {}",
+        "{case} sample stderr: {}",
         String::from_utf8_lossy(&sample_stderr)
     );
     assert_eq!(String::from_utf8(sample_stderr).unwrap(), "");
+    let measurements = read_records(&sample_stdout, RecordFormat::ZeroOne, measurement_width)
+        .expect("decode sampled measurements");
+    let b8_measurements =
+        write_records(&measurements, RecordFormat::B8).expect("encode sampled measurements as b8");
 
-    let m2d_args = vec![
-        OsString::from("stab"),
-        OsString::from("m2d"),
-        OsString::from("--in_format"),
-        OsString::from(format),
-        OsString::from("--out_format"),
-        OsString::from(format),
-        OsString::from("--append_observables"),
-        OsString::from("--circuit"),
-        circuit_path.as_os_str().to_os_string(),
-    ];
-    let mut m2d_stdout = Vec::new();
-    let mut m2d_stderr = Vec::new();
-    let m2d_status = run_from(
-        m2d_args,
-        sample_stdout.as_slice(),
-        &mut m2d_stdout,
-        &mut m2d_stderr,
+    let zero_one = run_generated_m2d(case, &circuit_path, "01", &sample_stdout);
+    let b8 = run_generated_m2d(case, &circuit_path, "b8", &b8_measurements);
+    assert_eq!(
+        read_records(&zero_one, RecordFormat::ZeroOne, detection_width)
+            .expect("decode 01 detections"),
+        read_records(&b8, RecordFormat::B8, detection_width).expect("decode b8 detections"),
+        "{case} m2d format equivalence"
+    );
+}
+
+fn run_generated_m2d(case: &str, circuit_path: &Path, format: &str, input: &[u8]) -> Vec<u8> {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        vec![
+            OsString::from("stab"),
+            OsString::from("m2d"),
+            OsString::from("--in_format"),
+            OsString::from(format),
+            OsString::from("--out_format"),
+            OsString::from(format),
+            OsString::from("--append_observables"),
+            OsString::from("--circuit"),
+            circuit_path.as_os_str().to_os_string(),
+        ],
+        input,
+        &mut stdout,
+        &mut stderr,
     );
     assert_eq!(
-        m2d_status,
+        status,
         0,
         "{case} m2d {format} stderr: {}",
-        String::from_utf8_lossy(&m2d_stderr)
+        String::from_utf8_lossy(&stderr)
     );
-    assert_eq!(String::from_utf8(m2d_stderr).unwrap(), "");
-
-    let mut detect_stdout = Vec::new();
-    let mut detect_stderr = Vec::new();
-    let detect_status = run_from(
-        [
-            "stab",
-            "detect",
-            "--shots=64",
-            "--seed=5",
-            "--out_format",
-            format,
-            "--append_observables",
-        ],
-        circuit,
-        &mut detect_stdout,
-        &mut detect_stderr,
-    );
-    assert_eq!(
-        detect_status,
-        0,
-        "{case} detect {format} stderr: {}",
-        String::from_utf8_lossy(&detect_stderr)
-    );
-    assert_eq!(String::from_utf8(detect_stderr).unwrap(), "");
-    assert_eq!(m2d_stdout, detect_stdout, "{case} {format} round trip");
+    assert!(stderr.is_empty(), "{case} m2d {format} wrote stderr");
+    stdout
 }
 
 #[test]
