@@ -35,6 +35,8 @@ just bench::e2e-release-check
 
 `e2e-check` is untimed and suitable for pull-request CI. Smoke timing is diagnostic. Formal evidence requires a clean commit, the pinned Stim source, fixed release builds, one CPU affinity, no competing benchmark process, host temperature below `100 C`, and no swap I/O during measured samples.
 
+`--affinity-cpu` takes a Linux CPU ID, including IDs in a restricted or noncontiguous affinity mask. The process supervisor applies the requested affinity through the kernel; the recorded available processor count is descriptive and does not bound CPU IDs.
+
 Every run writes to a previously absent child under `target/benchmarks/`. A bundle contains the exact suite, run identity, correctness witnesses, raw samples, derived JSON and Markdown reports, and a digest manifest. `e2e-replay` rejects extra files or changed bytes and reconstructs the report deterministically without executing a workload.
 
 The current controlled AArch64 full and soak bundles are named by [current-aarch64-evidence.toml](current-aarch64-evidence.toml). Both pass Stim parity, seeded Stab self-regression, memory, correctness witnesses, and offline replay. The historical `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` pair remains the explicitly `unseeded` source of the first reviewed baseline; no retroactive self-regression pass is claimed for that seeding evidence.

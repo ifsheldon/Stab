@@ -37,13 +37,6 @@ impl HostProfile {
         let logical_cpus = std::thread::available_parallelism()
             .map_err(|source| format!("cannot determine logical CPU count: {source}"))?
             .get();
-        if let Some(cpu) = affinity_cpu
-            && cpu >= logical_cpus
-        {
-            return Err(format!(
-                "affinity CPU {cpu} is outside {logical_cpus} logical CPUs"
-            ));
-        }
         Ok(Self {
             architecture: std::env::consts::ARCH.to_string(),
             cpu_model: cpu_model()?,
@@ -305,6 +298,96 @@ fn read_trimmed(path: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    fn affinity_request(cpu: usize, child: bool) -> crate::process::ProcessRequest {
+        use std::ffi::OsString;
+        use std::time::Duration;
+
+        crate::process::ProcessRequest {
+            program: std::env::current_exe().expect("test executable"),
+            args: [
+                "e2e::host::tests::restricted_affinity_helper",
+                "--exact",
+                "--ignored",
+                "--nocapture",
+            ]
+            .map(OsString::from)
+            .into(),
+            stdin: vec![b'\n'],
+            working_directory: std::env::current_dir().expect("working directory"),
+            environment: vec![
+                (OsString::from("STAB_HOST_TEST_CPU"), cpu.to_string().into()),
+                (
+                    OsString::from("STAB_HOST_TEST_CHILD"),
+                    child.to_string().into(),
+                ),
+            ]
+            .into(),
+            affinity_cpu: child.then_some(cpu),
+            limits: crate::process::ProcessLimits {
+                stdin_bytes: 1,
+                stdout: 4096.into(),
+                stderr: 4096.into(),
+                regular_file_bytes: None,
+                timeout: Duration::from_secs(10),
+            },
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn host_capture_accepts_a_restricted_nonzero_cpu() {
+        let allowed = rustix::thread::sched_getaffinity(None).expect("read affinity");
+        let Some(cpu) = (1..rustix::thread::CpuSet::MAX_CPU).find(|cpu| allowed.is_set(*cpu))
+        else {
+            eprintln!("no nonzero CPU is available for the restricted-affinity regression");
+            return;
+        };
+        let output = crate::process::run_bounded_process(&affinity_request(cpu, false))
+            .expect("restricted controller completes");
+        assert_eq!(
+            output.status,
+            Some(0),
+            "restricted controller stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "runs in a subprocess so affinity changes cannot affect other tests"]
+    fn restricted_affinity_helper() {
+        use std::io::Read as _;
+
+        let cpu = std::env::var("STAB_HOST_TEST_CPU")
+            .expect("requested CPU")
+            .parse::<usize>()
+            .expect("numeric CPU");
+        let mut expected = rustix::thread::CpuSet::new();
+        expected.set(cpu);
+        if std::env::var("STAB_HOST_TEST_CHILD").as_deref() == Ok("true") {
+            std::io::stdin()
+                .read_exact(&mut [0])
+                .expect("affinity handshake");
+            let actual = rustix::thread::sched_getaffinity(None).expect("child affinity");
+            assert_eq!(actual, expected);
+            return;
+        }
+        rustix::thread::sched_setaffinity(None, &expected).expect("restrict controller affinity");
+        let profile = HostProfile::capture(Some(cpu)).expect("capture restricted host");
+        let output = crate::process::run_bounded_process(&affinity_request(
+            profile.affinity_cpu.expect("selected CPU"),
+            true,
+        ))
+        .expect("supervised child completes");
+        assert_eq!(
+            output.status,
+            Some(0),
+            "affinity child stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 
     #[test]
     fn host_after_rejects_swap_io_and_identity_changes() {
