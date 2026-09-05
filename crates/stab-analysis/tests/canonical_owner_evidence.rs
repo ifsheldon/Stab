@@ -38,8 +38,40 @@ fn pf1_gate_tableau_metadata() {
         ],
         ["+XX", "+Z_", "+_X", "+ZZ"]
     );
+
+    let expected_tableau_names = expected_tableau_supported_gate_names();
+    let actual_tableau_names = Gate::all()
+        .filter(|gate| gate_has_tableau(*gate))
+        .map(|gate| gate.canonical_name())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actual_tableau_names, expected_tableau_names);
+
+    for gate_name in expected_tableau_names {
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let inverse = gate.inverse().expect("unitary inverse");
+        let gate_inverse_tableau = gate_tableau(gate)
+            .expect("gate tableau")
+            .inverse()
+            .expect("inverse tableau");
+        assert_eq!(
+            gate_inverse_tableau,
+            gate_tableau(inverse).expect("inverse gate tableau"),
+            "{gate_name} inverse tableau should match inverse gate metadata"
+        );
+    }
+
     for gate in Gate::all() {
         assert_eq!(gate_has_tableau(gate), gate_tableau(gate).is_ok());
+    }
+
+    for unsupported in ["M", "R", "DETECTOR", "SPP"] {
+        let gate = Gate::from_name(unsupported).expect("unsupported gate");
+        assert!(!gate_has_tableau(gate), "{unsupported}");
+        let error = gate_tableau(gate).expect_err("reject missing tableau data");
+        assert!(
+            error.to_string().contains("does not have tableau data"),
+            "{error}"
+        );
     }
 }
 

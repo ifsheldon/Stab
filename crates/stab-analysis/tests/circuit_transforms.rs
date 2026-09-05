@@ -879,30 +879,3 @@ fn flattened_rejects_coordinate_overflow() {
     assert!(matches!(error, AnalysisError::InvalidResultFormat { .. }));
     assert!(error.to_string().contains("coordinate shift overflowed"));
 }
-
-#[test]
-fn cq2_circuit_api_flattened_contract_matches_stim() {
-    flattened_matches_pinned_stim_basic_cases();
-    flattened_applies_coordinate_shifts_through_repeats();
-    flattened_preserves_instruction_tags_and_drops_repeat_tags();
-    flattened_operations_unrolls_without_fusing();
-    flattened_rejects_excessive_materialized_expansion();
-    flattened_folds_shift_only_large_repeats();
-    flattened_rejects_coordinate_overflow();
-}
-
-#[test]
-fn cq2_circuit_api_without_noise_contract_matches_stim() {
-    without_noise_matches_pinned_stim_basic_cases();
-    without_noise_replaces_heralded_noise_with_measurement_pads();
-    without_noise_preserves_tags_annotations_and_records();
-    without_noise_removes_identity_errors_like_stim();
-}
-
-#[test]
-fn cq2_circuit_api_decomposed_contract_matches_stim() {
-    decomposed_matches_public_stim_iswap_mpp_example();
-    decomposed_preserves_tags_noise_annotations_and_spp_shape();
-    decomposed_handles_constant_mpp_products_and_rejects_anti_hermitian_products();
-    decomposed_preserves_selected_measurement_rich_flows();
-}
