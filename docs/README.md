@@ -17,9 +17,9 @@ Superseded plans, progress reports, qualification dashboards, and feature invent
 
 ## Correctness
 
-Use `just oracle::parity-check` to validate the atomic parity ledger and every canonical owner selector. Use `just oracle::parity-run --tier pr|full|soak` to execute completed owners, and `just oracle::parity-render --check` to reject generated-view drift.
+Use `just oracle::parity-check` to validate the atomic parity ledger, every canonical owner selector, and its required supporting fixture identities. Use `just oracle::parity-run` to execute completed owners, and `just oracle::parity-render --check` to reject generated-view drift.
 
-Use `just oracle::result-formats --check` for the checked byte-exact result-format corpus and live pinned-Stim differential. Use `just oracle::gates` for the canonical gate catalog comparison. The fixture runner and compatibility matrix remain supporting oracle corpora, not feature-status ledgers.
+Use `just oracle::result-formats --check` for the checked byte-exact result-format corpus and live pinned-Stim differential. Use `just oracle::gates` for the canonical gate catalog comparison. The fixture manifest owns execution and source attribution; the parity manifest names required implemented fixtures without treating these broad supporting witnesses as semantic family owners. The former compatibility matrix and redundant oracle tiers are retired.
 
 Every surviving test must protect semantic, statistical, safety, resource, or user-visible behavior. Do not create tests whose only claim is a derive, label, re-export, constant, private pointer identity, or bookkeeping shape.
 

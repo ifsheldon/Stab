@@ -76,7 +76,7 @@ pub(super) fn validate_row_tokens(
     let uses_statistical_fixture_output =
         statistical_source == Some(StatisticalSource::FixtureOutput);
     for token in row.argv_tokens() {
-        let parsed = match parse_fixture_arg_token(&row.id, &token) {
+        let parsed = match parse_fixture_arg_token(row.id.as_str(), &token) {
             Ok(Some(parsed)) => parsed,
             Ok(None) => continue,
             Err(violation) => {
@@ -89,7 +89,7 @@ pub(super) fn validate_row_tokens(
             FixtureArgToken::Input(relative) => {
                 validate_fixture_path(
                     fixture_root,
-                    &row.id,
+                    row.id.as_str(),
                     "fixture_input",
                     relative,
                     FixturePathRequirement::MustExistFile,
@@ -125,7 +125,7 @@ pub(super) fn validate_row_tokens(
                 };
                 validate_fixture_path(
                     fixture_root,
-                    &row.id,
+                    row.id.as_str(),
                     "fixture_output",
                     relative,
                     requirement,
@@ -192,7 +192,7 @@ pub(super) fn prepare_command(
     let mut outputs = Vec::new();
     let mut scratch_dir = None;
     for token in row.argv_tokens() {
-        match parse_fixture_arg_token(&row.id, &token)
+        match parse_fixture_arg_token(row.id.as_str(), &token)
             .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?
         {
             Some(FixtureArgToken::Input(relative)) => {

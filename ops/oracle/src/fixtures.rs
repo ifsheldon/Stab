@@ -1,6 +1,6 @@
 //! Oracle fixture manifest loading and execution.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -14,12 +14,14 @@ mod hex_payload;
 mod milestone;
 mod outputs;
 mod paths;
+mod requirements;
 mod reverse_flow;
 mod statistical;
 
 use direct_rust::{is_direct_rust_fixture, run_direct_rust_fixture};
 pub(crate) use milestone::Milestone;
 use paths::{fixture_file, validate_fixture_path};
+pub(crate) use requirements::{FixtureId, check_required_fixtures};
 use reverse_flow::core_time_reverse_flows_output;
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
@@ -89,7 +91,7 @@ fn parse_milestone(value: &str) -> Result<Milestone, FixtureError> {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 struct FixtureRow {
-    id: String,
+    id: FixtureId,
     milestone: Milestone,
     upstream_source: String,
     parity_mode: ParityMode,
@@ -270,37 +272,37 @@ pub(crate) enum FixtureError {
 
     #[error("{id} expected status {expected}, got {actual:?}")]
     StatusMismatch {
-        id: String,
+        id: FixtureId,
         expected: i32,
         actual: Option<i32>,
     },
 
     #[error("{id} expected stderr class {expected}, got {actual:?}")]
     StderrClassMismatch {
-        id: String,
+        id: FixtureId,
         expected: &'static str,
         actual: StderrClass,
     },
 
     #[error("{id} expected stdout differs from {path}")]
-    ExpectedStdoutMismatch { id: String, path: PathBuf },
+    ExpectedStdoutMismatch { id: FixtureId, path: PathBuf },
 
     #[error("{id} expected fixture output differs from {path}")]
-    ExpectedFixtureOutputMismatch { id: String, path: PathBuf },
+    ExpectedFixtureOutputMismatch { id: FixtureId, path: PathBuf },
 
     #[error("{id} fixture output {path} exceeds {limit} bytes")]
     AuxiliaryOutputTooLarge {
-        id: String,
+        id: FixtureId,
         path: PathBuf,
         limit: u64,
     },
 
     #[error("{id} failed core fixture execution: {reason}")]
-    CoreFixtureFailed { id: String, reason: String },
+    CoreFixtureFailed { id: FixtureId, reason: String },
 
     #[error("{id} failed comparator {comparator}: {reason}")]
     ComparatorMismatch {
-        id: String,
+        id: FixtureId,
         comparator: &'static str,
         reason: String,
     },
@@ -335,17 +337,11 @@ impl FixtureManifest {
         expected_stdout_policy: ExpectedStdoutPolicy,
     ) -> Result<(), FixtureError> {
         let mut violations = Vec::new();
-        let mut ids = BTreeSet::new();
         let fixture_root = root.path.join(FIXTURE_ROOT);
         if let Err(violation) = paths::validate_fixture_root(root) {
             return Err(FixtureError::Validation(violation.into_boxed_str()));
         }
         for row in &self.rows {
-            if row.id.is_empty() {
-                violations.push("row with empty id".to_string());
-            } else if !ids.insert(row.id.clone()) {
-                violations.push(format!("duplicate fixture id {}", row.id));
-            }
             for (field, value) in [
                 ("upstream_source", &row.upstream_source),
                 ("command_shape", &row.command_shape),
@@ -421,9 +417,13 @@ impl FixtureManifest {
                 ),
             ] {
                 if !relative.is_empty() {
-                    if let Err(violation) =
-                        validate_fixture_path(&fixture_root, &row.id, field, relative, must_exist)
-                    {
+                    if let Err(violation) = validate_fixture_path(
+                        &fixture_root,
+                        row.id.as_str(),
+                        field,
+                        relative,
+                        must_exist,
+                    ) {
                         violations.push(violation);
                         continue;
                     }
@@ -439,42 +439,16 @@ impl FixtureManifest {
                 }
             }
         }
-        self.check_compatibility_coverage(root, &mut violations);
+        match crate::parity::required_fixture_ids(root) {
+            Ok(required) => self.check_required_ids(&required, &mut violations),
+            Err(error) => violations.push(error.to_string()),
+        }
         if violations.is_empty() {
             Ok(())
         } else {
             Err(FixtureError::Validation(
                 violations.join("\n").into_boxed_str(),
             ))
-        }
-    }
-
-    fn check_compatibility_coverage(&self, root: &RepoRoot, violations: &mut Vec<String>) {
-        let fixture_keys = self
-            .rows
-            .iter()
-            .map(|row| {
-                (
-                    row.upstream_source.as_str(),
-                    row.milestone.as_str(),
-                    row.parity_mode.as_str(),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        let matrix =
-            match crate::matrix::CompatibilityMatrix::read_from_path(root.compatibility_matrix()) {
-                Ok(matrix) => matrix,
-                Err(error) => {
-                    violations.push(format!("failed to read compatibility matrix: {error}"));
-                    return;
-                }
-            };
-        for (upstream_path, milestone, parity_mode) in matrix.required_fixture_rows() {
-            if !fixture_keys.contains(&(upstream_path, milestone, parity_mode)) {
-                violations.push(format!(
-                    "missing M2 fixture row for {upstream_path} ({milestone}/{parity_mode})"
-                ));
-            }
         }
     }
 

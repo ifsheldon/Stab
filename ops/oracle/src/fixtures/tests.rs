@@ -177,22 +177,22 @@ fn run_filter_matches_fixture_rows() {
     let exact_row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "m8-sample-basic")
+        .find(|row| row.id.as_str() == "m8-sample-basic")
         .expect("M8 exact row");
     let statistical_row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "m8-sample-noisy-statistical")
+        .find(|row| row.id.as_str() == "m8-sample-noisy-statistical")
         .expect("M8 statistical row");
     let structural_exact_row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "coverage-io-measure-record-writer")
+        .find(|row| row.id.as_str() == "coverage-io-measure-record-writer")
         .expect("M8 structural exact-parity row");
     let structural_row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "coverage-simulators-frame-simulator-util")
+        .find(|row| row.id.as_str() == "coverage-simulators-frame-simulator-util")
         .expect("M9 structural row");
 
     assert!(RunFilter::Exact.matches(exact_row));
@@ -218,7 +218,7 @@ fn m4_core_parse_print_rows_run_in_process() {
         let row = manifest
             .rows
             .iter()
-            .find(|row| row.id == id)
+            .find(|row| row.id.as_str() == id)
             .expect("M4 core row");
         let output = run_core_fixture(&root, row).expect("core fixture");
 
@@ -245,7 +245,7 @@ fn m4_direct_rust_rows_run_cargo_tests() {
         let row = manifest
             .rows
             .iter()
-            .find(|row| row.id == id)
+            .find(|row| row.id.as_str() == id)
             .expect("M4 direct Rust row");
         let output = run_direct_rust_fixture(&root, row).expect("direct Rust fixture");
 
@@ -337,17 +337,17 @@ fn only_upstream_executable_core_exact_rows_are_recordable() {
     let core_exact_row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "m4-convert-canonical-print")
+        .find(|row| row.id.as_str() == "m4-convert-canonical-print")
         .expect("M4 exact core row");
     let cli_exact_row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "smoke-tiny-circuit")
+        .find(|row| row.id.as_str() == "smoke-tiny-circuit")
         .expect("M0 CLI exact row");
     let reverse_flow_exact_row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "pfm-b1-exact-flow-reverse-measurement")
+        .find(|row| row.id.as_str() == "pfm-b1-exact-flow-reverse-measurement")
         .expect("PFM-B1 pinned reverse-flow row");
 
     assert!(!is_recordable(core_exact_row));
@@ -404,7 +404,7 @@ fn repository_fixture_placeholder_files_exist() {
 
     for row in &manifest.rows {
         for token in row.argv_tokens() {
-            match outputs::parse_fixture_arg_token(&row.id, &token)
+            match outputs::parse_fixture_arg_token(row.id.as_str(), &token)
                 .expect("parse fixture placeholder token")
             {
                 Some(FixtureArgToken::Input(relative)) => {
@@ -436,7 +436,7 @@ fn fixture_output_placeholders_use_owned_temporary_storage() {
     let row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "m11-sample-dem-observable-output-exact")
+        .find(|row| row.id.as_str() == "m11-sample-dem-observable-output-exact")
         .expect("M11 fixture output row");
 
     let command = outputs::prepare_command(&root, row, "test").expect("prepare command");
@@ -483,7 +483,7 @@ fn descriptor_owned_fixture_output_rejects_a_child_symlink() {
     let row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "m11-sample-dem-observable-output-exact")
+        .find(|row| row.id.as_str() == "m11-sample-dem-observable-output-exact")
         .expect("M11 fixture output row");
     let command = outputs::prepare_command(&root, row, "symlink-test").expect("prepare command");
     let output = command.outputs.first().expect("one fixture output");
@@ -509,7 +509,7 @@ fn fixture_input_placeholders_are_replaced_with_fixture_paths() {
     let row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "m11-sample-dem-replay-side-outputs-exact")
+        .find(|row| row.id.as_str() == "m11-sample-dem-replay-side-outputs-exact")
         .expect("M11 fixture input row");
 
     let command = outputs::prepare_command(&root, row, "test").expect("prepare command");
@@ -1038,26 +1038,6 @@ fn child_fixture_output_read_rejects_symlink() {
 }
 
 #[test]
-fn validation_requires_fixture_milestone_and_parity_to_match_matrix() {
-    let csv = format!(
-        "{HEADER}m7-convert-01-to-dets,M7,src/stim/cmd/command_convert.test.cc,exact-output,exact-output,stim convert 01 to dets,convert|--in_format=01|--out_format=dets,inputs/convert_measurements.01,expected/m7_convert_01_to_dets.stdout,0,empty,red,,hand-authored\n"
-    );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("repo root");
-    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-    let error = manifest
-        .check(&root)
-        .expect_err("M7 convert row must not satisfy M4 coverage");
-
-    assert!(error.to_string().contains(
-        "missing M2 fixture row for src/stim/cmd/command_convert.test.cc (M4/exact-output)"
-    ));
-}
-
-#[test]
 fn validation_requires_declared_expected_stdout_by_default() {
     let csv = format!(
         "{HEADER}bad,M4,src/stim/cmd/command_convert.test.cc,exact-output,exact-output,stab-core circuit parse print,core-circuit-parse-print,inputs/parser_basic.stim,expected/missing-golden.stdout,0,any,manifest-only,,hand-authored\n"
@@ -1094,7 +1074,7 @@ fn validation_allows_failure_exact_rows_without_expected_stdout() {
     let row = manifest
         .rows
         .iter()
-        .find(|row| row.id == "m7-convert-bits-to-dets-reject")
+        .find(|row| row.id.as_str() == "m7-convert-bits-to-dets-reject")
         .expect("M7 rejection row");
     assert_eq!(row.expected_status, 1);
     assert!(row.expected_stdout_path.is_empty());

@@ -11,7 +11,6 @@
 
 mod fixtures;
 mod gate_catalog;
-mod matrix;
 mod parity;
 mod process;
 mod result_format_corpus;
@@ -112,17 +111,6 @@ enum Command {
         rebuild_stim: bool,
     },
 
-    /// Inspect or validate the compatibility matrix.
-    Matrix {
-        /// Validate matrix coverage and acceptance metadata.
-        #[arg(long)]
-        check: bool,
-
-        /// Print rows owned by a milestone such as M4.
-        #[arg(long)]
-        milestone: Option<String>,
-    },
-
     /// Validate the pinned Stim result-format compatibility corpus.
     ResultFormats {
         /// Execute every corpus case against pinned Stim and Stab.
@@ -166,9 +154,6 @@ enum OracleError {
 
     #[error(transparent)]
     GateCatalog(#[from] gate_catalog::GateCatalogError),
-
-    #[error(transparent)]
-    Matrix(#[from] matrix::MatrixError),
 
     #[error(transparent)]
     ResultFormatCorpus(#[from] result_format_corpus::ResultFormatCorpusError),
@@ -364,10 +349,6 @@ impl RepoRoot {
         self.build_dir().join(BUILD_STAMP_FILE)
     }
 
-    fn compatibility_matrix(&self) -> PathBuf {
-        self.path.join("oracle").join("compatibility-matrix.csv")
-    }
-
     fn fixture_manifest(&self) -> PathBuf {
         self.path
             .join("oracle")
@@ -510,9 +491,6 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         } => {
             fixtures::record_fixtures(&root, check_clean, rebuild_stim)?;
         }
-        Command::Matrix { check, milestone } => {
-            run_matrix_command(&root, check, milestone.as_deref())?;
-        }
         Command::ResultFormats {
             check,
             rebuild_stim,
@@ -586,25 +564,6 @@ fn run_selected_cases(root: &RepoRoot, selection: RunSelection) -> Result<(), Or
         );
     }
     fixtures::run_fixtures(root, fixtures::RunMode::All, filter, selection.rebuild_stim)
-}
-
-fn run_matrix_command(
-    root: &RepoRoot,
-    check: bool,
-    milestone: Option<&str>,
-) -> Result<(), OracleError> {
-    let matrix = matrix::CompatibilityMatrix::read_from_path(root.compatibility_matrix())?;
-    if check {
-        let report = matrix.check(&root.path)?;
-        report.print();
-    }
-    if let Some(milestone) = milestone {
-        matrix.print_milestone(milestone)?;
-    }
-    if !check && milestone.is_none() {
-        matrix.print_summary();
-    }
-    Ok(())
 }
 
 fn fetch_stim(root: &RepoRoot) -> Result<(), OracleError> {

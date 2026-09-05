@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: Complete. P0 completed in `07ebf4c8`; P1 through P9 are complete. Release validity remains conditional on required GitHub CI passing the exact proposed release revision.
+Status: P0 through P9 completed for their recorded revisions. The September review repairs and code reduction are implemented and awaiting fresh controlled evidence; release validity remains conditional on the measured source, permitted evidence descendants, and required GitHub CI passing the exact proposed release revision.
 
 ## Summary
 
@@ -106,6 +106,8 @@ P0 introduces `oracle/stim-v1.16-parity.toml` as the sole current feature-parity
 - a rationale when status is `deferred` or `divergence`.
 
 There is no `partial` status. A broad row that contains both implemented and missing behavior must be split until every row has one honest implementation status. Missing canonical evidence never changes an implemented row back to `missing`; it changes only the evidence state. Entries describe behavior families, not every Rust export, every upstream test file, or every fixture.
+
+Schema version 2 adds the root `required_fixture_ids` list and removes oracle execution tiers. Every required ID must resolve to exactly one implemented fixture; the fixture manifest continues to own its command, comparator, source attribution, and inputs. The list preserves the former matrix's retained fixture-coverage floor without duplicating upstream-path/milestone/parity tuples or granting broad fixtures semantic ownership. The old matrix and its command are removed. One `just oracle::parity-run` executes the complete canonical owner set.
 
 The ledger generates `docs/stim-parity.md`. That generated document replaced `docs/stim-feature-list.md`, `docs/stab-feature-checklist.md`, the blocker ledger, and hand-maintained feature counts as the current status view. P9 retained their durable rationale in architecture and migration records, then removed the superseded files from the active tree; Git history preserves them.
 
@@ -593,7 +595,7 @@ The final suite has five layers:
 4. **Real CLI tests:** process-level workflows covering arguments, files, streams, outputs, errors, and exit status.
 5. **Focused safety tests:** hostile input, path identity, process supervision, allocation bounds, cancellation, and writer failure.
 
-Pull-request CI runs deterministic owner tests, the compact parity suite, architecture checks, CLI smoke, generated-document checks, and untimed benchmark preflight. Nightly CI runs the full differential, fuzz, and statistical tiers. Shared-host timing is diagnostic only. Formal performance evidence runs only on the controlled host.
+Pull-request and push CI run deterministic owner tests, the complete canonical parity-owner set, architecture checks, CLI smoke, generated-document checks, required fixture-reference checks, and untimed benchmark preflight. Ignored fuzz helpers remain explicit local checks; no separate scheduled differential or statistical tier is advertised. Shared-host timing is diagnostic only. Formal performance evidence runs only on the controlled host.
 
 Tests that merely assert derives, re-exports, constants, type names, private pointer identity, static labels, or bookkeeping shape are removed unless that representation is itself a documented public contract.
 
@@ -603,7 +605,7 @@ The target human-facing command surface is:
 
 ```text
 just oracle::parity-check
-just oracle::parity-run --tier pr|full|soak
+just oracle::parity-run
 just oracle::parity-render --check
 just bench::e2e-check
 just bench::e2e-run --tier smoke|full|soak

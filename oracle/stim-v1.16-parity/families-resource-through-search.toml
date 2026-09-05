@@ -16,7 +16,6 @@ package = "stab-algebra"
 kind = "test"
 target = "cq2_algebra_resources"
 name = "algebra_size_limits_reject_before_materialization_or_rng_use"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.circuit-count-overflow"
@@ -34,7 +33,6 @@ package = "stab-model"
 kind = "test"
 target = "circuit_model_regressions"
 name = "circuit_counts_accept_u64_maximum_and_reject_the_first_overflow"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.circuit-pass-limits"
@@ -52,7 +50,6 @@ package = "stab-analysis"
 kind = "test"
 target = "circuit_pass"
 name = "circuit_pass_resource_admission_is_atomic_across_framework_stages"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.circuit-to-dem-expanded-work-limit"
@@ -70,7 +67,6 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_traversal_resource"
 name = "pf4_dem_analyzer_repeat_resource_policy_is_source_owned"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.circuit-to-dem-local-decomposition-limit"
@@ -86,7 +82,6 @@ package = "stab-analysis"
 kind = "test"
 target = "consolidation_matrix"
 name = "circuit_to_dem_local_decomposition_symptom_boundary_matches_stim"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.circuit-to-dem-no-recurrence-limit"
@@ -104,7 +99,6 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_analyzer_loop_folding"
 name = "pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.cli-file-hardlink-identities"
@@ -121,7 +115,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::path_alias::hardlink_file_role_aliases_fail_without_truncation"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.cli-file-lexical-identities"
@@ -138,7 +131,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::path_alias::explicit_direct_file_role_aliases_fail_without_truncation"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.cli-file-normalized-identities"
@@ -155,7 +147,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::path_alias::normalized_relative_file_role_aliases_fail_without_truncation"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.cli-file-symlink-identities"
@@ -172,7 +163,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::path_alias::symlink_file_role_aliases_fail_without_truncation"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.dem-coordinate-map-limit"
@@ -190,7 +180,6 @@ package = "stab-model"
 kind = "test"
 target = "dem_coordinate_resources"
 name = "pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.dem-sampling-work-limits"
@@ -208,7 +197,6 @@ package = "stab-engine"
 kind = "test"
 target = "dem_sampling_plan_session"
 name = "work_limits_reject_before_rng_or_sink_and_leave_session_reusable"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.detecting-regions-limits"
@@ -226,7 +214,6 @@ package = "stab-analysis"
 kind = "lib"
 target = "stab_analysis"
 name = "circuit_detecting_regions::tests::detecting_regions_resource_contract_is_bounded"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.detection-compile-limits"
@@ -244,7 +231,6 @@ package = "stab-engine"
 kind = "test"
 target = "canonical_owner_evidence"
 name = "a2_detection_compile_limits_are_independent_and_atomic"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.feedback-inlining-fixed-limits"
@@ -262,7 +248,6 @@ package = "stab-analysis"
 kind = "lib"
 target = "stab_analysis"
 name = "circuit_feedback::tests::feedback_repeat_resource_divergence_has_one_aggregate_policy"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.flow-generation-fixed-limits"
@@ -280,7 +265,6 @@ package = "stab-analysis"
 kind = "test"
 target = "circuit_flow_resources"
 name = "circuit_flow_generators_admit_owned_rows_and_report_typed_limits"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.generation-qubit-limit"
@@ -298,7 +282,6 @@ package = "stab-analysis"
 kind = "test"
 target = "circuit_generation"
 name = "resource::cq2_generation_resource_admission_checks_family_boundaries_before_materialization"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.logical-search-budget-boundaries"
@@ -316,7 +299,6 @@ package = "stab-analysis"
 kind = "lib"
 target = "stab_analysis"
 name = "dem::search::budget::tests::graph_and_search_budgets_accept_exact_limits_and_reject_first_excess"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.logical-search-materialization-limits"
@@ -334,7 +316,6 @@ package = "stab-analysis"
 kind = "test"
 target = "logical_search_materialization_limits"
 name = "logical_search_limits_return_typed_failures_without_mutating_source"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.missing-detector-fixed-limits"
@@ -352,7 +333,6 @@ package = "stab-analysis"
 kind = "test"
 target = "missing_detectors"
 name = "missing_detector_resource_contract_is_atomic"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.model-circuit-parse-limits"
@@ -370,7 +350,6 @@ package = "stab-model"
 kind = "test"
 target = "model_parse_diagnostics"
 name = "byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.model-dem-parse-limits"
@@ -388,7 +367,6 @@ package = "stab-model"
 kind = "test"
 target = "model_parse_diagnostics"
 name = "byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.model-parse-accounting-order"
@@ -406,7 +384,6 @@ package = "stab-model"
 kind = "test"
 target = "parse_resources"
 name = "parser_admission_accumulates_fast_path_targets_and_prefusion_declarations"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.model-parse-allocation-admission"
@@ -424,7 +401,6 @@ package = "stab-model"
 kind = "test"
 target = "parse_resources"
 name = "parser_allocation_depends_only_on_admitted_model_storage"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.model-remaining-parse-limits"
@@ -442,7 +418,6 @@ package = "stab-model"
 kind = "test"
 target = "parse_resources"
 name = "parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.pauli-conjugation-fixed-limit"
@@ -460,7 +435,6 @@ package = "stab-analysis"
 kind = "test"
 target = "algebra_circuit_conversions"
 name = "pauli_circuit_conjugation_keeps_compact_unitaries_and_bounds_nonunitary_work"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.record-streaming-dense-packed-bounds"
@@ -478,7 +452,6 @@ package = "stab-records"
 kind = "test"
 target = "resource_contracts"
 name = "dense_and_packed_streaming_allocations_follow_width_not_record_count"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.record-streaming-sparse-token-bounds"
@@ -496,7 +469,6 @@ package = "stab-records"
 kind = "test"
 target = "resource_contracts"
 name = "sparse_and_token_streaming_allocations_follow_largest_record_not_record_count"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.sampling-expanded-work-limit"
@@ -513,7 +485,6 @@ status = "verified"
 package = "stab-engine"
 kind = "lib"
 name = "sampling::tests::expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work"
-minimum_tier = "pr"
 
 [[families]]
 id = "resource-safety.sat-materialization-limits"
@@ -531,7 +502,6 @@ package = "stab-analysis"
 kind = "test"
 target = "sat_materialization_limits"
 name = "sat_materialization_limits_admit_exact_boundaries_and_preserve_source"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.codecs-and-strict-grammars"
@@ -548,7 +518,6 @@ package = "stab-records"
 kind = "lib"
 target = "stab_records"
 name = "result_formats::tests::codecs_and_strict_grammars_contract"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-convert"
@@ -569,7 +538,6 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "convert_real_process_covers_layout_and_format_routes"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-convert-ptb64-observable-output"
@@ -587,13 +555,11 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::convert::convert_ptb64_observable_side_output_round_trips"
-minimum_tier = "pr"
 [families.evidence.stim_reproduction]
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
 name = "parity::tests::pinned_stim::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-convert-ptb64-output"
@@ -611,13 +577,11 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::convert::convert_ptb64_round_trips_and_interops_with_other_formats"
-minimum_tier = "pr"
 [families.evidence.stim_reproduction]
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
 name = "parity::tests::pinned_stim::pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-detect"
@@ -637,7 +601,6 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "detect_real_process_covers_options_and_output_routes"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-m2d"
@@ -659,7 +622,6 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "m2d_real_process_covers_measurement_sweep_and_output_routes"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-m2d-ptb64-observable-output-rejection"
@@ -675,7 +637,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::m9::m2d_rejects_ptb64_observable_output_like_stim"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-m2d-ptb64-output-rejection"
@@ -691,7 +652,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::m9::m2d_rejects_ptb64_detector_output_like_stim"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-sample"
@@ -708,7 +668,6 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "sample_real_process_covers_options_and_all_output_formats"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-sample-dem"
@@ -729,7 +688,6 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "sample_dem_real_process_covers_primary_side_and_replay_routes"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.routes-sample-dem-replay"
@@ -748,7 +706,6 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "sample_dem_real_process_covers_primary_side_and_replay_routes"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.streaming-and-typed-dets"
@@ -764,7 +721,6 @@ package = "stab-records"
 kind = "lib"
 target = "stab_records"
 name = "result_streaming::tests::streaming_and_typed_dets_contract"
-minimum_tier = "pr"
 
 [[families]]
 id = "result-formats.streaming-cancellation"
@@ -780,7 +736,6 @@ package = "stab-records"
 kind = "lib"
 target = "stab_records"
 name = "result_streaming::tests::generic_streaming_preserves_the_first_visitor_error"
-minimum_tier = "pr"
 
 [[families]]
 id = "sampling.circuit-common-measurement-and-reset"
@@ -796,7 +751,6 @@ package = "stab-engine"
 kind = "test"
 target = "lean_parity_contracts"
 name = "sampling_circuit_common_measurement_and_reset_contract"
-minimum_tier = "pr"
 
 [[families]]
 id = "sampling.circuit-core-gates"
@@ -812,7 +766,6 @@ package = "stab-engine"
 kind = "test"
 target = "gate_semantic_execution"
 name = "fixed_tableau_gates_execute_across_current_public_surfaces"
-minimum_tier = "pr"
 
 [[families]]
 id = "sampling.circuit-remaining-gate-target-surface"
@@ -829,7 +782,6 @@ package = "stab-engine"
 kind = "test"
 target = "gate_semantic_contract"
 name = "gate::semantic_contract::tests::product_surfaces_execute_every_declared_legal_gate_shape"
-minimum_tier = "pr"
 
 [[families]]
 id = "sampling.circuit-sweep-controls"
@@ -845,7 +797,6 @@ package = "stab-engine"
 kind = "test"
 target = "gate_semantic_contract"
 name = "gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls"
-minimum_tier = "pr"
 
 [[families]]
 id = "sampling.dem-sampling-and-replay"
@@ -861,7 +812,6 @@ package = "stab-engine"
 kind = "test"
 target = "dem_sampling_plan_session"
 name = "streamed_sessions_match_materialized_sampling_across_dem_families"
-minimum_tier = "pr"
 
 [[families]]
 id = "sampling.exact-stim-random-streams"
@@ -885,7 +835,6 @@ package = "stab-engine"
 kind = "lib"
 target = "stab_engine"
 name = "sampling::tests::reference_loop_policy_reuses_only_proven_invariant_work"
-minimum_tier = "pr"
 
 [[families]]
 id = "sampling.noise-complete"
@@ -901,7 +850,6 @@ package = "stab-engine"
 kind = "test"
 target = "lean_parity_contracts"
 name = "sampling_noise_complete_contract"
-minimum_tier = "pr"
 
 [[families]]
 id = "search.graphlike-shortest-error"
@@ -917,7 +865,6 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_search"
 name = "pf6_direct_dem_graphlike_search_matches_upstream_distance_cases"
-minimum_tier = "pr"
 
 [[families]]
 id = "search.hypergraph-heuristic"
@@ -933,7 +880,6 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_search"
 name = "pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases"
-minimum_tier = "pr"
 
 [[families]]
 id = "search.likeliest-error-wcnf-common"
@@ -949,7 +895,6 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_sat_repeat_folding"
 name = "likeliest_error_wcnf_common_matches_stim"
-minimum_tier = "pr"
 
 [[families]]
 id = "search.likeliest-error-wcnf-exhaustive-optimum"
@@ -965,7 +910,6 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_sat_repeat_semantics"
 name = "likeliest_wcnf_repeat_semantics_match_direct_exhaustion"
-minimum_tier = "pr"
 
 [[families]]
 id = "search.likeliest-error-wcnf-zero-probability-sparse-targets"
@@ -983,13 +927,11 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_sat_repeat_folding"
 name = "likeliest_error_wcnf_avoids_stim_zero_probability_sparse_literal_bug"
-minimum_tier = "pr"
 [families.evidence.stim_reproduction]
 package = "stab-oracle"
 kind = "bin"
 target = "stab-oracle"
 name = "parity::tests::pinned_stim::pinned_stim_weighted_wcnf_emits_false_sentinels_for_sparse_zero_probability_targets"
-minimum_tier = "pr"
 
 [[families]]
 id = "search.shortest-error-wcnf"
@@ -1005,4 +947,3 @@ package = "stab-analysis"
 kind = "test"
 target = "dem_sat_repeat_folding"
 name = "shortest_error_wcnf_common_matches_stim"
-minimum_tier = "pr"

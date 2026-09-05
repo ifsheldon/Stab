@@ -3,10 +3,11 @@ use std::path::{Component, Path, PathBuf};
 use serde::Deserialize;
 
 use super::{
-    CommandSurface, Family, FormatRoute, LEDGER_PATH, Ledger, MAX_LEDGER_BYTES, ParityError,
-    StimIdentity, invalid, read_regular_file_bounded,
+    CommandSurface, Family, FormatRoute, LEDGER_PATH, LEDGER_SCHEMA_VERSION, Ledger,
+    MAX_LEDGER_BYTES, ParityError, StimIdentity, invalid, read_regular_file_bounded,
 };
 use crate::RepoRoot;
+use crate::fixtures::FixtureId;
 
 const FRAGMENT_ROOT: &str = "oracle/stim-v1.16-parity";
 const MAX_FRAGMENTS: usize = 16;
@@ -15,6 +16,7 @@ const MAX_FRAGMENTS: usize = 16;
 #[serde(deny_unknown_fields)]
 struct Manifest {
     schema_version: u32,
+    required_fixture_ids: Vec<FixtureId>,
     stim: StimIdentity,
     family_files: Vec<FragmentPath>,
     command_surfaces: Vec<CommandSurface>,
@@ -69,16 +71,13 @@ impl<'de> Deserialize<'de> for FragmentPath {
 }
 
 pub(super) fn read(root: &RepoRoot) -> Result<Ledger, ParityError> {
-    let path = root.path.join(LEDGER_PATH);
-    let bytes = read_regular_file_bounded(&path, MAX_LEDGER_BYTES)?;
-    let manifest = parse::<Manifest>(&path, &bytes)?;
+    let (manifest, mut total_bytes) = read_manifest(root)?;
     if manifest.family_files.is_empty() || manifest.family_files.len() > MAX_FRAGMENTS {
         return Err(invalid(format!(
             "{LEDGER_PATH} must name between 1 and {MAX_FRAGMENTS} family fragments"
         )));
     }
 
-    let mut total_bytes = bytes.len();
     let mut previous: Option<&Path> = None;
     let mut families = Vec::new();
     for fragment_path in &manifest.family_files {
@@ -111,11 +110,34 @@ pub(super) fn read(root: &RepoRoot) -> Result<Ledger, ParityError> {
 
     Ok(Ledger {
         schema_version: manifest.schema_version,
+        required_fixture_ids: manifest.required_fixture_ids,
         stim: manifest.stim,
         command_surfaces: manifest.command_surfaces,
         format_routes: manifest.format_routes,
         families,
     })
+}
+
+pub(crate) fn required_fixture_ids(root: &RepoRoot) -> Result<Vec<FixtureId>, ParityError> {
+    read_manifest(root).map(|(manifest, _)| manifest.required_fixture_ids)
+}
+
+fn read_manifest(root: &RepoRoot) -> Result<(Manifest, usize), ParityError> {
+    let path = root.path.join(LEDGER_PATH);
+    let bytes = read_regular_file_bounded(&path, MAX_LEDGER_BYTES)?;
+    let manifest = parse::<Manifest>(&path, &bytes)?;
+    if manifest.schema_version != LEDGER_SCHEMA_VERSION {
+        return Err(invalid(format!(
+            "schema_version is {}, expected {LEDGER_SCHEMA_VERSION}",
+            manifest.schema_version
+        )));
+    }
+    if manifest.required_fixture_ids.is_empty() {
+        return Err(invalid(
+            "required_fixture_ids must not be empty".to_string(),
+        ));
+    }
+    Ok((manifest, bytes.len()))
 }
 
 fn parse<T>(path: &Path, bytes: &[u8]) -> Result<T, ParityError>
@@ -132,7 +154,63 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::FragmentPath;
+    use super::{FragmentPath, LEDGER_PATH, required_fixture_ids};
+    use crate::RepoRoot;
+
+    #[test]
+    fn fixture_requirements_reject_missing_empty_and_obsolete_root_contracts() {
+        let directory = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot {
+            path: directory.path().to_path_buf(),
+        };
+        std::fs::create_dir(root.path.join("oracle")).expect("oracle directory");
+        let source = include_str!("../../../../oracle/stim-v1.16-parity.toml");
+        let mut manifest = source.parse::<toml::Table>().expect("root manifest");
+        manifest.insert(
+            "required_fixture_ids".to_string(),
+            toml::Value::Array(vec![toml::Value::String("required".to_string())]),
+        );
+        let write = |value: &toml::Table| {
+            std::fs::write(
+                root.path.join(LEDGER_PATH),
+                toml::to_string(value).expect("manifest TOML"),
+            )
+            .expect("write manifest")
+        };
+        write(&manifest);
+        required_fixture_ids(&root).expect("root requirements do not load family fragments");
+
+        for (field, replacement, expected) in [
+            (
+                "required_fixture_ids",
+                None,
+                "missing field `required_fixture_ids`",
+            ),
+            (
+                "required_fixture_ids",
+                Some(toml::Value::Array(Vec::new())),
+                "required_fixture_ids must not be empty",
+            ),
+            (
+                "schema_version",
+                Some(toml::Value::Integer(1)),
+                "schema_version is 1, expected 2",
+            ),
+        ] {
+            let mut changed = manifest.clone();
+            match replacement {
+                Some(value) => {
+                    changed.insert(field.to_string(), value);
+                }
+                None => {
+                    changed.remove(field);
+                }
+            }
+            write(&changed);
+            let error = required_fixture_ids(&root).expect_err("incomplete requirements must fail");
+            assert!(error.to_string().contains(expected), "{error}");
+        }
+    }
 
     #[test]
     fn fragment_paths_are_normalized_and_confined_to_the_ledger_directory() {

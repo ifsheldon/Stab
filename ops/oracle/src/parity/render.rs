@@ -46,6 +46,7 @@ pub(super) fn render(ledger: &Ledger) -> String {
         "Pinned target: `{}` at `{}`.\n\n",
         ledger.stim.version, ledger.stim.commit
     ));
+    output.push_str("The ledger's `required_fixture_ids` preserves named supporting fixtures from [the fixture corpus](../oracle/fixtures/manifest.csv). Each reference must resolve to one implemented fixture; these requirements do not replace canonical family evidence.\n\n");
     output.push_str("## Summary\n\n");
     output.push_str("| Status | Families |\n| --- | ---: |\n");
     for status in [
@@ -144,7 +145,7 @@ pub(super) fn render(ledger: &Ledger) -> String {
                 Disposition::Done {
                     evidence: Evidence::Verified { test, .. },
                     ..
-                } => format!("`{}` ({})", test.display(), test.minimum_tier.as_str()),
+                } => format!("`{}`", test.display()),
                 Disposition::Done {
                     evidence: Evidence::NeedsOwner { milestone },
                     ..

@@ -6,7 +6,7 @@ fn assert_fixtures_execute_package(ids: &[&str], package: &str) {
         let row = manifest
             .rows
             .iter()
-            .find(|row| row.id == *id)
+            .find(|row| row.id.as_str() == *id)
             .expect("component-owned fixture");
         assert!(
             row.argv_tokens()

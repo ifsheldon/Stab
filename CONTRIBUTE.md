@@ -40,8 +40,7 @@ The atomic source ledger is `oracle/stim-v1.16-parity.toml` plus its named famil
 ```text
 just oracle::gates
 just oracle::parity-check
-just oracle::parity-run --tier pr
-just oracle::parity-run --tier full
+just oracle::parity-run
 just oracle::parity-render --check
 ```
 
@@ -52,10 +51,9 @@ Additional pinned checks are:
 ```text
 just oracle::result-formats --check
 just oracle::run --implemented-only
-just oracle::matrix --check
 ```
 
-The result-format corpus and gate helper run the actual pinned Stim source. The fixture corpus and compatibility matrix are supporting coverage maps; they do not own current feature status.
+The result-format corpus and gate helper run the actual pinned Stim source. Parity schema version 2 names required implemented fixture IDs in the root manifest; fixture definitions own their commands, comparators, source attribution, and statistical plans. These supporting fixtures do not promote semantic family status. The old compatibility matrix and oracle tier flags are removed; benchmark tiers still select different measurement workloads.
 
 ## Performance
 
@@ -69,7 +67,7 @@ just bench::e2e-replay --input target/benchmarks/<bundle>
 
 Smoke timing is diagnostic. Formal full and soak evidence requires a clean commit, controlled host, release binaries, fixed CPU affinity, temperature below `100 C`, and no swap I/O during measured samples. Every output path must be new. Do not delete samples, waive a failed ratio, relax the `1.25x` Stim parity gate, relax the `1.15x` self-regression gate, or reduce semantic work to obtain a pass.
 
-Formal runs use `--tier full|soak --affinity-cpu <cpu>`. Release authorization is `just bench::e2e-release-check`; it remains intentionally unavailable until P9 records the checked AArch64 evidence pointer.
+Formal runs use `--tier full|soak --affinity-cpu <cpu>`. Release authorization is `just bench::e2e-release-check`; it requires the checked AArch64 evidence pair and permits only the documented evidence descendants of its measured source.
 
 Add a persistent benchmark only for a user workflow. Add a diagnostic only after a profile attributes at least 10 percent of such a workflow to the measured component.
 

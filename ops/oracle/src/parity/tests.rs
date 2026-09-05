@@ -4,12 +4,11 @@ mod catalog_semantics;
 mod pinned_stim;
 mod support;
 
-fn test_owner(tier: Tier) -> TestOwner {
+fn test_owner() -> TestOwner {
     TestOwner {
         package: "stab-oracle".to_string(),
         target: CargoTestTarget::Lib,
         name: "parity_owner".to_string(),
-        minimum_tier: tier,
     }
 }
 
@@ -105,7 +104,7 @@ fn missing_family(id: &str, coverage: Vec<String>) -> Family {
     }
 }
 
-fn done_family(id: &str, tier: Tier) -> Family {
+fn done_family(id: &str) -> Family {
     Family {
         id: id.to_string(),
         area: Area::CircuitModel,
@@ -115,7 +114,7 @@ fn done_family(id: &str, tier: Tier) -> Family {
         disposition: Disposition::Done {
             owner: "stab-model".to_string(),
             evidence: Evidence::Verified {
-                test: test_owner(tier),
+                test: test_owner(),
                 stim_reproduction: None,
             },
         },
@@ -152,7 +151,7 @@ fn divergence_family(
             divergence_kind,
             rationale: "Stab deliberately preserves the documented behavior.".to_string(),
             evidence: Evidence::Verified {
-                test: test_owner(Tier::Pr),
+                test: test_owner(),
                 stim_reproduction,
             },
         },
@@ -202,6 +201,9 @@ fn valid_ledger() -> Ledger {
     coverage.extend(option_coverage(&command_surfaces));
     Ledger {
         schema_version: LEDGER_SCHEMA_VERSION,
+        required_fixture_ids: vec![
+            FixtureId::try_from("required".to_string()).expect("fixture id"),
+        ],
         stim: StimIdentity {
             version: STIM_TAG.to_string(),
             commit: STIM_COMMIT.to_string(),
@@ -247,7 +249,6 @@ status = "verified"
 package = "stab-records"
 kind = "lib"
 name = "dense_text_records"
-minimum_tier = "pr"
 "#;
     let error = toml::from_str::<Family>(source).expect_err("foreign status field");
     assert!(error.to_string().contains("milestone"));
@@ -271,7 +272,6 @@ status = "verified"
 package = "stab-engine"
 kind = "lib"
 name = "owner"
-minimum_tier = "pr"
 "#,
         ),
         (
@@ -314,7 +314,6 @@ status = "verified"
 package = "stab-records"
 kind = "lib"
 name = "bounded_input"
-minimum_tier = "pr"
 "#,
         ),
     ];
@@ -335,7 +334,7 @@ fn implementation_and_evidence_status_are_independent() {
         families: vec![family],
         ..valid_ledger()
     };
-    assert!(collect_owner_tests(&ledger, Some(Tier::Soak)).is_empty());
+    assert!(collect_owner_tests(&ledger).is_empty());
 }
 
 #[test]
@@ -383,7 +382,6 @@ status = "verified"
 package = "stab-engine"
 kind = "lib"
 name = "owner"
-minimum_tier = "pr"
 "#,
         ),
         (
@@ -437,9 +435,7 @@ fn facade_cannot_own_a_semantic_parity_family() {
 fn canonical_semantic_tests_run_in_the_product_owner_package() {
     let (_directory, root) = test_root();
     let mut ledger = valid_ledger();
-    ledger
-        .families
-        .push(done_family("zz.owner-package", Tier::Pr));
+    ledger.families.push(done_family("zz.owner-package"));
     ledger
         .families
         .sort_by(|left, right| left.id.cmp(&right.id));
@@ -715,7 +711,7 @@ fn exact_selector_listing_requires_one_match() {
 
 #[test]
 fn exact_owner_execution_includes_ignored_tests() {
-    let owner = test_owner(Tier::Soak);
+    let owner = test_owner();
     assert!(owner.run_args().contains(&"--include-ignored"));
     assert!(owner.display().contains("--include-ignored"));
 }
@@ -724,7 +720,7 @@ fn exact_owner_execution_includes_ignored_tests() {
 fn stim_bug_route_cells_require_stim_bug_dispositions() {
     let (_directory, root) = test_root();
     let mut ledger = valid_ledger();
-    ledger.families = vec![done_family("route.wrong", Tier::Pr)];
+    ledger.families = vec![done_family("route.wrong")];
     ledger
         .families
         .first_mut()
@@ -754,7 +750,7 @@ fn stim_bug_divergences_require_independent_reproductions() {
     ledger.families.push(divergence_family(
         "zz.resource-limit",
         DivergenceKind::ResourceLimit,
-        Some(test_owner(Tier::Pr)),
+        Some(test_owner()),
     ));
     let message = validation_message(
         validate(&root, &ledger, &route_only_expected()).expect_err("foreign reproduction"),
@@ -767,7 +763,7 @@ fn stim_bug_divergences_require_independent_reproductions() {
     ledger.families.push(divergence_family(
         "zz.stim-bug",
         DivergenceKind::StimBug,
-        Some(test_owner(Tier::Pr)),
+        Some(test_owner()),
     ));
     let message = validation_message(
         validate(&root, &ledger, &route_only_expected()).expect_err("same reproduction"),
@@ -777,7 +773,7 @@ fn stim_bug_divergences_require_independent_reproductions() {
     ));
 
     ledger.families.pop();
-    let mut non_oracle = test_owner(Tier::Pr);
+    let mut non_oracle = test_owner();
     non_oracle.package = "stab-cli".to_string();
     non_oracle.name = "independent_reproduction".to_string();
     ledger.families.push(divergence_family(
@@ -828,29 +824,15 @@ fn implemented_non_bug_divergences_may_receive_their_lean_owner_in_p1() {
 }
 
 #[test]
-fn tier_selection_is_cumulative_and_deduplicated() {
+fn shared_owner_selectors_are_deduplicated() {
     let mut ledger = valid_ledger();
-    ledger.families = vec![
-        done_family("one.pr", Tier::Pr),
-        done_family("two.pr", Tier::Pr),
-        done_family("three.full", Tier::Full),
-        done_family("four.soak", Tier::Soak),
-    ];
-    let pr = collect_owner_tests(&ledger, Some(Tier::Pr));
-    assert_eq!(pr.len(), 1);
+    ledger.families = vec![done_family("one.owner"), done_family("two.owner")];
+    let owners = collect_owner_tests(&ledger);
+    assert_eq!(owners.len(), 1);
     assert_eq!(
-        pr.values().next().expect("PR owner").1,
-        ["one.pr", "two.pr"]
+        owners.values().next().expect("shared owner").1,
+        ["one.owner", "two.owner"]
     );
-    let full = collect_owner_tests(&ledger, Some(Tier::Full));
-    assert_eq!(full.len(), 1);
-    assert_eq!(
-        full.values().next().expect("full owner").1,
-        ["one.pr", "two.pr", "three.full"]
-    );
-    let soak = collect_owner_tests(&ledger, Some(Tier::Soak));
-    assert_eq!(soak.len(), 1);
-    assert_eq!(soak.values().next().expect("soak owner").1.len(), 4);
 }
 
 #[test]

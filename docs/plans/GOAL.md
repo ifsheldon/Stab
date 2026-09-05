@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: Complete for revisions whose required GitHub CI is green. P0 through P9 are complete; release use remains fail-closed on exact-revision CI.
+Status: September review repairs and code reduction are implemented; full correctness verification and refreshed AArch64 evidence are in progress. P0 through P9 remain complete for their recorded revisions. Current source changes require fresh measurement and exact-revision CI before release use.
 
 ## Objective
 
@@ -17,15 +17,15 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 ## Sources Of Truth
 
 - [Active implementation plan](stim-core-parity-and-lean-evidence-plan.md) owns rationale, architecture, milestones, tests, benchmarks, and acceptance criteria.
-- `oracle/stim-v1.16-parity.toml` and its family fragments own feature and evidence status.
+- `oracle/stim-v1.16-parity.toml` and its family fragments own feature and evidence status plus required supporting fixture identities.
 - [Generated parity view](../stim-parity.md) owns volatile counts and must match the ledger.
 - [Architecture rules](../architecture/README.md) own durable component boundaries.
 - `benchmarks/suite.toml` is the sole active performance source; [the generated suite view](../../benchmarks/SUITE.md) must match it.
-- `benchmarks/current-aarch64-evidence.toml` names the only source-current controlled evidence pair.
+- `benchmarks/current-aarch64-evidence.toml` names the last accepted controlled evidence pair; the review repairs require a replacement pair from their clean source revision.
 
 Superseded plans, progress reports, qualification inventories, and benchmark manifests remain available through Git history. They do not create parallel requirements or promote current claims.
 
-## Completion Evidence
+## Last Accepted Evidence
 
 1. Measured source `ef9866324640a744208e862a9a918f9fa16d4953` passed exact-revision GitHub CI in [run 33150313661](https://github.com/ifsheldon/Stab/actions/runs/33150313661), including strict Rust checks, workspace tests, generated contracts, the 62-case result-format oracle, and all 138 pull-request parity owners.
 2. The controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/ef9866324640a744208e862a9a918f9fa16d4953/` each cover all 29 release cases and pass correctness, memory, `1.25x` Stim parity, and seeded `1.15x` Stab self-regression.

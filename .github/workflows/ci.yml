@@ -114,14 +114,11 @@ jobs:
       - name: Build and check pinned Stim gate oracle
         run: just oracle::gates
 
-      - name: Run PR-tier parity owners
-        run: just oracle::parity-run --tier pr
+      - name: Run parity owners
+        run: just oracle::parity-run
 
       - name: Check E2E performance contract
         run: just bench::e2e-check
-
-      - name: Check oracle fixture matrix
-        run: just oracle::matrix --check
 
       - name: Check pinned result-format corpus
         run: just oracle::result-formats --check

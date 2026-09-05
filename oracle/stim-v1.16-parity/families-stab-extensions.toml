@@ -14,7 +14,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::agent::capabilities_json_is_generated_from_product_and_clap_descriptors"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.agent-inspect"
@@ -32,7 +31,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::agent::inspect_json_reports_exact_circuit_and_dem_structure_without_execution"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.agent-plan"
@@ -50,7 +48,6 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::agent::plan_sample_separates_compilation_identity_from_run_configuration"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.circuit-pass"
@@ -69,7 +66,6 @@ package = "stab-analysis"
 kind = "test"
 target = "circuit_pass"
 name = "circuit_pass_validates_output_and_preserves_typed_diagnostics"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.decoder-session-layout-and-reuse"
@@ -88,7 +84,6 @@ package = "stab-decoder"
 kind = "test"
 target = "session_contract"
 name = "decoder_session_layout_projection_reuse_and_partitioning"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.decoder-session-preflight"
@@ -106,7 +101,6 @@ package = "stab-decoder"
 kind = "test"
 target = "session_contract"
 name = "decoder_session_preflight_is_atomic"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.decoder-session-progress"
@@ -124,7 +118,6 @@ package = "stab-decoder"
 kind = "test"
 target = "session_contract"
 name = "decoder_session_cancellation_and_failure_preserve_progress"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.decoder-session-protocol"
@@ -142,7 +135,6 @@ package = "stab-decoder"
 kind = "test"
 target = "session_contract"
 name = "decoder_session_protocol_and_zero_shot_contracts"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.json-diagnostics"
@@ -161,7 +153,6 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "json_diagnostics_real_process_keeps_machine_output_separate"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.model-approximate-equality-typed-tolerance"
@@ -179,7 +170,6 @@ package = "stab-model"
 kind = "test"
 target = "approximate_equality"
 name = "absolute_tolerance_rejects_invalid_numeric_domains"
-minimum_tier = "pr"
 
 [[families]]
 id = "stab-extensions.stim-canonical-convert"
@@ -197,4 +187,3 @@ status = "verified"
 package = "stab-cli"
 kind = "lib"
 name = "tests::diagnostics::model_cli_paths_accept_opaque_metadata_bytes_and_preserve_stim_conversion"
-minimum_tier = "pr"

@@ -23,11 +23,6 @@ list *args:
 record *args:
     cargo run -q -p stab-oracle -- record {{args}}
 
-# Inspect or validate the compatibility matrix.
-[working-directory: '..']
-matrix *args:
-    cargo run -q -p stab-oracle -- matrix {{args}}
-
 # Validate the pinned result-format acceptance and canonical-output corpus.
 [working-directory: '..']
 result-formats *args:
@@ -43,7 +38,7 @@ gates *args:
 parity-check *args:
     cargo run -q -p stab-oracle -- parity check {{args}}
 
-# Run canonical parity-owner tests for a PR, full, or soak tier.
+# Run every canonical parity-owner test once.
 [working-directory: '..']
 parity-run *args:
     cargo run -q -p stab-oracle -- parity run {{args}}
