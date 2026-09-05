@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "suite_sha256": "0dd673e91810b59730655d48344ccb6c5c24b1962595cc4bbdac768b707a181b",
+  "source_commit": "b4a758db169fd343c93f2b84a5b1d68558c9e6c3",
+  "source_clean": true,
+  "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
+  "stim_binary_sha256": "b91eee32e452c7af813a85cad61c0b4890aa244adcf32f05c3fb15652f72bddb",
+  "stab_binary_sha256": "c621180108e187b1c213c8d30d72968a7a54300b64a1ddde8ab2b627cf95e376",
+  "bench_binary_sha256": "3627f9d0a550ff999213f8d4e9fb1ed63c5a62c554acd27a4e9b669ce496dcf5",
+  "rustc": "rustc 1.98.0-nightly (f428d123a 2026-06-19)",
+  "target": "aarch64-unknown-linux-gnu",
+  "tier": "soak",
+  "formal": true,
+  "host_before": {
+    "architecture": "aarch64",
+    "cpu_model": "AI TOP ATOM (0xd85,0xd87)",
+    "logical_cpus": 20,
+    "affinity_cpu": 0,
+    "kernel_release": "6.17.0-1032-nvidia",
+    "thermal": [
+      {
+        "zone": "thermal_zone0",
+        "kind": "acpitz",
+        "millidegrees": 37600
+      },
+      {
+        "zone": "thermal_zone1",
+        "kind": "acpitz",
+        "millidegrees": 37600
+      },
+      {
+        "zone": "thermal_zone2",
+        "kind": "acpitz",
+        "millidegrees": 33900
+      },
+      {
+        "zone": "thermal_zone3",
+        "kind": "acpitz",
+        "millidegrees": 34400
+      },
+      {
+        "zone": "thermal_zone4",
+        "kind": "acpitz",
+        "millidegrees": 34700
+      },
+      {
+        "zone": "thermal_zone5",
+        "kind": "acpitz",
+        "millidegrees": 36700
+      },
+      {
+        "zone": "thermal_zone6",
+        "kind": "acpitz",
+        "millidegrees": 33800
+      }
+    ],
+    "swap": {
+      "configured": [],
+      "pages_in": 0,
+      "pages_out": 83
+    }
+  },
+  "host_after": {
+    "architecture": "aarch64",
+    "cpu_model": "AI TOP ATOM (0xd85,0xd87)",
+    "logical_cpus": 20,
+    "affinity_cpu": 0,
+    "kernel_release": "6.17.0-1032-nvidia",
+    "thermal": [
+      {
+        "zone": "thermal_zone0",
+        "kind": "acpitz",
+        "millidegrees": 39000
+      },
+      {
+        "zone": "thermal_zone1",
+        "kind": "acpitz",
+        "millidegrees": 39000
+      },
+      {
+        "zone": "thermal_zone2",
+        "kind": "acpitz",
+        "millidegrees": 34700
+      },
+      {
+        "zone": "thermal_zone3",
+        "kind": "acpitz",
+        "millidegrees": 34900
+      },
+      {
+        "zone": "thermal_zone4",
+        "kind": "acpitz",
+        "millidegrees": 34800
+      },
+      {
+        "zone": "thermal_zone5",
+        "kind": "acpitz",
+        "millidegrees": 36700
+      },
+      {
+        "zone": "thermal_zone6",
+        "kind": "acpitz",
+        "millidegrees": 33800
+      }
+    ],
+    "swap": {
+      "configured": [],
+      "pages_in": 0,
+      "pages_out": 83
+    }
+  },
+  "selected_cases": [
+    "generate-surface.medium",
+    "generate-surface.large",
+    "convert-sparse.hits-narrow",
+    "convert-sparse.r8-wide",
+    "convert-dense.01-to-b8",
+    "convert-dense.b8-to-01",
+    "convert-typed-dets.narrow",
+    "convert-typed-dets.wide",
+    "sample-surface.small",
+    "sample-surface.medium",
+    "sample-surface.large",
+    "sample-folded-ptb64.medium",
+    "sample-folded-ptb64.large",
+    "detect-observables.small",
+    "detect-observables.medium",
+    "detect-observables.large",
+    "m2d-packed-sweep.small",
+    "m2d-packed-sweep.medium",
+    "m2d-packed-sweep.large",
+    "analyze-folded.small",
+    "analyze-folded.medium",
+    "analyze-folded.large",
+    "sample-dem.small",
+    "sample-dem.medium",
+    "sample-dem.large",
+    "qec-cli-pipeline.medium",
+    "qec-cli-pipeline.large",
+    "qec-rust-pipeline.medium",
+    "qec-rust-pipeline.large"
+  ]
+}

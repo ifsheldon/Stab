@@ -1,0 +1,665 @@
+schema_version = 1
+expected_release_families = 12
+expected_release_cases = 29
+
+[stim]
+version = "v1.16.0"
+commit = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07"
+
+[policy]
+timing_boundary = "e2e-user-workflow-v2"
+parity_max_ratio = 1.25
+self_regression_max_ratio = 1.15
+bootstrap_seed = 6004497137074745393
+bootstrap_resamples = 10000
+confidence_level = 0.95
+maximum_temperature_millidegrees = 100000
+maximum_output_bytes = 67108864
+command_timeout_seconds = 600
+
+[tiers.smoke]
+warmups = 0
+samples = 1
+
+[tiers.full]
+warmups = 2
+samples = 9
+
+[tiers.soak]
+warmups = 3
+samples = 21
+
+[[families]]
+id = "generate-surface"
+description = "Generate and serialize noisy rotated surface-code circuits."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["generation.surface-code-memory", "generation.parameters-and-noise", "cli.gen"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 16
+work = { amount = 7689, unit = "generated-bytes" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = { kind = "empty" }, stdout = { kind = "exact", minimum_bytes = 7000 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 4
+work = { amount = 100738, unit = "generated-bytes" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "17", "--rounds", "100", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = { kind = "empty" }, stdout = { kind = "exact", minimum_bytes = 100000 } }
+
+[[families]]
+id = "convert-sparse"
+description = "Convert sparse result records into packed bytes at practical widths."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["result-formats.codecs-and-strict-grammars", "result-formats.routes-convert", "cli.convert"]
+
+[[families.cases]]
+id = "hits-narrow"
+size_class = "narrow"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "hits", "--out_format", "b8", "--bits_per_shot", "1024"], stdin = { kind = "records", format = "hits", records = 4096, bits = 1024, pattern = "sparse" }, stdout = { kind = "exact", minimum_bytes = 524288 } }
+
+[[families.cases]]
+id = "r8-wide"
+size_class = "wide"
+batch = 1
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "r8", "--out_format", "b8", "--bits_per_shot", "4096"], stdin = { kind = "records", format = "r8", records = 4096, bits = 4096, pattern = "sparse" }, stdout = { kind = "exact", minimum_bytes = 2097152 } }
+
+[[families]]
+id = "convert-dense"
+description = "Convert dense text and packed records in both useful width classes."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["result-formats.codecs-and-strict-grammars", "result-formats.routes-convert", "cli.convert"]
+
+[[families.cases]]
+id = "01-to-b8"
+size_class = "narrow"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "01", "--out_format", "b8", "--bits_per_shot", "128"], stdin = { kind = "records", format = "zeroone", records = 4096, bits = 128, pattern = "alternating" }, stdout = { kind = "exact", minimum_bytes = 65536 } }
+
+[[families.cases]]
+id = "b8-to-01"
+size_class = "wide"
+batch = 1
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "b8", "--out_format", "01", "--bits_per_shot", "2048"], stdin = { kind = "records", format = "b8", records = 4096, bits = 2048, pattern = "alternating" }, stdout = { kind = "exact", minimum_bytes = 8388608 } }
+
+[[families]]
+id = "convert-typed-dets"
+description = "Split typed detector and observable records into packed primary and side outputs."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["result-formats.codecs-and-strict-grammars", "result-formats.streaming-and-typed-dets", "result-formats.routes-convert", "cli.convert"]
+
+[[families.cases]]
+id = "narrow"
+size_class = "narrow"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "dets", "--out_format", "b8", "--num_detectors", "64", "--num_observables", "8", "--obs_out", "{file:obs}", "--obs_out_format", "b8"], stdin = { kind = "typed-dets", records = 4096, detectors = 64, observables = 8, detector_hits = 4, observable_hits = 2 }, files = [{ name = "obs", role = "output", output = { kind = "exact", minimum_bytes = 4096 } }], stdout = { kind = "exact", minimum_bytes = 32768 } }
+
+[[families.cases]]
+id = "wide"
+size_class = "wide"
+batch = 1
+work = { amount = 8192, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["convert", "--in_format", "dets", "--out_format", "b8", "--num_detectors", "512", "--num_observables", "32", "--obs_out", "{file:obs}", "--obs_out_format", "b8"], stdin = { kind = "typed-dets", records = 8192, detectors = 512, observables = 32, detector_hits = 8, observable_hits = 2 }, files = [{ name = "obs", role = "output", output = { kind = "exact", minimum_bytes = 32768 } }], stdout = { kind = "exact", minimum_bytes = 524288 } }
+
+[[families]]
+id = "sample-surface"
+description = "Sample noisy rotated surface-code circuits into packed measurement records."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["sampling.circuit-common-measurement-and-reset", "sampling.circuit-core-gates", "sampling.noise-complete", "result-formats.routes-sample", "cli.sample"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "4096", "--out_format", "b8", "--seed", "5"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "3", "--rounds", "5", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 49, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "8192", "--out_format", "b8", "--seed", "5"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 8192, bits = 265, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "4096", "--out_format", "b8", "--seed", "5"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "7", "--rounds", "20", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 1009, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families]]
+id = "sample-folded-ptb64"
+description = "Sample compact repeated circuits directly into PTB64 batches."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["circuit-model.syntax-and-canonical-text", "sampling.loop-folding-selection", "result-formats.routes-sample", "cli.sample"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "4096", "--out_format", "ptb64", "--seed", "7"], stdin = { kind = "folded-circuit", qubits = 4, repeat_blocks = 1, repeat_count = 64, error_probability = 0.01 }, stdout = { kind = "records", format = "ptb64", records = 4096, bits = 256, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample", "--shots", "8192", "--out_format", "ptb64", "--seed", "7"], stdin = { kind = "folded-circuit", qubits = 4, repeat_blocks = 1, repeat_count = 256, error_probability = 0.01 }, stdout = { kind = "records", format = "ptb64", records = 8192, bits = 1024, minimum_one_bits = 1, maximum_one_fraction = 0.75 } }
+
+[[families]]
+id = "detect-observables"
+description = "Sample detector events and appended observables from noisy surface-code circuits."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["detection.common-frame-gate-surface", "detection.reference-correction", "result-formats.routes-detect", "cli.detect"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["detect", "--shots", "4096", "--out_format", "b8", "--append_observables", "--seed", "11"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "3", "--rounds", "5", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 41, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["detect", "--shots", "8192", "--out_format", "b8", "--append_observables", "--seed", "11"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 8192, bits = 241, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["detect", "--shots", "4096", "--out_format", "b8", "--append_observables", "--seed", "11"], stdin = { kind = "generated-circuit", args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "7", "--rounds", "20", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"] }, stdout = { kind = "records", format = "b8", records = 4096, bits = 961, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families]]
+id = "m2d-packed-sweep"
+description = "Convert packed measurements and sweep data into packed detections and observables."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["detection.reference-correction", "detection.sweep-feedback-and-folded-conversion", "result-formats.routes-m2d", "cli.m2d"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 2
+work = { amount = 4096, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["m2d", "--circuit", "{file:circuit}", "--in_format", "b8", "--sweep", "{file:sweep}", "--sweep_format", "b8", "--out_format", "b8", "--append_observables"], stdin = { kind = "records", format = "b8", records = 4096, bits = 8, pattern = "alternating" }, files = [{ name = "circuit", role = "input", data = { kind = "m2d-circuit", bits = 8 } }, { name = "sweep", role = "input", data = { kind = "records", format = "b8", records = 4096, bits = 8, pattern = "alternating" } }], stdout = { kind = "exact", minimum_bytes = 8192 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 2
+work = { amount = 8192, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["m2d", "--circuit", "{file:circuit}", "--in_format", "b8", "--sweep", "{file:sweep}", "--sweep_format", "b8", "--out_format", "b8", "--append_observables"], stdin = { kind = "records", format = "b8", records = 8192, bits = 64, pattern = "alternating" }, files = [{ name = "circuit", role = "input", data = { kind = "m2d-circuit", bits = 64 } }, { name = "sweep", role = "input", data = { kind = "records", format = "b8", records = 8192, bits = 64, pattern = "alternating" } }], stdout = { kind = "exact", minimum_bytes = 73728 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 16384, unit = "records" }
+maximum_stab_peak_rss_bytes = 268435456
+workload = { kind = "cli", args = ["m2d", "--circuit", "{file:circuit}", "--in_format", "b8", "--sweep", "{file:sweep}", "--sweep_format", "b8", "--out_format", "b8", "--append_observables"], stdin = { kind = "records", format = "b8", records = 16384, bits = 256, pattern = "alternating" }, files = [{ name = "circuit", role = "input", data = { kind = "m2d-circuit", bits = 256 } }, { name = "sweep", role = "input", data = { kind = "records", format = "b8", records = 16384, bits = 256, pattern = "alternating" } }], stdout = { kind = "exact", minimum_bytes = 540672 } }
+
+[[families]]
+id = "analyze-folded"
+description = "Lower compact repeated noisy circuits into folded detector error models."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["analysis.circuit-to-dem-selected-gate-surface", "analysis.loop-folding-common", "cli.analyze-errors"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 4
+work = { amount = 3204, unit = "input-bytes" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["analyze_errors", "--fold_loops"], stdin = { kind = "folded-circuit", qubits = 1, repeat_blocks = 32, repeat_count = 1000000, error_probability = 0.001 }, stdout = { kind = "exact", minimum_bytes = 1000 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 2
+work = { amount = 16262, unit = "input-bytes" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["analyze_errors", "--fold_loops"], stdin = { kind = "folded-circuit", qubits = 2, repeat_blocks = 128, repeat_count = 1000000, error_probability = 0.001 }, stdout = { kind = "exact", minimum_bytes = 4000 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 92682, unit = "input-bytes" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["analyze_errors", "--fold_loops"], stdin = { kind = "folded-circuit", qubits = 4, repeat_blocks = 512, repeat_count = 1000000, error_probability = 0.001 }, stdout = { kind = "exact", minimum_bytes = 16000 } }
+
+[[families]]
+id = "sample-dem"
+description = "Sample detector events from repeated sparse detector error models."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["dem-model.syntax-and-canonical-text", "sampling.dem-sampling-and-replay", "result-formats.routes-sample-dem", "result-formats.routes-sample-dem-replay", "cli.sample-dem"]
+
+[[families.cases]]
+id = "small"
+size_class = "small"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample_dem", "--shots", "4096", "--out_format", "b8", "--seed", "13"], stdin = { kind = "dem", detectors = 64, mechanisms = 256, repeat_count = 1, error_probability = 0.001 }, stdout = { kind = "records", format = "b8", records = 4096, bits = 64, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample_dem", "--shots", "8192", "--out_format", "b8", "--seed", "13"], stdin = { kind = "dem", detectors = 512, mechanisms = 1024, repeat_count = 4, error_probability = 0.001 }, stdout = { kind = "records", format = "b8", records = 8192, bits = 2048, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli", args = ["sample_dem", "--shots", "4096", "--out_format", "b8", "--seed", "13"], stdin = { kind = "dem", detectors = 2048, mechanisms = 2048, repeat_count = 4, error_probability = 0.001 }, stdout = { kind = "records", format = "b8", records = 4096, bits = 8192, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families]]
+id = "qec-cli-pipeline"
+description = "Generate a surface-code circuit, lower it, and sample its detector error model."
+runner = "cli"
+comparator = "stim-cli"
+prerequisites = ["generation.surface-code-memory", "analysis.circuit-to-dem-selected-gate-surface", "sampling.dem-sampling-and-replay", "cli.gen", "cli.analyze-errors", "cli.sample-dem"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 4096, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli-pipeline", steps = [{ args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "3", "--rounds", "5", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = "empty" }, { args = ["analyze_errors", "--fold_loops"], stdin = "previous" }, { args = ["sample_dem", "--shots", "4096", "--out_format", "b8", "--seed", "17"], stdin = "previous" }], stdout = { kind = "records", format = "b8", records = 4096, bits = 40, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 8192, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "cli-pipeline", steps = [{ args = ["gen", "--code", "surface_code", "--task", "rotated_memory_z", "--distance", "5", "--rounds", "10", "--after_clifford_depolarization", "0.001", "--after_reset_flip_probability", "0.001", "--before_measure_flip_probability", "0.001", "--before_round_data_depolarization", "0.001"], stdin = "empty" }, { args = ["analyze_errors", "--fold_loops"], stdin = "previous" }, { args = ["sample_dem", "--shots", "8192", "--out_format", "b8", "--seed", "17"], stdin = "previous" }], stdout = { kind = "records", format = "b8", records = 8192, bits = 240, minimum_one_bits = 1, maximum_one_fraction = 0.50 } }
+
+[[families]]
+id = "qec-rust-pipeline"
+description = "Reuse compiled sampling, detection-conversion, and decoder sessions."
+runner = "rust"
+comparator = "self-only"
+prerequisites = ["sampling.circuit-common-measurement-and-reset", "sampling.circuit-core-gates", "detection.common-frame-gate-surface"]
+
+[[families.cases]]
+id = "medium"
+size_class = "medium"
+batch = 1
+work = { amount = 16384, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "rust-pipeline", shots = 16384, minimum_logical_failures = 327, maximum_logical_failures = 819, seed = 2815672542 }
+
+[[families.cases]]
+id = "large"
+size_class = "large"
+batch = 1
+work = { amount = 262144, unit = "shots" }
+maximum_stab_peak_rss_bytes = 536870912
+workload = { kind = "rust-pipeline", shots = 262144, minimum_logical_failures = 5242, maximum_logical_failures = 13107, seed = 2815672542 }
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "generate-surface.medium"
+case_digest = "123318e7c7a7d1bcc1d2a9a733c673c00af897e91e404379f55543fa1182d2f4"
+median_seconds_per_work = 0.0000001868618968656522
+upper_seconds_per_work = 0.0000001961757136818832
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "generate-surface.large"
+case_digest = "136d19391094c3f99c7e030fb53fe8d0797bba2a97e037722287f1a586ee67cc"
+median_seconds_per_work = 0.000000029332965216700748
+upper_seconds_per_work = 0.000000031008080366892335
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "convert-sparse.hits-narrow"
+case_digest = "67a56dd03d32539e3b53376ad2a5791ec20e65a7a13d3e0bc1a4c4b51a6a5c1e"
+median_seconds_per_work = 0.0000031775682373046877
+upper_seconds_per_work = 0.000003226443115234375
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "convert-sparse.r8-wide"
+case_digest = "c3613f51d5f9696c003dfef4952da86b07bc06529cbd612e4e2bed78e0376a7b"
+median_seconds_per_work = 0.000011553348388671876
+upper_seconds_per_work = 0.000011657406982421875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "convert-dense.01-to-b8"
+case_digest = "e924a2f3e9c3d7672c34cb85d89d528dc01b7cea754f5db5ed7ee416613c7010"
+median_seconds_per_work = 0.0000009328034667968749
+upper_seconds_per_work = 0.000000956619873046875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "convert-dense.b8-to-01"
+case_digest = "f86b30b36f01f09a27763b4c509b474e7f36e8ad3928c808ddfbb960787b87fe"
+median_seconds_per_work = 0.00000189016943359375
+upper_seconds_per_work = 0.000002067911376953125
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "convert-typed-dets.narrow"
+case_digest = "433cebcae40b00acde1891ebea88c071a1f4f576fcea94347100c484506a89e0"
+median_seconds_per_work = 0.0000007160479736328125
+upper_seconds_per_work = 0.0000007478603515625
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "convert-typed-dets.wide"
+case_digest = "62c126ae639ad394eccc82457b6ad19350c45f6087ed7ae985b7a801cf83db97"
+median_seconds_per_work = 0.0000019185833740234376
+upper_seconds_per_work = 0.0000019511849365234376
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-surface.small"
+case_digest = "71a00aea14a06e6e5c7608ace82006929c3f4345ffa8c25abe3b7b43be08875b"
+median_seconds_per_work = 0.000000372316162109375
+upper_seconds_per_work = 0.00000040687841796875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-surface.medium"
+case_digest = "e8c15e98226cbb4068ef6b69f9573e71197ae906c6405e846c95475f2f3afc9a"
+median_seconds_per_work = 0.00000038203857421875
+upper_seconds_per_work = 0.00000040001708984375
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-surface.large"
+case_digest = "ef3a9ad2d94ae6c7dfd9a340de33adc5ceb1283515e48c3576272fa8f127ecc2"
+median_seconds_per_work = 0.00000105575244140625
+upper_seconds_per_work = 0.00000112068212890625
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-folded-ptb64.medium"
+case_digest = "f633495187cc5a98dca83b204f6614dea5419bc4ca797cf808a6a75d75efa749"
+median_seconds_per_work = 0.00000045227294921875
+upper_seconds_per_work = 0.00000048926904296875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-folded-ptb64.large"
+case_digest = "99ac4fb2b498ea6814af2741d7b7d15a9ba27c09d7497a510a5158a4c353bccc"
+median_seconds_per_work = 0.0000008700281982421875
+upper_seconds_per_work = 0.000000909252685546875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "detect-observables.small"
+case_digest = "c8d181e400b606d8975cf495de02da3bb49e142ee76930f1160935e136e0b083"
+median_seconds_per_work = 0.00000045042529296875
+upper_seconds_per_work = 0.000000573788330078125
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "detect-observables.medium"
+case_digest = "60a31d2e0da107e1e8c78184a1aa1d63b0797df942592e9406f5eec419fc15d0"
+median_seconds_per_work = 0.0000004713411865234375
+upper_seconds_per_work = 0.0000004943978271484375
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "detect-observables.large"
+case_digest = "ebf617a71c0de9d1da7d93fb8f76605bb3935bb07b7b287c9332dfb11a2f8556"
+median_seconds_per_work = 0.00000121986181640625
+upper_seconds_per_work = 0.000001304076416015625
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "m2d-packed-sweep.small"
+case_digest = "93bf73a30287874e6db62862cb81af854b5d9eb19e1edfe44ce6bc758d0ee020"
+median_seconds_per_work = 0.0000004575853271484375
+upper_seconds_per_work = 0.0000005180949707031249
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "m2d-packed-sweep.medium"
+case_digest = "049675efb742f8e555e2e33e9d7895834f346fc5d0fe6d2f8c06ad30708b6332"
+median_seconds_per_work = 0.00000031343804931640624
+upper_seconds_per_work = 0.00000032783941650390625
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "m2d-packed-sweep.large"
+case_digest = "1dd039094ec0aa27dfbe381f1442afb62417201ee3ee9b16d919a80393c56ea5"
+median_seconds_per_work = 0.00000038404638671875
+upper_seconds_per_work = 0.00000039858740234375
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "analyze-folded.small"
+case_digest = "dad9ca4b2fc2c0c9256a53c54c5898c09ef24b5c17e9a67a8aa389b5dcf3ed58"
+median_seconds_per_work = 0.0000004415486891385767
+upper_seconds_per_work = 0.000000497684691011236
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "analyze-folded.medium"
+case_digest = "3e04b316753e63f174a07861e8012f80099b83a3e686a6147226f53769203bcb"
+median_seconds_per_work = 0.00000013775608781207723
+upper_seconds_per_work = 0.00000015353812569179683
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "analyze-folded.large"
+case_digest = "f4b8e01074ce5f032e9095d8b61085e3d5bec2dc47c7345c454d2278e629f5ca"
+median_seconds_per_work = 0.00000009164330722254591
+upper_seconds_per_work = 0.00000010033798364299432
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-dem.small"
+case_digest = "6dcbd78b19ab7773358de2bc2d4e4936b1fed59e946be13c8fea3b3594f06799"
+median_seconds_per_work = 0.00000040558154296875
+upper_seconds_per_work = 0.00000043238232421875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-dem.medium"
+case_digest = "2e1d9f8b8041dee37aec930f3da29eefd344d0a5f5e21c264e0a563b656382ab"
+median_seconds_per_work = 0.0000012804202880859376
+upper_seconds_per_work = 0.000001329504150390625
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "sample-dem.large"
+case_digest = "31a4e7ec57aada1f24b99cdd31fc5ab7a61c507f70287e8b475f70eb650b4923"
+median_seconds_per_work = 0.00000344884716796875
+upper_seconds_per_work = 0.000003530905517578125
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "qec-cli-pipeline.medium"
+case_digest = "4d65137ebcbc6174cecbc73ac9b5c6c7ba2e2ad79596ecb9f3785245521da749"
+median_seconds_per_work = 0.000001320416259765625
+upper_seconds_per_work = 0.000001363666259765625
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "qec-cli-pipeline.large"
+case_digest = "4f038e224f1d135c8be164d48ca77d56c7ddf81c0a117920e25129a0b30448ec"
+median_seconds_per_work = 0.000001927810302734375
+upper_seconds_per_work = 0.0000019650892333984374
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "qec-rust-pipeline.medium"
+case_digest = "ac2707d929a1186d62554eb0f67470848dfcfdac6de6171a6c28e81fbc123f15"
+median_seconds_per_work = 0.0000000778856201171875
+upper_seconds_per_work = 0.0000000800438232421875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.98.0-nightly (f428d123a 2026-06-19)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v2"
+case_id = "qec-rust-pipeline.large"
+case_digest = "2c139489937d1a1b75dc6d059c6229d3504d5c3c76215261dd3274c5504e3797"
+median_seconds_per_work = 0.00000007695725250244141
+upper_seconds_per_work = 0.00000007700362396240234

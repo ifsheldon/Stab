@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: September review repairs and code reduction pass full local correctness verification and smoke replay. Exact-revision CI and refreshed controlled AArch64 full and soak evidence are next. P0 through P9 remain complete for their recorded revisions; their historical evidence does not qualify the new source.
+Status: September review repairs and code reduction have passing local verification, source CI, and fresh controlled AArch64 full and soak evidence. Release use requires the release checker and both mandated CI jobs to pass the exact proposed evidence descendant. P0 through P9 remain complete for their recorded revisions.
 
 ## Objective
 
@@ -21,17 +21,17 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - [Generated parity view](../stim-parity.md) owns volatile counts and must match the ledger.
 - [Architecture rules](../architecture/README.md) own durable component boundaries.
 - `benchmarks/suite.toml` is the sole active performance source; [the generated suite view](../../benchmarks/SUITE.md) must match it.
-- `benchmarks/current-aarch64-evidence.toml` names the last accepted controlled evidence pair; the review repairs require a replacement pair from their clean source revision.
+- `benchmarks/current-aarch64-evidence.toml` names the controlled evidence pair for the repaired source revision.
 
 Superseded plans, progress reports, qualification inventories, and benchmark manifests remain available through Git history. They do not create parallel requirements or promote current claims.
 
-## Last Accepted Evidence
+## Current Evidence
 
-1. Measured source `ef9866324640a744208e862a9a918f9fa16d4953` passed exact-revision GitHub CI in [run 33150313661](https://github.com/ifsheldon/Stab/actions/runs/33150313661), including strict Rust checks, workspace tests, generated contracts, the 62-case result-format oracle, and all 138 pull-request parity owners.
-2. The controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/ef9866324640a744208e862a9a918f9fa16d4953/` each cover all 29 release cases and pass correctness, memory, `1.25x` Stim parity, and seeded `1.15x` Stab self-regression.
-3. Full worst median and confidence upper ratios are `1.156535x` and `1.176857x`; soak values are `1.153531x` and `1.170063x`. Maximum Stab peak RSS is `47,050,752` bytes for full and `50,065,408` bytes for soak.
-4. Both bundles replay offline. They used CPU 0, stayed below `39 C`, ran with no configured swap and unchanged swap counters, and `/swap.img` was restored afterward at its prior priority `-2`.
-5. Evidence publication commit `04b012ab` passes `just bench::e2e-release-check`. The historical `a8b56db3` pair remains the explicitly unseeded source of the first reviewed self-regression baseline; it is not retroactively promoted.
+1. Measured source `b4a758db169fd343c93f2b84a5b1d68558c9e6c3` passed both mandated GitHub CI jobs in [run 33954379257](https://github.com/ifsheldon/Stab/actions/runs/33954379257). Local verification also passed 1,831 workspace tests, all 138 canonical owners, 459 implemented fixtures, and the 62-case live result-format differential.
+2. The controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/b4a758db169fd343c93f2b84a5b1d68558c9e6c3/` each cover all 29 release cases and pass correctness, memory, `1.25x` Stim parity, and seeded `1.15x` Stab self-regression.
+3. Full worst median and confidence upper ratios are `1.179210x` and `1.190196x`; soak values are `1.163228x` and `1.199477x`. Maximum Stab peak RSS is `51,896,320` bytes for full and `52,101,120` bytes for soak.
+4. Both bundles replay offline. They used CPU 0, recorded temperatures at or below `39 C`, ran with no configured swap and unchanged swap counters, and `/swap.img` was restored afterward at its prior priority `-2`. No benchmark process remained.
+5. Workload definitions, timing identity, and the accepted self-regression baselines are unchanged. The historical `a8b56db3` pair remains the explicitly unseeded source of the first reviewed baseline; the `ef986632` pair remains evidence for its original source.
 6. Controlled x86-64 timing remains unqualified. Cross-architecture CI proves correctness and contracts, not x86-64 performance.
 
 ## Release Use

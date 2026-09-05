@@ -1,0 +1,845 @@
+{
+  "schema_version": 1,
+  "suite_sha256": "0dd673e91810b59730655d48344ccb6c5c24b1962595cc4bbdac768b707a181b",
+  "source_commit": "b4a758db169fd343c93f2b84a5b1d68558c9e6c3",
+  "tier": "soak",
+  "architecture": "aarch64",
+  "cpu_model": "AI TOP ATOM (0xd85,0xd87)",
+  "cases": [
+    {
+      "case_id": "generate-surface.medium",
+      "case_digest": "123318e7c7a7d1bcc1d2a9a733c673c00af897e91e404379f55543fa1182d2f4",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.8181268819775454,
+          "confidence_lower": 0.8072916600287124,
+          "confidence_upper": 0.836776793320421
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.450632315645728e-7,
+          "confidence_lower": 1.4319562849525297e-7,
+          "confidence_upper": 1.4660530465600208e-7
+        },
+        "stim_throughput": 5679424.936989147,
+        "stab_throughput": 6893545.588461984,
+        "stim_peak_rss_bytes": 4685824,
+        "stab_peak_rss_bytes": 4390912,
+        "stim_output_bytes": 123024,
+        "stab_output_bytes": 123024
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.7763125281173222,
+      "self_upper_ratio": 0.7473162804124468
+    },
+    {
+      "case_id": "generate-surface.large",
+      "case_digest": "136d19391094c3f99c7e030fb53fe8d0797bba2a97e037722287f1a586ee67cc",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.7121647607675542,
+          "confidence_lower": 0.7066651682893094,
+          "confidence_upper": 0.7280328849813625
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 2.5031234489467726e-8,
+          "confidence_lower": 2.495348577498064e-8,
+          "confidence_upper": 2.524493488058131e-8
+        },
+        "stim_throughput": 28335039.38090338,
+        "stab_throughput": 39950087.17691352,
+        "stim_peak_rss_bytes": 5341184,
+        "stab_peak_rss_bytes": 4493312,
+        "stim_output_bytes": 402952,
+        "stab_output_bytes": 402952
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.8533482484483421,
+      "self_upper_ratio": 0.8141405266588383
+    },
+    {
+      "case_id": "convert-sparse.hits-narrow",
+      "case_digest": "67a56dd03d32539e3b53376ad2a5791ec20e65a7a13d3e0bc1a4c4b51a6a5c1e",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.821629365092975,
+          "confidence_lower": 0.8197321060778527,
+          "confidence_upper": 0.8230129598952974
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.0554693603515623e-6,
+          "confidence_lower": 3.05166064453125e-6,
+          "confidence_upper": 3.06139892578125e-6
+        },
+        "stim_throughput": 268823.64387955307,
+        "stab_throughput": 327281.9596806364,
+        "stim_peak_rss_bytes": 8974336,
+        "stab_peak_rss_bytes": 8974336,
+        "stim_output_bytes": 1048576,
+        "stab_output_bytes": 1048576
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9615747427483435,
+      "self_upper_ratio": 0.948846397237307
+    },
+    {
+      "case_id": "convert-sparse.r8-wide",
+      "case_digest": "c3613f51d5f9696c003dfef4952da86b07bc06529cbd612e4e2bed78e0376a7b",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.8073357218949657,
+          "confidence_lower": 0.8002428464290884,
+          "confidence_upper": 0.8111279711392049
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 0.000011237314453125,
+          "confidence_lower": 0.000011224260009765625,
+          "confidence_upper": 0.000011253322265625
+        },
+        "stim_throughput": 71961.18003545282,
+        "stab_throughput": 88989.23351939383,
+        "stim_peak_rss_bytes": 25845760,
+        "stab_peak_rss_bytes": 25845760,
+        "stim_output_bytes": 2097152,
+        "stab_output_bytes": 2097152
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9726456846175652,
+      "self_upper_ratio": 0.9653366552779541
+    },
+    {
+      "case_id": "convert-dense.01-to-b8",
+      "case_digest": "e924a2f3e9c3d7672c34cb85d89d528dc01b7cea754f5db5ed7ee416613c7010",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.6334062590519343,
+          "confidence_lower": 0.6292208264359795,
+          "confidence_upper": 0.6376547199747555
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 8.265372314453124e-7,
+          "confidence_lower": 8.178985595703126e-7,
+          "confidence_upper": 8.304122314453125e-7
+        },
+        "stim_throughput": 766004.868507017,
+        "stab_throughput": 1209866.8540936315,
+        "stim_peak_rss_bytes": 25845760,
+        "stab_peak_rss_bytes": 25845760,
+        "stim_output_bytes": 131072,
+        "stab_output_bytes": 131072
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.8860786445011114,
+      "self_upper_ratio": 0.8680691827992388
+    },
+    {
+      "case_id": "convert-dense.b8-to-01",
+      "case_digest": "f86b30b36f01f09a27763b4c509b474e7f36e8ad3928c808ddfbb960787b87fe",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.16083571642274375,
+          "confidence_lower": 0.15725949690723168,
+          "confidence_upper": 0.1663399179526695
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.433855712890625e-6,
+          "confidence_lower": 1.380121337890625e-6,
+          "confidence_upper": 1.461988525390625e-6
+        },
+        "stim_throughput": 113819.13522521892,
+        "stab_throughput": 697420.2432014722,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 8392704,
+        "stab_output_bytes": 8392704
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.7585858110954938,
+      "self_upper_ratio": 0.7069879984628399
+    },
+    {
+      "case_id": "convert-typed-dets.narrow",
+      "case_digest": "433cebcae40b00acde1891ebea88c071a1f4f576fcea94347100c484506a89e0",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.0271401213911422,
+          "confidence_lower": 1.0138611723619646,
+          "confidence_upper": 1.0302314711710052
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 6.657442626953125e-7,
+          "confidence_lower": 6.600255126953124e-7,
+          "confidence_upper": 6.697891845703124e-7
+        },
+        "stim_throughput": 1528741.24990646,
+        "stab_throughput": 1502078.2844623094,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 73728,
+        "stab_output_bytes": 73728
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9297481275140155,
+      "self_upper_ratio": 0.8956072924188667
+    },
+    {
+      "case_id": "convert-typed-dets.wide",
+      "case_digest": "62c126ae639ad394eccc82457b6ad19350c45f6087ed7ae985b7a801cf83db97",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.8785442245157046,
+          "confidence_lower": 0.8711692849734085,
+          "confidence_upper": 0.8823216820928054
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.8884866943359375e-6,
+          "confidence_lower": 1.8847015380859374e-6,
+          "confidence_upper": 1.8949281005859375e-6
+        },
+        "stim_throughput": 465156.3432374575,
+        "stab_throughput": 529524.514522268,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 557056,
+        "stab_output_bytes": 557056
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9843130717721249,
+      "self_upper_ratio": 0.9711678606756073
+    },
+    {
+      "case_id": "sample-surface.small",
+      "case_digest": "71a00aea14a06e6e5c7608ace82006929c3f4345ffa8c25abe3b7b43be08875b",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.9182905484247376,
+          "confidence_lower": 0.8782355489727856,
+          "confidence_upper": 0.9656284221742091
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.8073046875e-7,
+          "confidence_lower": 3.6573828125e-7,
+          "confidence_upper": 3.8725390625e-7
+        },
+        "stim_throughput": 2499315.0680752164,
+        "stab_throughput": 2626530.0050273426,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 28672,
+        "stab_output_bytes": 28672
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 1.0225998962627711,
+      "self_upper_ratio": 0.9517681183073778
+    },
+    {
+      "case_id": "sample-surface.medium",
+      "case_digest": "e8c15e98226cbb4068ef6b69f9573e71197ae906c6405e846c95475f2f3afc9a",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.9332201511461385,
+          "confidence_lower": 0.9216504021734699,
+          "confidence_upper": 0.9567938785831032
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.584473876953125e-7,
+          "confidence_lower": 3.531505126953125e-7,
+          "confidence_upper": 3.619376220703125e-7
+        },
+        "stim_throughput": 2640249.560307561,
+        "stab_throughput": 2789809.7024214338,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 278528,
+        "stab_output_bytes": 278528
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9382492027888014,
+      "self_upper_ratio": 0.9048053977186034
+    },
+    {
+      "case_id": "sample-surface.large",
+      "case_digest": "ef3a9ad2d94ae6c7dfd9a340de33adc5ceb1283515e48c3576272fa8f127ecc2",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.967551343962181,
+          "confidence_lower": 0.9568136971470259,
+          "confidence_upper": 0.9828896325920331
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 9.5827734375e-7,
+          "confidence_lower": 9.51609375e-7,
+          "confidence_upper": 9.61562744140625e-7
+        },
+        "stim_throughput": 1011342.0429899379,
+        "stab_throughput": 1043539.2285147095,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 520192,
+        "stab_output_bytes": 520192
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9076723919042854,
+      "self_upper_ratio": 0.8580155954472832
+    },
+    {
+      "case_id": "sample-folded-ptb64.medium",
+      "case_digest": "f633495187cc5a98dca83b204f6614dea5419bc4ca797cf808a6a75d75efa749",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.9965298816997423,
+          "confidence_lower": 0.9791240386650674,
+          "confidence_upper": 1.0130466205768618
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 4.32890625e-7,
+          "confidence_lower": 4.2947265625e-7,
+          "confidence_upper": 4.3942578125e-7
+        },
+        "stim_throughput": 2303940.0975574637,
+        "stab_throughput": 2310052.337123263,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 131072,
+        "stab_output_bytes": 131072
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9571446307982143,
+      "self_upper_ratio": 0.8981270888991568
+    },
+    {
+      "case_id": "sample-folded-ptb64.large",
+      "case_digest": "99ac4fb2b498ea6814af2741d7b7d15a9ba27c09d7497a510a5158a4c353bccc",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.1521532724360435,
+          "confidence_lower": 1.135062700668837,
+          "confidence_upper": 1.1621732681392638
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 8.424024658203125e-7,
+          "confidence_lower": 8.381973876953125e-7,
+          "confidence_upper": 8.53886962890625e-7
+        },
+        "stim_throughput": 1358937.0431606832,
+        "stab_throughput": 1187081.045668857,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 1048576,
+        "stab_output_bytes": 1048576
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9682473137334051,
+      "self_upper_ratio": 0.9391085409630108
+    },
+    {
+      "case_id": "detect-observables.small",
+      "case_digest": "c8d181e400b606d8975cf495de02da3bb49e142ee76930f1160935e136e0b083",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.0116282672229508,
+          "confidence_lower": 0.9579253133165186,
+          "confidence_upper": 1.0759394692056483
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.8265234375e-7,
+          "confidence_lower": 3.6283203125e-7,
+          "confidence_upper": 3.940546875e-7
+        },
+        "stim_throughput": 2648705.1349701504,
+        "stab_throughput": 2613338.233342521,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 24576,
+        "stab_output_bytes": 24576
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.8495356493591668,
+      "self_upper_ratio": 0.6867596757263205
+    },
+    {
+      "case_id": "detect-observables.medium",
+      "case_digest": "60a31d2e0da107e1e8c78184a1aa1d63b0797df942592e9406f5eec419fc15d0",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.1632281852029291,
+          "confidence_lower": 1.1417892879535512,
+          "confidence_upper": 1.1994769399922076
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 4.197032470703125e-7,
+          "confidence_lower": 4.148868408203125e-7,
+          "confidence_upper": 4.2248046875e-7
+        },
+        "stim_throughput": 2780357.210736958,
+        "stab_throughput": 2382635.8432544386,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 253952,
+        "stab_output_bytes": 253952
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.8904446695312137,
+      "self_upper_ratio": 0.8545354480758163
+    },
+    {
+      "case_id": "detect-observables.large",
+      "case_digest": "ebf617a71c0de9d1da7d93fb8f76605bb3935bb07b7b287c9332dfb11a2f8556",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.0770377048733288,
+          "confidence_lower": 1.0657934946296304,
+          "confidence_upper": 1.0880537276649394
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.086480712890625e-6,
+          "confidence_lower": 1.080074462890625e-6,
+          "confidence_upper": 1.089617431640625e-6
+        },
+        "stim_throughput": 1003170.1744967495,
+        "stab_throughput": 920402.9009769168,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 495616,
+        "stab_output_bytes": 495616
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.8906588420739574,
+      "self_upper_ratio": 0.8355472258057993
+    },
+    {
+      "case_id": "m2d-packed-sweep.small",
+      "case_digest": "93bf73a30287874e6db62862cb81af854b5d9eb19e1edfe44ce6bc758d0ee020",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.9437158124050519,
+          "confidence_lower": 0.9248428884931174,
+          "confidence_upper": 0.9720972351283023
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.62021484375e-7,
+          "confidence_lower": 3.54623046875e-7,
+          "confidence_upper": 3.673282470703125e-7
+        },
+        "stim_throughput": 2673349.169359215,
+        "stab_throughput": 2762267.001159936,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 16384,
+        "stab_output_bytes": 16384
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.7911562344689491,
+      "self_upper_ratio": 0.7089979016237089
+    },
+    {
+      "case_id": "m2d-packed-sweep.medium",
+      "case_digest": "049675efb742f8e555e2e33e9d7895834f346fc5d0fe6d2f8c06ad30708b6332",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.1356601564758255,
+          "confidence_lower": 1.1140563451737484,
+          "confidence_upper": 1.1660385609829045
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 2.8647955322265624e-7,
+          "confidence_lower": 2.8403326416015627e-7,
+          "confidence_upper": 2.9057427978515624e-7
+        },
+        "stim_throughput": 3946582.390688533,
+        "stab_throughput": 3490650.515022218,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 147456,
+        "stab_output_bytes": 147456
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9139909907155649,
+      "self_upper_ratio": 0.8863311278547679
+    },
+    {
+      "case_id": "m2d-packed-sweep.large",
+      "case_digest": "1dd039094ec0aa27dfbe381f1442afb62417201ee3ee9b16d919a80393c56ea5",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.0981004162947252,
+          "confidence_lower": 1.0845859104808493,
+          "confidence_upper": 1.1050068843041054
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.5661920166015624e-7,
+          "confidence_lower": 3.5370220947265626e-7,
+          "confidence_upper": 3.590440673828125e-7
+        },
+        "stim_throughput": 3072730.7337776264,
+        "stab_throughput": 2804111.4873925378,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 540672,
+        "stab_output_bytes": 540672
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9285836659135669,
+      "self_upper_ratio": 0.9007913076820364
+    },
+    {
+      "case_id": "analyze-folded.small",
+      "case_digest": "dad9ca4b2fc2c0c9256a53c54c5898c09ef24b5c17e9a67a8aa389b5dcf3ed58",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.8933150203348039,
+          "confidence_lower": 0.8818796778892429,
+          "confidence_upper": 0.9027849337033775
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.8995263732833957e-7,
+          "confidence_lower": 3.8526849250936325e-7,
+          "confidence_upper": 3.9187773096129834e-7
+        },
+        "stim_throughput": 2283404.003760775,
+        "stab_throughput": 2564413.993584563,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 13088,
+        "stab_output_bytes": 13088
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.8831475371132987,
+      "self_upper_ratio": 0.7874016180104908
+    },
+    {
+      "case_id": "analyze-folded.medium",
+      "case_digest": "3e04b316753e63f174a07861e8012f80099b83a3e686a6147226f53769203bcb",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.9560299453152361,
+          "confidence_lower": 0.9520086846100391,
+          "confidence_upper": 0.9825205522255633
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.2816283359980323e-7,
+          "confidence_lower": 1.2707908006395278e-7,
+          "confidence_upper": 1.3075049194441027e-7
+        },
+        "stim_throughput": 7469938.458676363,
+        "stab_throughput": 7802574.052962693,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 39410,
+        "stab_output_bytes": 39410
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9303605788706716,
+      "self_upper_ratio": 0.8515832230938583
+    },
+    {
+      "case_id": "analyze-folded.large",
+      "case_digest": "f4b8e01074ce5f032e9095d8b61085e3d5bec2dc47c7345c454d2278e629f5ca",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.1036969394190057,
+          "confidence_lower": 1.092569282631384,
+          "confidence_upper": 1.1163374590675614
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 8.33187134502924e-8,
+          "confidence_lower": 8.24167044302022e-8,
+          "confidence_upper": 8.433379728534127e-8
+        },
+        "stim_throughput": 13293427.138803592,
+        "stab_throughput": 12002105.632567117,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 132827,
+        "stab_output_bytes": 132827
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9091631017632512,
+      "self_upper_ratio": 0.8404972296972157
+    },
+    {
+      "case_id": "sample-dem.small",
+      "case_digest": "6dcbd78b19ab7773358de2bc2d4e4936b1fed59e946be13c8fea3b3594f06799",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.9184023897650028,
+          "confidence_lower": 0.8998106974832958,
+          "confidence_upper": 0.9497116998759214
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.5044140625e-7,
+          "confidence_lower": 3.45734375e-7,
+          "confidence_upper": 3.55796875e-7
+        },
+        "stim_throughput": 2625747.0654263604,
+        "stab_throughput": 2853544.0794533677,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 32768,
+        "stab_output_bytes": 32768
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.8640467307384386,
+      "self_upper_ratio": 0.8228756243513691
+    },
+    {
+      "case_id": "sample-dem.medium",
+      "case_digest": "2e1d9f8b8041dee37aec930f3da29eefd344d0a5f5e21c264e0a563b656382ab",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.1580095190282242,
+          "confidence_lower": 1.1546614354583038,
+          "confidence_upper": 1.1650874922675634
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.195084228515625e-6,
+          "confidence_lower": 1.192381103515625e-6,
+          "confidence_upper": 1.197853759765625e-6
+        },
+        "stim_throughput": 970954.5673385201,
+        "stab_throughput": 836761.1053172941,
+        "stim_peak_rss_bytes": 34189312,
+        "stab_peak_rss_bytes": 34189312,
+        "stim_output_bytes": 2097152,
+        "stab_output_bytes": 2097152
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9333530869790583,
+      "self_upper_ratio": 0.9009778265180145
+    },
+    {
+      "case_id": "sample-dem.large",
+      "case_digest": "31a4e7ec57aada1f24b99cdd31fc5ab7a61c507f70287e8b475f70eb650b4923",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.025965931149909,
+          "confidence_lower": 1.0176719926847655,
+          "confidence_upper": 1.0304489313395822
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 3.12818798828125e-6,
+          "confidence_lower": 3.11502783203125e-6,
+          "confidence_upper": 3.136774169921875e-6
+        },
+        "stim_throughput": 327690.01420683414,
+        "stab_throughput": 319673.8826906114,
+        "stim_peak_rss_bytes": 52101120,
+        "stab_peak_rss_bytes": 52101120,
+        "stim_output_bytes": 4194304,
+        "stab_output_bytes": 4194304
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9070242419943598,
+      "self_upper_ratio": 0.8883766938270873
+    },
+    {
+      "case_id": "qec-cli-pipeline.medium",
+      "case_digest": "4d65137ebcbc6174cecbc73ac9b5c6c7ba2e2ad79596ecb9f3785245521da749",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 0.95298154651147,
+          "confidence_lower": 0.9445996572213381,
+          "confidence_upper": 0.9621625645545568
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.296090087890625e-6,
+          "confidence_lower": 1.273000244140625e-6,
+          "confidence_upper": 1.311910400390625e-6
+        },
+        "stim_throughput": 736482.8162700131,
+        "stab_throughput": 771551.305995628,
+        "stim_peak_rss_bytes": 52101120,
+        "stab_peak_rss_bytes": 52101120,
+        "stim_output_bytes": 20480,
+        "stab_output_bytes": 20480
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.981576891608925,
+      "self_upper_ratio": 0.9620465352102388
+    },
+    {
+      "case_id": "qec-cli-pipeline.large",
+      "case_digest": "4f038e224f1d135c8be164d48ca77d56c7ddf81c0a117920e25129a0b30448ec",
+      "timing": {
+        "parity_ratio": {
+          "sample_count": 21,
+          "median": 1.0102148946585514,
+          "confidence_lower": 1.0089436596897523,
+          "confidence_upper": 1.0191484294793018
+        },
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 1.889535400390625e-6,
+          "confidence_lower": 1.8799984130859375e-6,
+          "confidence_upper": 1.899603759765625e-6
+        },
+        "stim_throughput": 535756.9709064737,
+        "stab_throughput": 529230.6245192703,
+        "stim_peak_rss_bytes": 52101120,
+        "stab_peak_rss_bytes": 52101120,
+        "stim_output_bytes": 245760,
+        "stab_output_bytes": 245760
+      },
+      "parity": "passed",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9801459187714365,
+      "self_upper_ratio": 0.966675572528805
+    },
+    {
+      "case_id": "qec-rust-pipeline.medium",
+      "case_digest": "ac2707d929a1186d62554eb0f67470848dfcfdac6de6171a6c28e81fbc123f15",
+      "timing": {
+        "parity_ratio": null,
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 7.71259765625e-8,
+          "confidence_lower": 7.706353759765625e-8,
+          "confidence_upper": 7.8060546875e-8
+        },
+        "stim_throughput": null,
+        "stab_throughput": 12965800.16966965,
+        "stim_peak_rss_bytes": null,
+        "stab_peak_rss_bytes": 52101120,
+        "stim_output_bytes": null,
+        "stab_output_bytes": 9
+      },
+      "parity": "not-applicable",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9902466777109237,
+      "self_upper_ratio": 0.9752226182251847
+    },
+    {
+      "case_id": "qec-rust-pipeline.large",
+      "case_digest": "2c139489937d1a1b75dc6d059c6229d3504d5c3c76215261dd3274c5504e3797",
+      "timing": {
+        "parity_ratio": null,
+        "stab_seconds_per_work": {
+          "sample_count": 21,
+          "median": 7.669630432128906e-8,
+          "confidence_lower": 7.649751281738281e-8,
+          "confidence_upper": 7.675965499877929e-8
+        },
+        "stim_throughput": null,
+        "stab_throughput": 13038437.88627536,
+        "stim_peak_rss_bytes": null,
+        "stab_peak_rss_bytes": 52101120,
+        "stim_output_bytes": null,
+        "stab_output_bytes": 11
+      },
+      "parity": "not-applicable",
+      "self_regression": "passed",
+      "memory": "passed",
+      "self_median_ratio": 0.9966091801270573,
+      "self_upper_ratio": 0.9968317210142971
+    }
+  ],
+  "parity": "passed",
+  "self_regression": "passed",
+  "memory": "passed",
+  "passed": true
+}

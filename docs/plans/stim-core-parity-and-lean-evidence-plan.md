@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: P0 through P9 completed for their recorded revisions. The September review repairs and code reduction are implemented and awaiting fresh controlled evidence; release validity remains conditional on the measured source, permitted evidence descendants, and required GitHub CI passing the exact proposed release revision.
+Status: P0 through P9 completed for their recorded revisions. The September review repairs and code reduction have fresh passing controlled evidence; release validity remains conditional on the measured source, permitted evidence descendants, and required GitHub CI passing the exact proposed release revision.
 
 ## Summary
 
@@ -14,7 +14,7 @@ The command-whitespace, restricted-affinity, and detection-storage defects are r
 
 An independent follow-up review reconstructed every surviving legacy fixture obligation and confirmed unchanged canonical command identities. Local verification passed 1,831 workspace tests, 1,198 Stable component tests, 96 portable-SIMD tests, all 138 canonical owner tests, 459 implemented fixtures, and the 62-case live result-format differential. Strict Clippy, formatting, architecture and external-consumer checks, documentation links, API documentation, generated parity checks, staged hooks, and the unchanged 29-case E2E contract also passed. The fresh diagnostic smoke bundle at `target/benchmarks/2026-09-05-review-smoke` passes correctness and memory checks and replays offline. No Rust source reaches 1,200 lines.
 
-The source checkpoint now requires exact-revision GitHub CI followed by fresh controlled full and soak evidence. The accepted workload definitions, timing identity, and self-regression baselines remain unchanged.
+Measured source `b4a758db169fd343c93f2b84a5b1d68558c9e6c3` passes both mandated CI jobs in [run 33954379257](https://github.com/ifsheldon/Stab/actions/runs/33954379257). Fresh full and soak bundles under `benchmarks/evidence/aarch64/b4a758db169fd343c93f2b84a5b1d68558c9e6c3/` each pass all 29 cases and replay offline. The worst Stim confidence upper ratios are `1.190196x` for full and `1.199477x` for soak. Both pass seeded self-regression and memory limits. CPU 0 was fixed, recorded temperatures stayed at or below `39 C`, swap counters did not change, and the original `/swap.img` configuration was restored. The accepted workload definitions, timing identity, and self-regression baselines remain unchanged. The current evidence pointer binds this pair to its measured source; release use requires exact-revision CI and `e2e-release-check` on the evidence descendant.
 
 ## Rationale
 
@@ -582,7 +582,7 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 - The immutable controlled AArch64 full and soak bundles live under `benchmarks/evidence/aarch64/ef9866324640a744208e862a9a918f9fa16d4953/`. Each covers all 29 cases and passes correctness, memory, paired Stim parity, and seeded Stab self-regression.
 - Full-tier worst median and confidence upper ratios are `sample-dem.medium` at `1.156535x` and `detect-observables.medium` at `1.176857x`; maximum Stab peak RSS is `47,050,752` bytes. Soak-tier worst median and upper ratios are both `sample-dem.medium` at `1.153531x` and `1.170063x`; maximum Stab peak RSS is `50,065,408` bytes.
 - Both bundles replay offline, run on CPU 0, stay below `39 C`, use one controlled interval with no configured swap, and observe unchanged page-in and page-out counters. The prior `/swap.img` configuration was restored immediately afterward at priority `-2`.
-- The historical `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` pair remains correctly `unseeded` and is the reviewed source of the first 29-entry self-regression baseline. The current `ef986632` pair is the first source-current pair to pass that seeded `1.15x` gate; the seeding evidence is not retroactively promoted.
+- The historical `a8b56db319410f1d52bc64bfb7ee6a63c01c490f` pair remains correctly `unseeded` and is the reviewed source of the first 29-entry self-regression baseline. The `ef986632` pair was the first source-current pair to pass that seeded `1.15x` gate; the seeding evidence is not retroactively promoted.
 - Evidence publication commit `04b012ab` contains no product, oracle, benchmark-runner, or workflow change and passes `e2e-release-check`. Required GitHub CI must also pass the exact final descendant before release use.
 - The circuit-to-DEM catalog owner compares parsed model values across architectures because pinned Stim's DEM decimal width follows host C++ `long double` precision, while Stab's canonical DEM printer is architecture-stable. Model-owned DEM printer tests remain byte exact.
 
