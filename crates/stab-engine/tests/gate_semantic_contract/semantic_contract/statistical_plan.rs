@@ -230,81 +230,23 @@ pub(crate) fn gate_contract_statistical_count_is_accepted(
     (observed - expected_probability).abs() <= allowed_delta
 }
 
-pub(crate) fn gate_contract_statistical_rejection_boundaries(
-    shots: u64,
-    expected_probability: f64,
-    allowed_delta: f64,
-) -> (Option<u64>, Option<u64>) {
-    if shots == 0
-        || !expected_probability.is_finite()
-        || !allowed_delta.is_finite()
-        || allowed_delta < 0.0
-    {
-        return (None, None);
-    }
-    let rejected = |count| {
-        !gate_contract_statistical_count_is_accepted(
-            count,
-            shots,
-            expected_probability,
-            allowed_delta,
-        )
-    };
-
-    let lower_max = rejected(0).then(|| {
-        let mut low = 0;
-        let mut high = shots;
-        while low < high {
-            let middle = low + (high - low).div_ceil(2);
-            if rejected(middle) && middle as f64 / shots as f64 <= expected_probability {
-                low = middle;
-            } else {
-                high = middle - 1;
-            }
-        }
-        low
-    });
-    let upper_min = rejected(shots).then(|| {
-        let mut low = 0;
-        let mut high = shots;
-        while low < high {
-            let middle = low + (high - low) / 2;
-            if rejected(middle) && middle as f64 / shots as f64 >= expected_probability {
-                high = middle;
-            } else {
-                low = middle + 1;
-            }
-        }
-        low
-    });
-    (lower_max, upper_min)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        gate_contract_statistical_count_is_accepted, gate_contract_statistical_rejection_boundaries,
-    };
+    use super::gate_contract_statistical_count_is_accepted;
 
     #[test]
-    fn rejection_boundaries_match_the_executable_floating_predicate() {
-        let shots = 100_000;
-        let expected_probability = 0.25;
-        let allowed_delta = 0.01;
-
-        assert!(!gate_contract_statistical_count_is_accepted(
-            24_000,
-            shots,
-            expected_probability,
-            allowed_delta
-        ));
-        assert_eq!(
-            gate_contract_statistical_rejection_boundaries(
-                shots,
-                expected_probability,
-                allowed_delta
-            ),
-            (Some(24_000), Some(26_000))
-        );
+    fn statistical_counts_preserve_floating_acceptance_boundaries() {
+        for (count, accepted) in [
+            (24_000, false),
+            (24_001, true),
+            (25_999, true),
+            (26_000, false),
+        ] {
+            assert_eq!(
+                gate_contract_statistical_count_is_accepted(count, 100_000, 0.25, 0.01),
+                accepted,
+                "count={count}"
+            );
+        }
     }
 }

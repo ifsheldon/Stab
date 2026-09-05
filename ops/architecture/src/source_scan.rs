@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use syn::{Item, UseTree, Visibility};
 
 use crate::policy::is_stable_source_package;
-use crate::{CheckError, MigrationAllowance, PackageSpec, Violation};
+use crate::{CheckError, PackageSpec, Violation};
 
 const SIMD_PACKAGE: &str = "stab-kernels-simd";
 const FACADE_ROOT_REEXPORTS: &str = "ops/architecture/facade-root-reexports.txt";
@@ -22,7 +22,6 @@ mod rust_source;
 pub(super) struct SourceReport {
     pub rust_source_count: usize,
     pub violations: Vec<Violation>,
-    pub migration_allowances: Vec<MigrationAllowance>,
 }
 
 pub(super) fn scan_workspace_sources(
@@ -106,7 +105,6 @@ pub(super) fn scan_workspace_sources(
     Ok(SourceReport {
         rust_source_count: rust_sources.len(),
         violations,
-        migration_allowances: Vec::new(),
     })
 }
 

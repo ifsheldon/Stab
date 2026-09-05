@@ -166,10 +166,6 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
                     is_permitted && valid_kernel_edge,
                     "{kind:?} product edge {from} -> {to}"
                 );
-                assert!(
-                    report.migration_allowances.is_empty(),
-                    "{kind:?} product edge {from} -> {to} must not use a migration allowance"
-                );
             }
         }
     }

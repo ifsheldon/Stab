@@ -3,7 +3,7 @@ use std::path::{Component, PathBuf};
 
 use cargo_metadata::semver::{Op, Version, VersionReq};
 
-use crate::{MigrationAllowance, Violation};
+use crate::Violation;
 
 const RELEASE_MAJOR: u64 = 0;
 const RELEASE_MINOR: u64 = 2;
@@ -170,7 +170,6 @@ pub struct WorkspaceGraph {
 #[derive(Debug)]
 pub(super) struct PolicyReport {
     pub violations: Vec<Violation>,
-    pub migration_allowances: Vec<MigrationAllowance>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -183,7 +182,6 @@ enum PackageClass {
 
 pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
     let mut violations = Vec::new();
-    let mut migration_allowances = Vec::new();
     let packages = graph
         .packages
         .iter()
@@ -418,12 +416,7 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
 
     violations.sort();
     violations.dedup();
-    migration_allowances.sort();
-    migration_allowances.dedup();
-    PolicyReport {
-        violations,
-        migration_allowances,
-    }
+    PolicyReport { violations }
 }
 
 fn is_permitted_test_support_component_edge(edge: &WorkspaceEdge) -> bool {
@@ -646,7 +639,6 @@ mod tests {
         }];
         let report = validate_graph(&graph);
         assert!(report.violations.is_empty());
-        assert!(report.migration_allowances.is_empty());
 
         let support_edge = graph
             .edges
@@ -669,7 +661,6 @@ mod tests {
                 .code,
             "product-test-support-runtime-edge"
         );
-        assert!(report.migration_allowances.is_empty());
 
         let upward_graph = WorkspaceGraph {
             edges: vec![WorkspaceEdge {

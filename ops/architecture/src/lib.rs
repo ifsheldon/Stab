@@ -45,31 +45,17 @@ impl Violation {
     }
 }
 
-/// A pre-existing migration exception recognized by exact identity.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MigrationAllowance {
-    pub code: &'static str,
-    pub message: String,
-}
-
-/// Successful architecture-check counts and reported migration debt.
+/// Successful architecture-check counts.
 #[derive(Debug)]
 pub struct CheckSummary {
     pub package_count: usize,
     pub dependency_edge_count: usize,
     pub rust_source_count: usize,
     pub workflow_action_count: usize,
-    pub migration_allowances: Vec<MigrationAllowance>,
 }
 
 impl CheckSummary {
     pub fn print(&self) {
-        for allowance in &self.migration_allowances {
-            eprintln!(
-                "[{PREFIX}] migration allowance [{}]: {}",
-                allowance.code, allowance.message
-            );
-        }
         println!(
             "[{PREFIX}] checked {} workspace packages, {} workspace dependency edges, {} Rust source files, and {} workflow action uses",
             self.package_count,
@@ -169,13 +155,8 @@ pub fn check_workspace(root: &Path) -> Result<CheckReport, CheckError> {
 
     policy_report.violations.extend(source_report.violations);
     policy_report.violations.extend(workflow_report.violations);
-    policy_report
-        .migration_allowances
-        .extend(source_report.migration_allowances);
     policy_report.violations.sort();
     policy_report.violations.dedup();
-    policy_report.migration_allowances.sort();
-    policy_report.migration_allowances.dedup();
 
     Ok(CheckReport {
         summary: CheckSummary {
@@ -183,7 +164,6 @@ pub fn check_workspace(root: &Path) -> Result<CheckReport, CheckError> {
             dependency_edge_count: graph.edges.len(),
             rust_source_count: source_report.rust_source_count,
             workflow_action_count: workflow_report.action_use_count,
-            migration_allowances: policy_report.migration_allowances,
         },
         violations: policy_report.violations,
     })
