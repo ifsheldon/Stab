@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: September review repairs and code reduction are implemented; full correctness verification and refreshed AArch64 evidence are in progress. P0 through P9 remain complete for their recorded revisions. Current source changes require fresh measurement and exact-revision CI before release use.
+Status: September review repairs and code reduction pass full local correctness verification and smoke replay. Exact-revision CI and refreshed controlled AArch64 full and soak evidence are next. P0 through P9 remain complete for their recorded revisions; their historical evidence does not qualify the new source.
 
 ## Objective
 

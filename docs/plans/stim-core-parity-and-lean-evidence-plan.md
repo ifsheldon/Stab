@@ -8,6 +8,14 @@ Complete semantic feature parity with Stim v1.16.0 for Stab's core Rust librarie
 
 This is a deliberate pre-1.0 contract reset. Existing Stab APIs, test ledgers, benchmark schemas, and operational commands may be removed instead of receiving compatibility shims when a cleaner direct design replaces them. Stim-visible semantics remain the target; compatibility with obsolete Stab-only interfaces is not a goal.
 
+## September Review Repair Checkpoint
+
+The command-whitespace, restricted-affinity, and detection-storage defects are repaired. Detection storage is computed by its private allocation owners, includes both retained direct-output batches, and preserves the 256 MiB admission policy. The unused sparse-XOR utilities, numerical wrappers, partial MBQC API, duplicate gate suite, transform aggregates, statistical search helper, and empty architecture migration plumbing are removed. Public removals are recorded in the [0.2 migration guide](../MIGRATING-0.2.md).
+
+An independent follow-up review reconstructed every surviving legacy fixture obligation and confirmed unchanged canonical command identities. Local verification passed 1,831 workspace tests, 1,198 Stable component tests, 96 portable-SIMD tests, all 138 canonical owner tests, 459 implemented fixtures, and the 62-case live result-format differential. Strict Clippy, formatting, architecture and external-consumer checks, documentation links, API documentation, generated parity checks, staged hooks, and the unchanged 29-case E2E contract also passed. The fresh diagnostic smoke bundle at `target/benchmarks/2026-09-05-review-smoke` passes correctness and memory checks and replays offline. No Rust source reaches 1,200 lines.
+
+The source checkpoint now requires exact-revision GitHub CI followed by fresh controlled full and soak evidence. The accepted workload definitions, timing identity, and self-regression baselines remain unchanged.
+
 ## Rationale
 
 The current crate split is a sound product architecture. `stab-model`, `stab-records`, `stab-bits`, `stab-algebra`, `stab-analysis`, `stab-engine`, `stab-decoder`, `stab-kernels-simd`, `stab-cli`, and the `stab-core` facade already separate the major concerns well enough. Adding more product crates would mostly move complexity instead of removing it.
