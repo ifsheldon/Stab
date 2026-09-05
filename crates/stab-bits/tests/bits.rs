@@ -5,11 +5,8 @@
     reason = "M5 property tests construct in-range fixtures and direct assertions keep failing cases readable"
 )]
 
-use std::collections::BTreeSet;
-
 use proptest::prelude::*;
-use stab_bits as bits;
-use stab_bits::{BitBlock, BitError, BitMatrix, BitSlice, BitVec, SparseXorVec};
+use stab_bits::{BitBlock, BitError, BitMatrix, BitSlice, BitVec};
 
 #[test]
 fn bits_bit_ref_and_tail_boundaries_follow_stim() {
@@ -367,33 +364,6 @@ proptest! {
         }
     }
 
-    #[test]
-    fn bits_sparse_xor_vec_matches_symmetric_difference(
-        left in proptest::collection::vec(0u32..80, 0..80),
-        right in proptest::collection::vec(0u32..80, 0..80),
-    ) {
-        let mut actual = SparseXorVec::from_sorted_items(left.clone());
-        let rhs = SparseXorVec::from_sorted_items(right.clone());
-        actual.xor_assign(&rhs);
-
-        let expected = symmetric_difference_reference(&inplace_reference(left), &inplace_reference(right));
-        prop_assert_eq!(actual.items(), expected.as_slice());
-    }
-
-    #[test]
-    fn bits_sparse_xor_vec_xor_item_matches_reference_after_each_toggle(
-        items in proptest::collection::vec(0u32..80, 0..160),
-    ) {
-        let mut actual = SparseXorVec::new();
-        let mut reference = BTreeSet::new();
-        for item in items {
-            actual.xor_item(item);
-            toggle_reference_item(&mut reference, item);
-            let expected = reference.iter().copied().collect::<Vec<_>>();
-            prop_assert_eq!(actual.items(), expected.as_slice());
-            prop_assert!(actual.items().windows(2).all(|window| window[0] < window[1]));
-        }
-    }
 }
 
 #[test]
@@ -494,75 +464,6 @@ fn bits_bit_matrix_copies_packed_bytes_at_word_boundaries() {
     }
 }
 
-#[test]
-fn bits_sparse_xor_vec_ports_stim_examples() {
-    // Adapted from Stim v1.16.0 src/stim/mem/sparse_xor_vec.test.cc.
-    let mut left = SparseXorVec::new();
-    left.xor_item(1);
-    left.xor_item(3);
-    let mut right = SparseXorVec::new();
-    right.xor_item(3);
-    right.xor_item(2);
-    left.xor_assign(&right);
-    assert_eq!(left.items(), &[1, 2]);
-    assert_eq!(right.items(), &[2, 3]);
-
-    left.xor_item(2);
-    left.xor_item(6);
-    left.xor_item(9);
-    left.xor_item(2);
-    assert_eq!(left.items(), &[1, 2, 6, 9]);
-    assert!(left.contains(6));
-    assert!(left.is_superset_of(&[1, 9]));
-    assert!(!left.is_superset_of(&[1, 3]));
-    assert_eq!(left.to_string(), "SparseXorVec{1, 2, 6, 9}");
-
-    assert_eq!(bits::inplace_xor_sort(vec![5, 4, 5, 5]), vec![4, 5]);
-    assert_eq!(bits::inplace_xor_sort(vec![4, 5, 5, 4]), Vec::<u32>::new());
-}
-
-#[test]
-fn bits_sparse_xor_vec_xor_item_preserves_invariants_across_size_boundary() {
-    let mut actual = SparseXorVec::new();
-    let mut reference = BTreeSet::new();
-    for item in [7, 1, 12, 3, 9, 5, 15, 11, 13, 2, 9, 1, 18, 0, 7, 21] {
-        actual.xor_item(item);
-        toggle_reference_item(&mut reference, item);
-        let expected = reference.iter().copied().collect::<Vec<_>>();
-        assert_eq!(actual.items(), expected.as_slice());
-        assert!(
-            actual
-                .items()
-                .windows(2)
-                .all(|window| window[0] < window[1])
-        );
-    }
-}
-
-#[test]
-fn bits_twiddle_helpers_match_upstream_examples() {
-    // Adapted from Stim v1.16.0 src/stim/util_bot/twiddle.test.cc.
-    let powers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    let expected = [
-        false, true, true, false, true, false, false, false, true, false,
-    ];
-    for (value, expected) in powers.into_iter().zip(expected) {
-        assert_eq!(bits::is_power_of_2(value), expected);
-    }
-
-    assert_eq!(bits::floor_lg2(1), Some(0));
-    assert_eq!(bits::floor_lg2(2), Some(1));
-    assert_eq!(bits::floor_lg2(3), Some(1));
-    assert_eq!(bits::floor_lg2(9), Some(3));
-    assert_eq!(bits::floor_lg2(0), None);
-
-    let value = 0b0001_1100_1000_u64;
-    assert_eq!(bits::first_set_bit(value, 0), Some(3));
-    assert_eq!(bits::first_set_bit(value, 4), Some(6));
-    assert_eq!(bits::first_set_bit(value, 8), Some(8));
-    assert_eq!(bits::first_set_bit(0, 0), None);
-}
-
 fn bitvec_from_bools(bits: &[bool]) -> BitVec {
     let mut out = BitVec::zeros(bits.len());
     for (index, bit) in bits.iter().enumerate() {
@@ -600,28 +501,6 @@ fn xor_expected_with_mask(left: &[bool], right: &[bool], mask: &[bool]) -> Vec<b
         .zip(mask)
         .map(|((left, right), mask)| *left ^ (*right & *mask))
         .collect()
-}
-
-fn inplace_reference(items: Vec<u32>) -> Vec<u32> {
-    let mut set = BTreeSet::new();
-    for item in items {
-        if !set.insert(item) {
-            set.remove(&item);
-        }
-    }
-    set.into_iter().collect()
-}
-
-fn symmetric_difference_reference(left: &[u32], right: &[u32]) -> Vec<u32> {
-    let left = left.iter().copied().collect::<BTreeSet<_>>();
-    let right = right.iter().copied().collect::<BTreeSet<_>>();
-    left.symmetric_difference(&right).copied().collect()
-}
-
-fn toggle_reference_item(reference: &mut BTreeSet<u32>, item: u32) {
-    if !reference.insert(item) {
-        reference.remove(&item);
-    }
 }
 
 fn reference_popcount_words(words: &[u64]) -> usize {

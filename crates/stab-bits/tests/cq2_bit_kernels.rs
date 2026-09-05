@@ -4,12 +4,7 @@
     reason = "qualification fixtures use reviewed in-range indexes and explicit failures keep corpus diagnostics readable"
 )]
 
-use std::collections::BTreeSet;
-
-use stab_bits::{
-    self as bits, BIT_BLOCK_WORDS, BitBlock, BitError, BitLen, BitMatrix, BitSlice, BitVec,
-    SparseXorVec,
-};
+use stab_bits::{BIT_BLOCK_WORDS, BitBlock, BitError, BitLen, BitMatrix, BitSlice, BitVec};
 
 const WORD_BITS: usize = u64::BITS as usize;
 const BOUNDARY_WIDTHS: &[usize] = &[
@@ -554,98 +549,6 @@ fn cq2_bit_matrix_transpose_contract_matches_scalar_reference() {
     );
 }
 
-#[test]
-fn cq2_sparse_xor_matches_dense_across_density_transitions() {
-    assert!(SparseXorVec::new().is_empty());
-    for &width in &[0_usize, 1, 63, 64, 65, 255, 256, 257, 1025, 4093] {
-        for &period in &[1_usize, 2, 3, 7, 16, 64, 257] {
-            let left_items = patterned_items(width, period, 0);
-            let right_items = patterned_items(width, period.saturating_add(1), period / 2);
-            let mut sparse = SparseXorVec::from_sorted_items(with_even_duplicates(&left_items));
-            let rhs = SparseXorVec::from_sorted_items(with_even_duplicates(&right_items));
-            assert_eq!(sparse.items(), left_items.as_slice());
-            sparse.xor_assign(&rhs);
-
-            let expected = symmetric_difference(&left_items, &right_items);
-            assert_eq!(
-                sparse.items(),
-                expected.as_slice(),
-                "width={width} period={period}"
-            );
-            assert!(
-                sparse
-                    .items()
-                    .windows(2)
-                    .all(|window| window[0] < window[1])
-            );
-
-            let mut dense = BitVec::zeros(width);
-            for &item in &left_items {
-                dense.set(item as usize, true).expect("dense left item");
-            }
-            let mut dense_rhs = BitVec::zeros(width);
-            for &item in &right_items {
-                dense_rhs
-                    .set(item as usize, true)
-                    .expect("dense right item");
-            }
-            dense
-                .xor_assign(&dense_rhs.as_bitslice())
-                .expect("dense XOR");
-            let dense_items = (0..width)
-                .filter(|index| dense.get(*index) == Some(true))
-                .map(|index| u32::try_from(index).expect("qualification width fits u32"))
-                .collect::<Vec<_>>();
-            assert_eq!(
-                dense_items, expected,
-                "dense/sparse width={width} period={period}"
-            );
-        }
-    }
-
-    let mut toggled = SparseXorVec::new();
-    for item in [9, 1, 7, 1, 3, 9, 2, 7, 6] {
-        toggled.xor_item(item);
-    }
-    assert_eq!(toggled.items(), &[2, 3, 6]);
-    assert!(toggled.contains(3));
-    assert!(!toggled.contains(4));
-    assert!(toggled.is_superset_of(&[2, 6]));
-    assert!(!toggled.is_superset_of(&[2, 7]));
-    assert_eq!(toggled.to_string(), "SparseXorVec{2, 3, 6}");
-    assert_eq!(bits::inplace_xor_sort(vec![5, 4, 5, 5]), vec![4, 5]);
-    assert!(bits::is_subset_of_sorted(&[2, 6], toggled.items()));
-    assert!(!bits::is_subset_of_sorted(&[2, 7], toggled.items()));
-}
-
-#[test]
-fn cq2_twiddle_helpers_match_integer_reference() {
-    for value in 0_u64..=65_536 {
-        assert_eq!(
-            bits::is_power_of_2(value),
-            value.is_power_of_two(),
-            "value={value}"
-        );
-        let expected_lg = (value != 0).then(|| u64::BITS - 1 - value.leading_zeros());
-        assert_eq!(bits::floor_lg2(value), expected_lg, "value={value}");
-        for start in [0, 1, 7, 8, 31, 32, 63, 64, 65] {
-            let expected_first = if start >= u64::BITS {
-                None
-            } else {
-                let shifted = value >> start;
-                (shifted != 0).then(|| start + shifted.trailing_zeros())
-            };
-            assert_eq!(
-                bits::first_set_bit(value, start),
-                expected_first,
-                "value={value} start={start}"
-            );
-        }
-    }
-    assert_eq!(bits::floor_lg2(u64::MAX), Some(63));
-    assert_eq!(bits::first_set_bit(u64::MAX, 63), Some(63));
-}
-
 #[derive(Clone, Copy)]
 enum LogicalOp {
     Xor,
@@ -792,30 +695,4 @@ fn matrix_pattern(row: usize, col: usize) -> bool {
         .wrapping_add(row ^ col)
         % 19
         < 8
-}
-
-fn patterned_items(width: usize, period: usize, offset: usize) -> Vec<u32> {
-    (0..width)
-        .filter(|index| index.wrapping_add(offset) % period == 0)
-        .map(|index| u32::try_from(index).expect("qualification width fits u32"))
-        .collect()
-}
-
-fn with_even_duplicates(items: &[u32]) -> Vec<u32> {
-    let mut out = Vec::with_capacity(items.len().saturating_mul(3));
-    for (index, item) in items.iter().copied().enumerate() {
-        out.push(item);
-        if index % 2 == 0 {
-            out.push(item);
-            out.push(item);
-        }
-    }
-    out.reverse();
-    out
-}
-
-fn symmetric_difference(left: &[u32], right: &[u32]) -> Vec<u32> {
-    let left = left.iter().copied().collect::<BTreeSet<_>>();
-    let right = right.iter().copied().collect::<BTreeSet<_>>();
-    left.symmetric_difference(&right).copied().collect()
 }

@@ -7,7 +7,7 @@ Stab 0.2 is a coordinated breaking Rust API release. Stim v1.16.0 semantics rema
 | Crate | Primary use |
 | --- | --- |
 | `stab-model` | Circuits, detector error models, gates, targets, parsing, printing, validation, and model diagnostics |
-| `stab-bits` | Packed and sparse bit storage plus scalar bit operations |
+| `stab-bits` | Packed bit storage plus scalar bit operations |
 | `stab-records` | Typed batches, layouts, strict Stim result codecs, readers, writers, and sinks |
 | `stab-algebra` | Pauli, Clifford, tableau, flow, and unitary mathematics |
 | `stab-analysis` | Pure transforms, generation, circuit-to-DEM analysis, flow analysis, search, SAT, and error matching |
@@ -48,6 +48,8 @@ There are no `advanced` or `experimental` tiers. Low-level APIs and extension co
 | Caller-selectable sampling backend preferences | Removed; scalar is the sole execution plan and portable SIMD is internal leaf acceleration |
 
 The CLI composes owner errors into private human or JSON diagnostics. Library callers should preserve typed owner errors or define an application-specific aggregate only where a workflow genuinely crosses domains.
+
+The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sorted` APIs are removed without compatibility aliases. Sparse result codecs and sparse reverse-frame analysis remain supported through their independent owners. The tests-only numerical wrappers `is_power_of_2`, `floor_lg2`, and `first_set_bit` are also removed; callers can use Rust's integer bit operations directly.
 
 ## Parser Limits
 

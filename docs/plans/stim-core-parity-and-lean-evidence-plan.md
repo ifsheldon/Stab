@@ -69,7 +69,7 @@ Stim's MBQC decomposition helper is also excluded because it feeds rich help ren
 
 - `stab-model` owns circuit and detector error model syntax, typed targets, metadata, structural transforms, and canonical rendering.
 - `stab-records` owns result formats, layouts, readers, writers, bounded streaming, and format conversion.
-- `stab-bits` owns generic packed and sparse bit storage.
+- `stab-bits` owns generic packed bit storage.
 - `stab-algebra` owns Pauli, Clifford, tableau, and flow algebra.
 - `stab-analysis` owns circuit-to-DEM lowering, flow and detector analysis, inverse and reverse analyses, search, and satisfiability.
 - `stab-engine` owns compilation and execution plans, sampling sessions, detection conversion sessions, and detector error model sampling sessions.
@@ -453,7 +453,7 @@ The initial matrix contains 29 family-scale cases. Exact arguments, deterministi
 
 ### Diagnostic Budget
 
-The initial diagnostic candidates are circuit parse, circuit print, DEM parse, DEM print, sampler compile, sampler execute, detection conversion, analyzer lowering, record codec, sparse XOR, bit transpose, tableau composition, and Clifford composition. A diagnostic persists only when a profile shows that it accounts for at least 10% of an E2E workflow or when it is needed to isolate a confirmed regression. Gate lookup, singleton getters, trivial formatting, fingerprints, and protocol plumbing are not benchmark products.
+The initial diagnostic candidates are circuit parse, circuit print, DEM parse, DEM print, sampler compile, sampler execute, detection conversion, analyzer lowering, record codec, bit transpose, tableau composition, and Clifford composition. A diagnostic persists only when a profile shows that it accounts for at least 10% of an E2E workflow or when it is needed to isolate a confirmed regression. Gate lookup, singleton getters, trivial formatting, fingerprints, and protocol plumbing are not benchmark products.
 
 ### Measurement Contract
 
