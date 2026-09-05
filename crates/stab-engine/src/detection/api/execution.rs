@@ -1,11 +1,11 @@
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_records::DetectionSink;
+use stab_records::{DetectionSink, DetectorWidth, ObservableWidth};
 
 use super::{
-    DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
-    DetectionRunSummary, DirectDetectionState, DirectDetectorFramePlan, MAX_BATCH_SHOTS,
-    MAX_DETECTION_SESSION_STORAGE_BYTES, MeasurementToDetectionPlan,
+    DetectionBatchBuffers, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
+    DetectionRunStatus, DetectionRunSummary, DirectDetectionState, DirectDetectorFramePlan,
+    MAX_BATCH_SHOTS, MAX_DETECTION_SESSION_STORAGE_BYTES, MeasurementToDetectionPlan,
 };
 use crate::{RandomPolicy, SamplingCancellation, ShotCount, SinkFailurePhase};
 
@@ -124,10 +124,8 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
     let detectors = plan.detector_width().get() as u128;
     let observables = plan.observable_width().get() as u128;
     let records = detectors.saturating_add(observables);
-    let packed_batch_bytes = records
-        .saturating_mul(MAX_BATCH_SHOTS as u128)
-        .saturating_add(7)
-        / 8;
+    let packed_batch_bytes =
+        DetectionBatchBuffers::storage_bytes(plan.detector_width(), plan.observable_width());
     measurements
         .saturating_add(measurements.saturating_mul(size_of::<u64>() as u128))
         .saturating_add(sweeps.saturating_mul(size_of::<u64>() as u128))
@@ -139,23 +137,16 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
 pub(super) fn validate_direct_session_storage(
     plan: &DirectDetectorFramePlan,
 ) -> Result<(), DetectionExecutionError> {
-    let qubits = plan.qubit_count() as u128;
-    let measurements = plan.measurement_count() as u128;
-    let detectors = plan.detector_count() as u128;
-    let observables = plan.observable_count() as u128;
-    let records = detectors.saturating_add(observables);
-    let packed_batch_bytes = records
-        .saturating_mul(MAX_BATCH_SHOTS as u128)
-        .saturating_add(7)
-        / 8;
-    validate_session_storage(
-        qubits
-            .saturating_mul(2)
-            .saturating_add(measurements.saturating_mul(2))
-            .saturating_add(detectors)
-            .saturating_add(observables.saturating_mul(2))
-            .saturating_add(packed_batch_bytes),
-    )
+    validate_session_storage(direct_session_storage_bytes(plan))
+}
+
+pub(super) fn direct_session_storage_bytes(plan: &DirectDetectorFramePlan) -> u128 {
+    let packed_batch_bytes = DetectionBatchBuffers::storage_bytes(
+        DetectorWidth::new(plan.detector_count()),
+        ObservableWidth::new(plan.observable_count()),
+    );
+    plan.state_storage_bytes()
+        .saturating_add(packed_batch_bytes.saturating_mul(2))
 }
 
 fn validate_session_storage(estimated_bytes: u128) -> Result<(), DetectionExecutionError> {

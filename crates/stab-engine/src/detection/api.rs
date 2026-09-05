@@ -137,6 +137,15 @@ struct DetectionBatchBuffers {
 }
 
 impl DetectionBatchBuffers {
+    fn storage_bytes(detector_width: DetectorWidth, observable_width: ObservableWidth) -> u128 {
+        let detector_words = stab_bits::BitLen::new(detector_width.get()).word_count() as u128;
+        let observable_words = stab_bits::BitLen::new(observable_width.get()).word_count() as u128;
+        detector_words
+            .saturating_add(observable_words)
+            .saturating_mul(MAX_BATCH_SHOTS as u128)
+            .saturating_mul(size_of::<u64>() as u128)
+    }
+
     fn new(
         detector_width: DetectorWidth,
         observable_width: ObservableWidth,

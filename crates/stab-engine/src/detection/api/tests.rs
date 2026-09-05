@@ -954,6 +954,96 @@ fn warmed_conversion_reuses_width_and_batch_bounded_storage() {
 }
 
 #[test]
+fn session_storage_estimates_match_retained_allocations_at_word_boundaries() {
+    for (detectors, observables) in [(0, 0), (1, 1), (63, 64), (64, 63), (65, 65)] {
+        let mut text = String::from("M 0\n");
+        for _ in 0..detectors {
+            text.push_str("DETECTOR rec[-1]\n");
+        }
+        if observables > 0 {
+            text.push_str(&format!(
+                "OBSERVABLE_INCLUDE({}) rec[-1]\n",
+                observables - 1
+            ));
+        }
+        let direct = DetectionSamplingCompiler::new()
+            .compile(&circuit(&text))
+            .expect("compile direct allocation fixture");
+        let mut session = None;
+        let allocated = allocation_counter::measure(|| {
+            session = Some(
+                direct
+                    .session(RandomPolicy::Seeded(Seed::new(1)))
+                    .expect("allocate direct session"),
+            );
+        });
+        assert_eq!(
+            execution::direct_session_storage_bytes(&direct.inner.direct),
+            u128::try_from(allocated.bytes_current).expect("retained direct allocation"),
+            "direct widths {detectors}/{observables}"
+        );
+
+        for sweep in [false, true] {
+            let text = if sweep {
+                format!("CX sweep[0] 0\n{text}")
+            } else {
+                text.clone()
+            };
+            let conversion = MeasurementToDetectionCompiler::new()
+                .compile(&circuit(&text))
+                .expect("compile conversion allocation fixture");
+            let mut session = None;
+            let allocated = allocation_counter::measure(|| {
+                session = Some(conversion.session().expect("allocate conversion session"));
+            });
+            assert_eq!(
+                execution::conversion_session_storage_bytes(&conversion),
+                u128::try_from(allocated.bytes_current).expect("retained conversion allocation"),
+                "conversion widths {detectors}/{observables}, sweep={sweep}"
+            );
+        }
+    }
+}
+
+#[test]
+fn direct_session_storage_rejects_first_excess_before_allocation() {
+    // One measurement and detector add 16 plane bytes and two 512-byte packed batches.
+    // This sparse qubit identifier puts the admitted backing storage exactly at 256 MiB.
+    let at_limit = DetectionSamplingCompiler::new()
+        .compile(&circuit("M 16777150\nDETECTOR rec[-1]\n"))
+        .expect("compile exact storage boundary");
+    execution::validate_direct_session_storage(&at_limit.inner.direct)
+        .expect("admit the exact boundary without allocating its state");
+    assert_eq!(
+        execution::direct_session_storage_bytes(&at_limit.inner.direct),
+        u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES)
+    );
+
+    let over_limit = DetectionSamplingCompiler::new()
+        .compile(&circuit("M 16777151\nDETECTOR rec[-1]\n"))
+        .expect("compile the first excess qubit");
+    // Check admission first so a regression cannot allocate the large frame in this test.
+    execution::validate_direct_session_storage(&over_limit.inner.direct)
+        .expect_err("reject the first excess qubit before attempting construction");
+    let mut rejected = None;
+    let allocated = allocation_counter::measure(|| {
+        rejected = Some(
+            over_limit
+                .session(RandomPolicy::Seeded(Seed::new(1)))
+                .expect_err("public construction must use the same admission"),
+        );
+    });
+    assert_eq!(allocated.bytes_total, 0);
+    assert_eq!(
+        rejected,
+        Some(DetectionExecutionError::SessionStorageLimit {
+            estimated_bytes: u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) + 16,
+            limit_bytes: MAX_DETECTION_SESSION_STORAGE_BYTES,
+        })
+    );
+}
+
+#[test]
 fn warmed_detection_session_reuses_batch_storage() {
     let spp = (0..32)
         .map(|qubit| format!("X{qubit}"))

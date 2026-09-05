@@ -52,19 +52,37 @@ fn detect_basic_matches_m9_oracle_golden() {
 }
 
 #[test]
-fn detect_accepts_maximum_id_sparse_direct_z_circuit() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "detect", "--shots", "1"],
-        b"M 16777215\nDETECTOR rec[-1]\n".as_slice(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 0, "{}", String::from_utf8_lossy(&stderr));
-    assert_eq!(stdout, b"0\n");
-    assert!(stderr.is_empty(), "{}", String::from_utf8_lossy(&stderr));
+fn detect_enforces_storage_without_restricting_sparse_qubit_syntax() {
+    // Detection's two frame planes and both packed batches reach 256 MiB at this ID.
+    // Sampling's scalar Direct-Z path still supports the full Stim qubit-ID range.
+    for (command, qubit, expected_status) in [
+        ("detect", 16_777_150, 0),
+        ("detect", 16_777_215, 1),
+        ("sample", 16_777_215, 0),
+    ] {
+        let input = format!("M {qubit}\nDETECTOR rec[-1]\n");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            ["stab", command, "--shots", "1"],
+            input.as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+        let error = String::from_utf8(stderr).unwrap();
+        assert_eq!(status, expected_status, "{command}, qubit={qubit}: {error}");
+        if expected_status == 0 {
+            assert_eq!(stdout, b"0\n");
+            assert!(error.is_empty(), "{error}");
+        } else {
+            assert!(stdout.is_empty());
+            assert!(
+                error.contains("detection session needs an estimated 268436496 bytes")
+                    && error.contains("268435456-byte safety limit"),
+                "{error}"
+            );
+        }
+    }
 }
 
 #[test]

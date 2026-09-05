@@ -76,6 +76,15 @@ impl DirectDetectorFramePlan {
         )
     }
 
+    pub(in crate::detection) fn state_storage_bytes(&self) -> u128 {
+        DetectorFrameState::storage_bytes(
+            self.qubit_count(),
+            self.measurement_count(),
+            self.detector_count(),
+            self.observable_count(),
+        )
+    }
+
     pub(in crate::detection) fn sample_batch(
         &self,
         state: &mut DetectorFrameState,
@@ -231,12 +240,12 @@ impl SweepCorrectionPlan {
     }
 
     pub(in crate::detection) fn state_storage_bytes(&self) -> u128 {
-        (self.executable.qubit_count() as u128)
-            .saturating_mul(2)
-            .saturating_add(self.measurement_count as u128)
-            .saturating_add(self.detector_count as u128)
-            .saturating_add((self.observable_count as u128).saturating_mul(2))
-            .saturating_mul(size_of::<u64>() as u128)
+        DetectorFrameState::storage_bytes(
+            self.executable.qubit_count(),
+            self.measurement_count,
+            self.detector_count,
+            self.observable_count,
+        )
     }
 
     pub(in crate::detection) const fn retained_bytes(&self) -> u64 {
@@ -291,6 +300,20 @@ pub(in crate::detection) struct DetectorFrameState {
 }
 
 impl DetectorFrameState {
+    fn storage_bytes(
+        qubit_count: usize,
+        measurement_count: usize,
+        detector_count: usize,
+        observable_count: usize,
+    ) -> u128 {
+        (qubit_count as u128)
+            .saturating_mul(2)
+            .saturating_add(measurement_count as u128)
+            .saturating_add(detector_count as u128)
+            .saturating_add((observable_count as u128).saturating_mul(2))
+            .saturating_mul(size_of::<u64>() as u128)
+    }
+
     fn new(
         qubit_count: usize,
         measurement_count: usize,
