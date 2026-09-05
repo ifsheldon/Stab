@@ -51,6 +51,8 @@ The CLI composes owner errors into private human or JSON diagnostics. Library ca
 
 The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sorted` APIs are removed without compatibility aliases. Sparse result codecs and sparse reverse-frame analysis remain supported through their independent owners. The tests-only numerical wrappers `is_power_of_2`, `floor_lg2`, and `first_set_bit` are also removed; callers can use Rust's integer bit operations directly.
 
+The partial `stab_analysis::mbqc_decomposition` helper, also exposed through `stab_core::analysis`, is removed without a replacement. MBQC help decomposition remains outside the selected computational API; supported circuit base-gate lowering continues through `Circuit::decomposed`.
+
 ## Parser Limits
 
 Circuit and DEM command boundaries accept Stim's ASCII whitespace, including vertical tabs and form feeds before commands and repeat terminators. Whitespace inside instruction arguments and targets keeps the stricter Stim grammar, and diagnostics retain exact source-byte spans.

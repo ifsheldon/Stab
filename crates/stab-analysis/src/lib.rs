@@ -22,7 +22,6 @@ mod error;
 mod error_matcher;
 pub mod gate;
 mod matched_error;
-mod mbqc_decomposition;
 mod resources;
 mod sparse_rev_frame_tracker;
 mod tableau_circuit;
@@ -91,7 +90,6 @@ pub use matched_error::{
     DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
     canonicalize_circuit_error_location_parts, canonicalize_dem_error_terms,
 };
-pub use mbqc_decomposition::mbqc_decomposition;
 pub use resources::{CircuitPassStage, ResourceKind, ResourceLimitError, ResourceOperation};
 pub use tableau_circuit::tableau_to_circuit;
 
