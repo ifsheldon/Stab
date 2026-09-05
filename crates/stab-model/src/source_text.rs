@@ -1,5 +1,11 @@
 use crate::{ByteSpan, advanced::byte_span_from_valid_range};
 
+// Stim uses C `isspace` between commands, which also includes vertical tabs.
+// Whitespace within instruction arguments and targets follows stricter rules.
+fn is_command_space(character: char) -> bool {
+    character.is_ascii_whitespace() || character == '\x0b'
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct SourceSlice<'a> {
     text: &'a str,
@@ -42,8 +48,8 @@ impl<'a> SourceSlice<'a> {
         ByteSpan::try_new(self.byte_start.checked_add(relative_start)?, byte_length)
     }
 
-    pub(crate) fn trim_ascii_start(self) -> Self {
-        let trimmed = self.text.trim_ascii_start();
+    pub(crate) fn trim_command_space_start(self) -> Self {
+        let trimmed = self.text.trim_start_matches(is_command_space);
         Self {
             text: trimmed,
             byte_start: self.byte_start + (self.text.len() - trimmed.len()),
@@ -245,7 +251,7 @@ impl<'a> SourceCommands<'a> {
                         end_error_span: byte_span_from_valid_range(source.byte_start() + index, 1),
                     });
                 }
-                byte if !matches!(byte, b' ' | b'\t' | b'\r') => {
+                byte if !is_command_space(char::from(byte)) => {
                     has_non_space = true;
                 }
                 _ => {}
@@ -294,7 +300,7 @@ fn is_complete_block_terminator(text: &str) -> bool {
         *last == b'}'
             && prefix
                 .iter()
-                .all(|byte| matches!(byte, b' ' | b'\t' | b'\r'))
+                .all(|byte| is_command_space(char::from(*byte)))
     })
 }
 

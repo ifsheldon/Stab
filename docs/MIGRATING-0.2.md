@@ -51,6 +51,8 @@ The CLI composes owner errors into private human or JSON diagnostics. Library ca
 
 ## Parser Limits
 
+Circuit and DEM command boundaries accept Stim's ASCII whitespace, including vertical tabs and form feeds before commands and repeat terminators. Whitespace inside instruction arguments and targets keeps the stricter Stim grammar, and diagnostics retain exact source-byte spans.
+
 `ParseLimits::new` now takes typed source-byte, source-line, represented-instruction, represented-target, and repeat-nesting limits in that order. The new `SourceByteLimit`, `RepresentedInstructionLimit`, and `RepresentedTargetLimit` values are also available from the `stab-core` facade. Existing parser entry points use inclusive defaults of 64 MiB, 1,000,000 physical lines, 1,000,000 compact declarations, 32,000,000 retained targets, and 256 repeat levels.
 
 `ResourceLimitContext` and the parser-only `stab_model::advanced` error and target-parser constructors were removed. A `ResourceLimitError` now reports its `dialect`, `operation`, `resource`, optional `source_line`, `actual`, `limit`, and source `span` directly.

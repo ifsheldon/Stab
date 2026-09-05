@@ -52,7 +52,7 @@ impl<'a> DemParser<'a> {
     ) -> ModelResult<DetectorErrorModel> {
         while let Some(command) = self.next_command()? {
             let line_number = command.line_number();
-            let line = command.source().trim_ascii_start();
+            let line = command.source().trim_command_space_start();
             let semantic_line = trim_command_space_end(line);
             if semantic_line.text().is_empty() {
                 continue;

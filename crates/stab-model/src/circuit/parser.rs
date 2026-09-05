@@ -52,7 +52,7 @@ impl<'a> Parser<'a> {
             self.admission
                 .admit_source_line(line_number, command.source().span())?;
 
-            let line = command.source().trim_ascii_start();
+            let line = command.source().trim_command_space_start();
             let semantic_line = line.trim_ascii_end();
             if semantic_line.text().is_empty() {
                 continue;

@@ -67,6 +67,14 @@ fn circuit_parse_diagnostics_locate_crlf_utf8_arguments_targets_and_repeats() {
         "failed to parse line 2: unknown gate UNKNOWN",
     );
     assert_parse_error(
+        Circuit::from_stim_str("H 0\r\n\x0b\x0cUNKNOWN 1\r\n")
+            .expect_err("unknown gate after command whitespace"),
+        ParseErrorCode::UnknownInstruction,
+        span(7, 7),
+        "unknown gate UNKNOWN",
+        "failed to parse line 2: unknown gate UNKNOWN",
+    );
+    assert_parse_error(
         Circuit::from_stim_str("H[é\\Q] 0\n").expect_err("invalid UTF-8-adjacent tag escape"),
         ParseErrorCode::InvalidTagEscape,
         span(4, 2),
@@ -126,6 +134,14 @@ fn dem_parse_diagnostics_locate_crlf_utf8_numeric_and_eof_failures() {
             .expect_err("unknown DEM instruction"),
         ParseErrorCode::UnknownInstruction,
         span(15, 3),
+        "unknown DEM instruction wat",
+        "failed to parse line 2: invalid detector error model: unknown DEM instruction wat",
+    );
+    assert_parse_error(
+        DetectorErrorModel::from_dem_str("error(0.1) D0\r\n\x0b\x0cwat 0\r\n")
+            .expect_err("unknown DEM instruction after command whitespace"),
+        ParseErrorCode::UnknownInstruction,
+        span(17, 3),
         "unknown DEM instruction wat",
         "failed to parse line 2: invalid detector error model: unknown DEM instruction wat",
     );
@@ -769,6 +785,10 @@ fn circuit_and_dem_keep_stim_spacing_and_empty_argument_grammar() {
         "X_ERROR (0.1) 0\n",
         "H\u{a0}0\n",
         "DETECTOR rec[-1]\u{a0}rec[-2]\n",
+        "H\x0b0\n",
+        "H 0\x0b1\n",
+        "REPEAT\x0b2 {\n}\n",
+        "REPEAT 2\x0b{\n}\n",
     ] {
         Circuit::from_stim_str(input).expect_err("reject syntax outside the Stim grammar");
     }
@@ -776,6 +796,10 @@ fn circuit_and_dem_keep_stim_spacing_and_empty_argument_grammar() {
         "error [tag](0.1) D0\n",
         "error (0.1) D0\n",
         "error(0.1)\u{a0}D0\n",
+        "error(0.1)\x0bD0\n",
+        "error(0.1) D0\x0bD1\n",
+        "repeat\x0b2 {\n}\n",
+        "repeat 2\x0b{\n}\n",
     ] {
         DetectorErrorModel::from_dem_str(input)
             .expect_err("reject DEM syntax outside the Stim grammar");
@@ -784,15 +808,25 @@ fn circuit_and_dem_keep_stim_spacing_and_empty_argument_grammar() {
 
 #[test]
 fn circuit_and_dem_accept_stim_inline_block_boundaries() {
-    let circuit = Circuit::from_stim_str("REPEAT 2 { H 0\n} M 0\n").expect("inline circuit block");
-    assert_eq!(circuit.to_stim_string(), "REPEAT 2 {\n    H 0\n}\nM 0\n");
+    // Probed against pinned Stim v1.16.0, whose shared command scanner uses `isspace`.
+    for space in [" ", "\x0b", "\x0c", " \t\x0b\x0c\r"] {
+        for continuation in ["", "\n"] {
+            let circuit = Circuit::from_stim_str(&format!(
+                "{space}REPEAT 2 {{{space}H 0\n{space}}}{continuation}{space}M 0\n{space}# comment\n{space}"
+            ))
+            .expect("command whitespace around inline circuit block");
+            assert_eq!(circuit.to_stim_string(), "REPEAT 2 {\n    H 0\n}\nM 0\n");
 
-    let dem = DetectorErrorModel::from_dem_str("repeat 2 { error(0.1) D0\n} detector(1) D0\n")
-        .expect("inline DEM block");
-    assert_eq!(
-        dem.to_dem_string(),
-        "repeat 2 {\n    error(0.1000000000000000055511151231257827) D0\n}\ndetector(1) D0\n"
-    );
+            let dem = DetectorErrorModel::from_dem_str(&format!(
+                "{space}repeat 2 {{{space}error(0.125) D0\n{space}}}{continuation}{space}detector(1) D0\n{space}# comment\n{space}"
+            ))
+            .expect("command whitespace around inline DEM block");
+            assert_eq!(
+                dem.to_dem_string(),
+                "repeat 2 {\n    error(0.125) D0\n}\ndetector(1) D0\n"
+            );
+        }
+    }
 }
 
 #[test]
