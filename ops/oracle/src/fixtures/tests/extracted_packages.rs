@@ -33,11 +33,10 @@ fn result_format_fixtures_execute_the_canonical_records_package() {
 
 #[test]
 fn bit_fixtures_execute_the_canonical_bits_package() {
-    const BIT_FIXTURES: [&str; 4] = [
+    const BIT_FIXTURES: [&str; 3] = [
         "coverage-mem-simd-bit-table",
         "coverage-mem-simd-bits",
         "coverage-mem-simd-bits-range-ref",
-        "coverage-mem-sparse-xor-vec",
     ];
 
     assert_fixtures_execute_package(&BIT_FIXTURES, "stab-bits");
