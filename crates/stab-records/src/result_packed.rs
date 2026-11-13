@@ -148,11 +148,13 @@ pub(crate) fn unpack_b8_chunk_into(chunk: &[u8], record: &mut [bool]) {
 /// Reads one ptb64 group's measurement-major words out of its raw group bytes.
 pub(crate) fn extend_ptb64_group_words(group_bytes: &[u8], words: &mut Vec<u64>) {
     words.clear();
-    words.extend(group_bytes.chunks_exact(8).map(|chunk| {
-        let mut word_bytes = [0u8; 8];
-        word_bytes.copy_from_slice(chunk);
-        u64::from_le_bytes(word_bytes)
-    }));
+    words.extend(
+        group_bytes
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|word_bytes| u64::from_le_bytes(*word_bytes)),
+    );
 }
 
 /// Fills a dense record with one shot's bits from a ptb64 group's measurement-major words.

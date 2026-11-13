@@ -11,4 +11,4 @@ All Stab product crates use the same `0.2.0` version. Internal dependencies requ
 - Generated Stim parity status: <https://github.com/ifsheldon/Stab/blob/main/docs/stim-parity.md>
 - Compatibility target: Stim v1.16.0
 
-`stab-core` and `stab-cli` are built and checked with the repository's pinned Nightly toolchain. The stable component crates, including the always-on SIMD kernel crate built on `fearless_simd`, declare Rust 1.97.1 as their minimum supported Rust version.
+Every Stab crate, including `stab-core`, `stab-cli`, and the always-on SIMD kernel crate built on `fearless_simd`, builds on Stable Rust and declares Rust 1.100 as its minimum supported Rust version.

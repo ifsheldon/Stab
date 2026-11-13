@@ -318,13 +318,8 @@ impl<'a> CandidateCollector<'a> {
         {
             return Ok(());
         }
-        let mut groups = instruction.targets().chunks_exact(2);
-        for (group_index, group) in groups.by_ref().enumerate() {
-            let [left_target, right_target] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(
-                    "DEPOLARIZE2 expected paired targets during error matching",
-                ));
-            };
+        let (groups, unpaired) = instruction.targets().as_chunks::<2>();
+        for (group_index, [left_target, right_target]) in groups.iter().enumerate() {
             let Some(left) = left_target.qubit_id() else {
                 return Err(AnalysisError::invalid_detector_error_model(format!(
                     "DEPOLARIZE2 target {left_target} is not a qubit"
@@ -366,7 +361,7 @@ impl<'a> CandidateCollector<'a> {
                 });
             }
         }
-        if !groups.remainder().is_empty() {
+        if !unpaired.is_empty() {
             return Err(AnalysisError::invalid_detector_error_model(
                 "DEPOLARIZE2 expected an even number of targets during error matching",
             ));
@@ -385,13 +380,8 @@ impl<'a> CandidateCollector<'a> {
                 "PAULI_CHANNEL_2 expected 15 probability arguments during error matching",
             ));
         }
-        let mut groups = instruction.targets().chunks_exact(2);
-        for (group_index, group) in groups.by_ref().enumerate() {
-            let [left_target, right_target] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(
-                    "PAULI_CHANNEL_2 expected paired targets during error matching",
-                ));
-            };
+        let (groups, unpaired) = instruction.targets().as_chunks::<2>();
+        for (group_index, [left_target, right_target]) in groups.iter().enumerate() {
             let Some(left) = left_target.qubit_id() else {
                 return Err(AnalysisError::invalid_detector_error_model(format!(
                     "PAULI_CHANNEL_2 target {left_target} is not a qubit"
@@ -447,7 +437,7 @@ impl<'a> CandidateCollector<'a> {
                 });
             }
         }
-        if !groups.remainder().is_empty() {
+        if !unpaired.is_empty() {
             return Err(AnalysisError::invalid_detector_error_model(
                 "PAULI_CHANNEL_2 expected an even number of targets during error matching",
             ));

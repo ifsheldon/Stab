@@ -876,10 +876,8 @@ fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> ModelR
         }
         .into());
     }
-    for pair in targets.chunks_exact(2) {
-        if let [left, right] = pair
-            && left == right
-        {
+    for [left, right] in targets.as_chunks::<2>().0 {
+        if left == right {
             return Err(ValidationError::InvalidTarget {
                 gate,
                 target: left.to_string(),

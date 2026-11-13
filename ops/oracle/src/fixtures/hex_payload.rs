@@ -36,10 +36,7 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Vec<u8>, Box<str>> {
         return Err("an even number of hexadecimal digits is required".into());
     }
     let mut decoded = Vec::with_capacity(digits.len() / 2);
-    for pair in digits.chunks_exact(2) {
-        let [high, low] = pair else {
-            return Err("internal hex pair width was not two".into());
-        };
+    for [high, low] in digits.as_chunks::<2>().0 {
         let high = decode_digit(*high)?;
         let low = decode_digit(*low)?;
         decoded.push((high << 4) | low);

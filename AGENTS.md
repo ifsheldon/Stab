@@ -39,9 +39,8 @@
 - Treat this as a Cargo workspace project, even while the repository is still small.
 - When adding a new dependency, search for its latest stable version on crates.io before adding it. Do not recall a version from your memory.
 - Use the component ownership and dependency graph described in `docs/architecture/README.md` unless an architecture decision deliberately revises it.
-- Pin Nightly Rust in `rust-toolchain.toml` before using `portable_simd`.
-- This workspace currently pins `nightly-2026-06-20` so local and CI checks use the same toolchain.
-- Keep direct `std::simd` usage isolated in bit-kernel modules, with scalar reference implementations available for tests.
+- The workspace pins Stable Rust `1.100.0` in `rust-toolchain.toml`, every product crate declares 1.100 as its minimum supported Rust version, and unstable features must not be introduced.
+- Keep direct `fearless_simd` usage isolated in `stab-kernels-simd`, with scalar reference implementations available for tests.
 - Prefer small crates and clear module boundaries over large cross-cutting modules.
 - Avoid public APIs that expose awkward lifetimes, unnecessary generic parameters, or borrowed internals that will be painful to wrap with Python bindings later.
 - During iteration, prefer targeted `cargo test` commands over expensive full-suite runs.

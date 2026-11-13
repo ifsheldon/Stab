@@ -195,10 +195,10 @@ fn validate_metadata(root: &Path, package: &Package) -> Result<(), ReleaseError>
     if package.description.as_deref().is_none_or(str::is_empty)
         || package.license.as_deref() != Some("MIT")
         || package.repository.as_deref() != Some("https://github.com/ifsheldon/Stab")
-        || package.homepage.as_deref() != Some("https://github.com/ifsheldon/Stab")
+        || package.homepage.is_some()
     {
         return Err(ReleaseError::PackageContract(format!(
-            "{} has incomplete crates.io description, license, repository, or homepage metadata",
+            "{} has incomplete crates.io description, license, or repository metadata, or declares a homepage; the repository is the only published project link",
             package.name
         )));
     }

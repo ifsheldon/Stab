@@ -95,7 +95,7 @@ pub fn write_records(records: &[Vec<bool>], format: RecordFormat) -> RecordResul
 
 fn write_ptb64_records(records: &[Vec<bool>]) -> Vec<u8> {
     let mut output = Vec::new();
-    for shot_group in records.chunks_exact(64) {
+    for shot_group in records.as_chunks::<64>().0 {
         let bits_per_shot = shot_group.first().map_or(0, Vec::len);
         for measurement_index in 0..bits_per_shot {
             let mut word = 0u64;
@@ -156,14 +156,14 @@ pub fn read_ptb64_records(
     })?;
     let mut records = vec![vec![false; bits_per_record]; max_shots];
     for (group_records, group_bytes) in records
-        .chunks_exact_mut(64)
+        .as_chunks_mut::<64>()
+        .0
+        .iter_mut()
         .zip(input.chunks_exact(bytes_per_group))
         .take(shot_groups)
     {
-        for (bit_index, word_chunk) in group_bytes.chunks_exact(8).enumerate() {
-            let mut word_bytes = [0u8; 8];
-            word_bytes.copy_from_slice(word_chunk);
-            let word = u64::from_le_bytes(word_bytes);
+        for (bit_index, word_bytes) in group_bytes.as_chunks::<8>().0.iter().enumerate() {
+            let word = u64::from_le_bytes(*word_bytes);
             for (shot_offset, record) in group_records.iter_mut().enumerate() {
                 if word & (1u64 << shot_offset) != 0 {
                     let bit = record.get_mut(bit_index).ok_or_else(|| {

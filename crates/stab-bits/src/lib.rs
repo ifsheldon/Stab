@@ -543,18 +543,15 @@ impl BitMatrix {
         let tail_mask = self.cols.last_word_mask();
         let row_words = self.row_words_mut(row)?;
         row_words.fill(0);
-        let mut chunks = bytes.chunks_exact(size_of::<u64>());
+        let (chunks, remainder) = bytes.as_chunks::<{ size_of::<u64>() }>();
         let mut words = row_words.iter_mut();
-        for chunk in chunks.by_ref() {
+        for chunk in chunks {
             let word = words.next().ok_or(BitError::BitIndexOutOfRange {
                 index: bytes.len().saturating_mul(u8::BITS as usize),
                 len: bit_len,
             })?;
-            let mut packed = [0_u8; size_of::<u64>()];
-            packed.copy_from_slice(chunk);
-            *word = u64::from_le_bytes(packed);
+            *word = u64::from_le_bytes(*chunk);
         }
-        let remainder = chunks.remainder();
         if !remainder.is_empty() {
             let word = words.next().ok_or(BitError::BitIndexOutOfRange {
                 index: bytes.len().saturating_mul(u8::BITS as usize),

@@ -737,17 +737,14 @@ fn finish_bridged_visit<E>(
 fn unpack_b8_chunk_into_words(chunk: &[u8], bits_per_record: usize, words: &mut [u64]) {
     words.fill(0);
     let mut word_index = 0usize;
-    let mut chunks = chunk.chunks_exact(8);
-    for word_bytes in chunks.by_ref() {
+    let (chunks, remainder) = chunk.as_chunks::<8>();
+    for word_bytes in chunks {
         let Some(word) = words.get_mut(word_index) else {
             break;
         };
-        let mut bytes = [0u8; 8];
-        bytes.copy_from_slice(word_bytes);
-        *word = u64::from_le_bytes(bytes);
+        *word = u64::from_le_bytes(*word_bytes);
         word_index += 1;
     }
-    let remainder = chunks.remainder();
     if !remainder.is_empty()
         && let Some(word) = words.get_mut(word_index)
     {

@@ -488,15 +488,20 @@ fn fast_frame_operation(instruction: &CircuitInstruction) -> Option<FastFrameOpe
             Some(FastFrameOperation::SinglePauliNoise)
         }
         "DEPOLARIZE2" | "PAULI_CHANNEL_2" => Some(FastFrameOperation::TwoQubitPauliNoise),
-        "CX" if instruction.targets().chunks_exact(2).all(|targets| {
-            matches!(
-                stab_model::advanced::classify_controlled_pauli_target_pair(
-                    instruction.gate(),
-                    targets
-                ),
-                stab_model::advanced::ControlledPauliTargetPair::Quantum { .. }
-            )
-        }) =>
+        "CX" if instruction
+            .targets()
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .all(|targets| {
+                matches!(
+                    stab_model::advanced::classify_controlled_pauli_target_pair(
+                        instruction.gate(),
+                        targets
+                    ),
+                    stab_model::advanced::ControlledPauliTargetPair::Quantum { .. }
+                )
+            }) =>
         {
             Some(FastFrameOperation::ControlledNot)
         }

@@ -456,9 +456,7 @@ impl PauliStringIterator {
 
     fn reset_all_bases(&mut self) {
         if let Some(first_basis) = self.allowed.first() {
-            for basis in &mut self.active_bases {
-                *basis = first_basis;
-            }
+            self.active_bases.fill(first_basis);
         }
     }
 

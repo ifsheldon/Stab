@@ -5,7 +5,6 @@ edition.workspace = true
 description = "Release preflight and artifact packaging for Stab."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 publish = false
 default-run = "stab-release"
 

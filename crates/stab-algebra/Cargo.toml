@@ -2,11 +2,10 @@
 name = "stab-algebra"
 version.workspace = true
 edition.workspace = true
-rust-version = "1.97.1"
+rust-version.workspace = true
 description = "Stable Pauli, Clifford, tableau, and stabilizer-flow algebra for Stab."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 readme.workspace = true
 keywords.workspace = true
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for Stab 0.2. Supersedes [ADR 0005](adr-0005-backends-and-nightly.md) for leaf-kernel selection and amends the kernel edges of [ADR 0007](adr-0007-product-dependency-graph.md).
+Accepted for Stab 0.2. Supersedes [ADR 0005](adr-0005-backends-and-nightly.md) for leaf-kernel selection and the toolchain boundary, and amends the kernel edges of [ADR 0007](adr-0007-product-dependency-graph.md).
 
 ## Context
 
@@ -29,7 +29,7 @@ The following ADR 0005 rules carry over unchanged:
 - Leaf kernels are not a sampling backend. A future packed-frame or device implementation may introduce backend selection only after the engine owns two real executable plans, distinct plan fingerprints, semantic equivalence for each affected plan family, and phase-specific performance evidence.
 - No unimplemented GPU capability is advertised.
 
-The workspace toolchain is still the pinned Nightly when this decision lands, and `stab-core` and `stab-cli` are still classified as Nightly packages. A later milestone of the same plan removes that Nightly toolchain boundary and moves every product crate to one Stable minimum Rust version.
+The workspace builds with one Stable toolchain, Rust 1.100.0, pinned in `rust-toolchain.toml`. Every product crate, including `stab-core`, `stab-cli`, and `stab-kernels-simd`, declares Rust 1.100 as its minimum supported version, and there is no Nightly package class.
 
 ## Consequences
 
@@ -40,6 +40,6 @@ The workspace toolchain is still the pinned Nightly when this decision lands, an
 
 ## Enforcement
 
-`just architecture::check` rejects any resolved dependency on `fearless_simd` or `fearless_simd_macros` from a package other than `stab-kernels-simd`, requires the exact Stable minimum Rust version in every Stable component including `stab-kernels-simd`, and rejects unstable `feature(...)` gates in Stable components.
+`just architecture::check` rejects any resolved dependency on `fearless_simd` or `fearless_simd_macros` from a package other than `stab-kernels-simd`, requires the exact Rust 1.100 minimum in every product crate including `stab-kernels-simd`, `stab-core`, and `stab-cli`, and rejects unstable `feature(...)` gates in every product crate.
 
-`just architecture::consumer-check` requires exactly one resolved `stab-kernels-simd` package in the Stable component, facade, and mixed direct-component consumer fixtures.
+`just architecture::consumer-check` requires exactly one resolved `stab-kernels-simd` package in the component-only, facade, and mixed direct-component consumer fixtures.

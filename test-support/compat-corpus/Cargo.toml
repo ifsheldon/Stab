@@ -5,7 +5,6 @@ edition.workspace = true
 description = "Private checked compatibility-corpus support for Stab tests and operations."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 publish = false
 
 [lints]

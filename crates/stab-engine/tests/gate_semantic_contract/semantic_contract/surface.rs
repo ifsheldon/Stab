@@ -478,10 +478,8 @@ fn classify_target_groups(
         GateTargetRule::PlainPairs => vec![GateTargetPattern::PlainQubitPair],
         GateTargetRule::ClassicalControlPairs => {
             let mut patterns = Vec::new();
-            for pair in targets.chunks_exact(2) {
-                if let [left, right] = pair {
-                    push_unique(&mut patterns, classical_pair_pattern(left, right)?);
-                }
+            for [left, right] in targets.as_chunks::<2>().0 {
+                push_unique(&mut patterns, classical_pair_pattern(left, right)?);
             }
             patterns
         }

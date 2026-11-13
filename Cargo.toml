@@ -27,9 +27,9 @@ default-members = [
 [workspace.package]
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.100"
 license = "MIT"
 repository = "https://github.com/ifsheldon/Stab"
-homepage = "https://github.com/ifsheldon/Stab"
 readme = "README.crates.md"
 keywords = ["quantum-computing", "error-correction", "stabilizer", "simulation"]
 

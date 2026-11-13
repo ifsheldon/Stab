@@ -8,14 +8,14 @@ use crate::Violation;
 const RELEASE_MAJOR: u64 = 0;
 const RELEASE_MINOR: u64 = 2;
 const RELEASE_PATCH: u64 = 0;
-const STABLE_RUST_MAJOR: u64 = 1;
-const STABLE_RUST_MINOR: u64 = 97;
-const STABLE_RUST_PATCH: u64 = 1;
+const MINIMUM_RUST_MAJOR: u64 = 1;
+const MINIMUM_RUST_MINOR: u64 = 100;
+const MINIMUM_RUST_PATCH: u64 = 0;
 pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
-    ProductPackageContract::stable("stab-algebra", &["stab-bits", "stab-kernels-simd"]),
-    ProductPackageContract::stable("stab-analysis", &["stab-algebra", "stab-model"]),
-    ProductPackageContract::stable("stab-bits", &["stab-kernels-simd"]),
-    ProductPackageContract::nightly(
+    ProductPackageContract::library("stab-algebra", &["stab-bits", "stab-kernels-simd"]),
+    ProductPackageContract::library("stab-analysis", &["stab-algebra", "stab-model"]),
+    ProductPackageContract::library("stab-bits", &["stab-kernels-simd"]),
+    ProductPackageContract::binary(
         "stab-cli",
         &[
             "stab-analysis",
@@ -26,7 +26,7 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
         ],
         &["stab"],
     ),
-    ProductPackageContract::nightly(
+    ProductPackageContract::library(
         "stab-core",
         &[
             "stab-algebra",
@@ -36,10 +36,9 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
             "stab-model",
             "stab-records",
         ],
-        &[],
     ),
-    ProductPackageContract::stable("stab-decoder", &["stab-model", "stab-records"]),
-    ProductPackageContract::stable(
+    ProductPackageContract::library("stab-decoder", &["stab-model", "stab-records"]),
+    ProductPackageContract::library(
         "stab-engine",
         &[
             "stab-algebra",
@@ -49,11 +48,11 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
             "stab-records",
         ],
     ),
-    ProductPackageContract::stable("stab-kernels-simd", &[]),
-    ProductPackageContract::stable("stab-model", &[]),
-    ProductPackageContract::stable("stab-records", &["stab-bits"]),
+    ProductPackageContract::library("stab-kernels-simd", &[]),
+    ProductPackageContract::library("stab-model", &[]),
+    ProductPackageContract::library("stab-records", &["stab-bits"]),
 ];
-const STABLE_TEST_SUPPORT_PACKAGES: &[&str] =
+const MINIMUM_RUST_TEST_SUPPORT_PACKAGES: &[&str] =
     &["stab-reference-decoder", "stab-reference-noise-pass"];
 const SIMD_KERNEL_PACKAGE: &str = "stab-kernels-simd";
 const SIMD_LIBRARY_PACKAGES: &[&str] = &["fearless_simd", "fearless_simd_macros"];
@@ -61,29 +60,26 @@ const SIMD_LIBRARY_PACKAGES: &[&str] = &["fearless_simd", "fearless_simd_macros"
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ProductPackageContract {
     pub(crate) name: &'static str,
-    pub(crate) stable_component: bool,
     pub(crate) allowed_dependencies: &'static [&'static str],
     pub(crate) binary_targets: &'static [&'static str],
 }
 
 impl ProductPackageContract {
-    const fn stable(name: &'static str, allowed_dependencies: &'static [&'static str]) -> Self {
+    const fn library(name: &'static str, allowed_dependencies: &'static [&'static str]) -> Self {
         Self {
             name,
-            stable_component: true,
             allowed_dependencies,
             binary_targets: &[],
         }
     }
 
-    const fn nightly(
+    const fn binary(
         name: &'static str,
         allowed_dependencies: &'static [&'static str],
         binary_targets: &'static [&'static str],
     ) -> Self {
         Self {
             name,
-            stable_component: false,
             allowed_dependencies,
             binary_targets,
         }
@@ -96,12 +92,10 @@ pub(crate) fn product_contract(name: &str) -> Option<&'static ProductPackageCont
         .find(|contract| contract.name == name)
 }
 
-pub(crate) fn is_stable_component(name: &str) -> bool {
-    product_contract(name).is_some_and(|contract| contract.stable_component)
-}
-
-pub(crate) fn is_stable_source_package(name: &str) -> bool {
-    is_stable_component(name) || STABLE_TEST_SUPPORT_PACKAGES.contains(&name)
+/// Every product package and the Stable test-support proofs must declare the
+/// workspace minimum Rust version and must not enable unstable Rust features.
+pub(crate) fn requires_minimum_rust(name: &str) -> bool {
+    product_contract(name).is_some() || MINIMUM_RUST_TEST_SUPPORT_PACKAGES.contains(&name)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -212,8 +206,8 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
             PackageClass::Product => {
                 validate_product_identity(package, &mut violations);
                 validate_product_publication(package, &mut violations);
-                if is_stable_component(&package.name) {
-                    validate_stable_rust_version(package, &mut violations);
+                if product_contract(&package.name).is_some() {
+                    validate_minimum_rust_version(package, &mut violations);
                 }
             }
             PackageClass::Ops if package_is_publishable(package) => {
@@ -237,8 +231,8 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
                         ),
                     ));
                 }
-                if STABLE_TEST_SUPPORT_PACKAGES.contains(&package.name.as_str()) {
-                    validate_stable_rust_version(package, &mut violations);
+                if MINIMUM_RUST_TEST_SUPPORT_PACKAGES.contains(&package.name.as_str()) {
+                    validate_minimum_rust_version(package, &mut violations);
                 }
             }
             PackageClass::Ops | PackageClass::Unclassified => {}
@@ -522,8 +516,8 @@ fn validate_product_publication(package: &PackageSpec, violations: &mut Vec<Viol
     }
 }
 
-fn validate_stable_rust_version(package: &PackageSpec, violations: &mut Vec<Violation>) {
-    let expected = stable_rust_version();
+fn validate_minimum_rust_version(package: &PackageSpec, violations: &mut Vec<Violation>) {
+    let expected = minimum_rust_version();
     if package.rust_version.as_ref() == Some(&expected) {
         return;
     }
@@ -532,9 +526,9 @@ fn validate_stable_rust_version(package: &PackageSpec, violations: &mut Vec<Viol
         .as_ref()
         .map_or_else(|| "not declared".to_owned(), ToString::to_string);
     violations.push(Violation::new(
-        "stable-component-rust-version",
+        "minimum-rust-version",
         format!(
-            "Stable component {} must declare rust-version = {}, found {}",
+            "package {} must declare the workspace minimum rust-version = {}, found {}",
             package.name, expected, actual
         ),
     ));
@@ -548,8 +542,8 @@ fn release_version() -> Version {
     Version::new(RELEASE_MAJOR, RELEASE_MINOR, RELEASE_PATCH)
 }
 
-pub(crate) fn stable_rust_version() -> Version {
-    Version::new(STABLE_RUST_MAJOR, STABLE_RUST_MINOR, STABLE_RUST_PATCH)
+pub(crate) fn minimum_rust_version() -> Version {
+    Version::new(MINIMUM_RUST_MAJOR, MINIMUM_RUST_MINOR, MINIMUM_RUST_PATCH)
 }
 
 fn is_exact_release_requirement(requirement: &VersionReq) -> bool {
@@ -576,7 +570,7 @@ mod tests {
         PackageSpec {
             name: name.to_owned(),
             relative_path: PathBuf::from(prefix).join(name),
-            rust_version: is_stable_source_package(name).then(stable_rust_version),
+            rust_version: requires_minimum_rust(name).then(minimum_rust_version),
             version: Version::new(0, 2, 0),
             publish: if prefix == "crates" {
                 None
@@ -839,44 +833,49 @@ mod tests {
     }
 
     #[test]
-    fn stable_components_require_the_exact_rust_version() {
-        for contract in PRODUCT_PACKAGE_CONTRACTS
-            .iter()
-            .filter(|contract| contract.stable_component)
-        {
+    fn every_product_package_requires_the_exact_minimum_rust_version() {
+        for contract in PRODUCT_PACKAGE_CONTRACTS {
             let valid = graph(vec![package(contract.name, "crates")]);
             assert!(
                 validate_graph(&valid).violations.is_empty(),
-                "{} should accept the exact Stable MSRV",
+                "{} should accept the exact minimum Rust version",
                 contract.name
             );
 
-            for actual in [None, Some(Version::new(1, 97, 0))] {
+            for actual in [
+                None,
+                Some(Version::new(1, 97, 1)),
+                Some(Version::new(1, 99, 0)),
+                Some(Version::new(1, 100, 1)),
+                Some(Version::new(1, 101, 0)),
+            ] {
                 let mut invalid = valid.clone();
                 invalid
                     .packages
                     .first_mut()
                     .expect("fixture should contain one package")
-                    .rust_version = actual;
+                    .rust_version = actual.clone();
                 let report = validate_graph(&invalid);
-                let violation = report
-                    .violations
-                    .iter()
-                    .find(|violation| violation.code == "stable-component-rust-version")
-                    .expect("missing or mismatched Stable MSRV should fail");
+                let [violation] = report.violations.as_slice() else {
+                    panic!(
+                        "{} with rust-version {actual:?} should fail only the minimum: {:?}",
+                        contract.name, report.violations
+                    );
+                };
+                assert_eq!(violation.code, "minimum-rust-version");
                 assert!(violation.message.contains(contract.name));
-                assert!(violation.message.contains("1.97.1"));
+                assert!(violation.message.contains("1.100.0"));
             }
         }
     }
 
     #[test]
     fn stable_reference_proofs_require_exact_msrv() {
-        for proof_package in STABLE_TEST_SUPPORT_PACKAGES {
+        for proof_package in MINIMUM_RUST_TEST_SUPPORT_PACKAGES {
             let valid = graph(vec![package(proof_package, "test-support")]);
             assert!(validate_graph(&valid).violations.is_empty());
 
-            for actual in [None, Some(Version::new(1, 97, 0))] {
+            for actual in [None, Some(Version::new(1, 97, 1))] {
                 let mut invalid = valid.clone();
                 invalid
                     .packages
@@ -884,7 +883,7 @@ mod tests {
                     .expect("reference package")
                     .rust_version = actual;
                 assert!(validate_graph(&invalid).violations.iter().any(|violation| {
-                    violation.code == "stable-component-rust-version"
+                    violation.code == "minimum-rust-version"
                         && violation.message.contains(proof_package)
                 }));
             }

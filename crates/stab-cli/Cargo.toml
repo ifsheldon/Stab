@@ -2,10 +2,10 @@
 name = "stab-cli"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Stim-compatible command-line interface for Stab."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 readme.workspace = true
 keywords.workspace = true
 

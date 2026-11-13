@@ -37,17 +37,11 @@ jobs:
       - name: Show toolchain
         run: rustup show active-toolchain
 
-      - name: Install Stable component toolchain
-        run: rustup toolchain install 1.97.1 --profile minimal
-
       - name: Architecture
         run: |
           just architecture::check
           just architecture::consumer-check
           just architecture::docs-check
-
-      - name: Stable component tests
-        run: cargo +1.97.1 test --locked -p stab-kernels-simd -p stab-bits -p stab-records -p stab-algebra -p stab-model -p stab-analysis -p stab-engine -p stab-decoder -p stab-reference-decoder -p stab-reference-noise-pass --all-targets
 
       - name: Format
         run: cargo fmt --all --check
@@ -59,7 +53,7 @@ jobs:
         run: just docs::api-check
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
 
       - name: Oracle version
         run: just oracle::version

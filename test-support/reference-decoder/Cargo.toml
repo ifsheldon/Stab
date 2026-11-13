@@ -2,7 +2,7 @@
 name = "stab-reference-decoder"
 version.workspace = true
 edition.workspace = true
-rust-version = "1.97.1"
+rust-version.workspace = true
 publish = false
 
 [lints]

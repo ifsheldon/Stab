@@ -2,11 +2,10 @@
 name = "stab-reference-noise-pass"
 version.workspace = true
 edition.workspace = true
-rust-version = "1.97.1"
+rust-version.workspace = true
 description = "External Stable-Rust circuit-pass proof for Stab's public analysis seam."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 publish = false
 
 [lints]

@@ -112,12 +112,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 Ok(())
             }
             FastFrameOperation::ControlledNot => {
-                for targets in instruction.targets.chunks_exact(2) {
-                    let &[control, target] = targets else {
-                        return Err(DetectionError::invalid_sampler_compilation(
-                            "resolved CX target list was not paired",
-                        ));
-                    };
+                for &[control, target] in instruction.targets.as_chunks::<2>().0 {
                     let control_x = self.x_word(control)?;
                     let target_z = self.z_word(target)?;
                     self.xor_x_word(target, control_x)?;
@@ -220,18 +215,13 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                         ));
                     }
                 };
-                let pairs = instruction.targets.chunks_exact(2);
-                if !pairs.remainder().is_empty() {
+                let (pairs, unpaired) = instruction.targets.as_chunks::<2>();
+                if !unpaired.is_empty() {
                     return Err(DetectionError::invalid_sampler_compilation(
                         "compiled pair measurement target list was not paired",
                     ));
                 }
-                for pair in pairs {
-                    let &[left, right] = pair else {
-                        return Err(DetectionError::invalid_sampler_compilation(
-                            "compiled pair measurement target list was not paired",
-                        ));
-                    };
+                for &[left, right] in pairs {
                     if left == right {
                         self.measure_pauli_product_terms(&[], probability, rng, mode)?;
                     } else {
@@ -338,8 +328,8 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         if !mode.samples_noise() {
             return Ok(());
         }
-        let pairs = targets.chunks_exact(2);
-        if !pairs.remainder().is_empty() {
+        let (pairs, unpaired) = targets.as_chunks::<2>();
+        if !unpaired.is_empty() {
             return Err(DetectionError::invalid_sampler_compilation(
                 "compiled two-qubit noise target list is not paired",
             ));
@@ -384,12 +374,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         )? {
             return Ok(());
         }
-        for pair in targets.chunks_exact(2) {
-            let &[left, right] = pair else {
-                return Err(DetectionError::invalid_sampler_compilation(
-                    "compiled two-qubit noise target list is not paired",
-                ));
-            };
+        for &[left, right] in pairs {
             let masks = sample_categorical_masks(probabilities, mode.active_mask(), rng);
             for ((left_basis, right_basis), mask) in TWO_QUBIT_FRAME_BASES.into_iter().zip(masks) {
                 if let Some(basis) = left_basis {
@@ -903,8 +888,8 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         if !mode.samples_noise() {
             return Ok(());
         }
-        let target_groups = instruction.targets().chunks_exact(2);
-        if !target_groups.remainder().is_empty() {
+        let (target_groups, unpaired) = instruction.targets().as_chunks::<2>();
+        if !unpaired.is_empty() {
             return Err(unsupported_frame_instruction(instruction));
         }
         if visit_sparse_categorical_events(

@@ -414,8 +414,10 @@ mod tests {
             publish
                 .get(5..)
                 .expect("package selectors")
-                .chunks_exact(2)
-                .filter_map(|chunk| chunk.get(1))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|[_, selector]| selector)
                 .collect::<Vec<_>>(),
             PRODUCT_PACKAGE_ORDER
                 .iter()

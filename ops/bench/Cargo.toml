@@ -5,7 +5,6 @@ edition.workspace = true
 description = "Benchmark orchestration for pinned Stim and Stab performance contracts."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 publish = false
 
 [lints]

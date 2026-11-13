@@ -5,7 +5,6 @@ edition.workspace = true
 description = "Repository architecture dependency and source-boundary checks for Stab."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 publish = false
 
 [lints]

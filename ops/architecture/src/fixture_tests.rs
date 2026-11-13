@@ -4,7 +4,7 @@ use cargo_metadata::semver::Version;
 use serde::Deserialize;
 
 use crate::policy::{
-    PRODUCT_PACKAGE_CONTRACTS, is_stable_component, stable_rust_version, validate_graph,
+    PRODUCT_PACKAGE_CONTRACTS, minimum_rust_version, requires_minimum_rust, validate_graph,
 };
 use crate::{DependencyKind, PackageSpec, WorkspaceEdge, WorkspaceGraph};
 
@@ -62,7 +62,7 @@ fn assert_fixture(source: &str) {
         .packages
         .into_iter()
         .map(|package| {
-            let rust_version = is_stable_component(&package.name).then(stable_rust_version);
+            let rust_version = requires_minimum_rust(&package.name).then(minimum_rust_version);
             PackageSpec {
                 version: Version::new(0, 2, 0),
                 publish: if package.path.starts_with("crates") {
@@ -126,7 +126,7 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
         .map(|name| PackageSpec {
             name: (*name).to_owned(),
             relative_path: PathBuf::from("crates").join(name),
-            rust_version: is_stable_component(name).then(stable_rust_version),
+            rust_version: requires_minimum_rust(name).then(minimum_rust_version),
             version: Version::new(0, 2, 0),
             publish: None,
             binary_targets: if *name == "stab-cli" {

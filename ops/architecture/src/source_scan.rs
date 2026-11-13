@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use syn::{Item, UseTree, Visibility};
 
-use crate::policy::is_stable_source_package;
+use crate::policy::requires_minimum_rust;
 use crate::{CheckError, PackageSpec, Violation};
 
 const FACADE_ROOT_REEXPORTS: &str = "ops/architecture/facade-root-reexports.txt";
@@ -49,47 +49,58 @@ pub(super) fn scan_workspace_sources(
                 source,
             }
         })?;
-        let facts = match rust_source::inspect(&source) {
-            Ok(facts) => facts,
-            Err(error) => {
-                violations.push(Violation::new(
-                    "architecture-source-parse",
-                    format!(
-                        "failed to parse {} while checking source-boundary contracts: {error}",
-                        source_path.display()
-                    ),
-                ));
-                continue;
-            }
-        };
         let package = package_for_source(source_path, packages);
-        if package.is_some_and(|package| is_stable_source_package(&package.name))
-            && !facts.feature_gates.is_empty()
-        {
-            violations.push(Violation::new(
-                "stable-component-feature-gate",
-                format!(
-                    "Stable component source {} enables unstable Rust features {:?}",
-                    source_path.display(),
-                    facts.feature_gates
-                ),
-            ));
-        }
-        if package.is_some_and(|package| package.name == "stab-core") && facts.has_macro_export {
-            violations.push(Violation::new(
-                "facade-exported-macro",
-                format!(
-                    "{} exports a macro from stab-core; facade exports must remain inventory-owned Rust items",
-                    source_path.display()
-                ),
-            ));
-        }
+        violations.extend(source_violations(source_path, package, &source));
     }
 
     Ok(SourceReport {
         rust_source_count: rust_sources.len(),
         violations,
     })
+}
+
+fn source_violations(
+    source_path: &Path,
+    package: Option<&PackageSpec>,
+    source: &str,
+) -> Vec<Violation> {
+    let mut violations = Vec::new();
+    let facts = match rust_source::inspect(source) {
+        Ok(facts) => facts,
+        Err(error) => {
+            violations.push(Violation::new(
+                "architecture-source-parse",
+                format!(
+                    "failed to parse {} while checking source-boundary contracts: {error}",
+                    source_path.display()
+                ),
+            ));
+            return violations;
+        }
+    };
+    if package.is_some_and(|package| requires_minimum_rust(&package.name))
+        && !facts.feature_gates.is_empty()
+    {
+        violations.push(Violation::new(
+            "unstable-feature-gate",
+            format!(
+                "{} source {} enables unstable Rust features {:?}; product crates must build on the pinned Stable toolchain",
+                package.map_or("unknown", |package| package.name.as_str()),
+                source_path.display(),
+                facts.feature_gates
+            ),
+        ));
+    }
+    if package.is_some_and(|package| package.name == "stab-core") && facts.has_macro_export {
+        violations.push(Violation::new(
+            "facade-exported-macro",
+            format!(
+                "{} exports a macro from stab-core; facade exports must remain inventory-owned Rust items",
+                source_path.display()
+            ),
+        ));
+    }
+    violations
 }
 
 fn validate_facade_surface(root: &Path, violations: &mut Vec<Violation>) -> Result<(), CheckError> {
@@ -682,6 +693,47 @@ mod tests {
                 .iter()
                 .any(|message| message.contains("`Circuit`"))
         );
+    }
+
+    fn source_package(name: &str, relative_path: &str) -> PackageSpec {
+        PackageSpec {
+            name: name.to_owned(),
+            relative_path: PathBuf::from(relative_path),
+            rust_version: None,
+            version: cargo_metadata::semver::Version::new(0, 2, 0),
+            publish: None,
+            binary_targets: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn every_product_crate_rejects_unstable_feature_gates() {
+        let source =
+            "#![feature(portable_simd)]\nmod inner { #![feature(core_intrinsics, never_type)] }\n";
+        for (name, relative_path) in [
+            ("stab-cli", "crates/stab-cli"),
+            ("stab-core", "crates/stab-core"),
+            ("stab-kernels-simd", "crates/stab-kernels-simd"),
+            ("stab-reference-decoder", "test-support/reference-decoder"),
+        ] {
+            let package = source_package(name, relative_path);
+            let source_path = Path::new(relative_path).join("src/lib.rs");
+            let violations = source_violations(&source_path, Some(&package), source);
+            let [violation] = violations.as_slice() else {
+                panic!("{name} should report one feature-gate violation: {violations:?}");
+            };
+            assert_eq!(violation.code, "unstable-feature-gate");
+            assert!(violation.message.contains(name));
+            assert!(violation.message.contains("portable_simd"));
+            assert!(violation.message.contains("never_type"));
+
+            let stable_source =
+                "//! #![feature(portable_simd)] in documentation only.\npub fn run() {}\n";
+            assert!(
+                source_violations(&source_path, Some(&package), stable_source).is_empty(),
+                "{name} should accept sources without feature gates"
+            );
+        }
     }
 
     #[test]

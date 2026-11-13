@@ -2,11 +2,10 @@
 name = "stab-kernels-simd"
 version.workspace = true
 edition.workspace = true
-rust-version = "1.97.1"
+rust-version.workspace = true
 description = "Slice-level SIMD word kernels for Stab, built on fearless_simd."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 readme.workspace = true
 keywords.workspace = true
 

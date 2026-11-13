@@ -173,10 +173,7 @@ mod tests {
             row_words: 2,
             words: vec![0; 130],
         };
-        for row in source.words.chunks_exact_mut(2) {
-            let Some(tail) = row.get_mut(1) else {
-                panic!("two-word row has a tail");
-            };
+        for [_, tail] in source.words.as_chunks_mut::<2>().0 {
             *tail = u64::MAX;
         }
         let mut target = BitMatrix::zeros(65, 65).expect("target");
@@ -188,7 +185,14 @@ mod tests {
                 assert_eq!(target.get(row, col), Some(row == 64));
             }
         }
-        assert!(target.words.chunks_exact(2).all(|row| row[1] <= 1));
+        assert!(
+            target
+                .words
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .all(|[_, tail]| *tail <= 1)
+        );
     }
 
     #[test]

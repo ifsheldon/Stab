@@ -148,7 +148,12 @@ fn rand_source_words(probability: f64, seed: u64) -> Vec<u64> {
 
 fn indexed_words(probability: f64, seed: u64) -> Vec<u64> {
     let mut words = vec![0_u64; WORDS];
-    for (block, output) in words.chunks_exact_mut(INDEXED_BLOCK_WORDS).enumerate() {
+    for (block, output) in words
+        .as_chunks_mut::<INDEXED_BLOCK_WORDS>()
+        .0
+        .iter_mut()
+        .enumerate()
+    {
         sample_indexed_range_into(
             probability,
             seed,

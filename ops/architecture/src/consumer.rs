@@ -6,7 +6,6 @@ use cargo_metadata::{Metadata, MetadataCommand, PackageId};
 use thiserror::Error;
 
 const PREFIX: &str = "stab-architecture";
-const STABLE_TOOLCHAIN: &str = "+1.97.1";
 const KERNEL_PACKAGE: &str = "stab-kernels-simd";
 const FACADE_PACKAGE: &str = "stab-core";
 
@@ -14,19 +13,16 @@ const FIXTURES: [ConsumerFixture; 3] = [
     ConsumerFixture {
         id: "stable",
         relative_manifest: "test-support/consumers/stable/Cargo.toml",
-        toolchain: Some(STABLE_TOOLCHAIN),
         requires_core: false,
     },
     ConsumerFixture {
         id: "facade",
         relative_manifest: "test-support/consumers/facade/Cargo.toml",
-        toolchain: None,
         requires_core: true,
     },
     ConsumerFixture {
         id: "mixed",
         relative_manifest: "test-support/consumers/mixed/Cargo.toml",
-        toolchain: None,
         requires_core: true,
     },
 ];
@@ -35,7 +31,6 @@ const FIXTURES: [ConsumerFixture; 3] = [
 struct ConsumerFixture {
     id: &'static str,
     relative_manifest: &'static str,
-    toolchain: Option<&'static str>,
     requires_core: bool,
 }
 
@@ -135,11 +130,7 @@ fn validate_fixture_execution(
         .join("target")
         .join("architecture-consumers")
         .join(fixture.id);
-    let mut command = Command::new("cargo");
-    if let Some(toolchain) = fixture.toolchain {
-        command.arg(toolchain);
-    }
-    let status = command
+    let status = Command::new("cargo")
         .arg("test")
         .args(["--locked", "--manifest-path"])
         .arg(manifest)

@@ -310,8 +310,8 @@ mod tests {
                 .expect("fixture package should be retained");
             assert_eq!(
                 package.rust_version,
-                Some(crate::policy::stable_rust_version()),
-                "{package_name} should retain its declared Stable MSRV"
+                Some(crate::policy::minimum_rust_version()),
+                "{package_name} should retain its declared minimum Rust version"
             );
         }
         let report = crate::policy::validate_graph(&graph);

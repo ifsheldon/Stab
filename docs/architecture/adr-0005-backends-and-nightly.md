@@ -2,7 +2,9 @@
 
 ## Status
 
-Superseded by [ADR 0008: Unconditional Leaf Kernels On Fearless SIMD](adr-0008-unconditional-fearless-simd-kernels.md) for leaf-kernel selection. The optional kernel crate, the `portable-simd` feature, and the scalar production kernels described below no longer exist; the rules against placeholder backends, hot-loop dynamic dispatch, and unproven sampling backends carry over into ADR 0008.
+Superseded by [ADR 0008: Unconditional Leaf Kernels On Fearless SIMD](adr-0008-unconditional-fearless-simd-kernels.md) for leaf-kernel selection and for the toolchain boundary. The optional kernel crate, the `portable-simd` feature, and the scalar production kernels described below no longer exist; the rules against placeholder backends, hot-loop dynamic dispatch, and unproven sampling backends carry over into ADR 0008.
+
+The Stable-versus-Nightly toolchain boundary described below is also retired: the workspace pins Stable Rust 1.100.0, every product crate declares Rust 1.100 as its minimum supported version, and no Nightly package class remains.
 
 ## Context
 

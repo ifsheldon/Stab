@@ -2,10 +2,10 @@
 name = "stab-core"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 description = "Ergonomic facade for Stab's product crates."
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 readme.workspace = true
 keywords.workspace = true
 

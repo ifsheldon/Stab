@@ -3,8 +3,8 @@
 This guide summarizes Rust 1.80.0 through Rust 1.95.0 features that should shape future Stab code.
 It is a full-code-review skill reference for agents working in this repository, not a complete Rust release changelog.
 
-Stab uses Rust 2024 edition and plans to use Nightly Rust for `portable_simd`.
-Before recommending a feature below, still check the active toolchain, `rust-toolchain.toml`, and any future `rust-version` policy in `Cargo.toml`.
+Stab uses Rust 2024 edition on the Stable Rust 1.100.0 toolchain pinned in `rust-toolchain.toml`, and every product crate declares Rust 1.100 as its minimum supported version through `[workspace.package]` in `Cargo.toml`.
+Before recommending a feature below, still check the active toolchain and that `rust-version` policy.
 
 ## Prefer These Language Features
 

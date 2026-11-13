@@ -101,9 +101,9 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-The unpublished `stab-reference-decoder` proves decoder composition using only `stab-decoder`, `stab-model`, and `stab-records` at runtime; its analysis and engine dependencies are test-only experiment fixtures. The unpublished `stab-reference-noise-pass` proves circuit-pass composition using only `stab-analysis` and `stab-model`. Neither proof crate can depend on `stab-core`, CLI, ops, private modules, or Nightly features.
+The unpublished `stab-reference-decoder` proves decoder composition using only `stab-decoder`, `stab-model`, and `stab-records` at runtime; its analysis and engine dependencies are test-only experiment fixtures. The unpublished `stab-reference-noise-pass` proves circuit-pass composition using only `stab-analysis` and `stab-model`. Neither proof crate can depend on `stab-core`, CLI, ops, private modules, or unstable Rust features.
 
-`just architecture::check` derives package identity, Stable status, allowed product dependencies, binary targets, and protected package names from one product-contract table. It enforces every workspace edge, rejects product dependencies on operational crates or external packages impersonating reserved Stab product names, permits only the source-owned public-component edges required by each test-support proof, rejects any resolved `fearless_simd` or `fearless_simd_macros` dependency outside `stab-kernels-simd`, and requires each Stable component manifest to declare the exact Rust 1.97.1 minimum. It also parses every GitHub Actions workflow and rejects mutable remote action and reusable-workflow refs; remote actions require full commit SHAs, Docker actions require `sha256` digests, and repository-local actions remain source-bound to the checked-out commit.
+`just architecture::check` derives package identity, allowed product dependencies, binary targets, and protected package names from one product-contract table. It enforces every workspace edge, rejects product dependencies on operational crates or external packages impersonating reserved Stab product names, permits only the source-owned public-component edges required by each test-support proof, rejects any resolved `fearless_simd` or `fearless_simd_macros` dependency outside `stab-kernels-simd`, and requires every product manifest and both proof-crate manifests to declare the exact Rust 1.100 minimum. It also parses every GitHub Actions workflow and rejects mutable remote action and reusable-workflow refs; remote actions require full commit SHAs, Docker actions require `sha256` digests, and repository-local actions remain source-bound to the checked-out commit.
 
 The checker classifies workspace packages as product, operations, or test support from their repository paths, resolves Cargo metadata with all features enabled so optional edges cannot hide, validates every workspace dependency edge, and rejects test-support dependencies on product or operations code except the exact public-component edges assigned to the two proof crates above. It retains resolved package identities for workspace and transitive dependencies, so a path, Git, or registry package that reuses a protected Stab package name cannot bypass the local dependency graph.
 
@@ -111,17 +111,17 @@ The checker parses facade and product Rust sources with `syn`. It requires the `
 
 The shared result-format corpus lives under `test-support/compat-corpus` and is available to product crates only as a development dependency. It is not a runtime architecture allowance.
 
-The SIMD library belongs only to the mandatory `stab-kernels-simd` product crate, as recorded in [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md). Any product-to-ops edge, product runtime edge to test support, unapproved test-support upward edge, or normal, development, or build dependency on `fearless_simd` or `fearless_simd_macros` from another package fails the check, including renamed dependencies, because the rule runs on resolved Cargo metadata. Every unstable Rust `feature(...)` gate is rejected in Stable components, including target-gated and nested `cfg_attr` forms.
+The SIMD library belongs only to the mandatory `stab-kernels-simd` product crate, as recorded in [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md). Any product-to-ops edge, product runtime edge to test support, unapproved test-support upward edge, or normal, development, or build dependency on `fearless_simd` or `fearless_simd_macros` from another package fails the check, including renamed dependencies, because the rule runs on resolved Cargo metadata. Every unstable Rust `feature(...)` gate is rejected in every product crate and both proof crates, including target-gated and nested `cfg_attr` forms.
 
-`just architecture::consumer-check` compiles and tests the standalone Stable component (`stable`, on Rust 1.97.1), facade (`facade`), and mixed direct-component (`mixed`) consumer workspaces under `test-support/consumers/`. It requires exactly one resolved `stab-kernels-simd` package in each graph, requires `stab-core` in the facade and mixed graphs, and rejects it in the Stable component graph.
+`just architecture::consumer-check` compiles and tests the standalone component-only (`stable`), facade (`facade`), and mixed direct-component (`mixed`) consumer workspaces under `test-support/consumers/` with the pinned Rust 1.100.0 toolchain; each declares the 1.100 minimum. It requires exactly one resolved `stab-kernels-simd` package in each graph, requires `stab-core` in the facade and mixed graphs, and rejects it in the component-only graph.
 
 `just architecture::docs-check` uses `pulldown-cmark` with GitHub Flavored Markdown extensions to recursively validate repository-owned Markdown links. It derives same-file and cross-file heading anchors using GitHub's Unicode stripping and duplicate-suffix rules, treats heading text such as `{#custom}` literally instead of enabling non-GFM custom heading attributes, resolves local targets without permitting traversal outside the repository, reports all failures in deterministic source order, skips explicit external schemes, and excludes generated, build, vendor, and Git trees.
 
 ## Toolchain Boundary
 
-Rust 1.97.1 is the minimum supported Stable compiler for the SIMD kernels, model, bits, records, algebra, pure analysis, the current engine, and decoder interoperability. The `stab-kernels-simd`, `stab-bits`, `stab-records`, `stab-algebra`, `stab-model`, `stab-analysis`, `stab-engine`, and `stab-decoder` packages build on that compiler.
+The workspace builds with one pinned Stable toolchain, Rust 1.100.0, recorded in `rust-toolchain.toml`. Every product crate, including `stab-core`, `stab-cli`, and `stab-kernels-simd`, declares Rust 1.100 as its minimum supported version through `[workspace.package]`, and there is no Nightly package class.
 
-The complete `stab-core` facade and `stab-cli` use the pinned Nightly compiler. `stab-engine` remains Stable-compatible because its only registered sampling backend is scalar.
+No product crate may enable an unstable Rust feature; `just architecture::check` rejects any `feature(...)` gate in product and proof-crate sources.
 
 Generic packed storage lives in Stable `stab-bits`, and quantum-specific Clifford and Pauli-word operations live in Stable `stab-algebra`. Whole-slice XOR in `stab-bits` and Clifford right multiplication in `stab-algebra` always run through the `fearless_simd` kernels in `stab-kernels-simd`, which select the instruction set once per call; the remaining word loops, including the single-block XOR and masked XOR, are scalar. The kernels accelerate only measured leaf operations and do not register a sampling backend because the engine has no distinct packed-frame plan yet.
 
@@ -133,7 +133,7 @@ Dense and packed readers apply HITS and DETS token events directly, so duplicate
 
 `stab-kernels-simd` has no Stab dependency and accepts only raw word slices.
 
-Stable components must compile without enabling or parsing Nightly-only code.
+Product crates must compile on the pinned Stable toolchain without enabling unstable features.
 
 ## Public Facade
 
@@ -185,7 +185,7 @@ Requirements for a future process-isolated decoder are documented in [External D
 - [ADR 0003: Typed Batch Families](adr-0003-typed-batch-families.md)
 - [ADR 0004: Diagnostics And Resource Policies](adr-0004-diagnostics-and-resources.md)
 - [A2 Resource Policy Inventory](a2-resource-policy-inventory.md)
-- [ADR 0005: Backend Selection And Nightly Isolation](adr-0005-backends-and-nightly.md), superseded by ADR 0008 for leaf-kernel selection
+- [ADR 0005: Backend Selection And Nightly Isolation](adr-0005-backends-and-nightly.md), superseded by ADR 0008 for leaf-kernel selection and the toolchain boundary
 - [ADR 0006: Decoder And External Extension Boundaries](adr-0006-decoder-extension-boundaries.md)
 - [External Decoder Process Protocol Requirements](external-decoder-process-protocol-requirements.md)
 - [ADR 0007: Product Dependency Graph](adr-0007-product-dependency-graph.md)

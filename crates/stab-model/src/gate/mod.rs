@@ -426,10 +426,8 @@ fn validate_pair_targets(
         .into());
     }
     validate_targets(gate, targets, predicate)?;
-    for pair in targets.chunks_exact(2) {
-        if let [left, right] = pair
-            && left == right
-        {
+    for [left, right] in targets.as_chunks::<2>().0 {
+        if left == right {
             return Err(ValidationError::InvalidTarget {
                 gate,
                 target: left.to_string(),
