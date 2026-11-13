@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 is complete; E2 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 and E2 are complete; E6 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -136,6 +136,29 @@ Open items: generic Clifford gates in the reference cost about five times Stim's
 ### Done Criteria
 
 - No gate executes through a per-bit path during frame sampling or detection.
+
+### Checkpoint (2026-11-14)
+
+E2 landed at `28689edf`. Every unitary catalog gate lowers to a word-parallel frame operation derived at compile time from its pinned `H`, `S`, `CX` decomposition; identity-action gates compile to nothing; MPP and SPP products use a compile-time term arena; the per-bit tableau path is gone.
+
+Seeded `sample`, `detect`, and `m2d` output is byte-identical to the previous build on 39 comparisons.
+
+Best of three interleaved runs on one pinned core, in milliseconds:
+
+| Workload | Before | After | Stim |
+| --- | ---: | ---: | ---: |
+| `CZ` and `S` layers, 200,000 shots, reference skipped | 12,647.9 | 1563.8 | 913.6 |
+| `CZ` and `S` layers, 1 shot, reference skipped | 1074.9 | 1057.6 | 15.0 |
+| `CX` and `H` layers, 20,000 shots | 104.4 | 92.8 | 119.2 |
+| `detect`, color code d=9, 200,000 shots | 82.1 | 69.5 | 58.9 |
+| `detect`, d=11, 350,000 shots | 332.4 | 314.6 | 286.7 |
+| `detect`, d=7, 1000 rounds, 100,000 shots | 3484.8 | 3293.5 | 2962.9 |
+
+The per-shot cost of the `CZ` and `S` circuit is now below Stim's, about 2.5 against 4.5 microseconds.
+The remaining gap on that circuit is a fixed compile cost of about one second: `SampleProgram` compilation builds a gate tableau and a heap transform for every non-`CX` gate target, about 300,000 times.
+That cost belongs to E3, which retires `SampleProgram`, so E3 now carries a speed target as well as the simplification.
+
+`DirectZ` was measured and not deleted: at 1,000,000 shots it takes 27 to 28 ms against 24 to 27 ms for the Pauli-frame plan, so it is no faster than the path it bypasses.
 
 ## Milestone E3: One Resolved Circuit Program
 
