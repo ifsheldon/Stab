@@ -1,11 +1,11 @@
-use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, MeasureRecordOffset, RepeatNestingLimit,
-};
+use arrayvec::ArrayVec;
+use stab_model::{Circuit, CircuitInstruction, MeasureRecordOffset, RepeatNestingLimit};
 
 use super::buffers::{resource_amount, validate_vector_capacity};
 use super::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
+use super::frame::{TraversalEvent, visit_circuit};
 use super::{
     DetectionConversionLimits, DetectionRecordBuffer, DetectionRecordLimitSubject,
     UNSUPPORTED_SWEEP_DETECTION_MESSAGE,
@@ -71,14 +71,6 @@ struct RepeatFinish {
     marker_index: Option<usize>,
 }
 
-#[derive(Clone, Copy)]
-struct CircuitVisitFrame<'a> {
-    circuit: &'a Circuit,
-    next_item: usize,
-    depth: usize,
-    finish: Option<RepeatFinish>,
-}
-
 impl ConversionPlan {
     pub(super) fn from_circuit_with_limits(
         circuit: &Circuit,
@@ -92,14 +84,14 @@ impl ConversionPlan {
         circuit: &Circuit,
         limits: DetectionConversionLimits,
     ) -> DetectionResult<Self> {
-        Self::admission_from_visitor(limits, |plan| plan.visit_circuit(circuit, 0))
+        Self::admission_from_visitor(limits, |plan| plan.visit_circuit(circuit))
     }
 
     pub(super) fn materialize_circuit_from_admission(
         circuit: &Circuit,
         admission: Self,
     ) -> DetectionResult<Self> {
-        Self::materialize_from_admission(admission, |plan| plan.visit_circuit(circuit, 0))
+        Self::materialize_from_admission(admission, |plan| plan.visit_circuit(circuit))
     }
 
     #[cfg(test)]
@@ -160,88 +152,27 @@ impl ConversionPlan {
         }
     }
 
-    pub(super) fn visit_circuit(&mut self, circuit: &Circuit, depth: usize) -> DetectionResult<()> {
-        if depth > RepeatNestingLimit::HARD_MAX {
-            return Err(ResourceLimitError::detection_repeat_nesting(
-                depth,
-                RepeatNestingLimit::HARD_MAX,
-            )
-            .into());
-        }
-        let mut stack = [None; RepeatNestingLimit::HARD_MAX + 1];
-        stack[0] = Some(CircuitVisitFrame {
-            circuit,
-            next_item: 0,
-            depth,
-            finish: None,
-        });
-        let mut stack_len = 1_usize;
-
-        while stack_len != 0 {
-            let frame_index = stack_len.checked_sub(1).ok_or_else(compilation_overflow)?;
-            let (item, frame_depth) = {
-                let frame = stack
-                    .get_mut(frame_index)
-                    .and_then(Option::as_mut)
-                    .ok_or_else(compilation_shape_mismatch)?;
-                let item = frame.circuit.items().get(frame.next_item);
-                if item.is_some() {
-                    frame.next_item = frame
-                        .next_item
-                        .checked_add(1)
-                        .ok_or_else(compilation_overflow)?;
-                }
-                (item, frame.depth)
-            };
-            let Some(item) = item else {
-                let frame = stack
-                    .get_mut(frame_index)
-                    .and_then(Option::take)
-                    .ok_or_else(compilation_shape_mismatch)?;
-                stack_len = frame_index;
-                if let Some(finish) = frame.finish {
-                    self.integrate_repeated_body(
-                        finish.count,
-                        finish.snapshot,
-                        finish.marker_index,
-                    )?;
-                }
-                continue;
-            };
-            match item {
-                CircuitItem::Instruction(instruction) => self.visit_instruction(instruction)?,
-                CircuitItem::RepeatBlock(repeat) => {
-                    let next_depth = frame_depth.checked_add(1).ok_or_else(|| {
-                        DetectionError::invalid_sampler_compilation(
-                            "detection conversion repeat nesting overflowed",
-                        )
-                    })?;
-                    if next_depth > RepeatNestingLimit::HARD_MAX {
-                        return Err(ResourceLimitError::detection_repeat_nesting(
-                            next_depth,
-                            RepeatNestingLimit::HARD_MAX,
-                        )
-                        .into());
-                    }
-                    let (snapshot, marker_index) = self.begin_repeated_body()?;
-                    let slot = stack
-                        .get_mut(stack_len)
-                        .ok_or_else(compilation_shape_mismatch)?;
-                    *slot = Some(CircuitVisitFrame {
-                        circuit: repeat.body(),
-                        next_item: 0,
-                        depth: next_depth,
-                        finish: Some(RepeatFinish {
-                            count: repeat.repeat_count().get(),
-                            snapshot,
-                            marker_index,
-                        }),
-                    });
-                    stack_len = stack_len.checked_add(1).ok_or_else(compilation_overflow)?;
-                }
+    /// Visits `circuit` through the engine's one folded circuit walker, integrating each
+    /// repeat body arithmetically when the walker closes it.
+    pub(super) fn visit_circuit(&mut self, circuit: &Circuit) -> DetectionResult<()> {
+        let mut open_repeats = ArrayVec::<RepeatFinish, { RepeatNestingLimit::HARD_MAX }>::new();
+        visit_circuit(circuit, |event| match event {
+            TraversalEvent::Instruction(instruction) => self.visit_instruction(instruction),
+            TraversalEvent::BeginRepeat(count) => {
+                let (snapshot, marker_index) = self.begin_repeated_body()?;
+                open_repeats
+                    .try_push(RepeatFinish {
+                        count,
+                        snapshot,
+                        marker_index,
+                    })
+                    .map_err(|_| compilation_shape_mismatch())
             }
-        }
-        Ok(())
+            TraversalEvent::EndRepeat => {
+                let finish = open_repeats.pop().ok_or_else(compilation_shape_mismatch)?;
+                self.integrate_repeated_body(finish.count, finish.snapshot, finish.marker_index)
+            }
+        })
     }
 
     #[cfg(test)]

@@ -11,11 +11,13 @@ use super::*;
 use stab_analysis::{
     CodeDistance, RoundCount, SurfaceCodeParams, SurfaceCodeTask, generate_surface_code_circuit,
 };
-use stab_model::Gate;
+use stab_model::{Gate, Probability};
 use stab_records::{MeasurementBatchView, MeasurementSink};
 use std::fmt::Write as _;
 
+mod folded_tape;
 mod reference_differential;
+mod stored_expectations;
 
 #[derive(Clone, Debug, PartialEq)]
 struct TestSampler {
@@ -151,7 +153,7 @@ fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionSt
     reset_reference_execution_stats();
     workspace
         .run(
-            &plan.inner.operations,
+            &plan.inner.program,
             plan.reference_sample_loop_policy(),
             &[],
             &mut output,
@@ -367,7 +369,7 @@ fn expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work(
     assert_eq!(
         SamplingCompiler::new().compile(&nested),
         Err(SamplingCompileError::ExpandedOperationLimit {
-            actual: crate::ResourceAmount::exact(128_000_000_000_128),
+            actual: crate::ResourceAmount::exact(64_000_000_000_128),
             limit: 1_000_000,
         })
     );

@@ -24,11 +24,14 @@ pub use reference_signs::{
 use buffers::{try_false_vec, try_vec_with_capacity};
 use conversion_plan::ConversionPlan;
 use error::DetectionResult;
-use frame::{DetectorFrameState, SweepCorrectionPlan, admit_combined_compiled_storage};
+use frame::{
+    CircuitProgram, DetectorFrameState, ProgramOptions, SweepCorrectionPlan,
+    admit_combined_compiled_storage,
+};
 use reference::ReferenceSampleSource;
 use stab_model::Circuit;
 
-use crate::{CompilationDescriptor, CompilationOperation, SamplingCompiler};
+use crate::{CompilationDescriptor, CompilationOperation};
 
 #[cfg(test)]
 mod test_support;
@@ -41,7 +44,7 @@ pub const MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR: CompilationDescriptor
     CompilationDescriptor::new(
         CompilationOperation::MeasurementToDetection,
         stab_model::ModelDialect::StimCircuit,
-        3,
+        4,
         None,
         true,
     );
@@ -77,10 +80,27 @@ impl PreparedMeasurementToDetection {
     ) -> DetectionResult<Self> {
         let conversion_admission =
             ConversionPlan::admission_from_circuit_with_limits(circuit, limits)?;
-        let correction_admission = if conversion_admission.sweep_bit_count > 0 {
-            let conversion_bytes = conversion_admission.compiled_storage_bytes()?;
-            let admission =
-                SweepCorrectionPlan::admit(circuit, conversion_bytes, limits.max_compiled_bytes())?;
+        let uses_reference = matches!(
+            reference_mode,
+            crate::ReferenceSampleMode::UseReferenceSample
+        );
+        // One resolved program serves both the reference sample and sweep correction. Its
+        // allocation-free admission also validates sampler-only target shapes when neither is
+        // needed, so skip-reference conversion rejects the same circuits.
+        let needs_program = uses_reference || conversion_admission.sweep_bit_count > 0;
+        let conversion_bytes = conversion_admission.compiled_storage_bytes()?;
+        let (program_base, program_limit) = if needs_program {
+            (conversion_bytes, limits.max_compiled_bytes())
+        } else {
+            (0, u64::MAX)
+        };
+        let admission = CircuitProgram::admit(
+            circuit,
+            ProgramOptions::DETECTION,
+            program_base,
+            program_limit,
+        )?;
+        let program_admission = if needs_program {
             admit_combined_compiled_storage(
                 conversion_bytes,
                 admission.retained_bytes(),
@@ -92,51 +112,46 @@ impl PreparedMeasurementToDetection {
         };
         let plan =
             ConversionPlan::materialize_circuit_from_admission(circuit, conversion_admission)?;
-        let sweep_correction = match correction_admission {
+        let program = match program_admission {
             Some(admission) => {
-                let correction = SweepCorrectionPlan::materialize(
-                    circuit,
-                    admission,
-                    plan.measurement_count,
-                    plan.sweep_bit_count,
-                    plan.detector_count,
-                    plan.observable_count,
-                )?;
+                let program = CircuitProgram::materialize(circuit, &admission)?;
                 admit_combined_compiled_storage(
                     plan.compiled_storage_bytes()?,
-                    correction.retained_bytes(),
+                    program.retained_bytes(),
                     limits.max_compiled_bytes(),
                 )?;
-                Some(correction)
+                let counts = program.counts();
+                if counts.measurements != plan.measurement_count {
+                    return Err(DetectionError::invalid_result_format(format!(
+                        "reference program has {} measurements but detection conversion expected {}",
+                        counts.measurements, plan.measurement_count
+                    )));
+                }
+                if counts.sweep_bits != plan.sweep_bit_count {
+                    return Err(DetectionError::invalid_result_format(format!(
+                        "reference program has {} sweep bits but detection conversion expected {}",
+                        counts.sweep_bits, plan.sweep_bit_count
+                    )));
+                }
+                Some(program)
             }
             None => None,
         };
-        let sampling = SamplingCompiler::new().compile(circuit)?;
-        if sampling.measurement_width().get() != plan.measurement_count {
-            return Err(DetectionError::invalid_result_format(format!(
-                "reference sampler has {} measurements but detection conversion expected {}",
-                sampling.measurement_width().get(),
-                plan.measurement_count
-            )));
-        }
-        if sampling.sweep_bit_count() != plan.sweep_bit_count {
-            return Err(DetectionError::invalid_result_format(format!(
-                "reference sampler has {} sweep bits but detection conversion expected {}",
-                sampling.sweep_bit_count(),
-                plan.sweep_bit_count
-            )));
-        }
-        let reference_sample = if matches!(
-            reference_mode,
-            crate::ReferenceSampleMode::SkipReferenceSample
-        ) {
-            ReferenceSampleSource::Zero
-        } else {
-            ReferenceSampleSource::Static(reference::static_reference_sample(
-                &sampling,
-                plan.measurement_count,
-            )?)
+        let reference_sample = match (&program, uses_reference) {
+            (Some(program), true) => ReferenceSampleSource::Static(
+                reference::static_reference_sample(circuit, program, plan.measurement_count)?,
+            ),
+            _ => ReferenceSampleSource::Zero,
         };
+        let sweep_correction = program.filter(|_| plan.sweep_bit_count > 0).map(|program| {
+            SweepCorrectionPlan::new(
+                program,
+                plan.measurement_count,
+                plan.sweep_bit_count,
+                plan.detector_count,
+                plan.observable_count,
+            )
+        });
         Self::from_plan_reference_and_correction(plan, reference_sample, sweep_correction)
     }
 

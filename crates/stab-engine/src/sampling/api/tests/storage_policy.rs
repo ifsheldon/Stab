@@ -12,7 +12,7 @@ fn pauli_frame_plan(text: &str) -> SamplingPlan {
         .compile(&Circuit::from_stim_str(text).expect("parse storage fixture"))
         .expect("compile storage fixture");
     assert!(
-        matches!(plan.inner.kind, SamplingPlanKind::PauliFrame(_)),
+        matches!(plan.inner.kind, SamplingPlanKind::PauliFrame),
         "storage fixture must select the Pauli-frame session: {text}"
     );
     plan

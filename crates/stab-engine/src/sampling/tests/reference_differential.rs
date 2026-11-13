@@ -199,7 +199,7 @@ fn folded_reference_matches_iteration_on_surface_code_with_inserted_paulis() {
 
 /// Emits random qubit-targeted instructions covering the whole Clifford catalog, resets and
 /// measurements in every basis, pair measurements, Pauli products, feedback, and ignored noise.
-struct RandomCliffordEmitter {
+pub(super) struct RandomCliffordEmitter {
     single_qubit_gates: Vec<&'static str>,
     two_qubit_gates: Vec<&'static str>,
     product_gates: Vec<&'static str>,
@@ -207,7 +207,7 @@ struct RandomCliffordEmitter {
 }
 
 impl RandomCliffordEmitter {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let mut single_qubit_gates = Vec::new();
         let mut two_qubit_gates = Vec::new();
         let mut product_gates = Vec::new();
@@ -230,7 +230,13 @@ impl RandomCliffordEmitter {
         }
     }
 
-    fn emit(&mut self, text: &mut String, rng: &mut SmallRng, qubits: usize, operations: usize) {
+    pub(super) fn emit(
+        &mut self,
+        text: &mut String,
+        rng: &mut SmallRng,
+        qubits: usize,
+        operations: usize,
+    ) {
         for _ in 0..operations {
             let qubit = rng.random_range(0..qubits);
             let other = (qubit + rng.random_range(1..qubits.max(2))) % qubits;
@@ -304,7 +310,7 @@ fn random_product(rng: &mut SmallRng, qubits: usize) -> String {
         .join("*")
 }
 
-fn random_clifford_circuit(rng: &mut SmallRng, qubits: usize) -> String {
+pub(super) fn random_clifford_circuit(rng: &mut SmallRng, qubits: usize) -> String {
     let mut emitter = RandomCliffordEmitter::new();
     let mut text = String::new();
     emitter.emit(&mut text, rng, qubits, 2 * qubits.min(64) + 20);

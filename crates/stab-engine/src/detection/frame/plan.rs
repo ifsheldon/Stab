@@ -2,7 +2,7 @@ use rand::Rng;
 use stab_bits::{BIT_BLOCK_WORDS, BitBlock};
 use stab_model::Circuit;
 
-use super::program::{FrameProgram, FrameProgramAdmission};
+use super::program::{CircuitProgram, ProgramOptions};
 use super::word::FrameWord;
 use super::{BitPlaneDetectionFrame, FrameExecutionMode};
 use crate::detection::error::{
@@ -14,7 +14,7 @@ pub(crate) const PAULI_FRAME_BATCH_SHOTS: usize = BIT_BLOCK_WORDS * u64::BITS as
 
 #[derive(Clone, Debug)]
 pub(in crate::detection) struct DirectDetectorFramePlan {
-    executable: FrameProgram,
+    executable: CircuitProgram,
     conversion: ConversionPlan,
 }
 
@@ -26,8 +26,12 @@ impl DirectDetectorFramePlan {
         let conversion_admission =
             ConversionPlan::admission_from_circuit_with_limits(circuit, limits)?;
         let conversion_bytes = conversion_admission.compiled_storage_bytes()?;
-        let execution_admission =
-            FrameProgram::admit(circuit, conversion_bytes, limits.max_compiled_bytes(), true)?;
+        let execution_admission = CircuitProgram::admit(
+            circuit,
+            ProgramOptions::DETECTION,
+            conversion_bytes,
+            limits.max_compiled_bytes(),
+        )?;
         admit_combined_compiled_storage(
             conversion_bytes,
             execution_admission.retained_bytes(),
@@ -35,7 +39,7 @@ impl DirectDetectorFramePlan {
         )?;
         let conversion =
             ConversionPlan::materialize_circuit_from_admission(circuit, conversion_admission)?;
-        let executable = FrameProgram::materialize(circuit, execution_admission, true)?;
+        let executable = CircuitProgram::materialize(circuit, &execution_admission)?;
         let result = Self {
             executable,
             conversion,
@@ -49,7 +53,7 @@ impl DirectDetectorFramePlan {
     }
 
     pub(in crate::detection) fn qubit_count(&self) -> usize {
-        self.executable.qubit_count()
+        self.executable.frame_qubit_count()
     }
 
     pub(in crate::detection) fn detector_count(&self) -> usize {
@@ -108,50 +112,48 @@ impl DirectDetectorFramePlan {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct PauliFrameSamplingPlan {
-    executable: FrameProgram,
+/// Reusable bit-plane Pauli-frame storage for sampling one [`CircuitProgram`].
+#[derive(Debug)]
+pub(crate) struct PauliFrameSamplingState {
+    frame: BitPlaneDetectionFrame<BitBlock>,
     measurement_count: usize,
 }
 
-impl PauliFrameSamplingPlan {
-    pub(crate) fn try_compile(
-        circuit: &Circuit,
-        measurement_count: usize,
-        max_compiled_bytes: u64,
-    ) -> DetectionResult<Self> {
-        let admission = FrameProgram::admit(circuit, 0, max_compiled_bytes, false)?;
-        let executable = FrameProgram::materialize(circuit, admission, false)?;
+impl PauliFrameSamplingState {
+    pub(crate) fn try_new(program: &CircuitProgram) -> DetectionResult<Self> {
+        let measurement_count = program.counts().measurements;
         Ok(Self {
-            executable,
+            frame: BitPlaneDetectionFrame::try_reusable(
+                program.frame_qubit_count(),
+                measurement_count,
+                0,
+            )?,
             measurement_count,
         })
     }
 
-    pub(crate) fn state(&self) -> DetectionResult<PauliFrameSamplingState> {
-        Ok(PauliFrameSamplingState {
-            frame: BitPlaneDetectionFrame::try_reusable(
-                self.executable.qubit_count(),
-                self.measurement_count,
-                0,
-            )?,
-        })
+    pub(crate) fn storage_bytes(program: &CircuitProgram) -> u128 {
+        (program.frame_qubit_count() as u128)
+            .saturating_mul(2)
+            .saturating_add(program.counts().measurements as u128)
+            .saturating_mul(size_of::<BitBlock>() as u128)
     }
 
+    /// Samples one full batch of [`PAULI_FRAME_BATCH_SHOTS`] shots.
     pub(crate) fn sample_batch(
-        &self,
-        state: &mut PauliFrameSamplingState,
+        &mut self,
+        program: &CircuitProgram,
         rng: &mut impl Rng,
     ) -> DetectionResult<()> {
         let mode = FrameExecutionMode::Sample {
             active_lanes: PAULI_FRAME_BATCH_SHOTS,
         };
-        state.frame.reset(rng, mode);
-        state.frame.execute_program(&self.executable, rng, mode)?;
-        if state.frame.measurements.len() != self.measurement_count {
+        self.frame.reset(rng, mode);
+        self.frame.execute_program(program, rng, mode)?;
+        if self.frame.measurements.len() != self.measurement_count {
             return Err(DetectionError::invalid_sampler_compilation(format!(
                 "Pauli-frame sampler produced {} measurement planes but {} were compiled",
-                state.frame.measurements.len(),
+                self.frame.measurements.len(),
                 self.measurement_count
             )));
         }
@@ -164,13 +166,11 @@ impl PauliFrameSamplingPlan {
 
     pub(crate) fn measurement_segment(
         &self,
-        state: &PauliFrameSamplingState,
         bit_index: usize,
         start: usize,
         count: usize,
     ) -> DetectionResult<u64> {
-        state
-            .frame
+        self.frame
             .measurements
             .get(bit_index)
             .copied()
@@ -181,23 +181,11 @@ impl PauliFrameSamplingPlan {
                 )
             })
     }
-
-    pub(crate) fn state_storage_bytes(&self) -> u128 {
-        (self.executable.qubit_count() as u128)
-            .saturating_mul(2)
-            .saturating_add(self.measurement_count as u128)
-            .saturating_mul(size_of::<BitBlock>() as u128)
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct PauliFrameSamplingState {
-    frame: BitPlaneDetectionFrame<BitBlock>,
 }
 
 #[derive(Clone, Debug)]
 pub(in crate::detection) struct SweepCorrectionPlan {
-    executable: FrameProgram,
+    executable: CircuitProgram,
     measurement_count: usize,
     sweep_bit_count: usize,
     detector_count: usize,
@@ -205,34 +193,26 @@ pub(in crate::detection) struct SweepCorrectionPlan {
 }
 
 impl SweepCorrectionPlan {
-    pub(in crate::detection) fn admit(
-        circuit: &Circuit,
-        retained_base_bytes: u64,
-        max_combined_bytes: u64,
-    ) -> DetectionResult<FrameProgramAdmission> {
-        FrameProgram::admit(circuit, retained_base_bytes, max_combined_bytes, true)
-    }
-
-    pub(in crate::detection) fn materialize(
-        circuit: &Circuit,
-        admission: FrameProgramAdmission,
+    /// Wraps a detection program whose counts match the conversion plan it corrects.
+    pub(in crate::detection) fn new(
+        executable: CircuitProgram,
         measurement_count: usize,
         sweep_bit_count: usize,
         detector_count: usize,
         observable_count: usize,
-    ) -> DetectionResult<Self> {
-        Ok(Self {
-            executable: FrameProgram::materialize(circuit, admission, true)?,
+    ) -> Self {
+        Self {
+            executable,
             measurement_count,
             sweep_bit_count,
             detector_count,
             observable_count,
-        })
+        }
     }
 
     pub(in crate::detection) fn state(&self) -> DetectionResult<DetectorFrameState> {
         DetectorFrameState::new(
-            self.executable.qubit_count(),
+            self.executable.frame_qubit_count(),
             self.measurement_count,
             self.detector_count,
             self.observable_count,
@@ -241,15 +221,11 @@ impl SweepCorrectionPlan {
 
     pub(in crate::detection) fn state_storage_bytes(&self) -> u128 {
         DetectorFrameState::storage_bytes(
-            self.executable.qubit_count(),
+            self.executable.frame_qubit_count(),
             self.measurement_count,
             self.detector_count,
             self.observable_count,
         )
-    }
-
-    pub(in crate::detection) const fn retained_bytes(&self) -> u64 {
-        self.executable.retained_bytes()
     }
 
     pub(in crate::detection) fn correct_batch<'a>(

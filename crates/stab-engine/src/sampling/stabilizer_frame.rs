@@ -8,14 +8,14 @@ use super::SamplingCompileError;
 use super::reference_simulator::{LocalCliffordInverse, SignedLocalPauli};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct LocalTableauTransform {
+pub(crate) struct LocalTableauTransform {
     target_count: usize,
     outputs: Vec<LocalTableauOutput>,
     inverse: LocalCliffordInverse,
 }
 
 impl LocalTableauTransform {
-    pub(super) fn from_tableau(tableau: &Tableau) -> Result<Self, SamplingCompileError> {
+    pub(crate) fn from_tableau(tableau: &Tableau) -> Result<Self, SamplingCompileError> {
         let target_count = tableau.len();
         let output_count = local_basis_count(target_count)?;
         let mut outputs = Vec::with_capacity(output_count);
@@ -46,12 +46,12 @@ impl LocalTableauTransform {
         })
     }
 
-    pub(super) fn target_count(&self) -> usize {
+    pub(crate) fn target_count(&self) -> usize {
         self.target_count
     }
 
     /// The images `G^-1 P G` of each target's X and Z, as consumed by the reference simulator.
-    pub(super) fn inverse(&self) -> &LocalCliffordInverse {
+    pub(crate) fn inverse(&self) -> &LocalCliffordInverse {
         &self.inverse
     }
 
@@ -142,41 +142,6 @@ impl PartialEq for StabilizerFrame {
 
 impl Eq for StabilizerFrame {}
 
-/// Generator-list snapshot used by the pre-E1 reference path that tests keep as a baseline.
-#[cfg(test)]
-#[derive(Debug)]
-pub(super) struct StabilizerStateSnapshot {
-    generators: Vec<StabilizerGenerator>,
-}
-
-#[cfg(test)]
-impl StabilizerStateSnapshot {
-    pub(super) fn try_new(qubit_count: usize) -> Result<Self, FrameStorageError> {
-        let mut generators = Vec::new();
-        generators
-            .try_reserve_exact(qubit_count)
-            .map_err(|_| FrameStorageError::new("stabilizer snapshot generators", qubit_count))?;
-        for _ in 0..qubit_count {
-            generators.push(StabilizerGenerator::try_identity(qubit_count)?);
-        }
-        Ok(Self { generators })
-    }
-
-    pub(super) fn capture(&mut self, frame: &StabilizerFrame) -> bool {
-        if self.generators.len() != frame.generators.len() {
-            return false;
-        }
-        for (destination, source) in self.generators.iter_mut().zip(&frame.generators) {
-            destination.copy_from_generator(source);
-        }
-        true
-    }
-
-    pub(super) fn matches(&self, frame: &StabilizerFrame) -> bool {
-        self.generators == frame.generators
-    }
-}
-
 /// Admission estimate for a reference repeat-fold snapshot.
 ///
 /// This keeps the generator-list formula used before the inverse-tableau simulator so that
@@ -195,6 +160,7 @@ pub(super) fn reference_snapshot_admission_bytes(qubit_count: usize) -> u128 {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum MeasurementRandomness {
     Random,
+    #[cfg(test)]
     DeterministicFalse,
 }
 
@@ -252,18 +218,6 @@ impl StabilizerFrame {
             qubit_count,
             destabilizers,
             generators,
-            observable_scratch: StabilizerGenerator::try_identity(qubit_count)?,
-            pivot_scratch: StabilizerGenerator::try_identity(qubit_count)?,
-            collapsed_scratch: StabilizerGenerator::try_identity(qubit_count)?,
-            span_scratch: SpanScratch::try_new(qubit_count)?,
-        })
-    }
-
-    pub(super) fn try_new_unknown(qubit_count: usize) -> Result<Self, FrameStorageError> {
-        Ok(Self {
-            qubit_count,
-            destabilizers: Vec::new(),
-            generators: Vec::new(),
             observable_scratch: StabilizerGenerator::try_identity(qubit_count)?,
             pivot_scratch: StabilizerGenerator::try_identity(qubit_count)?,
             collapsed_scratch: StabilizerGenerator::try_identity(qubit_count)?,
@@ -388,15 +342,6 @@ impl StabilizerFrame {
         result
     }
 
-    pub(super) fn measure_is_deterministic(&mut self, qubit: usize, basis: PauliBasis) -> bool {
-        let mut observable = std::mem::take(&mut self.observable_scratch);
-        observable.reset_to_single(self.len(), qubit, basis, false);
-        let deterministic = self.deterministic_measurement_bit(&observable).is_some();
-        observable.reset_to_identity(self.len());
-        self.observable_scratch = observable;
-        deterministic
-    }
-
     pub(super) fn measure_pauli_product(
         &mut self,
         terms: &[(usize, PauliBasis)],
@@ -413,21 +358,6 @@ impl StabilizerFrame {
         observable.reset_to_identity(self.len());
         self.observable_scratch = observable;
         result
-    }
-
-    pub(super) fn pauli_product_measurement_is_deterministic(
-        &mut self,
-        terms: &[(usize, PauliBasis)],
-    ) -> bool {
-        let mut observable = std::mem::take(&mut self.observable_scratch);
-        observable.reset_to_identity(self.len());
-        for (qubit, basis) in terms {
-            observable.multiply_single_assign(*qubit, *basis);
-        }
-        let deterministic = self.deterministic_measurement_bit(&observable).is_some();
-        observable.reset_to_identity(self.len());
-        self.observable_scratch = observable;
-        deterministic
     }
 
     fn measure_observable(
@@ -475,13 +405,6 @@ impl StabilizerFrame {
             self.generators.push(collapsed);
         }
         sampled
-    }
-
-    fn deterministic_measurement_bit(&mut self, observable: &StabilizerGenerator) -> Option<bool> {
-        let MeasurementOutcome::Deterministic(bit) = self.measurement_outcome(observable) else {
-            return None;
-        };
-        Some(bit)
     }
 
     fn measurement_outcome(&mut self, observable: &StabilizerGenerator) -> MeasurementOutcome {
@@ -545,6 +468,7 @@ impl StabilizerFrame {
 fn random_measurement_bit(rng: &mut impl Rng, randomness: MeasurementRandomness) -> bool {
     match randomness {
         MeasurementRandomness::Random => rng.random_bool(0.5),
+        #[cfg(test)]
         MeasurementRandomness::DeterministicFalse => false,
     }
 }

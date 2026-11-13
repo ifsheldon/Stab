@@ -313,14 +313,14 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             {
                 "operation": "sample",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 5,
+                "compiler_schema_version": 6,
                 "request_fingerprint_schema_version": 1,
                 "configurable_limits": false
             },
             {
                 "operation": "m2d",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 3,
+                "compiler_schema_version": 4,
                 "request_fingerprint_schema_version": null,
                 "configurable_limits": true
             },

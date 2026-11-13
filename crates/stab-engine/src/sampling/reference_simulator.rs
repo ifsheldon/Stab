@@ -39,12 +39,12 @@ type SimResult<T> = Result<T, ReferenceSimulatorError>;
 /// Entry `2 * j` is the image of `X_j` and entry `2 * j + 1` the image of `Z_j`, where `j`
 /// indexes the gate's target list.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct LocalCliffordInverse {
+pub(crate) struct LocalCliffordInverse {
     images: Vec<SignedLocalPauli>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct SignedLocalPauli {
+pub(crate) struct SignedLocalPauli {
     pub(super) negative: bool,
     pub(super) bases: Vec<PauliBasis>,
 }
@@ -243,6 +243,13 @@ impl InverseTableauSimulator {
         self.multiply_row_into_row(target_z, control_z)
     }
 
+    /// Applies `S`. Since `S^-1 X S = -i X Z` and `S^-1 Z S = Z`, only the X row changes.
+    pub(super) fn apply_s(&mut self, qubit: usize) -> SimResult<()> {
+        let x_row = self.x_row_index(qubit)?;
+        let z_row = self.z_row_index(qubit)?;
+        self.multiply_row_into_row_with_phase(x_row, z_row, 3)
+    }
+
     /// Applies a Pauli gate, which flips the signs of the anticommuting input rows.
     pub(super) fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) -> SimResult<()> {
         if basis.z_bit() {
@@ -329,6 +336,13 @@ impl InverseTableauSimulator {
             self.apply_pauli(qubit, reset_correction(basis))?;
         }
         Ok(())
+    }
+
+    /// Reports whether measuring the Hermitian product `terms` has a determined outcome.
+    pub(super) fn is_deterministic(&mut self, terms: &[(usize, PauliBasis)]) -> SimResult<bool> {
+        self.observable_into_product(terms)?;
+        let (product_x, _) = self.product.split_at(self.words);
+        Ok(first_set_bit(product_x).is_none())
     }
 
     /// Measures a Hermitian product of single-qubit Paulis on distinct qubits.
@@ -477,6 +491,17 @@ impl InverseTableauSimulator {
 
     /// Replaces row `destination` with `destination * source` for commuting rows.
     fn multiply_row_into_row(&mut self, destination: usize, source: usize) -> SimResult<()> {
+        self.multiply_row_into_row_with_phase(destination, source, 0)
+    }
+
+    /// Replaces row `destination` with `i^extra_log_i * destination * source`, which must be
+    /// Hermitian.
+    fn multiply_row_into_row_with_phase(
+        &mut self,
+        destination: usize,
+        source: usize,
+        extra_log_i: u8,
+    ) -> SimResult<()> {
         let row_words = 2 * self.words;
         let (destination_row, source_row) = if destination < source {
             let (head, tail) = self.rows.split_at_mut(source * row_words);
@@ -501,7 +526,7 @@ impl InverseTableauSimulator {
             .get_mut(destination)
             .ok_or(invariant("row multiplication sign is outside the tableau"))?;
         *destination_sign = hermitian_sign(
-            (u8::from(*destination_sign) * 2 + u8::from(source_sign) * 2 + delta) & 3,
+            (u8::from(*destination_sign) * 2 + u8::from(source_sign) * 2 + delta + extra_log_i) & 3,
         )?;
         Ok(())
     }

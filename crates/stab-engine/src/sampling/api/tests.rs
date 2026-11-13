@@ -129,7 +129,8 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(2)))
         .expect("construct session");
-    session.batch = SessionBatch::DirectZ([0]);
+    // A zero-width batch cannot hold the plan's measurement plane.
+    session.batch = BitPlane64Batch::zeros(MAX_BATCH_SHOTS, 0).expect("zero-width batch");
     let mut sink = RecordSink::default();
 
     assert!(matches!(
@@ -150,13 +151,16 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
 }
 
 #[test]
-fn direct_z_variant_matches_the_general_frame_stream() {
-    let fixtures = [("X_ERROR(0.25) 0\nM(0.125) 0\n", 1)];
+fn general_frame_sessions_replay_the_general_executor_stream() {
+    let fixtures = [(
+        "X_ERROR(0.25) 0\nM(0.125) 0\nX_ERROR(0) 1\nH 1\nCX 1 2\nDEPOLARIZE2(0.1) 1 2\nM !1 2\n",
+        3,
+    )];
 
     for (source, expected_discriminator) in fixtures {
         let circuit = Circuit::from_stim_str(source).expect("parse fixture");
         let plan = SamplingCompiler::new()
-            .compile(&circuit)
+            .compile_general_frame_for_test(&circuit)
             .expect("compile fixture");
         assert_eq!(
             plan.inner.kind.executable_discriminator(),
@@ -187,7 +191,7 @@ fn direct_z_variant_matches_the_general_frame_stream() {
             let mut expected = Vec::new();
             for _ in 0..129 {
                 sample_general_into(
-                    &plan.inner.operations,
+                    &plan.inner.program,
                     &mut frame,
                     &mut record,
                     &mut output,
@@ -320,3 +324,68 @@ fn warmed_session_allocation_does_not_scale_with_shot_count() {
 }
 
 mod storage_policy;
+
+/// Circuits whose only work is one Z measurement, optionally after one single-qubit Pauli
+/// channel on the measured qubit, ran on a dedicated direct-Z plan before E3 and now run on the
+/// bit-plane Pauli frame. Their seeded streams changed, so this pins their distribution against
+/// the analytic outcome probability with a falsifiable bound.
+#[test]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "shot counts stay far below f64's exact integer range"
+)]
+fn former_direct_z_circuits_keep_their_analytic_outcome_distribution() {
+    const SHOTS: u64 = 200_000;
+    // (circuit, probability that the recorded bit is one, skip the reference sample)
+    let flip =
+        |pauli: f64, measurement: f64| pauli * (1.0 - measurement) + measurement * (1.0 - pauli);
+    let cases = [
+        ("M 0\n", 0.0, false),
+        ("M !0\n", 1.0, false),
+        ("M !0\n", 0.0, true),
+        (
+            "X_ERROR(0.25) 0\nM(0.125) !0\n",
+            1.0 - flip(0.25, 0.125),
+            false,
+        ),
+        ("X_ERROR(0.25) 0\nM(0.125) !0\n", flip(0.25, 0.125), true),
+        (
+            "R 0\nDEPOLARIZE1(0.3) 0\nM(0.05) 0\nDETECTOR rec[-1]\n",
+            flip(0.2, 0.05),
+            false,
+        ),
+        ("PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\nM 0\n", 0.3, false),
+        ("Y_ERROR(0.4) 0\nM 0\n", 0.4, false),
+        ("Z_ERROR(0.4) 0\nM(0.1) 0\n", 0.1, false),
+    ];
+    for (index, (source, probability, skip)) in cases.into_iter().enumerate() {
+        let circuit = Circuit::from_stim_str(source).expect("parse single-measurement fixture");
+        let plan = SamplingCompiler::new()
+            .compile(&circuit)
+            .expect("compile single-measurement fixture");
+        assert_eq!(plan.inner.kind, SamplingPlanKind::PauliFrame, "{source}");
+        let mode = if skip {
+            ReferenceSampleMode::SkipReferenceSample
+        } else {
+            ReferenceSampleMode::UseReferenceSample
+        };
+        let mut session = plan
+            .session_with_reference_mode(RandomPolicy::Seeded(Seed::new(index as u64 + 11)), mode)
+            .expect("construct session");
+        let mut sink = RecordSink::default();
+        session
+            .run(ShotCount::new(SHOTS), &mut sink)
+            .expect("run single-measurement fixture");
+        let ones = sink
+            .records
+            .iter()
+            .filter(|record| record == &&vec![true])
+            .count() as f64;
+        let expected = SHOTS as f64 * probability;
+        let tolerance = 6.0 * (SHOTS as f64 * probability * (1.0 - probability)).sqrt();
+        assert!(
+            (ones - expected).abs() <= tolerance,
+            "{source} skip={skip}: observed {ones} ones, expected {expected:.1} +/- {tolerance:.1}"
+        );
+    }
+}

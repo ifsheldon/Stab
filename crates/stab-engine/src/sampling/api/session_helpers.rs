@@ -1,13 +1,13 @@
 use rand::Rng;
 
+use stab_records::BitPlane64Batch;
+
 use super::{
     MAX_SAMPLING_SESSION_STORAGE_BYTES, ReferenceSampleMode, SamplingExecutionError,
-    SamplingPlanInner, SamplingPlanKind, SessionBatch, SessionFrame,
+    SamplingPlanInner, SamplingPlanKind, SessionFrame,
 };
-use crate::detection::frame::{PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingPlan};
-use crate::sampling::ExecutionMode;
-use crate::sampling::execute::{ExecutionBuffers, execute_operations};
-use crate::sampling::operation::SampleProgram;
+use crate::detection::frame::{CircuitProgram, PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingState};
+use crate::sampling::execute::{ExecutionBuffers, ExecutionMode, execute_program};
 use crate::sampling::reference_run::ReferenceWorkspace;
 use crate::sampling::stabilizer_frame::StabilizerFrame;
 
@@ -34,27 +34,22 @@ pub(super) fn session_storage_bytes(
     }
     let measurements = plan.measurement_count as u128;
     let mut estimated_bytes = measurements.saturating_mul(size_of::<u64>() as u128);
-    if !matches!(
-        plan.kind,
-        SamplingPlanKind::DirectZ(_) | SamplingPlanKind::PauliFrame(_)
-    ) {
+    if plan.kind == SamplingPlanKind::GeneralFrame {
         estimated_bytes = estimated_bytes.saturating_add(measurements.saturating_mul(2));
     }
-    let stores_reference = match (&plan.kind, reference_mode) {
-        (SamplingPlanKind::PauliFrame(_), ReferenceSampleMode::UseReferenceSample) => true,
-        (SamplingPlanKind::PauliFrame(_), ReferenceSampleMode::SkipReferenceSample) => false,
-        (_, ReferenceSampleMode::SkipReferenceSample) => true,
-        (_, ReferenceSampleMode::UseReferenceSample) => false,
+    let stores_reference = match (plan.kind, reference_mode) {
+        (SamplingPlanKind::PauliFrame, ReferenceSampleMode::UseReferenceSample)
+        | (SamplingPlanKind::GeneralFrame, ReferenceSampleMode::SkipReferenceSample) => true,
+        (SamplingPlanKind::PauliFrame, ReferenceSampleMode::SkipReferenceSample)
+        | (SamplingPlanKind::GeneralFrame, ReferenceSampleMode::UseReferenceSample) => false,
     };
     if stores_reference {
         estimated_bytes = estimated_bytes.saturating_add(measurements);
     }
-    if let SamplingPlanKind::PauliFrame(pauli) = &plan.kind {
-        estimated_bytes = estimated_bytes.saturating_add(pauli.state_storage_bytes());
-    } else if matches!(plan.kind, SamplingPlanKind::GeneralFrame)
-        || (reference_mode == ReferenceSampleMode::SkipReferenceSample
-            && !matches!(plan.kind, SamplingPlanKind::DirectZ(_)))
-    {
+    if plan.kind == SamplingPlanKind::PauliFrame {
+        estimated_bytes =
+            estimated_bytes.saturating_add(PauliFrameSamplingState::storage_bytes(&plan.program));
+    } else {
         let qubits = plan.qubit_count as u128;
         estimated_bytes = estimated_bytes
             .saturating_add(qubits.saturating_mul(qubits).saturating_mul(4))
@@ -82,11 +77,6 @@ pub(in crate::sampling) fn compute_reference_sample(
     if plan.measurement_count == 0 {
         return Ok(Vec::new());
     }
-    if let SamplingPlanKind::DirectZ(direct) = &plan.kind {
-        let mut output = try_bool_buffer(1, "direct reference sample")?;
-        output.push(direct.reference_bit());
-        return Ok(output);
-    }
     let needs_snapshot = plan.uses_reference_state_snapshot();
     crate::sampling::validate_general_frame_work_storage(
         plan.qubit_count,
@@ -95,7 +85,7 @@ pub(in crate::sampling) fn compute_reference_sample(
     )?;
     let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
     ReferenceWorkspace::try_new(plan.qubit_count, needs_snapshot)?.run(
-        &plan.operations,
+        &plan.program,
         plan.reference_sample_loop_policy,
         &[],
         &mut output,
@@ -120,17 +110,14 @@ pub(in crate::sampling) fn validate_reference_width(
     }
 }
 
-/// The pre-E1 generator-list reference path, kept only as a differential-test baseline.
+/// The generator-list reference path, iterating every repeat, kept as a differential baseline.
 #[cfg(test)]
 pub(in crate::sampling) fn compute_stabilizer_frame_reference_sample(
     plan: &SamplingPlanInner,
 ) -> Result<Vec<bool>, SamplingExecutionError> {
-    use crate::sampling::execute::execute_reference_operations;
-    use crate::sampling::stabilizer_frame::StabilizerStateSnapshot;
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
 
-    let needs_snapshot = plan.uses_reference_state_snapshot();
     let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
     let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
     let mut rng = SmallRng::seed_from_u64(0);
@@ -139,13 +126,6 @@ pub(in crate::sampling) fn compute_stabilizer_frame_reference_sample(
             message: error.to_string(),
         }
     })?;
-    let mut snapshot = needs_snapshot
-        .then(|| StabilizerStateSnapshot::try_new(plan.qubit_count))
-        .transpose()
-        .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
-            message: error.to_string(),
-        })?;
-    frame.reset_to_z_basis();
     let mut correlated_error_occurred = false;
     let mut buffers = ExecutionBuffers {
         frame: &mut frame,
@@ -153,21 +133,20 @@ pub(in crate::sampling) fn compute_stabilizer_frame_reference_sample(
         output: &mut output,
         correlated_error_occurred: &mut correlated_error_occurred,
     };
-    execute_reference_operations(
-        &plan.operations,
+    execute_program(
+        &plan.program,
         &mut buffers,
         &mut rng,
+        ExecutionMode::ReferenceSample,
         &[],
-        plan.reference_sample_loop_policy,
-        snapshot.as_mut(),
     )?;
     Ok(output)
 }
 
 pub(super) fn fill_pauli_frame_batch(
-    plan: &PauliFrameSamplingPlan,
+    program: &CircuitProgram,
     frame: &mut SessionFrame,
-    batch: &mut SessionBatch,
+    batch: &mut BitPlane64Batch,
     reference: Option<&[bool]>,
     rng: &mut impl Rng,
     shot_count: usize,
@@ -182,15 +161,10 @@ pub(super) fn fill_pauli_frame_batch(
             message: "Pauli sampling plan did not own Pauli-frame state".to_owned(),
         });
     };
-    let SessionBatch::BitPlanes(batch) = batch else {
-        return Err(SamplingExecutionError::InternalInvariant {
-            message: "Pauli sampling plan did not own bit-plane batch storage".to_owned(),
-        });
-    };
     let mut output_start = 0_usize;
     while output_start < shot_count {
         if *pending_count == 0 {
-            plan.sample_batch(state, rng).map_err(|error| {
+            state.sample_batch(program, rng).map_err(|error| {
                 SamplingExecutionError::InternalInvariant {
                     message: error.to_string(),
                 }
@@ -199,13 +173,13 @@ pub(super) fn fill_pauli_frame_batch(
             *pending_count = PAULI_FRAME_BATCH_SHOTS;
         }
         let take = (*pending_count).min(shot_count - output_start);
-        for bit_index in 0..plan.measurement_count() {
+        for bit_index in 0..state.measurement_count() {
             let reference_mask = reference
                 .and_then(|sample| sample.get(bit_index))
                 .copied()
                 .map_or(0, |bit| if bit { u64::MAX } else { 0 });
-            let segment = plan
-                .measurement_segment(state, bit_index, *pending_start, take)
+            let segment = state
+                .measurement_segment(bit_index, *pending_start, take)
                 .map_err(|error| SamplingExecutionError::InternalInvariant {
                     message: error.to_string(),
                 })?
@@ -247,7 +221,7 @@ const fn low_bits_mask(bit_count: usize) -> u64 {
 }
 
 pub(super) fn sample_general_into(
-    operations: &SampleProgram,
+    program: &CircuitProgram,
     frame: &mut StabilizerFrame,
     record: &mut Vec<bool>,
     output: &mut Vec<bool>,
@@ -264,7 +238,7 @@ pub(super) fn sample_general_into(
         output,
         correlated_error_occurred: &mut correlated_error_occurred,
     };
-    execute_operations(operations, &mut buffers, rng, ExecutionMode::Sample, &[])?;
+    execute_program(program, &mut buffers, rng, ExecutionMode::Sample, &[])?;
     if let Some(reference) = reference {
         for (bit, reference_bit) in output.iter_mut().zip(reference) {
             *bit ^= *reference_bit;

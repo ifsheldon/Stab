@@ -25,7 +25,7 @@ The `compilation` object contains:
 - `configurable_limits`, currently empty;
 - `validated`.
 
-Sampling compiler schema version 5 also applies one fixed one-million-expanded-operation boundary to measurement-bearing shots. Because this is fixed compiler admission rather than a caller option, it is bound by `compiler_schema_version` and does not appear in `configurable_limits`.
+Sampling compiler schema version 6 also applies one fixed one-million-expanded-instruction boundary to measurement-bearing shots, counted as `detect` counts it. Because this is fixed compiler admission rather than a caller option, it is bound by `compiler_schema_version` and does not appear in `configurable_limits`.
 
 The `run` object contains shots, random policy, optional seed, reference mode, output format, whether `--skip_loop_folding` was requested, and its selected effect. The effect is `fold-invariant-reference-repeats` by default and `iterate-reference-repeats` when the flag is present. The fold policy authorizes reuse after exact recurrence when its optional snapshot fits the existing session-storage ceiling; it falls back to iteration without changing admission or output when that snapshot would not fit.
 

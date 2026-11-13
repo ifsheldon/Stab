@@ -1,125 +1,59 @@
-use rand::Rng;
-#[cfg(test)]
-use stab_model::RepeatNestingLimit;
-use stab_model::advanced::ClassicalControl;
+//! Per-shot execution of the resolved circuit program on the general stabilizer frame.
+//!
+//! The general frame is the fallback for measurement-bearing programs whose retained size
+//! exceeds the bit-plane Pauli frame's compiled budget. It walks the same program as every
+//! other executor and consumes randomness per target in program order.
 
-#[cfg(test)]
-use super::api::ReferenceSampleLoopPolicy;
-use super::api::SamplingExecutionError;
-#[cfg(test)]
-use super::operation::SampleProgramEntry;
-use super::operation::{SampleOperation, SampleProgram};
-#[cfg(test)]
-use super::stabilizer_frame::StabilizerStateSnapshot;
-use super::stabilizer_frame::{MeasurementRandomness, StabilizerFrame, reset_correction};
-use super::{ExecutionMode, measurement_flip, noise};
+use rand::{Rng, RngExt as _};
 use stab_model::MeasureRecordOffset;
+
+use super::api::SamplingExecutionError;
+use super::noise;
+use super::reference_run::program_error;
+use super::stabilizer_frame::{MeasurementRandomness, StabilizerFrame};
+use crate::detection::frame::{
+    CircuitProgram, ControlledPair, ProgramInstruction, ReferenceClifford,
+};
+
+/// Whether execution samples noise and random outcomes or reproduces the noiseless reference.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ExecutionMode {
+    Sample,
+    /// Noiseless deterministic-false execution, the generator-list reference baseline of tests.
+    #[cfg(test)]
+    ReferenceSample,
+}
+
+impl ExecutionMode {
+    fn measurement_randomness(self) -> MeasurementRandomness {
+        match self {
+            Self::Sample => MeasurementRandomness::Random,
+            #[cfg(test)]
+            Self::ReferenceSample => MeasurementRandomness::DeterministicFalse,
+        }
+    }
+
+    fn includes_noise(self) -> bool {
+        matches!(self, Self::Sample)
+    }
+
+    /// Samples a result flip. Stim's reference sample is strictly noiseless:
+    /// `aliased_noiseless_circuit` drops result-flip probabilities before the reference run, so
+    /// even a certain flip must not invert a reference bit.
+    fn result_flip(self, probability: f64, rng: &mut impl Rng) -> bool {
+        match self {
+            Self::Sample => rng.random::<f64>() < probability,
+            #[cfg(test)]
+            Self::ReferenceSample => false,
+        }
+    }
+}
 
 pub(super) struct ExecutionBuffers<'a> {
     pub(super) frame: &'a mut StabilizerFrame,
     pub(super) record: &'a mut Vec<bool>,
     pub(super) output: &'a mut Vec<bool>,
     pub(super) correlated_error_occurred: &'a mut bool,
-}
-
-pub(super) fn count_determined_operations<R>(
-    operations: &SampleProgram,
-    frame: &mut StabilizerFrame,
-    record: &mut Vec<bool>,
-    rng: &mut R,
-) -> Result<u64, SamplingExecutionError>
-where
-    R: Rng,
-{
-    let mut count = 0;
-    let mut cursor = operations.cursor();
-    while let Some(operation) = cursor.next_operation()? {
-        match operation {
-            SampleOperation::ApplyHadamard { qubit } => {
-                frame.apply_hadamard(*qubit);
-            }
-            SampleOperation::ApplyControlledX { control, target } => {
-                frame.apply_controlled_x(*control, *target);
-            }
-            SampleOperation::ApplyTableau { targets, transform } => {
-                frame.apply_tableau(targets, transform);
-            }
-            SampleOperation::Reset { qubit, basis } => {
-                frame.reset(
-                    *qubit,
-                    *basis,
-                    rng,
-                    MeasurementRandomness::DeterministicFalse,
-                );
-            }
-            SampleOperation::Measure {
-                qubit,
-                basis,
-                inverted,
-                flip_probability: _,
-                reset,
-            } => {
-                // Stim's count_determined_measurements strips measurement arguments, so flip
-                // probabilities never affect determinism or the propagated record values.
-                if frame.measure_is_deterministic(*qubit, *basis) {
-                    count += 1;
-                }
-                let measured = frame.measure(
-                    *qubit,
-                    *basis,
-                    *inverted,
-                    rng,
-                    MeasurementRandomness::DeterministicFalse,
-                );
-                record.push(measured);
-                if *reset && (measured ^ *inverted) {
-                    frame.apply_pauli(*qubit, reset_correction(*basis));
-                }
-            }
-            SampleOperation::MeasureProduct {
-                terms,
-                inverted,
-                flip_probability: _,
-            } => {
-                if frame.pauli_product_measurement_is_deterministic(terms) {
-                    count += 1;
-                }
-                let measured = frame.measure_pauli_product(
-                    terms,
-                    *inverted,
-                    rng,
-                    MeasurementRandomness::DeterministicFalse,
-                );
-                record.push(measured);
-            }
-            SampleOperation::Pad { .. } => {
-                return Err(
-                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate { gate: "MPAD" },
-                );
-            }
-            SampleOperation::ClassicallyControlledPauli {
-                control,
-                qubit,
-                basis,
-            } => {
-                if matches!(control, ClassicalControl::Record(offset) if record_lookback(record, *offset))
-                {
-                    frame.apply_pauli(*qubit, *basis);
-                }
-            }
-            SampleOperation::HeraldedPauliChannel { .. } => {
-                return Err(
-                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate {
-                        gate: "heralded noise",
-                    },
-                );
-            }
-            SampleOperation::SingleQubitPauliChannel { .. }
-            | SampleOperation::TwoQubitPauliChannel { .. }
-            | SampleOperation::CorrelatedError { .. } => {}
-        }
-    }
-    Ok(count)
 }
 
 pub(super) fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> bool {
@@ -133,351 +67,185 @@ pub(super) fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> b
         .unwrap_or(false)
 }
 
-pub(super) fn execute_operations(
-    operations: &SampleProgram,
+pub(super) fn execute_program(
+    program: &CircuitProgram,
     buffers: &mut ExecutionBuffers<'_>,
     rng: &mut impl Rng,
     mode: ExecutionMode,
     sweep_record: &[bool],
 ) -> Result<(), SamplingExecutionError> {
-    let mut cursor = operations.cursor();
-    while let Some(operation) = cursor.next_operation()? {
-        execute_operation(operation, buffers, rng, mode, sweep_record);
+    let mut cursor = program.cursor();
+    while let Some(instruction) = cursor.next_instruction().map_err(program_error)? {
+        execute_instruction(program, instruction, buffers, rng, mode, sweep_record)?;
     }
     Ok(())
 }
 
-/// Pre-E1 generator-list reference execution, kept only as a differential-test baseline.
-#[cfg(test)]
-#[derive(Clone, Copy)]
-struct ReferenceRepeatFrame {
-    body_start: usize,
-    body_end: usize,
-    remaining: u64,
+fn apply_clifford(frame: &mut StabilizerFrame, clifford: &ReferenceClifford, targets: &[usize]) {
+    match clifford {
+        ReferenceClifford::Hadamard => {
+            for &qubit in targets {
+                frame.apply_hadamard(qubit);
+            }
+        }
+        ReferenceClifford::ControlledX => {
+            for pair in targets.chunks(2) {
+                if let &[control, target] = pair {
+                    frame.apply_controlled_x(control, target);
+                }
+            }
+        }
+        ReferenceClifford::Tableau { transform, .. } => {
+            for group in targets.chunks(transform.target_count().max(1)) {
+                frame.apply_tableau(group, transform);
+            }
+        }
+    }
 }
 
-#[cfg(test)]
-pub(super) fn execute_reference_operations(
-    program: &SampleProgram,
+fn push_result(buffers: &mut ExecutionBuffers<'_>, result: bool) {
+    buffers.record.push(result);
+    buffers.output.push(result);
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "one exhaustive dispatch keeps every instruction's per-target stream order visible"
+)]
+fn execute_instruction(
+    program: &CircuitProgram,
+    instruction: &ProgramInstruction,
     buffers: &mut ExecutionBuffers<'_>,
     rng: &mut impl Rng,
+    mode: ExecutionMode,
     sweep_record: &[bool],
-    loop_policy: ReferenceSampleLoopPolicy,
-    snapshot: Option<&mut StabilizerStateSnapshot>,
 ) -> Result<(), SamplingExecutionError> {
-    let Some(snapshot) = snapshot else {
-        execute_operations(
-            program,
-            buffers,
-            rng,
-            ExecutionMode::ReferenceSample,
-            sweep_record,
-        )?;
-        return Ok(());
-    };
-    if loop_policy == ReferenceSampleLoopPolicy::Iterate {
-        execute_operations(
-            program,
-            buffers,
-            rng,
-            ExecutionMode::ReferenceSample,
-            sweep_record,
-        )?;
-        return Ok(());
-    }
-
-    let entries = program.entries();
-    let mut repeats =
-        arrayvec::ArrayVec::<ReferenceRepeatFrame, { RepeatNestingLimit::HARD_MAX }>::new();
-    let mut index = 0;
-    while index < entries.len() {
-        let entry =
-            entries
-                .get(index)
-                .ok_or_else(|| SamplingExecutionError::InternalInvariant {
-                    message: "reference sampling moved beyond retained operations".to_owned(),
-                })?;
-        match entry {
-            SampleProgramEntry::Execute(operation) => {
-                execute_operation(
-                    operation,
-                    buffers,
-                    rng,
-                    ExecutionMode::ReferenceSample,
-                    sweep_record,
-                );
-                index += 1;
+    let randomness = mode.measurement_randomness();
+    match instruction {
+        ProgramInstruction::Clifford {
+            reference, targets, ..
+        } => apply_clifford(
+            buffers.frame,
+            program
+                .reference_clifford(*reference)
+                .map_err(program_error)?,
+            targets,
+        ),
+        ProgramInstruction::Reset { basis, targets } => {
+            for &qubit in targets {
+                buffers.frame.reset(qubit, *basis, rng, randomness);
             }
-            SampleProgramEntry::Repeat { count, body_end } => {
-                if *count == 0
-                    || *body_end <= index
-                    || !matches!(entries.get(*body_end), Some(SampleProgramEntry::EndRepeat))
-                {
-                    return Err(SamplingExecutionError::InternalInvariant {
-                        message: "reference sampling found an invalid repeat marker".to_owned(),
-                    });
+        }
+        ProgramInstruction::Measure {
+            basis,
+            reset,
+            flip_probability,
+            targets,
+            inverted,
+        } => {
+            for (index, &qubit) in targets.iter().enumerate() {
+                let flip = mode.result_flip(*flip_probability, rng);
+                let inverted = inverted.get(index).copied().unwrap_or(false);
+                let result = buffers
+                    .frame
+                    .measure(qubit, *basis, inverted ^ flip, rng, randomness);
+                push_result(buffers, result);
+                if *reset {
+                    buffers.frame.reset(qubit, *basis, rng, randomness);
                 }
-                let body_start = index.checked_add(1).ok_or_else(|| {
-                    SamplingExecutionError::InternalInvariant {
-                        message: "reference sampling repeat-body index overflowed".to_owned(),
-                    }
-                })?;
-                let may_fold = program.reference_fold_is_profitable(
-                    body_start,
-                    *body_end,
-                    *count,
-                    buffers.frame.len(),
-                ) && snapshot.capture(buffers.frame);
-                if may_fold {
-                    let output_start = buffers.output.len();
-                    let correlated_before = *buffers.correlated_error_occurred;
-                    execute_operations_range(
-                        program,
-                        body_start,
-                        *body_end,
-                        buffers,
-                        rng,
-                        ExecutionMode::ReferenceSample,
-                        sweep_record,
-                    )?;
-                    if snapshot.matches(buffers.frame)
-                        && *buffers.correlated_error_occurred == correlated_before
-                    {
-                        append_repeated_reference_bits(
-                            buffers,
-                            output_start,
-                            count.saturating_sub(1),
-                        )?;
-                        index = body_end.checked_add(1).ok_or_else(|| {
-                            SamplingExecutionError::InternalInvariant {
-                                message: "reference sampling repeat-end index overflowed"
-                                    .to_owned(),
-                            }
-                        })?;
-                        continue;
-                    }
-                    if *count == 1 {
-                        index = body_end.checked_add(1).ok_or_else(|| {
-                            SamplingExecutionError::InternalInvariant {
-                                message: "reference sampling repeat-end index overflowed"
-                                    .to_owned(),
-                            }
-                        })?;
-                        continue;
-                    }
-                    if repeats
-                        .try_push(ReferenceRepeatFrame {
-                            body_start,
-                            body_end: *body_end,
-                            remaining: count - 1,
-                        })
-                        .is_err()
-                    {
-                        return Err(SamplingExecutionError::InternalInvariant {
-                            message: "reference sampling exceeded the admitted repeat nesting"
-                                .to_owned(),
-                        });
-                    }
-                    index = body_start;
-                    continue;
-                }
-                if repeats
-                    .try_push(ReferenceRepeatFrame {
-                        body_start,
-                        body_end: *body_end,
-                        remaining: *count,
-                    })
-                    .is_err()
-                {
-                    return Err(SamplingExecutionError::InternalInvariant {
-                        message: "reference sampling exceeded the admitted repeat nesting"
-                            .to_owned(),
-                    });
-                }
-                index = body_start;
             }
-            SampleProgramEntry::EndRepeat => {
-                let Some(frame) = repeats.last_mut() else {
+        }
+        ProgramInstruction::MeasurePairs {
+            basis,
+            flip_probability,
+            targets,
+            inverted,
+        } => {
+            for (index, pair) in targets.chunks(2).enumerate() {
+                let &[left, right] = pair else {
                     return Err(SamplingExecutionError::InternalInvariant {
-                        message: "reference sampling ended an absent repeat".to_owned(),
+                        message: "pair measurement targets are not paired".to_owned(),
                     });
                 };
-                if frame.body_end != index || frame.remaining == 0 {
-                    return Err(SamplingExecutionError::InternalInvariant {
-                        message: "reference sampling repeat end disagrees with its marker"
-                            .to_owned(),
-                    });
-                }
-                if frame.remaining > 1 {
-                    frame.remaining -= 1;
-                    index = frame.body_start;
-                } else {
-                    repeats.pop();
-                    index = index.checked_add(1).ok_or_else(|| {
-                        SamplingExecutionError::InternalInvariant {
-                            message: "reference sampling repeat-end index overflowed".to_owned(),
-                        }
-                    })?;
-                }
+                let flip = mode.result_flip(*flip_probability, rng);
+                let inverted = inverted.get(2 * index).copied().unwrap_or(false)
+                    ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
+                let result = buffers.frame.measure_pauli_product(
+                    &[(left, *basis), (right, *basis)],
+                    inverted ^ flip,
+                    rng,
+                    randomness,
+                );
+                push_result(buffers, result);
             }
         }
-    }
-    if repeats.is_empty() {
-        Ok(())
-    } else {
-        Err(SamplingExecutionError::InternalInvariant {
-            message: "reference sampling ended inside a repeat".to_owned(),
-        })
-    }
-}
-
-#[cfg(test)]
-fn execute_operations_range(
-    program: &SampleProgram,
-    start: usize,
-    end: usize,
-    buffers: &mut ExecutionBuffers<'_>,
-    rng: &mut impl Rng,
-    mode: ExecutionMode,
-    sweep_record: &[bool],
-) -> Result<(), SamplingExecutionError> {
-    let mut cursor = program.cursor_range(start, end);
-    while let Some(operation) = cursor.next_operation()? {
-        execute_operation(operation, buffers, rng, mode, sweep_record);
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-fn append_repeated_reference_bits(
-    buffers: &mut ExecutionBuffers<'_>,
-    output_start: usize,
-    repetitions: u64,
-) -> Result<(), SamplingExecutionError> {
-    let pattern_len = buffers.output.len().saturating_sub(output_start);
-    if pattern_len == 0 {
-        return Ok(());
-    }
-    for _ in 0..repetitions {
-        for offset in 0..pattern_len {
-            let index = output_start.checked_add(offset).ok_or_else(|| {
-                SamplingExecutionError::InternalInvariant {
-                    message: "reference folding output-pattern index overflowed".to_owned(),
-                }
-            })?;
-            let bit = buffers.output.get(index).copied().ok_or_else(|| {
-                SamplingExecutionError::InternalInvariant {
-                    message: "reference folding lost its measured output pattern".to_owned(),
-                }
-            })?;
-            buffers.output.push(bit);
-            buffers.record.push(bit);
-        }
-    }
-    Ok(())
-}
-
-fn execute_operation(
-    operation: &SampleOperation,
-    buffers: &mut ExecutionBuffers<'_>,
-    rng: &mut impl Rng,
-    mode: ExecutionMode,
-    sweep_record: &[bool],
-) {
-    match operation {
-        SampleOperation::ApplyHadamard { qubit } => {
-            buffers.frame.apply_hadamard(*qubit);
-        }
-        SampleOperation::ApplyControlledX { control, target } => {
-            buffers.frame.apply_controlled_x(*control, *target);
-        }
-        SampleOperation::ApplyTableau { targets, transform } => {
-            buffers.frame.apply_tableau(targets, transform);
-        }
-        SampleOperation::Reset { qubit, basis } => {
-            buffers
-                .frame
-                .reset(*qubit, *basis, rng, mode.measurement_randomness());
-        }
-        SampleOperation::Measure {
-            qubit,
-            basis,
-            inverted,
-            flip_probability,
-            reset,
-        } => {
-            let noisy_flip = measurement_flip::sample(*flip_probability, rng, mode);
-            let result = buffers.frame.measure(
-                *qubit,
-                *basis,
-                *inverted ^ noisy_flip,
-                rng,
-                mode.measurement_randomness(),
-            );
-            buffers.record.push(result);
-            buffers.output.push(result);
-            if *reset {
-                buffers
-                    .frame
-                    .reset(*qubit, *basis, rng, mode.measurement_randomness());
+        ProgramInstruction::PauliProducts(measurement) => {
+            for product in measurement.products() {
+                let (terms, inverted) = product.map_err(program_error)?;
+                let flip = mode.result_flip(measurement.flip_probability(), rng);
+                let result =
+                    buffers
+                        .frame
+                        .measure_pauli_product(terms, inverted ^ flip, rng, randomness);
+                push_result(buffers, result);
             }
         }
-        SampleOperation::MeasureProduct {
-            terms,
-            inverted,
+        ProgramInstruction::MeasurePads {
             flip_probability,
+            values,
         } => {
-            let noisy_flip = measurement_flip::sample(*flip_probability, rng, mode);
-            let result = buffers.frame.measure_pauli_product(
-                terms,
-                *inverted ^ noisy_flip,
-                rng,
-                mode.measurement_randomness(),
-            );
-            buffers.record.push(result);
-            buffers.output.push(result);
+            for &value in values {
+                let result = value ^ mode.result_flip(*flip_probability, rng);
+                push_result(buffers, result);
+            }
         }
-        SampleOperation::Pad {
-            value,
-            flip_probability,
-        } => {
-            let result = *value ^ measurement_flip::sample(*flip_probability, rng, mode);
-            buffers.record.push(result);
-            buffers.output.push(result);
-        }
-        SampleOperation::SingleQubitPauliChannel {
-            qubit,
+        ProgramInstruction::SinglePauliNoise {
             probabilities,
-            total_probability,
+            targets,
         } => {
             if mode.includes_noise() {
-                noise::apply_single_qubit_pauli_channel(
-                    buffers.frame,
-                    *qubit,
-                    probabilities,
-                    *total_probability,
-                    rng,
-                );
+                let total = probabilities.iter().sum();
+                for &qubit in targets {
+                    noise::apply_single_qubit_pauli_channel(
+                        buffers.frame,
+                        qubit,
+                        probabilities,
+                        total,
+                        rng,
+                    );
+                }
             }
         }
-        SampleOperation::TwoQubitPauliChannel {
-            left,
-            right,
+        ProgramInstruction::TwoQubitPauliNoise {
             probabilities,
-            total_probability,
+            targets,
         } => {
             if mode.includes_noise() {
-                noise::apply_two_qubit_pauli_channel(
-                    buffers.frame,
-                    *left,
-                    *right,
-                    probabilities,
-                    *total_probability,
-                    rng,
-                );
+                let total = probabilities.iter().sum();
+                for pair in targets.chunks(2) {
+                    if let &[left, right] = pair {
+                        noise::apply_two_qubit_pauli_channel(
+                            buffers.frame,
+                            left,
+                            right,
+                            probabilities,
+                            total,
+                            rng,
+                        );
+                    }
+                }
             }
         }
-        SampleOperation::CorrelatedError {
+        ProgramInstruction::ZeroProbabilityNoise { pairs, targets } => {
+            if mode.includes_noise() {
+                // A zero-probability channel still draws its site's uniform value.
+                let sites = targets.len() / if *pairs { 2 } else { 1 };
+                for _ in 0..sites {
+                    let _: f64 = rng.random();
+                }
+            }
+        }
+        ProgramInstruction::CorrelatedError {
             else_branch,
             probability,
             terms,
@@ -495,45 +263,70 @@ fn execute_operation(
                 *buffers.correlated_error_occurred = false;
             }
         }
-        SampleOperation::HeraldedPauliChannel {
-            qubit,
-            probabilities,
+        ProgramInstruction::HeraldedErase {
+            probability,
+            targets,
         } => {
-            let herald = if mode.includes_noise() {
-                noise::apply_heralded_pauli_channel(buffers.frame, *qubit, probabilities, rng)
-            } else {
-                false
-            };
-            buffers.record.push(herald);
-            buffers.output.push(herald);
-        }
-        SampleOperation::ClassicallyControlledPauli {
-            control,
-            qubit,
-            basis,
-        } => {
-            let active = match control {
-                ClassicalControl::Record(offset) => measurement_record_bit(buffers.record, *offset),
-                ClassicalControl::Sweep(sweep_id) => usize::try_from(*sweep_id)
-                    .ok()
-                    .and_then(|index| sweep_record.get(index))
-                    .copied()
-                    .unwrap_or(false),
-            };
-            if active {
-                buffers.frame.apply_pauli(*qubit, *basis);
+            let quarter = probability / 4.0;
+            for &qubit in targets {
+                let herald = mode.includes_noise()
+                    && noise::apply_heralded_pauli_channel(
+                        buffers.frame,
+                        qubit,
+                        &[quarter; 4],
+                        rng,
+                    );
+                push_result(buffers, herald);
             }
         }
+        ProgramInstruction::HeraldedPauliChannel {
+            probabilities,
+            targets,
+        } => {
+            for &qubit in targets {
+                let herald = mode.includes_noise()
+                    && noise::apply_heralded_pauli_channel(
+                        buffers.frame,
+                        qubit,
+                        probabilities,
+                        rng,
+                    );
+                push_result(buffers, herald);
+            }
+        }
+        ProgramInstruction::ControlledPauli {
+            basis,
+            reference,
+            pairs,
+            ..
+        } => {
+            let clifford = program
+                .reference_clifford(*reference)
+                .map_err(program_error)?;
+            for pair in pairs {
+                match *pair {
+                    ControlledPair::Quantum { control, target } => {
+                        apply_clifford(buffers.frame, clifford, &[control, target]);
+                    }
+                    ControlledPair::Record { offset, qubit } => {
+                        if record_lookback(buffers.record, offset) {
+                            buffers.frame.apply_pauli(qubit, *basis);
+                        }
+                    }
+                    ControlledPair::Sweep { id, qubit } => {
+                        let active = usize::try_from(id)
+                            .ok()
+                            .and_then(|index| sweep_record.get(index))
+                            .copied()
+                            .unwrap_or(false);
+                        if active {
+                            buffers.frame.apply_pauli(qubit, *basis);
+                        }
+                    }
+                }
+            }
+        }
+        ProgramInstruction::Observable { .. } => {}
     }
-}
-
-fn measurement_record_bit(measurements: &[bool], offset: MeasureRecordOffset) -> bool {
-    let Ok(len) = i64::try_from(measurements.len()) else {
-        return false;
-    };
-    let index = len + i64::from(offset.get());
-    let Ok(index) = usize::try_from(index) else {
-        return false;
-    };
-    measurements.get(index).copied().unwrap_or(false)
+    Ok(())
 }

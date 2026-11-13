@@ -6,23 +6,35 @@ const FLIPPED_DETECTOR_AND_OBSERVABLE: &[u8] =
     b"X_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
 
 #[test]
-fn detect_enforces_storage_without_restricting_sparse_qubit_syntax() {
-    // Detection's two frame planes and both packed batches reach 256 MiB at this ID.
-    // Sampling's scalar Direct-Z path still supports the full Stim qubit-ID range.
-    for (command, qubit, accepted) in [
-        ("detect", 16_777_150, true),
-        ("detect", 16_777_215, false),
-        ("sample", 16_777_215, true),
+fn detect_and_sample_enforce_storage_without_restricting_sparse_qubit_syntax() {
+    // Detection's two frame planes and both packed batches reach 256 MiB at this ID. Sampling's
+    // wider bit-plane frame reaches its limit at a lower ID, and no single-measurement fast path
+    // exempts the full Stim qubit-ID range from that frame any more.
+    for (command, qubit, expected_error) in [
+        ("detect", 16_777_150, None),
+        (
+            "detect",
+            16_777_215,
+            Some("detection session needs an estimated 268436496 bytes"),
+        ),
+        ("sample", 4_000_000, None),
+        (
+            "sample",
+            16_777_215,
+            Some("sampling session needs an estimated 1073741864 bytes"),
+        ),
     ] {
         let input = format!("M {qubit}\nDETECTOR rec[-1]\n");
-        let result = run(&["stab", command, "--shots", "1"], input.as_bytes());
-        if accepted {
-            result.assert_ok(b"0\n");
+        // Sampling skips the reference sample, whose tableau would be quadratic in the ID.
+        let args: &[&str] = if command == "sample" {
+            &["stab", command, "--shots", "1", "--skip_reference_sample"]
         } else {
-            result.assert_err(&[
-                "detection session needs an estimated 268436496 bytes",
-                "268435456-byte safety limit",
-            ]);
+            &["stab", command, "--shots", "1"]
+        };
+        let result = run(args, input.as_bytes());
+        match expected_error {
+            None => result.assert_ok(b"0\n"),
+            Some(message) => result.assert_err(&[message, "268435456-byte safety limit"]),
         }
     }
 }

@@ -20,17 +20,16 @@ use stab_model::{Circuit, Gate, GateTargetGroupKind};
 
 use super::BitPlaneDetectionFrame;
 use super::noise::FrameExecutionMode;
-use super::program::FrameProgram;
+use super::program::{CircuitProgram, ProgramOptions};
 use super::word::FrameWord;
 
 const FRAME_QUBITS: usize = 300;
 const SINGLE_QUBIT_TARGETS: [usize; 10] = [0, 63, 64, 65, 127, 128, 255, 256, 299, 64];
 const TWO_QUBIT_TARGETS: [usize; 12] = [0, 63, 63, 64, 128, 1, 255, 256, 299, 127, 64, 0];
 
-fn compile(text: &str) -> FrameProgram {
+fn compile(text: &str) -> CircuitProgram {
     let circuit = Circuit::from_stim_str(text).expect("parse frame fixture");
-    let admission = FrameProgram::admit(&circuit, 0, u64::MAX, true).expect("admit frame fixture");
-    FrameProgram::materialize(&circuit, admission, true).expect("materialize frame fixture")
+    CircuitProgram::compile(&circuit, ProgramOptions::DETECTION).expect("compile frame fixture")
 }
 
 fn random_word<W: FrameWord>(rng: &mut SmallRng) -> W {
@@ -94,7 +93,7 @@ fn assert_gate_matches_reference<W: FrameWord + std::fmt::Debug>(gate: Gate, see
         FRAME_QUBITS - 1
     );
     let program = compile(&text);
-    assert_eq!(program.qubit_count(), FRAME_QUBITS);
+    assert_eq!(program.frame_qubit_count(), FRAME_QUBITS);
 
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut frame =
@@ -155,7 +154,7 @@ fn every_unitary_gate_kernel_matches_its_per_bit_tableau_reference() {
 }
 
 #[test]
-fn every_non_pauli_unitary_gate_compiles_to_one_frame_operation() {
+fn every_unitary_gate_compiles_to_one_program_operation() {
     for gate in unitary_gates() {
         let arity = stab_analysis::gate_tableau(gate)
             .expect("unitary gate tableau")
@@ -165,30 +164,46 @@ fn every_non_pauli_unitary_gate_compiles_to_one_frame_operation() {
             gate.canonical_name(),
             if arity == 1 { "0" } else { "0 1" }
         );
-        let expected = usize::from(!matches!(
-            gate.canonical_name(),
-            "I" | "X" | "Y" | "Z" | "II"
-        ));
+        let program = compile(&text);
         assert_eq!(
-            compile(&text).entry_count(),
-            expected,
-            "{} compiled to the wrong number of frame operations",
+            program.entry_count(),
+            1,
+            "{} compiled to the wrong number of program operations",
+            gate.canonical_name()
+        );
+        let frame_identity = matches!(gate.canonical_name(), "I" | "X" | "Y" | "Z" | "II");
+        assert!(
+            matches!(
+                program.entries().first(),
+                Some(super::program::ProgramEntry::Instruction(
+                    super::program::ProgramInstruction::Clifford { frame, .. }
+                )) if (*frame == super::program::FrameGate::Identity) == frame_identity
+            ),
+            "{} must keep its reference action and drop only its frame action",
             gate.canonical_name()
         );
     }
 }
 
 #[test]
-fn pauli_and_identity_gates_compile_to_no_frame_operations_but_size_the_frame() {
+fn pauli_and_identity_gates_have_no_frame_action_but_size_the_frame() {
     let program = compile("X 0 1\nY 2\nZ 3\nI 4\nII 5 6\nREPEAT 3 {\n    X 7\n    Z 8 9\n}\n");
-    // Only the repeat markers remain.
-    assert_eq!(program.entry_count(), 2);
+    // The gates stay for the reference sample, whose signs they change, but none acts on the
+    // frame.
+    assert_eq!(program.entry_count(), 9);
+    assert!(program.entries().iter().all(|entry| !matches!(
+        entry,
+        super::program::ProgramEntry::Instruction(super::program::ProgramInstruction::Clifford {
+            frame: super::program::FrameGate::Single(_) | super::program::FrameGate::Two(_),
+            ..
+        })
+    )));
     // The frame width still covers every qubit, because each batch reset draws one random
     // word per frame qubit and the seeded random stream must not change.
-    assert_eq!(program.qubit_count(), 10);
+    assert_eq!(program.frame_qubit_count(), 10);
 
     let mixed = compile("X 0\nH 0\nZ 0\nCZ 0 1\nY 1\n");
-    assert_eq!(mixed.entry_count(), 2);
+    assert_eq!(mixed.entry_count(), 5);
 }
 
 #[test]
@@ -200,12 +215,12 @@ fn warmed_pauli_product_execution_does_not_allocate() {
     assert_warmed_execution_does_not_allocate::<BitBlock>(&program);
 }
 
-fn assert_warmed_execution_does_not_allocate<W: FrameWord>(program: &FrameProgram) {
+fn assert_warmed_execution_does_not_allocate<W: FrameWord>(program: &CircuitProgram) {
     let mut rng = SmallRng::seed_from_u64(7);
     let mode = FrameExecutionMode::Sample {
         active_lanes: W::LANE_COUNT,
     };
-    let mut frame = BitPlaneDetectionFrame::<W>::try_reusable(program.qubit_count(), 16, 0)
+    let mut frame = BitPlaneDetectionFrame::<W>::try_reusable(program.frame_qubit_count(), 16, 0)
         .expect("frame fixture");
     frame.reset(&mut rng, mode);
     frame

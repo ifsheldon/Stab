@@ -1,139 +1,211 @@
+//! The engine's single compiled circuit representation.
+//!
+//! A [`CircuitProgram`] is one flat tape of resolved instructions with folded repeat markers.
+//! Lowering resolves gate identity, targets, probabilities, record lookbacks, sweep bits, Pauli
+//! products, and reference-sample Clifford actions once at compile time, so no executor matches
+//! gate names or re-parses arguments. The bit-plane Pauli frame, the inverse-tableau reference
+//! simulator, deterministic-measurement counting, and the general stabilizer frame all walk this
+//! tape through one [`ProgramCursor`].
+
 use arrayvec::ArrayVec;
 use stab_algebra::PauliBasis;
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, RepeatNestingLimit, Target};
-use std::ops::ControlFlow;
-
-use super::clifford::{FrameCliffordAction, FrameCliffordActionCache, TwoQubitFrameMap};
-use super::helpers::{
-    measurement_flip_probability, pauli_basis, probability_list, qubit_index,
-    single_probability_argument, unsupported_frame_instruction, unsupported_frame_target,
-    zero_probability_noise,
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, MeasureRecordOffset, RepeatNestingLimit,
 };
+
+use super::clifford::{SingleQubitFrameMap, TwoQubitFrameMap};
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
+use crate::sampling::LocalTableauTransform;
 
-#[derive(Clone, Debug)]
-pub(super) enum FrameProgramEntry {
-    Execute {
-        instruction: CircuitInstruction,
-        pair_map: Option<TwoQubitFrameMap>,
-    },
-    Fast {
-        instruction: FastFrameInstruction,
-    },
-    PauliProducts {
-        measurement: PauliProductMeasurement,
-    },
-    Repeat {
-        count: u64,
-        body_end: usize,
-    },
+mod lower;
+#[cfg(test)]
+mod tests;
+
+pub(crate) use lower::ProgramOptions;
+
+/// One entry of the flat program tape.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ProgramEntry {
+    Instruction(ProgramInstruction),
+    Repeat { count: u64, body_end: usize },
     EndRepeat,
 }
 
+/// The Pauli-frame action of a resolved unitary gate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum FastFrameOperation {
-    SingleQubitClifford(super::clifford::SingleQubitFrameMap),
-    TwoQubitClifford(TwoQubitFrameMap),
-    ResetZ,
-    MeasureZ,
-    MeasureResetZ,
-    MeasureXX,
-    MeasureYY,
-    MeasureZZ,
-    SinglePauliNoise,
-    TwoQubitPauliNoise,
+pub(crate) enum FrameGate {
+    /// The gate cannot change a Pauli frame, as for Pauli gates and identities, but it still
+    /// changes the reference sample's signs.
+    Identity,
+    Single(SingleQubitFrameMap),
+    Two(TwoQubitFrameMap),
 }
 
-#[derive(Clone, Debug)]
-pub(super) struct FastFrameInstruction {
-    pub(super) operation: FastFrameOperation,
-    pub(super) targets: Vec<usize>,
-    pub(super) probabilities: Vec<f64>,
+/// Index of a gate's reference-sample action in [`CircuitProgram::reference_clifford`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ReferenceGateId(u16);
+
+/// The stabilizer-state action of one unitary gate, resolved once per distinct gate.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ReferenceClifford {
+    Hadamard,
+    ControlledX,
+    /// Any other unitary gate, with its forward tableau for the general frame and, when the
+    /// gate has one, its exact `H`/`S`/`CX` decomposition for the inverse-tableau simulator.
+    Tableau {
+        transform: LocalTableauTransform,
+        steps: Option<Vec<CliffordStep>>,
+    },
+}
+
+/// One step of a gate's `H`/`S`/`CX` decomposition, on indices into the gate's target group.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CliffordStep {
+    H(u8),
+    S(u8),
+    Cx(u8, u8),
+}
+
+impl ReferenceClifford {
+    pub(crate) fn arity(&self) -> usize {
+        match self {
+            Self::Hadamard => 1,
+            Self::ControlledX => 2,
+            Self::Tableau { transform, .. } => transform.target_count(),
+        }
+    }
+}
+
+/// One target pair of a controlled Pauli whose targets include a classical control.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ControlledPair {
+    Quantum {
+        control: usize,
+        target: usize,
+    },
+    Record {
+        offset: MeasureRecordOffset,
+        qubit: usize,
+    },
+    Sweep {
+        id: u32,
+        qubit: usize,
+    },
+}
+
+/// A resolved circuit instruction.
+///
+/// Targets are qubit indices. `inverted` is empty when no target of the instruction carries a
+/// result inversion and otherwise holds one flag per target.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ProgramInstruction {
+    Clifford {
+        frame: FrameGate,
+        reference: ReferenceGateId,
+        targets: Vec<usize>,
+    },
+    Reset {
+        basis: PauliBasis,
+        targets: Vec<usize>,
+    },
+    Measure {
+        basis: PauliBasis,
+        reset: bool,
+        flip_probability: f64,
+        targets: Vec<usize>,
+        inverted: Vec<bool>,
+    },
+    MeasurePairs {
+        basis: PauliBasis,
+        flip_probability: f64,
+        targets: Vec<usize>,
+        inverted: Vec<bool>,
+    },
+    MeasurePads {
+        flip_probability: f64,
+        values: Vec<bool>,
+    },
+    PauliProducts(PauliProductMeasurement),
+    SinglePauliNoise {
+        probabilities: [f64; 3],
+        targets: Vec<usize>,
+    },
+    TwoQubitPauliNoise {
+        probabilities: Box<[f64; 15]>,
+        targets: Vec<usize>,
+    },
+    /// A Pauli channel whose probabilities are all zero. It is retained only for the general
+    /// stabilizer frame, whose per-target stream draws one uniform value per channel site.
+    ZeroProbabilityNoise {
+        pairs: bool,
+        targets: Vec<usize>,
+    },
+    CorrelatedError {
+        else_branch: bool,
+        probability: f64,
+        terms: Vec<(usize, PauliBasis)>,
+    },
+    HeraldedErase {
+        probability: f64,
+        targets: Vec<usize>,
+    },
+    HeraldedPauliChannel {
+        probabilities: [f64; 4],
+        targets: Vec<usize>,
+    },
+    ControlledPauli {
+        basis: PauliBasis,
+        frame: TwoQubitFrameMap,
+        reference: ReferenceGateId,
+        pairs: Vec<ControlledPair>,
+    },
+    Observable {
+        id: usize,
+        terms: Vec<(usize, PauliBasis)>,
+    },
 }
 
 /// The normalized Pauli products of one `MPP` instruction, stored in one term arena.
 ///
 /// Product `i` occupies `terms[product_ends[i - 1]..product_ends[i]]`, so execution walks
-/// precomputed slices and allocates nothing per batch.
-#[derive(Clone, Debug)]
-pub(super) struct PauliProductMeasurement {
+/// precomputed slices and allocates nothing per batch. `inverted[i]` is the static sign of
+/// product `i`, which only the reference sample observes.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PauliProductMeasurement {
     terms: Vec<(usize, PauliBasis)>,
     product_ends: Vec<usize>,
+    inverted: Vec<bool>,
     flip_probability: f64,
 }
 
 impl PauliProductMeasurement {
-    pub(super) const fn flip_probability(&self) -> f64 {
+    pub(crate) const fn flip_probability(&self) -> f64 {
         self.flip_probability
     }
 
-    pub(super) fn products(
-        &self,
-    ) -> impl Iterator<Item = DetectionResult<&[(usize, PauliBasis)]>> + '_ {
-        let mut start = 0_usize;
-        self.product_ends.iter().map(move |&end| {
-            let product = self.terms.get(start..end).ok_or_else(|| {
-                DetectionError::invalid_sampler_compilation(
-                    "compiled Pauli product escaped its term arena",
-                )
-            })?;
-            start = end;
-            Ok(product)
-        })
+    pub(crate) fn product_count(&self) -> usize {
+        self.product_ends.len()
     }
 
-    fn compile(
-        instruction: &CircuitInstruction,
-        shape: PauliProductShape,
-    ) -> DetectionResult<Self> {
-        let mut terms = Vec::new();
-        terms.try_reserve_exact(shape.term_count).map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "unable to reserve {} detector-frame Pauli product terms: {error}",
-                shape.term_count
-            ))
-        })?;
-        let mut product_ends = Vec::new();
-        product_ends
-            .try_reserve_exact(shape.product_count)
-            .map_err(|error| {
-                DetectionError::invalid_sampler_compilation(format!(
-                    "unable to reserve {} detector-frame Pauli products: {error}",
-                    shape.product_count
-                ))
-            })?;
-        for target_group in instruction.target_groups() {
-            let mut raw_terms = Vec::new();
-            for target in target_group {
-                if target.is_combiner() {
-                    continue;
-                }
-                let Some(pauli) = target.pauli_type() else {
-                    return Err(unsupported_frame_instruction(instruction));
-                };
-                // Static inversion belongs to the reference sample. The frame record only stores flips.
-                raw_terms.push((qubit_index(instruction, target)?, pauli_basis(pauli), false));
-            }
-            let (normalized, _) =
-                crate::sampling::pauli_product::normalize_terms(raw_terms, false)?;
-            if normalized.len() > terms.capacity() - terms.len()
-                || product_ends.len() == product_ends.capacity()
-            {
-                return Err(admission_drift());
-            }
-            terms.extend_from_slice(&normalized);
-            product_ends.push(terms.len());
-        }
-        if product_ends.len() != shape.product_count {
-            return Err(admission_drift());
-        }
-        Ok(Self {
-            terms,
-            product_ends,
-            flip_probability: measurement_flip_probability(instruction)?,
-        })
+    /// Yields each product's terms and static inversion.
+    pub(crate) fn products(
+        &self,
+    ) -> impl Iterator<Item = DetectionResult<(&[(usize, PauliBasis)], bool)>> + '_ {
+        let mut start = 0_usize;
+        self.product_ends
+            .iter()
+            .zip(&self.inverted)
+            .map(move |(&end, &inverted)| {
+                let product = self.terms.get(start..end).ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(
+                        "compiled Pauli product escaped its term arena",
+                    )
+                })?;
+                start = end;
+                Ok((product, inverted))
+            })
     }
 
     fn retained_bytes(&self) -> Option<usize> {
@@ -144,267 +216,211 @@ impl PauliProductMeasurement {
                 self.product_ends
                     .capacity()
                     .checked_mul(size_of::<usize>())?,
-            )
+            )?
+            .checked_add(self.inverted.capacity())
     }
 }
 
-/// The allocation-free size of a [`PauliProductMeasurement`], counted from raw targets.
-#[derive(Clone, Copy, Debug)]
-struct PauliProductShape {
-    term_count: usize,
-    product_count: usize,
-}
-
-impl PauliProductShape {
-    /// Counts one product per Pauli target that is not joined to its predecessor by a combiner,
-    /// and reserves one arena slot per raw term, since normalization only removes terms.
-    fn of(instruction: &CircuitInstruction) -> DetectionResult<Self> {
-        let mut shape = Self {
-            term_count: 0,
-            product_count: 0,
+impl ProgramInstruction {
+    fn retained_bytes(&self) -> Option<usize> {
+        let words = |targets: &Vec<usize>| targets.capacity().checked_mul(size_of::<usize>());
+        let terms = |terms: &Vec<(usize, PauliBasis)>| {
+            terms
+                .capacity()
+                .checked_mul(size_of::<(usize, PauliBasis)>())
         };
-        let mut joined = false;
-        for target in instruction.targets() {
-            if target.is_combiner() {
-                joined = true;
-                continue;
+        match self {
+            Self::Clifford { targets, .. }
+            | Self::Reset { targets, .. }
+            | Self::SinglePauliNoise { targets, .. }
+            | Self::ZeroProbabilityNoise { targets, .. }
+            | Self::HeraldedErase { targets, .. }
+            | Self::HeraldedPauliChannel { targets, .. } => words(targets),
+            Self::Measure {
+                targets, inverted, ..
             }
-            shape.term_count = shape
-                .term_count
-                .checked_add(1)
-                .ok_or_else(storage_overflow)?;
-            if !joined {
-                shape.product_count = shape
-                    .product_count
-                    .checked_add(1)
-                    .ok_or_else(storage_overflow)?;
+            | Self::MeasurePairs {
+                targets, inverted, ..
+            } => words(targets)?.checked_add(inverted.capacity()),
+            Self::MeasurePads { values, .. } => Some(values.capacity()),
+            Self::PauliProducts(measurement) => measurement.retained_bytes(),
+            Self::TwoQubitPauliNoise { targets, .. } => {
+                words(targets)?.checked_add(size_of::<[f64; 15]>())
             }
-            joined = false;
+            Self::CorrelatedError { terms: list, .. } | Self::Observable { terms: list, .. } => {
+                terms(list)
+            }
+            Self::ControlledPauli { pairs, .. } => {
+                pairs.capacity().checked_mul(size_of::<ControlledPair>())
+            }
         }
-        Ok(shape)
-    }
-
-    fn retained_bytes(self) -> DetectionResult<u64> {
-        checked_add_bytes(
-            byte_product(self.term_count, size_of::<(usize, PauliBasis)>())?,
-            byte_product(self.product_count, size_of::<usize>())?,
-        )
     }
 }
 
-/// How one circuit instruction is represented in the compiled frame program.
-#[derive(Clone, Copy, Debug)]
-enum LoweredFrameInstruction {
-    /// The instruction cannot change a frame or its records, so it compiles to nothing.
-    Noop,
-    /// A unitary gate whose frame action is the identity, such as a Pauli gate, or other
-    /// zero-probability noise. It compiles to nothing but still sizes the frame, because the
-    /// frame width fixes how much randomness a batch reset draws.
-    FrameIdentity,
-    Fast(FastFrameOperation),
-    PauliProducts(PauliProductShape),
-    /// Retained as a circuit instruction; controlled Paulis with classical controls carry the
-    /// frame map of their quantum pairs.
-    Execute {
-        pair_map: Option<TwoQubitFrameMap>,
-    },
-}
-
+/// Counts that admission derives from the resolved program.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(in crate::detection) struct FrameProgramAdmission {
-    entry_count: usize,
-    retained_bytes: u64,
-    qubit_count: usize,
+pub(crate) struct ProgramCounts {
+    pub(crate) measurements: usize,
+    pub(crate) sweep_bits: usize,
+    /// Circuit instructions executed by one unrolled shot, counted once per source instruction
+    /// exactly as detection conversion counts them.
+    pub(crate) expanded_instructions: u128,
+    /// Per-target operation dispatches of one unrolled shot, the historical sampling basis that
+    /// still bounds the general stabilizer-frame fallback.
+    pub(crate) expanded_target_operations: u128,
 }
 
-impl FrameProgramAdmission {
-    pub(in crate::detection) const fn retained_bytes(self) -> u64 {
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct CircuitProgram {
+    entries: Vec<ProgramEntry>,
+    cliffords: Vec<ReferenceClifford>,
+    retained_bytes: u64,
+    frame_qubit_count: usize,
+    counts: ProgramCounts,
+}
+
+impl CircuitProgram {
+    /// A program that executes nothing, for plans whose shots observe no measurement.
+    pub(crate) fn empty(counts: ProgramCounts) -> Self {
+        Self {
+            entries: Vec::new(),
+            cliffords: Vec::new(),
+            retained_bytes: 0,
+            frame_qubit_count: 0,
+            counts,
+        }
+    }
+
+    pub(crate) fn compile(circuit: &Circuit, options: ProgramOptions) -> DetectionResult<Self> {
+        let admission = Self::admit(circuit, options, 0, u64::MAX)?;
+        Self::materialize(circuit, &admission)
+    }
+
+    pub(crate) const fn retained_bytes(&self) -> u64 {
         self.retained_bytes
     }
-}
 
-#[derive(Clone, Debug)]
-pub(super) struct FrameProgram {
-    entries: Vec<FrameProgramEntry>,
-    retained_bytes: u64,
-    qubit_count: usize,
-}
-
-impl FrameProgram {
-    pub(super) fn admit(
-        circuit: &Circuit,
-        retained_base_bytes: u64,
-        max_combined_bytes: u64,
-        include_pauli_observables: bool,
-    ) -> DetectionResult<FrameProgramAdmission> {
-        let mut admission = FrameProgramAdmission::default();
-        let mut actions = FrameCliffordActionCache::default();
-        visit_circuit(circuit, |event| {
-            match event {
-                TraversalEvent::Instruction(instruction) => {
-                    visit_lowered_frame_instructions(instruction, |lowered| {
-                        validate_frame_instruction(lowered)?;
-                        let lowering = lower_frame_instruction(
-                            lowered,
-                            include_pauli_observables,
-                            &mut actions,
-                        )?;
-                        match lowering {
-                            LoweredFrameInstruction::Noop => return Ok(()),
-                            LoweredFrameInstruction::FrameIdentity => {
-                                admission.qubit_count =
-                                    admission.qubit_count.max(instruction_qubit_count(lowered)?);
-                                return Ok(());
-                            }
-                            _ => {}
-                        }
-                        add_admitted_entry(&mut admission)?;
-                        admission.retained_bytes = checked_add_bytes(
-                            admission.retained_bytes,
-                            instruction_payload_bytes(lowered, lowering)?,
-                        )?;
-                        admission.qubit_count =
-                            admission.qubit_count.max(instruction_qubit_count(lowered)?);
-                        validate_admission_bytes(
-                            admission,
-                            retained_base_bytes,
-                            max_combined_bytes,
-                        )?;
-                        Ok(())
-                    })?;
-                }
-                TraversalEvent::BeginRepeat(_) | TraversalEvent::EndRepeat => {
-                    add_admitted_entry(&mut admission)?;
-                    validate_admission_bytes(admission, retained_base_bytes, max_combined_bytes)?;
-                }
-            }
-            Ok(())
-        })?;
-        Ok(admission)
+    /// Number of qubits a Pauli frame for this program holds.
+    pub(crate) const fn frame_qubit_count(&self) -> usize {
+        self.frame_qubit_count
     }
 
-    pub(super) fn materialize(
-        circuit: &Circuit,
-        admission: FrameProgramAdmission,
-        include_pauli_observables: bool,
-    ) -> DetectionResult<Self> {
-        let mut entries = Vec::new();
-        entries
-            .try_reserve_exact(admission.entry_count)
-            .map_err(|error| {
-                DetectionError::invalid_sampler_compilation(format!(
-                    "unable to reserve {} compact detector-frame entries: {error}",
-                    admission.entry_count
-                ))
-            })?;
-        let mut repeat_markers = ArrayVec::<usize, { RepeatNestingLimit::HARD_MAX }>::new();
-        let mut qubit_count = 0_usize;
-        let mut actions = FrameCliffordActionCache::default();
-        visit_circuit(circuit, |event| {
-            match event {
-                TraversalEvent::Instruction(instruction) => {
-                    visit_lowered_frame_instructions(instruction, |lowered| {
-                        let entry = match lower_frame_instruction(
-                            lowered,
-                            include_pauli_observables,
-                            &mut actions,
-                        )? {
-                            LoweredFrameInstruction::Noop => return Ok(()),
-                            LoweredFrameInstruction::FrameIdentity => {
-                                qubit_count = qubit_count.max(instruction_qubit_count(lowered)?);
-                                return Ok(());
-                            }
-                            LoweredFrameInstruction::Fast(operation) => FrameProgramEntry::Fast {
-                                instruction: FastFrameInstruction {
-                                    operation,
-                                    targets: try_fast_targets(lowered)?,
-                                    probabilities: try_fast_probabilities(lowered, operation)?,
-                                },
-                            },
-                            LoweredFrameInstruction::PauliProducts(shape) => {
-                                FrameProgramEntry::PauliProducts {
-                                    measurement: PauliProductMeasurement::compile(lowered, shape)?,
-                                }
-                            }
-                            LoweredFrameInstruction::Execute { pair_map } => {
-                                FrameProgramEntry::Execute {
-                                    instruction: try_clone_execution_instruction(lowered)?,
-                                    pair_map,
-                                }
-                            }
-                        };
-                        qubit_count = qubit_count.max(instruction_qubit_count(lowered)?);
-                        entries.push(entry);
-                        Ok(())
-                    })?;
-                }
-                TraversalEvent::BeginRepeat(count) => {
-                    let marker = entries.len();
-                    repeat_markers.try_push(marker).map_err(|_| {
-                        DetectionError::invalid_sampler_compilation(
-                            "detector-frame program exceeded admitted repeat nesting",
-                        )
-                    })?;
-                    entries.push(FrameProgramEntry::Repeat {
-                        count,
-                        body_end: usize::MAX,
-                    });
-                }
-                TraversalEvent::EndRepeat => {
-                    let body_end = entries.len();
-                    entries.push(FrameProgramEntry::EndRepeat);
-                    let marker = repeat_markers.pop().ok_or_else(program_shape_error)?;
-                    let Some(FrameProgramEntry::Repeat {
-                        body_end: stored_end,
-                        ..
-                    }) = entries.get_mut(marker)
-                    else {
-                        return Err(program_shape_error());
-                    };
-                    *stored_end = body_end;
-                }
-            }
-            Ok(())
-        })?;
-        if !repeat_markers.is_empty()
-            || entries.len() != admission.entry_count
-            || qubit_count != admission.qubit_count
-        {
-            return Err(admission_drift());
-        }
-        validate_program(&entries)?;
-        let retained_bytes = materialized_retained_bytes(&entries, entries.capacity())?;
-        Ok(Self {
-            entries,
-            retained_bytes,
-            qubit_count,
+    pub(crate) const fn counts(&self) -> ProgramCounts {
+        self.counts
+    }
+
+    pub(crate) fn entries(&self) -> &[ProgramEntry] {
+        &self.entries
+    }
+
+    pub(crate) fn reference_clifford(
+        &self,
+        id: ReferenceGateId,
+    ) -> DetectionResult<&ReferenceClifford> {
+        self.cliffords.get(usize::from(id.0)).ok_or_else(|| {
+            DetectionError::invalid_sampler_compilation(
+                "compiled gate referenced a missing reference action",
+            )
         })
     }
 
-    pub(super) const fn retained_bytes(&self) -> u64 {
-        self.retained_bytes
+    pub(crate) fn cursor(&self) -> ProgramCursor<'_> {
+        ProgramCursor::new(&self.entries, 0, self.entries.len())
     }
 
-    pub(super) const fn qubit_count(&self) -> usize {
-        self.qubit_count
+    /// A cursor over `entries[start..end]`, which must hold whole repeat blocks.
+    pub(crate) fn cursor_range(&self, start: usize, end: usize) -> ProgramCursor<'_> {
+        ProgramCursor::new(&self.entries, start, end)
     }
 
     #[cfg(test)]
-    pub(super) fn entry_count(&self) -> usize {
+    pub(crate) fn entry_count(&self) -> usize {
         self.entries.len()
     }
+}
 
-    pub(super) fn cursor(&self) -> FrameProgramCursor<'_> {
-        FrameProgramCursor {
-            entries: &self.entries,
-            index: 0,
+/// Executes the flat tape, expanding every repeat iteration.
+pub(crate) struct ProgramCursor<'a> {
+    entries: &'a [ProgramEntry],
+    index: usize,
+    end: usize,
+    repeats: ArrayVec<RepeatExecutionFrame, { RepeatNestingLimit::HARD_MAX }>,
+}
+
+#[derive(Clone, Copy)]
+struct RepeatExecutionFrame {
+    body_start: usize,
+    body_end: usize,
+    remaining: u64,
+}
+
+impl<'a> ProgramCursor<'a> {
+    fn new(entries: &'a [ProgramEntry], start: usize, end: usize) -> Self {
+        Self {
+            entries,
+            index: start,
+            end: end.min(entries.len()),
             repeats: ArrayVec::new(),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn next_instruction(&mut self) -> DetectionResult<Option<&'a ProgramInstruction>> {
+        loop {
+            if self.index >= self.end {
+                if self.repeats.is_empty() {
+                    return Ok(None);
+                }
+                return Err(program_shape_error());
+            }
+            let entry = self
+                .entries
+                .get(self.index)
+                .ok_or_else(program_shape_error)?;
+            match entry {
+                ProgramEntry::Instruction(instruction) => {
+                    self.index += 1;
+                    return Ok(Some(instruction));
+                }
+                ProgramEntry::Repeat { count, body_end } => {
+                    if *count == 0
+                        || *body_end <= self.index
+                        || *body_end >= self.end
+                        || !matches!(self.entries.get(*body_end), Some(ProgramEntry::EndRepeat))
+                    {
+                        return Err(program_shape_error());
+                    }
+                    let body_start = self.index + 1;
+                    self.repeats
+                        .try_push(RepeatExecutionFrame {
+                            body_start,
+                            body_end: *body_end,
+                            remaining: *count,
+                        })
+                        .map_err(|_| program_shape_error())?;
+                    self.index = body_start;
+                }
+                ProgramEntry::EndRepeat => {
+                    let frame = self.repeats.last_mut().ok_or_else(program_shape_error)?;
+                    if frame.body_end != self.index || frame.remaining == 0 {
+                        return Err(program_shape_error());
+                    }
+                    if frame.remaining > 1 {
+                        frame.remaining -= 1;
+                        self.index = frame.body_start;
+                    } else {
+                        self.repeats.pop();
+                        self.index += 1;
+                    }
+                }
+            }
         }
     }
 }
 
+/// One step of the shared folded circuit walk.
 #[derive(Clone, Copy)]
-enum TraversalEvent<'a> {
+pub(crate) enum TraversalEvent<'a> {
     Instruction(&'a CircuitInstruction),
     BeginRepeat(u64),
     EndRepeat,
@@ -415,7 +431,11 @@ struct TraversalFrame<'a> {
     end_repeat: bool,
 }
 
-fn visit_circuit<'a>(
+/// Walks a circuit once in source order without expanding repeats.
+///
+/// This is the engine's one circuit walker: program lowering and detection conversion both
+/// consume its events, so they agree on traversal order and nesting admission.
+pub(crate) fn visit_circuit<'a>(
     circuit: &'a Circuit,
     mut visitor: impl FnMut(TraversalEvent<'a>) -> DetectionResult<()>,
 ) -> DetectionResult<()> {
@@ -431,18 +451,18 @@ fn visit_circuit<'a>(
                 visitor(TraversalEvent::Instruction(instruction))?;
             }
             Some(CircuitItem::RepeatBlock(repeat)) => {
+                if frames.is_full() {
+                    return Err(ResourceLimitError::detection_repeat_nesting(
+                        RepeatNestingLimit::HARD_MAX + 1,
+                        RepeatNestingLimit::HARD_MAX,
+                    )
+                    .into());
+                }
                 visitor(TraversalEvent::BeginRepeat(repeat.repeat_count().get()))?;
-                frames
-                    .try_push(TraversalFrame {
-                        items: repeat.body().items().iter(),
-                        end_repeat: true,
-                    })
-                    .map_err(|_| {
-                        ResourceLimitError::detection_repeat_nesting(
-                            RepeatNestingLimit::HARD_MAX + 1,
-                            RepeatNestingLimit::HARD_MAX,
-                        )
-                    })?;
+                frames.push(TraversalFrame {
+                    items: repeat.body().items().iter(),
+                    end_repeat: true,
+                });
             }
             None => {
                 let Some(completed) = frames.pop() else {
@@ -458,485 +478,15 @@ fn visit_circuit<'a>(
     }
 }
 
-fn validate_frame_instruction(instruction: &CircuitInstruction) -> DetectionResult<()> {
-    match instruction.gate().canonical_name() {
-        "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE"
-        | "I_ERROR" | "II_ERROR" => Ok(()),
-        "R"
-        | "RX"
-        | "RY"
-        | "M"
-        | "MX"
-        | "MY"
-        | "MR"
-        | "MRX"
-        | "MRY"
-        | "MXX"
-        | "MYY"
-        | "MZZ"
-        | "MPP"
-        | "MPAD"
-        | "X_ERROR"
-        | "Y_ERROR"
-        | "Z_ERROR"
-        | "DEPOLARIZE1"
-        | "DEPOLARIZE2"
-        | "PAULI_CHANNEL_1"
-        | "PAULI_CHANNEL_2"
-        | "E"
-        | "ELSE_CORRELATED_ERROR"
-        | "HERALDED_ERASE"
-        | "HERALDED_PAULI_CHANNEL_1" => Ok(()),
-        "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => validate_controlled_pauli_targets(instruction),
-        _ if stab_analysis::gate_has_tableau(instruction.gate()) => Ok(()),
-        _ if zero_probability_noise(instruction)? => Ok(()),
-        name => Err(DetectionError::invalid_sampler_compilation(format!(
-            "detector frame execution does not support {name}"
-        ))),
-    }
-}
-
-fn frame_instruction_is_noop(
-    instruction: &CircuitInstruction,
-    include_pauli_observables: bool,
-) -> DetectionResult<bool> {
-    match instruction.gate().canonical_name() {
-        "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "I_ERROR" | "II_ERROR" => Ok(true),
-        "OBSERVABLE_INCLUDE" => Ok(!include_pauli_observables
-            || !instruction.targets().iter().any(Target::is_pauli_target)),
-        "X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "DEPOLARIZE2" | "PAULI_CHANNEL_1"
-        | "PAULI_CHANNEL_2" => zero_probability_noise(instruction),
-        _ => Ok(false),
-    }
-}
-
-fn add_admitted_entry(admission: &mut FrameProgramAdmission) -> DetectionResult<()> {
-    admission.entry_count = admission
-        .entry_count
-        .checked_add(1)
-        .ok_or_else(storage_overflow)?;
-    admission.retained_bytes = checked_add_bytes(
-        admission.retained_bytes,
-        u64::try_from(size_of::<FrameProgramEntry>()).map_err(|_| storage_overflow())?,
-    )?;
-    Ok(())
-}
-
-fn visit_lowered_frame_instructions(
-    instruction: &CircuitInstruction,
-    mut visitor: impl FnMut(&CircuitInstruction) -> DetectionResult<()>,
-) -> DetectionResult<()> {
-    if !matches!(instruction.gate().canonical_name(), "SPP" | "SPP_DAG") {
-        return visitor(instruction);
-    }
-    let completion =
-        stab_analysis::advanced::visit_decomposed_spp_instructions(instruction, |lowered| {
-            if matches!(lowered.gate().canonical_name(), "SPP" | "SPP_DAG") {
-                return ControlFlow::Break(DetectionError::invalid_sampler_compilation(
-                    "single-instruction frame lowering retained its source instruction",
-                ));
-            }
-            match visitor(&lowered) {
-                Ok(()) => ControlFlow::Continue(()),
-                Err(error) => ControlFlow::Break(error),
-            }
-        })
-        .map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "{} cannot be compiled for detector-frame execution: {error}",
-                instruction.gate().canonical_name()
-            ))
-        })?;
-    if let ControlFlow::Break(error) = completion {
-        return Err(error);
-    }
-    Ok(())
-}
-
-fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> DetectionResult<()> {
-    use stab_model::advanced::{ControlledPauliTargetPair, classify_controlled_pauli_target_pair};
-    for target_group in instruction.targets().chunks(2) {
-        if matches!(
-            classify_controlled_pauli_target_pair(instruction.gate(), target_group),
-            ControlledPauliTargetPair::Unsupported
-        ) {
-            return Err(DetectionError::invalid_sampler_compilation(format!(
-                "sampling execution does not support the {} target shape",
-                instruction.gate().canonical_name()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn lower_frame_instruction(
-    instruction: &CircuitInstruction,
-    include_pauli_observables: bool,
-    actions: &mut FrameCliffordActionCache,
-) -> DetectionResult<LoweredFrameInstruction> {
-    if frame_instruction_is_noop(instruction, include_pauli_observables)? {
-        return Ok(LoweredFrameInstruction::Noop);
-    }
-    let operation = match instruction.gate().canonical_name() {
-        "R" => FastFrameOperation::ResetZ,
-        "M" => FastFrameOperation::MeasureZ,
-        "MR" => FastFrameOperation::MeasureResetZ,
-        "MXX" => FastFrameOperation::MeasureXX,
-        "MYY" => FastFrameOperation::MeasureYY,
-        "MZZ" => FastFrameOperation::MeasureZZ,
-        "X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "PAULI_CHANNEL_1" => {
-            FastFrameOperation::SinglePauliNoise
-        }
-        "DEPOLARIZE2" | "PAULI_CHANNEL_2" => FastFrameOperation::TwoQubitPauliNoise,
-        "MPP" => {
-            return Ok(LoweredFrameInstruction::PauliProducts(
-                PauliProductShape::of(instruction)?,
-            ));
-        }
-        "OBSERVABLE_INCLUDE"
-        | "RX"
-        | "RY"
-        | "MX"
-        | "MY"
-        | "MRX"
-        | "MRY"
-        | "MPAD"
-        | "E"
-        | "ELSE_CORRELATED_ERROR"
-        | "HERALDED_ERASE"
-        | "HERALDED_PAULI_CHANNEL_1" => {
-            return Ok(LoweredFrameInstruction::Execute { pair_map: None });
-        }
-        name => {
-            let Some(action) = actions.action(instruction.gate())? else {
-                if zero_probability_noise(instruction)? {
-                    return Ok(LoweredFrameInstruction::FrameIdentity);
-                }
-                return Err(DetectionError::invalid_sampler_compilation(format!(
-                    "detector frame execution does not support {name}"
-                )));
-            };
-            let all_qubits = instruction
-                .targets()
-                .iter()
-                .all(|target| target.qubit_id().is_some());
-            match action {
-                FrameCliffordAction::Identity => return Ok(LoweredFrameInstruction::FrameIdentity),
-                FrameCliffordAction::Single(map) if all_qubits => {
-                    FastFrameOperation::SingleQubitClifford(map)
-                }
-                FrameCliffordAction::Two(map) if all_qubits => {
-                    FastFrameOperation::TwoQubitClifford(map)
-                }
-                FrameCliffordAction::Two(map)
-                    if matches!(name, "CX" | "CY" | "CZ" | "XCZ" | "YCZ") =>
-                {
-                    return Ok(LoweredFrameInstruction::Execute {
-                        pair_map: Some(map),
-                    });
-                }
-                FrameCliffordAction::Single(_) | FrameCliffordAction::Two(_) => {
-                    let target = instruction
-                        .targets()
-                        .iter()
-                        .find(|target| target.qubit_id().is_none())
-                        .ok_or_else(program_shape_error)?;
-                    return Err(unsupported_frame_target(name, target));
-                }
-            }
-        }
-    };
-    Ok(LoweredFrameInstruction::Fast(operation))
-}
-
-fn instruction_qubit_count(instruction: &CircuitInstruction) -> DetectionResult<usize> {
-    if instruction.gate().targets_are_pad_values() {
-        return Ok(0);
-    }
-    instruction
-        .targets()
-        .iter()
-        .filter_map(Target::qubit_id)
-        .try_fold(0_usize, |count, qubit| {
-            let next = usize::try_from(qubit.get())
-                .ok()
-                .and_then(|index| index.checked_add(1))
-                .ok_or_else(storage_overflow)?;
-            Ok(count.max(next))
-        })
-}
-
-fn instruction_payload_bytes(
-    instruction: &CircuitInstruction,
-    lowering: LoweredFrameInstruction,
-) -> DetectionResult<u64> {
-    match lowering {
-        LoweredFrameInstruction::Noop | LoweredFrameInstruction::FrameIdentity => Ok(0),
-        LoweredFrameInstruction::Fast(operation) => checked_add_bytes(
-            byte_product(instruction.targets().len(), size_of::<usize>())?,
-            byte_product(fast_probability_count(operation), size_of::<f64>())?,
-        ),
-        LoweredFrameInstruction::PauliProducts(shape) => shape.retained_bytes(),
-        LoweredFrameInstruction::Execute { .. } => {
-            let bytes =
-                stab_model::advanced::circuit_instruction_minimum_retained_heap_bytes(instruction)
-                    .ok_or_else(storage_overflow)?;
-            u64::try_from(bytes).map_err(|_| storage_overflow())
-        }
-    }
-}
-
-fn materialized_retained_bytes(
-    entries: &[FrameProgramEntry],
-    entry_capacity: usize,
-) -> DetectionResult<u64> {
-    let mut retained = byte_product(entry_capacity, size_of::<FrameProgramEntry>())?;
-    for entry in entries {
-        let payload = match entry {
-            FrameProgramEntry::Execute { instruction, .. } => {
-                stab_model::advanced::circuit_instruction_retained_heap_bytes(instruction)
-                    .ok_or_else(storage_overflow)?
-            }
-            FrameProgramEntry::Fast { instruction } => instruction
-                .targets
-                .capacity()
-                .checked_mul(size_of::<usize>())
-                .and_then(|target_bytes| {
-                    instruction
-                        .probabilities
-                        .capacity()
-                        .checked_mul(size_of::<f64>())
-                        .and_then(|probability_bytes| target_bytes.checked_add(probability_bytes))
-                })
-                .ok_or_else(storage_overflow)?,
-            FrameProgramEntry::PauliProducts { measurement } => {
-                measurement.retained_bytes().ok_or_else(storage_overflow)?
-            }
-            FrameProgramEntry::Repeat { .. } | FrameProgramEntry::EndRepeat => continue,
-        };
-        retained = checked_add_bytes(
-            retained,
-            u64::try_from(payload).map_err(|_| storage_overflow())?,
-        )?;
-    }
-    Ok(retained)
-}
-
-fn try_fast_targets(instruction: &CircuitInstruction) -> DetectionResult<Vec<usize>> {
-    let mut targets = Vec::new();
-    targets
-        .try_reserve_exact(instruction.targets().len())
-        .map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "unable to reserve {} resolved detector-frame targets: {error}",
-                instruction.targets().len()
-            ))
-        })?;
-    for target in instruction.targets() {
-        let qubit = target.qubit_id().ok_or_else(program_shape_error)?;
-        targets.push(usize::try_from(qubit.get()).map_err(|_| storage_overflow())?);
-    }
-    Ok(targets)
-}
-
-const fn fast_probability_count(operation: FastFrameOperation) -> usize {
-    match operation {
-        FastFrameOperation::MeasureZ
-        | FastFrameOperation::MeasureResetZ
-        | FastFrameOperation::MeasureXX
-        | FastFrameOperation::MeasureYY
-        | FastFrameOperation::MeasureZZ => 1,
-        FastFrameOperation::SinglePauliNoise => 3,
-        FastFrameOperation::TwoQubitPauliNoise => 15,
-        FastFrameOperation::SingleQubitClifford(_)
-        | FastFrameOperation::TwoQubitClifford(_)
-        | FastFrameOperation::ResetZ => 0,
-    }
-}
-
-fn try_fast_probabilities(
-    instruction: &CircuitInstruction,
-    operation: FastFrameOperation,
-) -> DetectionResult<Vec<f64>> {
-    let mut probabilities = Vec::new();
-    probabilities
-        .try_reserve_exact(fast_probability_count(operation))
-        .map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "unable to reserve {} detector-frame probabilities: {error}",
-                fast_probability_count(operation)
-            ))
-        })?;
-    match operation {
-        FastFrameOperation::SingleQubitClifford(_)
-        | FastFrameOperation::TwoQubitClifford(_)
-        | FastFrameOperation::ResetZ => {}
-        FastFrameOperation::MeasureZ
-        | FastFrameOperation::MeasureResetZ
-        | FastFrameOperation::MeasureXX
-        | FastFrameOperation::MeasureYY
-        | FastFrameOperation::MeasureZZ => {
-            probabilities.push(measurement_flip_probability(instruction)?);
-        }
-        FastFrameOperation::SinglePauliNoise => {
-            let values = match instruction.gate().canonical_name() {
-                "X_ERROR" => [single_probability_argument(instruction)?.get(), 0.0, 0.0],
-                "Y_ERROR" => [0.0, single_probability_argument(instruction)?.get(), 0.0],
-                "Z_ERROR" => [0.0, 0.0, single_probability_argument(instruction)?.get()],
-                "DEPOLARIZE1" => {
-                    let probability = single_probability_argument(instruction)?.get() / 3.0;
-                    [probability; 3]
-                }
-                "PAULI_CHANNEL_1" => probability_list::<3>(instruction)?,
-                _ => return Err(program_shape_error()),
-            };
-            probabilities.extend_from_slice(&values);
-        }
-        FastFrameOperation::TwoQubitPauliNoise => {
-            let values = match instruction.gate().canonical_name() {
-                "DEPOLARIZE2" => {
-                    let probability = single_probability_argument(instruction)?.get() / 15.0;
-                    [probability; 15]
-                }
-                "PAULI_CHANNEL_2" => probability_list::<15>(instruction)?,
-                _ => return Err(program_shape_error()),
-            };
-            probabilities.extend_from_slice(&values);
-        }
-    }
-    Ok(probabilities)
-}
-
-fn try_clone_execution_instruction(
-    instruction: &CircuitInstruction,
-) -> DetectionResult<CircuitInstruction> {
-    let mut args = Vec::new();
-    args.try_reserve_exact(instruction.args().len())
-        .map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "unable to reserve {} detector-frame argument slots: {error}",
-                instruction.args().len()
-            ))
-        })?;
-    args.extend_from_slice(instruction.args());
-    let mut targets = Vec::new();
-    targets
-        .try_reserve_exact(instruction.targets().len())
-        .map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "unable to reserve {} detector-frame target slots: {error}",
-                instruction.targets().len()
-            ))
-        })?;
-    targets.extend(instruction.targets().iter().cloned());
-    stab_model::advanced::circuit_instruction_with_tag_bytes(
-        instruction.gate(),
-        args,
-        targets,
-        None,
-    )
-    .map_err(Into::into)
-}
-
-#[derive(Clone, Copy)]
-struct RepeatExecutionFrame {
-    body_start: usize,
-    body_end: usize,
-    remaining: u64,
-}
-
-pub(super) struct FrameProgramCursor<'a> {
-    entries: &'a [FrameProgramEntry],
-    index: usize,
-    repeats: ArrayVec<RepeatExecutionFrame, { RepeatNestingLimit::HARD_MAX }>,
-}
-
-impl<'a> FrameProgramCursor<'a> {
-    pub(super) fn next_instruction(&mut self) -> DetectionResult<Option<FrameInstruction<'a>>> {
-        loop {
-            let Some(entry) = self.entries.get(self.index) else {
-                if self.repeats.is_empty() && self.index == self.entries.len() {
-                    return Ok(None);
-                }
-                return Err(program_shape_error());
-            };
-            match entry {
-                FrameProgramEntry::Execute {
-                    instruction,
-                    pair_map,
-                } => {
-                    self.index = self.index.checked_add(1).ok_or_else(storage_overflow)?;
-                    return Ok(Some(FrameInstruction::Execute {
-                        instruction,
-                        pair_map: *pair_map,
-                    }));
-                }
-                FrameProgramEntry::PauliProducts { measurement } => {
-                    self.index = self.index.checked_add(1).ok_or_else(storage_overflow)?;
-                    return Ok(Some(FrameInstruction::PauliProducts(measurement)));
-                }
-                FrameProgramEntry::Fast { instruction } => {
-                    self.index = self.index.checked_add(1).ok_or_else(storage_overflow)?;
-                    return Ok(Some(FrameInstruction::Fast(instruction)));
-                }
-                FrameProgramEntry::Repeat { count, body_end } => {
-                    if *count == 0
-                        || *body_end <= self.index
-                        || !matches!(
-                            self.entries.get(*body_end),
-                            Some(FrameProgramEntry::EndRepeat)
-                        )
-                    {
-                        return Err(program_shape_error());
-                    }
-                    let body_start = self.index.checked_add(1).ok_or_else(storage_overflow)?;
-                    self.repeats
-                        .try_push(RepeatExecutionFrame {
-                            body_start,
-                            body_end: *body_end,
-                            remaining: *count,
-                        })
-                        .map_err(|_| program_shape_error())?;
-                    self.index = body_start;
-                }
-                FrameProgramEntry::EndRepeat => {
-                    let frame = self.repeats.last_mut().ok_or_else(program_shape_error)?;
-                    if frame.body_end != self.index || frame.remaining == 0 {
-                        return Err(program_shape_error());
-                    }
-                    if frame.remaining > 1 {
-                        frame.remaining -= 1;
-                        self.index = frame.body_start;
-                    } else {
-                        self.repeats.pop();
-                        self.index = self.index.checked_add(1).ok_or_else(storage_overflow)?;
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub(super) enum FrameInstruction<'a> {
-    Execute {
-        instruction: &'a CircuitInstruction,
-        pair_map: Option<TwoQubitFrameMap>,
-    },
-    Fast(&'a FastFrameInstruction),
-    PauliProducts(&'a PauliProductMeasurement),
-}
-
-fn validate_program(entries: &[FrameProgramEntry]) -> DetectionResult<()> {
+fn validate_program(entries: &[ProgramEntry]) -> DetectionResult<()> {
     let mut repeat_ends = ArrayVec::<usize, { RepeatNestingLimit::HARD_MAX }>::new();
     for (index, entry) in entries.iter().enumerate() {
         match entry {
-            FrameProgramEntry::Execute { .. }
-            | FrameProgramEntry::Fast { .. }
-            | FrameProgramEntry::PauliProducts { .. } => {}
-            FrameProgramEntry::Repeat { count, body_end } => {
+            ProgramEntry::Instruction(_) => {}
+            ProgramEntry::Repeat { count, body_end } => {
                 if *count == 0
-                    || *body_end <= index
-                    || !matches!(entries.get(*body_end), Some(FrameProgramEntry::EndRepeat))
+                    || *body_end <= index + 1
+                    || !matches!(entries.get(*body_end), Some(ProgramEntry::EndRepeat))
                     || repeat_ends
                         .last()
                         .is_some_and(|parent_end| body_end >= parent_end)
@@ -947,7 +497,7 @@ fn validate_program(entries: &[FrameProgramEntry]) -> DetectionResult<()> {
                     .try_push(*body_end)
                     .map_err(|_| program_shape_error())?;
             }
-            FrameProgramEntry::EndRepeat => {
+            ProgramEntry::EndRepeat => {
                 if repeat_ends.pop() != Some(index) {
                     return Err(program_shape_error());
                 }
@@ -960,6 +510,24 @@ fn validate_program(entries: &[FrameProgramEntry]) -> DetectionResult<()> {
         .ok_or_else(program_shape_error)
 }
 
+fn materialized_retained_bytes(
+    entries: &[ProgramEntry],
+    entry_capacity: usize,
+) -> DetectionResult<u64> {
+    let mut retained = byte_product(entry_capacity, size_of::<ProgramEntry>())?;
+    for entry in entries {
+        let ProgramEntry::Instruction(instruction) = entry else {
+            continue;
+        };
+        let payload = instruction.retained_bytes().ok_or_else(storage_overflow)?;
+        retained = checked_add_bytes(
+            retained,
+            u64::try_from(payload).map_err(|_| storage_overflow())?,
+        )?;
+    }
+    Ok(retained)
+}
+
 fn byte_product(count: usize, item_size: usize) -> DetectionResult<u64> {
     let bytes = count.checked_mul(item_size).ok_or_else(storage_overflow)?;
     u64::try_from(bytes).map_err(|_| storage_overflow())
@@ -967,20 +535,6 @@ fn byte_product(count: usize, item_size: usize) -> DetectionResult<u64> {
 
 fn checked_add_bytes(left: u64, right: u64) -> DetectionResult<u64> {
     left.checked_add(right).ok_or_else(storage_overflow)
-}
-
-fn validate_admission_bytes(
-    admission: FrameProgramAdmission,
-    retained_base_bytes: u64,
-    max_combined_bytes: u64,
-) -> DetectionResult<()> {
-    let combined = checked_add_bytes(retained_base_bytes, admission.retained_bytes)?;
-    if combined > max_combined_bytes {
-        return Err(
-            ResourceLimitError::detection_compiled_bytes(combined, max_combined_bytes).into(),
-        );
-    }
-    Ok(())
 }
 
 fn storage_overflow() -> DetectionError {
@@ -999,39 +553,4 @@ fn program_shape_error() -> DetectionError {
     DetectionError::invalid_sampler_compilation(
         "compact detector-frame program has an invalid repeat shape",
     )
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::expect_used,
-        reason = "frame-program tests use direct structural fixture assertions"
-    )]
-
-    use super::*;
-
-    #[test]
-    fn structural_validation_does_not_execute_repeat_iterations() {
-        let entries = [
-            FrameProgramEntry::Repeat {
-                count: u64::MAX,
-                body_end: 1,
-            },
-            FrameProgramEntry::EndRepeat,
-        ];
-
-        validate_program(&entries).expect("validate compact repeat tape structurally");
-    }
-
-    #[test]
-    fn spp_lowering_stops_at_the_first_compiled_byte_rejection() {
-        let circuit = Circuit::from_stim_str("SPP X0 X1*Z1\n").expect("parse SPP fixture");
-        let error = FrameProgram::admit(&circuit, 0, 0, true)
-            .expect_err("the first lowered instruction exceeds a zero-byte budget");
-        assert!(matches!(
-            error,
-            DetectionError::ResourceLimit(ref resource)
-                if resource.kind() == crate::detection::DetectionResourceKind::CompiledBytes
-        ));
-    }
 }

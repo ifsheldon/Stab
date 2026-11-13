@@ -2,7 +2,6 @@ use rand::{Rng, RngExt as _};
 
 use stab_algebra::PauliBasis;
 
-use super::operation::{SINGLE_QUBIT_PAULI_CHANNEL_BASES, TWO_QUBIT_PAULI_CHANNEL_BASES};
 use super::stabilizer_frame::StabilizerFrame;
 
 pub(super) fn apply_heralded_pauli_channel(
@@ -103,3 +102,24 @@ pub(super) fn apply_two_qubit_pauli_channel(
         sampled_probability -= probability;
     }
 }
+
+const SINGLE_QUBIT_PAULI_CHANNEL_BASES: [PauliBasis; 3] =
+    [PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
+
+const TWO_QUBIT_PAULI_CHANNEL_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
+    (None, Some(PauliBasis::X)),
+    (None, Some(PauliBasis::Y)),
+    (None, Some(PauliBasis::Z)),
+    (Some(PauliBasis::X), None),
+    (Some(PauliBasis::X), Some(PauliBasis::X)),
+    (Some(PauliBasis::X), Some(PauliBasis::Y)),
+    (Some(PauliBasis::X), Some(PauliBasis::Z)),
+    (Some(PauliBasis::Y), None),
+    (Some(PauliBasis::Y), Some(PauliBasis::X)),
+    (Some(PauliBasis::Y), Some(PauliBasis::Y)),
+    (Some(PauliBasis::Y), Some(PauliBasis::Z)),
+    (Some(PauliBasis::Z), None),
+    (Some(PauliBasis::Z), Some(PauliBasis::X)),
+    (Some(PauliBasis::Z), Some(PauliBasis::Y)),
+    (Some(PauliBasis::Z), Some(PauliBasis::Z)),
+];

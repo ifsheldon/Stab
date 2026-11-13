@@ -1,7 +1,10 @@
-use crate::SamplingPlan;
+use stab_model::Circuit;
 
-use super::buffers::{try_false_vec, try_vec_with_capacity};
+use super::buffers::try_false_vec;
 use super::error::{DetectionError, DetectionResult};
+use super::frame::CircuitProgram;
+use crate::ReferenceSampleLoopPolicy;
+use crate::sampling::{program_reference_sample, reference_work_storage_bytes};
 
 const MAX_REFERENCE_SCRATCH_BYTES: u128 = 256 * 1024 * 1024;
 
@@ -26,30 +29,28 @@ impl ReferenceSampleSource {
     }
 }
 
+/// Computes the all-zero-sweep reference sample from the conversion's resolved program.
 pub(super) fn static_reference_sample(
-    sampling: &SamplingPlan,
+    circuit: &Circuit,
+    program: &CircuitProgram,
     measurement_count: usize,
 ) -> DetectionResult<Vec<bool>> {
-    validate_reference_scratch_storage(sampling)?;
-    let mut reference_sample =
-        try_vec_with_capacity(measurement_count, "detection conversion reference sample")?;
-    let zero_sweeps = try_false_vec(
-        sampling.sweep_bit_count(),
-        "detection reference zero-sweep record",
-    )?;
-    sampling.reference_measurement_record_with_sweep_into(&zero_sweeps, &mut reference_sample)?;
-    validate_reference_sample_len(&reference_sample, measurement_count)?;
-    Ok(reference_sample)
-}
-
-fn validate_reference_scratch_storage(sampling: &SamplingPlan) -> DetectionResult<()> {
-    let estimated_bytes = sampling.estimated_reference_work_storage_bytes();
+    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    let loop_policy = ReferenceSampleLoopPolicy::Fold;
+    let estimated_bytes = reference_work_storage_bytes(program, qubit_count, loop_policy);
     if estimated_bytes > MAX_REFERENCE_SCRATCH_BYTES {
         return Err(DetectionError::invalid_sampler_compilation(format!(
             "detection reference sampling needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {MAX_REFERENCE_SCRATCH_BYTES}-byte safety limit"
         )));
     }
-    Ok(())
+    let zero_sweeps = try_false_vec(
+        program.counts().sweep_bits,
+        "detection reference zero-sweep record",
+    )?;
+    let reference_sample =
+        program_reference_sample(program, qubit_count, loop_policy, &zero_sweeps)?;
+    validate_reference_sample_len(&reference_sample, measurement_count)?;
+    Ok(reference_sample)
 }
 
 pub(super) fn validate_reference_sample_len(

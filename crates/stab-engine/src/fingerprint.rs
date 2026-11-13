@@ -53,7 +53,7 @@ pub struct CompilationRequestFingerprint {
 
 impl CompilationRequestFingerprint {
     pub const SCHEMA_VERSION: u16 = 1;
-    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 5;
+    pub const SAMPLING_COMPILER_SCHEMA_VERSION: u16 = 6;
     pub const ALGORITHM: &'static str = "sha256";
 
     pub fn for_sampling(circuit: &Circuit) -> Self {
@@ -162,7 +162,7 @@ REPEAT[loop] 3 {\n\
         );
         assert_eq!(
             frozen.digest_hex(),
-            "baeb18b2253a82defa506cf7cbd43d2ea6e1d5c51cbb0c4b8de88adca16cdde5"
+            "7999bae33a1317b7bb6effc5578b8b410e5ef50669c7502b202976715890f050"
         );
     }
 

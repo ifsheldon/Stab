@@ -86,7 +86,9 @@ Compiler schema version `4` kept those semantics and additionally:
 - compiles nested repeats with a fixed-depth iterative traversal so accepted nesting does not depend on the host thread stack;
 - leaves the reference-repeat execution policy out of the semantic request identity because `fold` and `iterate` accept and lower the same circuit.
 
-Current compiler schema version `5` retains schema `4` lowering and additionally admits at most one million expanded operation dispatches for a measurement-bearing shot. Zero-width circuits bypass represented execution work because no result can observe it. This is one aggregate execution-work boundary, not a repeat-count syntax cap.
+Compiler schema version `5` retains schema `4` lowering and additionally admits at most one million expanded operation dispatches for a measurement-bearing shot. Zero-width circuits bypass represented execution work because no result can observe it. This is one aggregate execution-work boundary, not a repeat-count syntax cap.
+
+Current compiler schema version `6` lowers once into the resolved circuit program that detection sampling also executes, and counts that one-million boundary in expanded circuit instructions, exactly as detection conversion counts them, instead of per-target operation dispatches. A circuit with up to one million expanded instructions whose targets expand to more dispatches is now admitted, as `detect` already admitted it; zero-width circuits still bypass the boundary. A measurement-bearing program above the bit-plane frame's 256 MiB compiled budget, which falls back to the general stabilizer frame, keeps the schema-5 per-target dispatch bound.
 
 All sampling compiler schemas encode:
 
@@ -121,10 +123,10 @@ Its model fingerprint is:
 Its sampling compilation request fingerprint is:
 
 ```text
-baeb18b2253a82defa506cf7cbd43d2ea6e1d5c51cbb0c4b8de88adca16cdde5
+7999bae33a1317b7bb6effc5578b8b410e5ef50669c7502b202976715890f050
 ```
 
-The request digest was independently reconstructed from the table above with Perl `Digest::SHA` and binary `pack`, rather than copied from the Rust implementation.
+The request digest was independently reconstructed from the table above with Python `hashlib` and explicit big-endian packing, rather than copied from the Rust implementation.
 
 ## Resource Behavior
 

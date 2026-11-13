@@ -473,12 +473,12 @@ name = "packed_streaming_allocations_follow_width_not_record_count"
 [[families]]
 id = "resource-safety.sampling-expanded-work-limit"
 area = "resource-safety"
-contract = "Circuit sampling admits at most one million expanded operation dispatches per measurement-bearing shot, rejects the first excess before session construction, and executes arbitrarily repeated zero-width circuits without traversing their represented work."
+contract = "Circuit sampling admits at most one million expanded circuit instructions per measurement-bearing shot, counted exactly as detection sampling counts them, rejects the first excess before session construction, and executes arbitrarily repeated zero-width circuits without traversing their represented work."
 stim_refs = ["src/stim/simulators/frame_simulator.test.cc"]
 status = "divergence"
 owner = "stab-engine"
 divergence_kind = "resource-limit"
-rationale = "Stab gives one-shot sampling work an explicit aggregate bound so a compact hostile repeat cannot monopolize an uncancellable batch; the limit counts represented operation work instead of imposing a repeat-count syntax cap."
+rationale = "Stab gives one-shot sampling work an explicit aggregate bound so a compact hostile repeat cannot monopolize an uncancellable batch; the limit counts represented instructions on the one resolved program that detection also admits, instead of imposing a repeat-count syntax cap."
 [families.evidence]
 status = "verified"
 [families.evidence.test]

@@ -20,7 +20,7 @@ use crate::detection::error::{DetectionError, DetectionResult};
 /// The invertible 2x2 GF(2) matrices form a group of six elements, so these five variants and
 /// the identity cover every single-qubit Clifford exactly.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum SingleQubitFrameMap {
+pub(crate) enum SingleQubitFrameMap {
     /// `X <-> Z`, as for `H`: `x' = z`, `z' = x`.
     SwapXz,
     /// `X -> Y`, `Z -> Z`, as for `S`: `z' = z ^ x`.
@@ -62,7 +62,7 @@ const TWO_QUBIT_PLANES: usize = 4;
 /// A 4x4 GF(2) matrix stored by column: bit `k` of `columns[i]` is set when input plane `i`
 /// contributes to output plane `k`, with planes ordered `x1, z1, x2, z2`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct TwoQubitFrameMatrix {
+pub(crate) struct TwoQubitFrameMatrix {
     columns: [u8; TWO_QUBIT_PLANES],
 }
 
@@ -95,7 +95,7 @@ impl TwoQubitFrameMatrix {
 /// The common gates get dedicated kernels; every other symplectic matrix runs through the
 /// branch-free general kernel.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum TwoQubitFrameMap {
+pub(crate) enum TwoQubitFrameMap {
     ControlledX,
     ControlledZ,
     Swap,

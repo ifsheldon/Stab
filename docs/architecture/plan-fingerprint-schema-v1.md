@@ -33,7 +33,7 @@ Schema version 1 first calculates an executable-contract SHA-256 digest from:
 | Order | Field | Encoding |
 | --- | --- | --- |
 | 1 | domain | exact bytes `stab:sampling-executable-contract\0` |
-| 2 | executable-contract schema | big-endian `u16`, current value `5` |
+| 2 | executable-contract schema | big-endian `u16`, current value `6` |
 | 3 | backend | one discriminator byte |
 | 4 | private executable variant | one discriminator byte |
 | 5 | reference-sample loop policy | one discriminator byte |
@@ -49,7 +49,7 @@ Private executable-variant discriminators are:
 
 | Variant | Discriminator |
 | --- | --- |
-| Direct Z measurement | `1` |
+| Direct Z measurement, historical schemas 1 through 5 | `1` |
 | Small stabilizer frame, historical schemas 1 through 4 | `2` |
 | General stabilizer frame | `3` |
 | Bit-plane Pauli frame | `4` |
@@ -75,7 +75,9 @@ Executable-contract schema version `3` retains repeats in one validated flat ope
 
 Executable-contract schema version `4` gives zero-width sampling a constant-work execution path and removes frame allocation for that path. Measurement-bearing plans retain schema `3` execution after compiler-schema-5 aggregate work admission.
 
-Current executable-contract schema version `5` replaces the redundant per-shot small-frame executor with a reusable 64-shot bit-plane Pauli frame for general compatible Clifford circuits. Unconsumed lanes remain in the session so partitioning a seeded run does not change its output stream. The existing scalar operation program remains the reference-sample and analysis representation, while unsupported circuits retain the general stabilizer-frame fallback.
+Executable-contract schema version `5` replaces the redundant per-shot small-frame executor with a reusable 64-shot bit-plane Pauli frame for general compatible Clifford circuits. Unconsumed lanes remain in the session so partitioning a seeded run does not change its output stream. The existing scalar operation program remains the reference-sample and analysis representation, while unsupported circuits retain the general stabilizer-frame fallback.
+
+Current executable-contract schema version `6` compiles one resolved circuit program per plan and drives every executor from it: the bit-plane Pauli frame, the inverse-tableau reference sample, deterministic-measurement counting, and the general stabilizer frame. The separate per-target scalar operation program is retired. The direct Z measurement variant is removed, so a circuit whose only operation is one Z measurement, optionally preceded by a single-qubit Pauli channel on the measured qubit, now selects the bit-plane Pauli frame; its seeded output stream changes while its distribution does not. The general stabilizer frame remains selected only for a measurement-bearing program whose retained size exceeds the bit-plane frame's 256 MiB compiled budget.
 
 ## Plan Fingerprint Encoding
 
@@ -104,21 +106,21 @@ M 0
 Its sampling compilation request fingerprint is:
 
 ```text
-985c1f3cfc8642113bb68568a71508ec46f0d39fa7d918fed9b75fa3764d4b79
+3eed620c6e6811fe2808572d8cd39917731ceaf3a99a4c50cc60507ed77716af
 ```
 
-Scalar compilation selects the direct Z measurement variant.
+Scalar compilation selects the bit-plane Pauli frame variant.
 
 The executable-contract digest is:
 
 ```text
-c80923552aa640482af211b7f6de03580b9311f42685c971f7b0f53355d4bbdf
+4e4716e1ca5a58cfb6801f5b64b86e782eefd4994b6e520732534e82d7fbb369
 ```
 
 The final plan fingerprint is:
 
 ```text
-12d6f2077cf0e77f15690476071bb5c1a2a56e1039956c4c62a71b71961911d0
+9aaeadd0765842bb713dfc254564cc4fb67ec0fd11b65ec70e0d13a99df667fd
 ```
 
 The test reconstructs both digests independently from the tables above instead of calling the production fingerprint constructor.

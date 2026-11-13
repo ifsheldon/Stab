@@ -1,16 +1,21 @@
-//! Drives the inverse-tableau reference simulator over a compact sampling program.
+//! Drives the inverse-tableau reference simulator over the resolved circuit program.
 
 use stab_model::RepeatNestingLimit;
-use stab_model::advanced::ClassicalControl;
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
 use super::execute::record_lookback;
-use super::operation::{SampleOperation, SampleProgram, SampleProgramEntry};
 use super::reference_simulator::{
     InverseTableauSimulator, ReferenceSimulatorError, ReferenceStateSnapshot, reset_correction,
 };
+use crate::detection::frame::{
+    CircuitProgram, CliffordStep, ControlledPair, ProgramEntry, ProgramInstruction,
+    ReferenceClifford,
+};
 
-/// Reusable simulator storage for computing reference samples of one plan.
+/// Below this many repeated work units a repeat is iterated rather than snapshotted.
+const MIN_REFERENCE_FOLD_WORK: u128 = 64;
+
+/// Reusable simulator storage for computing reference samples of one program.
 #[derive(Debug)]
 pub(super) struct ReferenceWorkspace {
     simulator: InverseTableauSimulator,
@@ -39,7 +44,7 @@ impl ReferenceWorkspace {
     /// sweep-controlled Paulis read `sweep_record` (missing bits are false).
     pub(super) fn run(
         &mut self,
-        program: &SampleProgram,
+        program: &CircuitProgram,
         loop_policy: ReferenceSampleLoopPolicy,
         sweep_record: &[bool],
         output: &mut Vec<bool>,
@@ -56,6 +61,113 @@ impl ReferenceWorkspace {
     }
 }
 
+/// Whether any repeat of `program` may be folded, so a reference run needs a state snapshot.
+pub(super) fn has_reference_fold_candidate(program: &CircuitProgram, qubit_count: usize) -> bool {
+    let entries = program.entries();
+    entries
+        .iter()
+        .enumerate()
+        .any(|(index, entry)| match entry {
+            ProgramEntry::Repeat { count, body_end }
+                if *body_end > index
+                    && matches!(entries.get(*body_end), Some(ProgramEntry::EndRepeat)) =>
+            {
+                reference_fold_is_profitable(program, index + 1, *body_end, *count, qubit_count)
+            }
+            _ => false,
+        })
+}
+
+fn reference_fold_is_profitable(
+    program: &CircuitProgram,
+    start: usize,
+    end: usize,
+    repeat_count: u64,
+    qubit_count: usize,
+) -> bool {
+    let body = program.entries().get(start..end).unwrap_or_default();
+    if body.iter().any(|entry| {
+        matches!(
+            entry,
+            ProgramEntry::Instruction(ProgramInstruction::ControlledPauli { pairs, .. })
+                if pairs.iter().any(|pair| !matches!(pair, ControlledPair::Quantum { .. }))
+        )
+    }) {
+        return false;
+    }
+    let repeated_work = reference_work_units(program, body, qubit_count)
+        .saturating_mul(u128::from(repeat_count.saturating_sub(1)));
+    let snapshot_work = (qubit_count as u128)
+        .saturating_mul(qubit_count as u128)
+        .saturating_mul(2);
+    repeated_work >= MIN_REFERENCE_FOLD_WORK.max(snapshot_work)
+}
+
+/// Estimated simulator work of one pass over `body`, per target dispatch: a Clifford costs one
+/// row update per qubit and target, a collapse one per qubit squared, and the rest one unit.
+fn reference_work_units(
+    program: &CircuitProgram,
+    body: &[ProgramEntry],
+    qubit_count: usize,
+) -> u128 {
+    let qubits = (qubit_count as u128).max(1);
+    let collapse = qubits.saturating_mul(qubits);
+    let gate_work = |arity: usize, clifford: Option<&ReferenceClifford>| match clifford {
+        Some(ReferenceClifford::Hadamard | ReferenceClifford::ControlledX) => qubits,
+        _ => qubits.saturating_mul(arity.max(1) as u128),
+    };
+    body.iter()
+        .filter_map(|entry| match entry {
+            ProgramEntry::Instruction(instruction) => Some(instruction),
+            ProgramEntry::Repeat { .. } | ProgramEntry::EndRepeat => None,
+        })
+        .fold(0_u128, |work, instruction| {
+            let units = match instruction {
+                ProgramInstruction::Clifford {
+                    reference, targets, ..
+                } => {
+                    let clifford = program.reference_clifford(*reference).ok();
+                    let arity = clifford.map_or(1, ReferenceClifford::arity).max(1);
+                    gate_work(arity, clifford).saturating_mul((targets.len() / arity) as u128)
+                }
+                ProgramInstruction::Reset { targets, .. }
+                | ProgramInstruction::Measure { targets, .. } => {
+                    collapse.saturating_mul(targets.len() as u128)
+                }
+                ProgramInstruction::MeasurePairs { targets, .. } => {
+                    collapse.saturating_mul((targets.len() / 2) as u128)
+                }
+                ProgramInstruction::PauliProducts(measurement) => {
+                    collapse.saturating_mul(measurement.product_count() as u128)
+                }
+                ProgramInstruction::MeasurePads { values, .. } => values.len() as u128,
+                ProgramInstruction::SinglePauliNoise { targets, .. }
+                | ProgramInstruction::HeraldedErase { targets, .. }
+                | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len() as u128,
+                ProgramInstruction::ZeroProbabilityNoise { pairs, targets } => {
+                    (targets.len() / if *pairs { 2 } else { 1 }) as u128
+                }
+                ProgramInstruction::TwoQubitPauliNoise { targets, .. } => {
+                    (targets.len() / 2) as u128
+                }
+                ProgramInstruction::CorrelatedError { .. } => 1,
+                ProgramInstruction::ControlledPauli {
+                    reference, pairs, ..
+                } => {
+                    let clifford = program.reference_clifford(*reference).ok();
+                    pairs.iter().fold(0_u128, |units, pair| {
+                        units.saturating_add(match pair {
+                            ControlledPair::Quantum { .. } => gate_work(2, clifford),
+                            ControlledPair::Record { .. } | ControlledPair::Sweep { .. } => 1,
+                        })
+                    })
+                }
+                ProgramInstruction::Observable { .. } => 0,
+            };
+            work.saturating_add(units)
+        })
+}
+
 #[derive(Clone, Copy)]
 struct RepeatFrame {
     body_start: usize,
@@ -64,7 +176,7 @@ struct RepeatFrame {
 }
 
 fn run_entries(
-    program: &SampleProgram,
+    program: &CircuitProgram,
     simulator: &mut InverseTableauSimulator,
     mut snapshot: Option<&mut ReferenceStateSnapshot>,
     sweep_record: &[bool],
@@ -78,14 +190,14 @@ fn run_entries(
             .get(index)
             .ok_or_else(|| run_invariant("reference sampling moved beyond retained operations"))?;
         match entry {
-            SampleProgramEntry::Execute(operation) => {
-                apply_operation(operation, simulator, sweep_record, output)?;
+            ProgramEntry::Instruction(instruction) => {
+                apply_instruction(program, instruction, simulator, sweep_record, output)?;
                 index += 1;
             }
-            SampleProgramEntry::Repeat { count, body_end } => {
+            ProgramEntry::Repeat { count, body_end } => {
                 if *count == 0
                     || *body_end <= index
-                    || !matches!(entries.get(*body_end), Some(SampleProgramEntry::EndRepeat))
+                    || !matches!(entries.get(*body_end), Some(ProgramEntry::EndRepeat))
                 {
                     return Err(run_invariant(
                         "reference sampling found an invalid repeat marker",
@@ -97,7 +209,8 @@ fn run_entries(
                 })?;
                 let mut remaining = *count;
                 if let Some(fold_snapshot) = snapshot.as_deref_mut()
-                    && program.reference_fold_is_profitable(
+                    && reference_fold_is_profitable(
+                        program,
                         body_start,
                         *body_end,
                         *count,
@@ -106,14 +219,12 @@ fn run_entries(
                     && simulator.capture(fold_snapshot)
                 {
                     let output_start = output.len();
-                    run_range(
-                        program,
-                        body_start,
-                        *body_end,
-                        simulator,
-                        sweep_record,
-                        output,
-                    )?;
+                    let mut cursor = program.cursor_range(body_start, *body_end);
+                    while let Some(instruction) =
+                        cursor.next_instruction().map_err(program_error)?
+                    {
+                        apply_instruction(program, instruction, simulator, sweep_record, output)?;
+                    }
                     if simulator
                         .same_state_as(fold_snapshot)
                         .map_err(simulator_error)?
@@ -124,7 +235,12 @@ fn run_entries(
                         #[cfg(test)]
                         record_fold(
                             count - 1,
-                            (program.compact_operation_count(body_start, *body_end) as u128)
+                            (entries
+                                .get(body_start..*body_end)
+                                .unwrap_or_default()
+                                .iter()
+                                .filter(|entry| matches!(entry, ProgramEntry::Instruction(_)))
+                                .count() as u128)
                                 .saturating_mul(u128::from(count - 1)),
                         );
                         index = after_body;
@@ -147,7 +263,7 @@ fn run_entries(
                     })?;
                 index = body_start;
             }
-            SampleProgramEntry::EndRepeat => {
+            ProgramEntry::EndRepeat => {
                 let Some(frame) = repeats.last_mut() else {
                     return Err(run_invariant("reference sampling ended an absent repeat"));
                 };
@@ -173,96 +289,306 @@ fn run_entries(
     }
 }
 
-fn run_range(
-    program: &SampleProgram,
-    start: usize,
-    end: usize,
+/// Applies a resolved unitary gate to every target group of `targets`.
+fn apply_clifford(
+    clifford: &ReferenceClifford,
+    targets: &[usize],
     simulator: &mut InverseTableauSimulator,
-    sweep_record: &[bool],
-    output: &mut Vec<bool>,
-) -> Result<(), SamplingExecutionError> {
-    let mut cursor = program.cursor_range(start, end);
-    while let Some(operation) = cursor.next_operation()? {
-        apply_operation(operation, simulator, sweep_record, output)?;
+) -> Result<(), ReferenceSimulatorError> {
+    match clifford {
+        ReferenceClifford::Hadamard => {
+            for &qubit in targets {
+                simulator.apply_hadamard(qubit)?;
+            }
+        }
+        ReferenceClifford::ControlledX => {
+            for pair in targets.chunks(2) {
+                let &[control, target] = pair else {
+                    return Err(ReferenceSimulatorError::Invariant(
+                        "controlled-X targets are not paired",
+                    ));
+                };
+                simulator.apply_controlled_x(control, target)?;
+            }
+        }
+        ReferenceClifford::Tableau { transform, steps } => {
+            let arity = transform.target_count().max(1);
+            for group in targets.chunks(arity) {
+                let Some(steps) = steps else {
+                    simulator.apply_local_clifford(group, transform.inverse())?;
+                    continue;
+                };
+                let qubit = |index: u8| {
+                    group.get(usize::from(index)).copied().ok_or(
+                        ReferenceSimulatorError::Invariant(
+                            "decomposition step escaped its target group",
+                        ),
+                    )
+                };
+                for step in steps {
+                    match *step {
+                        CliffordStep::H(target) => simulator.apply_hadamard(qubit(target)?)?,
+                        CliffordStep::S(target) => simulator.apply_s(qubit(target)?)?,
+                        CliffordStep::Cx(control, target) => {
+                            simulator.apply_controlled_x(qubit(control)?, qubit(target)?)?;
+                        }
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }
 
-fn apply_operation(
-    operation: &SampleOperation,
+fn apply_instruction(
+    program: &CircuitProgram,
+    instruction: &ProgramInstruction,
     simulator: &mut InverseTableauSimulator,
     sweep_record: &[bool],
     output: &mut Vec<bool>,
 ) -> Result<(), SamplingExecutionError> {
-    match operation {
-        SampleOperation::ApplyHadamard { qubit } => simulator.apply_hadamard(*qubit),
-        SampleOperation::ApplyControlledX { control, target } => {
-            simulator.apply_controlled_x(*control, *target)
-        }
-        SampleOperation::ApplyTableau { targets, transform } => {
-            simulator.apply_local_clifford(targets, transform.inverse())
-        }
-        SampleOperation::Reset { qubit, basis } => simulator.reset(*qubit, *basis),
-        SampleOperation::Measure {
-            qubit,
+    match instruction {
+        ProgramInstruction::Clifford {
+            reference, targets, ..
+        } => apply_clifford(
+            program
+                .reference_clifford(*reference)
+                .map_err(program_error)?,
+            targets,
+            simulator,
+        )
+        .map_err(simulator_error),
+        ProgramInstruction::Reset { basis, targets } => targets
+            .iter()
+            .try_for_each(|&qubit| simulator.reset(qubit, *basis))
+            .map_err(simulator_error),
+        ProgramInstruction::Measure {
             basis,
-            inverted,
-            flip_probability: _,
             reset,
+            targets,
+            inverted,
+            ..
         } => {
             // Stim's reference sample is noiseless, so result-flip probabilities are ignored.
-            let measured = simulator.measure(*qubit, *basis).map_err(simulator_error)?;
-            output.push(measured ^ *inverted);
-            if *reset && measured {
-                simulator.apply_pauli(*qubit, reset_correction(*basis))
-            } else {
-                Ok(())
+            for (index, &qubit) in targets.iter().enumerate() {
+                let measured = simulator.measure(qubit, *basis).map_err(simulator_error)?;
+                output.push(measured ^ inverted.get(index).copied().unwrap_or(false));
+                if *reset && measured {
+                    simulator
+                        .apply_pauli(qubit, reset_correction(*basis))
+                        .map_err(simulator_error)?;
+                }
             }
-        }
-        SampleOperation::MeasureProduct {
-            terms,
-            inverted,
-            flip_probability: _,
-        } => {
-            let measured = simulator.measure_product(terms).map_err(simulator_error)?;
-            output.push(measured ^ *inverted);
             Ok(())
         }
-        SampleOperation::Pad {
-            value,
-            flip_probability: _,
-        } => {
-            output.push(*value);
-            Ok(())
-        }
-        SampleOperation::HeraldedPauliChannel { .. } => {
-            output.push(false);
-            Ok(())
-        }
-        SampleOperation::SingleQubitPauliChannel { .. }
-        | SampleOperation::TwoQubitPauliChannel { .. }
-        | SampleOperation::CorrelatedError { .. } => Ok(()),
-        SampleOperation::ClassicallyControlledPauli {
-            control,
-            qubit,
+        ProgramInstruction::MeasurePairs {
             basis,
+            targets,
+            inverted,
+            ..
         } => {
-            let active = match control {
-                ClassicalControl::Record(offset) => record_lookback(output, *offset),
-                ClassicalControl::Sweep(sweep_id) => usize::try_from(*sweep_id)
-                    .ok()
-                    .and_then(|index| sweep_record.get(index))
-                    .copied()
-                    .unwrap_or(false),
-            };
-            if active {
-                simulator.apply_pauli(*qubit, *basis)
-            } else {
-                Ok(())
+            for (index, pair) in targets.chunks(2).enumerate() {
+                let &[left, right] = pair else {
+                    return Err(run_invariant("pair measurement targets are not paired"));
+                };
+                let measured = simulator
+                    .measure_product(&[(left, *basis), (right, *basis)])
+                    .map_err(simulator_error)?;
+                let flip = inverted.get(2 * index).copied().unwrap_or(false)
+                    ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
+                output.push(measured ^ flip);
             }
+            Ok(())
+        }
+        ProgramInstruction::PauliProducts(measurement) => {
+            for product in measurement.products() {
+                let (terms, inverted) = product.map_err(program_error)?;
+                let measured = simulator.measure_product(terms).map_err(simulator_error)?;
+                output.push(measured ^ inverted);
+            }
+            Ok(())
+        }
+        ProgramInstruction::MeasurePads { values, .. } => {
+            output.extend_from_slice(values);
+            Ok(())
+        }
+        ProgramInstruction::HeraldedErase { targets, .. }
+        | ProgramInstruction::HeraldedPauliChannel { targets, .. } => {
+            output.extend(std::iter::repeat_n(false, targets.len()));
+            Ok(())
+        }
+        ProgramInstruction::SinglePauliNoise { .. }
+        | ProgramInstruction::TwoQubitPauliNoise { .. }
+        | ProgramInstruction::ZeroProbabilityNoise { .. }
+        | ProgramInstruction::CorrelatedError { .. }
+        | ProgramInstruction::Observable { .. } => Ok(()),
+        ProgramInstruction::ControlledPauli {
+            basis,
+            reference,
+            pairs,
+            ..
+        } => {
+            let clifford = program
+                .reference_clifford(*reference)
+                .map_err(program_error)?;
+            for pair in pairs {
+                match *pair {
+                    ControlledPair::Quantum { control, target } => {
+                        apply_clifford(clifford, &[control, target], simulator)
+                    }
+                    ControlledPair::Record { offset, qubit } => {
+                        if record_lookback(output, offset) {
+                            simulator.apply_pauli(qubit, *basis)
+                        } else {
+                            Ok(())
+                        }
+                    }
+                    ControlledPair::Sweep { id, qubit } => {
+                        let active = usize::try_from(id)
+                            .ok()
+                            .and_then(|index| sweep_record.get(index))
+                            .copied()
+                            .unwrap_or(false);
+                        if active {
+                            simulator.apply_pauli(qubit, *basis)
+                        } else {
+                            Ok(())
+                        }
+                    }
+                }
+                .map_err(simulator_error)?;
+            }
+            Ok(())
         }
     }
-    .map_err(simulator_error)
+}
+
+/// Counts the measurements of `program` whose outcome is determined by earlier operations.
+///
+/// With `unknown_input`, each qubit starts maximally entangled with a private reference qubit
+/// that no operation touches, so a measurement is determined only by the circuit's own earlier
+/// measurements and resets. Flip probabilities and noise never matter, matching Stim, which
+/// strips instruction arguments before counting.
+pub(super) fn count_determined_measurements(
+    program: &CircuitProgram,
+    qubit_count: usize,
+    unknown_input: bool,
+) -> Result<u64, SamplingExecutionError> {
+    let simulated = if unknown_input {
+        qubit_count
+            .checked_mul(2)
+            .ok_or_else(|| run_invariant("unknown-input qubit count overflowed"))?
+    } else {
+        qubit_count
+    };
+    let mut simulator = InverseTableauSimulator::try_new(simulated).map_err(simulator_error)?;
+    if unknown_input {
+        for qubit in 0..qubit_count {
+            simulator.apply_hadamard(qubit).map_err(simulator_error)?;
+            simulator
+                .apply_controlled_x(qubit, qubit + qubit_count)
+                .map_err(simulator_error)?;
+        }
+    }
+    let mut record = Vec::new();
+    let mut count = 0_u64;
+    let mut cursor = program.cursor();
+    while let Some(instruction) = cursor.next_instruction().map_err(program_error)? {
+        match instruction {
+            ProgramInstruction::Measure {
+                basis,
+                reset,
+                targets,
+                inverted,
+                ..
+            } => {
+                for (index, &qubit) in targets.iter().enumerate() {
+                    let terms = [(qubit, *basis)];
+                    count += u64::from(
+                        simulator
+                            .is_deterministic(&terms)
+                            .map_err(simulator_error)?,
+                    );
+                    let measured = simulator.measure(qubit, *basis).map_err(simulator_error)?;
+                    record.push(measured ^ inverted.get(index).copied().unwrap_or(false));
+                    if *reset && measured {
+                        simulator
+                            .apply_pauli(qubit, reset_correction(*basis))
+                            .map_err(simulator_error)?;
+                    }
+                }
+            }
+            ProgramInstruction::MeasurePairs {
+                basis,
+                targets,
+                inverted,
+                ..
+            } => {
+                for (index, pair) in targets.chunks(2).enumerate() {
+                    let &[left, right] = pair else {
+                        return Err(run_invariant("pair measurement targets are not paired"));
+                    };
+                    let terms = [(left, *basis), (right, *basis)];
+                    count += u64::from(
+                        simulator
+                            .is_deterministic(&terms)
+                            .map_err(simulator_error)?,
+                    );
+                    let measured = simulator.measure_product(&terms).map_err(simulator_error)?;
+                    let flip = inverted.get(2 * index).copied().unwrap_or(false)
+                        ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
+                    record.push(measured ^ flip);
+                }
+            }
+            ProgramInstruction::PauliProducts(measurement) => {
+                for product in measurement.products() {
+                    let (terms, inverted) = product.map_err(program_error)?;
+                    count += u64::from(simulator.is_deterministic(terms).map_err(simulator_error)?);
+                    let measured = simulator.measure_product(terms).map_err(simulator_error)?;
+                    record.push(measured ^ inverted);
+                }
+            }
+            ProgramInstruction::MeasurePads { .. } => {
+                return Err(
+                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate { gate: "MPAD" },
+                );
+            }
+            ProgramInstruction::HeraldedErase { .. }
+            | ProgramInstruction::HeraldedPauliChannel { .. } => {
+                return Err(
+                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate {
+                        gate: "heralded noise",
+                    },
+                );
+            }
+            ProgramInstruction::ControlledPauli {
+                basis,
+                reference,
+                pairs,
+                ..
+            } => {
+                let clifford = program
+                    .reference_clifford(*reference)
+                    .map_err(program_error)?;
+                for pair in pairs {
+                    match *pair {
+                        ControlledPair::Quantum { control, target } => {
+                            apply_clifford(clifford, &[control, target], &mut simulator)
+                        }
+                        ControlledPair::Record { offset, qubit }
+                            if record_lookback(&record, offset) =>
+                        {
+                            simulator.apply_pauli(qubit, *basis)
+                        }
+                        ControlledPair::Record { .. } | ControlledPair::Sweep { .. } => Ok(()),
+                    }
+                    .map_err(simulator_error)?;
+                }
+            }
+            other => apply_instruction(program, other, &mut simulator, &[], &mut record)?,
+        }
+    }
+    Ok(count)
 }
 
 fn append_repeated_bits(
@@ -299,6 +625,12 @@ pub(super) fn simulator_error(error: ReferenceSimulatorError) -> SamplingExecuti
         ReferenceSimulatorError::Invariant(_) => SamplingExecutionError::InternalInvariant {
             message: error.to_string(),
         },
+    }
+}
+
+pub(super) fn program_error(error: crate::detection::DetectionError) -> SamplingExecutionError {
+    SamplingExecutionError::InternalInvariant {
+        message: error.to_string(),
     }
 }
 

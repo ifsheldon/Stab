@@ -24,7 +24,8 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_model::Circuit;
 
-use super::{DirectDetectorFramePlan, PauliFrameSamplingPlan};
+use super::super::program::{CircuitProgram, ProgramOptions};
+use super::{DirectDetectorFramePlan, PauliFrameSamplingState};
 use crate::detection::DetectionConversionLimits;
 
 const DATA_QUBITS: usize = 50;
@@ -216,17 +217,21 @@ fn assert_binomial(label: &str, successes: u64, trials: u64, probability: f64) {
 fn bit_block_sampling_frame_sparse_channels_match_category_target_and_lane_marginals() {
     for (channel, seed) in [(Channel::Single, 0x5A11), (Channel::Pair, 0x5A12)] {
         let circuit = channel.circuit();
-        let plan = PauliFrameSamplingPlan::try_compile(&circuit, 2 * DATA_QUBITS, 1 << 30)
-            .expect("compile Pauli-frame sampling plan");
-        let mut state = plan.state().expect("allocate Pauli-frame state");
+        let program = CircuitProgram::compile(&circuit, ProgramOptions::SAMPLING)
+            .expect("compile Pauli-frame sampling program");
+        assert_eq!(program.counts().measurements, 2 * DATA_QUBITS);
+        let mut state =
+            PauliFrameSamplingState::try_new(&program).expect("allocate Pauli-frame state");
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut tally = Tally::new(channel, 4);
         for _ in 0..BIT_BLOCK_BATCHES {
-            plan.sample_batch(&mut state, &mut rng)
+            state
+                .sample_batch(&program, &mut rng)
                 .expect("sample BitBlock batch");
             for lane_word in 0..4 {
                 tally.add_lane_word(lane_word, u64::MAX, |measurement| {
-                    plan.measurement_segment(&state, measurement, lane_word * 64, 64)
+                    state
+                        .measurement_segment(measurement, lane_word * 64, 64)
                         .expect("measurement segment")
                 });
             }
