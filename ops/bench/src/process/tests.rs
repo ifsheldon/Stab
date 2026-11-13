@@ -8,6 +8,7 @@ const OUTPUT_PATH_ENV: &str = "STAB_BENCH_OUTPUT_PATH";
 
 fn request(mode: &str) -> ProcessRequest {
     ProcessRequest {
+        launch: ProcessLaunch::Direct,
         program: std::env::current_exe().expect("test executable"),
         args: vec![
             OsString::from(HELPER_TEST),
@@ -394,6 +395,109 @@ fn managed_child_drop_kills_and_reaps_after_io_start() {
         !PathBuf::from(format!("/proc/{pid}")).exists(),
         "managed child {pid} survived guard cleanup"
     );
+}
+
+const LAUNCHER_TEST: &str = "process::tests::launcher_entry";
+
+/// Runs `mode` through the measurement launcher, played by this test binary.
+fn measured(mode: &str) -> ProcessRequest {
+    let mut request = request(mode);
+    request.launch = ProcessLaunch::Measured(Launcher {
+        program: std::env::current_exe().expect("test executable"),
+        args: [LAUNCHER_TEST, "--exact", "--ignored", "--nocapture"]
+            .into_iter()
+            .map(OsString::from)
+            .collect(),
+    });
+    request
+}
+
+#[test]
+#[ignore = "executed only as the measurement launcher by bounded-process tests"]
+fn launcher_entry() {
+    std::process::exit(i32::from(launcher::launcher_exit_code()));
+}
+
+/// Regression: a directly spawned child inherited the supervisor's high-water
+/// RSS, so every benchmark reported the runner's footprint instead of its own.
+#[test]
+fn measured_peak_rss_excludes_the_supervisor_footprint() {
+    let mut supervisor = vec![0_u8; 128 << 20];
+    for byte in supervisor.iter_mut().step_by(4096) {
+        *byte = 1;
+    }
+    std::hint::black_box(&supervisor);
+
+    let idle = run_bounded_process(&measured("success")).expect("measured helper");
+    assert_eq!(idle.status, Some(0));
+    assert!(String::from_utf8_lossy(&idle.stdout).contains("helper-success"));
+    let idle_peak = idle.parent_observed_peak_rss_bytes.expect("measured peak");
+    assert!(
+        idle_peak < 64 << 20,
+        "an idle child reported {idle_peak} bytes after the supervisor touched 128 MiB"
+    );
+
+    let allocating = run_bounded_process(&measured("peak-rss")).expect("measured allocation");
+    let allocating_peak = allocating
+        .parent_observed_peak_rss_bytes
+        .expect("measured peak");
+    assert!(
+        allocating_peak >= idle_peak + (24 << 20),
+        "a 32 MiB allocation reported {allocating_peak} bytes over an idle {idle_peak}"
+    );
+    drop(supervisor);
+}
+
+#[test]
+fn measured_runs_report_the_program_status_affinity_and_file_limit() {
+    assert_eq!(
+        run_bounded_process(&measured("nonzero"))
+            .expect("nonzero")
+            .status,
+        Some(7)
+    );
+    assert_eq!(
+        run_bounded_process(&measured("signal"))
+            .expect("signal")
+            .status,
+        None
+    );
+
+    let allowed = rustix::thread::sched_getaffinity(None).expect("read parent affinity");
+    let cpu = (0..rustix::thread::CpuSet::MAX_CPU)
+        .find(|cpu| allowed.is_set(*cpu))
+        .expect("at least one allowed CPU");
+    let mut pinned = measured("affinity");
+    pinned.stdin = vec![b'\n'];
+    pinned.affinity_cpu = Some(cpu);
+    pinned.environment.push((
+        OsString::from(EXPECTED_CPU_ENV),
+        OsString::from(cpu.to_string()),
+    ));
+    let result = run_bounded_process(&pinned).expect("affinity helper succeeds");
+    assert!(String::from_utf8_lossy(&result.stdout).contains("affinity-ok"));
+
+    let directory = tempfile::tempdir().expect("temporary output directory");
+    let output = directory.path().join("bounded-output");
+    let mut bounded_file = measured("file-overflow");
+    bounded_file.stdin = vec![b'\n'];
+    bounded_file.limits.stdin_bytes = 1;
+    bounded_file.limits.regular_file_bytes = Some(64);
+    bounded_file.environment.push((
+        OsString::from(OUTPUT_PATH_ENV),
+        output.as_os_str().to_os_string(),
+    ));
+    assert!(matches!(
+        run_bounded_process(&bounded_file),
+        Err(ProcessError::FileLimit(error)) if error.maximum == 64
+    ));
+
+    let mut invalid_affinity = measured("success");
+    invalid_affinity.affinity_cpu = Some(rustix::thread::CpuSet::MAX_CPU);
+    assert!(matches!(
+        run_bounded_process(&invalid_affinity),
+        Err(ProcessError::Launch { .. })
+    ));
 }
 
 #[test]

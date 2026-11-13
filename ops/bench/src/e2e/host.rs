@@ -243,7 +243,9 @@ fn competing_benchmark_processes() -> Result<Vec<String>, String> {
         };
         let command = String::from_utf8_lossy(&bytes).replace('\0', " ");
         if command.contains("stab-bench")
-            && (command.contains("e2e-run") || command.contains("e2e-worker"))
+            && (command.contains("e2e-run")
+                || command.contains("e2e-worker")
+                || command.contains("e2e-launch"))
         {
             matches.push(format!("{pid}:{command}"));
         }
@@ -305,6 +307,7 @@ mod tests {
         use std::time::Duration;
 
         crate::process::ProcessRequest {
+            launch: crate::process::ProcessLaunch::Direct,
             program: std::env::current_exe().expect("test executable"),
             args: [
                 "e2e::host::tests::restricted_affinity_helper",

@@ -42,6 +42,10 @@ enum Command {
     #[command(name = "e2e-worker", hide = true)]
     Worker(e2e::WorkerArgs),
 
+    /// Internal measurement launcher; reads its launch spec from the environment.
+    #[command(name = "e2e-launch", hide = true)]
+    Launch,
+
     /// Validate the source-owned suite and generated documentation.
     E2eCheck(e2e::CheckArgs),
 
@@ -59,7 +63,11 @@ enum Command {
 }
 
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
+    let cli = Cli::parse();
+    if matches!(cli.command, Command::Launch) {
+        return process::run_launcher();
+    }
+    match run(cli) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("[{PREFIX}] ERROR: {error}");
@@ -76,8 +84,8 @@ fn run(cli: Cli) -> Result<(), BenchError> {
     };
     let root = RepoRoot::resolve(&root)?;
     match command {
-        Command::Worker(_) => Err(BenchError::E2e(
-            "E2E worker dispatch reached the repository controller".to_string(),
+        Command::Worker(_) | Command::Launch => Err(BenchError::E2e(
+            "internal subprocess dispatch reached the repository controller".to_string(),
         )),
         Command::E2eCheck(args) => e2e::check(&root, args),
         Command::E2eRun(args) => e2e::run(&root, args),

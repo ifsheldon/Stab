@@ -12,11 +12,11 @@ The suite deliberately benchmarks user experience instead of every public functi
 - An absent or identity-mismatched baseline is `unseeded`, never passing.
 - Each case enforces a Stab peak-RSS ceiling and validates all primary and side output outside the timed region.
 - Workloads, thresholds, and semantic work may not be reduced or waived to obtain a pass.
-- Accepted baselines are keyed by architecture, CPU, Rust target, Rust toolchain, case digest, and the explicit `e2e-user-workflow-v2` timing boundary.
+- Accepted baselines are keyed by architecture, CPU, Rust target, Rust toolchain, case digest, and the explicit `e2e-user-workflow-v3` timing boundary.
 
 ## Measurement
 
-CLI timing begins immediately before process spawn and ends when Linux reports primary-child completion through a pidfd-backed `wait4`. Concurrent readers fully consume output and impose real pipe backpressure, while controller polling, final post-exit drain, and semantic validation remain outside the interval. Pipeline timing sums the same interval for each command. The Rust pipeline uses stable component APIs and includes the complete reusable sample, detect, and decode workflow. The runner alternates Stim-first and Stab-first pairs, retains every sample, records kernel-reported child peak RSS, and normalizes timing by declared semantic work.
+Every measured program runs under a freshly executed `stab-bench e2e-launch` launcher. Linux folds a spawning process's high-water RSS into the child it executes, so a program spawned directly by the large runner would report at least the runner's own peak; the small launcher pins its CPU, spawns the program, bounds its regular-file writes, and reaps it with `wait4`. Timing begins in the launcher immediately before the program's spawn and ends at its `wait4` completion, and peak RSS is that program's kernel-reported maximum above the launcher's few-MiB floor. Concurrent readers fully consume output and impose real pipe backpressure, while controller polling, final post-exit drain, and semantic validation remain outside the interval. Pipeline timing sums the same interval for each command. The Rust pipeline uses stable component APIs and includes the complete reusable sample, detect, and decode workflow. The runner alternates Stim-first and Stab-first pairs, retains every sample, records kernel-reported child peak RSS, and normalizes timing by declared semantic work.
 
 Deterministic outputs are compared exactly. Stochastic outputs are decoded and checked for record count, width, format validity, and source-owned nondegeneracy witnesses. Generated circuits are produced independently by Stim and Stab before timing and must agree byte for byte.
 

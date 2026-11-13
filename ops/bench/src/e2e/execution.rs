@@ -24,8 +24,8 @@ use super::statistics::{PairOrder, PairedTiming, StabTiming};
 use super::{LoadedSuite, load_suite, validate_prerequisites};
 use crate::error::BenchError;
 use crate::process::{
-    OutputPolicy, ProcessEnvironment, ProcessLimits, ProcessRequest, ProcessResult,
-    run_bounded_process, run_checked_status,
+    Launcher, OutputPolicy, ProcessEnvironment, ProcessLaunch, ProcessLimits, ProcessRequest,
+    ProcessResult, run_bounded_process, run_checked_status,
 };
 use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_cli, validate_stim_source};
@@ -1052,7 +1052,10 @@ fn run_command(
     } else {
         OutputPolicy::Discard
     };
+    let launcher = Launcher::current_bench()
+        .map_err(|source| BenchError::E2e(format!("locate measurement launcher: {source}")))?;
     run_bounded_process(&ProcessRequest {
+        launch: ProcessLaunch::Measured(launcher),
         program: binary.to_path_buf(),
         args: args.to_vec(),
         stdin: stdin.to_vec(),
@@ -1095,6 +1098,7 @@ pub(super) fn command_output(
 ) -> Result<Vec<u8>, BenchError> {
     let args = args.iter().map(OsString::from).collect::<Vec<_>>();
     let result = run_bounded_process(&ProcessRequest {
+        launch: ProcessLaunch::Direct,
         program: binary.to_path_buf(),
         args,
         stdin: stdin.to_vec(),
