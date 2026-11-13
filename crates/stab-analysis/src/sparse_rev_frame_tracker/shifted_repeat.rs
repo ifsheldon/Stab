@@ -2,11 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{Circuit, DemTarget};
 
+use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
 use super::{
     GaugeOutputPolicy, ReverseTrackerBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
-    search_shifted_recurrence,
+    TargetSets, search_shifted_recurrence,
 };
 
 #[cfg(test)]
@@ -48,9 +49,9 @@ pub(super) fn undo_loop_with_gauge_output(
         undo_probe_iteration(probe, body, gauge_output, work_budget)
     })?;
     let recurrence = match search {
-        ShiftedRecurrenceSearch::Found { recurrence } => recurrence,
+        ShiftedRecurrenceSearch::Found { recurrence } => *recurrence,
         ShiftedRecurrenceSearch::Exhausted { state, iterations } => {
-            *tracker = state;
+            *tracker = *state;
             return undo_loop_by_unrolling_with_gauge_output(
                 tracker,
                 body,
@@ -217,13 +218,10 @@ pub(super) fn shift(
         add_signed_u64(tracker.detector_count, detector_offset, "detector count")?;
 
     let mut shifted_records = BTreeMap::new();
-    for (index, targets) in &tracker.rec_bits {
-        let shifted_index = add_signed_usize(*index, measurement_offset, "record index")?;
-        let shifted_targets = shift_target_set(targets, detector_offset)?;
-        if shifted_records
-            .insert(shifted_index, shifted_targets)
-            .is_some()
-        {
+    for (index, mut targets) in std::mem::take(&mut tracker.rec_bits) {
+        let shifted_index = add_signed_usize(index, measurement_offset, "record index")?;
+        shift_target_set(&mut targets, detector_offset)?;
+        if shifted_records.insert(shifted_index, targets).is_some() {
             return Err(AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat shift merged measurement records unexpectedly",
             ));
@@ -234,7 +232,7 @@ pub(super) fn shift(
     shift_target_sets(&mut tracker.zs, detector_offset)?;
     shift_target_sets(&mut tracker.observable_effects, detector_offset)?;
     for gauge in &mut tracker.gauge_errors {
-        *gauge = shift_target_set(gauge, detector_offset)?;
+        shift_target_set(gauge, detector_offset)?;
     }
     tracker.anticommutations = tracker
         .anticommutations
@@ -250,8 +248,8 @@ pub(super) fn shift(
 }
 
 fn rec_bits_match_shifted(
-    unshifted: &BTreeMap<usize, BTreeSet<DemTarget>>,
-    expected: &BTreeMap<usize, BTreeSet<DemTarget>>,
+    unshifted: &TargetSets<usize>,
+    expected: &TargetSets<usize>,
     measurement_offset: i128,
     detector_offset: i128,
 ) -> bool {
@@ -271,8 +269,8 @@ fn rec_bits_match_shifted(
 }
 
 fn maps_match_shifted<K: Ord>(
-    unshifted: &BTreeMap<K, BTreeSet<DemTarget>>,
-    expected: &BTreeMap<K, BTreeSet<DemTarget>>,
+    unshifted: &TargetSets<K>,
+    expected: &TargetSets<K>,
     detector_offset: i128,
 ) -> bool {
     unshifted.len() == expected.len()
@@ -284,8 +282,8 @@ fn maps_match_shifted<K: Ord>(
 }
 
 fn target_sets_match_shifted(
-    unshifted: &[BTreeSet<DemTarget>],
-    expected: &[BTreeSet<DemTarget>],
+    unshifted: &[TargetXorSet],
+    expected: &[TargetXorSet],
     detector_offset: i128,
 ) -> bool {
     unshifted.len() == expected.len()
@@ -313,38 +311,28 @@ fn anticommutations_match_shifted(
         })
 }
 
+/// A uniform detector shift preserves target order, so sorted sets match elementwise.
 fn target_set_matches_shifted(
-    unshifted: &BTreeSet<DemTarget>,
-    expected: &BTreeSet<DemTarget>,
+    unshifted: &TargetXorSet,
+    expected: &TargetXorSet,
     detector_offset: i128,
 ) -> bool {
-    if unshifted.len() != expected.len() {
-        return false;
-    }
-    unshifted.iter().all(|target| {
-        shifted_detector_target(*target, detector_offset)
-            .is_ok_and(|shifted| expected.contains(&shifted))
-    })
+    unshifted.len() == expected.len()
+        && unshifted.iter().zip(expected).all(|(target, expected)| {
+            shifted_detector_target(*target, detector_offset)
+                .is_ok_and(|shifted| shifted == *expected)
+        })
 }
 
-fn shift_target_sets<K>(
-    sets: &mut BTreeMap<K, BTreeSet<DemTarget>>,
-    detector_offset: i128,
-) -> AnalysisResult<()> {
+fn shift_target_sets<K>(sets: &mut TargetSets<K>, detector_offset: i128) -> AnalysisResult<()> {
     for targets in sets.values_mut() {
-        *targets = shift_target_set(targets, detector_offset)?;
+        shift_target_set(targets, detector_offset)?;
     }
     Ok(())
 }
 
-fn shift_target_set(
-    targets: &BTreeSet<DemTarget>,
-    detector_offset: i128,
-) -> AnalysisResult<BTreeSet<DemTarget>> {
-    targets
-        .iter()
-        .map(|target| shifted_detector_target(*target, detector_offset))
-        .collect()
+fn shift_target_set(targets: &mut TargetXorSet, detector_offset: i128) -> AnalysisResult<()> {
+    targets.try_map_monotone(|target| shifted_detector_target(target, detector_offset))
 }
 
 fn shifted_detector_target(target: DemTarget, detector_offset: i128) -> AnalysisResult<DemTarget> {

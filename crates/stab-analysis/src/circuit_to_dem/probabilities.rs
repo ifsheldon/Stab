@@ -4,19 +4,6 @@ use stab_model::Probability;
 
 use crate::AnalysisResult;
 
-pub(super) fn merge_independent_probability<K: Ord>(
-    probabilities: &mut BTreeMap<K, Probability>,
-    targets: K,
-    probability: Probability,
-) -> AnalysisResult<()> {
-    if let Some(existing) = probabilities.get_mut(&targets) {
-        *existing = xor_probability(*existing, probability)?;
-    } else {
-        probabilities.insert(targets, probability);
-    }
-    Ok(())
-}
-
 pub(super) fn merge_disjoint_probability<K: Ord>(
     probabilities: &mut BTreeMap<K, Probability>,
     key: K,

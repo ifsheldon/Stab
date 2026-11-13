@@ -34,7 +34,7 @@ pub(crate) mod advanced {
 
 use traversal::FoldedDemTraversal;
 
-use crate::circuit::printing::format_dem_float;
+use crate::circuit::printing::DemFloatCache;
 use crate::model_bytes::PreparedModelText;
 use crate::{
     AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
@@ -127,7 +127,7 @@ impl DetectorErrorModel {
     /// [`Self::to_dem_bytes`] when exact metadata preservation matters.
     pub fn to_dem_string(&self) -> String {
         let mut out = String::new();
-        self.write_dem(&mut out, 0);
+        self.write_dem(&mut out, 0, &mut DemFloatCache::new());
         out
     }
 
@@ -137,10 +137,22 @@ impl DetectorErrorModel {
     /// whose tags may not be valid UTF-8.
     pub fn to_dem_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
-        match self.write_dem_io(&mut out, 0) {
+        match self.write_dem_bytes(&mut out) {
             Ok(()) => out,
             Err(error) => unreachable!("writing a DEM into Vec<u8> failed: {error}"),
         }
+    }
+
+    /// Streams the canonical DEM text of [`Self::to_dem_bytes`] into `out`.
+    ///
+    /// Opaque tag bytes are preserved exactly. The writer receives many small writes, so wrap
+    /// unbuffered sinks such as files in [`std::io::BufWriter`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error reported by `out`.
+    pub fn write_dem_bytes<W: Write>(&self, out: &mut W) -> io::Result<()> {
+        self.write_dem_io(out, 0, &mut DemFloatCache::new())
     }
 
     pub fn total_detector_shift(&self) -> ModelResult<u64> {
@@ -164,15 +176,20 @@ impl DetectorErrorModel {
             .observable_count())
     }
 
-    fn write_dem(&self, out: &mut String, indent: usize) {
+    fn write_dem(&self, out: &mut String, indent: usize, floats: &mut DemFloatCache) {
         for item in &self.items {
-            item.write_dem(out, indent);
+            item.write_dem(out, indent, floats);
         }
     }
 
-    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+    fn write_dem_io<W: Write>(
+        &self,
+        out: &mut W,
+        indent: usize,
+        floats: &mut DemFloatCache,
+    ) -> io::Result<()> {
         for item in &self.items {
-            item.write_dem_io(out, indent)?;
+            item.write_dem_io(out, indent, floats)?;
         }
         Ok(())
     }
@@ -266,17 +283,22 @@ pub enum DemItem {
 }
 
 impl DemItem {
-    fn write_dem(&self, out: &mut String, indent: usize) {
+    fn write_dem(&self, out: &mut String, indent: usize, floats: &mut DemFloatCache) {
         match self {
-            Self::Instruction(instruction) => instruction.write_dem(out, indent),
-            Self::RepeatBlock(repeat) => repeat.write_dem(out, indent),
+            Self::Instruction(instruction) => instruction.write_dem(out, indent, floats),
+            Self::RepeatBlock(repeat) => repeat.write_dem(out, indent, floats),
         }
     }
 
-    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+    fn write_dem_io<W: Write>(
+        &self,
+        out: &mut W,
+        indent: usize,
+        floats: &mut DemFloatCache,
+    ) -> io::Result<()> {
         match self {
-            Self::Instruction(instruction) => instruction.write_dem_io(out, indent),
-            Self::RepeatBlock(repeat) => repeat.write_dem_io(out, indent),
+            Self::Instruction(instruction) => instruction.write_dem_io(out, indent, floats),
+            Self::RepeatBlock(repeat) => repeat.write_dem_io(out, indent, floats),
         }
     }
 }
@@ -338,7 +360,7 @@ impl DemRepeatBlock {
         self.tag.as_ref().map(DemTag::as_bytes)
     }
 
-    fn write_dem(&self, out: &mut String, indent: usize) {
+    fn write_dem(&self, out: &mut String, indent: usize, floats: &mut DemFloatCache) {
         write_indent(out, indent);
         out.push_str("repeat");
         write_optional_tag(out, self.tag.as_ref());
@@ -349,12 +371,17 @@ impl DemRepeatBlock {
         if self.body.items.is_empty() {
             out.push('\n');
         }
-        self.body.write_dem(out, indent + 4);
+        self.body.write_dem(out, indent + 4, floats);
         write_indent(out, indent);
         out.push_str("}\n");
     }
 
-    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+    fn write_dem_io<W: Write>(
+        &self,
+        out: &mut W,
+        indent: usize,
+        floats: &mut DemFloatCache,
+    ) -> io::Result<()> {
         write_indent_io(out, indent)?;
         out.write_all(b"repeat")?;
         write_optional_tag_io(out, self.tag.as_ref())?;
@@ -362,7 +389,7 @@ impl DemRepeatBlock {
         if self.body.items.is_empty() {
             out.write_all(b"\n")?;
         }
-        self.body.write_dem_io(out, indent + 4)?;
+        self.body.write_dem_io(out, indent + 4, floats)?;
         write_indent_io(out, indent)?;
         out.write_all(b"}\n")
     }
@@ -559,20 +586,25 @@ impl DemInstruction {
         }
     }
 
-    fn write_dem(&self, out: &mut String, indent: usize) {
+    fn write_dem(&self, out: &mut String, indent: usize, floats: &mut DemFloatCache) {
         write_indent(out, indent);
         out.push_str(self.kind.canonical_name());
         write_optional_tag(out, self.tag.as_ref());
-        write_args(out, &self.args);
+        write_args(out, &self.args, floats);
         write_dem_targets(out, &self.targets);
         out.push('\n');
     }
 
-    fn write_dem_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+    fn write_dem_io<W: Write>(
+        &self,
+        out: &mut W,
+        indent: usize,
+        floats: &mut DemFloatCache,
+    ) -> io::Result<()> {
         write_indent_io(out, indent)?;
         out.write_all(self.kind.canonical_name().as_bytes())?;
         write_optional_tag_io(out, self.tag.as_ref())?;
-        write_args_io(out, &self.args)?;
+        write_args_io(out, &self.args, floats)?;
         write_dem_targets_io(out, &self.targets)?;
         out.write_all(b"\n")
     }
@@ -805,7 +837,7 @@ fn write_optional_tag(out: &mut String, tag: Option<&DemTag>) {
     out.push(']');
 }
 
-fn write_optional_tag_io(out: &mut impl Write, tag: Option<&DemTag>) -> io::Result<()> {
+fn write_optional_tag_io<W: Write>(out: &mut W, tag: Option<&DemTag>) -> io::Result<()> {
     let Some(tag) = tag else {
         return Ok(());
     };
@@ -814,7 +846,7 @@ fn write_optional_tag_io(out: &mut impl Write, tag: Option<&DemTag>) -> io::Resu
     out.write_all(b"]")
 }
 
-fn write_args(out: &mut String, args: &[f64]) {
+fn write_args(out: &mut String, args: &[f64], floats: &mut DemFloatCache) {
     if args.is_empty() {
         return;
     }
@@ -823,12 +855,17 @@ fn write_args(out: &mut String, args: &[f64]) {
         if index > 0 {
             out.push_str(", ");
         }
-        out.push_str(format_dem_float(*arg).as_str());
+        // The cache returns the ASCII text of `format_dem_float`.
+        out.extend(floats.format(*arg).iter().copied().map(char::from));
     }
     out.push(')');
 }
 
-fn write_args_io(out: &mut impl Write, args: &[f64]) -> io::Result<()> {
+fn write_args_io<W: Write>(
+    out: &mut W,
+    args: &[f64],
+    floats: &mut DemFloatCache,
+) -> io::Result<()> {
     if args.is_empty() {
         return Ok(());
     }
@@ -837,7 +874,7 @@ fn write_args_io(out: &mut impl Write, args: &[f64]) -> io::Result<()> {
         if index > 0 {
             out.write_all(b", ")?;
         }
-        out.write_all(format_dem_float(*arg).as_bytes())?;
+        out.write_all(floats.format(*arg))?;
     }
     out.write_all(b")")
 }
@@ -849,14 +886,14 @@ fn write_dem_targets(out: &mut String, targets: &[DemTarget]) {
     }
 }
 
-fn write_dem_targets_io(out: &mut impl Write, targets: &[DemTarget]) -> io::Result<()> {
+fn write_dem_targets_io<W: Write>(out: &mut W, targets: &[DemTarget]) -> io::Result<()> {
     for target in targets {
         write!(out, " {target}")?;
     }
     Ok(())
 }
 
-fn write_indent_io(out: &mut impl Write, indent: usize) -> io::Result<()> {
+fn write_indent_io<W: Write>(out: &mut W, indent: usize) -> io::Result<()> {
     for _ in 0..indent {
         out.write_all(b" ")?;
     }

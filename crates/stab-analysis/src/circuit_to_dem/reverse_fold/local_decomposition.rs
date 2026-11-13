@@ -1,26 +1,36 @@
-use std::collections::{BTreeMap, BTreeSet};
-
-use stab_model::{DemTarget, Probability};
+use stab_model::{DemDetectorId, DemTarget, Probability};
 
 use crate::{AnalysisError, AnalysisResult};
 
-pub(super) fn locally_decompose_combinations(
-    basis_errors: &[BTreeSet<DemTarget>],
+/// Pinned Stim assigns each detector of a composite error one bit of a 16-bit local mask.
+const MAX_LOCAL_DETECTORS: usize = 16;
+
+/// Rewrites composite-error combinations as graphlike components where the basis errors allow.
+///
+/// `joined` is a reused buffer; each rewritten combination swaps storage with it.
+pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
+    basis_errors: &[B],
     combinations: &mut [Vec<DemTarget>],
+    joined: &mut Vec<DemTarget>,
 ) -> AnalysisResult<()> {
-    let mut involved_detectors = BTreeMap::new();
+    // First-seen order assigns the mask bits, like the ordered insertion it ports.
+    let mut involved_detectors = [None::<DemDetectorId>; MAX_LOCAL_DETECTORS];
+    let mut involved_count = 0;
     for basis in basis_errors {
-        for target in basis {
-            if let DemTarget::RelativeDetector(detector) = target {
-                let next = involved_detectors.len();
-                if !involved_detectors.contains_key(detector) {
-                    if next >= 16 {
-                        return Err(AnalysisError::invalid_detector_error_model(
-                            "an error case in a composite error exceeded 16 detector symptoms",
-                        ));
-                    }
-                    involved_detectors.insert(*detector, next);
-                }
+        for target in basis.as_ref() {
+            if let DemTarget::RelativeDetector(detector) = target
+                && !involved_detectors
+                    .iter()
+                    .take(involved_count)
+                    .any(|seen| *seen == Some(*detector))
+            {
+                let slot = involved_detectors.get_mut(involved_count).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model(
+                        "an error case in a composite error exceeded 16 detector symptoms",
+                    )
+                })?;
+                *slot = Some(*detector);
+                involved_count += 1;
             }
         }
     }
@@ -30,11 +40,15 @@ pub(super) fn locally_decompose_combinations(
         let mut mask = 0_u64;
         for target in targets {
             if let DemTarget::RelativeDetector(detector) = target {
-                let bit = involved_detectors.get(detector).copied().ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "composite error detector has no local mask",
-                    )
-                })?;
+                let bit = involved_detectors
+                    .iter()
+                    .take(involved_count)
+                    .position(|seen| *seen == Some(*detector))
+                    .ok_or_else(|| {
+                        AnalysisError::invalid_detector_error_model(
+                            "composite error detector has no local mask",
+                        )
+                    })?;
                 mask ^= 1_u64 << bit;
             }
         }
@@ -83,7 +97,7 @@ pub(super) fn locally_decompose_combinations(
             continue;
         }
         let goal = *indexed(&detector_masks, goal_index, "composite error detector mask")?;
-        let mut components = Vec::new();
+        joined.clear();
         let mut remnants = if goal & !single_detector_union == 0 {
             goal
         } else {
@@ -101,8 +115,9 @@ pub(super) fn locally_decompose_combinations(
                 }
             }
             if let Some((pair, pair_mask)) = contained_pair {
-                components.push(
-                    indexed(combinations, pair, "irreducible composite error component")?.clone(),
+                push_component(
+                    joined,
+                    indexed(combinations, pair, "irreducible composite error component")?,
                 );
                 goal & !pair_mask
             } else if let Some((left, right)) = find_two_disjoint_pairs(
@@ -111,16 +126,14 @@ pub(super) fn locally_decompose_combinations(
                 &irreducible_pairs,
                 &detector_masks,
             )? {
-                let left_component =
-                    indexed(combinations, left, "left composite error pair")?.clone();
-                let right_component =
-                    indexed(combinations, right, "right composite error pair")?.clone();
+                let left_component = indexed(combinations, left, "left composite error pair")?;
+                let right_component = indexed(combinations, right, "right composite error pair")?;
                 if left_component <= right_component {
-                    components.push(left_component);
-                    components.push(right_component);
+                    push_component(joined, left_component);
+                    push_component(joined, right_component);
                 } else {
-                    components.push(right_component);
-                    components.push(left_component);
+                    push_component(joined, right_component);
+                    push_component(joined, left_component);
                 }
                 let left_mask = *indexed(&detector_masks, left, "left composite error pair mask")?;
                 let right_mask =
@@ -155,14 +168,21 @@ pub(super) fn locally_decompose_combinations(
                 ));
             };
             remnants &= !detector_mask;
-            components
-                .push(indexed(combinations, single, "single composite error component")?.clone());
+            push_component(
+                joined,
+                indexed(combinations, single, "single composite error component")?,
+            );
         }
-        *indexed_mut(
-            combinations,
-            goal_index,
-            "decomposed composite error component",
-        )? = join_error_components(&components);
+        // Components are solved singles and pairs, which are never rewritten, so reading them
+        // before replacing the goal matches joining copies taken up front.
+        std::mem::swap(
+            indexed_mut(
+                combinations,
+                goal_index,
+                "decomposed composite error component",
+            )?,
+            joined,
+        );
     }
     Ok(())
 }
@@ -187,15 +207,12 @@ fn find_two_disjoint_pairs(
     Ok(None)
 }
 
-fn join_error_components(components: &[Vec<DemTarget>]) -> Vec<DemTarget> {
-    let mut joined = Vec::new();
-    for (index, component) in components.iter().enumerate() {
-        if index > 0 {
-            joined.push(DemTarget::separator());
-        }
-        joined.extend(component.iter().copied());
+/// Appends one component, separated from any previous component.
+fn push_component(joined: &mut Vec<DemTarget>, component: &[DemTarget]) {
+    if !joined.is_empty() {
+        joined.push(DemTarget::separator());
     }
-    joined
+    joined.extend_from_slice(component);
 }
 
 pub(super) fn merge_indistinguishable_disjoint_probabilities(
@@ -265,23 +282,24 @@ mod tests {
 
     use super::*;
 
-    fn detector_basis_errors(count: u64) -> AnalysisResult<Vec<BTreeSet<DemTarget>>> {
+    fn detector_basis_errors(count: u64) -> AnalysisResult<Vec<Vec<DemTarget>>> {
         (0..count)
-            .map(|detector| Ok(BTreeSet::from([DemTarget::relative_detector(detector)?])))
+            .map(|detector| Ok(vec![DemTarget::relative_detector(detector)?]))
             .collect()
     }
 
     #[test]
     fn local_decomposition_accepts_sixteen_detector_symptoms() -> AnalysisResult<()> {
         let basis_errors = detector_basis_errors(16)?;
-        locally_decompose_combinations(&basis_errors, &mut [Vec::new()])
+        locally_decompose_combinations(&basis_errors, &mut [Vec::new()], &mut Vec::new())
     }
 
     #[test]
     fn local_decomposition_rejects_seventeen_detector_symptoms() -> AnalysisResult<()> {
         let basis_errors = detector_basis_errors(17)?;
-        let error = locally_decompose_combinations(&basis_errors, &mut [Vec::new()])
-            .expect_err("seventeen detector symptoms must exceed the local mask contract");
+        let error =
+            locally_decompose_combinations(&basis_errors, &mut [Vec::new()], &mut Vec::new())
+                .expect_err("seventeen detector symptoms must exceed the local mask contract");
         assert!(error.to_string().contains("exceeded 16 detector symptoms"));
         Ok(())
     }

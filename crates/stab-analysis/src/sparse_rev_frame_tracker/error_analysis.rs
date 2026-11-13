@@ -1,12 +1,9 @@
-use std::collections::BTreeSet;
-
 use stab_model::{DemTarget, Pauli, QubitId};
 
+use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
-use super::{
-    Anticommutation, SparseReverseFrameTracker, TrackerBasis, TrackerLocation, toggle_targets,
-};
+use super::{Anticommutation, SparseReverseFrameTracker, TrackerBasis, TrackerLocation};
 
 impl SparseReverseFrameTracker {
     pub(crate) fn new_for_error_analysis(
@@ -26,16 +23,23 @@ impl SparseReverseFrameTracker {
         tracker
     }
 
-    pub(crate) fn take_gauge_errors(&mut self) -> Vec<BTreeSet<DemTarget>> {
+    /// Returns gauge errors recorded since the last call; usually none.
+    pub(crate) fn take_gauge_errors(&mut self) -> Vec<TargetXorSet> {
         std::mem::take(&mut self.gauge_errors)
     }
 
-    pub(crate) fn error_sensitivity(
+    pub(crate) fn has_gauge_errors(&self) -> bool {
+        !self.gauge_errors.is_empty()
+    }
+
+    /// Writes the sorted symptoms of a Pauli error on `qubit` into `out`.
+    pub(crate) fn error_sensitivity_into(
         &self,
         qubit: QubitId,
         pauli: Pauli,
-    ) -> AnalysisResult<BTreeSet<DemTarget>> {
-        self.anticommuting_sensitivity(qubit, TrackerBasis::from_pauli(pauli))
+        out: &mut Vec<DemTarget>,
+    ) -> AnalysisResult<()> {
+        self.anticommuting_sensitivity_into(qubit, TrackerBasis::from_pauli(pauli), out)
     }
 
     pub(super) fn check_measurement_gauge(
@@ -43,21 +47,17 @@ impl SparseReverseFrameTracker {
         qubit: QubitId,
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
-        self.check_gauge(qubit, basis, self.anticommuting_sensitivity(qubit, basis)?)
+        self.check_gauge(qubit, basis)
     }
 
     pub(super) fn check_product_measurement_gauge(
         &mut self,
         terms: &[(QubitId, TrackerBasis)],
     ) -> AnalysisResult<()> {
-        let mut gauge = BTreeSet::new();
-        for (qubit, basis) in terms {
-            toggle_targets(
-                &mut gauge,
-                self.anticommuting_sensitivity(*qubit, *basis)?
-                    .iter()
-                    .copied(),
-            );
+        let gauge = self.product_anticommuting_sensitivity(terms)?;
+        if gauge.is_empty() {
+            self.scratch.recycle(gauge);
+            return Ok(());
         }
         self.check_product_gauge(terms, gauge)
     }
@@ -67,22 +67,26 @@ impl SparseReverseFrameTracker {
         qubit: QubitId,
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
-        self.check_gauge(qubit, basis, self.anticommuting_sensitivity(qubit, basis)?)
+        self.check_gauge(qubit, basis)
     }
 
-    fn check_gauge(
-        &mut self,
-        qubit: QubitId,
-        basis: TrackerBasis,
-        gauge: BTreeSet<DemTarget>,
-    ) -> AnalysisResult<()> {
-        self.check_product_gauge(&[(qubit, basis)], gauge)
+    fn check_gauge(&mut self, qubit: QubitId, basis: TrackerBasis) -> AnalysisResult<()> {
+        let mut gauge = self.scratch.take_operand();
+        self.anticommuting_sensitivity_into(qubit, basis, &mut gauge)?;
+        if gauge.is_empty() {
+            self.scratch.operand = gauge;
+            return Ok(());
+        }
+        let mut owned = self.scratch.take_set();
+        owned.assign_sorted(&gauge);
+        self.scratch.operand = gauge;
+        self.check_product_gauge(&[(qubit, basis)], owned)
     }
 
     fn check_product_gauge(
         &mut self,
         terms: &[(QubitId, TrackerBasis)],
-        gauge: BTreeSet<DemTarget>,
+        gauge: TargetXorSet,
     ) -> AnalysisResult<()> {
         if gauge.is_empty() {
             return Ok(());
@@ -140,7 +144,7 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
-    fn eliminate_detector_gauge(&mut self, gauge: &BTreeSet<DemTarget>) {
+    fn eliminate_detector_gauge(&mut self, gauge: &TargetXorSet) {
         let Some(pivot) = gauge
             .iter()
             .filter_map(|target| match target {
@@ -154,24 +158,16 @@ impl SparseReverseFrameTracker {
         else {
             return;
         };
-        for targets in self.xs.values_mut() {
+        let merge = &mut self.scratch.merge;
+        for targets in self
+            .xs
+            .values_mut()
+            .chain(self.zs.values_mut())
+            .chain(self.rec_bits.values_mut())
+            .chain(self.observable_effects.values_mut())
+        {
             if targets.contains(&pivot) {
-                toggle_targets(targets, gauge.iter().copied());
-            }
-        }
-        for targets in self.zs.values_mut() {
-            if targets.contains(&pivot) {
-                toggle_targets(targets, gauge.iter().copied());
-            }
-        }
-        for targets in self.rec_bits.values_mut() {
-            if targets.contains(&pivot) {
-                toggle_targets(targets, gauge.iter().copied());
-            }
-        }
-        for targets in self.observable_effects.values_mut() {
-            if targets.contains(&pivot) {
-                toggle_targets(targets, gauge.iter().copied());
+                targets.xor_sorted(gauge.as_slice(), merge);
             }
         }
         self.xs.retain(|_, targets| !targets.is_empty());

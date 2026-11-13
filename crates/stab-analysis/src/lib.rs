@@ -25,6 +25,7 @@ mod matched_error;
 mod resources;
 mod sparse_rev_frame_tracker;
 mod tableau_circuit;
+mod target_xor_set;
 
 pub use circuit::circuit_without_tags;
 pub use circuit_detecting_regions::{

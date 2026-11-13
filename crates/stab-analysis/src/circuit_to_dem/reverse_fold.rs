@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, DemInstruction, DemInstructionKind, DemItem,
@@ -7,21 +7,22 @@ use stab_model::{
 };
 
 use super::{
-    AnalyzerTag, ErrorAnalyzerOptions,
-    decompose::decompose_tagged_error_probabilities,
+    ErrorAnalyzerOptions,
+    decompose::decompose_accumulated_errors,
     effects::AnalyzerPauli,
+    error_accumulator::{ErrorAccumulator, TagId},
     error_decomp::{
         depolarize1_independent_channel_probability, depolarize2_independent_channel_probability,
         pauli_channel2_components,
     },
-    owned_tag,
-    probabilities::{merge_disjoint_probability, merge_independent_probability},
+    probabilities::merge_disjoint_probability,
     try_disjoint_to_independent_xyz_errors,
 };
 use crate::sparse_rev_frame_tracker::{
     AnalyzerProbeBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
     search_shifted_recurrence,
 };
+use crate::target_xor_set::{TargetXorSet, xor_merge_into};
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError};
 
 mod local_decomposition;
@@ -32,14 +33,26 @@ mod tests;
 use local_decomposition::{
     locally_decompose_combinations, merge_indistinguishable_disjoint_probabilities,
 };
-use output::unreverse_model;
+use output::{SeenTargets, unreverse_model};
 
 #[cfg(not(test))]
 const MAX_LOOP_CYCLE_STEPS: u64 = 1_000_000;
 #[cfg(test)]
 const MAX_LOOP_CYCLE_STEPS: u64 = 4_096;
 
-type ErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
+/// Composite channels combine at most four basis errors (two-qubit depolarization).
+const MAX_COMBINATION_BASES: usize = 4;
+
+/// Reused buffers for symptom sets built while recording errors.
+#[derive(Debug, Default)]
+struct AnalyzerScratch {
+    sensitivity: Vec<DemTarget>,
+    merge: Vec<DemTarget>,
+    composite: TargetXorSet,
+    bases: [Vec<DemTarget>; MAX_COMBINATION_BASES],
+    combinations: Vec<Vec<DemTarget>>,
+    joined: Vec<DemTarget>,
+}
 
 pub(super) fn try_analyze(
     circuit: &Circuit,
@@ -59,7 +72,8 @@ struct ReverseFoldAnalyzer {
     tracker: SparseReverseFrameTracker,
     ticks_left: u64,
     reversed_model: DetectorErrorModel,
-    error_probabilities: BTreeMap<ErrorKey, Probability>,
+    errors: ErrorAccumulator,
+    scratch: AnalyzerScratch,
     probe_budget: AnalyzerProbeBudget,
     /// ELSE_CORRELATED_ERROR instructions seen (in reverse) since the last
     /// unrelated instruction, awaiting their leading E (error_analyzer.cc:673).
@@ -84,7 +98,8 @@ impl ReverseFoldAnalyzer {
             ),
             ticks_left: circuit.count_ticks()?,
             reversed_model: DetectorErrorModel::new(),
-            error_probabilities: BTreeMap::new(),
+            errors: ErrorAccumulator::new(),
+            scratch: AnalyzerScratch::default(),
             probe_budget: AnalyzerProbeBudget::new(MAX_LOOP_CYCLE_STEPS),
             stacked_else_correlated: Vec::new(),
         })
@@ -95,9 +110,11 @@ impl ReverseFoldAnalyzer {
         self.tracker.undo_implicit_rz_at_start_of_circuit()?;
         self.collect_gauge_errors()?;
         self.flush()?;
+        let mut model = std::mem::take(&mut self.reversed_model);
         let mut base_detector_id = 0_u64;
-        let mut seen = BTreeSet::new();
-        unreverse_model(&self.reversed_model, &mut base_detector_id, &mut seen)
+        let mut seen = SeenTargets::new();
+        unreverse_model(&mut model, &mut base_detector_id, &mut seen)?;
+        Ok(model)
     }
 
     fn undo_circuit(&mut self, circuit: &Circuit) -> AnalysisResult<()> {
@@ -220,9 +237,10 @@ impl ReverseFoldAnalyzer {
                 instruction.gate().canonical_name()
             ))
         })?;
+        let tag = self.errors.intern_tag(instruction.tag_bytes())?;
         for index in (start..end).rev() {
-            let targets = self.tracker.record_targets_at(index)?;
-            self.add_independent_error(probability, targets, owned_tag(instruction.tag_bytes()))?;
+            let targets = self.tracker.record_targets_slice_at(index)?;
+            add_independent_error(&mut self.errors, probability, targets, tag)?;
         }
         Ok(())
     }
@@ -235,6 +253,7 @@ impl ReverseFoldAnalyzer {
         let Some(probability) = instruction.probability_argument()? else {
             return Ok(());
         };
+        let tag = self.errors.intern_tag(instruction.tag_bytes())?;
         for target in instruction.targets() {
             let qubit = target.qubit_id().ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model(format!(
@@ -242,8 +261,14 @@ impl ReverseFoldAnalyzer {
                     instruction.gate().canonical_name()
                 ))
             })?;
-            let targets = self.tracker.error_sensitivity(qubit, pauli)?;
-            self.add_independent_error(probability, targets, owned_tag(instruction.tag_bytes()))?;
+            self.tracker
+                .error_sensitivity_into(qubit, pauli, &mut self.scratch.sensitivity)?;
+            add_independent_error(
+                &mut self.errors,
+                probability,
+                &self.scratch.sensitivity,
+                tag,
+            )?;
         }
         Ok(())
     }
@@ -295,8 +320,14 @@ impl ReverseFoldAnalyzer {
         instruction: &CircuitInstruction,
         probability: Probability,
     ) -> AnalysisResult<()> {
-        let targets = self.composite_error_targets(instruction.targets())?;
-        self.add_independent_error(probability, targets, owned_tag(instruction.tag_bytes()))
+        self.composite_error_targets(instruction.targets())?;
+        let tag = self.errors.intern_tag(instruction.tag_bytes())?;
+        add_independent_error(
+            &mut self.errors,
+            probability,
+            self.scratch.composite.as_slice(),
+            tag,
+        )
     }
 
     fn require_no_pending_else_chain(&self) -> AnalysisResult<()> {
@@ -381,8 +412,16 @@ impl ReverseFoldAnalyzer {
                 ))
             })?;
             let herald = self.tracker.pop_record_sensitivity()?;
+            self.load_bases(&[(qubit, Pauli::Z), (qubit, Pauli::X)])?;
+            let herald_basis = self.scratch.bases.get_mut(2).ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "heralded error basis slot is out of range",
+                )
+            })?;
+            herald_basis.clear();
+            herald_basis.extend_from_slice(herald.as_slice());
             self.record_error_combinations(
-                vec![
+                &mut [
                     channels[0],
                     zero,
                     zero,
@@ -392,11 +431,7 @@ impl ReverseFoldAnalyzer {
                     channels[3],
                     channels[4],
                 ],
-                vec![
-                    self.tracker.error_sensitivity(qubit, Pauli::Z)?,
-                    self.tracker.error_sensitivity(qubit, Pauli::X)?,
-                    herald,
-                ],
+                3,
                 true,
                 instruction.tag_bytes(),
             )?;
@@ -415,17 +450,15 @@ impl ReverseFoldAnalyzer {
                     "DEPOLARIZE1 target {target} is not a qubit"
                 ))
             })?;
+            self.load_bases(&[(qubit, Pauli::Z), (qubit, Pauli::X)])?;
             self.record_error_combinations(
-                vec![
+                &mut [
                     Probability::try_new(0.0)?,
                     independent,
                     independent,
                     independent,
                 ],
-                vec![
-                    self.tracker.error_sensitivity(qubit, Pauli::Z)?,
-                    self.tracker.error_sensitivity(qubit, Pauli::X)?,
-                ],
+                2,
                 false,
                 instruction.tag_bytes(),
             )?;
@@ -454,24 +487,16 @@ impl ReverseFoldAnalyzer {
                     "DEPOLARIZE2 right target is not a qubit",
                 )
             })?;
-            let mut probabilities = vec![independent; 16];
-            let first = probabilities.first_mut().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "DEPOLARIZE2 probability table was unexpectedly empty",
-                )
-            })?;
+            let mut probabilities = [independent; 16];
+            let [first, ..] = &mut probabilities;
             *first = Probability::try_new(0.0)?;
-            self.record_error_combinations(
-                probabilities,
-                vec![
-                    self.tracker.error_sensitivity(left, Pauli::Z)?,
-                    self.tracker.error_sensitivity(left, Pauli::X)?,
-                    self.tracker.error_sensitivity(right, Pauli::Z)?,
-                    self.tracker.error_sensitivity(right, Pauli::X)?,
-                ],
-                false,
-                instruction.tag_bytes(),
-            )?;
+            self.load_bases(&[
+                (left, Pauli::Z),
+                (left, Pauli::X),
+                (right, Pauli::Z),
+                (right, Pauli::X),
+            ])?;
+            self.record_error_combinations(&mut probabilities, 4, false, instruction.tag_bytes())?;
         }
         Ok(())
     }
@@ -506,18 +531,28 @@ impl ReverseFoldAnalyzer {
                 [(*x, Pauli::X), (*y, Pauli::Y), (*z, Pauli::Z)]
             };
             if independent.is_some() {
+                let tag = self.errors.intern_tag(instruction.tag_bytes())?;
                 for (probability, pauli) in components {
-                    self.add_independent_error(
+                    self.tracker.error_sensitivity_into(
+                        qubit,
+                        pauli,
+                        &mut self.scratch.sensitivity,
+                    )?;
+                    add_independent_error(
+                        &mut self.errors,
                         probability,
-                        self.tracker.error_sensitivity(qubit, pauli)?,
-                        owned_tag(instruction.tag_bytes()),
+                        &self.scratch.sensitivity,
+                        tag,
                     )?;
                 }
             } else {
                 let disjoint = components
                     .into_iter()
                     .map(|(probability, pauli)| {
-                        Ok((probability, self.tracker.error_sensitivity(qubit, pauli)?))
+                        let mut targets = Vec::new();
+                        self.tracker
+                            .error_sensitivity_into(qubit, pauli, &mut targets)?;
+                        Ok((probability, targets))
                     })
                     .collect::<AnalysisResult<Vec<_>>>()?;
                 self.add_disjoint_components(disjoint, instruction.tag_bytes())?;
@@ -598,7 +633,7 @@ impl ReverseFoldAnalyzer {
 
     fn add_disjoint_components(
         &mut self,
-        components: impl IntoIterator<Item = (Probability, BTreeSet<DemTarget>)>,
+        components: impl IntoIterator<Item = (Probability, Vec<DemTarget>)>,
         tag: Option<&[u8]>,
     ) -> AnalysisResult<()> {
         let mut disjoint = BTreeMap::new();
@@ -606,27 +641,39 @@ impl ReverseFoldAnalyzer {
             if probability.get() == 0.0 || targets.is_empty() {
                 continue;
             }
-            merge_disjoint_probability(
-                &mut disjoint,
-                targets.into_iter().collect::<Vec<_>>(),
-                probability,
-            )?;
+            merge_disjoint_probability(&mut disjoint, targets, probability)?;
         }
+        let tag = self.errors.intern_tag(tag)?;
         for (targets, probability) in disjoint {
-            self.add_independent_error(probability, targets.into_iter().collect(), owned_tag(tag))?;
+            add_independent_error(&mut self.errors, probability, &targets, tag)?;
         }
         Ok(())
     }
 
+    /// Loads the symptom sets of single-qubit Pauli errors into the leading basis slots.
+    fn load_bases(&mut self, errors: &[(QubitId, Pauli)]) -> AnalysisResult<()> {
+        for (index, &(qubit, pauli)) in errors.iter().enumerate() {
+            let basis = self.scratch.bases.get_mut(index).ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "composite error basis index is out of range",
+                )
+            })?;
+            self.tracker.error_sensitivity_into(qubit, pauli, basis)?;
+        }
+        Ok(())
+    }
+
+    /// Records every combination of the first `basis_count` loaded basis errors, where
+    /// `probabilities[mask]` belongs to the XOR of the bases selected by `mask`.
     fn record_error_combinations(
         &mut self,
-        mut probabilities: Vec<Probability>,
-        basis_errors: Vec<BTreeSet<DemTarget>>,
+        probabilities: &mut [Probability],
+        basis_count: usize,
         probabilities_are_disjoint: bool,
         tag: Option<&[u8]>,
     ) -> AnalysisResult<()> {
         let combination_count = 1_usize
-            .checked_shl(u32::try_from(basis_errors.len()).map_err(|_| {
+            .checked_shl(u32::try_from(basis_count).map_err(|_| {
                 AnalysisError::invalid_detector_error_model(
                     "composite error basis count does not fit u32",
                 )
@@ -642,39 +689,50 @@ impl ReverseFoldAnalyzer {
                 probabilities.len()
             )));
         }
-
-        let mut targets = vec![BTreeSet::new(); combination_count];
+        let bases = self.scratch.bases.get(..basis_count).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "composite error basis index is out of range",
+            )
+        })?;
+        let combinations = &mut self.scratch.combinations;
+        if combinations.len() < combination_count {
+            combinations.resize_with(combination_count, Vec::new);
+        }
+        let combinations = combinations.get_mut(..combination_count).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "composite error target index is out of range",
+            )
+        })?;
+        if let Some(empty) = combinations.first_mut() {
+            empty.clear();
+        }
         for mask in 1..combination_count {
             let bit = mask.trailing_zeros() as usize;
             let previous = mask & (mask - 1);
-            let basis = basis_errors.get(bit).ok_or_else(|| {
+            let basis = bases.get(bit).ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model(
                     "composite error basis index is out of range",
                 )
             })?;
-            let mut combined = targets.get(previous).cloned().ok_or_else(|| {
+            let (earlier, later) = combinations.split_at_mut(mask);
+            let previous = earlier.get(previous).ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model(
                     "composite error predecessor is out of range",
                 )
             })?;
-            toggle_targets(&mut combined, basis.clone());
-            let slot = targets.get_mut(mask).ok_or_else(|| {
+            let slot = later.first_mut().ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model(
                     "composite error target index is out of range",
                 )
             })?;
-            *slot = combined;
+            xor_merge_into(previous, basis, slot);
         }
 
-        let mut target_vectors = targets
-            .into_iter()
-            .map(|targets| targets.into_iter().collect::<Vec<_>>())
-            .collect::<Vec<_>>();
         if self.options.decompose_errors {
-            locally_decompose_combinations(&basis_errors, &mut target_vectors)?;
+            locally_decompose_combinations(bases, combinations, &mut self.scratch.joined)?;
         }
         if probabilities_are_disjoint {
-            merge_indistinguishable_disjoint_probabilities(&target_vectors, &mut probabilities)?;
+            merge_indistinguishable_disjoint_probabilities(combinations, probabilities)?;
         }
         // Pinned Stim chains every slot through the accumulated map
         // (`add_error` per combination, error_analyzer.cc:1658-1660); slots
@@ -682,14 +740,17 @@ impl ReverseFoldAnalyzer {
         // `fma(old, 1 - p, (1 - old) * p)` rounding as cross-instruction
         // merges. An earlier pre-combined `l + r - 2lr` subtotal here was a
         // black-box misreading of that contraction.
-        for (probability, targets) in probabilities.into_iter().zip(target_vectors).skip(1) {
-            self.add_independent_error_targets(probability, targets, owned_tag(tag))?;
+        let tag = self.errors.intern_tag(tag)?;
+        for (probability, targets) in probabilities.iter().zip(combinations.iter()).skip(1) {
+            add_independent_error(&mut self.errors, *probability, targets, tag)?;
         }
         Ok(())
     }
 
-    fn composite_error_targets(&self, targets: &[Target]) -> AnalysisResult<BTreeSet<DemTarget>> {
-        let mut result = BTreeSet::new();
+    /// Writes the XOR of the symptoms of a correlated error's Pauli targets into
+    /// `scratch.composite`.
+    fn composite_error_targets(&mut self, targets: &[Target]) -> AnalysisResult<()> {
+        self.scratch.composite.clear();
         for target in targets {
             // Pinned Stim's correlated-error handlers consult only the Pauli
             // X/Z bits, so combiner targets and inversion bits are ignored
@@ -707,73 +768,67 @@ impl ReverseFoldAnalyzer {
                     "correlated error target {target} does not identify a qubit"
                 ))
             })?;
-            toggle_targets(&mut result, self.tracker.error_sensitivity(qubit, pauli)?);
+            self.tracker
+                .error_sensitivity_into(qubit, pauli, &mut self.scratch.sensitivity)?;
+            self.scratch
+                .composite
+                .xor_sorted(&self.scratch.sensitivity, &mut self.scratch.merge);
         }
-        Ok(result)
+        Ok(())
     }
 
     fn paired_error_targets(
-        &self,
+        &mut self,
         left: Option<(QubitId, Pauli)>,
         right: Option<(QubitId, Pauli)>,
-    ) -> AnalysisResult<BTreeSet<DemTarget>> {
-        let mut result = BTreeSet::new();
+    ) -> AnalysisResult<Vec<DemTarget>> {
+        let mut result = TargetXorSet::new();
         for (qubit, pauli) in left.into_iter().chain(right) {
-            toggle_targets(&mut result, self.tracker.error_sensitivity(qubit, pauli)?);
+            self.tracker
+                .error_sensitivity_into(qubit, pauli, &mut self.scratch.sensitivity)?;
+            result.xor_sorted(&self.scratch.sensitivity, &mut self.scratch.merge);
         }
-        Ok(result)
-    }
-
-    fn add_independent_error(
-        &mut self,
-        probability: Probability,
-        targets: BTreeSet<DemTarget>,
-        tag: Option<AnalyzerTag>,
-    ) -> AnalysisResult<()> {
-        self.add_independent_error_targets(probability, targets.into_iter().collect(), tag)
-    }
-
-    fn add_independent_error_targets(
-        &mut self,
-        probability: Probability,
-        targets: Vec<DemTarget>,
-        tag: Option<AnalyzerTag>,
-    ) -> AnalysisResult<()> {
-        if probability.get() == 0.0 || targets.is_empty() {
-            return Ok(());
-        }
-        merge_independent_probability(&mut self.error_probabilities, (targets, tag), probability)
+        Ok(result.as_slice().to_vec())
     }
 
     fn collect_gauge_errors(&mut self) -> AnalysisResult<()> {
+        if !self.tracker.has_gauge_errors() {
+            return Ok(());
+        }
         for targets in self.tracker.take_gauge_errors() {
-            self.add_independent_error(Probability::try_new(0.5)?, targets, None)?;
+            add_independent_error(
+                &mut self.errors,
+                Probability::try_new(0.5)?,
+                targets.as_slice(),
+                TagId::UNTAGGED,
+            )?;
         }
         Ok(())
     }
 
     fn flush(&mut self) -> AnalysisResult<()> {
-        let mut probabilities = std::mem::take(&mut self.error_probabilities);
         if self.options.decompose_errors {
-            probabilities = decompose_tagged_error_probabilities(
-                probabilities,
+            decompose_accumulated_errors(
+                &mut self.errors,
                 self.options
                     .block_decomposition_from_introducing_remnant_edges,
                 self.options.ignore_decomposition_failures,
             )?;
         }
-        for ((targets, tag), probability) in probabilities.into_iter().rev() {
+        for class in self.errors.sorted_classes()?.into_iter().rev() {
+            let probability = self.errors.probability(class)?;
+            let targets = self.errors.targets(class)?;
             if probability.get() != 0.0 && !targets.is_empty() {
                 self.reversed_model.push_instruction(
-                    stab_model::advanced::dem_instruction_with_tag_bytes(
-                        DemInstructionKind::Error,
-                        vec![probability.get()],
+                    stab_model::advanced::dem_error_instruction_from_targets(
+                        probability,
                         targets,
-                        tag.as_deref(),
+                        self.errors.tag_bytes(self.errors.tag(class)?),
                     )?,
                 );
             }
         }
+        self.errors.clear();
         Ok(())
     }
 
@@ -797,7 +852,7 @@ impl ReverseFoldAnalyzer {
             |probe| probe.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget),
         )?;
         let recurrence = match search {
-            ShiftedRecurrenceSearch::Found { recurrence } => recurrence,
+            ShiftedRecurrenceSearch::Found { recurrence } => *recurrence,
             ShiftedRecurrenceSearch::Exhausted { .. } => {
                 if iterations > super::MAX_ANALYZER_REPEAT_ITERATIONS {
                     return Err(ResourceLimitError::circuit_to_detector_error_model(
@@ -927,7 +982,7 @@ impl ReverseFoldAnalyzer {
                 )
             })?;
         if remaining_shift > 0 {
-            period_body = prepend_detector_shift(period_body, remaining_shift)?;
+            prepend_detector_shift(&mut period_body, remaining_shift)?;
         }
 
         self.reversed_model = outer_reversed;
@@ -957,69 +1012,51 @@ fn analyzer_pauli(pauli: AnalyzerPauli) -> Pauli {
     }
 }
 
-fn toggle_targets(target: &mut BTreeSet<DemTarget>, values: BTreeSet<DemTarget>) {
-    for value in values {
-        if !target.insert(value) {
-            target.remove(&value);
-        }
+fn add_independent_error(
+    errors: &mut ErrorAccumulator,
+    probability: Probability,
+    targets: &[DemTarget],
+    tag: TagId,
+) -> AnalysisResult<()> {
+    if probability.get() == 0.0 || targets.is_empty() {
+        return Ok(());
     }
+    errors.merge_independent(targets, tag, probability)
 }
 
+/// Adds `detector_shift` to the body's leading `shift_detectors`, or inserts one.
 fn prepend_detector_shift(
-    model: DetectorErrorModel,
+    model: &mut DetectorErrorModel,
     detector_shift: u64,
-) -> AnalysisResult<DetectorErrorModel> {
-    let mut result = DetectorErrorModel::new();
-    let mut items = model.items().iter();
-    match items.next() {
-        Some(DemItem::Instruction(instruction))
-            if instruction.kind() == DemInstructionKind::ShiftDetectors =>
-        {
-            let combined = stab_model::advanced::dem_instruction_detector_shift(instruction)?
-                .checked_add(detector_shift)
-                .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "folded analyzer detector shift overflowed",
-                    )
-                })?;
-            result.push_instruction(stab_model::advanced::dem_instruction_with_tag_bytes(
-                DemInstructionKind::ShiftDetectors,
-                instruction.args().to_vec(),
-                vec![DemTarget::numeric(combined)],
-                instruction.tag_bytes(),
-            )?);
-        }
-        Some(first) => {
-            result.push_instruction(DemInstruction::shift_detectors(
-                Vec::new(),
-                detector_shift,
-                None,
-            )?);
-            push_items(&mut result, std::slice::from_ref(first));
-        }
-        None => {
-            result.push_instruction(DemInstruction::shift_detectors(
-                Vec::new(),
-                detector_shift,
-                None,
-            )?);
-        }
+) -> AnalysisResult<()> {
+    let items = stab_model::advanced::dem_model_items_mut(model);
+    if let Some(DemItem::Instruction(instruction)) = items.first_mut()
+        && instruction.kind() == DemInstructionKind::ShiftDetectors
+    {
+        let combined = stab_model::advanced::dem_instruction_detector_shift(instruction)?
+            .checked_add(detector_shift)
+            .ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "folded analyzer detector shift overflowed",
+                )
+            })?;
+        *instruction = stab_model::advanced::dem_instruction_with_tag_bytes(
+            DemInstructionKind::ShiftDetectors,
+            instruction.args().to_vec(),
+            vec![DemTarget::numeric(combined)],
+            instruction.tag_bytes(),
+        )?;
+        return Ok(());
     }
-    for item in items {
-        push_items(&mut result, std::slice::from_ref(item));
-    }
-    Ok(result)
-}
-
-fn push_items(target: &mut DetectorErrorModel, items: &[DemItem]) {
-    for item in items {
-        match item {
-            DemItem::Instruction(instruction) => {
-                target.push_instruction(instruction.clone());
-            }
-            DemItem::RepeatBlock(repeat) => target.push_repeat_block(repeat.clone()),
-        }
-    }
+    items.insert(
+        0,
+        DemItem::Instruction(DemInstruction::shift_detectors(
+            Vec::new(),
+            detector_shift,
+            None,
+        )?),
+    );
+    Ok(())
 }
 
 fn checked_add(left: u64, right: u64, context: &str) -> AnalysisResult<u64> {

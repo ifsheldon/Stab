@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Bound, ControlFlow, Range, RangeBounds};
 
-use crate::{ModelError, ModelResult};
+use crate::{ModelError, ModelResult, Probability};
 
 use super::coordinate_scan::{
     MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
@@ -295,6 +295,57 @@ impl DemInstruction {
     /// stripping remains owned by the analysis layer.
     pub(crate) fn clear_tag(&mut self) {
         self.tag = None;
+    }
+
+    /// Builds a validated error instruction from a borrowed target slice.
+    pub(crate) fn error_from_targets(
+        probability: Probability,
+        targets: &[DemTarget],
+        tag: Option<&[u8]>,
+    ) -> ModelResult<Self> {
+        let mut args = super::DemArgVec::new();
+        args.push(probability.get());
+        Self::from_parts(
+            DemInstructionKind::Error,
+            args,
+            super::DemTargetVec::from_slice(targets),
+            tag.and_then(super::DemTag::from_slice),
+        )
+    }
+
+    /// Subtracts `base` from every relative detector target in place.
+    ///
+    /// Fails with the first detector id below `base` and leaves the instruction unchanged.
+    /// Lowering detector ids keeps every validated instruction shape valid.
+    pub(crate) fn rebase_detectors(&mut self, base: u64) -> Result<(), u64> {
+        if let Some(detector) = self.targets.iter().find_map(|target| match target {
+            DemTarget::RelativeDetector(detector) if detector.get() < base => Some(detector.get()),
+            _ => None,
+        }) {
+            return Err(detector);
+        }
+        for target in &mut self.targets {
+            if let DemTarget::RelativeDetector(detector) = target {
+                *detector = DemDetectorId(detector.get() - base);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl DetectorErrorModel {
+    /// Mutable item storage for consumers that rebuild a model in place.
+    ///
+    /// Items carry no cross-item invariants, so any sequence of valid items is a valid model.
+    pub(crate) fn items_mut(&mut self) -> &mut Vec<DemItem> {
+        &mut self.items
+    }
+}
+
+impl DemRepeatBlock {
+    /// Mutable access to the repeated body.
+    pub(crate) fn body_mut(&mut self) -> &mut DetectorErrorModel {
+        &mut self.body
     }
 }
 

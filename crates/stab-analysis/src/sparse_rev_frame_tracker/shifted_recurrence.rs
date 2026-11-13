@@ -14,10 +14,10 @@ pub(crate) struct ShiftedRecurrence {
 #[derive(Clone, Debug)]
 pub(crate) enum ShiftedRecurrenceSearch {
     Found {
-        recurrence: ShiftedRecurrence,
+        recurrence: Box<ShiftedRecurrence>,
     },
     Exhausted {
-        state: SparseReverseFrameTracker,
+        state: Box<SparseReverseFrameTracker>,
         iterations: u64,
     },
 }
@@ -59,7 +59,7 @@ where
     }
 
     Ok(ShiftedRecurrenceSearch::Exhausted {
-        state: hare,
+        state: Box::new(hare),
         iterations: hare_iterations,
     })
 }
@@ -81,12 +81,12 @@ fn found(
         ));
     }
     Ok(ShiftedRecurrenceSearch::Found {
-        recurrence: ShiftedRecurrence {
+        recurrence: Box::new(ShiftedRecurrence {
             cycle_start_state,
             cycle_end_state,
             transient_iterations,
             cycle_end_iterations,
             period,
-        },
+        }),
     })
 }

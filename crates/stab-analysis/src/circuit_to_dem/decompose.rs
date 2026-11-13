@@ -4,62 +4,61 @@ use stab_model::{DemTarget, Probability};
 
 use crate::{AnalysisError, AnalysisResult};
 
-use super::AnalyzerTag;
-use super::probabilities::xor_probability;
+use super::error_accumulator::ErrorAccumulator;
 
-/// Symptom keys hold the one or two detectors of a known graphlike component;
-/// values hold the component's full target span including observables.
-type KnownGraphlikeComponents = BTreeMap<Vec<DemTarget>, Vec<DemTarget>>;
-type TaggedErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
+/// The one or two detectors of a graphlike component, in component order.
+type GraphlikeKey = (DemTarget, Option<DemTarget>);
+
+/// Symptom keys of known graphlike components, mapped to the component's full target span
+/// including observables, borrowed from the accumulated error classes.
+type KnownGraphlikeComponents<'a> = BTreeMap<GraphlikeKey, &'a [DemTarget]>;
 
 /// Pinned Stim refuses to decompose a component with 64 or more terms
 /// (error_analyzer.cc:1466-1469).
 const MAX_PROBLEM_TERMS: usize = 64;
 
-pub(super) fn decompose_tagged_error_probabilities(
-    mut probabilities: BTreeMap<TaggedErrorKey, Probability>,
+pub(super) fn decompose_accumulated_errors(
+    errors: &mut ErrorAccumulator,
     block_remnant_edges: bool,
     ignore_failures: bool,
-) -> AnalysisResult<BTreeMap<TaggedErrorKey, Probability>> {
-    let known_graphlike = known_graphlike_components(
-        probabilities
-            .iter()
-            .map(|((targets, _tag), probability)| (targets, *probability)),
-    );
+) -> AnalysisResult<()> {
     // Pinned Stim plans every rewrite against the undecomposed classes, then moves each rewritten
     // class's current probability onto its decomposed key with `add_error`, in class order
     // (error_analyzer.cc:1516-1578). The merge rounds asymmetrically (see `xor_probability`), so
     // rewritten classes must merge into the classes already present, in that order, for
     // byte-exact probabilities.
+    let order = errors.sorted_classes()?;
     let mut rewrites = Vec::new();
-    for ((targets, tag), probability) in &probabilities {
-        // Pinned Stim's rewrite scan skips zero-probability, empty, and graphlike classes
-        // (error_analyzer.cc:1519-1526).
-        if probability.get() == 0.0 || targets.is_empty() || is_graphlike(targets) {
-            continue;
+    {
+        let mut classes = Vec::with_capacity(order.len());
+        for &class in &order {
+            classes.push((class, errors.targets(class)?, errors.probability(class)?));
         }
-        let decomposed = decompose_targets(
-            targets,
-            &known_graphlike,
-            block_remnant_edges,
-            ignore_failures,
-        )?;
-        rewrites.push(((targets.clone(), tag.clone()), decomposed));
-    }
-    for (original, decomposed) in rewrites {
-        let probability = probabilities.remove(&original).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "error decomposition lost a planned rewrite class",
-            )
-        })?;
-        let key = (decomposed, original.1);
-        if let Some(existing) = probabilities.get_mut(&key) {
-            *existing = xor_probability(*existing, probability)?;
-        } else {
-            probabilities.insert(key, probability);
+        let known_graphlike = known_graphlike_components(
+            classes
+                .iter()
+                .map(|&(_, targets, probability)| (targets, probability)),
+        );
+        for &(class, targets, probability) in &classes {
+            // Pinned Stim's rewrite scan skips zero-probability, empty, and graphlike classes
+            // (error_analyzer.cc:1519-1526).
+            if probability.get() == 0.0 || targets.is_empty() || is_graphlike(targets) {
+                continue;
+            }
+            let decomposed = decompose_targets(
+                targets,
+                &known_graphlike,
+                block_remnant_edges,
+                ignore_failures,
+            )?;
+            rewrites.push((class, decomposed));
         }
     }
-    Ok(probabilities)
+    for (class, decomposed) in rewrites {
+        let (probability, tag) = errors.remove(class)?;
+        errors.merge_independent(&decomposed, tag, probability)?;
+    }
+    Ok(())
 }
 
 fn decompose_targets(
@@ -96,8 +95,8 @@ fn decompose_targets(
 }
 
 fn known_graphlike_components<'a>(
-    entries: impl Iterator<Item = (&'a Vec<DemTarget>, Probability)>,
-) -> KnownGraphlikeComponents {
+    entries: impl Iterator<Item = (&'a [DemTarget], Probability)>,
+) -> KnownGraphlikeComponents<'a> {
     let mut known = BTreeMap::new();
     for (targets, probability) in entries {
         // Pinned Stim's known-symptom map skips zero-probability and empty
@@ -106,9 +105,8 @@ fn known_graphlike_components<'a>(
             continue;
         }
         for component in split_components(targets) {
-            let key = detector_key(component);
-            if matches!(key.len(), 1 | 2) {
-                known.insert(key, component.to_vec());
+            if let Some(key) = detector_key(component) {
+                known.insert(key, component);
             }
         }
     }
@@ -242,9 +240,9 @@ fn brute_force_decomposition(
                 continue;
             }
             used_term_mask ^= 1_u64 << k;
-            vec![*first, *second]
+            (*first, Some(*second))
         } else {
-            vec![*first]
+            (*first, None)
         };
         if let Some(component) = known_graphlike.get(&key) {
             let observable_change = observable_mask_of(component);
@@ -256,7 +254,7 @@ fn brute_force_decomposition(
                 known_graphlike,
                 matches,
             ) {
-                matches.push(component.clone());
+                matches.push(component.to_vec());
                 return true;
             }
         }
@@ -299,10 +297,10 @@ fn remnant_decomposition(
             let (Some(first), Some(second)) = (problem.get(k), problem.get(k2)) else {
                 continue;
             };
-            if let Some(component) = known_graphlike.get(&vec![*first, *second]) {
+            if let Some(component) = known_graphlike.get(&(*first, Some(*second))) {
                 set_done(&mut done, k);
                 set_done(&mut done, k2);
-                components.push(component.clone());
+                components.push(component.to_vec());
                 sparse.toggle_all(component)?;
                 break;
             }
@@ -313,10 +311,10 @@ fn remnant_decomposition(
     for k in 0..problem.len() {
         if !done.get(k).copied().unwrap_or(true)
             && let Some(first) = problem.get(k)
-            && let Some(component) = known_graphlike.get(&vec![*first])
+            && let Some(component) = known_graphlike.get(&(*first, None))
         {
             set_done(&mut done, k);
-            components.push(component.clone());
+            components.push(component.to_vec());
             sparse.toggle_all(component)?;
         }
         missed += usize::from(!done.get(k).copied().unwrap_or(true));
@@ -373,12 +371,18 @@ fn split_components(targets: &[DemTarget]) -> impl Iterator<Item = &[DemTarget]>
     targets.split(|target| matches!(target, DemTarget::Separator))
 }
 
-fn detector_key(targets: &[DemTarget]) -> Vec<DemTarget> {
-    targets
+/// The symptom key of a component with one or two detectors.
+fn detector_key(targets: &[DemTarget]) -> Option<GraphlikeKey> {
+    let mut detectors = targets
         .iter()
         .copied()
-        .filter(|target| matches!(target, DemTarget::RelativeDetector(_)))
-        .collect()
+        .filter(|target| matches!(target, DemTarget::RelativeDetector(_)));
+    let first = detectors.next()?;
+    let second = detectors.next();
+    if detectors.next().is_some() {
+        return None;
+    }
+    Some((first, second))
 }
 
 fn join_components(components: &[Vec<DemTarget>]) -> Vec<DemTarget> {

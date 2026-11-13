@@ -6,6 +6,7 @@
 )]
 
 use super::*;
+use stab_algebra::{PauliSign, SingleQubitClifford};
 use stab_model::{Gate, MeasureRecordOffset};
 
 use crate::{circuit_to_tableau, decomposed_circuit};
@@ -20,7 +21,7 @@ fn measurement_record_count(circuit: &Circuit) -> AnalysisResult<usize> {
 
 fn tracker_from_pauli_text(text: &str) -> SparseReverseFrameTracker {
     let mut tracker = SparseReverseFrameTracker::new(text.len(), 0, 0, true);
-    let sensitivity = BTreeSet::from([DemTarget::logical_observable(0).unwrap()]);
+    let sensitivity = [DemTarget::logical_observable(0).unwrap()];
     for (index, character) in text.chars().enumerate() {
         let qubit = QubitId::new(u32::try_from(index).unwrap()).unwrap();
         match character {
@@ -83,12 +84,12 @@ fn rec(offset: i32) -> Target {
     Target::measurement_record(MeasureRecordOffset::try_new(offset).unwrap())
 }
 
-fn single_pauli_set(id: u64) -> BTreeSet<DemTarget> {
-    BTreeSet::from([DemTarget::logical_observable(id).unwrap()])
+fn single_pauli_set(id: u64) -> TargetXorSet {
+    TargetXorSet::from_target(DemTarget::logical_observable(id).unwrap())
 }
 
-fn detector_set(id: u64) -> BTreeSet<DemTarget> {
-    BTreeSet::from([DemTarget::relative_detector(id).unwrap()])
+fn detector_set(id: u64) -> TargetXorSet {
+    TargetXorSet::from_target(DemTarget::relative_detector(id).unwrap())
 }
 
 #[test]
@@ -99,16 +100,12 @@ fn sparse_rev_frame_tracker_allocates_only_active_qubit_entries() {
 
     assert!(tracker.xs.is_empty());
     assert!(tracker.zs.is_empty());
-    tracker
-        .toggle_xs(qid(HIGH_QUBIT), &BTreeSet::from([target]))
-        .unwrap();
+    tracker.toggle_xs(qid(HIGH_QUBIT), &[target]).unwrap();
     assert_eq!(tracker.xs.len(), 1);
     assert!(tracker.xs_for(qid(HIGH_QUBIT)).unwrap().contains(&target));
     assert!(tracker.xs_for(qid(0)).unwrap().is_empty());
 
-    tracker
-        .toggle_xs(qid(HIGH_QUBIT), &BTreeSet::from([target]))
-        .unwrap();
+    tracker.toggle_xs(qid(HIGH_QUBIT), &[target]).unwrap();
     assert!(tracker.xs.is_empty());
 }
 
@@ -338,7 +335,7 @@ fn sparse_rev_frame_tracker_measure_resets_clear_then_move_feedback() {
     actual.measurement_count = 2;
     actual.rec_bits.insert(
         0,
-        BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
+        TargetXorSet::from_target(DemTarget::logical_observable(0).unwrap()),
     );
     actual.undo_instruction(&instruction("MRX 0 2\n")).unwrap();
     let mut expected = tracker_from_pauli_text("XII");
@@ -353,7 +350,7 @@ fn sparse_rev_frame_tracker_feedback_from_measurement_subset() {
         actual.measurement_count = 2;
         actual.rec_bits.insert(
             0,
-            BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
+            TargetXorSet::from_target(DemTarget::logical_observable(0).unwrap()),
         );
         actual
             .undo_instruction(&instruction(&format!("{gate} 0 2\n")))
@@ -383,7 +380,7 @@ fn sparse_rev_frame_tracker_feedback_into_measurement_subset() {
         expected.measurement_count = 12;
         expected.rec_bits.insert(
             7,
-            BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
+            TargetXorSet::from_target(DemTarget::logical_observable(0).unwrap()),
         );
         assert_eq!(actual, expected, "{gate}");
     }
@@ -423,7 +420,7 @@ fn sparse_rev_frame_tracker_pair_measurements_subset() {
         actual.measurement_count = 2;
         actual.rec_bits.insert(
             1,
-            BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
+            TargetXorSet::from_target(DemTarget::logical_observable(0).unwrap()),
         );
         actual
             .undo_instruction(&instruction(&format!("{gate} 0 1\n")))
@@ -487,7 +484,7 @@ fn sparse_rev_frame_tracker_undo_circuit_feedback_subset() {
         .zs
         .entry(qid(0))
         .or_default()
-        .insert(DemTarget::relative_detector(0).unwrap());
+        .xor_item(DemTarget::relative_detector(0).unwrap());
     assert_eq!(actual, expected);
 }
 
@@ -547,12 +544,24 @@ fn sparse_rev_frame_tracker_observable_include_paulis_subset() {
 
     assert!(tracker.xs_for(qid(0)).unwrap().is_empty());
     assert!(tracker.zs_for(qid(0)).unwrap().is_empty());
-    assert_eq!(tracker.xs_for(qid(1)).unwrap(), &single_pauli_set(5));
+    assert_eq!(
+        tracker.xs_for(qid(1)).unwrap(),
+        single_pauli_set(5).as_slice()
+    );
     assert!(tracker.zs_for(qid(1)).unwrap().is_empty());
-    assert_eq!(tracker.xs_for(qid(2)).unwrap(), &single_pauli_set(5));
-    assert_eq!(tracker.zs_for(qid(2)).unwrap(), &single_pauli_set(5));
+    assert_eq!(
+        tracker.xs_for(qid(2)).unwrap(),
+        single_pauli_set(5).as_slice()
+    );
+    assert_eq!(
+        tracker.zs_for(qid(2)).unwrap(),
+        single_pauli_set(5).as_slice()
+    );
     assert!(tracker.xs_for(qid(3)).unwrap().is_empty());
-    assert_eq!(tracker.zs_for(qid(3)).unwrap(), &single_pauli_set(5));
+    assert_eq!(
+        tracker.zs_for(qid(3)).unwrap(),
+        single_pauli_set(5).as_slice()
+    );
     assert_eq!(tracker.rec_bits.get(&3), Some(&single_pauli_set(5)));
 }
 
@@ -571,24 +580,24 @@ fn sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets() {
         .rec_bits
         .get_mut(&195)
         .unwrap()
-        .insert(DemTarget::relative_detector(293).unwrap());
+        .xor_item(DemTarget::relative_detector(293).unwrap());
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
     expected
         .rec_bits
         .get_mut(&1995)
         .unwrap()
-        .insert(DemTarget::relative_detector(293).unwrap());
+        .xor_item(DemTarget::relative_detector(293).unwrap());
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
     expected
         .rec_bits
         .get_mut(&1995)
         .unwrap()
-        .remove(&DemTarget::relative_detector(293).unwrap());
+        .xor_item(DemTarget::relative_detector(293).unwrap());
     expected
         .rec_bits
         .get_mut(&1995)
         .unwrap()
-        .insert(DemTarget::relative_detector(2993).unwrap());
+        .xor_item(DemTarget::relative_detector(2993).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
     actual.xs.insert(qid(5), single_pauli_set(3));
@@ -605,26 +614,26 @@ fn sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets() {
         .xs
         .get_mut(&qid(5))
         .unwrap()
-        .insert(DemTarget::relative_detector(287).unwrap());
+        .xor_item(DemTarget::relative_detector(287).unwrap());
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
     expected
         .xs
         .get_mut(&qid(5))
         .unwrap()
-        .insert(DemTarget::relative_detector(2987).unwrap());
+        .xor_item(DemTarget::relative_detector(2987).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
     actual
         .zs
         .get_mut(&qid(6))
         .unwrap()
-        .insert(DemTarget::relative_detector(287).unwrap());
+        .xor_item(DemTarget::relative_detector(287).unwrap());
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
     expected
         .zs
         .get_mut(&qid(6))
         .unwrap()
-        .insert(DemTarget::relative_detector(2987).unwrap());
+        .xor_item(DemTarget::relative_detector(2987).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
     actual.observable_effects.insert(9, detector_set(286));
@@ -681,7 +690,10 @@ fn sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period() {
     assert_eq!(folded, unrolled);
 
     shifted_repeat::undo_loop(&mut folded, &body, 1_000_000_000_001).unwrap();
-    assert_eq!(folded.zs_for(qid(0)).unwrap(), &single_pauli_set(3));
+    assert_eq!(
+        folded.zs_for(qid(0)).unwrap(),
+        single_pauli_set(3).as_slice()
+    );
     assert_eq!(folded.measurement_count, 1_999_999_998_497);
     assert_eq!(folded.detector_count, 2_999_999_999_499);
 }
@@ -710,7 +722,7 @@ fn sparse_rev_frame_tracker_repeat_blocks_track_measurements_and_detectors() {
         .zs
         .get_mut(&qid(0))
         .unwrap()
-        .insert(DemTarget::relative_detector(1).unwrap());
+        .xor_item(DemTarget::relative_detector(1).unwrap());
     assert_eq!(tracker, expected);
 }
 
@@ -720,7 +732,7 @@ fn sparse_rev_frame_tracker_accepts_mpad_and_discards_record_sensitivity() {
     actual.measurement_count = 2;
     actual.rec_bits.insert(
         1,
-        BTreeSet::from([DemTarget::relative_detector(5).unwrap()]),
+        TargetXorSet::from_target(DemTarget::relative_detector(5).unwrap()),
     );
     actual.undo_instruction(&instruction("MPAD 0\n")).unwrap();
 

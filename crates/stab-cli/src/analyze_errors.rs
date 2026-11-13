@@ -103,14 +103,14 @@ where
             approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
         },
     )?;
-    let output_bytes = dem.to_dem_bytes();
     let mut outputs = io.activate()?;
     let mut output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
-    output.write_with(|writer| {
-        if output_bytes.is_empty() {
+    output.write_with(|mut writer| {
+        // A model with no items prints no text; pinned Stim still emits one newline.
+        if dem.items().is_empty() {
             writer.write_all(b"\n")
         } else {
-            writer.write_all(&output_bytes)
+            dem.write_dem_bytes(&mut writer)
         }
     })?;
     output.flush()

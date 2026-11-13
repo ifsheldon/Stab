@@ -1,6 +1,7 @@
 mod budget;
 mod decompose;
 mod effects;
+mod error_accumulator;
 mod error_decomp;
 mod options;
 mod probabilities;
@@ -18,12 +19,6 @@ pub use options::ErrorAnalyzerOptions;
 
 const MAX_ANALYZER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 const MAX_ANALYZER_REPEAT_ITERATIONS: u64 = 1_000_000;
-
-pub(super) type AnalyzerTag = Box<[u8]>;
-
-pub(super) fn owned_tag(tag: Option<&[u8]>) -> Option<AnalyzerTag> {
-    tag.map(Box::<[u8]>::from)
-}
 
 pub fn circuit_to_detector_error_model(
     circuit: &Circuit,

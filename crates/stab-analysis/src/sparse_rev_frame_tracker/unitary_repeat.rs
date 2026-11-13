@@ -5,7 +5,7 @@ use stab_model::{
     advanced::{CircuitBuilder, circuit_instruction_with_tag_bytes, repeat_block_with_tag_bytes},
 };
 
-use super::{SparseReverseFrameTracker, qubit_index, replace_qubit_set, toggle_targets};
+use super::{SparseReverseFrameTracker, TargetXorSet, qubit_index, replace_qubit_set};
 use crate::{AnalysisError, AnalysisResult, gate_has_tableau, single_qubit_clifford_for_gate};
 
 pub(super) fn try_undo_supported_unitary_repeat(
@@ -115,13 +115,14 @@ impl SlotTransform {
         let slot_count = self.destinations.len();
         let mut old_slots = Vec::with_capacity(slot_count);
         for &qubit in &self.qubits {
-            old_slots.push(tracker.xs_for(qubit_id_from_index(qubit)?)?.clone());
+            old_slots.push(tracker.xs_for(qubit_id_from_index(qubit)?)?.to_vec());
         }
         for &qubit in &self.qubits {
-            old_slots.push(tracker.zs_for(qubit_id_from_index(qubit)?)?.clone());
+            old_slots.push(tracker.zs_for(qubit_id_from_index(qubit)?)?.to_vec());
         }
 
-        let mut new_slots = vec![BTreeSet::new(); slot_count];
+        let mut new_slots = vec![TargetXorSet::new(); slot_count];
+        let mut merge = Vec::new();
         for (source_slot, source_targets) in old_slots.iter().enumerate() {
             if source_targets.is_empty() {
                 continue;
@@ -138,23 +139,33 @@ impl SlotTransform {
                             "unitary repeat destination slot {destination_slot} is out of bounds"
                         ))
                     })?;
-                toggle_targets(destination_targets, source_targets.iter().copied());
+                destination_targets.xor_sorted(source_targets, &mut merge);
             }
         }
 
         for (local, &qubit) in self.qubits.iter().enumerate() {
             let value = new_slots
-                .get(local)
-                .cloned()
+                .get_mut(local)
+                .map(std::mem::take)
                 .ok_or_else(|| active_slot_error("X transform", qubit))?;
-            replace_qubit_set(&mut tracker.xs, qubit_id_from_index(qubit)?, value);
+            replace_qubit_set(
+                &mut tracker.xs,
+                qubit_id_from_index(qubit)?,
+                value,
+                &mut tracker.scratch,
+            );
         }
         for (local, &qubit) in self.qubits.iter().enumerate() {
             let value = new_slots
-                .get(active_qubit_count + local)
-                .cloned()
+                .get_mut(active_qubit_count + local)
+                .map(std::mem::take)
                 .ok_or_else(|| active_slot_error("Z transform", qubit))?;
-            replace_qubit_set(&mut tracker.zs, qubit_id_from_index(qubit)?, value);
+            replace_qubit_set(
+                &mut tracker.zs,
+                qubit_id_from_index(qubit)?,
+                value,
+                &mut tracker.scratch,
+            );
         }
         Ok(())
     }
@@ -301,7 +312,7 @@ fn seed_slot(
                 "sparse reverse unitary repeat slot does not fit u32",
             )
         })?)?;
-        tracker.toggle_xs(qubit, &BTreeSet::from([target]))
+        tracker.toggle_xs(qubit, &[target])
     } else {
         let z_slot = slot.checked_sub(qubit_count).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
@@ -313,7 +324,7 @@ fn seed_slot(
                 "sparse reverse unitary repeat slot does not fit u32",
             )
         })?)?;
-        tracker.toggle_zs(qubit, &BTreeSet::from([target]))
+        tracker.toggle_zs(qubit, &[target])
     }
 }
 
@@ -417,7 +428,7 @@ mod tests {
 
     fn tracker_from_pauli_text(text: &str) -> SparseReverseFrameTracker {
         let mut tracker = SparseReverseFrameTracker::new(text.len(), 0, 0, true);
-        let sensitivity = BTreeSet::from([DemTarget::logical_observable(0).unwrap()]);
+        let sensitivity = [DemTarget::logical_observable(0).unwrap()];
         for (index, character) in text.chars().enumerate() {
             let qubit = QubitId::new(u32::try_from(index).unwrap()).unwrap();
             match character {
@@ -625,7 +636,7 @@ mod tests {
         let target = DemTarget::logical_observable(0).unwrap();
         let mut tracker = SparseReverseFrameTracker::new(HIGH_QUBIT as usize + 1, 0, 0, true);
         tracker
-            .toggle_xs(QubitId::new(HIGH_QUBIT).unwrap(), &BTreeSet::from([target]))
+            .toggle_xs(QubitId::new(HIGH_QUBIT).unwrap(), &[target])
             .unwrap();
 
         assert!(try_undo_supported_unitary_repeat(&mut tracker, &repeat).unwrap());
@@ -650,7 +661,7 @@ mod tests {
         let target = DemTarget::logical_observable(0).unwrap();
         let mut tracker = SparseReverseFrameTracker::new(HIGH_QUBIT as usize + 1, 0, 0, true);
         tracker
-            .toggle_xs(QubitId::new(HIGH_QUBIT).unwrap(), &BTreeSet::from([target]))
+            .toggle_xs(QubitId::new(HIGH_QUBIT).unwrap(), &[target])
             .unwrap();
 
         assert!(try_undo_supported_unitary_repeat(&mut tracker, &repeat).unwrap());

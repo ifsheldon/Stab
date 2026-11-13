@@ -196,6 +196,37 @@ pub mod advanced {
         DemRepeatBlock::new_with_tag_bytes(repeat_count, body, tag)
     }
 
+    /// Constructs a validated DEM error instruction from a borrowed target slice.
+    pub fn dem_error_instruction_from_targets(
+        probability: Probability,
+        targets: &[DemTarget],
+        tag: Option<&[u8]>,
+    ) -> ModelResult<DemInstruction> {
+        DemInstruction::error_from_targets(probability, targets, tag)
+    }
+
+    /// Subtracts `base` from every relative detector target of an instruction in place.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first detector id below `base` and leaves the instruction unchanged.
+    pub fn dem_instruction_rebase_detectors(
+        instruction: &mut DemInstruction,
+        base: u64,
+    ) -> Result<(), u64> {
+        instruction.rebase_detectors(base)
+    }
+
+    /// Returns a model's item storage for consumers that rebuild a model in place.
+    pub fn dem_model_items_mut(model: &mut DetectorErrorModel) -> &mut Vec<crate::DemItem> {
+        model.items_mut()
+    }
+
+    /// Returns a repeat block's body for consumers that rebuild a model in place.
+    pub fn dem_repeat_block_body_mut(repeat: &mut DemRepeatBlock) -> &mut DetectorErrorModel {
+        repeat.body_mut()
+    }
+
     /// Removes the tag from a DEM instruction in place.
     pub fn dem_instruction_clear_tag(instruction: &mut DemInstruction) {
         instruction.clear_tag();
