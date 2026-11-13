@@ -4,12 +4,7 @@ use stab_model::{
     advanced::{ControlledPauliTargetPair, classify_controlled_pauli_target_pair},
 };
 
-use crate::{
-    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
-    circuit_to_tableau,
-};
-
-const MAX_NONUNITARY_PAULI_CONJUGATION_INSTRUCTIONS: u64 = 1_000_000;
+use crate::{AnalysisError, AnalysisResult, circuit_to_tableau};
 
 /// Returns the Pauli observable after the circuit, when its value remains well defined.
 ///
@@ -21,7 +16,6 @@ pub fn pauli_after_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisRe
         return apply_tableau_at_width(pauli, &tableau, false);
     }
 
-    admit_nonunitary_expanded_work(circuit)?;
     let mut result = pauli.clone();
     for instruction in circuit.iter_flattened_instructions() {
         apply_instruction_after(&mut result, instruction)?;
@@ -36,7 +30,6 @@ pub fn pauli_before_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisR
         return apply_tableau_at_width(pauli, &tableau, true);
     }
 
-    admit_nonunitary_expanded_work(circuit)?;
     let mut result = pauli.clone();
     for instruction in circuit.iter_flattened_instructions_reverse() {
         apply_instruction_before(&mut result, instruction)?;
@@ -80,42 +73,6 @@ fn validate_compact_pauli_circuit(width: usize, circuit: &Circuit) -> AnalysisRe
                     return Ok(());
                 };
                 items = parent;
-            }
-        }
-    }
-}
-
-fn admit_nonunitary_expanded_work(circuit: &Circuit) -> AnalysisResult<()> {
-    let limit = u128::from(MAX_NONUNITARY_PAULI_CONJUGATION_INSTRUCTIONS);
-    let mut count = 0_u128;
-    let mut multiplier = 1_u128;
-    let mut pending = Vec::new();
-    let mut items = circuit.items().iter();
-    loop {
-        match items.next() {
-            Some(CircuitItem::Instruction(_)) => {
-                count = count.saturating_add(multiplier);
-                if count > limit {
-                    return Err(ResourceLimitError::fixed_operation(
-                        ResourceOperation::PauliConjugation,
-                        ResourceKind::ExpandedOperations,
-                        u64::try_from(count).unwrap_or(u64::MAX),
-                        MAX_NONUNITARY_PAULI_CONJUGATION_INSTRUCTIONS,
-                    )
-                    .into());
-                }
-            }
-            Some(CircuitItem::RepeatBlock(repeat)) => {
-                pending.push((items, multiplier));
-                multiplier = multiplier.saturating_mul(u128::from(repeat.repeat_count().get()));
-                items = repeat.body().items().iter();
-            }
-            None => {
-                let Some((parent, parent_multiplier)) = pending.pop() else {
-                    return Ok(());
-                };
-                items = parent;
-                multiplier = parent_multiplier;
             }
         }
     }

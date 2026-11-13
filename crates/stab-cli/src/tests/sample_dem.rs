@@ -260,7 +260,7 @@ fn sample_dem_rejects_malformed_or_short_replay_input() {
             blank_prefix,
             "1",
             &b"error(1) D0\n"[..],
-            "sample_dem replay text record is too large; limit is 1048576 bytes",
+            "sample_dem replay text record has more than 1048576 bytes, exceeding the memory budget",
         ),
         (
             "ptb64",
@@ -286,6 +286,7 @@ fn sample_dem_rejects_malformed_or_short_replay_input() {
                 format,
                 "--shots",
                 shots,
+                "--memory-budget=2MiB",
             ],
             dem,
         )

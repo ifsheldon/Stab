@@ -4,7 +4,7 @@
 //! Lowering resolves gate identity, targets, probabilities, record lookbacks, sweep bits, Pauli
 //! products, and reference-sample Clifford actions once at compile time, so no executor matches
 //! gate names or re-parses arguments. The bit-plane Pauli frame, the inverse-tableau reference
-//! simulator, deterministic-measurement counting, and the general stabilizer frame all walk this
+//! simulator, deterministic-measurement counting, and the test-only generator-list frame walk this
 //! tape through one [`ProgramCursor`].
 
 use arrayvec::ArrayVec;
@@ -136,12 +136,6 @@ pub(crate) enum ProgramInstruction {
         probabilities: Box<[f64; 15]>,
         targets: Vec<usize>,
     },
-    /// A Pauli channel whose probabilities are all zero. It is retained only for the general
-    /// stabilizer frame, whose per-target stream draws one uniform value per channel site.
-    ZeroProbabilityNoise {
-        pairs: bool,
-        targets: Vec<usize>,
-    },
     CorrelatedError {
         else_branch: bool,
         probability: f64,
@@ -233,7 +227,6 @@ impl ProgramInstruction {
             Self::Clifford { targets, .. }
             | Self::Reset { targets, .. }
             | Self::SinglePauliNoise { targets, .. }
-            | Self::ZeroProbabilityNoise { targets, .. }
             | Self::HeraldedErase { targets, .. }
             | Self::HeraldedPauliChannel { targets, .. } => words(targets),
             Self::Measure {
@@ -262,12 +255,6 @@ impl ProgramInstruction {
 pub(crate) struct ProgramCounts {
     pub(crate) measurements: usize,
     pub(crate) sweep_bits: usize,
-    /// Circuit instructions executed by one unrolled shot, counted once per source instruction
-    /// exactly as detection conversion counts them.
-    pub(crate) expanded_instructions: u128,
-    /// Per-target operation dispatches of one unrolled shot, the historical sampling basis that
-    /// still bounds the general stabilizer-frame fallback.
-    pub(crate) expanded_target_operations: u128,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -291,6 +278,7 @@ impl CircuitProgram {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn compile(circuit: &Circuit, options: ProgramOptions) -> DetectionResult<Self> {
         let admission = Self::admit(circuit, options, 0, u64::MAX)?;
         Self::materialize(circuit, &admission)

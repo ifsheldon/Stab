@@ -3,15 +3,20 @@ use stab_analysis::{
     RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
-use stab_model::CircuitItem;
+use stab_model::{CircuitItem, MemoryBudget};
 
-const MAX_GENERATED_PHYSICAL_QUBITS: u64 = 131_072;
+/// A 256 MiB budget at 2048 projected bytes per physical qubit admits exactly the 131,072
+/// physical qubits that the retired fixed generator cap admitted.
+const BUDGET: MemoryBudget = MemoryBudget::from_bytes(256 * 1024 * 1024);
+const BUDGET_QUBITS: u64 = 131_072;
+const BYTES_PER_QUBIT: u64 = 2048;
 
-/// Admission projects each family's physical qubit count from the distance and rejects an
-/// oversized request before materializing anything. The projection is checked against
-/// materialized small circuits, the documented maximum distances sit under the limit while the
-/// next distance is rejected with the projected count, and the tightest boundary (rotated
-/// surface code, 131,071 qubits) is materialized once to prove the accepted side end to end.
+/// Admission projects each family's physical qubit count from the distance and refuses a request
+/// whose projected size exceeds the memory budget before materializing anything. The projection
+/// is checked against materialized small circuits, the boundary distances sit under the budget
+/// while the next distance is refused with the projected count, the tightest boundary (rotated
+/// surface code, 131,071 qubits) is materialized once to prove the accepted side end to end, and
+/// the per-qubit projection is checked to dominate the generator's peak allocation.
 #[test]
 fn cq2_generation_resource_admission_checks_family_boundaries_before_materialization() {
     assert_repetition_generation_boundary();
@@ -19,6 +24,7 @@ fn cq2_generation_resource_admission_checks_family_boundaries_before_materializa
     assert_surface_generation_boundary(SurfaceCodeTask::UnrotatedMemoryZ, 181);
     assert_color_generation_boundary();
     assert_rotated_surface_boundary_materializes();
+    assert_projection_dominates_peak_allocation();
     assert_huge_round_counts_stay_folded();
 }
 
@@ -42,6 +48,15 @@ fn surface_params(task: SurfaceCodeTask, distance: u32) -> SurfaceCodeParams {
         task,
     )
     .expect("surface parameters")
+    .with_memory_budget(BUDGET)
+}
+
+fn budget_refusal(qubits: u64, family: &str) -> String {
+    format!(
+        "{qubits} physical qubits for {family} need at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+        qubits * BYTES_PER_QUBIT,
+        BUDGET.bytes()
+    )
 }
 
 fn surface_physical_qubits(task: SurfaceCodeTask, distance: u32) -> u64 {
@@ -66,7 +81,7 @@ fn assert_surface_generation_boundary(task: SurfaceCodeTask, accepted_distance: 
             "{task:?} d={distance} projected and materialized qubit counts diverged"
         );
     }
-    assert!(surface_physical_qubits(task, accepted_distance) <= MAX_GENERATED_PHYSICAL_QUBITS);
+    assert!(surface_physical_qubits(task, accepted_distance) <= BUDGET_QUBITS);
 
     let rejected_distance = accepted_distance + 1;
     let family = if matches!(
@@ -79,11 +94,8 @@ fn assert_surface_generation_boundary(task: SurfaceCodeTask, accepted_distance: 
     };
     super::assert_invalid_domain_value(
         generate_surface_code_circuit(&surface_params(task, rejected_distance)),
-        "generated circuit physical qubit count",
-        &format!(
-            "{} for {family}; current limit is {MAX_GENERATED_PHYSICAL_QUBITS}",
-            surface_physical_qubits(task, rejected_distance)
-        ),
+        "generated circuit size",
+        &budget_refusal(surface_physical_qubits(task, rejected_distance), family),
     );
 }
 
@@ -102,6 +114,7 @@ fn color_params(distance: u32) -> ColorCodeParams {
         ColorCodeTask::MemoryXyz,
     )
     .expect("color parameters")
+    .with_memory_budget(BUDGET)
 }
 
 fn color_physical_qubits(distance: u32) -> u64 {
@@ -122,8 +135,36 @@ fn assert_color_generation_boundary() {
     assert_eq!(color_physical_qubits(341), 130_816);
     super::assert_invalid_domain_value(
         generate_color_code_circuit(&color_params(343)),
-        "generated circuit physical qubit count",
-        "132355 for color code; current limit is 131072",
+        "generated circuit size",
+        &budget_refusal(132_355, "color code"),
+    );
+}
+
+fn assert_projection_dominates_peak_allocation() {
+    for (task, distance) in [
+        (SurfaceCodeTask::RotatedMemoryZ, 33),
+        (SurfaceCodeTask::UnrotatedMemoryZ, 17),
+    ] {
+        let params = surface_params(task, distance);
+        let measured = allocation_counter::measure(|| {
+            std::hint::black_box(generate_surface_code_circuit(&params).expect("generate"));
+        });
+        let projected = surface_physical_qubits(task, distance) * BYTES_PER_QUBIT;
+        assert!(
+            measured.bytes_max <= projected,
+            "{task:?} d={distance}: peak {} exceeds projection {projected}",
+            measured.bytes_max
+        );
+    }
+    let params = color_params(21);
+    let measured = allocation_counter::measure(|| {
+        std::hint::black_box(generate_color_code_circuit(&params).expect("generate"));
+    });
+    let projected = color_physical_qubits(21) * BYTES_PER_QUBIT;
+    assert!(
+        measured.bytes_max <= projected,
+        "color d=21: peak {} exceeds projection {projected}",
+        measured.bytes_max
     );
 }
 

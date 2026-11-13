@@ -177,25 +177,19 @@ fn time_reversal_routes_mpad_flows_and_observables() {
 }
 
 #[test]
-fn time_reversal_bounds_measurement_rich_repeat_expansion() {
+fn time_reversal_admits_measurement_rich_repeat_expansion_against_the_memory_budget() {
     let small = circuit("REPEAT 2 {\n    M 0\n}\n");
     let (inverse, flows) =
         circuit_time_reversed_for_flows(&small, &[]).expect("reverse bounded repeat");
     assert_eq!(inverse, circuit("M 0 0\n"));
     assert!(flows.is_empty());
 
-    let oversized = circuit("REPEAT 1000001 {\n    M 0\n}\n");
+    let oversized = circuit("REPEAT 1000000000000 {\n    M 0\n}\n");
     let error = circuit_time_reversed_for_flows(&oversized, &[])
-        .expect_err("oversized measurement-rich repeat is rejected")
+        .expect_err("measurement-rich expansion beyond the memory budget is refused")
         .to_string();
-    assert!(
-        error.contains("1,000,000") || error.contains("1000000"),
-        "{error}"
-    );
-    assert!(
-        error.contains("repeat") || error.contains("expanded"),
-        "{error}"
-    );
+    assert!(error.contains("memory budget"), "{error}");
+    assert!(error.contains("repeat"), "{error}");
 }
 
 #[test]

@@ -7,7 +7,6 @@ use crate::{
 
 mod reverse_flow;
 
-const MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 const MAX_TIME_REVERSE_TABLEAU_QUBITS: usize = StabilizerResource::TableauQubits.limit();
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -277,9 +276,7 @@ enum FlowValidation {
 impl FlowValidation {
     fn for_circuit(circuit: &Circuit) -> AnalysisResult<Self> {
         let within_tableau_budget = stab_model::advanced::circuit_simulated_qubit_count(circuit)
-            <= MAX_TIME_REVERSE_TABLEAU_QUBITS
-            && expanded_instruction_count(circuit)
-                .is_some_and(|count| count <= MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS);
+            <= MAX_TIME_REVERSE_TABLEAU_QUBITS;
         let has_repeat = circuit
             .items()
             .iter()
@@ -296,7 +293,7 @@ impl FlowValidation {
             return Ok(Self::SparseFolded);
         }
         Err(AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows unitary fast path requires at most {MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS} expanded instructions and {MAX_TIME_REVERSE_TABLEAU_QUBITS} tableau qubits unless the circuit is supported by folded sparse validation"
+            "time_reversed_for_flows unitary fast path requires at most {MAX_TIME_REVERSE_TABLEAU_QUBITS} tableau qubits unless the circuit is supported by folded sparse validation"
         )))
     }
 
@@ -310,17 +307,6 @@ impl FlowValidation {
                 .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string())),
         }
     }
-}
-
-fn expanded_instruction_count(circuit: &Circuit) -> Option<u64> {
-    circuit.items().iter().try_fold(0_u64, |count, item| {
-        let item_count = match item {
-            CircuitItem::Instruction(_) => 1,
-            CircuitItem::RepeatBlock(repeat) => expanded_instruction_count(repeat.body())?
-                .checked_mul(repeat.repeat_count().get())?,
-        };
-        count.checked_add(item_count)
-    })
 }
 
 fn sparse_tracker_can_validate_without_unbounded_unroll(circuit: &Circuit) -> bool {

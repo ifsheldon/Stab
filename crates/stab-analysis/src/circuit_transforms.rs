@@ -1,94 +1,38 @@
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, QubitId, RepeatNestingLimit, Target,
-    advanced::CircuitBuilder,
+    Circuit, CircuitInstruction, CircuitItem, Gate, MemoryBudget, QubitId, RepeatNestingLimit,
+    Target, advanced::CircuitBuilder,
 };
 
 use crate::{
     AnalysisError, AnalysisResult, CircuitPass, CircuitPassInput, CircuitPassOutput,
-    CircuitPassResources, ResourceLimitError,
+    CircuitPassResources, ResourceKind, ResourceLimitError, ResourceOperation,
 };
 
-const MAX_MATERIALIZED_FLATTENED_OPERATIONS: u64 = 1_000_000;
-const MAX_MATERIALIZED_FLATTENED_TARGETS: u64 = 32_000_000;
-const MAX_MATERIALIZED_FLATTENED_ARGUMENTS: u64 = 16_000_000;
-const MAX_MATERIALIZED_FLATTENED_BYTES: u64 = 512 * 1024 * 1024;
-
 /// Resource policy for operation-owned circuit flattening.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+///
+/// The memory budget bounds the conservative retained size of the materialized circuit, admitted
+/// before the output is allocated. Expanded operation, target, and argument counts are not
+/// separately capped; repeat nesting stays the shared fixed recursion envelope.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CircuitFlattenLimits {
-    max_expanded_operations: u64,
-    max_expanded_targets: u64,
-    max_expanded_arguments: u64,
-    max_materialized_bytes: u64,
+    memory_budget: MemoryBudget,
 }
 
 impl CircuitFlattenLimits {
-    /// The default maximum for owned flattened circuit materialization.
-    pub const DEFAULT_MAX_EXPANDED_OPERATIONS: u64 = MAX_MATERIALIZED_FLATTENED_OPERATIONS;
-    /// The default maximum number of retained target occurrences.
-    pub const DEFAULT_MAX_EXPANDED_TARGETS: u64 = MAX_MATERIALIZED_FLATTENED_TARGETS;
-    /// The default maximum number of retained argument values.
-    pub const DEFAULT_MAX_EXPANDED_ARGUMENTS: u64 = MAX_MATERIALIZED_FLATTENED_ARGUMENTS;
-    /// The default conservative byte ceiling for the materialized result.
-    pub const DEFAULT_MAX_MATERIALIZED_BYTES: u64 = MAX_MATERIALIZED_FLATTENED_BYTES;
-
-    /// Returns the configured expanded-operation limit.
-    pub const fn max_expanded_operations(self) -> u64 {
-        self.max_expanded_operations
+    pub const fn new(memory_budget: MemoryBudget) -> Self {
+        Self { memory_budget }
     }
 
-    /// Returns the configured retained-target limit.
-    pub const fn max_expanded_targets(self) -> u64 {
-        self.max_expanded_targets
+    /// Returns the configured memory budget for the materialized result.
+    pub const fn memory_budget(self) -> MemoryBudget {
+        self.memory_budget
     }
 
-    /// Returns the configured retained-argument limit.
-    pub const fn max_expanded_arguments(self) -> u64 {
-        self.max_expanded_arguments
-    }
-
-    /// Returns the configured conservative materialized-byte limit.
-    pub const fn max_materialized_bytes(self) -> u64 {
-        self.max_materialized_bytes
-    }
-
-    /// Returns this policy with a different expanded-operation limit.
+    /// Returns this policy with a different memory budget.
     #[must_use]
-    pub const fn with_max_expanded_operations(mut self, max_expanded_operations: u64) -> Self {
-        self.max_expanded_operations = max_expanded_operations;
+    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.memory_budget = memory_budget;
         self
-    }
-
-    /// Returns this policy with a different retained-target limit.
-    #[must_use]
-    pub const fn with_max_expanded_targets(mut self, max_expanded_targets: u64) -> Self {
-        self.max_expanded_targets = max_expanded_targets;
-        self
-    }
-
-    /// Returns this policy with a different retained-argument limit.
-    #[must_use]
-    pub const fn with_max_expanded_arguments(mut self, max_expanded_arguments: u64) -> Self {
-        self.max_expanded_arguments = max_expanded_arguments;
-        self
-    }
-
-    /// Returns this policy with a different conservative materialized-byte limit.
-    #[must_use]
-    pub const fn with_max_materialized_bytes(mut self, max_materialized_bytes: u64) -> Self {
-        self.max_materialized_bytes = max_materialized_bytes;
-        self
-    }
-}
-
-impl Default for CircuitFlattenLimits {
-    fn default() -> Self {
-        Self {
-            max_expanded_operations: Self::DEFAULT_MAX_EXPANDED_OPERATIONS,
-            max_expanded_targets: Self::DEFAULT_MAX_EXPANDED_TARGETS,
-            max_expanded_arguments: Self::DEFAULT_MAX_EXPANDED_ARGUMENTS,
-            max_materialized_bytes: Self::DEFAULT_MAX_MATERIALIZED_BYTES,
-        }
     }
 }
 
@@ -96,8 +40,9 @@ impl Default for CircuitFlattenLimits {
 ///
 /// `SHIFT_COORDS` instructions are absorbed into subsequent `QUBIT_COORDS` and `DETECTOR`
 /// instructions, matching Stim's materialized `flattened` transform. Because this returns an
-/// owned circuit, expansions above one million operations are rejected; use the lazy flattened
-/// iterators for raw repeat traversal when materialization is not required.
+/// owned circuit, expansions whose conservative size exceeds the default memory budget are
+/// rejected; use the lazy flattened iterators for raw repeat traversal when materialization is
+/// not required.
 pub fn flattened_circuit(circuit: &Circuit) -> AnalysisResult<Circuit> {
     flattened_circuit_with_limits(circuit, CircuitFlattenLimits::default())
 }
@@ -313,35 +258,15 @@ fn validate_flattening_budget(
 ) -> AnalysisResult<CircuitFlattenEstimate> {
     validate_flattened_repeat_nesting(circuit)?;
     let estimate = flattened_materialization_estimate(circuit, 1)?;
-
-    if estimate.operations > limits.max_expanded_operations() {
-        return Err(ResourceLimitError::circuit_flatten_expanded_operations(
-            estimate.operations,
-            limits.max_expanded_operations(),
-        )
-        .into());
-    }
     validate_materialized_instruction_capacity(estimate.operations)?;
-    if estimate.targets > limits.max_expanded_targets() {
-        return Err(ResourceLimitError::circuit_flatten_target_occurrences(
-            estimate.targets,
-            limits.max_expanded_targets(),
-        )
-        .into());
-    }
-    if estimate.arguments > limits.max_expanded_arguments() {
-        return Err(ResourceLimitError::circuit_flatten_argument_values(
-            estimate.arguments,
-            limits.max_expanded_arguments(),
-        )
-        .into());
-    }
-
     let materialized_bytes = estimate.materialized_bytes()?;
-    if materialized_bytes > limits.max_materialized_bytes() {
-        return Err(ResourceLimitError::circuit_flatten_materialized_bytes(
+    let budget = limits.memory_budget();
+    if !budget.admits(u128::from(materialized_bytes)) {
+        return Err(ResourceLimitError::memory_budget(
+            ResourceOperation::CircuitFlatten,
+            ResourceKind::MaterializedBytes,
             materialized_bytes,
-            limits.max_materialized_bytes(),
+            budget.bytes(),
         )
         .into());
     }

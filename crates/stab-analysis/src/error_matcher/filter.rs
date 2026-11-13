@@ -6,14 +6,13 @@ use stab_model::advanced::{
     FoldedDemVisitor,
 };
 use stab_model::{
-    DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget, DetectorErrorModel,
+    DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget, DetectorErrorModel, MemoryBudget,
 };
 
 use crate::{AnalysisError, AnalysisResult};
 
-const MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL: u64 = 100_000;
-const MAX_ERROR_MATCHER_FILTER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_ERROR_MATCHER_FILTER_REPEAT_ITERATIONS: u64 = 1_000_000;
+/// Retained error keys are admitted against the default memory budget.
+const ERROR_MATCHER_FILTER_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
 
 pub(super) fn error_keys_from_dem(
     model: &DetectorErrorModel,
@@ -23,7 +22,7 @@ pub(super) fn error_keys_from_dem(
     let block_policies = FilterBlockPolicies::new(traversal.root());
     let mut keys = Vec::new();
     let mut visitor = ErrorMatcherFilterVisitor {
-        expanded_instructions: 0,
+        retained_key_bytes: 0,
         block_policies,
         keys: &mut keys,
     };
@@ -32,25 +31,24 @@ pub(super) fn error_keys_from_dem(
 }
 
 struct ErrorMatcherFilterVisitor<'a> {
-    expanded_instructions: u64,
+    retained_key_bytes: u64,
     block_policies: FilterBlockPolicies,
     keys: &'a mut Vec<Vec<DemTarget>>,
 }
 
 impl ErrorMatcherFilterVisitor<'_> {
-    fn add_expanded_instruction(&mut self) -> AnalysisResult<()> {
-        self.expanded_instructions =
-            self.expanded_instructions.checked_add(1).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "DEM ErrorMatcher filter expanded instruction count overflowed",
-                )
-            })?;
-        if self.expanded_instructions > MAX_ERROR_MATCHER_FILTER_EXPANDED_INSTRUCTIONS {
+    /// Charges one retained error key before it is retained.
+    fn admit_key(&mut self, target_count: usize) -> AnalysisResult<()> {
+        let key_bytes = (size_of::<Vec<DemTarget>>() as u64)
+            .saturating_add((target_count as u64).saturating_mul(size_of::<DemTarget>() as u64));
+        let next = self.retained_key_bytes.saturating_add(key_bytes);
+        if !ERROR_MATCHER_FILTER_MEMORY_BUDGET.admits(u128::from(next)) {
             return Err(AnalysisError::invalid_detector_error_model(format!(
-                "DEM ErrorMatcher filter currently supports at most {MAX_ERROR_MATCHER_FILTER_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.expanded_instructions
+                "DEM ErrorMatcher filter needs at least {next} bytes of error keys, exceeding the {}-byte memory budget",
+                ERROR_MATCHER_FILTER_MEMORY_BUDGET.bytes()
             )));
         }
+        self.retained_key_bytes = next;
         Ok(())
     }
 }
@@ -63,10 +61,8 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
         instruction: &DemInstruction,
         state: &DemTraversalState,
     ) -> AnalysisResult<ControlFlow<()>> {
-        if state.folded_repeat_depth() == 0 || instruction.kind() == DemInstructionKind::Error {
-            self.add_expanded_instruction()?;
-        }
         if instruction.kind() == DemInstructionKind::Error {
+            self.admit_key(instruction.targets().len())?;
             self.keys.push(canonical_error_key(
                 instruction.targets(),
                 state.detector_offset(),
@@ -77,7 +73,7 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
 
     fn enter_repeat(
         &mut self,
-        repeat: &DemRepeatBlock,
+        _repeat: &DemRepeatBlock,
         body: &FoldedDemBlock<'_>,
         _state: &DemTraversalState,
     ) -> AnalysisResult<DemRepeatSelection> {
@@ -93,14 +89,8 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
         {
             return Ok(DemRepeatSelection::FoldOnce);
         }
-        let repeat_count = repeat.repeat_count().get();
-        if repeat_count > MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "DEM ErrorMatcher filter currently supports repeat counts up to {MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL}, got {repeat_count}"
-            )));
-        }
         Ok(DemRepeatSelection::Expand {
-            max_total_iterations: MAX_ERROR_MATCHER_FILTER_REPEAT_ITERATIONS,
+            max_total_iterations: u64::MAX,
             context: "ErrorMatcher filter",
         })
     }

@@ -3,23 +3,24 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{FlexPauliString, PauliBasis, StabilizerResource};
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget, GateCategory,
-    QubitId, Target,
+    MemoryBudget, QubitId, Target,
 };
 
 use crate::{
-    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError,
+    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
     sparse_rev_frame_tracker::{ReverseTrackerWorkBudget, SparseReverseFrameTracker},
 };
 
-const MAX_DETECTING_REGION_REPRESENTED_WORK: u64 = 1_000_000;
-const MAX_DETECTING_REGION_TRAVERSAL_WORK: u64 = 1_000_000;
-const MAX_DETECTING_REGION_LIVE_STATE_UNITS: u64 = 1_000_000;
-const MAX_DETECTING_REGION_OUTPUT_REGIONS: u64 = 1_000_000;
-const MAX_DETECTING_REGION_OUTPUT_BYTES: u64 = 256 * 1024 * 1024;
-// This keeps every recursive compact traversal inside ordinary worker and test-thread stacks.
+/// Region extraction admits its retained tracker state, recurrence-probe clones, output map, and
+/// convenience helper vectors against the default memory budget.
+const DETECTING_REGION_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
+/// Conservative retained bytes of one live tracker-state unit (one sparse map entry).
+const DETECTING_REGION_LIVE_STATE_UNIT_BYTES: u64 = 64;
+/// Region extraction recurses through the snapshot walk and the sparse tracker's recurrence
+/// probes at several frames per repeat level. The shared 256-level envelope overflows a 2 MiB
+/// test-thread stack in debug builds, so this traversal keeps its tighter 128-level bound until it
+/// is made iterative.
 const MAX_DETECTING_REGION_REPEAT_NESTING: usize = 128;
-const MAX_DETECTING_REGION_HELPER_TARGETS: u64 = MAX_DETECTING_REGION_REPRESENTED_WORK;
-const MAX_DETECTING_REGION_HELPER_TICKS: u64 = 1_000_000;
 const DETECTING_REGION_OUTPUT_ENTRY_OVERHEAD_BYTES: u64 = 64;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -70,7 +71,7 @@ pub fn circuit_detecting_regions_for_targets(
 ) -> AnalysisResult<DetectingRegionTargetMap> {
     let mut budget =
         DetectingRegionBudget::for_request(options.targets.len(), options.ticks.len())?;
-    validate_supported_subset(circuit, &mut budget)?;
+    validate_supported_subset(circuit)?;
     let fail_on_anticommute = !options.ignore_anticommutation_errors;
     let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
     let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
@@ -112,7 +113,10 @@ pub fn all_detecting_region_targets(circuit: &Circuit) -> AnalysisResult<Vec<Dem
     let detector_count = circuit.count_detectors()?;
     let observable_count = circuit.count_observables()?;
     let target_capacity = dense_target_helper_capacity(detector_count, observable_count)?;
-    let mut targets = Vec::with_capacity(target_capacity);
+    let mut targets = Vec::new();
+    targets.try_reserve_exact(target_capacity).map_err(|_| {
+        detecting_region_resource_error(ResourceKind::MaterializedUnits, target_capacity as u64, 0)
+    })?;
     for detector in 0..detector_count {
         targets.push(DemTarget::relative_detector(detector)?);
     }
@@ -127,13 +131,7 @@ fn dense_target_helper_capacity(
     observable_count: u64,
 ) -> AnalysisResult<usize> {
     let target_count = detector_count.saturating_add(observable_count);
-    if target_count > MAX_DETECTING_REGION_HELPER_TARGETS {
-        return Err(detecting_region_resource_error(
-            ResourceKind::MaterializedUnits,
-            target_count,
-            MAX_DETECTING_REGION_HELPER_TARGETS,
-        ));
-    }
+    admit_helper_bytes(target_count, size_of::<DemTarget>())?;
     usize::try_from(target_count).map_err(|_| {
         detecting_region_resource_error(
             ResourceKind::MaterializedUnits,
@@ -145,14 +143,30 @@ fn dense_target_helper_capacity(
 
 pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<CircuitTick>> {
     let tick_count = circuit.count_ticks()?;
-    if tick_count > MAX_DETECTING_REGION_HELPER_TICKS {
-        return Err(detecting_region_resource_error(
-            ResourceKind::MaterializedUnits,
-            tick_count,
-            MAX_DETECTING_REGION_HELPER_TICKS,
-        ));
+    let capacity = admit_helper_bytes(tick_count, size_of::<CircuitTick>())?;
+    let mut ticks = Vec::new();
+    ticks.try_reserve_exact(capacity).map_err(|_| {
+        detecting_region_resource_error(ResourceKind::MaterializedUnits, tick_count, 0)
+    })?;
+    ticks.extend((0..tick_count).map(CircuitTick::new));
+    Ok(ticks)
+}
+
+/// Admits a dense helper vector of `count` elements against the budget before allocating it.
+fn admit_helper_bytes(count: u64, element_bytes: usize) -> AnalysisResult<usize> {
+    let required = count.saturating_mul(element_bytes as u64);
+    if !DETECTING_REGION_MEMORY_BUDGET.admits(u128::from(required)) {
+        return Err(ResourceLimitError::memory_budget(
+            ResourceOperation::DetectingRegions,
+            ResourceKind::MaterializedBytes,
+            required,
+            DETECTING_REGION_MEMORY_BUDGET.bytes(),
+        )
+        .into());
     }
-    Ok((0..tick_count).map(CircuitTick::new).collect())
+    usize::try_from(count).map_err(|_| {
+        detecting_region_resource_error(ResourceKind::MaterializedUnits, count, usize::MAX as u64)
+    })
 }
 
 struct SnapshotContext<'a> {
@@ -346,19 +360,11 @@ fn snapshot_regions(
     regions: &mut DetectingRegionTargetMap,
     budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
-    budget.consume_traversal_work(usize_to_u64(
-        context.represented_qubits.len(),
-        "snapshot qubit count",
-    )?)?;
     let mut active_targets = BTreeSet::new();
     for qubit in context.represented_qubits {
         let qubit_targets = tracker.pauli_targets_at(*qubit)?;
         active_targets.extend(qubit_targets.intersection(context.targets).copied());
     }
-    budget.consume_traversal_work(usize_to_u64(
-        active_targets.len(),
-        "snapshot active target count",
-    )?)?;
     for target in active_targets {
         let output_bytes = budget.admit_output_candidate(context.qubit_count)?;
         let region = tracker.region_for_target(target)?;
@@ -368,11 +374,8 @@ fn snapshot_regions(
     Ok(())
 }
 
-fn validate_supported_subset(
-    circuit: &Circuit,
-    budget: &mut DetectingRegionBudget,
-) -> AnalysisResult<()> {
-    validate_supported_subset_inner(circuit, 0, budget)
+fn validate_supported_subset(circuit: &Circuit) -> AnalysisResult<()> {
+    validate_supported_subset_inner(circuit, 0)
 }
 
 fn represented_qubit_ids(
@@ -408,11 +411,7 @@ fn represented_qubit_ids(
     Ok(qubits)
 }
 
-fn validate_supported_subset_inner(
-    circuit: &Circuit,
-    depth: usize,
-    budget: &mut DetectingRegionBudget,
-) -> AnalysisResult<()> {
+fn validate_supported_subset_inner(circuit: &Circuit, depth: usize) -> AnalysisResult<()> {
     if depth > MAX_DETECTING_REGION_REPEAT_NESTING {
         return Err(detecting_region_resource_error(
             ResourceKind::RepeatNesting,
@@ -424,42 +423,13 @@ fn validate_supported_subset_inner(
         match item {
             CircuitItem::Instruction(instruction) => {
                 validate_supported_instruction(instruction)?;
-                budget.add_represented_work(instruction_represented_work(instruction)?)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                let tag_bytes = repeat.tag_bytes().map_or(0, <[u8]>::len);
-                budget.add_represented_work(
-                    usize_to_u64(tag_bytes, "repeat tag byte count")?
-                        .checked_add(1)
-                        .ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
-                                "detecting-region represented repeat work overflowed",
-                            )
-                        })?,
-                )?;
-                validate_supported_subset_inner(repeat.body(), depth.saturating_add(1), budget)?;
+                validate_supported_subset_inner(repeat.body(), depth.saturating_add(1))?;
             }
         }
     }
     Ok(())
-}
-
-fn instruction_represented_work(instruction: &CircuitInstruction) -> AnalysisResult<u64> {
-    let target_count = usize_to_u64(instruction.targets().len(), "instruction target count")?;
-    let argument_count = usize_to_u64(instruction.args().len(), "instruction argument count")?;
-    let tag_bytes = usize_to_u64(
-        instruction.tag_bytes().map_or(0, <[u8]>::len),
-        "instruction tag byte count",
-    )?;
-    1_u64
-        .checked_add(target_count)
-        .and_then(|work| work.checked_add(argument_count))
-        .and_then(|work| work.checked_add(tag_bytes))
-        .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "detecting-region represented instruction work overflowed",
-            )
-        })
 }
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> {
@@ -801,12 +771,9 @@ fn validate_ticks(ticks: &BTreeSet<CircuitTick>, tick_count: u64) -> AnalysisRes
 }
 
 struct DetectingRegionBudget {
-    represented_work: u64,
-    traversal_work: u64,
     live_state_units: u64,
     tracker_state_units: u64,
     tracked_target_upper_bound: u64,
-    output_regions: u64,
     output_bytes: u64,
 }
 
@@ -815,57 +782,24 @@ impl DetectingRegionBudget {
         let request_units = usize_to_u64(target_count, "requested target count")?
             .saturating_add(usize_to_u64(tick_count, "requested tick count")?);
         let mut result = Self {
-            represented_work: 0,
-            traversal_work: 0,
             live_state_units: 0,
             tracker_state_units: 0,
             tracked_target_upper_bound: 0,
-            output_regions: 0,
             output_bytes: 0,
         };
         result.reserve_live_state(request_units)?;
         Ok(result)
     }
 
-    fn add_represented_work(&mut self, count: u64) -> AnalysisResult<()> {
-        let next = self.represented_work.saturating_add(count);
-        ensure_resource_limit(
-            ResourceKind::RepresentedItems,
-            next,
-            MAX_DETECTING_REGION_REPRESENTED_WORK,
-        )?;
-        self.represented_work = next;
-        Ok(())
-    }
-
-    fn consume_traversal_work(&mut self, count: u64) -> AnalysisResult<()> {
-        let next = self.traversal_work.saturating_add(count);
-        ensure_resource_limit(
-            ResourceKind::TraversalWork,
-            next,
-            MAX_DETECTING_REGION_TRAVERSAL_WORK,
-        )?;
-        self.traversal_work = next;
-        Ok(())
-    }
-
     fn reserve_live_state(&mut self, count: u64) -> AnalysisResult<()> {
         let next = self.live_state_units.saturating_add(count);
-        ensure_resource_limit(
-            ResourceKind::LiveStateUnits,
-            next,
-            MAX_DETECTING_REGION_LIVE_STATE_UNITS,
-        )?;
+        admit_live_state_units(next)?;
         self.live_state_units = next;
         Ok(())
     }
 
     fn admit_transient_live_state(&self, count: u64) -> AnalysisResult<()> {
-        ensure_resource_limit(
-            ResourceKind::LiveStateUnits,
-            self.live_state_units.saturating_add(count),
-            MAX_DETECTING_REGION_LIVE_STATE_UNITS,
-        )
+        admit_live_state_units(self.live_state_units.saturating_add(count))
     }
 
     fn reserve_tracker_state(&mut self, count: u64) -> AnalysisResult<()> {
@@ -879,7 +813,6 @@ impl DetectingRegionBudget {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<()> {
-        self.consume_traversal_work(1)?;
         let gate_name = instruction.gate().canonical_name();
         let target_slots = usize_to_u64(instruction.targets().len(), "traversed target count")?;
         let state_growth = match gate_name {
@@ -913,37 +846,52 @@ impl DetectingRegionBudget {
             ));
         }
         let candidate_bytes = output_region_bytes(qubit_count)?;
-        self.next_output_totals(candidate_bytes)?;
+        self.next_output_bytes(candidate_bytes)?;
         Ok(candidate_bytes)
     }
 
     fn commit_output_region(&mut self, bytes: u64) -> AnalysisResult<()> {
-        let (next_region_count, next_output_bytes) = self.next_output_totals(bytes)?;
-        self.output_regions = next_region_count;
-        self.output_bytes = next_output_bytes;
+        self.output_bytes = self.next_output_bytes(bytes)?;
         Ok(())
     }
 
-    fn next_output_totals(&self, bytes: u64) -> AnalysisResult<(u64, u64)> {
-        let next_region_count = self.output_regions.saturating_add(1);
-        ensure_resource_limit(
-            ResourceKind::OutputRecords,
-            next_region_count,
-            MAX_DETECTING_REGION_OUTPUT_REGIONS,
-        )?;
+    /// Live tracker state and the output map share the operation's one budget.
+    fn next_output_bytes(&self, bytes: u64) -> AnalysisResult<u64> {
         let next_output_bytes = self.output_bytes.saturating_add(bytes);
-        ensure_resource_limit(
+        let live_bytes = self
+            .live_state_units
+            .saturating_mul(DETECTING_REGION_LIVE_STATE_UNIT_BYTES);
+        admit_region_bytes(
             ResourceKind::OutputBytes,
-            next_output_bytes,
-            MAX_DETECTING_REGION_OUTPUT_BYTES,
+            next_output_bytes.saturating_add(live_bytes),
         )?;
-        Ok((next_region_count, next_output_bytes))
+        Ok(next_output_bytes)
     }
+}
+
+fn admit_live_state_units(units: u64) -> AnalysisResult<()> {
+    admit_region_bytes(
+        ResourceKind::LiveStateUnits,
+        units.saturating_mul(DETECTING_REGION_LIVE_STATE_UNIT_BYTES),
+    )
+}
+
+fn admit_region_bytes(resource: ResourceKind, required: u64) -> AnalysisResult<()> {
+    if DETECTING_REGION_MEMORY_BUDGET.admits(u128::from(required)) {
+        return Ok(());
+    }
+    Err(ResourceLimitError::memory_budget(
+        ResourceOperation::DetectingRegions,
+        resource,
+        required,
+        DETECTING_REGION_MEMORY_BUDGET.bytes(),
+    )
+    .into())
 }
 
 impl ReverseTrackerWorkBudget for DetectingRegionBudget {
     fn admit_probe_iteration(&mut self) -> AnalysisResult<()> {
-        self.consume_traversal_work(1)
+        Ok(())
     }
 
     fn admit_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
@@ -964,13 +912,6 @@ fn output_region_bytes(qubit_count: usize) -> AnalysisResult<u64> {
     Ok(dense_temporary
         .saturating_add(packed_storage)
         .saturating_add(DETECTING_REGION_OUTPUT_ENTRY_OVERHEAD_BYTES))
-}
-
-fn ensure_resource_limit(resource: ResourceKind, actual: u64, limit: u64) -> AnalysisResult<()> {
-    if actual <= limit {
-        return Ok(());
-    }
-    Err(detecting_region_resource_error(resource, actual, limit))
 }
 
 fn detecting_region_resource_error(

@@ -151,69 +151,12 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
 }
 
 #[test]
-fn general_frame_sessions_replay_the_general_executor_stream() {
-    let fixtures = [(
-        "X_ERROR(0.25) 0\nM(0.125) 0\nX_ERROR(0) 1\nH 1\nCX 1 2\nDEPOLARIZE2(0.1) 1 2\nM !1 2\n",
-        3,
-    )];
-
-    for (source, expected_discriminator) in fixtures {
-        let circuit = Circuit::from_stim_str(source).expect("parse fixture");
-        let plan = SamplingCompiler::new()
-            .compile_general_frame_for_test(&circuit)
-            .expect("compile fixture");
-        assert_eq!(
-            plan.inner.kind.executable_discriminator(),
-            expected_discriminator
-        );
-        for reference_mode in [
-            ReferenceSampleMode::UseReferenceSample,
-            ReferenceSampleMode::SkipReferenceSample,
-        ] {
-            let mut session = plan
-                .session_with_reference_mode(RandomPolicy::Seeded(Seed::new(43)), reference_mode)
-                .expect("construct session");
-            let mut sink = RecordSink::default();
-            session
-                .run(ShotCount::new(129), &mut sink)
-                .expect("run plan variant");
-
-            let reference = match reference_mode {
-                ReferenceSampleMode::UseReferenceSample => None,
-                ReferenceSampleMode::SkipReferenceSample => {
-                    Some(compute_reference_sample(&plan.inner).expect("reference sample"))
-                }
-            };
-            let mut rng = sampler_rng(Some(43));
-            let mut frame = StabilizerFrame::new(plan.inner.qubit_count);
-            let mut record = Vec::with_capacity(plan.inner.measurement_count);
-            let mut output = Vec::with_capacity(plan.inner.measurement_count);
-            let mut expected = Vec::new();
-            for _ in 0..129 {
-                sample_general_into(
-                    &plan.inner.program,
-                    &mut frame,
-                    &mut record,
-                    &mut output,
-                    reference.as_deref(),
-                    &mut rng,
-                )
-                .expect("execute general-frame comparison");
-                expected.push(output.clone());
-            }
-            assert_eq!(sink.records, expected, "{source:?} {reference_mode:?}");
-        }
-    }
-}
-
-#[test]
 fn pauli_frame_preserves_reference_modes_and_seeded_partitions() {
     let circuit = Circuit::from_stim_str("X 9\nM 9\nR 9\nH 9\nX_ERROR(0.25) 9\nM 9\n")
         .expect("parse fixture");
     let plan = SamplingCompiler::new()
         .compile(&circuit)
         .expect("compile fixture");
-    assert_eq!(plan.inner.kind.executable_discriminator(), 4);
 
     let mut with_reference = plan
         .session_with_reference_mode(
@@ -363,7 +306,6 @@ fn former_direct_z_circuits_keep_their_analytic_outcome_distribution() {
         let plan = SamplingCompiler::new()
             .compile(&circuit)
             .expect("compile single-measurement fixture");
-        assert_eq!(plan.inner.kind, SamplingPlanKind::PauliFrame, "{source}");
         let mode = if skip {
             ReferenceSampleMode::SkipReferenceSample
         } else {

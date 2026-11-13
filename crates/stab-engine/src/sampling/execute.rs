@@ -1,15 +1,14 @@
-//! Per-shot execution of the resolved circuit program on the general stabilizer frame.
+//! Per-shot execution of the resolved circuit program on the generator-list stabilizer frame.
 //!
-//! The general frame is the fallback for measurement-bearing programs whose retained size
-//! exceeds the bit-plane Pauli frame's compiled budget. It walks the same program as every
-//! other executor and consumes randomness per target in program order.
+//! Production sampling always runs on the bit-plane Pauli frame. This executor survives only as
+//! the test suite's differential baseline: it walks the same program as every other executor
+//! and consumes randomness per target in program order.
 
 use rand::{Rng, RngExt as _};
-use stab_model::MeasureRecordOffset;
 
 use super::api::SamplingExecutionError;
 use super::noise;
-use super::reference_run::program_error;
+use super::reference_run::{program_error, record_lookback};
 use super::stabilizer_frame::{MeasurementRandomness, StabilizerFrame};
 use crate::detection::frame::{
     CircuitProgram, ControlledPair, ProgramInstruction, ReferenceClifford,
@@ -54,17 +53,6 @@ pub(super) struct ExecutionBuffers<'a> {
     pub(super) record: &'a mut Vec<bool>,
     pub(super) output: &'a mut Vec<bool>,
     pub(super) correlated_error_occurred: &'a mut bool,
-}
-
-pub(super) fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> bool {
-    let index = i64::try_from(record.len())
-        .ok()
-        .and_then(|len| len.checked_add(i64::from(offset.get())))
-        .and_then(|index| usize::try_from(index).ok());
-    index
-        .and_then(|index| record.get(index))
-        .copied()
-        .unwrap_or(false)
 }
 
 pub(super) fn execute_program(
@@ -233,15 +221,6 @@ fn execute_instruction(
                             rng,
                         );
                     }
-                }
-            }
-        }
-        ProgramInstruction::ZeroProbabilityNoise { pairs, targets } => {
-            if mode.includes_noise() {
-                // A zero-probability channel still draws its site's uniform value.
-                let sites = targets.len() / if *pairs { 2 } else { 1 };
-                for _ in 0..sites {
-                    let _: f64 = rng.random();
                 }
             }
         }

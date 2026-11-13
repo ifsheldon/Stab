@@ -2,7 +2,6 @@
 //! truncates an output role.
 
 use super::super::support::{Scratch, ptb64_words, run};
-use crate::MAX_CIRCUIT_INPUT_BYTES;
 
 /// One rejected invocation. `@name` arguments become paths in a fresh scratch directory; every
 /// seeded file must be byte-identical afterwards and no `absent` path may exist.
@@ -173,12 +172,12 @@ fn inputs_and_admission_precede_output_creation_and_truncation() {
                 "@c.stim",
             ]),
             files: &[
-                ("c.stim", b"REPEAT 1000001 {\nTICK\n}\n"),
+                ("c.stim", b"REPEAT 1000000000000000 {\nM 0\n}\n"),
                 ("m.01", b""),
                 ("output.01", b"primary sentinel\n"),
                 ("obs.01", b"observable sentinel\n"),
             ],
-            stderr: &["1000001 expanded instructions; current limit is 1000000"],
+            stderr: &["1073741824-byte memory budget", "--memory-budget"],
             ..DEFAULT
         },
         Preflight {
@@ -460,9 +459,9 @@ fn ptb64_output_requires_whole_64_shot_groups_before_creating_output() {
 }
 
 #[test]
-fn oversized_model_inputs_are_rejected_before_reading() {
+fn oversized_model_inputs_are_rejected_against_the_memory_budget_before_reading() {
     let scratch = Scratch::new();
-    let oversized = scratch.sparse_file("oversized", MAX_CIRCUIT_INPUT_BYTES + 1);
+    let oversized = scratch.sparse_file("oversized", 64 * 1024 + 1);
     for (args, label) in [
         (&["sample", "--in"][..], "sample circuit input"),
         (&["detect", "--in"], "detect circuit input"),
@@ -470,8 +469,16 @@ fn oversized_model_inputs_are_rejected_before_reading() {
         (&["analyze_errors", "--in"], "analyze_errors input"),
         (&["sample_dem", "--in"], "sample_dem input"),
     ] {
-        let argv = [&["stab"][..], args, &[oversized.as_str()]].concat();
-        run(&argv, b"").assert_err(&[&format!("{label} is too large; limit is 67108864 bytes")]);
+        let argv = [
+            &["stab"][..],
+            args,
+            &[oversized.as_str(), "--memory-budget=64KiB"],
+        ]
+        .concat();
+        run(&argv, b"").assert_err(&[
+            &format!("{label} has more than 65536 bytes, exceeding the memory budget"),
+            "--memory-budget",
+        ]);
     }
 }
 
@@ -488,6 +495,6 @@ fn read_limited_input_rejects_special_file_after_limit() {
     assert!(
         error
             .to_string()
-            .contains("test input is too large; limit is 1024 bytes")
+            .contains("test input has more than 1024 bytes, exceeding the memory budget")
     );
 }

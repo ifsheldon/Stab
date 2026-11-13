@@ -10,6 +10,7 @@ mod error;
 mod fingerprint;
 mod gate;
 mod ids;
+mod memory_budget;
 mod model_bytes;
 mod model_parse;
 mod model_tag;
@@ -43,10 +44,8 @@ pub use ids::{
     AbsoluteTolerance, CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset,
     MeasureRecordOffsetText, ObservableId, Probability, ProbabilityStimText, QubitId, RepeatCount,
 };
-pub use parse_limits::{
-    ParseLimits, RepeatNestingLimit, RepeatNestingLimitError, RepresentedInstructionLimit,
-    RepresentedTargetLimit, SourceByteLimit, SourceLineLimit,
-};
+pub use memory_budget::{MemoryBudget, MemoryBudgetParseError};
+pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError};
 pub use resource_limit::{ResourceKind, ResourceLimitError, ResourceOperation};
 pub use resources::{Estimate, EstimateClass, ResourceEstimate, ResourceEstimateBuilder};
 pub use target::{Pauli, Target};

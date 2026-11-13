@@ -5,62 +5,16 @@ use crate::{AnalysisError, AnalysisResult};
 
 use super::is_pure_noise;
 
-const MAX_ERROR_MATCHER_REPEAT_UNROLL: u64 = 100_000;
-const MAX_ERROR_MATCHER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_ERROR_MATCHER_REPEAT_ITERATIONS: u64 = 1_000_000;
-
-#[derive(Debug, Default)]
-struct ErrorMatcherExpansionBudget {
-    expanded_instructions: u64,
-    repeat_iterations: u64,
-}
-
-impl ErrorMatcherExpansionBudget {
-    fn add_expanded_instructions(&mut self, count: u64) -> AnalysisResult<()> {
-        self.expanded_instructions =
-            self.expanded_instructions
-                .checked_add(count)
-                .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "ErrorMatcher expanded instruction count overflowed",
-                    )
-                })?;
-        if self.expanded_instructions > MAX_ERROR_MATCHER_EXPANDED_INSTRUCTIONS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "ErrorMatcher currently supports at most {MAX_ERROR_MATCHER_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.expanded_instructions
-            )));
-        }
-        Ok(())
-    }
-
-    fn add_repeat_iterations(&mut self, count: u64) -> AnalysisResult<()> {
-        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "ErrorMatcher repeat iteration count overflowed",
-            )
-        })?;
-        if self.repeat_iterations > MAX_ERROR_MATCHER_REPEAT_ITERATIONS {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "ErrorMatcher currently supports at most {MAX_ERROR_MATCHER_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
-                self.repeat_iterations
-            )));
-        }
-        Ok(())
-    }
-}
-
+/// Validates the supported ErrorMatcher subset before any candidate work. Expanded work is not
+/// capped; repeat nesting stays the shared fixed envelope.
 pub(super) fn validate_error_matcher_circuit(circuit: &Circuit) -> AnalysisResult<()> {
-    let mut budget = ErrorMatcherExpansionBudget::default();
-    validate_error_matcher_circuit_items(circuit, 1, 0, false, &mut budget)
+    validate_error_matcher_circuit_items(circuit, 0, false)
 }
 
 fn validate_error_matcher_circuit_items(
     circuit: &Circuit,
-    multiplier: u64,
     depth: usize,
     inside_repeat: bool,
-    budget: &mut ErrorMatcherExpansionBudget,
 ) -> AnalysisResult<()> {
     if depth > MAX_DEM_REPEAT_NESTING {
         return Err(AnalysisError::invalid_detector_error_model(format!(
@@ -70,7 +24,6 @@ fn validate_error_matcher_circuit_items(
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                budget.add_expanded_instructions(multiplier)?;
                 if inside_repeat && has_repeat_contained_stochastic_effect(instruction)? {
                     return Err(AnalysisError::invalid_detector_error_model(
                         "ErrorMatcher does not yet support repeat-contained noise",
@@ -78,26 +31,7 @@ fn validate_error_matcher_circuit_items(
                 }
             }
             CircuitItem::RepeatBlock(repeat) => {
-                let repeat_count = repeat.repeat_count().get();
-                if repeat_count > MAX_ERROR_MATCHER_REPEAT_UNROLL {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "ErrorMatcher currently supports repeat counts up to {MAX_ERROR_MATCHER_REPEAT_UNROLL}, got {repeat_count}"
-                    )));
-                }
-                let repeated_multiplier =
-                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
-                            "ErrorMatcher repeat expansion count overflowed",
-                        )
-                    })?;
-                budget.add_repeat_iterations(repeated_multiplier)?;
-                validate_error_matcher_circuit_items(
-                    repeat.body(),
-                    repeated_multiplier,
-                    depth + 1,
-                    true,
-                    budget,
-                )?;
+                validate_error_matcher_circuit_items(repeat.body(), depth + 1, true)?;
             }
         }
     }

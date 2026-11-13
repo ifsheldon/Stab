@@ -93,6 +93,7 @@
 - Reject path traversal, unsafe path components, unexpected symlinks, unsafe archive entries, and writes outside intended output roots.
 - Keep platform-owned metadata and scratch files outside user-writable paths when possible.
 - Do not treat storage quotas, container quotas, network policy, log limits, scratch cleanup, and metadata ownership as substitutes for one another if runner or artifact infrastructure is added later.
+- Hostile-input protection means memory safety, no panics, checked arithmetic, bounded allocation, and bounded recursion; CPU time is the caller's to bound and is not capped by fixed work limits.
 
 ### Secrets And External Processes
 

@@ -12,9 +12,9 @@ The stable byte contract for backend-neutral compiler inputs is defined by [comp
 
 The stable byte contract for backend-bearing executable identities is defined by [plan fingerprint schema version 1](plan-fingerprint-schema-v1.md).
 
-The current successful machine-output contracts are [capabilities schema version 5](agent-cli-capabilities-schema-v5.md), [plan schema version 4](agent-cli-plan-schema-v4.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Superseded schemas remain available in Git history and are not emitted as compatibility views.
+The current successful machine-output contracts are [capabilities schema version 6](agent-cli-capabilities-schema-v6.md), [plan schema version 4](agent-cli-plan-schema-v4.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Superseded schemas remain available in Git history and are not emitted as compatibility views.
 
-The A2 decision for each caller-selectable, fixed, semantic, representational, and implementation resource boundary is recorded in [the A2 resource policy inventory](a2-resource-policy-inventory.md).
+The E4 classification of every resource limit, including each removed one, is recorded in [the resource policy inventory](a2-resource-policy-inventory.md).
 
 ## Architectural Center
 
@@ -145,13 +145,17 @@ The root inventory is intentionally smaller than the union of component APIs. Co
 
 ## Resource And Diagnostic Policy
 
-Every materializing, expanding, searching, or executing operation performs typed admission against either a caller-selectable operation policy or a fixed non-overridable safety contract.
+Hostile-input protection means memory safety, no panics, checked arithmetic, bounded allocation, and bounded recursion.
+It does not mean bounded CPU time, which belongs to the caller.
 
-Default policies preserve current source-owned safe boundaries.
+Every materializing or executing operation admits its conservative retained storage against one typed `MemoryBudget` before allocating, advancing randomness, or writing output, and reserves fallibly after admission.
+The budget defaults to one gibibyte, is caller-selectable through each operation's limits type, and is exposed on the CLI as the one Stab-native `--memory-budget` option.
 
-Semantic hard limits are not configurable.
+Format and representation invariants and the shared 256-level repeat-nesting envelope are not configurable resources.
+Explicit search budgets with budget-exhausted results remain separate caller policy.
+Count caps that only proxy memory and fixed work caps are not used; a compact input that fits the budget runs for as long as its work takes.
 
-A public policy is introduced only when callers can meaningfully choose the budget. The presence of an internal safety constant alone is not sufficient justification for another public limits type.
+The [resource policy inventory](a2-resource-policy-inventory.md) classifies every remaining limit constant and records each removed one.
 
 Domain errors retain typed context. Applications and the CLI compose them into structured diagnostics only at their workflow boundary.
 
@@ -172,7 +176,7 @@ Dynamic Rust libraries, runtime gate registration, serialized executable plans, 
 
 An extension seam is accepted only after a separate crate uses it without private or operational APIs.
 
-The common circuit-pass executor admits the folded input before dispatch, admits each pass's conservative represented-item, target, argument, projected-payload, and repeat-nesting output projection before proportional lowering allocation, and validates the returned `Circuit` against both the caller policy and that projection. Projected payload excludes allocator metadata and spare collection capacity, so it is not a resident-memory claim. Pass-specific options, reports, and diagnostics remain associated types. Since the model dialect is closed, a research operation that cannot lower to ordinary Stim-compatible gates is rejected instead of registering a runtime instruction.
+The common circuit-pass executor admits the folded input before dispatch, admits each pass's conservative output projection, whose projected payload is charged to the caller's memory budget and whose repeat nesting is checked against the caller's nesting limit, before proportional lowering allocation, and validates the returned `Circuit` against both the caller policy and that projection. Projected payload excludes allocator metadata and spare collection capacity, so it is not a resident-memory claim. Pass-specific options, reports, and diagnostics remain associated types. Since the model dialect is closed, a research operation that cannot lower to ordinary Stim-compatible gates is rejected instead of registering a runtime instruction.
 
 Requirements for a future process-isolated decoder are documented in [External Decoder Process Protocol Requirements](external-decoder-process-protocol-requirements.md); Stab 0.2 does not implement that transport.
 
@@ -182,7 +186,7 @@ Requirements for a future process-isolated decoder are documented in [External D
 - [ADR 0002: Plans, Sessions, And Sinks](adr-0002-plan-session-sink.md)
 - [ADR 0003: Typed Batch Families](adr-0003-typed-batch-families.md)
 - [ADR 0004: Diagnostics And Resource Policies](adr-0004-diagnostics-and-resources.md)
-- [A2 Resource Policy Inventory](a2-resource-policy-inventory.md)
+- [Resource Policy Inventory](a2-resource-policy-inventory.md)
 - [ADR 0005: Backend Selection And Nightly Isolation](adr-0005-backends-and-nightly.md), superseded by ADR 0008 for leaf-kernel selection and the toolchain boundary
 - [ADR 0006: Decoder And External Extension Boundaries](adr-0006-decoder-extension-boundaries.md)
 - [External Decoder Process Protocol Requirements](external-decoder-process-protocol-requirements.md)

@@ -12,7 +12,7 @@ use super::program::{
     reset_detection_record, usize_from_u64,
 };
 use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
-use super::{DemError, DemResourceLimitError, DemResult, DemSamplerLimits};
+use super::{DemError, DemResult, DemSamplerLimits};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount};
 
 /// Compiler for immutable detector-error-model sampling plans.
@@ -125,42 +125,15 @@ impl DemSamplingPlan {
         DemReplaySession::new(self.clone(), expected_shots, limits)
     }
 
-    /// Validates replay traversal work without constructing a session or touching a sink.
+    /// Validates that a replay of `shots` shots is representable, without constructing a
+    /// session or touching a sink. Replay work is not capped.
     pub fn validate_replay(&self, shots: ShotCount) -> DemResult<()> {
-        self.validate_replay_with_limits(shots, DemSamplerLimits::default())
-    }
-
-    /// Validates replay traversal work against explicit caller-owned limits.
-    pub fn validate_replay_with_limits(
-        &self,
-        shots: ShotCount,
-        limits: DemSamplerLimits,
-    ) -> DemResult<()> {
-        let shots = usize::try_from(shots.get()).map_err(|_| {
+        usize::try_from(shots.get()).map_err(|_| {
             DemError::invalid_sampler_compilation(
                 "DEM sampler replay shot count does not fit in usize",
             )
         })?;
-        self.validate_replay_work_units_with_limits(shots, limits)
-    }
-
-    pub fn validate_replay_work_units_with_limits(
-        &self,
-        shots: usize,
-        limits: DemSamplerLimits,
-    ) -> DemResult<()> {
-        let units_per_shot = self.replay_work_units_per_shot()?;
-        if shots == 0 {
-            return Ok(());
-        }
-        if units_per_shot > limits.max_replay_work_units_per_shot() {
-            return Err(DemResourceLimitError::replay_work_units(
-                units_per_shot,
-                limits.max_replay_work_units_per_shot(),
-            )
-            .into());
-        }
-        Ok(())
+        self.replay_work_units_per_shot().map(drop)
     }
 
     pub fn replay_work_units_per_shot(&self) -> DemResult<usize> {
@@ -173,26 +146,6 @@ impl DemSamplingPlan {
                     "DEM sampler replay work overflowed while validating buffer size",
                 )
             })
-    }
-
-    pub fn validate_detector_sample_work_units_with_limits(
-        &self,
-        shots: usize,
-        limits: DemSamplerLimits,
-    ) -> DemResult<()> {
-        self.validate_sample_work_units(
-            shots,
-            self.inner.operations.direct_sample_work_count,
-            limits,
-        )
-    }
-
-    pub fn validate_sampled_error_work_units_with_limits(
-        &self,
-        shots: usize,
-        limits: DemSamplerLimits,
-    ) -> DemResult<()> {
-        self.validate_sample_work_units(shots, self.error_count(), limits)
     }
 
     pub(super) fn try_reusable_detection_record(&self) -> DemResult<DetectionRecordBuffer> {
@@ -288,25 +241,6 @@ impl DemSamplingPlan {
             return Err(DemError::invalid_result_format(
                 "DEM error record had unused trailing bits",
             ));
-        }
-        Ok(())
-    }
-
-    fn validate_sample_work_units(
-        &self,
-        shots: usize,
-        error_applications_per_shot: usize,
-        limits: DemSamplerLimits,
-    ) -> DemResult<()> {
-        if error_applications_per_shot == 0 || shots == 0 {
-            return Ok(());
-        }
-        if error_applications_per_shot > limits.max_sampled_error_applications_per_shot() {
-            return Err(DemResourceLimitError::sampled_error_applications(
-                error_applications_per_shot,
-                limits.max_sampled_error_applications_per_shot(),
-            )
-            .into());
         }
         Ok(())
     }

@@ -14,6 +14,13 @@ use super::super::test_support::convert_measurements_to_detection_events_with_sw
 use super::*;
 use crate::detection::DetectionRecordBuffer;
 use crate::{DetectionResourceKind, Seed};
+use stab_model::MemoryBudget;
+
+fn budget(bytes: impl TryInto<u64>) -> DetectionConversionLimits {
+    DetectionConversionLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+        bytes.try_into().ok().expect("test budget fits u64"),
+    ))
+}
 
 #[derive(Default)]
 struct CollectSink {
@@ -681,7 +688,7 @@ fn zero_shots_do_not_touch_sink_or_advance_seeded_stream() {
 #[test]
 fn compilation_rejects_limits_before_session_or_sink_work() {
     let circuit = circuit("M 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n");
-    let limits = DetectionConversionLimits::default().with_max_record_bits(1);
+    let limits = budget(0_u64);
     let conversion_error = MeasurementToDetectionCompiler::new()
         .limits(limits)
         .compile(&circuit)
@@ -690,7 +697,7 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
         &conversion_error,
         DetectionCompileError::InvalidCircuit(_)
     ));
-    assert!(conversion_error.to_string().contains("record width"));
+    assert!(conversion_error.to_string().contains("memory budget"));
     let sampling_error = DetectionSamplingCompiler::new()
         .limits(limits)
         .compile(&circuit)
@@ -699,7 +706,7 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
         &sampling_error,
         DetectionCompileError::InvalidCircuit(_)
     ));
-    assert!(sampling_error.to_string().contains("record width"));
+    assert!(sampling_error.to_string().contains("memory budget"));
 }
 
 #[test]
@@ -726,11 +733,11 @@ fn direct_frame_compilation_charges_executable_targets_before_materialization() 
     );
 
     DetectionSamplingCompiler::new()
-        .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes))
+        .limits(budget(exact_bytes))
         .compile(&tagged)
         .expect("accept exact combined direct-plan byte boundary");
     let error = DetectionSamplingCompiler::new()
-        .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes - 1))
+        .limits(budget(exact_bytes - 1))
         .compile(&tagged)
         .expect_err("reject the first byte above the direct-plan boundary");
     let DetectionCompileError::InvalidCircuit(DetectionError::ResourceLimit(resource)) = error
@@ -774,7 +781,7 @@ fn direct_frame_compilation_admits_repeats_and_filtered_targets_before_materiali
             .expect("compile exact-byte probe");
         let exact_bytes = direct_compiled_bytes(&exact_plan);
         DetectionSamplingCompiler::new()
-            .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes))
+            .limits(budget(exact_bytes))
             .compile(circuit)
             .expect("accept exact combined direct-plan byte boundary");
 
@@ -797,7 +804,7 @@ fn rejected_direct_frame_allocations(
     let mut rejected = false;
     let measured = allocation_counter::measure(|| {
         rejected = DetectionSamplingCompiler::new()
-            .limits(DetectionConversionLimits::default().with_max_compiled_bytes(exact_bytes - 1))
+            .limits(budget(exact_bytes - 1))
             .compile(circuit)
             .is_err();
     });
@@ -901,84 +908,73 @@ fn session_storage_estimates_match_retained_allocations_at_word_boundaries() {
 }
 
 #[test]
-fn direct_session_storage_rejects_first_excess_before_allocation() {
-    // One measurement and detector add 16 plane bytes and two 512-byte packed batches.
-    // This sparse qubit identifier puts the admitted backing storage exactly at 256 MiB.
+fn direct_session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte() {
+    let fixture = circuit("M 1000\nDETECTOR rec[-1]\n");
+    let probe = DetectionSamplingCompiler::new()
+        .compile(&fixture)
+        .expect("compile storage probe");
+    let exact = execution::direct_session_storage_bytes(&probe.inner.direct);
     let at_limit = DetectionSamplingCompiler::new()
-        .compile(&circuit("M 16777150\nDETECTOR rec[-1]\n"))
-        .expect("compile exact storage boundary");
-    execution::validate_direct_session_storage(&at_limit.inner.direct)
-        .expect("admit the exact boundary without allocating its state");
-    assert_eq!(
-        execution::direct_session_storage_bytes(&at_limit.inner.direct),
-        u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES)
-    );
+        .limits(budget(exact))
+        .compile(&fixture)
+        .expect("the plan fits the session budget");
+    at_limit
+        .session(RandomPolicy::Seeded(Seed::new(1)))
+        .expect("admit the exact session budget");
 
     let over_limit = DetectionSamplingCompiler::new()
-        .compile(&circuit("M 16777151\nDETECTOR rec[-1]\n"))
-        .expect("compile the first excess qubit");
-    // Check admission first so a regression cannot allocate the large frame in this test.
-    execution::validate_direct_session_storage(&over_limit.inner.direct)
-        .expect_err("reject the first excess qubit before attempting construction");
+        .limits(budget(exact - 1))
+        .compile(&fixture)
+        .expect("the plan still fits one byte less");
     let mut rejected = None;
     let allocated = allocation_counter::measure(|| {
         rejected = Some(
             over_limit
                 .session(RandomPolicy::Seeded(Seed::new(1)))
-                .expect_err("public construction must use the same admission"),
+                .expect_err("reject the first excess byte before allocation"),
         );
     });
     assert_eq!(allocated.bytes_total, 0);
     assert_eq!(
         rejected,
         Some(DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes: u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) + 16,
-            limit_bytes: MAX_DETECTION_SESSION_STORAGE_BYTES,
+            estimated_bytes: exact,
+            limit_bytes: u64::try_from(exact - 1).expect("small budget"),
         })
     );
 }
 
 #[test]
-fn conversion_session_storage_rejects_first_excess_before_allocation() {
-    // The sampling compiler bounds expanded measurements at 1,000,000 and sweep targets are
-    // bounded too, so the 256 MiB conversion limit is reached through the sweep-correction frame,
-    // which retains two eight-byte planes per qubit. Eight measurements, one sweep bit, and one
-    // detector retain 600 more bytes (measurement slots and planes, sweep and detector planes, a
-    // 512-byte packed batch, and the frame's measurement and detector planes), so a sweep target
-    // on qubit 16,777,173 lands exactly on 256 MiB.
-    let compile = |sweep_target: u64| {
+fn conversion_session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte() {
+    let fixture = circuit("CX sweep[0] 1000\nM 0 0 0 0 0 0 0 0\nDETECTOR rec[-1]\n");
+    let compile = |limits| {
         MeasurementToDetectionCompiler::new()
+            .limits(limits)
             .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
-            .compile(&circuit(&format!(
-                "CX sweep[0] {sweep_target}\nM 0 0 0 0 0 0 0 0\nDETECTOR rec[-1]\n"
-            )))
-            .expect("compile conversion storage boundary")
+            .compile(&fixture)
+            .expect("compile conversion storage probe")
     };
-    let at_limit = compile(16_777_173);
-    execution::validate_conversion_session_storage(&at_limit)
-        .expect("admit the exact boundary without allocating its state");
-    assert_eq!(
-        execution::conversion_session_storage_bytes(&at_limit),
-        u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES)
-    );
+    let exact =
+        execution::conversion_session_storage_bytes(&compile(DetectionConversionLimits::default()));
+    compile(budget(exact))
+        .session()
+        .expect("admit the exact session budget");
 
-    let over_limit = compile(16_777_174);
-    execution::validate_conversion_session_storage(&over_limit)
-        .expect_err("reject the first excess qubit before attempting construction");
+    let over_limit = compile(budget(exact - 1));
     let mut rejected = None;
     let allocated = allocation_counter::measure(|| {
         rejected = Some(
             over_limit
                 .session()
-                .expect_err("public construction must use the same admission"),
+                .expect_err("reject the first excess byte before allocation"),
         );
     });
     assert_eq!(allocated.bytes_total, 0);
     assert_eq!(
         rejected,
         Some(DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes: u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) + 16,
-            limit_bytes: MAX_DETECTION_SESSION_STORAGE_BYTES,
+            estimated_bytes: exact,
+            limit_bytes: u64::try_from(exact - 1).expect("small budget"),
         })
     );
 }

@@ -37,7 +37,7 @@ name = "circuit_counts_accept_u64_maximum_and_reject_the_first_overflow"
 [[families]]
 id = "resource-safety.circuit-pass-limits"
 area = "resource-safety"
-contract = "CircuitPass rejects input, projected-output, actual-output, and arithmetic resource excesses at their owning framework stage without premature dispatch."
+contract = "CircuitPass admits the input, each pass's projected output, and the returned circuit against one memory budget and a tightenable repeat-nesting limit at the owning framework stage without premature dispatch."
 stim_refs = ["src/stim/circuit/circuit.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
@@ -50,23 +50,6 @@ package = "stab-analysis"
 kind = "test"
 target = "circuit_pass"
 name = "circuit_pass_resource_admission_is_atomic_across_framework_stages"
-
-[[families]]
-id = "resource-safety.circuit-to-dem-expanded-work-limit"
-area = "resource-safety"
-contract = "Circuit-to-DEM analysis admits aggregate expanded operations, repeat iterations, and nesting through one typed one-million-work policy."
-stim_refs = ["src/stim/simulators/error_analyzer.test.cc", "src/stim/util_top/circuit_to_dem.test.cc"]
-status = "divergence"
-owner = "stab-analysis"
-divergence_kind = "resource-limit"
-rationale = "Stab bounds total analyzer work and nesting explicitly instead of relying on unbounded expansion."
-[families.evidence]
-status = "verified"
-[families.evidence.test]
-package = "stab-analysis"
-kind = "test"
-target = "dem_traversal_resource"
-name = "pf4_dem_analyzer_repeat_resource_policy_is_source_owned"
 
 [[families]]
 id = "resource-safety.circuit-to-dem-local-decomposition-limit"
@@ -84,21 +67,21 @@ target = "consolidation_matrix"
 name = "circuit_to_dem_local_decomposition_symptom_boundary_matches_stim"
 
 [[families]]
-id = "resource-safety.circuit-to-dem-no-recurrence-limit"
+id = "resource-safety.circuit-to-dem-memory-budget"
 area = "resource-safety"
-contract = "Circuit-to-DEM loop folding rejects a non-recurrent repeat after one million recurrence probes or unrolled iterations instead of searching through an arbitrarily large repeat count."
-stim_refs = ["src/stim/simulators/error_analyzer.cc", "src/stim/simulators/error_analyzer.test.cc"]
+contract = "Circuit-to-DEM analysis does not cap expanded work, repeat iterations, or recurrence probes; it charges each retained output item against the caller's memory budget before retaining it and refuses the first excess with a typed error."
+stim_refs = ["src/stim/simulators/error_analyzer.cc", "src/stim/simulators/error_analyzer.test.cc", "src/stim/util_top/circuit_to_dem.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Pinned Stim searches through the requested iterations when no shifted recurrence is found; Stab uses the source-owned analyzer work ceiling to prevent tiny compact inputs from requesting unbounded state evolution."
+rationale = "Pinned Stim relies on host allocation failure; Stab admits retained storage against a caller-selected memory budget and refuses the first excess with a typed error, while running time stays the caller's to bound."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-analysis"
-kind = "test"
-target = "dem_analyzer_loop_folding"
-name = "pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget"
+kind = "lib"
+target = "stab_analysis"
+name = "circuit_to_dem::reverse_fold::tests::analyzer_output_is_admitted_against_the_memory_budget_for_folded_and_unrolled_loops"
 
 [[families]]
 id = "resource-safety.cli-file-hardlink-identities"
@@ -184,46 +167,45 @@ name = "standard_stream_aliases_fail_without_touching_files"
 [[families]]
 id = "resource-safety.dem-coordinate-map-limit"
 area = "resource-safety"
-contract = "Full DEM detector-coordinate maps reject above one million entries while selected coordinate queries remain available on compact large models."
+contract = "Full DEM detector-coordinate maps are admitted against a memory budget, one gibibyte by default, and refused before allocation beyond it, while selected coordinate queries remain available on compact large models."
 stim_refs = ["src/stim/dem/detector_error_model.test.cc"]
 status = "divergence"
 owner = "stab-model"
 divergence_kind = "resource-limit"
-rationale = "Stab bounds inherently expanded full coordinate maps while retaining sparse selected queries."
+rationale = "Pinned Stim materializes the full map without an admission check; Stab refuses a map whose conservative size exceeds the budget before allocating it."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-model"
 kind = "test"
 target = "dem_coordinate_resources"
-name = "pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries"
+name = "dem_coordinate_all_map_is_admitted_against_the_memory_budget_but_selected_queries_are_not"
 
 [[families]]
-id = "resource-safety.dem-sampling-work-limits"
+id = "resource-safety.dem-sampling-memory-budget"
 area = "resource-safety"
-contract = "DEM sampling rejects a model whose single shot exceeds the typed per-shot detector or sampled-error work limit before RNG advancement or sink mutation and leaves the session reusable, while streaming any shot count whose shots fit; replay rejects owned-session construction for an excessive per-shot replay width before record traversal or sink mutation."
+contract = "DEM sampling and replay sessions admit their reusable storage against the caller's memory budget at the exact boundary and refuse the first excess byte before allocation, RNG advancement, or sink mutation; per-shot sampling and replay work and shot counts are not capped."
 stim_refs = ["src/stim/simulators/dem_sampler.test.cc"]
 status = "divergence"
 owner = "stab-engine"
 divergence_kind = "resource-limit"
-rationale = "Stab gives DEM sampling explicit caller-visible per-shot work admission instead of relying on host allocation failure; like Stim, it streams arbitrarily many shots of an admitted model."
+rationale = "Pinned Stim relies on host allocation failure; Stab admits retained storage against a caller-selected memory budget and refuses the first excess with a typed error, while running time stays the caller's to bound."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-engine"
-kind = "test"
-target = "dem_sampling_plan_session"
-name = "work_limits_reject_before_rng_or_sink_and_leave_session_reusable"
+kind = "lib"
+name = "dem_sampling::session::storage_tests::session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte_before_allocation"
 
 [[families]]
 id = "resource-safety.detecting-regions-limits"
 area = "resource-safety"
-contract = "Detecting-region extraction admits compact repeat counts independently of syntax, omits inactive outputs, and reports typed represented-work, traversal-work, live-state, output-record, output-byte, materialized-width, and 128-level nesting excesses."
+contract = "Detecting-region extraction admits compact repeat counts independently of syntax, omits inactive outputs, charges live tracker state, output regions, and helper vectors against a one-gibibyte memory budget, and reports typed budget, materialized-width, and 128-level nesting excesses."
 stim_refs = ["src/stim/util_top/circuit_to_detecting_regions.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Stab bounds hostile detecting-region requests and retained output explicitly while preserving folded repeat semantics and sparse inactive snapshots."
+rationale = "Stab bounds hostile detecting-region requests and retained output by a memory budget while preserving folded repeat semantics and sparse inactive snapshots; its recursive traversal keeps a 128-level nesting bound because 256 levels overflow a 2 MiB thread stack in debug builds."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -233,48 +215,48 @@ target = "stab_analysis"
 name = "circuit_detecting_regions::tests::detecting_regions_resource_contract_is_bounded"
 
 [[families]]
-id = "resource-safety.detection-compile-limits"
+id = "resource-safety.detection-memory-budget"
 area = "resource-safety"
-contract = "Compact detection conversion compilation admits exact aggregate repeat-iteration, expanded-instruction, retained-term, retained-byte, and record-width limits and rejects the first excess with the corresponding typed resource kind without a per-block syntax cap."
+contract = "Detection conversion and detection sampling charge the compact plan, the resolved program, the reference-simulator scratch, and one byte per record bit against the caller's memory budget, admit the exact budget, and reject the first excess byte with typed context; expanded work, repeat iterations, retained terms, and record width are not separately capped."
 stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc"]
 status = "divergence"
 owner = "stab-engine"
 divergence_kind = "resource-limit"
-rationale = "Stab gives compact detection conversion explicit aggregate work and retained-storage admission boundaries without rejecting a folded circuit solely because one repeat count exceeds 100000."
+rationale = "Pinned Stim relies on host allocation failure; Stab admits retained storage against a caller-selected memory budget and refuses the first excess with a typed error, while running time stays the caller's to bound."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-engine"
 kind = "test"
 target = "canonical_owner_evidence"
-name = "a2_detection_compile_limits_are_independent_and_atomic"
+name = "detection_compiled_plan_admits_the_exact_budget_and_rejects_the_first_excess_byte"
 
 [[families]]
-id = "resource-safety.feedback-inlining-fixed-limits"
+id = "resource-safety.feedback-inlining-memory-budget"
 area = "resource-safety"
-contract = "Feedback inlining has no per-block repeat-count cap, admits one aggregate expanded-work and repeat-iteration boundary, and reports typed expanded-operation, repeat-iteration, and 256-level nesting excesses."
+contract = "Feedback inlining admits the conservative size of its unrolled intermediate and output circuits against the memory budget before unrolling and reports typed budget and 256-level nesting excesses; expanded work is not capped."
 stim_refs = ["src/stim/util_top/transform_without_feedback.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Stab bounds the current feedback-expansion algorithm explicitly instead of relying on host runtime or allocation failure."
+rationale = "Pinned Stim relies on host allocation failure; Stab admits retained storage against a caller-selected memory budget and refuses the first excess with a typed error, while running time stays the caller's to bound."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-analysis"
 kind = "lib"
 target = "stab_analysis"
-name = "circuit_feedback::tests::feedback_repeat_resource_divergence_has_one_aggregate_policy"
+name = "circuit_feedback::tests::feedback_unrolling_is_admitted_against_the_memory_budget_and_nesting_stays_fixed"
 
 [[families]]
 id = "resource-safety.flow-generation-fixed-limits"
 area = "resource-safety"
-contract = "Measurement-rich flow generation reports typed projected-payload, expanded-operation, and 256-level repeat-nesting excesses while ignored-only and compact unitary paths retain their specialized behavior."
+contract = "Measurement-rich flow generation admits its projected owned rows against the one-gibibyte default memory budget and reports typed projected-payload and 256-level repeat-nesting excesses, while ignored-only and compact unitary paths retain their specialized behavior; expanded solver work is not capped."
 stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Stab bounds owned flow storage and expansion work explicitly before allocating rows or traversing hostile compact repeats."
+rationale = "Stab admits owned flow rows before allocation; the ignored-only path keeps its dense quadratic-qubit bound until that algorithm is replaced."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -284,14 +266,14 @@ target = "circuit_flow_resources"
 name = "circuit_flow_generators_admit_owned_rows_and_report_typed_limits"
 
 [[families]]
-id = "resource-safety.generation-qubit-limit"
+id = "resource-safety.generation-memory-budget"
 area = "resource-safety"
-contract = "Built-in circuit generation admits exact family boundaries and rejects a projected physical-qubit count above 131072 before materialization."
+contract = "Built-in circuit generation admits its projected size, 2048 bytes per physical qubit, against the caller's memory budget before materialization and writes nothing when refused."
 stim_refs = ["src/stim/gen/gen_rep_code.test.cc", "src/stim/gen/gen_surface_code.test.cc", "src/stim/gen/gen_color_code.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Stab uses a typed generated-circuit qubit admission boundary to prevent hostile materialization."
+rationale = "Stim generates within its distance bounds without an admission check; Stab refuses a projected generated circuit above the memory budget before generating it."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -337,12 +319,12 @@ name = "logical_search_limits_return_typed_failures_without_mutating_source"
 [[families]]
 id = "resource-safety.missing-detector-fixed-limits"
 area = "resource-safety"
-contract = "Missing-detector discovery reports typed expanded-operation, projected-payload, and repeat-nesting limits while a proven final local repeat remains count-independent."
+contract = "Missing-detector discovery admits declared rows and projected flow rows against the one-gibibyte default memory budget and reports typed budget and repeat-nesting excesses, while a proven final local repeat remains count-independent."
 stim_refs = ["src/stim/util_top/missing_detectors.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Stab bounds unsupported expanded analysis shapes and projected flow storage explicitly, but proves covered final local repeats from one iteration instead of rejecting by repeat count."
+rationale = "Stab bounds retained rows by a memory budget instead of relying on allocation failure; expanded scans are not capped."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -354,41 +336,24 @@ name = "missing_detector_resource_contract_is_atomic"
 [[families]]
 id = "resource-safety.model-circuit-parse-limits"
 area = "resource-safety"
-contract = "Circuit parsing admits the exact configured source-line and repeat-depth boundaries and rejects the first excess."
+contract = "Circuit and DEM byte parsing admit the exact configured repeat-depth boundary after UTF-8 decoding and reject the first excess."
 stim_refs = ["src/stim/circuit/circuit.test.cc"]
 status = "divergence"
 owner = "stab-model"
 divergence_kind = "resource-limit"
-rationale = "Stab gives circuit parsing explicit source-line and repeat-depth admission boundaries."
+rationale = "Callers may tighten the shared 256-level repeat-nesting envelope; Stim has no configurable parse depth."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-model"
 kind = "test"
 target = "model_parse_diagnostics"
-name = "byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode"
-
-[[families]]
-id = "resource-safety.model-dem-parse-limits"
-area = "resource-safety"
-contract = "DEM parsing admits the exact configured source-line boundary and rejects the first excess."
-stim_refs = ["src/stim/dem/detector_error_model.test.cc"]
-status = "divergence"
-owner = "stab-model"
-divergence_kind = "resource-limit"
-rationale = "Stab gives DEM parsing an explicit source-line admission boundary."
-[families.evidence]
-status = "verified"
-[families.evidence.test]
-package = "stab-model"
-kind = "test"
-target = "model_parse_diagnostics"
-name = "byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode"
+name = "byte_parse_limit_entrypoints_apply_custom_nesting_limits_after_utf8_decode"
 
 [[families]]
 id = "resource-safety.model-parse-accounting-order"
 area = "resource-safety"
-contract = "Circuit and DEM canonical fast paths charge retained targets cumulatively, and adjacent circuit declarations are admitted before fusion."
+contract = "Circuit and DEM canonical fast paths charge retained targets against the memory budget before retention, and adjacent circuit declarations are charged before fusion."
 stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/dem/detector_error_model.test.cc"]
 status = "divergence"
 owner = "stab-model"
@@ -400,7 +365,7 @@ status = "verified"
 package = "stab-model"
 kind = "test"
 target = "parse_resources"
-name = "parser_admission_accumulates_fast_path_targets_and_prefusion_declarations"
+name = "parser_admission_charges_fast_path_targets_and_prefusion_declarations"
 
 [[families]]
 id = "resource-safety.model-parse-allocation-admission"
@@ -420,38 +385,21 @@ target = "parse_resources"
 name = "parser_allocation_depends_only_on_admitted_model_storage"
 
 [[families]]
-id = "resource-safety.model-remaining-parse-limits"
+id = "resource-safety.model-parse-memory-budget"
 area = "resource-safety"
-contract = "Circuit and DEM parsing enforce typed original-byte, compact-declaration, and retained-target admission at exact inclusive boundaries through string and byte entry points."
+contract = "Circuit and DEM parsing admit source bytes plus the conservative retained model size against one memory budget at the exact inclusive boundary through string and byte entry points; source lines, declarations, and targets are not separately capped."
 stim_refs = ["src/stim/circuit/circuit.test.cc", "src/stim/dem/detector_error_model.test.cc"]
 status = "divergence"
 owner = "stab-model"
 divergence_kind = "resource-limit"
-rationale = "Stim v1.16.0 has no equivalent configurable byte, compact-declaration, or retained-target parser policy; Stab rejects hostile model growth at typed caller-selected boundaries."
+rationale = "Pinned Stim relies on host allocation failure; Stab admits retained storage against a caller-selected memory budget and refuses the first excess with a typed error, while running time stays the caller's to bound."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-model"
 kind = "test"
 target = "parse_resources"
-name = "parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit"
-
-[[families]]
-id = "resource-safety.pauli-conjugation-fixed-limit"
-area = "resource-safety"
-contract = "Pauli conjugation keeps pure Clifford repeats compact and reports a typed expanded-operation excess before traversing more than 1,000,000 nonunitary instructions."
-stim_refs = ["src/stim/circuit/circuit2.pybind.cc"]
-status = "divergence"
-owner = "stab-analysis"
-divergence_kind = "resource-limit"
-rationale = "Stab bounds the measurement/reset traversal explicitly while preserving the unbounded compact tableau path for unitary repeats."
-[families.evidence]
-status = "verified"
-[families.evidence.test]
-package = "stab-analysis"
-kind = "test"
-target = "algebra_circuit_conversions"
-name = "pauli_circuit_conjugation_keeps_compact_unitaries_and_bounds_nonunitary_work"
+name = "parser_admission_accepts_the_exact_budget_and_rejects_the_first_excess_byte"
 
 [[families]]
 id = "resource-safety.record-streaming-dense-packed-bounds"
@@ -471,20 +419,21 @@ target = "resource_contracts"
 name = "packed_streaming_allocations_follow_width_not_record_count"
 
 [[families]]
-id = "resource-safety.sampling-expanded-work-limit"
+id = "resource-safety.sampling-memory-budget"
 area = "resource-safety"
-contract = "Circuit sampling admits at most one million expanded circuit instructions per measurement-bearing shot, counted exactly as detection sampling counts them, rejects the first excess before session construction, and executes arbitrarily repeated zero-width circuits without traversing their represented work."
+contract = "Circuit sampling admits its compiled program, session storage, and reference-simulator scratch against the caller's memory budget, admits the exact budget, and refuses the first excess byte before RNG or sink use; expanded work is not capped."
 stim_refs = ["src/stim/simulators/frame_simulator.test.cc"]
 status = "divergence"
 owner = "stab-engine"
 divergence_kind = "resource-limit"
-rationale = "Stab gives one-shot sampling work an explicit aggregate bound so a compact hostile repeat cannot monopolize an uncancellable batch; the limit counts represented instructions on the one resolved program that detection also admits, instead of imposing a repeat-count syntax cap."
+rationale = "Pinned Stim relies on host allocation failure; Stab admits retained storage against a caller-selected memory budget and refuses the first excess with a typed error, while running time stays the caller's to bound."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-engine"
-kind = "lib"
-name = "sampling::tests::expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work"
+kind = "test"
+target = "memory_budget_admission"
+name = "sampling_admits_the_exact_budget_and_rejects_the_first_excess_byte_before_work"
 
 [[families]]
 id = "resource-safety.sat-materialization-limits"

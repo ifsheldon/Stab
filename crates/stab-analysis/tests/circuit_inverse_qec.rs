@@ -853,6 +853,15 @@ fn time_reversed_for_flows_matches_stim_and_reversed_flows_hold() {
 
 #[test]
 fn time_reversed_for_flows_rejects_flows_the_input_does_not_satisfy() {
+    // A large repeated unitary outside the folded subset is validated on the dense tableau path
+    // now that its expanded-instruction cap is retired, so it is accepted when it holds.
+    assert!(
+        circuit_time_reversed_for_flows(
+            &circuit("REPEAT 1001 {\n    SWAP 0 1\n}\n"),
+            &[flow("X0 -> X1")]
+        )
+        .is_ok()
+    );
     for (name, input, input_flows, expected_error) in [
         (
             "unitary flow",
@@ -865,12 +874,6 @@ fn time_reversed_for_flows_rejects_flows_the_input_does_not_satisfy() {
             "SWAP 0 1\n",
             &["X0 -> X0"][..],
             "requires input circuit to satisfy flow 0",
-        ),
-        (
-            "large repeated unitary outside the folded subset",
-            "REPEAT 1000001 {\n    SWAP 0 1\n}\n",
-            &["X0 -> X1"][..],
-            "folded sparse validation",
         ),
         (
             "measurement flow",

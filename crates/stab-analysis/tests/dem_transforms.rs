@@ -187,9 +187,9 @@ fn deep_folded_dem_transforms_use_bounded_stack() {
 }
 
 #[test]
-fn pf4_dem_materialized_flattened_rejects_excessive_repeat() {
+fn pf4_dem_materialized_flattened_refuses_repeats_beyond_the_memory_budget() {
     let dem = DetectorErrorModel::from_dem_str(
-        "repeat 100001 {\n\
+        "repeat 1000000000000 {\n\
              error(0.125) D0\n\
          }\n",
     )
@@ -197,12 +197,7 @@ fn pf4_dem_materialized_flattened_rejects_excessive_repeat() {
 
     let error = flattened_detector_error_model(&dem).expect_err("reject excessive flattening");
 
-    assert!(
-        error
-            .to_string()
-            .contains("DEM flattened currently supports repeat counts up to 100000"),
-        "{error}"
-    );
+    assert!(error.to_string().contains("memory budget"), "{error}");
 }
 
 #[test]
@@ -455,9 +450,9 @@ fn pfm_b3_folded_traversal_transforms() {
     assert!(stripped.starts_with("repeat 1000000000"), "{stripped}");
     assert!(!stripped.contains('['), "{stripped}");
     let flatten_error = flattened_detector_error_model(&source)
-        .expect_err("materialized flattening keeps its explicit cap");
+        .expect_err("materialized flattening beyond the memory budget is refused");
     assert!(
-        flatten_error.to_string().contains("supports repeat counts"),
+        flatten_error.to_string().contains("memory budget"),
         "{flatten_error}"
     );
 

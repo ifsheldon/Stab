@@ -8,9 +8,8 @@ use serde_json::{Value, json};
 use stab_analysis::{AnalysisError, ResourceLimitError as AnalysisResourceLimitError};
 use stab_engine::{
     DemError, DemResourceKind, DemResourceLimitError, DemSamplingExecutionError,
-    DetectionCompileError, DetectionError, DetectionExecutionError, DetectionRecordLimitSubject,
-    DetectionResourceKind, DetectionResourceLimitError, RunError, SamplingCompileError,
-    SamplingExecutionError,
+    DetectionCompileError, DetectionError, DetectionExecutionError, DetectionResourceKind,
+    DetectionResourceLimitError, RunError, SamplingCompileError, SamplingExecutionError,
 };
 use stab_model::{
     ByteSpan as ModelByteSpan, DiagnosticSeverity, ModelDialect, ModelError, ParseError,
@@ -140,7 +139,9 @@ pub(crate) enum CliError {
     #[error("replay error input has {actual} records but --shots requested {expected}")]
     ReplayErrorRecordCountMismatch { expected: usize, actual: usize },
 
-    #[error("{kind} is too large; limit is {limit} bytes")]
+    #[error(
+        "{kind} has more than {limit} bytes, exceeding the memory budget; raise it with --memory-budget"
+    )]
     InputTooLarge { kind: &'static str, limit: u64 },
 
     #[error("not enough information given to parse input file")]
@@ -213,9 +214,24 @@ pub(crate) fn write_cli_error(
     error: &CliError,
 ) -> io::Result<()> {
     match format {
-        ErrorFormatArg::Human => writeln!(writer, "error: {error}"),
+        ErrorFormatArg::Human => {
+            writeln!(writer, "error: {error}")?;
+            if is_memory_budget_refusal(error) {
+                writeln!(writer, "help: {MEMORY_BUDGET_HELP}")?;
+            }
+            Ok(())
+        }
         ErrorFormatArg::Json => write_json(writer, &cli_error_diagnostic(error)),
     }
+}
+
+const MEMORY_BUDGET_HELP: &str =
+    "Raise the budget with `--memory-budget <SIZE>`, for example `--memory-budget 4GiB`.";
+
+/// Every typed budget refusal renders the budget it exceeded as an `N-byte memory budget`.
+fn is_memory_budget_refusal(error: &CliError) -> bool {
+    matches!(error, CliError::InputTooLarge { .. })
+        || error.to_string().contains("-byte memory budget")
 }
 
 pub(crate) fn write_clap_error(writer: &mut impl Write, error: &clap::Error) -> io::Result<()> {
@@ -404,7 +420,7 @@ fn sampling_compile_error_code(error: &SamplingCompileError) -> &'static str {
         SamplingCompileError::Model(error) => model_error_code(error),
         SamplingCompileError::Analysis(error) => analysis_error_code(error),
         SamplingCompileError::InvalidCircuit { .. } => "invalid-sampler-compilation",
-        SamplingCompileError::ExpandedOperationLimit { .. } => "resource-limit-exceeded",
+        SamplingCompileError::CompiledBytesLimit { .. } => "resource-limit-exceeded",
     }
 }
 
@@ -456,6 +472,9 @@ fn dem_execution_error_code(error: &DemSamplingExecutionError) -> &'static str {
 }
 
 fn cli_error_help(error: &CliError) -> Option<&'static str> {
+    if is_memory_budget_refusal(error) {
+        return Some(MEMORY_BUDGET_HELP);
+    }
     match error {
         CliError::MissingRecordWidth => Some("Provide layout counts or `--bits_per_shot`."),
         CliError::MissingConvertTypes => Some("Add `--types` with unique M, D, or L letters."),
@@ -599,7 +618,7 @@ fn model_error(error: &CliError) -> Option<&ModelError> {
             SamplingCompileError::Model(error) => Some(error),
             SamplingCompileError::Analysis(error) => model_error_from_analysis(error),
             SamplingCompileError::InvalidCircuit { .. }
-            | SamplingCompileError::ExpandedOperationLimit { .. } => None,
+            | SamplingCompileError::CompiledBytesLimit { .. } => None,
         },
         CliError::Detection(error) => model_error_from_detection(error),
         CliError::DetectionCompile(DetectionCompileError::InvalidCircuit(error)) => {
@@ -720,19 +739,11 @@ fn sampling_compile_error_context(error: &SamplingCompileError) -> Value {
         SamplingCompileError::Model(error) => model_error_context(error),
         SamplingCompileError::Analysis(error) => analysis_error_context(error),
         SamplingCompileError::InvalidCircuit { .. } => json!({}),
-        SamplingCompileError::ExpandedOperationLimit { actual, limit } => {
-            let mut context = json!({
-                "resource": "expanded-operations-per-shot",
-                "actual": actual.value().to_string(),
-                "limit": limit.to_string(),
-            });
-            if actual.is_lower_bound()
-                && let Value::Object(fields) = &mut context
-            {
-                fields.insert("actual_is_lower_bound".to_owned(), Value::Bool(true));
-            }
-            context
-        }
+        SamplingCompileError::CompiledBytesLimit { required, budget } => json!({
+            "resource": "materialized-bytes",
+            "actual": required.to_string(),
+            "limit": budget.to_string(),
+        }),
     }
 }
 
@@ -946,37 +957,11 @@ fn analysis_resource_context(error: &AnalysisResourceLimitError) -> Value {
 
 fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
     let resource = match error.kind() {
-        DetectionResourceKind::RecordBits(_) => "record-bits",
-        DetectionResourceKind::SamplingExpandedOperations => "expanded-operations-per-shot",
         DetectionResourceKind::RepeatNesting => "repeat-nesting",
-        DetectionResourceKind::ExpandedInstructions => "expanded-operations",
-        DetectionResourceKind::RepeatIterations => "repeat-iterations",
-        DetectionResourceKind::CompiledTerms => "compiled-terms",
         DetectionResourceKind::CompiledBytes => "materialized-bytes",
     };
-    let subject = match error.kind() {
-        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::DetectionRecord) => {
-            Some("detection-record")
-        }
-        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::MeasurementRecord) => {
-            Some("measurement-record")
-        }
-        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::SweepRecord) => {
-            Some("sweep-record")
-        }
-        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::ObservableCount) => {
-            Some("observable-count")
-        }
-        _ => None,
-    };
-    let operation = if matches!(
-        error.kind(),
-        DetectionResourceKind::SamplingExpandedOperations
-    ) {
-        "detection-sampling"
-    } else {
-        "detection-conversion"
-    };
+    let subject: Option<&str> = None;
+    let operation = "detection-conversion";
     let mut context = json!({
         "operation": operation,
         "resource": resource,
@@ -994,8 +979,6 @@ fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
 
 fn dem_resource_context(error: &DemResourceLimitError) -> Value {
     let resource = match error.kind() {
-        DemResourceKind::SampledErrorApplications => "sampled-error-applications",
-        DemResourceKind::ReplayWorkUnits => "replay-work-units",
         DemResourceKind::ActiveBatchBytes => "active-batch-bytes",
     };
     json!({

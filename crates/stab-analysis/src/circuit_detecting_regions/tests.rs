@@ -528,27 +528,25 @@ fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
 }
 
 #[test]
-fn detecting_regions_target_api_rejects_dense_helper_expansion() {
+fn detecting_regions_target_api_admits_dense_helpers_against_the_memory_budget() {
     let high_observable = Circuit::from_stim_str("OBSERVABLE_INCLUDE(4294967296) Z0\n").unwrap();
     let error = all_detecting_region_targets(&high_observable).unwrap_err();
     let AnalysisError::ResourceLimit(resource) = error else {
         panic!("expected typed target-helper rejection, got {error}");
     };
     assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
-    assert_eq!(resource.resource(), ResourceKind::MaterializedUnits);
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert!(resource.actual() > resource.limit());
-    assert_eq!(resource.limit(), MAX_DETECTING_REGION_HELPER_TARGETS);
+    assert_eq!(resource.limit(), DETECTING_REGION_MEMORY_BUDGET.bytes());
 
-    let many_detectors =
+    let above_retired_cap =
         Circuit::from_stim_str("M 0\nREPEAT 1000001 {\n    DETECTOR rec[-1]\n}\n").unwrap();
-    let error = all_detecting_region_targets(&many_detectors).unwrap_err();
-    let AnalysisError::ResourceLimit(resource) = error else {
-        panic!("expected typed target-helper rejection, got {error}");
-    };
-    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
-    assert_eq!(resource.resource(), ResourceKind::MaterializedUnits);
-    assert_eq!(resource.actual(), 1_000_001);
-    assert_eq!(resource.limit(), MAX_DETECTING_REGION_HELPER_TARGETS);
+    assert_eq!(
+        all_detecting_region_targets(&above_retired_cap)
+            .unwrap()
+            .len(),
+        1_000_001
+    );
 }
 
 fn detecting_regions_clifford_supports_single_qubit_clifford_gate_set() {

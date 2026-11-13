@@ -14,7 +14,7 @@ mod unitary_repeat;
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::target_xor_set::{TargetXorSet, xor_merge_into};
 use crate::{AnalysisError, AnalysisResult};
-pub(crate) use budget::{AnalyzerProbeBudget, ReverseTrackerBudget, ReverseTrackerWorkBudget};
+pub(crate) use budget::{ReverseTrackerBudget, ReverseTrackerWorkBudget};
 use clifford_action::{single_qubit_action, two_qubit_action};
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
 pub(crate) use shifted_recurrence::{ShiftedRecurrenceSearch, search_shifted_recurrence};
@@ -160,11 +160,12 @@ impl SparseReverseFrameTracker {
     pub(crate) fn undo_circuit_for_analyzer_probe(
         &mut self,
         circuit: &Circuit,
-        budget: &mut AnalyzerProbeBudget,
     ) -> AnalysisResult<()> {
-        budget.admit_probe_iteration()?;
-        let mut budget = ReverseTrackerBudget::Metered(budget);
-        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Discard, &mut budget)
+        self.undo_circuit_with_gauge_output(
+            circuit,
+            GaugeOutputPolicy::Discard,
+            &mut ReverseTrackerBudget::Unlimited,
+        )
     }
 
     fn undo_circuit_with_gauge_output(

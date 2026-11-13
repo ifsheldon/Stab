@@ -19,7 +19,6 @@ impl<'a> PreparedModelText<'a> {
         limits: ParseLimits,
     ) -> ModelResult<Self> {
         ParseAdmission::admit_source_bytes(dialect, input.len(), limits)?;
-        let input = admitted_source_prefix(input, limits.source_line_limit().get());
         if let Ok(text) = std::str::from_utf8(input) {
             return Ok(Self {
                 text: Cow::Borrowed(text),
@@ -124,25 +123,6 @@ fn byte_range_is_opaque_metadata(
         return range.start <= byte_start && byte_end <= range.end;
     }
     false
-}
-
-fn admitted_source_prefix(input: &[u8], admitted_lines: usize) -> &[u8] {
-    let mut line_start = 0usize;
-    for _ in 0..admitted_lines {
-        let Some(remaining) = input.get(line_start..) else {
-            return input;
-        };
-        let Some(relative_newline) = remaining.iter().position(|byte| *byte == b'\n') else {
-            return input;
-        };
-        line_start = line_start
-            .saturating_add(relative_newline)
-            .saturating_add(1);
-    }
-    if line_start >= input.len() {
-        return input;
-    }
-    input.get(..line_start.saturating_add(1)).unwrap_or(input)
 }
 
 fn error_precedes_invalid_utf8(error: &ModelError, invalid_utf8: &ParseError) -> bool {
@@ -293,9 +273,7 @@ fn unescape_tag(raw: &[u8]) -> Vec<u8> {
 mod tests {
     use std::ops::Range;
 
-    use crate::{ParseLimits, SourceLineLimit};
-
-    use super::{PreparedModelText, byte_range_is_opaque_metadata, scan_metadata};
+    use super::{byte_range_is_opaque_metadata, scan_metadata};
 
     #[test]
     fn metadata_scanner_distinguishes_tags_comments_and_target_brackets() {
@@ -322,20 +300,6 @@ mod tests {
                 .iter()
                 .any(|range| input.get(range.clone()) == Some(b"-1".as_slice()))
         );
-    }
-
-    #[test]
-    fn byte_preparation_stops_after_the_first_rejected_physical_line() {
-        let limits = ParseLimits::default().with_source_line_limit(SourceLineLimit::new(1));
-        let prepared = PreparedModelText::new(
-            b"H 0\nM 1\nM 2\nM 3\n",
-            crate::ModelDialect::StimCircuit,
-            limits,
-        );
-        assert!(prepared.is_ok());
-        if let Ok(prepared) = prepared {
-            assert_eq!(prepared.text(), "H 0\nM");
-        }
     }
 
     #[test]

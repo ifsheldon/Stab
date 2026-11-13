@@ -6,24 +6,10 @@ use crate::{ResourceAmount, SamplingCompileError, SamplingExecutionError};
 
 pub(crate) type DetectionResult<T> = Result<T, DetectionError>;
 
-/// Detection record dimension whose configured limit was exceeded.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum DetectionRecordLimitSubject {
-    DetectionRecord,
-    MeasurementRecord,
-    SweepRecord,
-    ObservableCount,
-}
-
 /// Detection-conversion resource dimension whose configured limit was exceeded.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DetectionResourceKind {
-    RecordBits(DetectionRecordLimitSubject),
-    SamplingExpandedOperations,
     RepeatNesting,
-    ExpandedInstructions,
-    RepeatIterations,
-    CompiledTerms,
     CompiledBytes,
 }
 
@@ -36,55 +22,7 @@ pub struct DetectionResourceLimitError {
 }
 
 impl DetectionResourceLimitError {
-    pub(crate) const fn sampling_expanded_operations(actual: ResourceAmount, limit: u64) -> Self {
-        Self {
-            kind: DetectionResourceKind::SamplingExpandedOperations,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn detection_record_bits(
-        subject: DetectionRecordLimitSubject,
-        actual: u64,
-        limit: u64,
-    ) -> Self {
-        Self::record_bits(subject, actual, limit)
-    }
-
     pub(crate) const fn detection_repeat_nesting(actual: usize, limit: usize) -> Self {
-        Self::repeat_nesting(actual, limit)
-    }
-
-    pub(crate) const fn detection_expanded_instructions(actual: u64, limit: u64) -> Self {
-        Self::expanded_instructions(actual, limit)
-    }
-
-    pub(crate) const fn detection_repeat_iterations(actual: u64, limit: u64) -> Self {
-        Self::repeat_iterations(actual, limit)
-    }
-
-    pub(crate) const fn detection_compiled_terms(actual: u64, limit: u64) -> Self {
-        Self::compiled_terms(actual, limit)
-    }
-
-    pub(crate) const fn detection_compiled_bytes(actual: u64, limit: u64) -> Self {
-        Self::compiled_bytes(actual, limit)
-    }
-
-    pub(crate) const fn record_bits(
-        subject: DetectionRecordLimitSubject,
-        actual: u64,
-        limit: u64,
-    ) -> Self {
-        Self {
-            kind: DetectionResourceKind::RecordBits(subject),
-            actual: ResourceAmount::exact(actual),
-            limit,
-        }
-    }
-
-    pub(crate) const fn repeat_nesting(actual: usize, limit: usize) -> Self {
         Self {
             kind: DetectionResourceKind::RepeatNesting,
             actual: ResourceAmount::exact(actual as u64),
@@ -92,31 +30,7 @@ impl DetectionResourceLimitError {
         }
     }
 
-    pub(crate) const fn expanded_instructions(actual: u64, limit: u64) -> Self {
-        Self {
-            kind: DetectionResourceKind::ExpandedInstructions,
-            actual: ResourceAmount::exact(actual),
-            limit,
-        }
-    }
-
-    pub(crate) const fn repeat_iterations(actual: u64, limit: u64) -> Self {
-        Self {
-            kind: DetectionResourceKind::RepeatIterations,
-            actual: ResourceAmount::exact(actual),
-            limit,
-        }
-    }
-
-    pub(crate) const fn compiled_terms(actual: u64, limit: u64) -> Self {
-        Self {
-            kind: DetectionResourceKind::CompiledTerms,
-            actual: ResourceAmount::exact(actual),
-            limit,
-        }
-    }
-
-    pub(crate) const fn compiled_bytes(actual: u64, limit: u64) -> Self {
+    pub(crate) const fn detection_compiled_bytes(actual: u64, limit: u64) -> Self {
         Self {
             kind: DetectionResourceKind::CompiledBytes,
             actual: ResourceAmount::exact(actual),
@@ -144,60 +58,14 @@ impl DetectionResourceLimitError {
 impl Display for DetectionResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self.kind {
-            DetectionResourceKind::RecordBits(subject) => match subject {
-                DetectionRecordLimitSubject::DetectionRecord => write!(
-                    formatter,
-                    "invalid result format data: detection record width {} exceeds current limit {}",
-                    self.actual.value(),
-                    self.limit
-                ),
-                DetectionRecordLimitSubject::MeasurementRecord => write!(
-                    formatter,
-                    "invalid result format data: measurement record width {} exceeds current detection conversion limit {}",
-                    self.actual.value(),
-                    self.limit
-                ),
-                DetectionRecordLimitSubject::SweepRecord => write!(
-                    formatter,
-                    "invalid result format data: sweep bit width {} exceeds current detection conversion limit {}",
-                    self.actual.value(),
-                    self.limit
-                ),
-                DetectionRecordLimitSubject::ObservableCount => write!(
-                    formatter,
-                    "invalid result format data: observable id {} exceeds current detection record limit {}",
-                    self.actual.value().saturating_sub(1),
-                    self.limit
-                ),
-            },
-            DetectionResourceKind::SamplingExpandedOperations => write!(
-                formatter,
-                "cannot compile circuit sampler: expanded operation work {} exceeds per-shot limit {}",
-                self.actual, self.limit
-            ),
             DetectionResourceKind::RepeatNesting => write!(
                 formatter,
                 "cannot compile circuit sampler: detection conversion repeat nesting {} exceeds fixed safety limit {}",
                 self.actual, self.limit
             ),
-            DetectionResourceKind::ExpandedInstructions => write!(
-                formatter,
-                "cannot compile circuit sampler: detection conversion would execute {} expanded instructions; current limit is {}",
-                self.actual, self.limit
-            ),
-            DetectionResourceKind::RepeatIterations => write!(
-                formatter,
-                "cannot compile circuit sampler: detection conversion would execute {} repeat iterations; current limit is {}",
-                self.actual, self.limit
-            ),
-            DetectionResourceKind::CompiledTerms => write!(
-                formatter,
-                "cannot compile circuit sampler: detection conversion would retain {} measurement-reference terms; current limit is {}",
-                self.actual, self.limit
-            ),
             DetectionResourceKind::CompiledBytes => write!(
                 formatter,
-                "cannot compile circuit sampler: detection conversion would require at least {} compiled bytes; current limit is {}",
+                "cannot compile circuit sampler: the compiled plan and its records need at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
                 self.actual, self.limit
             ),
         }
@@ -247,8 +115,8 @@ impl From<SamplingCompileError> for DetectionError {
             SamplingCompileError::InvalidCircuit { message } => {
                 Self::invalid_sampler_compilation(message)
             }
-            SamplingCompileError::ExpandedOperationLimit { actual, limit } => Self::ResourceLimit(
-                DetectionResourceLimitError::sampling_expanded_operations(actual, limit),
+            SamplingCompileError::CompiledBytesLimit { required, budget } => Self::ResourceLimit(
+                DetectionResourceLimitError::detection_compiled_bytes(required, budget),
             ),
         }
     }

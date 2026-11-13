@@ -29,7 +29,7 @@ pub enum DetectionExecutionError {
     ShotCounterOverflow,
 
     #[error(
-        "detection session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte safety limit"
+        "detection session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte memory budget; raise the memory budget to admit it"
     )]
     SessionStorageLimit {
         estimated_bytes: u128,

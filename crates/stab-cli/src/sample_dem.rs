@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use stab_engine::{
-    DemReplaySession, DemSamplingCompiler, DemSamplingRunError, DemSamplingSession, RandomPolicy,
-    Seed, ShotCount,
+    DemReplaySession, DemSamplerLimits, DemSamplingCompiler, DemSamplingRunError,
+    DemSamplingSession, RandomPolicy, Seed, ShotCount,
 };
-use stab_model::DetectorErrorModel;
+use stab_model::{DetectorErrorModel, ParseLimits};
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
     HitsDuplicates, RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader,
@@ -14,15 +14,13 @@ use stab_records::{
 };
 
 use super::{
-    CliError, RecordFormatArg, SampleOutFormatArg,
+    CliError, MemoryBudgetArg, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DemSampleBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
 };
 
-const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
-const MAX_SAMPLE_DEM_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 const REPLAY_TEXT_RECORD_KIND: &str = "sample_dem replay text record";
 /// Replay records delivered to the engine per transaction batch.
 const REPLAY_BATCH_SHOTS: usize = u64::BITS as usize;
@@ -92,6 +90,9 @@ pub(super) struct SampleDemArgs {
         default_value = "01"
     )]
     replay_err_in_format: RecordFormatArg,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 pub(super) fn run_sample_dem<R, W>(
@@ -140,11 +141,12 @@ where
         return Ok(());
     }
     let input_bytes = if let Some(input_file) = io.input_mut(FileRole::Input) {
-        read_limited_input_file(input_file, MAX_SAMPLE_DEM_INPUT_BYTES, "sample_dem input")?
+        read_limited_input_file(input_file, args.memory.input_bytes(), "sample_dem input")?
     } else {
-        read_limited_stdin(input, MAX_SAMPLE_DEM_INPUT_BYTES, "sample_dem input")?
+        read_limited_stdin(input, args.memory.input_bytes(), "sample_dem input")?
     };
-    let dem = parse_dem_bytes(&input_bytes)?;
+    let dem = parse_dem_bytes(&input_bytes, args.memory.parse_limits())?;
+    let limits = DemSamplerLimits::new(args.memory.get());
     let plan = DemSamplingCompiler::new()
         .compile(&dem)
         .map_err(CliError::from)?;
@@ -156,6 +158,7 @@ where
             args.replay_err_in_format,
             plan.error_count(),
             args.shots,
+            args.memory.record_bytes(),
         )?;
     }
     let encoder = DemSampleBatchEncoder::try_new(
@@ -184,11 +187,13 @@ where
     let mut execution = if let Some(input) = io.take_input(FileRole::ReplayErrorInput) {
         SampleDemExecution::Replay {
             input,
-            session: plan.replay_session(shots).map_err(CliError::from)?,
+            session: plan
+                .replay_session_with_limits(shots, limits)
+                .map_err(CliError::from)?,
         }
     } else {
         SampleDemExecution::Sample(
-            plan.session(dem_random_policy(args.seed))
+            plan.session_with_limits(dem_random_policy(args.seed), limits)
                 .map_err(CliError::from)?,
         )
     };
@@ -213,6 +218,7 @@ where
                 args.replay_err_in_format,
                 plan.error_count(),
                 args.shots,
+                args.memory.record_bytes(),
             )?;
             let mut transaction = session
                 .start_transaction(&mut sink)
@@ -307,8 +313,10 @@ fn dem_random_policy(seed: Option<u64>) -> RandomPolicy {
     }
 }
 
-fn parse_dem_bytes(input: &[u8]) -> Result<DetectorErrorModel, CliError> {
-    Ok(DetectorErrorModel::from_dem_bytes(input)?)
+fn parse_dem_bytes(input: &[u8], limits: ParseLimits) -> Result<DetectorErrorModel, CliError> {
+    Ok(DetectorErrorModel::from_dem_bytes_with_limits(
+        input, limits,
+    )?)
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
@@ -347,9 +355,16 @@ fn validate_replay_input(
     format: RecordFormatArg,
     error_count: usize,
     expected_shots: usize,
+    max_record_bytes: usize,
 ) -> Result<(), CliError> {
     {
-        let mut replay = ReplayInput::new(&mut *input, format, error_count, expected_shots)?;
+        let mut replay = ReplayInput::new(
+            &mut *input,
+            format,
+            error_count,
+            expected_shots,
+            max_record_bytes,
+        )?;
         replay.skip_all()?;
     }
     input.rewind()
@@ -371,6 +386,7 @@ impl<'a> ReplayInput<'a> {
         format: RecordFormatArg,
         error_count: usize,
         expected_shots: usize,
+        max_record_bytes: usize,
     ) -> Result<Self, CliError> {
         let format = sample_dem_record_format(format)?;
         if format == RecordFormat::Ptb64 && error_count > 0 {
@@ -378,15 +394,11 @@ impl<'a> ReplayInput<'a> {
         }
         let path = input.path().to_path_buf();
         let source: Box<dyn Read + 'a> = Box::new(input);
-        let reader = RecordStreamReader::measurements(
-            source,
-            format,
-            error_count,
-            MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES,
-        )
-        .with_framing(RecordFraming::Records)
-        .with_hits_duplicates(HitsDuplicates::Set)
-        .with_blank_dets_line_budget();
+        let reader =
+            RecordStreamReader::measurements(source, format, error_count, max_record_bytes)
+                .with_framing(RecordFraming::Records)
+                .with_hits_duplicates(HitsDuplicates::Set)
+                .with_blank_dets_line_budget();
         Ok(Self {
             reader,
             path,

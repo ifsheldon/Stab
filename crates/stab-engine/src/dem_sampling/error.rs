@@ -7,8 +7,6 @@ pub(crate) type DemResult<T> = Result<T, DemError>;
 /// DEM-sampling resource dimension whose configured limit was exceeded.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DemResourceKind {
-    SampledErrorApplications,
-    ReplayWorkUnits,
     ActiveBatchBytes,
 }
 
@@ -21,28 +19,8 @@ pub struct DemResourceLimitError {
 }
 
 impl DemResourceLimitError {
-    pub(crate) const fn sampled_error_applications(actual: usize, limit: usize) -> Self {
-        Self::new(
-            DemResourceKind::SampledErrorApplications,
-            actual as u64,
-            limit as u64,
-        )
-    }
-
-    pub(crate) const fn replay_work_units(actual: usize, limit: usize) -> Self {
-        Self::new(
-            DemResourceKind::ReplayWorkUnits,
-            actual as u64,
-            limit as u64,
-        )
-    }
-
-    pub(crate) const fn active_batch_bytes(actual: usize, limit: usize) -> Self {
-        Self::new(
-            DemResourceKind::ActiveBatchBytes,
-            actual as u64,
-            limit as u64,
-        )
+    pub(crate) const fn active_batch_bytes(actual: u64, limit: u64) -> Self {
+        Self::new(DemResourceKind::ActiveBatchBytes, actual, limit)
     }
 
     const fn new(kind: DemResourceKind, actual: u64, limit: u64) -> Self {
@@ -69,19 +47,9 @@ impl DemResourceLimitError {
 impl Display for DemResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self.kind {
-            DemResourceKind::SampledErrorApplications => write!(
-                formatter,
-                "cannot compile DEM sampler: one shot would apply {} sampled errors; current per-shot limit is {}",
-                self.actual, self.limit
-            ),
-            DemResourceKind::ReplayWorkUnits => write!(
-                formatter,
-                "cannot compile DEM sampler: one replayed shot would require {} work units; current per-shot limit is {}",
-                self.actual, self.limit
-            ),
             DemResourceKind::ActiveBatchBytes => write!(
                 formatter,
-                "cannot compile DEM sampler: the sampling session would require at least {} active batch bytes; current limit is {}",
+                "cannot compile DEM sampler: the sampling session would require at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
                 self.actual, self.limit
             ),
         }

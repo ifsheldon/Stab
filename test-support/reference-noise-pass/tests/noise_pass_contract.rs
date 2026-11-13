@@ -7,7 +7,7 @@ use stab_analysis::{
     CircuitPassContext, CircuitPassLimits, CircuitPassResources, CircuitPassStage, ResourceKind,
     ResourceOperation, run_circuit_pass,
 };
-use stab_model::{Circuit, Probability};
+use stab_model::{Circuit, MemoryBudget, Probability};
 use stab_reference_noise_pass::{
     XErrorAfterSingleQubitUnitariesOptions, XErrorAfterSingleQubitUnitariesPass,
 };
@@ -139,7 +139,12 @@ fn excludes_non_unitary_pair_and_pauli_product_operations() {
 fn common_admission_rejects_expanded_output_after_admitting_input() {
     let source = Circuit::from_stim_str("H 0\n").expect("valid source circuit");
     let options = XErrorAfterSingleQubitUnitariesOptions::new(probability(0.1));
-    let limits = CircuitPassLimits::default().with_max_represented_items(1);
+    // A budget that admits exactly the input payload refuses the larger projected output.
+    let input_bytes = CircuitPassResources::try_new(1, 1, 0, 0, 0)
+        .expect("representable input resources")
+        .projected_payload_bytes();
+    let limits =
+        CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(input_bytes));
 
     let error = run_circuit_pass(
         &XErrorAfterSingleQubitUnitariesPass,
@@ -151,9 +156,9 @@ fn common_admission_rejects_expanded_output_after_admitting_input() {
 
     let resource = error.resource_limit_error().expect("resource diagnostic");
     assert_eq!(resource.operation(), ResourceOperation::CircuitPass);
-    assert_eq!(resource.resource(), ResourceKind::RepresentedItems);
-    assert_eq!(resource.actual(), 2);
-    assert_eq!(resource.limit(), 1);
+    assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
+    assert!(resource.actual() > resource.limit());
+    assert_eq!(resource.limit(), input_bytes);
     assert_eq!(
         error.resource_stage(),
         Some(CircuitPassStage::OutputProjection)
@@ -166,8 +171,9 @@ fn opaque_tag_output_projection_rejects_before_pass_allocation() {
     let options = XErrorAfterSingleQubitUnitariesOptions::new(probability(0.1));
     let input_resources =
         CircuitPassResources::try_new(1, 1, 0, 1, 0).expect("representable input resources");
-    let limits = CircuitPassLimits::default()
-        .with_max_projected_payload_bytes(input_resources.projected_payload_bytes());
+    let limits = CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+        input_resources.projected_payload_bytes(),
+    ));
 
     let mut result = None;
     let allocations = allocation_counter::measure(|| {

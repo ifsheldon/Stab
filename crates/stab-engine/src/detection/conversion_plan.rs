@@ -7,8 +7,7 @@ use super::error::{
 };
 use super::frame::{TraversalEvent, visit_circuit};
 use super::{
-    DetectionConversionLimits, DetectionRecordBuffer, DetectionRecordLimitSubject,
-    UNSUPPORTED_SWEEP_DETECTION_MESSAGE,
+    DetectionConversionLimits, DetectionRecordBuffer, UNSUPPORTED_SWEEP_DETECTION_MESSAGE,
 };
 
 mod execution;
@@ -49,8 +48,6 @@ pub(super) struct ConversionPlan {
     retained_term_capacity: u64,
     compact_operation_count: u64,
     iteration_operation_count: u64,
-    expanded_instruction_count: u64,
-    repeat_iteration_count: u64,
     collect_program: bool,
 }
 
@@ -58,8 +55,6 @@ pub(super) struct ConversionPlan {
 struct RepeatSnapshot {
     measurement_count: usize,
     detector_count: usize,
-    expanded_instruction_count: u64,
-    repeat_iteration_count: u64,
     compact_operation_count: u64,
     iteration_operation_count: u64,
 }
@@ -146,8 +141,6 @@ impl ConversionPlan {
             retained_term_capacity: 0,
             compact_operation_count: 0,
             iteration_operation_count: 0,
-            expanded_instruction_count: 0,
-            repeat_iteration_count: 0,
             collect_program,
         }
     }
@@ -193,8 +186,6 @@ impl ConversionPlan {
         let snapshot = RepeatSnapshot {
             measurement_count: self.measurement_count,
             detector_count: self.detector_count,
-            expanded_instruction_count: self.expanded_instruction_count,
-            repeat_iteration_count: self.repeat_iteration_count,
             compact_operation_count: self.compact_operation_count,
             iteration_operation_count: self.iteration_operation_count,
         };
@@ -234,42 +225,14 @@ impl ConversionPlan {
             repeat_count,
             "measurement record count",
         )?;
-        self.validate_measurement_width()?;
         self.detector_count = repeated_usize_total(
             snapshot.detector_count,
             body_detectors,
             repeat_count,
             "detector count",
         )?;
-        self.validate_record_width_value(self.output_bit_count()?)?;
-
-        let body_expanded_instructions = self
-            .expanded_instruction_count
-            .checked_sub(snapshot.expanded_instruction_count)
-            .ok_or_else(compilation_overflow)?;
-        self.expanded_instruction_count = repeated_u64_total(
-            snapshot.expanded_instruction_count,
-            body_expanded_instructions,
-            repeat_count,
-        )?;
-        self.validate_expanded_instruction_count()?;
-
-        let body_repeat_iterations = self
-            .repeat_iteration_count
-            .checked_sub(snapshot.repeat_iteration_count)
-            .ok_or_else(compilation_overflow)?;
-        let nested_iterations = body_repeat_iterations
-            .checked_mul(repeat_count)
-            .ok_or_else(compilation_overflow)?;
-        self.repeat_iteration_count = snapshot
-            .repeat_iteration_count
-            .checked_add(
-                repeat_count
-                    .checked_add(nested_iterations)
-                    .ok_or_else(compilation_overflow)?,
-            )
-            .ok_or_else(compilation_overflow)?;
-        self.validate_repeat_iteration_count()?;
+        self.output_bit_count()?;
+        self.validate_compiled_bytes()?;
 
         let body_operation_count = self
             .compact_operation_count
@@ -314,7 +277,6 @@ impl ConversionPlan {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> DetectionResult<()> {
-        self.add_expanded_instructions(1)?;
         self.record_sweep_bits(instruction)?;
         self.visit_instruction_semantics(instruction)
     }
@@ -343,14 +305,15 @@ impl ConversionPlan {
                 "detector count overflowed while planning conversion",
             )
         })?;
-        let next_width = next_detector_count
+        next_detector_count
             .checked_add(self.observable_count)
             .ok_or_else(|| {
                 DetectionError::invalid_result_format(
                     "detection record width overflowed while planning conversion",
                 )
             })?;
-        self.validate_record_width_value(next_width)?;
+        self.detector_count = next_detector_count;
+        self.validate_compiled_bytes()?;
 
         let mut terms = Vec::new();
         if self.collect_program {
@@ -385,7 +348,6 @@ impl ConversionPlan {
             )?)?;
         }
         self.add_root_operation(true)?;
-        self.detector_count = next_detector_count;
         if self.collect_program {
             self.try_push_operation(ConversionOperation::Detector(terms))?;
         }
@@ -406,14 +368,6 @@ impl ConversionPlan {
                             "sweep bit id {sweep_id} does not fit this platform"
                         ))
                     })?;
-                if next_count > self.limits.max_record_bits {
-                    return Err(ResourceLimitError::detection_record_bits(
-                        DetectionRecordLimitSubject::SweepRecord,
-                        resource_amount(next_count, "sweep bit width")?,
-                        resource_amount(self.limits.max_record_bits, "sweep bit limit")?,
-                    )
-                    .into());
-                }
                 next_sweep_bit_count = next_sweep_bit_count.max(next_count);
             }
         }
@@ -423,7 +377,7 @@ impl ConversionPlan {
         match instruction.gate().canonical_name() {
             "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => {
                 self.sweep_bit_count = next_sweep_bit_count;
-                Ok(())
+                self.validate_compiled_bytes()
             }
             name => Err(DetectionError::invalid_result_format(format!(
                 "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {name}"
@@ -495,35 +449,20 @@ impl ConversionPlan {
     }
 
     fn ensure_observable(&mut self, observable_id: usize) -> DetectionResult<()> {
-        if observable_id >= self.limits.max_record_bits {
-            let actual = observable_id.checked_add(1).ok_or_else(|| {
-                DetectionError::invalid_result_format(
-                    "observable count overflowed while planning detection conversion",
-                )
-            })?;
-            return Err(ResourceLimitError::detection_record_bits(
-                DetectionRecordLimitSubject::ObservableCount,
-                resource_amount(actual, "observable count")?,
-                resource_amount(self.limits.max_record_bits, "observable count limit")?,
-            )
-            .into());
-        }
         let next_observable_count = observable_id.checked_add(1).ok_or_else(|| {
             DetectionError::invalid_result_format(
                 "observable count overflowed while planning detection conversion",
             )
         })?;
-        let next_width = self
-            .detector_count
+        self.detector_count
             .checked_add(next_observable_count)
             .ok_or_else(|| {
                 DetectionError::invalid_result_format(
                     "detection record width overflowed while planning conversion",
                 )
             })?;
-        self.validate_record_width_value(next_width)?;
         self.observable_count = self.observable_count.max(next_observable_count);
-        Ok(())
+        self.validate_compiled_bytes()
     }
 
     fn add_measurements(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
@@ -536,25 +475,10 @@ impl ConversionPlan {
                 "measurement record count overflowed during detection conversion planning",
             )
         })?;
-        self.validate_measurement_width()?;
+        self.validate_compiled_bytes()?;
         self.add_root_operation(false)?;
         if self.collect_program {
             self.try_push_operation(ConversionOperation::AdvanceMeasurements(count))?;
-        }
-        Ok(())
-    }
-
-    fn validate_measurement_width(&self) -> DetectionResult<()> {
-        if self.measurement_count > self.limits.max_record_bits {
-            return Err(ResourceLimitError::detection_record_bits(
-                DetectionRecordLimitSubject::MeasurementRecord,
-                resource_amount(self.measurement_count, "measurement record width")?,
-                resource_amount(
-                    self.limits.max_record_bits,
-                    "measurement record width limit",
-                )?,
-            )
-            .into());
         }
         Ok(())
     }
@@ -567,18 +491,6 @@ impl ConversionPlan {
                     "detection record width overflowed while planning conversion",
                 )
             })
-    }
-
-    fn validate_record_width_value(&self, width: usize) -> DetectionResult<()> {
-        if width > self.limits.max_record_bits {
-            return Err(ResourceLimitError::detection_record_bits(
-                DetectionRecordLimitSubject::DetectionRecord,
-                resource_amount(width, "detection record width")?,
-                resource_amount(self.limits.max_record_bits, "detection record width limit")?,
-            )
-            .into());
-        }
-        Ok(())
     }
 
     fn validate_measurement_offset(&self, offset: MeasureRecordOffset) -> DetectionResult<()> {
@@ -609,48 +521,11 @@ impl ConversionPlan {
         Ok(())
     }
 
-    fn add_expanded_instructions(&mut self, count: u64) -> DetectionResult<()> {
-        self.expanded_instruction_count = self
-            .expanded_instruction_count
-            .checked_add(count)
-            .ok_or_else(compilation_overflow)?;
-        self.validate_expanded_instruction_count()
-    }
-
-    fn validate_expanded_instruction_count(&self) -> DetectionResult<()> {
-        if self.expanded_instruction_count > self.limits.max_expanded_instructions {
-            return Err(ResourceLimitError::detection_expanded_instructions(
-                self.expanded_instruction_count,
-                self.limits.max_expanded_instructions,
-            )
-            .into());
-        }
-        Ok(())
-    }
-
-    fn validate_repeat_iteration_count(&self) -> DetectionResult<()> {
-        if self.repeat_iteration_count > self.limits.max_repeat_iterations {
-            return Err(ResourceLimitError::detection_repeat_iterations(
-                self.repeat_iteration_count,
-                self.limits.max_repeat_iterations,
-            )
-            .into());
-        }
-        Ok(())
-    }
-
     fn add_compiled_terms(&mut self, count: u64) -> DetectionResult<()> {
         self.compiled_term_count = self
             .compiled_term_count
             .checked_add(count)
             .ok_or_else(compilation_overflow)?;
-        if self.compiled_term_count > self.limits.max_compiled_terms {
-            return Err(ResourceLimitError::detection_compiled_terms(
-                self.compiled_term_count,
-                self.limits.max_compiled_terms,
-            )
-            .into());
-        }
         self.validate_compiled_bytes()
     }
 
@@ -743,16 +618,6 @@ impl ConversionPlan {
                 admission.iteration_operation_count,
                 self.iteration_operation_count,
             ),
-            (
-                "expanded instruction count",
-                admission.expanded_instruction_count,
-                self.expanded_instruction_count,
-            ),
-            (
-                "repeat iteration count",
-                admission.repeat_iteration_count,
-                self.repeat_iteration_count,
-            ),
         ] {
             if actual != expected {
                 return Err(compilation_admission_mismatch(field, expected, actual));
@@ -843,14 +708,33 @@ impl ConversionPlan {
 
     fn validate_compiled_bytes(&self) -> DetectionResult<()> {
         let bytes = self.compiled_storage_bytes()?;
-        if bytes > self.limits.max_compiled_bytes {
-            return Err(ResourceLimitError::detection_compiled_bytes(
-                bytes,
-                self.limits.max_compiled_bytes,
-            )
-            .into());
+        self.admit_bytes(bytes)
+    }
+
+    fn admit_bytes(&self, bytes: u64) -> DetectionResult<()> {
+        let budget = self.limits.memory_budget();
+        if !budget.admits(u128::from(bytes)) {
+            return Err(ResourceLimitError::detection_compiled_bytes(bytes, budget.bytes()).into());
         }
         Ok(())
+    }
+
+    /// One byte per record bit of every record the plan's consumers hold at least once: the
+    /// measurement, sweep, detector, and observable records.
+    fn record_storage_bytes(&self) -> DetectionResult<u64> {
+        [
+            self.measurement_count,
+            self.sweep_bit_count,
+            self.detector_count,
+            self.observable_count,
+        ]
+        .into_iter()
+        .try_fold(0_u64, |total, width| {
+            u64::try_from(width)
+                .ok()
+                .and_then(|width| total.checked_add(width))
+                .ok_or_else(compilation_overflow)
+        })
     }
 
     fn validate_materialized_storage_with_terms(&self, term_count: u64) -> DetectionResult<()> {
@@ -858,15 +742,10 @@ impl ConversionPlan {
             self.program.capacity(),
             "compact conversion operation capacity",
         )?;
-        let bytes = compiled_storage_bytes(operation_count, term_count)?;
-        if bytes > self.limits.max_compiled_bytes {
-            return Err(ResourceLimitError::detection_compiled_bytes(
-                bytes,
-                self.limits.max_compiled_bytes,
-            )
-            .into());
-        }
-        Ok(())
+        let bytes = compiled_storage_bytes(operation_count, term_count)?
+            .checked_add(self.record_storage_bytes()?)
+            .ok_or_else(compilation_overflow)?;
+        self.admit_bytes(bytes)
     }
 
     pub(super) fn compiled_storage_bytes(&self) -> DetectionResult<u64> {
@@ -883,7 +762,9 @@ impl ConversionPlan {
         } else {
             self.compiled_term_count
         };
-        compiled_storage_bytes(operation_count, term_count)
+        compiled_storage_bytes(operation_count, term_count)?
+            .checked_add(self.record_storage_bytes()?)
+            .ok_or_else(compilation_overflow)
     }
 
     pub(super) fn reference_signs_into(
@@ -1000,13 +881,6 @@ fn repeated_usize_total(
     initial
         .checked_add(repeated)
         .ok_or_else(|| DetectionError::invalid_sampler_compilation(format!("{subject} overflowed")))
-}
-
-fn repeated_u64_total(initial: u64, per_iteration: u64, repeat_count: u64) -> DetectionResult<u64> {
-    per_iteration
-        .checked_mul(repeat_count)
-        .and_then(|repeated| initial.checked_add(repeated))
-        .ok_or_else(compilation_overflow)
 }
 
 fn compiled_storage_bytes(operation_count: u64, term_count: u64) -> DetectionResult<u64> {

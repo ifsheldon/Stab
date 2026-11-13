@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::{AnalysisError, AnalysisResult};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, Probability, QubitId,
-    RepeatBlock, RepeatCount, Target,
+    Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, MemoryBudget, Probability,
+    QubitId, RepeatBlock, RepeatCount, Target,
 };
 
 mod color;
@@ -14,7 +14,10 @@ mod tests;
 pub use color::generate_color_code_circuit;
 pub use surface::generate_surface_code_circuit;
 
-const MAX_GENERATED_PHYSICAL_QUBITS: u64 = 131_072;
+/// Conservative retained bytes per generated physical qubit: the materialized circuit, the
+/// coordinate maps and target lists built while generating it, and its layout diagram.
+/// Generation is linear in the physical-qubit count, so this bounds its allocation.
+const GENERATED_BYTES_PER_PHYSICAL_QUBIT: u64 = 2048;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CodeDistance(u32);
@@ -56,6 +59,7 @@ struct CircuitGenParams {
     before_measure_flip_probability: Probability,
     after_reset_flip_probability: Probability,
     after_clifford_depolarization: Probability,
+    memory_budget: MemoryBudget,
 }
 
 impl CircuitGenParams {
@@ -63,6 +67,7 @@ impl CircuitGenParams {
         Ok(Self {
             rounds,
             distance,
+            memory_budget: MemoryBudget::DEFAULT,
             before_round_data_depolarization: Probability::try_new(0.0)?,
             before_measure_flip_probability: Probability::try_new(0.0)?,
             after_reset_flip_probability: Probability::try_new(0.0)?,
@@ -162,6 +167,18 @@ impl RepetitionCodeParams {
         self
     }
 
+    /// Budget for the generated circuit, admitted from its physical-qubit count before any
+    /// generation work.
+    #[must_use]
+    pub fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.common.memory_budget = memory_budget;
+        self
+    }
+
+    pub fn memory_budget(&self) -> MemoryBudget {
+        self.common.memory_budget
+    }
+
     fn common(&self) -> &CircuitGenParams {
         &self.common
     }
@@ -241,6 +258,18 @@ impl SurfaceCodeParams {
         self
     }
 
+    /// Budget for the generated circuit, admitted from its physical-qubit count before any
+    /// generation work.
+    #[must_use]
+    pub fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.common.memory_budget = memory_budget;
+        self
+    }
+
+    pub fn memory_budget(&self) -> MemoryBudget {
+        self.common.memory_budget
+    }
+
     fn common(&self) -> &CircuitGenParams {
         &self.common
     }
@@ -317,6 +346,18 @@ impl ColorCodeParams {
         self
     }
 
+    /// Budget for the generated circuit, admitted from its physical-qubit count before any
+    /// generation work.
+    #[must_use]
+    pub fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.common.memory_budget = memory_budget;
+        self
+    }
+
+    pub fn memory_budget(&self) -> MemoryBudget {
+        self.common.memory_budget
+    }
+
     fn common(&self) -> &CircuitGenParams {
         &self.common
     }
@@ -345,14 +386,14 @@ impl GeneratedCircuit {
 
 /// Generates Stim-compatible repetition-code memory circuits for the M7 generator subset.
 ///
-/// Returns an error before materialization if the projected circuit exceeds the generator's
-/// 131,072-physical-qubit resource limit. Every valid repetition-code distance fits this limit.
+/// Returns an error before materialization if the projected circuit exceeds the parameters'
+/// memory budget. Every valid repetition-code distance fits the default budget.
 pub fn generate_repetition_code_circuit(
     params: &RepetitionCodeParams,
 ) -> AnalysisResult<GeneratedCircuit> {
     let RepetitionCodeTask::Memory = params.task;
     let common = params.common();
-    validate_repetition_generation_size(common.distance.get())?;
+    validate_repetition_generation_size(common.distance.get(), common.memory_budget)?;
     let measurement_count = common.distance.get() - 1;
     let qubit_count = measurement_count
         .checked_mul(2)
@@ -415,15 +456,19 @@ pub fn generate_repetition_code_circuit(
     })
 }
 
-fn validate_repetition_generation_size(distance: u32) -> AnalysisResult<()> {
+fn validate_repetition_generation_size(distance: u32, budget: MemoryBudget) -> AnalysisResult<()> {
     let physical_qubits = u64::from(distance)
         .checked_mul(2)
         .and_then(|count| count.checked_sub(1))
         .ok_or_else(|| generation_size_overflow("repetition code", distance))?;
-    validate_generated_physical_qubits("repetition code", physical_qubits)
+    validate_generated_physical_qubits("repetition code", physical_qubits, budget)
 }
 
-pub(super) fn validate_surface_generation_size(distance: u32, rotated: bool) -> AnalysisResult<()> {
+pub(super) fn validate_surface_generation_size(
+    distance: u32,
+    rotated: bool,
+    budget: MemoryBudget,
+) -> AnalysisResult<()> {
     let distance = u64::from(distance);
     let (family, physical_qubits) = if rotated {
         let count = distance
@@ -442,10 +487,13 @@ pub(super) fn validate_surface_generation_size(distance: u32, rotated: bool) -> 
             .ok_or_else(|| generation_size_overflow("unrotated surface code", distance))?;
         ("unrotated surface code", count)
     };
-    validate_generated_physical_qubits(family, physical_qubits)
+    validate_generated_physical_qubits(family, physical_qubits, budget)
 }
 
-pub(super) fn validate_color_generation_size(distance: u32) -> AnalysisResult<()> {
+pub(super) fn validate_color_generation_size(
+    distance: u32,
+    budget: MemoryBudget,
+) -> AnalysisResult<()> {
     let distance = u64::from(distance);
     let width = distance
         .checked_add(
@@ -463,18 +511,21 @@ pub(super) fn validate_color_generation_size(distance: u32) -> AnalysisResult<()
         )
         .and_then(|count| count.checked_div(2))
         .ok_or_else(|| generation_size_overflow("color code", distance))?;
-    validate_generated_physical_qubits("color code", physical_qubits)
+    validate_generated_physical_qubits("color code", physical_qubits, budget)
 }
 
 fn validate_generated_physical_qubits(
     family: &'static str,
     physical_qubits: u64,
+    budget: MemoryBudget,
 ) -> AnalysisResult<()> {
-    if physical_qubits > MAX_GENERATED_PHYSICAL_QUBITS {
+    let required = physical_qubits.saturating_mul(GENERATED_BYTES_PER_PHYSICAL_QUBIT);
+    if !budget.admits(u128::from(required)) {
         return Err(AnalysisError::invalid_domain_value(
-            "generated circuit physical qubit count",
+            "generated circuit size",
             format!(
-                "{physical_qubits} for {family}; current limit is {MAX_GENERATED_PHYSICAL_QUBITS}"
+                "{physical_qubits} physical qubits for {family} need at least {required} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+                budget.bytes()
             ),
         ));
     }

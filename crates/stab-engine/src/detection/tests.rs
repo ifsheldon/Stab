@@ -848,9 +848,18 @@ fn detection_sampling_frame_path_rejects_invalid_feedback_measurement_references
 }
 
 #[test]
-fn detection_conversion_rejects_unbounded_record_shapes() {
-    let huge_observable =
+fn detection_conversion_rejects_record_shapes_beyond_the_budget() {
+    let above_retired_cap =
         Circuit::from_stim_str("M 0\nOBSERVABLE_INCLUDE(1000000) rec[-1]\n").expect("parse");
+    convert_measurements_to_detection_events(
+        &above_retired_cap,
+        &[vec![false]],
+        ReferenceSampleMode::SkipReferenceSample,
+    )
+    .expect("an observable record wider than the retired cap fits the budget");
+
+    let huge_observable =
+        Circuit::from_stim_str("M 0\nOBSERVABLE_INCLUDE(2000000000) rec[-1]\n").expect("parse");
     assert!(
         convert_measurements_to_detection_events(
             &huge_observable,

@@ -121,13 +121,14 @@ const EXPECTED_STABLE_CAPABILITIES: [&str; 10] = [
     "gate-tableau-metadata",
     "gate-unitary-metadata",
 ];
-const EXPECTED_EXTENSIONS: [&str; 7] = [
+const EXPECTED_EXTENSIONS: [&str; 8] = [
     "agent-capabilities",
     "agent-inspect",
     "agent-plan",
     "circuit-pass",
     "decoder-session",
     "json-diagnostics",
+    "memory-budget",
     "stim-canonical-convert",
 ];
 const EXPECTED_OBSOLETE_SURFACES: [&str; 7] = [

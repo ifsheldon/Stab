@@ -6,14 +6,22 @@ use stab_model::{
 };
 
 use crate::{
-    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError,
-    circuit_flow::flow_record_index, circuit_flow_generators,
+    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
+    circuit_flow::{FLOW_GENERATOR_MEMORY_BUDGET, flow_record_index},
+    circuit_flow_generators,
 };
 
 mod final_repeat;
 
-const MAX_MISSING_DETECTOR_SCANNED_INSTRUCTIONS: u64 = 1_000_000;
+/// Above this many expanded instructions the count-independent folded final-repeat proof is
+/// tried first. It selects an algorithm; it does not reject work.
+const FOLDED_FINAL_REPEAT_THRESHOLD: u64 = 1_000_000;
 const MAX_MISSING_DETECTOR_REPEAT_NESTING: usize = 256;
+/// Conservative retained bytes of one declared row before its targets, and per row target.
+const DECLARED_ROW_BYTES: u64 = 64;
+const DECLARED_ROW_TARGET_BYTES: u64 = 48;
+/// Declared rows are retained twice: once as declared and once reduced.
+const DECLARED_ROW_COPIES: u64 = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MissingDetectorOptions {
@@ -30,13 +38,11 @@ pub fn missing_detectors(
     options: MissingDetectorOptions,
 ) -> AnalysisResult<Circuit> {
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
-    if let DeclarationScan::Exceeds(actual) = declaration_scan(circuit)? {
-        if let Some(output) =
+    if declaration_scan(circuit)?.instructions > FOLDED_FINAL_REPEAT_THRESHOLD
+        && let Some(output) =
             final_repeat::try_missing_detectors_folded_final_repeat(circuit, options, qubit_count)?
-        {
-            return Ok(output);
-        }
-        return Err(declaration_scan_limit_error(actual));
+    {
+        return Ok(output);
     }
     if !contains_measurement_row_instruction(circuit) {
         return Ok(Circuit::new());
@@ -184,12 +190,6 @@ fn collect_declared_rows(
     })
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum DeclarationScan {
-    Fits,
-    Exceeds(u64),
-}
-
 fn validate_missing_detector_flow_storage(
     qubit_count: usize,
     measurement_count: usize,
@@ -198,16 +198,28 @@ fn validate_missing_detector_flow_storage(
         qubit_count,
         measurement_count,
     );
-    let limit = crate::circuit_flow::MAX_FLOW_GENERATOR_PROJECTED_BYTES;
-    if projected > limit {
-        return Err(ResourceLimitError::missing_detector_discovery(
-            ResourceKind::ProjectedPayloadBytes,
+    admit_missing_detector_bytes(ResourceKind::ProjectedPayloadBytes, projected)
+}
+
+fn admit_missing_detector_bytes(resource: ResourceKind, projected: u64) -> AnalysisResult<()> {
+    let budget = FLOW_GENERATOR_MEMORY_BUDGET;
+    if !budget.admits(u128::from(projected)) {
+        return Err(ResourceLimitError::memory_budget(
+            ResourceOperation::MissingDetectorDiscovery,
+            resource,
             projected,
-            limit,
+            budget.bytes(),
         )
         .into());
     }
     Ok(())
+}
+
+/// Saturating expanded totals of one arithmetic declaration scan.
+#[derive(Clone, Copy, Debug, Default)]
+struct DeclarationScan {
+    instructions: u64,
+    row_bytes: u64,
 }
 
 fn declaration_scan(circuit: &Circuit) -> AnalysisResult<DeclarationScan> {
@@ -215,8 +227,8 @@ fn declaration_scan(circuit: &Circuit) -> AnalysisResult<DeclarationScan> {
         circuit: &Circuit,
         multiplier: u64,
         depth: usize,
-        total: &mut u64,
-    ) -> AnalysisResult<DeclarationScan> {
+        totals: &mut DeclarationScan,
+    ) -> AnalysisResult<()> {
         if depth > MAX_MISSING_DETECTOR_REPEAT_NESTING {
             return Err(ResourceLimitError::missing_detector_discovery(
                 ResourceKind::RepeatNesting,
@@ -227,47 +239,47 @@ fn declaration_scan(circuit: &Circuit) -> AnalysisResult<DeclarationScan> {
         }
         for item in circuit.items() {
             match item {
-                CircuitItem::Instruction(_) => {
-                    *total = total.saturating_add(multiplier);
-                    if *total > MAX_MISSING_DETECTOR_SCANNED_INSTRUCTIONS {
-                        return Ok(DeclarationScan::Exceeds(*total));
+                CircuitItem::Instruction(instruction) => {
+                    totals.instructions = totals.instructions.saturating_add(multiplier);
+                    if matches!(
+                        instruction.gate().canonical_name(),
+                        "DETECTOR" | "OBSERVABLE_INCLUDE"
+                    ) {
+                        let row = DECLARED_ROW_BYTES.saturating_add(
+                            (instruction.targets().len() as u64)
+                                .saturating_mul(DECLARED_ROW_TARGET_BYTES),
+                        );
+                        totals.row_bytes = totals.row_bytes.saturating_add(
+                            row.saturating_mul(DECLARED_ROW_COPIES)
+                                .saturating_mul(multiplier),
+                        );
                     }
                 }
                 CircuitItem::RepeatBlock(repeat) => {
                     let repeated_multiplier =
                         multiplier.saturating_mul(repeat.repeat_count().get());
-                    if let DeclarationScan::Exceeds(actual) = count(
+                    count(
                         repeat.body(),
                         repeated_multiplier,
                         depth.saturating_add(1),
-                        total,
-                    )? {
-                        return Ok(DeclarationScan::Exceeds(actual));
-                    }
+                        totals,
+                    )?;
                 }
             }
         }
-        Ok(DeclarationScan::Fits)
+        Ok(())
     }
 
-    let mut total = 0;
-    count(circuit, 1, 0, &mut total)
+    let mut totals = DeclarationScan::default();
+    count(circuit, 1, 0, &mut totals)?;
+    Ok(totals)
 }
 
 fn validate_declaration_scan(circuit: &Circuit) -> AnalysisResult<()> {
-    match declaration_scan(circuit)? {
-        DeclarationScan::Fits => Ok(()),
-        DeclarationScan::Exceeds(actual) => Err(declaration_scan_limit_error(actual)),
-    }
-}
-
-fn declaration_scan_limit_error(actual: u64) -> AnalysisError {
-    ResourceLimitError::missing_detector_discovery(
-        ResourceKind::ExpandedOperations,
-        actual,
-        MAX_MISSING_DETECTOR_SCANNED_INSTRUCTIONS,
+    admit_missing_detector_bytes(
+        ResourceKind::MaterializedBytes,
+        declaration_scan(circuit)?.row_bytes,
     )
-    .into()
 }
 
 fn row_from_record_targets(

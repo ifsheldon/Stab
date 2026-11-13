@@ -19,11 +19,10 @@ use super::{
     try_disjoint_to_independent_xyz_errors,
 };
 use crate::sparse_rev_frame_tracker::{
-    AnalyzerProbeBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
-    search_shifted_recurrence,
+    ShiftedRecurrenceSearch, SparseReverseFrameTracker, search_shifted_recurrence,
 };
 use crate::target_xor_set::{TargetXorSet, xor_merge_into};
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError};
+use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
 
 mod local_decomposition;
 mod output;
@@ -34,11 +33,6 @@ use local_decomposition::{
     locally_decompose_combinations, merge_indistinguishable_disjoint_probabilities,
 };
 use output::{SeenTargets, unreverse_model};
-
-#[cfg(not(test))]
-const MAX_LOOP_CYCLE_STEPS: u64 = 1_000_000;
-#[cfg(test)]
-const MAX_LOOP_CYCLE_STEPS: u64 = 4_096;
 
 /// Composite channels combine at most four basis errors (two-qubit depolarization).
 const MAX_COMBINATION_BASES: usize = 4;
@@ -59,10 +53,9 @@ pub(super) fn try_analyze(
     options: ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
     if !options.fold_loops {
-        // Unrolled analysis admits the same documented expansion budget the
-        // retired forward path enforced; folded analysis keeps its own
-        // per-loop recurrence and bounded-unroll limits.
-        super::budget::validate_analyzer_expansion_budget(circuit)?;
+        // Unrolled analysis recurses once per repeat level, so it admits the shared nesting
+        // envelope before any work; expanded work itself is not capped.
+        super::budget::validate_analyzer_repeat_nesting(circuit)?;
     }
     ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)
 }
@@ -74,7 +67,8 @@ struct ReverseFoldAnalyzer {
     reversed_model: DetectorErrorModel,
     errors: ErrorAccumulator,
     scratch: AnalyzerScratch,
-    probe_budget: AnalyzerProbeBudget,
+    /// Conservative retained bytes of every item pushed into `reversed_model`.
+    output_bytes: u64,
     /// ELSE_CORRELATED_ERROR instructions seen (in reverse) since the last
     /// unrelated instruction, awaiting their leading E (error_analyzer.cc:673).
     stacked_else_correlated: Vec<CircuitInstruction>,
@@ -100,9 +94,38 @@ impl ReverseFoldAnalyzer {
             reversed_model: DetectorErrorModel::new(),
             errors: ErrorAccumulator::new(),
             scratch: AnalyzerScratch::default(),
-            probe_budget: AnalyzerProbeBudget::new(MAX_LOOP_CYCLE_STEPS),
+            output_bytes: 0,
             stacked_else_correlated: Vec::new(),
         })
+    }
+
+    /// Charges `bytes` of retained output against the caller's budget before retaining them.
+    fn charge_output(&mut self, bytes: u64) -> AnalysisResult<()> {
+        let budget = self.options.memory_budget;
+        let total = self.output_bytes.saturating_add(bytes);
+        if !budget.admits(u128::from(total)) {
+            return Err(ResourceLimitError::memory_budget(
+                ResourceOperation::CircuitToDetectorErrorModel,
+                ResourceKind::MaterializedBytes,
+                total,
+                budget.bytes(),
+            )
+            .into());
+        }
+        self.output_bytes = total;
+        Ok(())
+    }
+
+    fn push_output_instruction(&mut self, instruction: DemInstruction) -> AnalysisResult<()> {
+        let bytes = (size_of::<DemItem>() as u64)
+            .saturating_add(
+                (instruction.targets().len() as u64).saturating_mul(size_of::<DemTarget>() as u64),
+            )
+            .saturating_add((instruction.args().len() as u64).saturating_mul(8))
+            .saturating_add(instruction.tag_bytes().map_or(0, <[u8]>::len) as u64);
+        self.charge_output(bytes)?;
+        self.reversed_model.push_instruction(instruction);
+        Ok(())
     }
 
     fn analyze(mut self, circuit: &Circuit) -> AnalysisResult<DetectorErrorModel> {
@@ -172,14 +195,14 @@ impl ReverseFoldAnalyzer {
             }
             "DETECTOR" => {
                 self.tracker.undo_instruction(instruction)?;
-                self.reversed_model.push_instruction(
+                self.push_output_instruction(
                     stab_model::advanced::dem_instruction_with_tag_bytes(
                         DemInstructionKind::Detector,
                         instruction.args().to_vec(),
                         vec![DemTarget::relative_detector(self.tracker.detector_count())?],
                         instruction.tag_bytes(),
                     )?,
-                );
+                )?;
             }
             "OBSERVABLE_INCLUDE" => {
                 self.tracker.undo_instruction(instruction)?;
@@ -188,24 +211,24 @@ impl ReverseFoldAnalyzer {
                         "OBSERVABLE_INCLUDE is missing an observable id",
                     )
                 })?;
-                self.reversed_model.push_instruction(
+                self.push_output_instruction(
                     stab_model::advanced::dem_instruction_with_tag_bytes(
                         DemInstructionKind::LogicalObservable,
                         Vec::new(),
                         vec![DemTarget::logical_observable(observable.get())?],
                         instruction.tag_bytes(),
                     )?,
-                );
+                )?;
             }
             "SHIFT_COORDS" => {
-                self.reversed_model.push_instruction(
+                self.push_output_instruction(
                     stab_model::advanced::dem_instruction_with_tag_bytes(
                         DemInstructionKind::ShiftDetectors,
                         instruction.args().to_vec(),
                         vec![DemTarget::numeric(0)],
                         instruction.tag_bytes(),
                     )?,
-                );
+                )?;
             }
             "TICK" => {
                 self.ticks_left = self.ticks_left.checked_sub(1).ok_or_else(|| {
@@ -819,13 +842,13 @@ impl ReverseFoldAnalyzer {
             let probability = self.errors.probability(class)?;
             let targets = self.errors.targets(class)?;
             if probability.get() != 0.0 && !targets.is_empty() {
-                self.reversed_model.push_instruction(
+                self.push_output_instruction(
                     stab_model::advanced::dem_error_instruction_from_targets(
                         probability,
                         targets,
                         self.errors.tag_bytes(self.errors.tag(class)?),
                     )?,
-                );
+                )?;
             }
         }
         self.errors.clear();
@@ -846,22 +869,12 @@ impl ReverseFoldAnalyzer {
             return self.undo_loop_by_unrolling(body, iterations);
         }
 
-        let search = search_shifted_recurrence(
-            &self.tracker,
-            iterations.min(MAX_LOOP_CYCLE_STEPS),
-            |probe| probe.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget),
-        )?;
+        let search = search_shifted_recurrence(&self.tracker, iterations, |probe| {
+            probe.undo_circuit_for_analyzer_probe(body)
+        })?;
         let recurrence = match search {
             ShiftedRecurrenceSearch::Found { recurrence } => *recurrence,
             ShiftedRecurrenceSearch::Exhausted { .. } => {
-                if iterations > super::MAX_ANALYZER_REPEAT_ITERATIONS {
-                    return Err(ResourceLimitError::circuit_to_detector_error_model(
-                        ResourceKind::RepeatIterations,
-                        iterations,
-                        super::MAX_ANALYZER_REPEAT_ITERATIONS,
-                    )
-                    .into());
-                }
                 return self.undo_loop_by_unrolling(body, iterations);
             }
         };
@@ -986,6 +999,7 @@ impl ReverseFoldAnalyzer {
         }
 
         self.reversed_model = outer_reversed;
+        self.charge_output(size_of::<DemItem>() as u64)?;
         self.reversed_model.push_repeat_block(
             stab_model::advanced::dem_repeat_block_with_tag_bytes(
                 DemRepeatCount::new(period_repetitions),

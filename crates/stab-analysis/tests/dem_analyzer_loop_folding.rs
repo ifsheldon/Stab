@@ -4,7 +4,7 @@
 )]
 
 use stab_analysis::{ErrorAnalyzerOptions, ResourceKind, circuit_to_detector_error_model};
-use stab_model::{Circuit, Probability};
+use stab_model::{Circuit, MemoryBudget, Probability};
 
 fn analyze_folding_loops(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
@@ -123,7 +123,7 @@ fn dem_analyzer_fold_loops_preserves_simple_nested_repeat_like_stim() {
 }
 
 #[test]
-fn dem_analyzer_rejects_nested_repeat_expansion_budget() {
+fn dem_analyzer_refuses_nested_repeat_output_beyond_the_memory_budget() {
     let circuit = Circuit::from_stim_str(
         "
         REPEAT 100000 {
@@ -136,11 +136,20 @@ fn dem_analyzer_rejects_nested_repeat_expansion_budget() {
     )
     .expect("circuit");
 
-    let error = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
-        .expect_err("reject nested expansion");
+    // 10^10 unrolled iterations each retain a detector declaration: the analyzer runs until its
+    // retained output reaches the budget, then refuses with a typed error.
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            memory_budget: MemoryBudget::from_bytes(64 * 1024),
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("refuse output beyond the budget");
 
     let resource = error.resource_limit_error().expect("typed resource limit");
-    assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+    assert_eq!(resource.limit(), 64 * 1024);
     assert!(resource.actual() > resource.limit());
 }
 
@@ -490,27 +499,20 @@ REPEAT 2 {
 }
 
 #[test]
-fn pf6_dem_analyzer_fallback_enforces_each_expansion_budget() {
-    // The direct unroll path (fold_loops off) keeps every expansion cap the
-    // retired heralded fallback used to exercise.
+fn pf6_dem_analyzer_fallback_unrolls_beyond_the_retired_expansion_caps() {
+    // The direct unroll path (fold_loops off) no longer caps expanded work: these symptomless
+    // heralded erasures exceed the retired iteration and instruction caps and retain no output.
     let cases = [
-        (
-            "REPEAT 1001 {\n    REPEAT 1000 {\n        HERALDED_ERASE(0.125) 0\n    }\n}\n"
-                .to_string(),
-            ResourceKind::RepeatIterations,
-        ),
-        (
-            format!(
-                "REPEAT 100000 {{\n{} }}\n",
-                "    HERALDED_ERASE(0.125) 0\n    TICK\n".repeat(6)
-            ),
-            ResourceKind::ExpandedOperations,
+        "REPEAT 1001 {\n    REPEAT 1000 {\n        HERALDED_ERASE(0.125) 0\n    }\n}\n".to_string(),
+        format!(
+            "REPEAT 100000 {{\n{} }}\n",
+            "    HERALDED_ERASE(0.125) 0\n    TICK\n".repeat(6)
         ),
     ];
 
-    for (text, expected_resource) in cases {
-        let circuit = Circuit::from_stim_str(&text).expect("valid unroll budget circuit");
-        let error = circuit_to_detector_error_model(
+    for text in cases {
+        let circuit = Circuit::from_stim_str(&text).expect("valid unroll circuit");
+        let dem = circuit_to_detector_error_model(
             &circuit,
             ErrorAnalyzerOptions {
                 fold_loops: false,
@@ -520,16 +522,8 @@ fn pf6_dem_analyzer_fallback_enforces_each_expansion_budget() {
                 ..ErrorAnalyzerOptions::default()
             },
         )
-        .expect_err("unrolled expansion must be preflighted");
-        let resource = error
-            .resource_limit_error()
-            .expect("unrolled expansion must return a typed resource error");
-        assert_eq!(
-            resource.resource(),
-            expected_resource,
-            "wrong resource for:\n{text}"
-        );
-        assert!(resource.actual() > resource.limit());
+        .expect("unrolled analysis is not work-capped");
+        assert!(dem.is_empty(), "{text}");
     }
 }
 
@@ -586,13 +580,13 @@ fn pf6_dem_analyzer_rejects_folded_observables_crossing_iterations() {
 }
 
 #[test]
-fn pf6_dem_analyzer_no_recurrence_uses_aggregate_repeat_budget() {
+fn pf6_dem_analyzer_no_recurrence_unrolls_within_the_memory_budget() {
     let circuit = Circuit::from_stim_str(
         "
         R 0
         M 0
         DETECTOR rec[-1]
-        REPEAT 1000001 {
+        REPEAT 2001 {
             X_ERROR(0.125) 0
             M 0
             DETECTOR rec[-1] rec[-2]
@@ -607,10 +601,11 @@ fn pf6_dem_analyzer_no_recurrence_uses_aggregate_repeat_budget() {
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
+            memory_budget: MemoryBudget::from_bytes(16 * 1024),
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject unsummarizable repeat beyond aggregate budget");
+    .expect_err("unsummarizable repeats unroll until their output reaches the budget");
 
     let resource = error.resource_limit_error().expect("typed resource limit");
     assert_eq!(
@@ -619,14 +614,24 @@ fn pf6_dem_analyzer_no_recurrence_uses_aggregate_repeat_budget() {
     );
     assert_eq!(
         resource.resource(),
-        stab_analysis::ResourceKind::ExpandedOperations
+        stab_analysis::ResourceKind::MaterializedBytes
     );
-    assert_eq!(resource.actual(), 1_000_001);
-    assert_eq!(resource.limit(), 1_000_000);
+    assert_eq!(resource.limit(), 16 * 1024);
+    let unrolled = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("unroll the same circuit within the default budget");
+    let folded = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("no-recurrence folding falls back to unrolling without a work cap");
+    assert_eq!(folded, unrolled);
 }
 
 #[test]
-fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget() {
+fn pf6_dem_analyzer_no_recurrence_delayed_dependency_unrolls_within_the_memory_budget() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -637,7 +642,7 @@ fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget() {
         DETECTOR rec[-1]
         M 0
         DETECTOR rec[-1]
-        REPEAT 1000001 {
+        REPEAT 2001 {
             X_ERROR(0.125) 0
             M 0
             R 0
@@ -653,10 +658,11 @@ fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget() {
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
+            memory_budget: MemoryBudget::from_bytes(16 * 1024),
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject unsummarizable delayed dependency beyond repeat budget");
+    .expect_err("unsummarizable repeats unroll until their output reaches the budget");
 
     let resource = error.resource_limit_error().expect("typed resource limit");
     assert_eq!(
@@ -665,10 +671,20 @@ fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_budget() {
     );
     assert_eq!(
         resource.resource(),
-        stab_analysis::ResourceKind::ExpandedOperations
+        stab_analysis::ResourceKind::MaterializedBytes
     );
-    assert_eq!(resource.actual(), 1_000_001);
-    assert_eq!(resource.limit(), 1_000_000);
+    assert_eq!(resource.limit(), 16 * 1024);
+    let unrolled = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("unroll the same circuit within the default budget");
+    let folded = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("no-recurrence folding falls back to unrolling without a work cap");
+    assert_eq!(folded, unrolled);
 }
 
 #[test]

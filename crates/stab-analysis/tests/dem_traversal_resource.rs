@@ -33,17 +33,16 @@ fn pf4_dem_analyzer_repeat_resource_policy_is_source_owned() {
     .expect("aggregate work below the limit remains admitted");
     assert!(empty.is_empty());
 
-    let too_large = Circuit::from_stim_str("REPEAT 1000001 {\n    TICK\n}\n").unwrap();
-    let error = circuit_to_detector_error_model(&too_large, ErrorAnalyzerOptions::default())
-        .expect_err("reject excessive aggregate repeat work");
-    let resource = error.resource_limit_error().expect("typed resource limit");
-    assert_eq!(
-        resource.operation(),
-        ResourceOperation::CircuitToDetectorErrorModel
+    let above_retired_aggregate_cap =
+        Circuit::from_stim_str("REPEAT 1000001 {\n    TICK\n}\n").unwrap();
+    assert!(
+        circuit_to_detector_error_model(
+            &above_retired_aggregate_cap,
+            ErrorAnalyzerOptions::default()
+        )
+        .expect("aggregate repeat work is not capped")
+        .is_empty()
     );
-    assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
-    assert_eq!(resource.actual(), 1_000_001);
-    assert_eq!(resource.limit(), 1_000_000);
 
     let nested = Circuit::from_stim_str(
         "
@@ -56,9 +55,19 @@ fn pf4_dem_analyzer_repeat_resource_policy_is_source_owned() {
         ",
     )
     .unwrap();
-    let error = circuit_to_detector_error_model(&nested, ErrorAnalyzerOptions::default())
-        .expect_err("reject nested expansion");
+    let error = circuit_to_detector_error_model(
+        &nested,
+        ErrorAnalyzerOptions {
+            memory_budget: stab_model::MemoryBudget::from_bytes(64 * 1024),
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("refuse nested expansion output beyond the budget");
     let resource = error.resource_limit_error().expect("typed resource limit");
-    assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
+    assert_eq!(
+        resource.operation(),
+        ResourceOperation::CircuitToDetectorErrorModel
+    );
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert!(resource.actual() > resource.limit());
 }

@@ -13,9 +13,7 @@ pub use api::{
     DetectionSamplingSession, MeasurementToDetectionCompiler, MeasurementToDetectionPlan,
     MeasurementToDetectionSession, MeasurementToDetectionTransaction,
 };
-pub use error::{
-    DetectionError, DetectionRecordLimitSubject, DetectionResourceKind, DetectionResourceLimitError,
-};
+pub use error::{DetectionError, DetectionResourceKind, DetectionResourceLimitError};
 pub use limits::DetectionConversionLimits;
 pub use reference_signs::{
     CircuitReferenceSigns, circuit_reference_signs, circuit_reference_signs_with_limits,
@@ -90,7 +88,7 @@ impl PreparedMeasurementToDetection {
         let needs_program = uses_reference || conversion_admission.sweep_bit_count > 0;
         let conversion_bytes = conversion_admission.compiled_storage_bytes()?;
         let (program_base, program_limit) = if needs_program {
-            (conversion_bytes, limits.max_compiled_bytes())
+            (conversion_bytes, limits.memory_budget().bytes())
         } else {
             (0, u64::MAX)
         };
@@ -104,7 +102,7 @@ impl PreparedMeasurementToDetection {
             admit_combined_compiled_storage(
                 conversion_bytes,
                 admission.retained_bytes(),
-                limits.max_compiled_bytes(),
+                limits.memory_budget().bytes(),
             )?;
             Some(admission)
         } else {
@@ -118,7 +116,7 @@ impl PreparedMeasurementToDetection {
                 admit_combined_compiled_storage(
                     plan.compiled_storage_bytes()?,
                     program.retained_bytes(),
-                    limits.max_compiled_bytes(),
+                    limits.memory_budget().bytes(),
                 )?;
                 let counts = program.counts();
                 if counts.measurements != plan.measurement_count {
@@ -138,9 +136,14 @@ impl PreparedMeasurementToDetection {
             None => None,
         };
         let reference_sample = match (&program, uses_reference) {
-            (Some(program), true) => ReferenceSampleSource::Static(
-                reference::static_reference_sample(circuit, program, plan.measurement_count)?,
-            ),
+            (Some(program), true) => {
+                ReferenceSampleSource::Static(reference::static_reference_sample(
+                    circuit,
+                    program,
+                    plan.measurement_count,
+                    limits.memory_budget(),
+                )?)
+            }
             _ => ReferenceSampleSource::Zero,
         };
         let sweep_correction = program.filter(|_| plan.sweep_bit_count > 0).map(|program| {

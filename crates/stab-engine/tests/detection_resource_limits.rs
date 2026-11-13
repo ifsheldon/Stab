@@ -7,14 +7,14 @@
 use std::convert::Infallible;
 
 use stab_engine::{
-    DetectionCompileError, DetectionConversionLimits, DetectionError, DetectionRecordLimitSubject,
-    DetectionResourceKind, DetectionResourceLimitError, DetectionSamplingCompiler,
-    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
-    circuit_reference_signs_with_limits, validate_detection_sampling_circuit_with_limits,
+    DetectionCompileError, DetectionConversionLimits, DetectionError, DetectionResourceKind,
+    DetectionResourceLimitError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
+    RandomPolicy, ReferenceSampleMode, Seed, ShotCount, circuit_reference_signs_with_limits,
+    validate_detection_sampling_circuit_with_limits,
 };
 use stab_model::{
-    Circuit, CircuitInstruction, Gate, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
-    Target,
+    Circuit, CircuitInstruction, Gate, MemoryBudget, QubitId, RepeatBlock, RepeatCount,
+    RepeatNestingLimit, Target,
 };
 use stab_records::{DetectionBatchView, DetectionSink};
 
@@ -65,7 +65,8 @@ fn compact_reference_sign_plan_bytes(circuit: &Circuit) -> u64 {
     loop {
         match circuit_reference_signs_with_limits(
             circuit,
-            DetectionConversionLimits::default().with_max_compiled_bytes(limit),
+            DetectionConversionLimits::default()
+                .with_memory_budget(MemoryBudget::from_bytes(limit)),
         ) {
             Ok(_) => return limit,
             Err(error) => {
@@ -233,130 +234,30 @@ fn measurement_circuit(width: usize) -> Circuit {
 }
 
 #[test]
-fn default_record_width_accepts_the_boundary_and_rejects_the_next_bit() {
-    compile(
-        &measurement_circuit(1_000_000),
+fn record_width_above_the_retired_one_million_bit_cap_compiles() {
+    let plan = compile(
+        &measurement_circuit(1_000_001),
         DetectionConversionLimits::default(),
     )
-    .expect("the default measurement-width boundary must compile");
-
-    let resource = compile_resource(
-        compile(
-            &measurement_circuit(1_000_001),
-            DetectionConversionLimits::default(),
-        )
-        .expect_err("the first excess measurement bit must reject"),
-    );
-    assert_eq!(
-        resource.kind(),
-        DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::MeasurementRecord)
-    );
-    assert_eq!(
-        (resource.actual(), resource.limit()),
-        (1_000_001, 1_000_000)
-    );
+    .expect("a record wider than the retired cap fits the default budget");
+    assert_eq!(plan.measurement_width().get(), 1_000_001);
 }
 
 #[test]
-fn default_traversal_limits_accept_the_boundary_and_reject_the_next_unit() {
-    let mut expanded_text = String::from("REPEAT 100000 {\n");
-    for _ in 0..10 {
-        expanded_text.push_str("TICK\n");
-    }
-    expanded_text.push_str("}\n");
-    let mut expanded = Circuit::from_stim_str(&expanded_text).expect("parse expanded fixture");
-    compile(&expanded, DetectionConversionLimits::default())
-        .expect("one million expanded instructions must compile");
-    expanded
-        .append_from_stim_text("TICK\n")
-        .expect("append first excess instruction");
-    let resource = compile_resource(
-        compile(&expanded, DetectionConversionLimits::default())
-            .expect_err("the first excess expanded instruction must reject"),
-    );
-    assert_eq!(resource.kind(), DetectionResourceKind::ExpandedInstructions);
-    assert_eq!(
-        (resource.actual(), resource.limit()),
-        (1_000_001, 1_000_000)
-    );
-
-    let mut inner = Circuit::new();
-    inner.append_repeat_block(RepeatBlock::new(
-        RepeatCount::try_new(999).expect("valid repeat count"),
-        Circuit::new(),
-        None,
-    ));
-    let mut iterations = Circuit::new();
-    iterations.append_repeat_block(RepeatBlock::new(
-        RepeatCount::try_new(1_000).expect("valid repeat count"),
-        inner,
-        None,
-    ));
-    compile(&iterations, DetectionConversionLimits::default())
-        .expect("one million aggregate repeat iterations must compile");
-    iterations.append_repeat_block(RepeatBlock::new(
-        RepeatCount::try_new(1).expect("valid repeat count"),
-        Circuit::new(),
-        None,
-    ));
-    let resource = compile_resource(
-        compile(&iterations, DetectionConversionLimits::default())
-            .expect_err("the first excess repeat iteration must reject"),
-    );
-    assert_eq!(resource.kind(), DetectionResourceKind::RepeatIterations);
-    assert_eq!(
-        (resource.actual(), resource.limit()),
-        (1_000_001, 1_000_000)
-    );
-}
-
-#[test]
-fn reference_sign_entrypoint_propagates_exact_resource_boundaries() {
-    let record =
-        Circuit::from_stim_str("M 0 1\nDETECTOR rec[-1]\n").expect("parse record-width fixture");
-    let record_limits = DetectionConversionLimits::default().with_max_record_bits(2);
-    circuit_reference_signs_with_limits(&record, record_limits)
-        .expect("admit exact measurement-record width");
-
+fn reference_sign_entrypoint_propagates_the_exact_budget() {
     let repeated = Circuit::from_stim_str("M 0\nREPEAT 3 {\nDETECTOR rec[-1]\n}\n")
         .expect("parse repeated term fixture");
     let exact_bytes = compact_reference_sign_plan_bytes(&repeated);
-    let exact = DetectionConversionLimits::default()
-        .with_max_repeat_iterations(3)
-        .with_max_expanded_instructions(4)
-        .with_max_compiled_terms(1)
-        .with_max_compiled_bytes(exact_bytes);
-    circuit_reference_signs_with_limits(&repeated, exact)
-        .expect("admit exact repeat, term, and byte limits");
-
-    for (circuit, limits, kind, actual, limit) in [
-        (
-            &record,
-            record_limits.with_max_record_bits(1),
-            DetectionResourceKind::RecordBits(DetectionRecordLimitSubject::MeasurementRecord),
-            2,
-            1,
-        ),
-        (
-            &repeated,
-            exact.with_max_compiled_terms(0),
-            DetectionResourceKind::CompiledTerms,
-            1,
-            0,
-        ),
-        (
-            &repeated,
-            exact.with_max_compiled_bytes(exact_bytes - 1),
-            DetectionResourceKind::CompiledBytes,
-            exact_bytes,
-            exact_bytes - 1,
-        ),
-    ] {
-        let error = detection_resource(
-            circuit_reference_signs_with_limits(circuit, limits)
-                .expect_err("reject first excess reference-sign resource unit"),
-        );
-        assert_eq!(error.kind(), kind);
-        assert_eq!((error.actual(), error.limit()), (actual, limit));
-    }
+    let limits = |bytes| {
+        DetectionConversionLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes))
+    };
+    circuit_reference_signs_with_limits(&repeated, limits(exact_bytes))
+        .expect("admit the exact budget");
+    let error = detection_resource(
+        circuit_reference_signs_with_limits(&repeated, limits(exact_bytes - 1))
+            .expect_err("reject the first excess byte"),
+    );
+    assert_eq!(error.kind(), DetectionResourceKind::CompiledBytes);
+    assert_eq!(error.limit(), exact_bytes - 1);
+    assert!(error.actual() >= exact_bytes);
 }

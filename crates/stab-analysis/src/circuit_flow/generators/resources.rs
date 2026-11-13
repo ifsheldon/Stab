@@ -1,10 +1,10 @@
 use stab_algebra::Flow;
-use stab_model::{Circuit, CircuitItem};
+use stab_model::{Circuit, CircuitItem, MemoryBudget};
 
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
 
-pub(crate) const MAX_FLOW_GENERATOR_PROJECTED_BYTES: u64 = 512 * 1024 * 1024;
-const MAX_FLOW_GENERATOR_EXPANDED_OPERATIONS: u64 = 1_000_000;
+/// Owned flow-generator rows are admitted against the default memory budget.
+pub(crate) const FLOW_GENERATOR_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
 const MAX_FLOW_GENERATOR_REPEAT_NESTING: usize = 256;
 // Two rows per qubit, two Pauli strings per row, and two bit planes per string.
 const MAX_IGNORED_ONLY_FLOW_GENERATOR_PROJECTED_BYTES: u64 = 4096 * 4096;
@@ -30,12 +30,14 @@ pub(crate) fn validate_measurement_rich_flow_generator_resources(
 ) -> AnalysisResult<()> {
     let projected_bytes =
         measurement_rich_flow_generator_projected_bytes(qubit_count, measurement_count);
-    if projected_bytes > MAX_FLOW_GENERATOR_PROJECTED_BYTES {
-        return Err(flow_resource_error(
+    if !FLOW_GENERATOR_MEMORY_BUDGET.admits(u128::from(projected_bytes)) {
+        return Err(ResourceLimitError::memory_budget(
+            ResourceOperation::FlowGeneration,
             ResourceKind::ProjectedPayloadBytes,
             projected_bytes,
-            MAX_FLOW_GENERATOR_PROJECTED_BYTES,
-        ));
+            FLOW_GENERATOR_MEMORY_BUDGET.bytes(),
+        )
+        .into());
     }
     Ok(())
 }
@@ -53,13 +55,10 @@ pub(crate) fn measurement_rich_flow_generator_projected_bytes(
     u64::try_from(rows.saturating_mul(bytes_per_row)).unwrap_or(u64::MAX)
 }
 
-pub(super) fn validate_flow_generator_expanded_work(circuit: &Circuit) -> AnalysisResult<()> {
-    fn count(
-        circuit: &Circuit,
-        multiplier: u64,
-        depth: usize,
-        total: &mut u64,
-    ) -> AnalysisResult<()> {
+/// Rejects repeat nesting beyond the fixed envelope before the solver recurses. Expanded solver
+/// work is not capped: it mutates rows that the byte budget already bounds.
+pub(super) fn validate_flow_generator_repeat_nesting(circuit: &Circuit) -> AnalysisResult<()> {
+    fn count(circuit: &Circuit, depth: usize) -> AnalysisResult<()> {
         if depth > MAX_FLOW_GENERATOR_REPEAT_NESTING {
             return Err(flow_resource_error(
                 ResourceKind::RepeatNesting,
@@ -68,35 +67,14 @@ pub(super) fn validate_flow_generator_expanded_work(circuit: &Circuit) -> Analys
             ));
         }
         for item in circuit.items() {
-            match item {
-                CircuitItem::Instruction(_) => {
-                    let actual = total.checked_add(multiplier).unwrap_or(u64::MAX);
-                    if actual > MAX_FLOW_GENERATOR_EXPANDED_OPERATIONS {
-                        return Err(flow_resource_error(
-                            ResourceKind::ExpandedOperations,
-                            actual,
-                            MAX_FLOW_GENERATOR_EXPANDED_OPERATIONS,
-                        ));
-                    }
-                    *total = actual;
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    let repeated_multiplier =
-                        multiplier.saturating_mul(repeat.repeat_count().get());
-                    count(
-                        repeat.body(),
-                        repeated_multiplier,
-                        depth.saturating_add(1),
-                        total,
-                    )?;
-                }
+            if let CircuitItem::RepeatBlock(repeat) = item {
+                count(repeat.body(), depth.saturating_add(1))?;
             }
         }
         Ok(())
     }
 
-    let mut total = 0;
-    count(circuit, 1, 0, &mut total)
+    count(circuit, 0)
 }
 
 fn flow_resource_error(resource: ResourceKind, actual: u64, limit: u64) -> AnalysisError {

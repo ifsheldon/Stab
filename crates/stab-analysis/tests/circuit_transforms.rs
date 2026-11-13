@@ -237,21 +237,23 @@ fn flattened_operations_unrolls_without_fusing() {
 
 #[test]
 fn flattened_rejects_excessive_materialized_expansion() {
-    let boundary = circuit("REPEAT 1000000 {\nH 0\n}\n")
+    let boundary = circuit("REPEAT 100000 {\nH 0\n}\n")
         .flattened()
-        .expect("accept exact materialized limit");
+        .expect("materialize within the memory budget");
     let boundary_instruction = boundary
         .items()
         .first()
         .and_then(CircuitItem::as_instruction)
         .expect("fused boundary instruction");
     assert_eq!(boundary.len(), 1);
-    assert_eq!(boundary_instruction.targets().len(), 1_000_000);
+    assert_eq!(boundary_instruction.targets().len(), 100_000);
 
-    let circuit = circuit("REPEAT 1000001 {\nH 0\n}\n");
-    let error = circuit.flattened().expect_err("reject large flatten");
+    let circuit = circuit("REPEAT 1000000000000 {\nH 0\n}\n");
+    let error = circuit
+        .flattened()
+        .expect_err("refuse flatten beyond the budget");
 
-    assert!(error.to_string().contains("materialized limit"), "{error}");
+    assert!(error.to_string().contains("memory budget"), "{error}");
 }
 
 #[test]
@@ -857,17 +859,17 @@ REPEAT 2 {
 }
 
 #[test]
-fn with_inlined_feedback_rejects_aggregate_repeat_overflow() {
-    let error = circuit("REPEAT 1000001 {\n    TICK\n}\n")
+fn with_inlined_feedback_refuses_unrolling_beyond_the_memory_budget() {
+    let error = circuit("REPEAT 1000000000000 {\n    TICK\n}\n")
         .with_inlined_feedback()
-        .expect_err("reject aggregate feedback repeat work");
+        .expect_err("refuse unrolled feedback output beyond the budget");
     let resource = error
         .resource_limit_error()
         .expect("typed feedback resource error");
     assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
-    assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
-    assert_eq!(resource.actual(), 1_000_001);
-    assert_eq!(resource.limit(), 1_000_000);
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+    assert!(resource.actual() > resource.limit());
+    assert_eq!(resource.limit(), 1 << 30);
 }
 
 #[test]

@@ -17,12 +17,12 @@ use stab_records::{
 };
 
 use crate::{
-    Cli, CliError, FileRole, MAX_CIRCUIT_INPUT_BYTES, PendingIo, SampleOutFormatArg,
-    StandardStreams, StreamUse, one_shot_visible_measurement_count, parse_stim_u64,
-    parse_stim_usize, read_limited_input_file, read_limited_stdin,
+    Cli, CliError, FileRole, MemoryBudgetArg, PendingIo, SampleOutFormatArg, StandardStreams,
+    StreamUse, one_shot_visible_measurement_count, parse_stim_u64, parse_stim_usize,
+    read_limited_input_file, read_limited_stdin,
 };
 
-const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 5;
+const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 6;
 const INSPECT_OUTPUT_SCHEMA_VERSION: u16 = 2;
 const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 4;
 const STIM_COMPATIBILITY_VERSION: &str = "1.16.0";
@@ -36,7 +36,7 @@ pub(crate) enum AgentOutputFormatArg {
 
 #[derive(Debug, Args)]
 pub(crate) struct CapabilitiesArgs {
-    /// Selects concise human text or schema-version-5 JSON.
+    /// Selects concise human text or schema-version-6 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 }
@@ -62,6 +62,9 @@ pub(crate) struct InspectArgs {
     /// Selects concise human text or schema-version-2 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 #[derive(Debug, Args)]
@@ -105,6 +108,9 @@ struct PlanSampleArgs {
     /// Selects concise human text or schema-version-4 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 pub(crate) fn run_capabilities<W>(args: CapabilitiesArgs, stdout: &mut W) -> Result<(), CliError>
@@ -136,11 +142,12 @@ where
         stdin,
         streams,
         "inspect model input",
-        MAX_CIRCUIT_INPUT_BYTES,
+        args.memory.input_bytes(),
     )?;
+    let limits = args.memory.parse_limits();
     let report = match model_type {
-        InspectModelTypeArg::Circuit => InspectReport::for_circuit(&input)?,
-        InspectModelTypeArg::Dem => InspectReport::for_dem(&input)?,
+        InspectModelTypeArg::Circuit => InspectReport::for_circuit(&input, limits)?,
+        InspectModelTypeArg::Dem => InspectReport::for_dem(&input, limits)?,
     };
     write_agent_output(stdout, args.format, &report, &render_inspect_human(&report))
 }
@@ -180,9 +187,9 @@ where
         stdin,
         streams,
         "plan sample circuit input",
-        MAX_CIRCUIT_INPUT_BYTES,
+        args.memory.input_bytes(),
     )?;
-    let circuit = Circuit::from_stim_bytes(&input)?;
+    let circuit = Circuit::from_stim_bytes_with_limits(&input, args.memory.parse_limits())?;
     let reference_sample_loop_policy = if args.skip_loop_folding {
         ReferenceSampleLoopPolicy::Iterate
     } else {
@@ -191,6 +198,7 @@ where
 
     // Compilation is intentionally performed for validation. No sampling method is called.
     let plan = SamplingCompiler::new()
+        .memory_budget(args.memory.get())
         .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
         .map_err(CliError::from)?;
@@ -366,6 +374,7 @@ struct CapabilitiesReport {
     stim_compatibility_version: &'static str,
     commands: Vec<CommandReport>,
     dialects: Vec<DialectReport>,
+    memory_budget: MemoryBudgetReport,
     gates: Vec<GateReport>,
     codecs: Vec<CodecReport>,
     compilers: Vec<CompilerReport>,
@@ -387,15 +396,17 @@ impl CapabilitiesReport {
                     DialectReport {
                         name: dialect.as_str(),
                         default_parse_limits: ParseLimitsReport {
-                            source_bytes: limits.source_byte_limit().get(),
-                            source_lines: limits.source_line_limit().get(),
-                            represented_instructions: limits.represented_instruction_limit().get(),
-                            represented_targets: limits.represented_target_limit().get(),
+                            memory_budget_bytes: limits.memory_budget().bytes(),
                             repeat_nesting: limits.repeat_nesting_limit().get(),
                         },
                     }
                 })
                 .collect(),
+            memory_budget: MemoryBudgetReport {
+                option: "--memory-budget",
+                default_bytes: stab_model::MemoryBudget::DEFAULT.bytes(),
+                suffixes: &["KiB", "MiB", "GiB"],
+            },
             gates: Gate::all()
                 .map(|gate| GateReport {
                     canonical_name: gate.canonical_name(),
@@ -448,11 +459,16 @@ struct DialectReport {
 
 #[derive(Serialize)]
 struct ParseLimitsReport {
-    source_bytes: usize,
-    source_lines: usize,
-    represented_instructions: usize,
-    represented_targets: usize,
+    memory_budget_bytes: u64,
     repeat_nesting: usize,
+}
+
+/// The Stab-native admission budget every executing command accepts.
+#[derive(Serialize)]
+struct MemoryBudgetReport {
+    option: &'static str,
+    default_bytes: u64,
+    suffixes: &'static [&'static str],
 }
 
 #[derive(Serialize)]
@@ -532,8 +548,8 @@ struct InspectReport {
 }
 
 impl InspectReport {
-    fn for_circuit(input: &[u8]) -> Result<Self, CliError> {
-        let circuit = Circuit::from_stim_bytes(input)?;
+    fn for_circuit(input: &[u8], limits: ParseLimits) -> Result<Self, CliError> {
+        let circuit = Circuit::from_stim_bytes_with_limits(input, limits)?;
         Ok(Self {
             schema_version: INSPECT_OUTPUT_SCHEMA_VERSION,
             executes: false,
@@ -553,8 +569,8 @@ impl InspectReport {
         })
     }
 
-    fn for_dem(input: &[u8]) -> Result<Self, CliError> {
-        let model = DetectorErrorModel::from_dem_bytes(input)?;
+    fn for_dem(input: &[u8], limits: ParseLimits) -> Result<Self, CliError> {
+        let model = DetectorErrorModel::from_dem_bytes_with_limits(input, limits)?;
         Ok(Self {
             schema_version: INSPECT_OUTPUT_SCHEMA_VERSION,
             executes: false,

@@ -1,12 +1,6 @@
 use stab_model::CircuitInstruction;
 
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError};
-
-#[derive(Debug)]
-pub(crate) struct AnalyzerProbeBudget {
-    consumed_steps: u64,
-    max_steps: u64,
-}
+use crate::AnalysisResult;
 
 pub(crate) trait ReverseTrackerWorkBudget {
     fn admit_probe_iteration(&mut self) -> AnalysisResult<()>;
@@ -44,42 +38,5 @@ impl ReverseTrackerBudget<'_> {
             Self::Unlimited => Ok(()),
             Self::Metered(budget) => budget.admit_recurrence_search(),
         }
-    }
-}
-
-impl AnalyzerProbeBudget {
-    pub(crate) fn new(max_steps: u64) -> Self {
-        Self {
-            consumed_steps: 0,
-            max_steps,
-        }
-    }
-
-    fn consume_work_unit(&mut self) -> AnalysisResult<()> {
-        let next = self.consumed_steps.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "analyze_errors recurrence probe step count overflowed",
-            )
-        })?;
-        if next > self.max_steps {
-            return Err(ResourceLimitError::circuit_to_detector_error_model(
-                ResourceKind::ExpandedOperations,
-                next,
-                self.max_steps,
-            )
-            .into());
-        }
-        self.consumed_steps = next;
-        Ok(())
-    }
-}
-
-impl ReverseTrackerWorkBudget for AnalyzerProbeBudget {
-    fn admit_probe_iteration(&mut self) -> AnalysisResult<()> {
-        self.consume_work_unit()
-    }
-
-    fn admit_instruction(&mut self, _instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        self.consume_work_unit()
     }
 }

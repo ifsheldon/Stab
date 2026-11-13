@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for Stab 0.2 architecture work.
+Accepted for Stab 0.2 architecture work. Revised on 2026-11-14 by the E4 limit policy reset of the [engine speed and architecture plan](../plans/engine-speed-and-architecture-plan.md).
 
 ## Context
 
@@ -22,11 +22,20 @@ CLI human output remains the default and JSON schema version 1 is additive.
 
 Established human parser output remains stable where the old behavior already matches pinned Stim. Direct Stim v1.16.0 evidence takes precedence over preserving an incompatible old Stab acceptance or rejection.
 
-Resource policies are owned by one concrete operation and preserve established safe acceptance and first-rejection behavior. A dimension with no prior aggregate rejection may default to the representable maximum only when compact input cannot cause unbounded traversal, retention, or allocation; otherwise its owner defines and tests a finite operation-safety default.
+Resource policies are owned by one concrete operation.
+Since E4 of the engine speed and architecture plan, each materializing or executing operation has exactly one admission dimension, a typed `MemoryBudget` of retained bytes, plus the shared repeat-nesting envelope where its traversal recurses.
+The budget defaults to one gibibyte, is admitted from conservative checked arithmetic before allocation, RNG advancement, or output, and is followed by fallible reservation.
 
-The first concrete policies are parsing, circuit flattening, DEM flattening, detection conversion, DEM sampling, logical-error search, and SAT materialization. They are not aliases of one global limits structure.
+Hostile-input protection means memory safety, no panics, checked arithmetic, bounded allocation, and bounded recursion.
+It does not mean bounded CPU time: count caps that only proxied memory and fixed work caps on expanded instructions, repeat iterations, sampled errors, replay work, or analysis work units are removed, and a compact input that fits the budget runs for as long as its work takes.
+Bounding running time belongs to the caller.
 
-A constant is not automatically a public policy field. Representation bounds, parser-recursion envelopes, platform limits, and fixed algorithm invariants remain private when callers cannot safely raise them or gain useful control by lowering them.
+The per-operation limits types for parsing, circuit flattening, DEM flattening, detection conversion, DEM sampling, sampling, error analysis, and circuit generation each carry the one budget.
+Logical-error search and SAT materialization keep their explicit search budgets with budget-exhausted results.
+These policies are not aliases of one global limits structure, although the CLI feeds all of them from one `--memory-budget` option.
+
+A constant is not automatically a public policy field.
+Representation bounds, the parser-recursion envelope, platform limits, implementation thresholds that select an algorithm without rejecting work, and the dense `stab-algebra` bounds that remain until their algorithms are replaced stay private.
 
 Semantic hard limits are not configurable.
 
@@ -38,5 +47,6 @@ Estimates label values as exact, upper-bound, or unknown and do not execute the 
 - Existing safety boundaries remain explicit and testable.
 - Policy objects do not become a global configuration dependency.
 - Callers see only limits relevant to the operation they invoke.
-- New operation policies require a real admission boundary, exact default and first-rejection tests, and structured `ResourceLimitError` context.
+- New operation policies require a real byte-admission boundary, exact-budget and first-excess tests, and structured `ResourceLimitError` context naming the budget.
+- Long-running work on compact inputs is expected; callers bound time, and cooperative cancellation is the planned mechanism for interrupting it.
 - Admission precedes allocation proportional to rejected work, RNG advancement, output mutation, and expensive lowering; bounded capacity estimation from an admitted source prefix remains an implementation optimization.

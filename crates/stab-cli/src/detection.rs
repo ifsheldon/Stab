@@ -2,10 +2,11 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_analysis::circuit_with_inlined_feedback;
+use stab_analysis::circuit_with_inlined_feedback_with_memory_budget;
 use stab_engine::{
-    DetectionRunError, DetectionSamplingCompiler, MeasurementToDetectionCompiler,
-    MeasurementToDetectionTransaction, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
+    DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler,
+    MeasurementToDetectionCompiler, MeasurementToDetectionTransaction, RandomPolicy,
+    ReferenceSampleMode, Seed, ShotCount,
 };
 use stab_records::{
     ByteSpan, DetectionBatchView, DetectionSink, FormatError, FormatErrorCode,
@@ -14,7 +15,7 @@ use stab_records::{
 };
 
 use crate::{
-    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
+    CliError, MemoryBudgetArg, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
@@ -22,7 +23,6 @@ use crate::{
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
 };
 
-const MAX_M2D_TEXT_RECORD_BYTES: usize = 1_048_576;
 const M2D_BATCH_SHOTS: usize = u64::BITS as usize;
 
 #[derive(Debug, Args)]
@@ -58,6 +58,9 @@ pub(crate) struct DetectArgs {
     /// Separate observable-flip output format.
     #[arg(long = "obs_out_format", value_enum, default_value = "01")]
     obs_out_format: RecordFormatArg,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 #[derive(Debug, Args)]
@@ -109,6 +112,9 @@ pub(crate) struct M2dArgs {
     /// Stim compatibility flag for externally transformed circuits.
     #[arg(long = "ran_without_feedback")]
     ran_without_feedback: bool,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 pub(crate) fn run_detect<R, W>(
@@ -150,15 +156,16 @@ where
     let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
         read_limited_input_file(
             &mut input_file,
-            MAX_CIRCUIT_INPUT_BYTES,
+            args.memory.input_bytes(),
             "detect circuit input",
         )?
     } else {
-        read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "detect circuit input")?
+        read_limited_stdin(input, args.memory.input_bytes(), "detect circuit input")?
     };
-    let circuit = parse_circuit_bytes(&input_bytes)?;
+    let circuit = parse_circuit_bytes(&input_bytes, args.memory)?;
     let observable_mode = detect_observable_output_mode(&args);
     let plan = DetectionSamplingCompiler::new()
+        .limits(DetectionConversionLimits::new(args.memory.get()))
         .compile(&circuit)
         .map_err(CliError::from)?;
     let encoder = DetectionBatchEncoder::try_new(
@@ -220,12 +227,12 @@ where
         })?;
     let circuit_bytes = read_limited_input_file(
         &mut circuit_file,
-        MAX_CIRCUIT_INPUT_BYTES,
+        args.memory.input_bytes(),
         "m2d circuit input",
     )?;
-    let circuit = parse_circuit_bytes(&circuit_bytes)?;
+    let circuit = parse_circuit_bytes(&circuit_bytes, args.memory)?;
     let circuit = if args.ran_without_feedback {
-        circuit_with_inlined_feedback(&circuit)?
+        circuit_with_inlined_feedback_with_memory_budget(&circuit, args.memory.get())?
     } else {
         circuit
     };
@@ -233,6 +240,7 @@ where
     let observable_mode = observable_output_mode(args.append_observables);
     let sweep_input = io.take_input(FileRole::Sweep);
     let plan = MeasurementToDetectionCompiler::new()
+        .limits(DetectionConversionLimits::new(args.memory.get()))
         .reference_sample_mode(reference_sample_mode(args.skip_reference_sample))
         .compile(&circuit)
         .map_err(CliError::from)?;
@@ -248,17 +256,28 @@ where
             .transpose()?,
     )?;
     let mut measurements = match measurement_input {
-        Some(file) => M2dInput::from_file(file, args.in_format, plan.measurement_width().get()),
+        Some(file) => M2dInput::from_file(
+            file,
+            args.in_format,
+            plan.measurement_width().get(),
+            args.memory.record_bytes(),
+        ),
         None => M2dInput::new(
             Box::new(input),
             None,
             args.in_format,
-            plan.measurement_width().get(),
+            (plan.measurement_width().get(), args.memory.record_bytes()),
             M2D_MEASUREMENT_KIND,
         ),
     };
     let mut sweeps = sweep_input.map(|file| {
-        M2dInput::from_file(file, args.sweep_format, plan.sweep_width().get()).into_sweep()
+        M2dInput::from_file(
+            file,
+            args.sweep_format,
+            plan.sweep_width().get(),
+            args.memory.record_bytes(),
+        )
+        .into_sweep()
     });
     let mut outputs = io.activate()?;
     let primary = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
@@ -515,7 +534,7 @@ impl<'a> M2dInput<'a> {
         source: Box<dyn Read + 'a>,
         input_path: Option<PathBuf>,
         format: RecordFormatArg,
-        bits_per_record: usize,
+        (bits_per_record, max_record_bytes): (usize, usize),
         kind: &'static str,
     ) -> Self {
         let reader = format.record_format().map(|record_format| {
@@ -523,7 +542,7 @@ impl<'a> M2dInput<'a> {
                 source,
                 record_format,
                 bits_per_record,
-                MAX_M2D_TEXT_RECORD_BYTES,
+                max_record_bytes,
             )
             .with_framing(RecordFraming::Records)
         });
@@ -535,13 +554,18 @@ impl<'a> M2dInput<'a> {
         }
     }
 
-    fn from_file(file: InputFile, format: RecordFormatArg, bits_per_record: usize) -> Self {
+    fn from_file(
+        file: InputFile,
+        format: RecordFormatArg,
+        bits_per_record: usize,
+        max_record_bytes: usize,
+    ) -> Self {
         let input_path = Some(file.path().to_path_buf());
         Self::new(
             Box::new(file),
             input_path,
             format,
-            bits_per_record,
+            (bits_per_record, max_record_bytes),
             M2D_MEASUREMENT_KIND,
         )
     }

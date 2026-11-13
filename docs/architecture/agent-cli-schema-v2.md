@@ -6,7 +6,7 @@ These commands are additive Stab extensions and do not claim matching Stim v1.16
 
 Schema version 2 supersedes the historical version 1 contract retained in Git history. It remains current for `stab inspect`; its `plan sample` section is historical because planning now emits [schema version 4](agent-cli-plan-schema-v4.md).
 
-`stab capabilities` now emits [capabilities schema version 5](agent-cli-capabilities-schema-v5.md).
+`stab capabilities` now emits [capabilities schema version 6](agent-cli-capabilities-schema-v6.md).
 
 ## Invocation And Streams
 
@@ -26,7 +26,7 @@ The commands do not accept output paths.
 
 `inspect` and `plan sample` accept one optional positional input path and otherwise read stdin.
 
-All input paths reuse retained-handle preflight and the existing 64 MiB circuit-input admission envelope.
+All input paths reuse retained-handle preflight and admit their input against the command's `--memory-budget`, one gibibyte by default.
 
 ## Design Rationale
 

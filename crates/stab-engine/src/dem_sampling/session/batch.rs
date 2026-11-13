@@ -1,12 +1,14 @@
 use stab_records::{BitPlane64BatchView, DemSampleBatchView, DetectionBatchView, PackedShotBatch};
 
-use super::{
-    DemSamplingExecutionError, MAX_BATCH_SHOTS, MAX_DEM_SESSION_STORAGE_BYTES, ReplayRecord,
-    internal_format_error,
-};
+use stab_model::MemoryBudget;
+
+use super::{DemSamplingExecutionError, MAX_BATCH_SHOTS, ReplayRecord, internal_format_error};
 use crate::DetectionRecordBuffer;
 use crate::bernoulli::INDEXED_BLOCK_SHOTS;
-use crate::dem_sampling::{DemError, DemResourceLimitError, DemSamplerLimits, DemSamplingPlan};
+use crate::dem_sampling::{DemResourceLimitError, DemSamplerLimits, DemSamplingPlan};
+
+/// Active-batch size that batch selection aims for; larger budgets admit more but batch alike.
+const PREFERRED_ACTIVE_BATCH_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug)]
 pub(super) struct SessionBatch {
@@ -191,9 +193,22 @@ pub(super) fn initial_capacities(
     plan: &DemSamplingPlan,
     limits: DemSamplerLimits,
 ) -> Result<SessionCapacities, DemSamplingExecutionError> {
-    let include_sampled_errors = validate_session_storage(plan, 1, 1, true, limits).is_ok();
+    // Batch shape follows the historical 64 MiB active-batch target, which keeps seeded streams
+    // independent of the admission budget; only a smaller budget shrinks it further.
+    let preferred = limits
+        .memory_budget()
+        .min(MemoryBudget::from_bytes(PREFERRED_ACTIVE_BATCH_BYTES));
+    let fits = |output, sample, include_sampled_errors| {
+        preferred.admits(session_storage_bytes(
+            plan,
+            output,
+            sample,
+            include_sampled_errors,
+        ))
+    };
+    let include_sampled_errors = fits(1, 1, true);
     for output in (1..=MAX_BATCH_SHOTS).rev() {
-        if validate_session_storage(plan, output, 1, include_sampled_errors, limits).is_err() {
+        if !fits(output, 1, include_sampled_errors) {
             continue;
         }
         if output < MAX_BATCH_SHOTS {
@@ -203,17 +218,16 @@ pub(super) fn initial_capacities(
             });
         }
         for sample in (1..=INDEXED_BLOCK_SHOTS).rev() {
-            if validate_session_storage(plan, output, sample, include_sampled_errors, limits)
-                .is_ok()
-            {
+            if fits(output, sample, include_sampled_errors) {
                 return Ok(SessionCapacities { output, sample });
             }
         }
     }
+    // Even one shot exceeds the preferred batch size; admit a one-shot batch within the budget.
     validate_session_storage(plan, 1, 1, false, limits)?;
-    Err(DemSamplingExecutionError::InternalInvariant {
-        message: "one-shot DEM session storage passed admission but no batch capacity was selected"
-            .to_owned(),
+    Ok(SessionCapacities {
+        output: 1,
+        sample: 1,
     })
 }
 
@@ -226,22 +240,12 @@ pub(super) fn validate_session_storage(
 ) -> Result<(), DemSamplingExecutionError> {
     let estimated_bytes =
         session_storage_bytes(plan, output_shots, sample_shots, include_sampled_errors);
-    if estimated_bytes > limits.max_active_batch_bytes() as u128 {
-        let actual = usize::try_from(estimated_bytes).map_err(|_| {
-            DemSamplingExecutionError::InvalidRequest(DemError::invalid_sampler_compilation(
-                "DEM sampling session active byte estimate overflowed usize",
-            ))
-        })?;
+    let budget = limits.memory_budget();
+    if !budget.admits(estimated_bytes) {
+        let actual = u64::try_from(estimated_bytes).unwrap_or(u64::MAX);
         return Err(DemSamplingExecutionError::InvalidRequest(
-            DemResourceLimitError::active_batch_bytes(actual, limits.max_active_batch_bytes())
-                .into(),
+            DemResourceLimitError::active_batch_bytes(actual, budget.bytes()).into(),
         ));
-    }
-    if estimated_bytes > u128::from(MAX_DEM_SESSION_STORAGE_BYTES) {
-        return Err(DemSamplingExecutionError::SessionStorageLimit {
-            estimated_bytes,
-            limit_bytes: MAX_DEM_SESSION_STORAGE_BYTES,
-        });
     }
     Ok(())
 }

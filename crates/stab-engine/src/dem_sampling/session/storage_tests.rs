@@ -8,13 +8,14 @@
 
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     reason = "storage admission tests use fixed valid fixtures and fail immediately on errors"
 )]
 
 use super::batch::{SessionCapacities, session_storage_bytes};
 use super::*;
-use crate::{DemSamplingCompiler, Seed};
-use stab_model::DetectorErrorModel;
+use crate::{DemResourceKind, DemSamplingCompiler, Seed};
+use stab_model::{DetectorErrorModel, MemoryBudget};
 
 const INLINE_RECORD_BYTES: u128 = size_of::<DetectionRecordBuffer>() as u128;
 
@@ -36,8 +37,10 @@ fn plan(detectors: usize, observables: usize, errors: usize) -> DemSamplingPlan 
         .expect("compile storage DEM")
 }
 
-fn raised_cap_limits() -> DemSamplerLimits {
-    DemSamplerLimits::default().with_max_active_batch_bytes(usize::MAX)
+fn budget(bytes: u128) -> DemSamplerLimits {
+    DemSamplerLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+        u64::try_from(bytes).expect("test budget fits u64"),
+    ))
 }
 
 #[test]
@@ -89,65 +92,73 @@ fn session_storage_estimate_matches_retained_allocation_including_lazy_sampled_e
 }
 
 #[test]
-fn session_capacity_admission_is_exact_at_the_256_mib_cap() {
-    // With the configurable active-batch limit raised, only the 256 MiB session cap binds. At an
-    // eight-shot output capacity, 26,843,536 detectors estimate exactly 256 MiB:
-    // 48 + 9 * D + 8 * 8 * ceil(D / 64).
-    let at_limit = plan(26_843_536, 0, 0);
-    let capacities = initial_capacities(&at_limit, raised_cap_limits()).expect("admit cap");
-    assert_eq!(
-        capacities,
-        SessionCapacities {
-            output: 8,
-            sample: 8
-        }
-    );
-    assert_eq!(
-        session_storage_bytes(&at_limit, 8, 8, true),
-        u128::from(MAX_DEM_SESSION_STORAGE_BYTES)
-    );
-    let one_more = plan(26_843_537, 0, 0);
-    assert_eq!(
-        initial_capacities(&one_more, raised_cap_limits()).expect("admit smaller batch"),
-        SessionCapacities {
-            output: 7,
-            sample: 7
-        },
-        "the first excess byte must shrink the batch instead of exceeding the cap"
-    );
+fn batch_shape_follows_the_preferred_64_mib_target_whatever_the_budget() {
+    // Batch shape, and therefore the seeded stream, is chosen against the historical 64 MiB
+    // active-batch target even when the budget is larger. At an eight-shot output capacity,
+    // 48 + 9 * D + 8 * 8 * ceil(D / 64) bytes first exceed 64 MiB at 6,710,879 detectors.
+    let preferred = 64 * 1024 * 1024_u128;
+    let fits = plan(6_710_878, 0, 0);
+    assert_eq!(session_storage_bytes(&fits, 8, 8, true), preferred - 2);
+    for limits in [DemSamplerLimits::default(), budget(u128::from(u64::MAX))] {
+        assert_eq!(
+            initial_capacities(&fits, limits).expect("admit an eight-shot batch"),
+            SessionCapacities {
+                output: 8,
+                sample: 8
+            }
+        );
+        assert_eq!(
+            initial_capacities(&plan(6_710_879, 0, 0), limits).expect("admit a smaller batch"),
+            SessionCapacities {
+                output: 7,
+                sample: 7
+            },
+            "one more detector shrinks the batch instead of growing past the target"
+        );
+    }
 }
 
 #[test]
-fn session_storage_rejects_the_first_one_shot_excess_before_allocation() {
-    // One-shot storage is 48 + 9 * D + 8 * ceil(D / 64) bytes, which steps by 9 bytes and cannot
-    // land exactly on 256 MiB: 29,417,578 detectors estimate 6 bytes under it and one more
-    // detector estimates 3 bytes over it.
-    let last_admitted = plan(29_417_578, 0, 0);
+fn session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte_before_allocation() {
+    let model = plan(1000, 3, 7);
+    let exact = session_storage_bytes(&model, 1, 1, false);
     assert_eq!(
-        initial_capacities(&last_admitted, raised_cap_limits()).expect("admit one-shot batch"),
+        initial_capacities(&model, budget(exact)).expect("admit the exact one-shot budget"),
         SessionCapacities {
             output: 1,
             sample: 1
         }
     );
-    let first_rejected = plan(29_417_579, 0, 0);
+    model
+        .session_with_limits(RandomPolicy::Seeded(Seed::new(1)), budget(exact))
+        .expect("open a session at the exact budget");
+
     let mut rejected = None;
     let allocated = allocation_counter::measure(|| {
         rejected = Some(
-            first_rejected
-                .session_with_limits(RandomPolicy::Seeded(Seed::new(1)), raised_cap_limits())
-                .expect_err("reject the first excess detector before allocation"),
+            model
+                .session_with_limits(RandomPolicy::Seeded(Seed::new(1)), budget(exact - 1))
+                .expect_err("reject the first excess byte before allocation"),
         );
     });
     assert_eq!(allocated.bytes_total, 0);
-    assert!(
-        matches!(
-            rejected,
-            Some(DemSamplingExecutionError::SessionStorageLimit {
-                estimated_bytes,
-                limit_bytes: MAX_DEM_SESSION_STORAGE_BYTES,
-            }) if estimated_bytes == u128::from(MAX_DEM_SESSION_STORAGE_BYTES) + 3
-        ),
-        "{rejected:?}"
+    match rejected {
+        Some(DemSamplingExecutionError::InvalidRequest(DemError::ResourceLimit(resource))) => {
+            assert_eq!(resource.kind(), DemResourceKind::ActiveBatchBytes);
+            assert_eq!(u128::from(resource.actual()), exact);
+            assert_eq!(u128::from(resource.limit()), exact - 1);
+        }
+        other => panic!("expected a typed budget refusal, got {other:?}"),
+    }
+
+    // A one-shot session above the preferred batch target is admitted within the budget.
+    let above_target = plan(8_000_000, 0, 0);
+    assert_eq!(
+        initial_capacities(&above_target, DemSamplerLimits::default())
+            .expect("a one-shot batch above 64 MiB fits the default budget"),
+        SessionCapacities {
+            output: 1,
+            sample: 1
+        }
     );
 }

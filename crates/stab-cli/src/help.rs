@@ -61,6 +61,9 @@ fn command_list_help() -> String {
         "Useful topics: commands, formats, gates, capabilities, inspect, plan, sample, 01, ptb64, H.\n",
     );
     out.push_str("Use `--error-format=json` for schema-version-1 JSON Lines diagnostics.\n");
+    out.push_str(
+        "Use `--memory-budget SIZE` (default 1GiB) to set the memory each command may admit; running time is not capped.\n",
+    );
     out.push_str("\nDocs and sources: ");
     out.push_str(env!("CARGO_PKG_REPOSITORY"));
     out.push('\n');
@@ -93,34 +96,34 @@ fn gate_list_help() -> String {
 fn command_help(command: &str) -> Option<String> {
     let text = match command {
         "gen" => {
-            "stab gen\n\nGenerates supported repetition, surface, and color-code circuits.\n\nKey flags: --code, --task, --distance, --rounds, and --out.\n\nNoise flags: --after_clifford_depolarization, --after_reset_flip_probability, --before_measure_flip_probability, and --before_round_data_depolarization.\n"
+            "stab gen\n\nGenerates supported repetition, surface, and color-code circuits.\n\nKey flags: --code, --task, --distance, --rounds, and --out.\n\nNoise flags: --after_clifford_depolarization, --after_reset_flip_probability, --before_measure_flip_probability, and --before_round_data_depolarization.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "capabilities" => {
-            "stab capabilities\n\nReports commands, model dialects, gate syntax, result codecs, compilers, and parse defaults from source-owned descriptors.\n\nUse --format=json for schema-version-5 machine output.\n"
+            "stab capabilities\n\nReports commands, model dialects, gate syntax, result codecs, compilers, and parse defaults from source-owned descriptors.\n\nUse --format=json for schema-version-6 machine output.\n"
         }
         "inspect" => {
-            "stab inspect [INPUT]\n\nParses and summarizes a .stim circuit or .dem detector error model without compiling or executing it.\n\nUse --type=stim or --type=dem for stdin or paths without a recognized extension. Use --format=json for schema-version-2 machine output.\n"
+            "stab inspect [INPUT]\n\nParses and summarizes a .stim circuit or .dem detector error model without compiling or executing it.\n\nUse --type=stim or --type=dem for stdin or paths without a recognized extension. Use --format=json for schema-version-2 machine output.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "plan" => {
-            "stab plan sample [INPUT]\n\nValidates and describes a sampling request without executing shots.\n\nKey flags: --shots, --out_format, --seed, --skip_reference_sample, --skip_loop_folding, and --format.\n\nRun configuration remains separate from the compilation-request fingerprint. Use --format=json for schema-version-4 machine output.\n"
+            "stab plan sample [INPUT]\n\nValidates and describes a sampling request without executing shots.\n\nKey flags: --shots, --out_format, --seed, --skip_reference_sample, --skip_loop_folding, and --format.\n\nRun configuration remains separate from the compilation-request fingerprint. Use --format=json for schema-version-4 machine output.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "convert" => {
-            "stab convert\n\nConverts result data between 01, b8, r8, hits, dets, and ptb64 formats.\n\nLayout flags: --num_measurements, --num_detectors, --num_observables, --bits_per_shot, --circuit, --dem, and --types.\n\nI/O flags: --in_format, --out_format, --in, --out, --obs_out, and --obs_out_format.\n\nThe Stab extension `--in_format=stim --out_format=stim` canonicalizes .stim circuit text.\n"
+            "stab convert\n\nConverts result data between 01, b8, r8, hits, dets, and ptb64 formats.\n\nLayout flags: --num_measurements, --num_detectors, --num_observables, --bits_per_shot, --circuit, --dem, and --types.\n\nI/O flags: --in_format, --out_format, --in, --out, --obs_out, and --obs_out_format.\n\nThe Stab extension `--in_format=stim --out_format=stim` canonicalizes .stim circuit text.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "sample" => {
-            "stab sample\n\nSamples measurements from a circuit.\n\nKey flags: --shots, --in, --out, --out_format, --seed, --skip_reference_sample, and --skip_loop_folding.\n"
+            "stab sample\n\nSamples measurements from a circuit.\n\nKey flags: --shots, --in, --out, --out_format, --seed, --skip_reference_sample, and --skip_loop_folding.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "detect" => {
-            "stab detect\n\nSamples detector events and observable flips from a circuit.\n\nKey flags: --shots, --in, --out, --out_format, --obs_out, --obs_out_format, --append_observables, and --seed.\n"
+            "stab detect\n\nSamples detector events and observable flips from a circuit.\n\nKey flags: --shots, --in, --out, --out_format, --obs_out, --obs_out_format, --append_observables, and --seed.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "m2d" => {
-            "stab m2d\n\nConverts measurement records into detector-event records using a circuit.\n\nKey flags: --circuit, --in_format, --out_format, --in, --out, --sweep, --sweep_format, --obs_out, --obs_out_format, --append_observables, --skip_reference_sample, and --ran_without_feedback.\n"
+            "stab m2d\n\nConverts measurement records into detector-event records using a circuit.\n\nKey flags: --circuit, --in_format, --out_format, --in, --out, --sweep, --sweep_format, --obs_out, --obs_out_format, --append_observables, --skip_reference_sample, and --ran_without_feedback.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "analyze_errors" => {
-            "stab analyze_errors\n\nConverts a supported circuit into a detector error model.\n\nKey flags: --in, --out, --decompose_errors, --fold_loops, --allow_gauge_detectors, --approximate_disjoint_errors, --block_decompose_from_introducing_remnant_edges, and --ignore_decomposition_failures.\n"
+            "stab analyze_errors\n\nConverts a supported circuit into a detector error model.\n\nKey flags: --in, --out, --decompose_errors, --fold_loops, --allow_gauge_detectors, --approximate_disjoint_errors, --block_decompose_from_introducing_remnant_edges, and --ignore_decomposition_failures.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "sample_dem" => {
-            "stab sample_dem\n\nSamples detection events from a detector error model.\n\nKey flags: --shots, --in, --out, --out_format, --obs_out, --obs_out_format, --err_out, --err_out_format, --replay_err_in, --replay_err_in_format, and --seed.\n"
+            "stab sample_dem\n\nSamples detection events from a detector error model.\n\nKey flags: --shots, --in, --out, --out_format, --obs_out, --obs_out_format, --err_out, --err_out_format, --replay_err_in, --replay_err_in_format, and --seed.\n\nResource flag: --memory-budget SIZE bounds the memory this command admits (default 1GiB; KiB, MiB, and GiB suffixes).\n"
         }
         "help" => {
             "stab help [topic]\n\nPrints Stab-native help for implemented commands, result formats, and gate names.\n\nExamples: stab help commands, stab help convert, stab help 01, stab help H.\n"

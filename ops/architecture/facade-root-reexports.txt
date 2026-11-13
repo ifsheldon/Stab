@@ -69,6 +69,8 @@ stab_model::MeasureRecordOffset
 stab_records::MeasurementBatchView
 stab_records::MeasurementSink
 stab_records::MeasurementWidth
+stab_model::MemoryBudget
+stab_model::MemoryBudgetParseError
 stab_model::ModelDialect
 stab_model::ModelError
 stab_model::ModelFingerprint
@@ -96,13 +98,9 @@ stab_model::RepeatBlock
 stab_model::RepeatCount
 stab_model::RepeatNestingLimit
 stab_model::RepeatNestingLimitError
-stab_model::RepresentedInstructionLimit
-stab_model::RepresentedTargetLimit
 stab_model::ResourceEstimate
 stab_records::SampledErrorWidth
 stab_algebra::SingleQubitClifford
-stab_model::SourceByteLimit
-stab_model::SourceLineLimit
 stab_algebra::StabilizerError
 stab_algebra::StabilizerResource
 stab_algebra::StabilizerResult

@@ -33,7 +33,9 @@ pub use circuit_detecting_regions::{
     DetectingRegionTargetOptions, all_detecting_region_targets, all_detecting_region_ticks,
     circuit_detecting_regions, circuit_detecting_regions_for_targets,
 };
-pub use circuit_feedback::circuit_with_inlined_feedback;
+pub use circuit_feedback::{
+    circuit_with_inlined_feedback, circuit_with_inlined_feedback_with_memory_budget,
+};
 pub use circuit_flow::{
     UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,

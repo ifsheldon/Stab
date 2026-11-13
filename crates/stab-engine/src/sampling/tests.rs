@@ -1,5 +1,6 @@
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     reason = "sampling unit tests use direct fixture parsing assertions for compact diagnostics"
 )]
 
@@ -229,7 +230,7 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
     assert!(!ordinary.inner.uses_reference_state_snapshot());
     assert_eq!(
         ordinary.estimated_reference_work_storage_bytes(),
-        general_frame_work_storage_bytes(
+        simulator_work_storage_bytes(
             ordinary.inner.qubit_count,
             ordinary.inner.measurement_count,
             false,
@@ -254,10 +255,10 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
         folded
             .estimated_reference_work_storage_bytes()
             .saturating_sub(iterated.estimated_reference_work_storage_bytes()),
-        stabilizer_frame::reference_snapshot_admission_bytes(folded.inner.qubit_count)
+        reference_snapshot_admission_bytes(folded.inner.qubit_count)
     );
 
-    let base = general_frame_work_storage_bytes(
+    let base = simulator_work_storage_bytes(
         folded.inner.qubit_count,
         folded.inner.measurement_count,
         false,
@@ -265,24 +266,22 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
     assert!(reference_state_snapshot_fits(
         folded.inner.qubit_count,
         folded.inner.measurement_count,
-        u64::try_from(folded.estimated_reference_work_storage_bytes())
-            .expect("small folded reference estimate"),
+        MemoryBudget::from_bytes(
+            u64::try_from(folded.estimated_reference_work_storage_bytes())
+                .expect("small folded reference estimate"),
+        ),
     ));
     assert!(!reference_state_snapshot_fits(
         folded.inner.qubit_count,
         folded.inner.measurement_count,
-        u64::try_from(base).expect("small base reference estimate"),
+        MemoryBudget::from_bytes(u64::try_from(base).expect("small base reference estimate")),
     ));
 
-    let fallback_qubits = (65..20_000)
+    let fallback_qubits = (65..40_000)
         .find(|qubits| {
-            let base = general_frame_work_storage_bytes(*qubits, 1, false);
-            base <= u128::from(api::MAX_SAMPLING_SESSION_STORAGE_BYTES)
-                && !reference_state_snapshot_fits(
-                    *qubits,
-                    1,
-                    api::MAX_SAMPLING_SESSION_STORAGE_BYTES,
-                )
+            let base = simulator_work_storage_bytes(*qubits, 1, false);
+            MemoryBudget::DEFAULT.admits(base)
+                && !reference_state_snapshot_fits(*qubits, 1, MemoryBudget::DEFAULT)
         })
         .expect("reference snapshot has a fallback-only storage interval");
     let fallback_repetitions = fallback_qubits.saturating_mul(2).saturating_add(1);
@@ -312,45 +311,18 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
 }
 
 #[test]
-fn expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work() {
-    let exact = Circuit::from_stim_str("REPEAT 999999 {\n    H 0\n}\nM 0\n")
-        .expect("parse exact expanded-work boundary");
-    SamplingCompiler::new()
-        .compile(&exact)
-        .expect("accept exact expanded-work boundary");
-
-    let first_excess = Circuit::from_stim_str("REPEAT 1000000 {\n    H 0\n}\nM 0\n")
-        .expect("parse first expanded-work excess");
-    assert_eq!(
-        SamplingCompiler::new().compile(&first_excess),
-        Err(SamplingCompileError::ExpandedOperationLimit {
-            actual: crate::ResourceAmount::exact(1_000_001),
-            limit: 1_000_000,
-        })
-    );
-    assert_eq!(
+fn expanded_sampling_work_is_not_capped_and_zero_width_repeats_are_constant_work() {
+    // Expanded work far above the retired one-million cap compiles; executing it costs CPU
+    // time that the caller bounds, so these plans are only compiled here.
+    for text in [
+        "REPEAT 1000000 {\n    H 0\n}\nM 0\n",
+        "REPEAT 64 {\n    REPEAT 1000000000000 {\n        H 0\n        H 0\n    }\n    M 0\n    R 0\n}\n",
+        "REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n",
+    ] {
+        let circuit = Circuit::from_stim_str(text).expect("parse uncapped expanded work");
         SamplingCompiler::new()
-            .compile(&first_excess)
-            .expect_err("expanded work must be rejected")
-            .code(),
-        SamplingCompileErrorCode::ResourceLimit
-    );
-    let detection_error = crate::DetectionError::from(
-        SamplingCompiler::new()
-            .compile(&first_excess)
-            .expect_err("detection sampling must preserve the resource failure"),
-    );
-    assert!(matches!(
-        detection_error,
-        crate::DetectionError::ResourceLimit(_)
-    ));
-    if let crate::DetectionError::ResourceLimit(detection_limit) = detection_error {
-        assert_eq!(
-            detection_limit.kind(),
-            crate::DetectionResourceKind::SamplingExpandedOperations
-        );
-        assert_eq!(detection_limit.actual(), 1_000_001);
-        assert_eq!(detection_limit.limit(), 1_000_000);
+            .compile(&circuit)
+            .expect("expanded work is not a resource limit");
     }
 
     let zero_width = Circuit::from_stim_str("REPEAT 1000000000000 {\n    H 0\n    H 0\n}\n")
@@ -361,119 +333,31 @@ fn expanded_sampling_work_is_bounded_while_zero_width_repeats_are_constant_work(
         vec![Vec::<bool>::new(); 3]
     );
     assert!(sampler.reference_sample().is_empty());
-
-    let nested = Circuit::from_stim_str(
-        "REPEAT 64 {\n    REPEAT 1000000000000 {\n        H 0\n        H 0\n    }\n    M 0\n    R 0\n}\n",
-    )
-    .expect("parse nested excessive work");
-    assert_eq!(
-        SamplingCompiler::new().compile(&nested),
-        Err(SamplingCompileError::ExpandedOperationLimit {
-            actual: crate::ResourceAmount::exact(64_000_000_000_128),
-            limit: 1_000_000,
-        })
-    );
-
-    let above_u64 = Circuit::from_stim_str(
-        "REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n",
-    )
-    .expect("parse work above u64");
-    let error = SamplingCompiler::new()
-        .compile(&above_u64)
-        .expect_err("work above u64 must retain a truthful lower-bound diagnostic");
-    assert_eq!(
-        error,
-        SamplingCompileError::ExpandedOperationLimit {
-            actual: crate::ResourceAmount::from_u128(u128::MAX),
-            limit: 1_000_000,
-        }
-    );
-    let detection_error = crate::DetectionError::from(error);
-    assert!(matches!(
-        detection_error,
-        crate::DetectionError::ResourceLimit(_)
-    ));
-    if let crate::DetectionError::ResourceLimit(detection_limit) = detection_error {
-        assert_eq!(detection_limit.actual(), u64::MAX);
-        assert!(detection_limit.actual_is_lower_bound());
-    }
 }
 
 #[test]
-fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
-    let mut circuit_text = String::new();
-    for gate in Gate::all().filter(|gate| stab_analysis::gate_has_tableau(*gate)) {
-        let inverse = gate.inverse().expect("tableau gate inverse");
-        let arity = stab_analysis::gate_tableau(gate)
-            .expect("gate tableau")
-            .len();
-        let targets = [(1, "0"), (2, "0 1")]
-            .into_iter()
-            .find_map(|(candidate, targets)| (candidate == arity).then_some(targets))
-            .expect("fixed-tableau gate must have supported arity");
-        writeln!(circuit_text, "{} {targets}", gate.canonical_name()).expect("write gate circuit");
-        writeln!(circuit_text, "{} {targets}", inverse.canonical_name())
-            .expect("write inverse circuit");
-    }
-    let circuit = Circuit::from_stim_str(&circuit_text).expect("parse gate corpus");
-    let sampler = TestSampler::compile(&circuit).expect("compile gate corpus");
-    let mut rng = SmallRng::seed_from_u64(29);
-    let mut frame = StabilizerFrame::new(sampler.plan.inner.qubit_count);
-    let mut record = Vec::with_capacity(sampler.plan.inner.measurement_count);
-    let mut output = Vec::with_capacity(sampler.plan.inner.measurement_count);
-    sampler
-        .plan
-        .sample_shot_in_mode_into(
-            &mut rng,
-            ExecutionMode::Sample,
-            &[],
-            &mut frame,
-            &mut record,
-            &mut output,
-        )
-        .expect("warm gate corpus");
-
-    let one = allocation_counter::measure(|| {
-        sampler
-            .plan
-            .sample_shot_in_mode_into(
-                &mut rng,
-                ExecutionMode::Sample,
-                &[],
-                &mut frame,
-                &mut record,
-                &mut output,
-            )
-            .expect("execute one warmed gate corpus");
-    });
-    let many = allocation_counter::measure(|| {
-        for _ in 0..256 {
-            sampler
-                .plan
-                .sample_shot_in_mode_into(
-                    &mut rng,
-                    ExecutionMode::Sample,
-                    &[],
-                    &mut frame,
-                    &mut record,
-                    &mut output,
-                )
-                .expect("execute warmed gate corpus");
-        }
-    });
-
+fn compiled_program_bytes_are_admitted_against_the_budget_before_materialization() {
+    let circuit = Circuit::from_stim_str("REPEAT 3 {\n    H 0 1\n    CX 0 1\n    M 0 1\n}\n")
+        .expect("parse program-budget fixture");
+    let error = SamplingCompiler::new()
+        .memory_budget(MemoryBudget::from_bytes(0))
+        .compile(&circuit)
+        .expect_err("the program exceeds a zero budget");
+    let SamplingCompileError::CompiledBytesLimit { required, budget } = error.clone() else {
+        panic!("expected a typed compiled-bytes refusal, got {error:?}");
+    };
+    assert_eq!(budget, 0);
+    assert!(required > 0);
+    assert_eq!(error.code(), SamplingCompileErrorCode::ResourceLimit);
+    let crate::DetectionError::ResourceLimit(detection_limit) = crate::DetectionError::from(error)
+    else {
+        panic!("detection sampling must preserve the typed refusal");
+    };
     assert_eq!(
-        many.count_total, one.count_total,
-        "gate dispatch allocation count scaled with repetitions: one={one:?}, many={many:?}"
+        detection_limit.kind(),
+        crate::DetectionResourceKind::CompiledBytes
     );
-    assert_eq!(
-        many.bytes_total, one.bytes_total,
-        "gate dispatch allocation bytes scaled with repetitions: one={one:?}, many={many:?}"
-    );
-    assert_eq!(
-        many.bytes_max, one.bytes_max,
-        "gate dispatch peak allocation scaled with repetitions: one={one:?}, many={many:?}"
-    );
+    assert_eq!(detection_limit.limit(), 0);
 }
 
 #[test]

@@ -17,15 +17,12 @@ pub use error_decomp::{
 };
 pub use options::ErrorAnalyzerOptions;
 
-const MAX_ANALYZER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_ANALYZER_REPEAT_ITERATIONS: u64 = 1_000_000;
-
 pub fn circuit_to_detector_error_model(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
     // The sparse reverse tracker is the only sensitivity-propagation engine
     // (WS2b Stage 4 deleted the original forward analyzer); with `fold_loops`
-    // off it unrolls loops under the documented expansion budget.
+    // off it unrolls every loop, admitting only its retained output against the budget.
     reverse_fold::try_analyze(circuit, options)
 }

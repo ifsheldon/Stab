@@ -33,22 +33,14 @@ use crate::sampling::LocalTableauTransform;
 pub(crate) struct ProgramOptions {
     /// Retain `OBSERVABLE_INCLUDE` Pauli terms, which detection frames record.
     pub(crate) include_pauli_observables: bool,
-    /// Retain zero-probability Pauli channels for the general stabilizer frame.
-    pub(crate) retain_zero_probability_noise: bool,
 }
 
 impl ProgramOptions {
     pub(crate) const SAMPLING: Self = Self {
         include_pauli_observables: false,
-        retain_zero_probability_noise: false,
-    };
-    pub(crate) const GENERAL_SAMPLING: Self = Self {
-        include_pauli_observables: false,
-        retain_zero_probability_noise: true,
     };
     pub(crate) const DETECTION: Self = Self {
         include_pauli_observables: true,
-        retain_zero_probability_noise: false,
     };
 }
 
@@ -99,9 +91,6 @@ enum EntryKind {
     },
     SinglePauliNoise,
     TwoQubitPauliNoise,
-    ZeroProbabilityNoise {
-        pairs: bool,
-    },
     CorrelatedError {
         else_branch: bool,
     },
@@ -119,8 +108,6 @@ enum EntryKind {
 struct CountState {
     measurements: u64,
     sweep_bits: u64,
-    instructions: u128,
-    target_operations: u128,
 }
 
 #[derive(Clone, Copy)]
@@ -166,7 +153,6 @@ impl CircuitProgram {
         visit_circuit(circuit, |event| {
             match event {
                 TraversalEvent::Instruction(instruction) => {
-                    counts.instructions = counts.instructions.saturating_add(1);
                     visit_lowered_instructions(instruction, |lowered| {
                         let lowering = lower(lowered, options, &mut actions)?;
                         record_effects(lowered, lowering, &mut counts)?;
@@ -238,8 +224,6 @@ impl CircuitProgram {
                     "sweep bit count cannot fit in usize during sampler compilation",
                 )
             })?,
-            expanded_instructions: counts.instructions,
-            expanded_target_operations: counts.target_operations,
         };
         Ok(admission)
     }
@@ -365,14 +349,6 @@ fn integrate_repeat(counts: &mut CountState, repeat: RepeatAdmission) -> Detecti
             "measurement record count overflows during sampler compilation",
         )
     })?;
-    let repeat_total = |now: u128, before: u128| {
-        before.saturating_add(
-            now.saturating_sub(before)
-                .saturating_mul(u128::from(repeat.count)),
-        )
-    };
-    counts.instructions = repeat_total(counts.instructions, before.instructions);
-    counts.target_operations = repeat_total(counts.target_operations, before.target_operations);
     Ok(())
 }
 
@@ -444,10 +420,7 @@ fn lower(
         | "DEPOLARIZE2" | "PAULI_CHANNEL_2") => {
             let pairs = matches!(name, "DEPOLARIZE2" | "PAULI_CHANNEL_2");
             if zero_probability_noise(instruction)? {
-                if !options.retain_zero_probability_noise {
-                    return Ok(Lowering::Noop);
-                }
-                EntryKind::ZeroProbabilityNoise { pairs }
+                return Ok(Lowering::Noop);
             } else if pairs {
                 EntryKind::TwoQubitPauliNoise
             } else {
@@ -540,39 +513,32 @@ fn pauli_product_shape(instruction: &CircuitInstruction) -> DetectionResult<Entr
     Ok(EntryKind::PauliProducts { terms, products })
 }
 
-/// Records measurements, sweep bits, expanded work, and record-lookback validity.
+/// Records measurements, sweep bits, and record-lookback validity.
 fn record_effects(
     instruction: &CircuitInstruction,
     lowering: Lowering,
     counts: &mut CountState,
 ) -> DetectionResult<()> {
     let targets = instruction.targets().len();
-    let (measurements, operations) = match lowering {
-        Lowering::Noop | Lowering::FrameIdentity => (0, 0),
+    let measurements = match lowering {
+        Lowering::Noop | Lowering::FrameIdentity => 0,
         Lowering::Entry(kind) => match kind {
-            EntryKind::Clifford(_) => {
-                let arity = match instruction.gate().target_group_kind() {
-                    stab_model::GateTargetGroupKind::Pairs => 2,
-                    _ => 1,
-                };
-                (0, targets / arity)
-            }
-            EntryKind::Reset(_) => (0, targets),
             EntryKind::Measure { .. } | EntryKind::MeasurePads | EntryKind::HeraldedErase => {
-                (targets, targets)
+                targets
             }
-            EntryKind::HeraldedPauliChannel => (targets, targets),
-            EntryKind::MeasurePairs(_) => (targets / 2, targets / 2),
-            EntryKind::PauliProducts { products, .. } => (products, products),
-            EntryKind::SinglePauliNoise | EntryKind::ZeroProbabilityNoise { pairs: false } => {
-                (0, targets)
+            EntryKind::HeraldedPauliChannel => targets,
+            EntryKind::MeasurePairs(_) => targets / 2,
+            EntryKind::PauliProducts { products, .. } => products,
+            EntryKind::ControlledPauli { .. } => {
+                record_controls(instruction, counts)?;
+                0
             }
-            EntryKind::TwoQubitPauliNoise | EntryKind::ZeroProbabilityNoise { pairs: true } => {
-                (0, targets / 2)
-            }
-            EntryKind::CorrelatedError { .. } => (0, 1),
-            EntryKind::ControlledPauli { .. } => (0, record_controls(instruction, counts)?),
-            EntryKind::Observable => (0, 0),
+            EntryKind::Clifford(_)
+            | EntryKind::Reset(_)
+            | EntryKind::SinglePauliNoise
+            | EntryKind::TwoQubitPauliNoise
+            | EntryKind::CorrelatedError { .. }
+            | EntryKind::Observable => 0,
         },
     };
     if let Lowering::Entry(EntryKind::Clifford(_)) = lowering
@@ -592,7 +558,6 @@ fn record_effects(
                 "measurement record count overflows during sampler compilation",
             )
         })?;
-    counts.target_operations = counts.target_operations.saturating_add(operations as u128);
     Ok(())
 }
 
@@ -699,7 +664,6 @@ fn payload_bytes(instruction: &CircuitInstruction, kind: EntryKind) -> Detection
         EntryKind::Clifford(_)
         | EntryKind::Reset(_)
         | EntryKind::SinglePauliNoise
-        | EntryKind::ZeroProbabilityNoise { .. }
         | EntryKind::HeraldedErase
         | EntryKind::HeraldedPauliChannel => Ok(words),
         EntryKind::Measure { .. } | EntryKind::MeasurePairs(_) => checked_add_bytes(words, flags),
@@ -854,10 +818,6 @@ fn build(
                 targets: qubit_targets(instruction)?,
             }
         }
-        EntryKind::ZeroProbabilityNoise { pairs } => ProgramInstruction::ZeroProbabilityNoise {
-            pairs,
-            targets: qubit_targets(instruction)?,
-        },
         EntryKind::CorrelatedError { else_branch } => ProgramInstruction::CorrelatedError {
             else_branch,
             probability: single_probability_argument(instruction)?.get(),

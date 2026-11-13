@@ -5,12 +5,12 @@
 
 use std::collections::BTreeMap;
 
-use stab_model::{DemDetectorId, DetectorErrorModel};
+use stab_model::{DemDetectorId, DetectorErrorModel, MemoryBudget};
 
 #[test]
-fn pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries() {
+fn dem_coordinate_all_map_is_admitted_against_the_memory_budget_but_selected_queries_are_not() {
     let dem = DetectorErrorModel::from_dem_str(
-        "repeat 1000001 {\n\
+        "repeat 1000000000000 {\n\
              detector(1, 2) D0\n\
              shift_detectors(3, 4) 1\n\
          }\n",
@@ -19,13 +19,34 @@ fn pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries() {
 
     let error = dem
         .detector_coordinates()
-        .expect_err("reject huge all-detector coordinate map");
-    assert!(
-        error
-            .to_string()
-            .contains("detector_coordinates currently supports at most 1000000"),
-        "{error}"
+        .expect_err("reject an all-detector map beyond the default budget before allocating");
+    assert!(error.to_string().contains("memory budget"), "{error}");
+
+    let small = DetectorErrorModel::from_dem_str(
+        "repeat 3 {\n\
+             detector(1, 2) D0\n\
+             shift_detectors(3, 4) 1\n\
+         }\n",
+    )
+    .expect("parse small coordinate DEM");
+    // Three entries of 96 bytes plus two coordinate scalars each fit exactly 336 bytes.
+    let exact = MemoryBudget::from_bytes(3 * (96 + 2 * 8));
+    assert_eq!(
+        small
+            .detector_coordinates_with_memory_budget(exact)
+            .expect("exact budget admits the map")
+            .len(),
+        3
     );
+    let excess = MemoryBudget::from_bytes(exact.bytes() - 1);
+    let measured = allocation_counter::measure(|| {
+        std::hint::black_box(
+            small
+                .detector_coordinates_with_memory_budget(excess)
+                .expect_err("one byte below the requirement is refused"),
+        );
+    });
+    assert!(measured.bytes_max < 1024, "{measured:?}");
 
     let detector_0 = DemDetectorId::try_new(0).expect("D0");
     let detector_1 = DemDetectorId::try_new(1).expect("D1");

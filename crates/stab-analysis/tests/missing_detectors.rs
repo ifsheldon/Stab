@@ -477,30 +477,30 @@ fn pf5_missing_detectors_observable_neutral_final_repeat_folds_redundant_observa
 }
 
 #[test]
-fn pf5_missing_detectors_observable_neutral_final_repeat_keeps_dependent_bodies_capped()
+fn pf5_missing_detectors_observable_neutral_final_repeat_admits_dependent_bodies_against_the_budget()
 -> Result<(), Box<dyn std::error::Error>> {
     require_missing_error_contains(
         "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
         true,
-        "expanded instructions",
+        "memory budget",
         "observable-dependent final repeat",
     )?;
     require_missing_error_contains(
         "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
         true,
-        "expanded instructions",
+        "memory budget",
         "duplicate observable-dependent final repeat",
     )?;
     require_missing_error_contains(
         "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) X0\n    DETECTOR rec[-1]\n}\n",
         true,
-        "expanded instructions",
+        "memory budget",
         "Pauli observable target in final repeat",
     )?;
     require_missing_error_contains(
         "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n        OBSERVABLE_INCLUDE(0) rec[-1]\n        DETECTOR rec[-1]\n    }\n}\n",
         true,
-        "expanded instructions",
+        "memory budget",
         "nested observable row in final repeat body",
     )?;
     Ok(())
@@ -523,27 +523,26 @@ fn over_depth_nested_repeat_circuit(depth: usize) -> Result<Circuit, Box<dyn std
 }
 
 #[test]
-fn pf5_missing_detectors_nested_final_repeat_keeps_unselected_bodies_capped()
+fn pf5_missing_detectors_nested_final_repeat_admits_unselected_bodies_against_the_budget()
 -> Result<(), Box<dyn std::error::Error>> {
     require_missing_error_contains(
         "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n        DETECTOR rec[-1] rec[-2]\n    }\n}\n",
         true,
-        "expanded instructions",
+        "memory budget",
         "nested cross-iteration repeat",
     )?;
 
     require_missing_error_contains(
         "REPEAT 1000001 {\n    REPEAT 1000001 {\n        M 0\n        DETECTOR rec[-1]\n    }\n}\n",
         true,
-        "expanded instructions",
+        "memory budget",
         "nested large-repeat",
     )?;
 
     Ok(())
 }
 
-fn assert_missing_detector_expansion_and_nesting_limits() -> Result<(), Box<dyn std::error::Error>>
-{
+fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std::error::Error>> {
     let cross_iteration = Circuit::from_stim_str(
         "R 0\nM 0\nREPEAT 1000001 {\n    M 0\n    DETECTOR rec[-1] rec[-2]\n}\n",
     )?;
@@ -562,9 +561,9 @@ fn assert_missing_detector_expansion_and_nesting_limits() -> Result<(), Box<dyn 
         resource.operation(),
         ResourceOperation::MissingDetectorDiscovery
     );
-    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
-    assert_eq!(resource.actual(), 1_000_003);
-    assert_eq!(resource.limit(), 1_000_000);
+    assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
+    assert!(resource.actual() > resource.limit());
+    assert_eq!(resource.limit(), 1 << 30);
 
     let observable_merging = Circuit::from_stim_str(
         "R 0\nREPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
@@ -584,9 +583,9 @@ fn assert_missing_detector_expansion_and_nesting_limits() -> Result<(), Box<dyn 
         resource.operation(),
         ResourceOperation::MissingDetectorDiscovery
     );
-    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
-    assert_eq!(resource.actual(), 1_000_002);
-    assert_eq!(resource.limit(), 1_000_000);
+    assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
+    assert!(resource.actual() > resource.limit());
+    assert_eq!(resource.limit(), 1 << 30);
 
     let nested = over_depth_nested_repeat_circuit(257)?;
     let error = match missing_detectors(
@@ -630,57 +629,28 @@ fn assert_missing_detector_expansion_and_nesting_limits() -> Result<(), Box<dyn 
     let nonempty_overflow = Circuit::from_stim_str(
         "REPEAT 9223372036854775807 {\n    REPEAT 9223372036854775807 {\n        SHIFT_COORDS(1)\n    }\n}\n",
     )?;
-    let error = match missing_detectors(
-        &nonempty_overflow,
-        MissingDetectorOptions {
-            ignore_non_deterministic_measurements: true,
-        },
-    ) {
-        Ok(_) => {
-            return Err(std::io::Error::other(
-                "nonempty overflowing expansion unexpectedly succeeded",
-            )
-            .into());
-        }
-        Err(error) => error,
-    };
-    let AnalysisError::ResourceLimit(resource) = error else {
-        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
-    };
-    assert_eq!(
-        resource.operation(),
-        ResourceOperation::MissingDetectorDiscovery
-    );
-    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
-    assert_eq!(resource.actual(), u64::MAX);
-    assert_eq!(resource.limit(), 1_000_000);
-
-    for (context, text) in [
-        (
-            "unsupported shift coords",
-            "REPEAT 1000001 {\n    SHIFT_COORDS(1)\n}\n",
-        ),
-        (
-            "capped measurement pad",
-            "REPEAT 1000001 {\n    MPAD 0\n}\n",
-        ),
-    ] {
-        let circuit = Circuit::from_stim_str(text)?;
-        let Err(error) = missing_detectors(
-            &circuit,
+    // Measurement-free expansion has no rows to retain, so it completes without a work cap.
+    assert!(
+        missing_detectors(
+            &nonempty_overflow,
             MissingDetectorOptions {
                 ignore_non_deterministic_measurements: true,
             },
-        ) else {
-            return Err(
-                std::io::Error::other(format!("expected {context} repeat rejection")).into(),
-            );
-        };
-        if !error.to_string().contains("expanded instructions") {
-            return Err(
-                std::io::Error::other(format!("{context}: unexpected error: {error}")).into(),
-            );
-        }
+        )?
+        .is_empty()
+    );
+
+    let measurement_pads = Circuit::from_stim_str("REPEAT 1000001 {\n    MPAD 0\n}\n")?;
+    let Err(error) = missing_detectors(
+        &measurement_pads,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) else {
+        return Err(std::io::Error::other("expected measurement-pad repeat rejection").into());
+    };
+    if !error.to_string().contains("memory budget") {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
     }
 
     let tracker_changing =
@@ -693,14 +663,14 @@ fn assert_missing_detector_expansion_and_nesting_limits() -> Result<(), Box<dyn 
     ) else {
         return Err(std::io::Error::other("expected tracker-changing repeat rejection").into());
     };
-    if !error.to_string().contains("expanded instructions") {
+    if !error.to_string().contains("memory budget") {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
     }
 
     require_missing_error_contains(
         "R 0\nREPEAT 1000001 {\n    X 0\n    M 0\n    DETECTOR rec[-1]\n}\n",
         true,
-        "expanded instructions",
+        "memory budget",
         "signed terminal-state-changing repeat",
     )?;
     Ok(())
@@ -797,7 +767,7 @@ fn assert_missing_detector_projected_storage_and_allocation_bounds()
 }
 
 #[test]
-fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
+fn pf5_missing_detectors_repeat_refuses_expansion_beyond_the_budget()
 -> Result<(), Box<dyn std::error::Error>> {
     let circuit = Circuit::from_stim_str("REPEAT 1000001 {\n    M 0\n}\n")?;
     let Err(error) = missing_detectors(
@@ -808,7 +778,7 @@ fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
     ) else {
         return Err(std::io::Error::other("expected excessive repeat expansion rejection").into());
     };
-    if !error.to_string().contains("expanded instructions") {
+    if !error.to_string().contains("memory budget") {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
     }
 
@@ -874,7 +844,7 @@ fn assert_missing_detector_folded_final_repeat_is_count_independent()
 
 #[test]
 fn missing_detector_resource_contract_is_atomic() -> Result<(), Box<dyn std::error::Error>> {
-    assert_missing_detector_expansion_and_nesting_limits()?;
+    assert_missing_detector_budget_and_nesting_limits()?;
     assert_missing_detector_projected_storage_and_allocation_bounds()?;
     assert_missing_detector_folded_final_repeat_is_count_independent()
 }

@@ -447,8 +447,8 @@ mod tests {
     fn reference_sample_tree_construction_preserves_storage_admission() {
         let circuit = Circuit::from_stim_str(
             "
-            H 10000
-            M 10000
+            H 20000
+            M 20000
             ",
         )
         .expect("parse wide circuit");

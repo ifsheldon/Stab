@@ -14,7 +14,6 @@ use super::{DemError, DemSamplerLimits};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount, SinkFailurePhase};
 
 const MAX_BATCH_SHOTS: usize = 64;
-const MAX_DEM_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
 
 mod batch;
 
@@ -52,14 +51,6 @@ pub enum DemSamplingExecutionError {
 
     #[error("DEM replay session lifecycle error: {message}")]
     ReplayLifecycle { message: &'static str },
-
-    #[error(
-        "DEM sampling session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte safety limit"
-    )]
-    SessionStorageLimit {
-        estimated_bytes: u128,
-        limit_bytes: u64,
-    },
 
     #[error("DEM sampling session could not allocate bounded storage: {message}")]
     SessionStorageAllocation { message: String },
@@ -338,23 +329,13 @@ impl DemSamplingSession {
         if shots.get() == 0 {
             return Ok(self.summary(DemSamplingRunStatus::Completed, shots, 0));
         }
-        let shots_usize =
-            usize::try_from(shots.get()).map_err(|_| DemSamplingRunError::Engine {
-                source: DemSamplingExecutionError::ShotCounterOverflow,
-                progress: DemSamplingRunProgress::new(0, 0),
-            })?;
-        match mode {
-            RunMode::DetectorOnly => self
-                .plan
-                .validate_detector_sample_work_units_with_limits(shots_usize, self.limits)
-                .map_err(preflight_error)?,
-            RunMode::WithSampledErrors => {
-                self.plan
-                    .validate_sampled_error_work_units_with_limits(shots_usize, self.limits)
-                    .map_err(preflight_error)?;
-                self.ensure_sampled_error_storage()
-                    .map_err(preflight_execution_error)?;
-            }
+        usize::try_from(shots.get()).map_err(|_| DemSamplingRunError::Engine {
+            source: DemSamplingExecutionError::ShotCounterOverflow,
+            progress: DemSamplingRunProgress::new(0, 0),
+        })?;
+        if matches!(mode, RunMode::WithSampledErrors) {
+            self.ensure_sampled_error_storage()
+                .map_err(preflight_execution_error)?;
         }
 
         let mut remaining = shots.get();
@@ -712,7 +693,7 @@ impl DemReplaySession {
         if expected_shots.get() != 0 {
             session
                 .plan
-                .validate_replay_with_limits(expected_shots, limits)
+                .validate_replay(expected_shots)
                 .map_err(DemSamplingExecutionError::InvalidRequest)?;
             session.ensure_sampled_error_storage()?;
         }

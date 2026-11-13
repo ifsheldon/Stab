@@ -32,7 +32,6 @@ use execution::{
 };
 
 const MAX_BATCH_SHOTS: usize = 64;
-const MAX_DETECTION_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Builder for immutable measurement-to-detection conversion plans.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

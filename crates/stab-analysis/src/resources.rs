@@ -138,6 +138,10 @@ enum ResourceLimitCause {
         operation: ResourceOperation,
         resource: ResourceKind,
     },
+    MemoryBudget {
+        operation: ResourceOperation,
+        resource: ResourceKind,
+    },
     CircuitToDetectorErrorModel {
         resource: ResourceKind,
     },
@@ -149,17 +153,7 @@ enum ResourceLimitCause {
         resource: ResourceKind,
     },
     CircuitFlattenRepeatNesting,
-    CircuitFlattenExpandedOperations,
-    CircuitFlattenTargetOccurrences,
-    CircuitFlattenArgumentValues,
-    CircuitFlattenMaterializedBytes,
     CircuitFlattenMaterializedUnits,
-    DemFlattenRepeatCount,
-    DemFlattenExpandedInstructions,
-    DemFlattenRepeatIterations,
-    DemFlattenTargetOccurrences,
-    DemFlattenArgumentValues,
-    DemFlattenMaterializedBytes,
     DemFlattenMaterializedUnits,
     SatMaterialization {
         resource: SatMaterializationResource,
@@ -226,6 +220,23 @@ impl ResourceLimitError {
         }
     }
 
+    /// A conservative byte requirement that exceeds the operation's caller-selected budget.
+    pub(crate) const fn memory_budget(
+        operation: ResourceOperation,
+        resource: ResourceKind,
+        actual: u64,
+        limit: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::MemoryBudget {
+                operation,
+                resource,
+            },
+            actual,
+            limit,
+        }
+    }
+
     pub(crate) const fn circuit_to_detector_error_model(
         resource: ResourceKind,
         actual: u64,
@@ -259,14 +270,6 @@ impl ResourceLimitError {
         }
     }
 
-    pub(crate) const fn circuit_flatten_expanded_operations(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenExpandedOperations,
-            actual,
-            limit,
-        }
-    }
-
     pub(crate) const fn circuit_flatten_repeat_nesting(actual: usize, limit: usize) -> Self {
         Self {
             cause: ResourceLimitCause::CircuitFlattenRepeatNesting,
@@ -278,78 +281,6 @@ impl ResourceLimitError {
     pub(crate) const fn circuit_flatten_materialized_units(actual: u64, limit: u64) -> Self {
         Self {
             cause: ResourceLimitCause::CircuitFlattenMaterializedUnits,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_target_occurrences(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenTargetOccurrences,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_argument_values(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenArgumentValues,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn circuit_flatten_materialized_bytes(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::CircuitFlattenMaterializedBytes,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_repeat_count(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DemFlattenRepeatCount,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_expanded_instructions(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DemFlattenExpandedInstructions,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_repeat_iterations(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DemFlattenRepeatIterations,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_target_occurrences(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DemFlattenTargetOccurrences,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_argument_values(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DemFlattenArgumentValues,
-            actual,
-            limit,
-        }
-    }
-
-    pub(crate) const fn dem_flatten_materialized_bytes(actual: u64, limit: u64) -> Self {
-        Self {
-            cause: ResourceLimitCause::DemFlattenMaterializedBytes,
             actual,
             limit,
         }
@@ -430,6 +361,7 @@ impl ResourceLimitError {
 
     pub const fn operation(self) -> ResourceOperation {
         match self.cause {
+            ResourceLimitCause::MemoryBudget { operation, .. } => operation,
             ResourceLimitCause::FixedOperation { operation, .. } => operation,
             ResourceLimitCause::CircuitToDetectorErrorModel { .. } => {
                 ResourceOperation::CircuitToDetectorErrorModel
@@ -437,20 +369,10 @@ impl ResourceLimitError {
             ResourceLimitCause::CircuitPass { .. } => ResourceOperation::CircuitPass,
             ResourceLimitCause::DetectingRegions { .. } => ResourceOperation::DetectingRegions,
             ResourceLimitCause::CircuitFlattenRepeatNesting
-            | ResourceLimitCause::CircuitFlattenExpandedOperations
-            | ResourceLimitCause::CircuitFlattenTargetOccurrences
-            | ResourceLimitCause::CircuitFlattenArgumentValues
-            | ResourceLimitCause::CircuitFlattenMaterializedBytes
             | ResourceLimitCause::CircuitFlattenMaterializedUnits => {
                 ResourceOperation::CircuitFlatten
             }
-            ResourceLimitCause::DemFlattenRepeatCount
-            | ResourceLimitCause::DemFlattenExpandedInstructions
-            | ResourceLimitCause::DemFlattenRepeatIterations
-            | ResourceLimitCause::DemFlattenTargetOccurrences
-            | ResourceLimitCause::DemFlattenArgumentValues
-            | ResourceLimitCause::DemFlattenMaterializedBytes
-            | ResourceLimitCause::DemFlattenMaterializedUnits => {
+            ResourceLimitCause::DemFlattenMaterializedUnits => {
                 ResourceOperation::DetectorErrorModelFlatten
             }
             ResourceLimitCause::SatMaterialization { .. }
@@ -469,24 +391,13 @@ impl ResourceLimitError {
 
     pub const fn resource(self) -> ResourceKind {
         match self.cause {
-            ResourceLimitCause::FixedOperation { resource, .. } => resource,
+            ResourceLimitCause::FixedOperation { resource, .. }
+            | ResourceLimitCause::MemoryBudget { resource, .. } => resource,
             ResourceLimitCause::CircuitToDetectorErrorModel { resource } => resource,
             ResourceLimitCause::CircuitPass { resource, .. } => resource,
             ResourceLimitCause::DetectingRegions { resource } => resource,
             ResourceLimitCause::CircuitFlattenRepeatNesting => ResourceKind::RepeatNesting,
-            ResourceLimitCause::CircuitFlattenExpandedOperations => {
-                ResourceKind::ExpandedOperations
-            }
-            ResourceLimitCause::CircuitFlattenTargetOccurrences => ResourceKind::TargetOccurrences,
-            ResourceLimitCause::CircuitFlattenArgumentValues => ResourceKind::ArgumentValues,
-            ResourceLimitCause::CircuitFlattenMaterializedBytes => ResourceKind::MaterializedBytes,
             ResourceLimitCause::CircuitFlattenMaterializedUnits => ResourceKind::MaterializedUnits,
-            ResourceLimitCause::DemFlattenRepeatCount => ResourceKind::RepeatCount,
-            ResourceLimitCause::DemFlattenExpandedInstructions => ResourceKind::ExpandedOperations,
-            ResourceLimitCause::DemFlattenRepeatIterations => ResourceKind::RepeatIterations,
-            ResourceLimitCause::DemFlattenTargetOccurrences => ResourceKind::TargetOccurrences,
-            ResourceLimitCause::DemFlattenArgumentValues => ResourceKind::ArgumentValues,
-            ResourceLimitCause::DemFlattenMaterializedBytes => ResourceKind::MaterializedBytes,
             ResourceLimitCause::DemFlattenMaterializedUnits => ResourceKind::MaterializedUnits,
             ResourceLimitCause::SatMaterialization { resource } => match resource {
                 SatMaterializationResource::ExpandedInstructions => {
@@ -566,10 +477,31 @@ impl Display for ResourceLimitError {
                 self.actual,
                 self.limit
             ),
+            ResourceLimitCause::MemoryBudget {
+                operation,
+                resource,
+            } => write!(
+                formatter,
+                "{} {} needs at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+                operation.as_str(),
+                resource.as_str(),
+                self.actual,
+                self.limit
+            ),
             ResourceLimitCause::CircuitToDetectorErrorModel { resource } => write!(
                 formatter,
                 "circuit-to-detector-error-model {} value {} exceeds current limit {}",
                 resource.as_str(),
+                self.actual,
+                self.limit
+            ),
+            ResourceLimitCause::CircuitPass {
+                stage,
+                resource: ResourceKind::ProjectedPayloadBytes,
+            } => write!(
+                formatter,
+                "circuit pass {} needs at least {} projected payload bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+                stage.as_str(),
                 self.actual,
                 self.limit
             ),
@@ -593,59 +525,9 @@ impl Display for ResourceLimitError {
                 "invalid flattened circuit repeat nesting value {} exceeds fixed safety limit {}",
                 self.actual, self.limit
             ),
-            ResourceLimitCause::CircuitFlattenExpandedOperations => write!(
-                formatter,
-                "invalid flattened circuit operation count value {} exceeds current materialized limit {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenTargetOccurrences => write!(
-                formatter,
-                "invalid flattened circuit target count value {} exceeds current materialized limit {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenArgumentValues => write!(
-                formatter,
-                "invalid flattened circuit argument count value {} exceeds current materialized limit {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::CircuitFlattenMaterializedBytes => write!(
-                formatter,
-                "invalid flattened circuit would require at least {} materialized bytes; current limit is {}",
-                self.actual, self.limit
-            ),
             ResourceLimitCause::CircuitFlattenMaterializedUnits => write!(
                 formatter,
                 "invalid flattened circuit instruction vector would require {} materialized units; platform limit is {}",
-                self.actual, self.limit
-            ),
-            ResourceLimitCause::DemFlattenRepeatCount => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports repeat counts up to {}, got {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DemFlattenExpandedInstructions => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} expanded instructions, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DemFlattenRepeatIterations => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} expanded repeat iterations, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DemFlattenTargetOccurrences => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} target occurrences, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DemFlattenArgumentValues => write!(
-                formatter,
-                "invalid detector error model: DEM flattened currently supports at most {} argument values, got at least {}",
-                self.limit, self.actual
-            ),
-            ResourceLimitCause::DemFlattenMaterializedBytes => write!(
-                formatter,
-                "invalid detector error model: DEM flattened would require at least {} materialized bytes; current limit is {}",
                 self.actual, self.limit
             ),
             ResourceLimitCause::DemFlattenMaterializedUnits => write!(

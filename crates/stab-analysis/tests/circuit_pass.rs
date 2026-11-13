@@ -12,7 +12,9 @@ use stab_analysis::{
     CircuitPassOutput, CircuitPassResources, CircuitPassStage, ResourceKind, ResourceOperation,
     WithoutNoiseOptions, WithoutNoisePass, circuit_without_noise, run_circuit_pass,
 };
-use stab_model::{Circuit, RepeatCount, RepeatNestingLimit, advanced::repeat_block_with_tag_bytes};
+use stab_model::{
+    Circuit, MemoryBudget, RepeatCount, RepeatNestingLimit, advanced::repeat_block_with_tag_bytes,
+};
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("valid test circuit")
@@ -180,24 +182,10 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
     let zero_nesting = RepeatNestingLimit::try_new(0).expect("zero nesting");
     for (source, limits, expected_resource) in [
         (
-            circuit("H 0\nX 1\n"),
-            CircuitPassLimits::default().with_max_represented_items(1),
-            ResourceKind::RepresentedItems,
-        ),
-        (
-            circuit("H 0 1\n"),
-            CircuitPassLimits::default().with_max_target_occurrences(1),
-            ResourceKind::TargetOccurrences,
-        ),
-        (
-            circuit("QUBIT_COORDS(1, 2) 0\n"),
-            CircuitPassLimits::default().with_max_argument_values(1),
-            ResourceKind::ArgumentValues,
-        ),
-        (
             circuit("H 0\n"),
-            CircuitPassLimits::default()
-                .with_max_projected_payload_bytes(payload.projected_payload_bytes() - 1),
+            CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+                payload.projected_payload_bytes() - 1,
+            )),
             ResourceKind::ProjectedPayloadBytes,
         ),
         (
@@ -217,32 +205,15 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
         assert!(!pass.ran.get());
     }
 
-    let two_items = CircuitPassResources::try_new(2, 0, 0, 0, 0).expect("items");
-    let two_targets = CircuitPassResources::try_new(0, 2, 0, 0, 0).expect("targets");
-    let two_arguments = CircuitPassResources::try_new(0, 0, 2, 0, 0).expect("arguments");
     let projected_payload = CircuitPassResources::try_new(1, 1, 1, 1, 0).expect("payload");
     let projected_nesting = CircuitPassResources::try_new(0, 0, 0, 0, 2).expect("nesting");
     let one_nesting = RepeatNestingLimit::try_new(1).expect("one nesting");
     for (projection, limits, expected_resource) in [
         (
-            two_items,
-            CircuitPassLimits::default().with_max_represented_items(1),
-            ResourceKind::RepresentedItems,
-        ),
-        (
-            two_targets,
-            CircuitPassLimits::default().with_max_target_occurrences(1),
-            ResourceKind::TargetOccurrences,
-        ),
-        (
-            two_arguments,
-            CircuitPassLimits::default().with_max_argument_values(1),
-            ResourceKind::ArgumentValues,
-        ),
-        (
             projected_payload,
-            CircuitPassLimits::default()
-                .with_max_projected_payload_bytes(projected_payload.projected_payload_bytes() - 1),
+            CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+                projected_payload.projected_payload_bytes() - 1,
+            )),
             ResourceKind::ProjectedPayloadBytes,
         ),
         (
@@ -317,9 +288,15 @@ fn circuit_pass_validates_output_and_preserves_typed_diagnostics() {
         &admitted_pass,
         &admitted_source,
         &(),
-        &CircuitPassContext::new(CircuitPassLimits::default().with_max_represented_items(1)),
+        &CircuitPassContext::new(
+            CircuitPassLimits::default().with_memory_budget(MemoryBudget::from_bytes(
+                CircuitPassResources::try_new(1, 1, 0, 0, 0)
+                    .expect("single instruction")
+                    .projected_payload_bytes(),
+            )),
+        ),
     )
-    .expect("admit input and output at the declared boundary");
+    .expect("admit input and output at the exact budget");
     assert!(admitted_pass.ran.get());
     assert_eq!(admitted.circuit(), &admitted_source);
 

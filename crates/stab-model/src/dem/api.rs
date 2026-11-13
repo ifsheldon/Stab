@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Bound, ControlFlow, Range, RangeBounds};
 
-use crate::{ModelError, ModelResult, Probability};
+use crate::{MemoryBudget, ModelError, ModelResult, Probability};
 
 use super::coordinate_scan::{
     MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
@@ -17,8 +17,14 @@ use super::{
     DetectorErrorModel,
 };
 
-const MAX_DEM_COORDINATE_MAP_DETECTORS: u64 = 1_000_000;
-const MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES: u64 = 1_000_000;
+/// Conservative retained bytes of one all-map detector entry, excluding its coordinate values:
+/// a selected-detector set node plus a result-map node holding a vector header.
+const COORDINATE_MAP_ENTRY_BYTES: u64 = 96;
+/// Conservative retained bytes of one selected repeat-iteration candidate set node.
+const SELECTED_COORDINATE_CANDIDATE_BYTES: u64 = 48;
+/// Candidate iterations retained by one selected-coordinate query within the default budget.
+const MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES: u64 =
+    MemoryBudget::DEFAULT.bytes() / SELECTED_COORDINATE_CANDIDATE_BYTES;
 
 #[derive(Clone, Debug)]
 pub struct DemFlattenedInstructionIter<'a> {
@@ -195,12 +201,26 @@ impl DetectorErrorModel {
         DemFlattenedInstructionIter::new(self)
     }
 
+    /// Materializes every detector's coordinates within the default memory budget.
     pub fn detector_coordinates(&self) -> ModelResult<BTreeMap<DemDetectorId, Vec<f64>>> {
+        self.detector_coordinates_with_memory_budget(MemoryBudget::DEFAULT)
+    }
+
+    /// Materializes every detector's coordinates after admitting the conservative map size
+    /// against `budget`.
+    pub fn detector_coordinates_with_memory_budget(
+        &self,
+        budget: MemoryBudget,
+    ) -> ModelResult<BTreeMap<DemDetectorId, Vec<f64>>> {
         let traversal = FoldedDemTraversal::new(self)?;
         let count = traversal.root().summary().detector_count()?;
-        if count > MAX_DEM_COORDINATE_MAP_DETECTORS {
+        let entry_bytes = u128::from(COORDINATE_MAP_ENTRY_BYTES)
+            + (max_instruction_argument_count(self) as u128).saturating_mul(8);
+        let required = u128::from(count).saturating_mul(entry_bytes);
+        if !budget.admits(required) {
             return Err(ModelError::invalid_detector_error_model(format!(
-                "DEM detector_coordinates currently supports at most {MAX_DEM_COORDINATE_MAP_DETECTORS} detectors, got {count}; use detector_coordinates_for for selected detectors"
+                "DEM detector_coordinates needs at least {required} bytes for {count} detectors, exceeding the {}-byte memory budget; raise the memory budget or use detector_coordinates_for for selected detectors",
+                budget.bytes()
             )));
         }
         let detectors = (0..count)
@@ -480,7 +500,7 @@ impl FoldedDemVisitor for SelectedCoordinateVisitor<'_> {
             .find(|detector| !self.coordinates.contains_key(detector))
         {
             return Err(ModelError::invalid_detector_error_model(format!(
-                "DEM detector_coordinates_for currently supports at most {MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES} overlapping repeat candidates before finding detector {}",
+                "DEM detector_coordinates_for retains at most {MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES} overlapping repeat candidates within the default memory budget before finding detector {}",
                 detector.get()
             )));
         }
@@ -879,4 +899,21 @@ fn checked_dem_item_range(range: impl RangeBounds<usize>, len: usize) -> ModelRe
 
 fn dem_item_range_error(value: impl ToString) -> ModelError {
     ModelError::invalid_detector_error_model(format!("DEM item range {}", value.to_string()))
+}
+
+/// Longest argument list of any instruction, which bounds every coordinate vector length.
+fn max_instruction_argument_count(model: &DetectorErrorModel) -> usize {
+    let mut longest = 0;
+    let mut stack = vec![model.items.as_slice()];
+    while let Some(items) = stack.pop() {
+        for item in items {
+            match item {
+                DemItem::Instruction(instruction) => {
+                    longest = longest.max(instruction.args().len())
+                }
+                DemItem::RepeatBlock(repeat) => stack.push(repeat.body().items.as_slice()),
+            }
+        }
+    }
+    longest
 }

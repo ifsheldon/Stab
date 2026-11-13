@@ -5,9 +5,8 @@
 
 use stab_model::{
     ByteSpan, Circuit, DetectorErrorModel, DiagnosticSeverity, Estimate, EstimateClass,
-    ModelDialect, ModelError, ModelResult, ParseError, ParseErrorCode, ParseErrorContext,
-    ParseLimits, RepeatNestingLimit, RepresentedInstructionLimit, RepresentedTargetLimit,
-    ResourceKind, ResourceOperation, SourceByteLimit, SourceLineLimit, advanced,
+    MemoryBudget, ModelDialect, ModelError, ModelResult, ParseError, ParseErrorCode,
+    ParseErrorContext, ParseLimits, RepeatNestingLimit, ResourceKind, ResourceOperation, advanced,
 };
 
 type ParseStr = fn(&str, ParseLimits) -> ModelResult<()>;
@@ -122,164 +121,129 @@ fn parse_estimates_preserve_exact_line_and_byte_accounting() {
     assert_eq!(bytes.input_items(), Estimate::Exact(2));
 }
 
+fn budget(bytes: usize) -> ParseLimits {
+    ParseLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes as u64))
+}
+
+/// Smallest memory budget that admits `input`, found by bisection over a monotone predicate.
+fn minimal_budget(input: &str, parse: ParseStr) -> usize {
+    let (mut low, mut high) = (0_usize, 1 << 20);
+    assert!(
+        parse(input, budget(high)).is_ok(),
+        "fixture fits the search bound"
+    );
+    while low < high {
+        let middle = low + (high - low) / 2;
+        if parse(input, budget(middle)).is_ok() {
+            high = middle;
+        } else {
+            low = middle + 1;
+        }
+    }
+    low
+}
+
 #[test]
-fn parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit() {
+fn default_parse_budget_is_one_gibibyte_with_the_shared_nesting_envelope() {
+    let limits = ParseLimits::default();
+    assert_eq!(limits.memory_budget(), MemoryBudget::from_bytes(1 << 30));
+    assert_eq!(
+        limits.repeat_nesting_limit().get(),
+        RepeatNestingLimit::HARD_MAX
+    );
+}
+
+#[test]
+fn parser_admission_accepts_the_exact_budget_and_rejects_the_first_excess_byte() {
     struct Case {
         name: &'static str,
-        accepted: &'static str,
-        rejected: &'static str,
-        limits: ParseLimits,
+        input: &'static str,
         parse_str: ParseStr,
         parse_bytes: ParseBytes,
         dialect: ModelDialect,
         operation: ResourceOperation,
-        resource: ResourceKind,
-        actual: u64,
-        limit: u64,
-        source_line: Option<usize>,
-        rejected_span: ByteSpan,
+        last_line: usize,
     }
-
-    let circuit_instructions = "REPEAT 99 {\nM 0\n}\nM 1\n";
-    let dem_instructions = "repeat 99 {\nerror(0.1) D0\n}\nerror(0.2) D1\n";
-    let circuit_targets = "MPP X0*Y1 Z2";
-    let dem_targets = "error(0.1) D0 ^ L0 D1";
     let cases = [
         Case {
-            name: "circuit source bytes",
-            accepted: "H 0",
-            rejected: "H 0\n",
-            limits: ParseLimits::default()
-                .with_source_byte_limit(SourceByteLimit::new("H 0".len())),
+            name: "circuit",
+            input: "REPEAT 99 {\nM 0\n}\nMPP X0*Y1 Z2\n",
             parse_str: parse_circuit_str,
             parse_bytes: parse_circuit_bytes,
             dialect: ModelDialect::StimCircuit,
             operation: ResourceOperation::CircuitParse,
-            resource: ResourceKind::SourceBytes,
-            actual: 4,
-            limit: 3,
-            source_line: None,
-            rejected_span: span(3, 1),
+            last_line: 4,
         },
         Case {
-            name: "DEM source bytes",
-            accepted: "error(0) D0",
-            rejected: "error(0) D0\n",
-            limits: ParseLimits::default()
-                .with_source_byte_limit(SourceByteLimit::new("error(0) D0".len())),
+            name: "DEM",
+            input: "repeat 99 {\nerror(0.1) D0\n}\nerror(0.1) D0 ^ L0 D1\n",
             parse_str: parse_dem_str,
             parse_bytes: parse_dem_bytes,
             dialect: ModelDialect::DetectorErrorModel,
             operation: ResourceOperation::DetectorErrorModelParse,
-            resource: ResourceKind::SourceBytes,
-            actual: 12,
-            limit: 11,
-            source_line: None,
-            rejected_span: span(11, 1),
-        },
-        Case {
-            name: "circuit represented instructions",
-            accepted: "REPEAT 99 {\nM 0\n}\n",
-            rejected: circuit_instructions,
-            limits: ParseLimits::default()
-                .with_represented_instruction_limit(RepresentedInstructionLimit::new(2)),
-            parse_str: parse_circuit_str,
-            parse_bytes: parse_circuit_bytes,
-            dialect: ModelDialect::StimCircuit,
-            operation: ResourceOperation::CircuitParse,
-            resource: ResourceKind::RepresentedInstructions,
-            actual: 3,
-            limit: 2,
-            source_line: Some(4),
-            rejected_span: span(circuit_instructions.find("M 1").expect("marker"), 3),
-        },
-        Case {
-            name: "DEM represented instructions",
-            accepted: "repeat 99 {\nerror(0.1) D0\n}\n",
-            rejected: dem_instructions,
-            limits: ParseLimits::default()
-                .with_represented_instruction_limit(RepresentedInstructionLimit::new(2)),
-            parse_str: parse_dem_str,
-            parse_bytes: parse_dem_bytes,
-            dialect: ModelDialect::DetectorErrorModel,
-            operation: ResourceOperation::DetectorErrorModelParse,
-            resource: ResourceKind::RepresentedInstructions,
-            actual: 3,
-            limit: 2,
-            source_line: Some(4),
-            rejected_span: span(dem_instructions.find("error(0.2)").expect("marker"), 13),
-        },
-        Case {
-            name: "circuit represented targets",
-            accepted: "MPP X0*Y1",
-            rejected: circuit_targets,
-            limits: ParseLimits::default()
-                .with_represented_target_limit(RepresentedTargetLimit::new(3)),
-            parse_str: parse_circuit_str,
-            parse_bytes: parse_circuit_bytes,
-            dialect: ModelDialect::StimCircuit,
-            operation: ResourceOperation::CircuitParse,
-            resource: ResourceKind::RepresentedTargets,
-            actual: 4,
-            limit: 3,
-            source_line: Some(1),
-            rejected_span: span(circuit_targets.find("Z2").expect("marker"), 2),
-        },
-        Case {
-            name: "DEM represented targets",
-            accepted: "error(0.1) D0 ^ L0",
-            rejected: dem_targets,
-            limits: ParseLimits::default()
-                .with_represented_target_limit(RepresentedTargetLimit::new(3)),
-            parse_str: parse_dem_str,
-            parse_bytes: parse_dem_bytes,
-            dialect: ModelDialect::DetectorErrorModel,
-            operation: ResourceOperation::DetectorErrorModelParse,
-            resource: ResourceKind::RepresentedTargets,
-            actual: 4,
-            limit: 3,
-            source_line: Some(1),
-            rejected_span: span(dem_targets.find("D1").expect("marker"), 2),
+            last_line: 4,
         },
     ];
 
     for case in cases {
-        let accepted_str = (case.parse_str)(case.accepted, case.limits);
-        assert!(accepted_str.is_ok(), "{}: {accepted_str:?}", case.name);
-        let accepted_bytes = (case.parse_bytes)(case.accepted.as_bytes(), case.limits);
-        assert!(accepted_bytes.is_ok(), "{}: {accepted_bytes:?}", case.name);
+        let exact = minimal_budget(case.input, case.parse_str);
+        assert!(
+            exact > case.input.len(),
+            "{}: retained model storage is charged beyond the source bytes",
+            case.name
+        );
+        assert!((case.parse_bytes)(case.input.as_bytes(), budget(exact)).is_ok());
 
         for error in [
-            (case.parse_str)(case.rejected, case.limits)
-                .expect_err("string parser rejects first excess unit"),
-            (case.parse_bytes)(case.rejected.as_bytes(), case.limits)
-                .expect_err("byte parser rejects first excess unit"),
+            (case.parse_str)(case.input, budget(exact - 1))
+                .expect_err("string parser rejects the first excess byte"),
+            (case.parse_bytes)(case.input.as_bytes(), budget(exact - 1))
+                .expect_err("byte parser rejects the first excess byte"),
         ] {
             let resource = error
                 .resource_limit_error()
                 .expect("typed parser resource failure");
             assert_eq!(resource.code(), "resource-limit-exceeded", "{}", case.name);
+            assert_eq!(resource.severity(), DiagnosticSeverity::Error);
+            assert_eq!(resource.dialect(), case.dialect, "{}", case.name);
+            assert_eq!(resource.operation(), case.operation, "{}", case.name);
+            assert_eq!(resource.resource(), ResourceKind::RetainedBytes);
+            assert_eq!(resource.actual(), exact as u64, "{}", case.name);
+            assert_eq!(resource.limit(), exact as u64 - 1, "{}", case.name);
             assert_eq!(
-                resource.severity(),
-                DiagnosticSeverity::Error,
+                resource.source_line(),
+                Some(case.last_line),
                 "{}",
                 case.name
             );
-            assert_eq!(resource.dialect(), case.dialect, "{}", case.name);
-            assert_eq!(resource.operation(), case.operation, "{}", case.name);
-            assert_eq!(resource.resource(), case.resource, "{}", case.name);
-            assert_eq!(resource.actual(), case.actual, "{}", case.name);
-            assert_eq!(resource.limit(), case.limit, "{}", case.name);
-            assert_eq!(resource.source_line(), case.source_line, "{}", case.name);
-            assert_eq!(resource.span(), case.rejected_span, "{}", case.name);
+            assert!(
+                resource.to_string().contains("memory budget"),
+                "{}: {resource}",
+                case.name
+            );
+        }
+
+        let source_limit = budget(case.input.len() - 1);
+        for error in [
+            (case.parse_str)(case.input, source_limit).expect_err("source bytes exceed"),
+            (case.parse_bytes)(case.input.as_bytes(), source_limit).expect_err("source bytes"),
+        ] {
+            let resource = error.resource_limit_error().expect("typed source failure");
+            assert_eq!(
+                resource.resource(),
+                ResourceKind::SourceBytes,
+                "{}",
+                case.name
+            );
+            assert_eq!(resource.actual(), case.input.len() as u64);
+            assert_eq!(resource.limit(), case.input.len() as u64 - 1);
+            assert_eq!(resource.source_line(), None);
+            assert_eq!(resource.span(), span(case.input.len() - 1, 1));
         }
     }
 
     let zero = ParseLimits::new(
-        SourceByteLimit::new(0),
-        SourceLineLimit::new(0),
-        RepresentedInstructionLimit::new(0),
-        RepresentedTargetLimit::new(0),
+        MemoryBudget::from_bytes(0),
         RepeatNestingLimit::try_new(0).expect("zero nesting is valid"),
     );
     parse_circuit_str("", zero).expect("empty circuit fits zero limits");
@@ -299,49 +263,36 @@ fn parser_admission_accepts_exact_limits_and_rejects_the_first_excess_unit() {
 }
 
 #[test]
-fn parser_admission_accumulates_fast_path_targets_and_prefusion_declarations() {
-    let target_limits =
-        ParseLimits::default().with_represented_target_limit(RepresentedTargetLimit::new(11));
-    for (name, error, operation) in [
+fn parser_admission_charges_fast_path_targets_and_prefusion_declarations() {
+    for (name, prefix, input, parse) in [
         (
             "circuit",
-            parse_circuit_str("H 0\nM 1 2 3 4 5 6 7 8 9 10 11\n", target_limits)
-                .expect_err("the first fast-path target contributes to the cumulative budget"),
-            ResourceOperation::CircuitParse,
+            "H 0\n",
+            "H 0\nM 1 2 3 4 5 6 7 8 9 10 11\n",
+            parse_circuit_str as ParseStr,
         ),
         (
             "DEM",
-            parse_dem_str(
-                "error(0) D0\nerror(0) D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11\n",
-                target_limits,
-            )
-            .expect_err("the first DEM fast-path target contributes to the cumulative budget"),
-            ResourceOperation::DetectorErrorModelParse,
+            "error(0) D0\n",
+            "error(0) D0\nerror(0) D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11\n",
+            parse_dem_str as ParseStr,
         ),
     ] {
-        let resource = error
-            .resource_limit_error()
-            .expect("cumulative target rejection is typed");
-        assert_eq!(resource.operation(), operation, "{name}");
-        assert_eq!(
-            resource.resource(),
-            ResourceKind::RepresentedTargets,
-            "{name}"
-        );
-        assert_eq!((resource.actual(), resource.limit()), (12, 11), "{name}");
+        // A budget that admits the source and the first line's retained storage rejects the
+        // fast-path line, so its targets are charged before retention.
+        let first_line = minimal_budget(prefix, parse) - prefix.len();
+        let error = parse(input, budget(input.len() + first_line))
+            .expect_err("fast-path targets are charged");
+        let resource = error.resource_limit_error().expect("typed rejection");
+        assert_eq!(resource.resource(), ResourceKind::RetainedBytes, "{name}");
         assert_eq!(resource.source_line(), Some(2), "{name}");
     }
 
-    let instruction_limits = ParseLimits::default()
-        .with_represented_instruction_limit(RepresentedInstructionLimit::new(1));
-    let error = parse_circuit_str("H 0\nH 1\n", instruction_limits)
-        .expect_err("adjacent instructions are admitted before fusion");
-    let resource = error
-        .resource_limit_error()
-        .expect("prefusion declaration rejection is typed");
-    assert_eq!(resource.resource(), ResourceKind::RepresentedInstructions);
-    assert_eq!((resource.actual(), resource.limit()), (2, 1));
-    assert_eq!(resource.source_line(), Some(2));
+    // Adjacent instructions are charged before fusion: two declarations retain more than one
+    // declaration with the same targets.
+    let fused = minimal_budget("H 0 1\n", parse_circuit_str) - "H 0 1\n".len();
+    let split = minimal_budget("H 0\nH 1\n", parse_circuit_str) - "H 0\nH 1\n".len();
+    assert!(split > fused, "{split} <= {fused}");
 }
 
 #[test]
@@ -366,61 +317,57 @@ fn parser_allocation_depends_only_on_admitted_model_storage() {
         })
     }
 
-    let instruction_limits = ParseLimits::default()
-        .with_represented_instruction_limit(RepresentedInstructionLimit::new(1));
-    let target_limits =
-        ParseLimits::default().with_represented_target_limit(RepresentedTargetLimit::new(1));
+    // Each budget admits the source plus the retained storage of `first`, so every case is
+    // rejected at the same declaration however long its rejected suffix is.
     let cases = [
         (
-            "circuit instructions",
+            "circuit declarations",
+            "H 0\n",
             "H 0\nM 1\n".to_string(),
             format!("H 0\nM 1\n{}", "M 2\n".repeat(4_096)),
-            instruction_limits,
             parse_circuit_str as ParseStr,
         ),
         (
-            "DEM instructions",
+            "DEM declarations",
+            "error(0.1) D0\n",
             "error(0.1) D0\nerror(0.2) D1\n".to_string(),
             format!(
                 "error(0.1) D0\nerror(0.2) D1\n{}",
                 "error(0.3) D2\n".repeat(4_096)
             ),
-            instruction_limits,
             parse_dem_str as ParseStr,
         ),
         (
             "circuit targets",
-            "# target prefix\nM 0 1".to_string(),
-            format!("# target prefix\nM 0 1 {}", "2 ".repeat(4_096)),
-            target_limits,
-            parse_circuit_str as ParseStr,
-        ),
-        (
-            "circuit declarations after rejected target",
-            "M 0 1".to_string(),
-            format!("M 0 1\n{}", "TICK\n".repeat(4_096)),
-            target_limits,
+            "M 0\n",
+            "M 0\nM 1 2 3".to_string(),
+            format!("M 0\nM 1 2 3 {}", "2 ".repeat(4_096)),
             parse_circuit_str as ParseStr,
         ),
         (
             "DEM targets",
-            "# target prefix\nerror(0.1) D0 D1".to_string(),
-            format!("# target prefix\nerror(0.1) D0 D1 {}", "D2 ".repeat(4_096)),
-            target_limits,
+            "error(0.1) D0\n",
+            "error(0.1) D0\nerror(0.1) D0 D1 D2".to_string(),
+            format!("error(0.1) D0\nerror(0.1) D0 D1 D2 {}", "D2 ".repeat(4_096)),
             parse_dem_str as ParseStr,
         ),
-        (
-            "DEM declarations after rejected target",
-            "error(0.1) D0 D1".to_string(),
-            format!("error(0.1) D0 D1\n{}", "shift_detectors 1\n".repeat(4_096)),
-            target_limits,
-            parse_dem_str as ParseStr,
-        ),
+    ];
+
+    for (name, first, short, long, parse) in cases {
+        let first = minimal_budget(first, parse) - first.len();
+        let short = allocations(&short, budget(short.len() + first), parse);
+        let long = allocations(&long, budget(long.len() + first), parse);
+        assert_eq!(long.count_total, short.count_total, "{name}: {long:?}");
+        assert_eq!(long.bytes_total, short.bytes_total, "{name}: {long:?}");
+        assert_eq!(long.count_max, short.count_max, "{name}: {long:?}");
+        assert_eq!(long.bytes_max, short.bytes_max, "{name}: {long:?}");
+    }
+
+    for (name, short, long, parse) in [
         (
             "circuit declarations after invalid command",
             "NOT_A_GATE\n".to_string(),
             format!("NOT_A_GATE\n{}", "TICK\n".repeat(4_096)),
-            ParseLimits::default(),
             parse_circuit_str as ParseStr,
         ),
         (
@@ -430,23 +377,17 @@ fn parser_allocation_depends_only_on_admitted_model_storage() {
                 "not_a_dem_instruction\n{}",
                 "shift_detectors 1\n".repeat(4_096)
             ),
-            ParseLimits::default(),
             parse_dem_str as ParseStr,
         ),
-    ];
-
-    for (name, short, long, limits, parse) in cases {
-        let short = allocations(&short, limits, parse);
-        let long = allocations(&long, limits, parse);
+    ] {
+        let short = allocations(&short, ParseLimits::default(), parse);
+        let long = allocations(&long, ParseLimits::default(), parse);
         assert_eq!(long.count_total, short.count_total, "{name}: {long:?}");
         assert_eq!(long.bytes_total, short.bytes_total, "{name}: {long:?}");
-        assert_eq!(long.count_max, short.count_max, "{name}: {long:?}");
-        assert_eq!(long.bytes_max, short.bytes_max, "{name}: {long:?}");
     }
 
-    let byte_limits = ParseLimits::default().with_source_byte_limit(SourceByteLimit::new(3));
     for input in ["H 0\n", &format!("H 0\n{}", "M 1\n".repeat(4_096))] {
-        let measured = allocations(input, byte_limits, parse_circuit_str);
+        let measured = allocations(input, budget(3), parse_circuit_str);
         assert_eq!(measured.count_total, 0, "{measured:?}");
         assert_eq!(measured.bytes_total, 0, "{measured:?}");
     }
@@ -455,24 +396,9 @@ fn parser_allocation_depends_only_on_admitted_model_storage() {
         parse_circuit_bytes as ParseBytes,
         parse_dem_bytes as ParseBytes,
     ] {
-        let measured = byte_allocations(
-            b"\xff",
-            ParseLimits::default().with_source_byte_limit(SourceByteLimit::new(0)),
-            parse,
-        );
+        let measured = byte_allocations(b"\xff", budget(0), parse);
         assert_eq!(measured.count_total, 0, "{measured:?}");
         assert_eq!(measured.bytes_total, 0, "{measured:?}");
-
-        let line_limits = ParseLimits::default().with_source_line_limit(SourceLineLimit::new(1));
-        let short = b"#\n\xff";
-        let mut long = short.to_vec();
-        long.extend(std::iter::repeat_n(0xff, 32_768));
-        let short = byte_allocations(short, line_limits, parse);
-        let long = byte_allocations(&long, line_limits, parse);
-        assert_eq!(long.count_total, short.count_total, "{long:?}");
-        assert_eq!(long.bytes_total, short.bytes_total, "{long:?}");
-        assert_eq!(long.count_max, short.count_max, "{long:?}");
-        assert_eq!(long.bytes_max, short.bytes_max, "{long:?}");
     }
 
     let short = "\n# ignored\n".repeat(32);

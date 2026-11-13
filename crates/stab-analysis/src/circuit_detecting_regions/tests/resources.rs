@@ -172,46 +172,23 @@ fn repeat_nesting_boundary_is_exact() {
 }
 
 fn budget_boundaries_are_typed_and_fail_closed() {
-    let mut represented = DetectingRegionBudget::for_request(0, 0).unwrap();
-    represented
-        .add_represented_work(MAX_DETECTING_REGION_REPRESENTED_WORK)
-        .unwrap();
-    assert_resource_error(
-        represented.add_represented_work(1).unwrap_err(),
-        ResourceKind::RepresentedItems,
-        MAX_DETECTING_REGION_REPRESENTED_WORK + 1,
-        MAX_DETECTING_REGION_REPRESENTED_WORK,
-    );
-
-    let mut traversal = DetectingRegionBudget::for_request(0, 0).unwrap();
-    traversal
-        .consume_traversal_work(MAX_DETECTING_REGION_TRAVERSAL_WORK)
-        .unwrap();
-    assert_resource_error(
-        traversal.consume_traversal_work(1).unwrap_err(),
-        ResourceKind::TraversalWork,
-        MAX_DETECTING_REGION_TRAVERSAL_WORK + 1,
-        MAX_DETECTING_REGION_TRAVERSAL_WORK,
-    );
-
+    let budget_bytes = DETECTING_REGION_MEMORY_BUDGET.bytes();
+    let max_units = budget_bytes / DETECTING_REGION_LIVE_STATE_UNIT_BYTES;
     let mut live = DetectingRegionBudget::for_request(0, 0).unwrap();
-    live.reserve_live_state(MAX_DETECTING_REGION_LIVE_STATE_UNITS)
-        .unwrap();
+    live.reserve_live_state(max_units).unwrap();
     assert_resource_error(
         live.reserve_live_state(1).unwrap_err(),
         ResourceKind::LiveStateUnits,
-        MAX_DETECTING_REGION_LIVE_STATE_UNITS + 1,
-        MAX_DETECTING_REGION_LIVE_STATE_UNITS,
+        (max_units + 1) * DETECTING_REGION_LIVE_STATE_UNIT_BYTES,
+        budget_bytes,
     );
 
     let mut clone_boundary = DetectingRegionBudget::for_request(0, 0).unwrap();
-    clone_boundary
-        .reserve_tracker_state(MAX_DETECTING_REGION_LIVE_STATE_UNITS / 3)
-        .unwrap();
+    clone_boundary.reserve_tracker_state(max_units / 3).unwrap();
     clone_boundary.admit_recurrence_probe().unwrap();
     let mut clone_excess = DetectingRegionBudget::for_request(0, 0).unwrap();
     clone_excess
-        .reserve_tracker_state(MAX_DETECTING_REGION_LIVE_STATE_UNITS / 3 + 1)
+        .reserve_tracker_state(max_units / 3 + 1)
         .unwrap();
     let error = clone_excess.admit_recurrence_probe().unwrap_err();
     let AnalysisError::ResourceLimit(resource) = error else {
@@ -221,23 +198,12 @@ fn budget_boundaries_are_typed_and_fail_closed() {
     assert_eq!(resource.resource(), ResourceKind::LiveStateUnits);
     assert!(resource.actual() > resource.limit());
 
-    let mut regions = DetectingRegionBudget::for_request(0, 0).unwrap();
-    regions.output_regions = MAX_DETECTING_REGION_OUTPUT_REGIONS;
-    assert_resource_error(
-        regions.commit_output_region(0).unwrap_err(),
-        ResourceKind::OutputRecords,
-        MAX_DETECTING_REGION_OUTPUT_REGIONS + 1,
-        MAX_DETECTING_REGION_OUTPUT_REGIONS,
-    );
-
     let mut bytes = DetectingRegionBudget::for_request(0, 0).unwrap();
-    bytes
-        .commit_output_region(MAX_DETECTING_REGION_OUTPUT_BYTES)
-        .unwrap();
+    bytes.commit_output_region(budget_bytes).unwrap();
     assert_resource_error(
         bytes.commit_output_region(1).unwrap_err(),
         ResourceKind::OutputBytes,
-        MAX_DETECTING_REGION_OUTPUT_BYTES + 1,
-        MAX_DETECTING_REGION_OUTPUT_BYTES,
+        budget_bytes + 1,
+        budget_bytes,
     );
 }

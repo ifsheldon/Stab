@@ -54,11 +54,7 @@ pub(crate) fn read_limited_stdin<R>(
 where
     R: Read,
 {
-    let mut input = Vec::new();
-    stdin
-        .take(limit.saturating_add(1))
-        .read_to_end(&mut input)
-        .map_err(CliError::ReadInput)?;
+    let input = read_bounded(stdin, limit, 0).map_err(CliError::ReadInput)?;
     reject_oversized_input(input.len(), kind, limit)?;
     Ok(input)
 }
@@ -69,10 +65,11 @@ pub(crate) fn read_limited_input_file(
     kind: &'static str,
 ) -> Result<Vec<u8>, CliError> {
     let path = file.path().to_path_buf();
-    if file.len()? > limit {
+    let len = file.len()?;
+    if len > limit {
         return Err(CliError::InputTooLarge { kind, limit });
     }
-    read_limited_open_path(&path, file, limit, kind)
+    read_limited_open_path_with_hint(&path, file, limit, kind, len)
 }
 
 #[cfg(test)]
@@ -94,6 +91,7 @@ pub(crate) fn open_limited_input_path(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn read_limited_open_path<R>(
     path: &Path,
     reader: &mut R,
@@ -103,16 +101,70 @@ pub(crate) fn read_limited_open_path<R>(
 where
     R: Read,
 {
-    let mut input = Vec::new();
-    reader
-        .take(limit.saturating_add(1))
-        .read_to_end(&mut input)
-        .map_err(|source| CliError::ReadPath {
-            path: path.to_path_buf(),
-            source,
-        })?;
+    read_limited_open_path_with_hint(path, reader, limit, kind, 0)
+}
+
+fn read_limited_open_path_with_hint<R>(
+    path: &Path,
+    reader: &mut R,
+    limit: u64,
+    kind: &'static str,
+    size_hint: u64,
+) -> Result<Vec<u8>, CliError>
+where
+    R: Read,
+{
+    let input = read_bounded(reader, limit, size_hint).map_err(|source| CliError::ReadPath {
+        path: path.to_path_buf(),
+        source,
+    })?;
     reject_oversized_input(input.len(), kind, limit)?;
     Ok(input)
+}
+
+/// Reads at most `limit + 1` bytes with fallible reservation, so an input admitted by the
+/// memory budget never aborts on allocation failure. `size_hint` (a file's length, already
+/// admitted) is reserved exactly up front; otherwise storage grows geometrically and is capped at
+/// `limit + 1` bytes.
+fn read_bounded<R>(reader: &mut R, limit: u64, size_hint: u64) -> std::io::Result<Vec<u8>>
+where
+    R: Read,
+{
+    const CHUNK_BYTES: usize = 64 * 1024;
+    let cap = usize::try_from(limit.saturating_add(1)).unwrap_or(usize::MAX);
+    let out_of_memory = |error: std::collections::TryReserveError| {
+        std::io::Error::new(std::io::ErrorKind::OutOfMemory, error)
+    };
+    let mut input = Vec::new();
+    let hint = usize::try_from(size_hint).unwrap_or(usize::MAX).min(cap);
+    input.try_reserve_exact(hint).map_err(out_of_memory)?;
+    loop {
+        if input.len() >= cap {
+            return Ok(input);
+        }
+        if input.len() == input.capacity() {
+            let grown = input.capacity().max(CHUNK_BYTES).min(cap - input.len());
+            input.try_reserve(grown).map_err(out_of_memory)?;
+        }
+        let start = input.len();
+        let window = (input.capacity() - start).min(cap - start);
+        input.resize(start + window, 0);
+        let read = loop {
+            let window = input.get_mut(start..).unwrap_or_default();
+            match reader.read(window) {
+                Ok(read) => break read,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(error) => {
+                    input.truncate(start);
+                    return Err(error);
+                }
+            }
+        };
+        input.truncate(start + read);
+        if read == 0 {
+            return Ok(input);
+        }
+    }
 }
 
 fn reject_oversized_input(len: usize, kind: &'static str, limit: u64) -> Result<(), CliError> {

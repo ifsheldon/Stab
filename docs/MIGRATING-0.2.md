@@ -53,17 +53,44 @@ The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sort
 
 The partial `stab_analysis::mbqc_decomposition` helper, also exposed through `stab_core::analysis`, is removed without a replacement. MBQC help decomposition remains outside the selected computational API; supported circuit base-gate lowering continues through `stab_analysis::decomposed_circuit`.
 
-`DemSamplerLimits` work limits now bound one shot instead of the whole request: `with_max_sampled_error_applications` and `with_max_replay_work_units` (and their getters) are renamed with a `_per_shot` suffix, and a session streams any number of shots whose single-shot work fits. The former total-work caps rejected ordinary workloads such as 100,000 shots of a distance-11 surface-code model.
+`DemSamplerLimits` per-shot and total work limits were removed in E4; see Memory Budget below.
+Sessions stream any number of shots whose reusable storage fits the budget.
 
 `Tableau::random` now samples uniformly over the Clifford group, signs included, using the Bravyi–Maslov construction ported from Stim. Earlier builds applied a bounded random gate walk whose distribution was not uniform, so seeded callers receive different tableaux for the same seed; the signature, error behavior, and `RandomTableauQubits` limit are unchanged.
 
-Circuit sampling compiles one resolved program shared with detection, and no public item was removed or renamed. Four observable behaviors changed. `SamplingCompiler::compile` now counts its fixed one-million boundary in expanded circuit instructions, as `DetectionSamplingCompiler` does, so `SamplingCompileError::ExpandedOperationLimit` reports instruction counts and wide circuits that detection already accepted now compile; the sampling compiler schema is `6` and the executable-contract schema is `6`, so every sampling request and plan fingerprint changed. A circuit whose only work is one Z measurement, optionally after one single-qubit Pauli channel on the measured qubit, no longer uses a dedicated direct-Z plan, so its seeded output stream differs while its distribution does not. Without that plan, a single measurement of a very large qubit index is refused by the same frame and reference storage limits as any other circuit, including the `MeasurementToDetectionCompiler` reference sample. `count_determined_measurements` with `unknown_input` now matches pinned Stim on circuits that reset every qubit before measuring them, where it previously undercounted. The measurement-to-detection compiler schema reported by `capabilities` is `4`, because its reference sample and sweep correction now share one program admitted within the conversion's configured compiled-byte limit instead of a separate sampling plan.
+Circuit sampling compiles one resolved program shared with detection, and no public item was removed or renamed. Four observable behaviors changed. `SamplingCompiler::compile` then counted its fixed one-million boundary, removed in E4, in expanded circuit instructions, as `DetectionSamplingCompiler` does, so `SamplingCompileError::ExpandedOperationLimit` reports instruction counts and wide circuits that detection already accepted now compile; the sampling compiler schema is `6` and the executable-contract schema is `6`, so every sampling request and plan fingerprint changed. A circuit whose only work is one Z measurement, optionally after one single-qubit Pauli channel on the measured qubit, no longer uses a dedicated direct-Z plan, so its seeded output stream differs while its distribution does not. Without that plan, a single measurement of a very large qubit index is refused by the same frame and reference storage limits as any other circuit, including the `MeasurementToDetectionCompiler` reference sample. `count_determined_measurements` with `unknown_input` now matches pinned Stim on circuits that reset every qubit before measuring them, where it previously undercounted. The measurement-to-detection compiler schema reported by `capabilities` is `4`, because its reference sample and sweep correction now share one program admitted within the conversion's configured compiled-byte limit instead of a separate sampling plan.
+
+## Memory Budget
+
+E4 replaces count and work limits with one typed byte budget per operation.
+`stab_model::MemoryBudget`, also exported from the `stab-core` root with `MemoryBudgetParseError`, parses an integer byte count with an optional `KiB`, `MiB`, or `GiB` suffix through `FromStr` and defaults to one gibibyte.
+Every admitted workload produces byte-identical output; only workloads that the removed caps refused are newly admitted.
+
+| Removed item | Replacement |
+| --- | --- |
+| `DetectionConversionLimits::{max_record_bits, max_expanded_instructions, max_repeat_iterations, max_compiled_terms, max_compiled_bytes}` and their `with_*` builders | `DetectionConversionLimits::{new, memory_budget, with_memory_budget}`; the budget bounds the compiled plan, one byte per record bit, the reference scratch, and session storage |
+| `DetectionResourceKind::{RecordBits, SamplingExpandedOperations, ExpandedInstructions, RepeatIterations, CompiledTerms}` and `DetectionRecordLimitSubject` | `DetectionResourceKind::CompiledBytes` and `RepeatNesting` |
+| `SamplingCompileError::ExpandedOperationLimit` | `SamplingCompileError::CompiledBytesLimit { required, budget }`; configure the budget with `SamplingCompiler::memory_budget` |
+| The general stabilizer-frame sampling fallback for programs above 256 MiB | A typed `CompiledBytesLimit` refusal against the budget |
+| `DemSamplerLimits::{max_sampled_error_applications_per_shot, max_replay_work_units_per_shot, max_active_batch_bytes}` and their builders; `DemResourceKind::{SampledErrorApplications, ReplayWorkUnits}`; `DemSamplingExecutionError::SessionStorageLimit` | `DemSamplerLimits::{new, memory_budget, with_memory_budget}`; session storage refusals report `DemResourceKind::ActiveBatchBytes` |
+| `DemSamplingPlan::{validate_replay_with_limits, validate_replay_work_units_with_limits, validate_detector_sample_work_units_with_limits, validate_sampled_error_work_units_with_limits}` | `DemSamplingPlan::validate_replay`, which only checks representability |
+| `CircuitFlattenLimits` count fields, `DEFAULT_MAX_*` constants, and builders | `CircuitFlattenLimits::{new, memory_budget, with_memory_budget}` |
+| `DemFlattenLimits` repeat-unroll, expanded-instruction, repeat-iteration, target, argument, and byte fields, `DEFAULT_MAX_*` constants, and builders | `DemFlattenLimits::{new, memory_budget, with_memory_budget}` |
+| `CircuitPassLimits` item, target, argument, and payload fields, `DEFAULT_MAX_*` constants, and builders | `CircuitPassLimits::new(memory_budget, repeat_nesting)` with `memory_budget` and `with_memory_budget` |
+| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, ErrorMatcher, and coordinate-query work caps | Removed; retained storage is admitted against the default budget, and `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_memory_budget`, `DetectorErrorModel::detector_coordinates_with_memory_budget`, and the generator parameters' `with_memory_budget` accept a caller budget |
+| The generator's 131,072-physical-qubit cap | A projected 2048 bytes per physical qubit admitted against the generator parameters' budget |
+
+`ErrorAnalyzerOptions` gained the public `memory_budget` field, so struct literals must add it or use `..ErrorAnalyzerOptions::default()`.
+The CLI's fixed 64 MiB input caps and 1 MiB or 64 MiB per-record caps are replaced by `--memory-budget`, which bounds whole inputs at the budget and streamed records at half of it.
 
 ## Parser Limits
 
 Circuit and DEM command boundaries accept Stim's ASCII whitespace, including vertical tabs and form feeds before commands and repeat terminators. Whitespace inside instruction arguments and targets keeps the stricter Stim grammar, and diagnostics retain exact source-byte spans.
 
-`ParseLimits::new` now takes typed source-byte, source-line, represented-instruction, represented-target, and repeat-nesting limits in that order. The new `SourceByteLimit`, `RepresentedInstructionLimit`, and `RepresentedTargetLimit` values are also available from the `stab-core` facade. Existing parser entry points use inclusive defaults of 64 MiB, 1,000,000 physical lines, 1,000,000 compact declarations, 32,000,000 retained targets, and 256 repeat levels.
+`ParseLimits::new` now takes a `MemoryBudget` and a `RepeatNestingLimit`.
+The budget bounds the source bytes plus the conservative retained size of the parsed model and defaults to one gibibyte; source lines, compact declarations, and retained targets are no longer capped.
+`SourceByteLimit`, `SourceLineLimit`, `RepresentedInstructionLimit`, and `RepresentedTargetLimit` and the `ParseLimits` accessors and builders for them are removed; use `with_memory_budget` and `memory_budget`.
+`ResourceKind::SourceLines`, `RepresentedInstructions`, and `RepresentedTargets` are replaced by `ResourceKind::RetainedBytes`.
 
 `ResourceLimitContext` and the parser-only `stab_model::advanced` error and target-parser constructors were removed. A `ResourceLimitError` now reports its `dialect`, `operation`, `resource`, optional `source_line`, `actual`, `limit`, and source `span` directly.
 

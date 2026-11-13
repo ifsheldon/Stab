@@ -10,20 +10,13 @@ use stab_records::{
 };
 
 use crate::{
-    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg,
+    CliError, MemoryBudgetArg, RecordFormatArg,
     batch_output::record_write_io,
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink},
 };
-
-/// Upper bound on one framed text record's bytes while streaming conversion input.
-///
-/// Streaming conversion replaces the former whole-input 64 MiB cap. This per-record bound keeps
-/// memory bounded without rejecting any input that route accepted, because no record in a
-/// cap-compliant input could exceed it.
-const MAX_CONVERT_RECORD_BYTES: usize = 64 * 1024 * 1024;
 
 /// Upper bound on the packed bytes one conversion batch holds, so very wide records are
 /// converted a few at a time instead of reserving 64 rows at once.
@@ -83,6 +76,9 @@ pub(crate) struct ConvertArgs {
     /// Raw bits per shot when no value type is known.
     #[arg(long = "bits_per_shot", default_value_t = 0)]
     bits_per_shot: usize,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -229,7 +225,7 @@ where
             [(FileRole::Output, args.output.as_deref())],
         )?;
         io.reject_standard_stream_aliases(streams, stream_use)?;
-        return run_convert_stim(io, stdin, stdout);
+        return run_convert_stim(io, stdin, stdout, args.memory);
     }
     if args.obs_out_format == RecordFormatArg::Stim {
         return Err(CliError::UnsupportedConversion);
@@ -258,17 +254,22 @@ where
     stream_convert_records(input, input_path.as_deref(), layout, &args, io, stdout)
 }
 
-fn run_convert_stim<R, W>(mut io: PendingIo, stdin: &mut R, stdout: &mut W) -> Result<(), CliError>
+fn run_convert_stim<R, W>(
+    mut io: PendingIo,
+    stdin: &mut R,
+    stdout: &mut W,
+    memory: MemoryBudgetArg,
+) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
 {
     let input = if let Some(mut input_file) = io.take_input(FileRole::Input) {
-        read_limited_input_file(&mut input_file, MAX_CIRCUIT_INPUT_BYTES, "convert input")?
+        read_limited_input_file(&mut input_file, memory.input_bytes(), "convert input")?
     } else {
-        read_limited_stdin(stdin, MAX_CIRCUIT_INPUT_BYTES, "convert input")?
+        read_limited_stdin(stdin, memory.input_bytes(), "convert input")?
     };
-    let circuit = parse_circuit_bytes(&input)?;
+    let circuit = parse_circuit_bytes(&input, memory)?;
     let output = circuit.to_stim_bytes();
     write_convert_outputs(io, stdout, &output)
 }
@@ -305,16 +306,18 @@ fn resolve_convert_layout(
 ) -> Result<ConvertLayout, CliError> {
     let mut layout = ConvertLayout::from_explicit_counts(args);
     if args.dem.is_some() {
-        let dem_bytes = read_side_input(io, FileRole::Dem, "convert dem input")?;
-        let dem = DetectorErrorModel::from_dem_bytes(&dem_bytes)?;
+        let dem_bytes = read_side_input(io, FileRole::Dem, "convert dem input", args.memory)?;
+        let dem =
+            DetectorErrorModel::from_dem_bytes_with_limits(&dem_bytes, args.memory.parse_limits())?;
         layout.overwrite_dem_counts(&dem)?;
     }
     if args.circuit.is_some() {
         let Some(types) = args.types.as_deref() else {
             return Err(CliError::MissingConvertTypes);
         };
-        let circuit_bytes = read_side_input(io, FileRole::Circuit, "convert circuit input")?;
-        let circuit = parse_circuit_bytes(&circuit_bytes)?;
+        let circuit_bytes =
+            read_side_input(io, FileRole::Circuit, "convert circuit input", args.memory)?;
+        let circuit = parse_circuit_bytes(&circuit_bytes, args.memory)?;
         layout.overwrite_circuit_counts(&circuit, types)?;
     }
     if !layout.has_included_bits() {
@@ -338,18 +341,19 @@ fn convert_record_reader<'a>(
     input: Box<dyn Read + 'a>,
     format: RecordFormatArg,
     layout: ConvertLayout,
+    max_record_bytes: usize,
 ) -> Result<RecordStreamReader<Box<dyn Read + 'a>>, CliError> {
     let width = layout.input_width()?;
     Ok(match format {
         RecordFormatArg::Dets => {
-            RecordStreamReader::dets(input, layout.dets_layout()?, MAX_CONVERT_RECORD_BYTES)
+            RecordStreamReader::dets(input, layout.dets_layout()?, max_record_bytes)
         }
         RecordFormatArg::Stim => return Err(CliError::UnsupportedConversion),
         _ => RecordStreamReader::measurements(
             input,
             format.required_record_format()?,
             width,
-            MAX_CONVERT_RECORD_BYTES,
+            max_record_bytes,
         ),
     })
 }
@@ -365,7 +369,8 @@ fn stream_convert_records<W>(
 where
     W: Write,
 {
-    let mut reader = convert_record_reader(input, args.in_format, layout)?;
+    let mut reader =
+        convert_record_reader(input, args.in_format, layout, args.memory.record_bytes())?;
     let split_observables = args.obs_output.is_some();
     let mut primary = RecordEncoder::try_new(
         args.out_format.required_record_format()?,
@@ -565,11 +570,12 @@ fn read_side_input(
     io: &mut PendingIo,
     role: FileRole,
     kind: &'static str,
+    memory: MemoryBudgetArg,
 ) -> Result<Vec<u8>, CliError> {
     let mut input = io.take_input(role).ok_or(CliError::IoPlanInvariant {
         message: "convert preflight omitted a requested side input",
     })?;
-    read_limited_input_file(&mut input, MAX_CIRCUIT_INPUT_BYTES, kind)
+    read_limited_input_file(&mut input, memory.input_bytes(), kind)
 }
 
 fn write_convert_outputs<W>(io: PendingIo, stdout: &mut W, primary: &[u8]) -> Result<(), CliError>

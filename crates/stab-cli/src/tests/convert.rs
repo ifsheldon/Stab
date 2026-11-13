@@ -4,7 +4,10 @@
 use tempfile::tempdir;
 
 use super::support::{Scratch, run};
-use crate::{MAX_CIRCUIT_INPUT_BYTES, run_from};
+use crate::run_from;
+
+/// The whole-input cap that streaming conversion retired.
+const RETIRED_INPUT_CAP_BYTES: usize = 64 * 1024 * 1024;
 
 fn run_ok(args: &[&str], input: &[u8]) -> Vec<u8> {
     let result = run(args, input);
@@ -589,7 +592,7 @@ impl std::io::Read for PatternInput {
 }
 
 fn over_retired_cap_len() -> usize {
-    usize::try_from(MAX_CIRCUIT_INPUT_BYTES).expect("cap fits usize") + STREAMING_RECORD_BYTES
+    RETIRED_INPUT_CAP_BYTES + STREAMING_RECORD_BYTES
 }
 
 /// Verifies streamed output against the synthesized pattern without buffering it.
@@ -688,7 +691,9 @@ fn convert_takes_model_counts_that_agree_with_the_engine_conversion_plan() {
         "HERALDED_ERASE(0.1) 0\nM 0\nDETECTOR rec[-1] rec[-2]\nHERALDED_PAULI_CHANNEL_1(0, 1, 0, 0) 1\n",
     ];
     for text in circuits {
-        let circuit = crate::parse_circuit_bytes(text.as_bytes()).expect("valid circuit");
+        let circuit =
+            crate::parse_circuit_bytes(text.as_bytes(), crate::MemoryBudgetArg::default())
+                .expect("valid circuit");
         let measurements = circuit.count_measurements().expect("measurement count");
         let detectors = circuit.count_detectors().expect("detector count");
         let observables = circuit.count_observables().expect("observable count");

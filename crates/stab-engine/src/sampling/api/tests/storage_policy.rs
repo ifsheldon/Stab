@@ -1,21 +1,21 @@
 //! Session-storage admission parity with the detection sessions.
 //!
 //! The Pauli-frame sampling session is the production path for every frame-admissible circuit;
-//! its admission estimate must equal the bytes a constructed session retains, and the 256 MiB
-//! limit must admit the exact boundary and reject the first excess byte before allocating.
+//! its admission estimate must equal the bytes a constructed session retains, and the memory
+//! budget must admit the exact boundary and reject the first excess byte before allocating.
 
 use super::super::session_helpers::session_storage_bytes;
 use super::*;
 
 fn pauli_frame_plan(text: &str) -> SamplingPlan {
-    let plan = SamplingCompiler::new()
+    budgeted_plan(text, MemoryBudget::DEFAULT)
+}
+
+fn budgeted_plan(text: &str, budget: MemoryBudget) -> SamplingPlan {
+    SamplingCompiler::new()
+        .memory_budget(budget)
         .compile(&Circuit::from_stim_str(text).expect("parse storage fixture"))
-        .expect("compile storage fixture");
-    assert!(
-        matches!(plan.inner.kind, SamplingPlanKind::PauliFrame),
-        "storage fixture must select the Pauli-frame session: {text}"
-    );
-    plan
+        .expect("compile storage fixture")
 }
 
 #[test]
@@ -51,24 +51,19 @@ fn pauli_frame_session_storage_estimate_equals_retained_allocation_at_word_bound
 }
 
 #[test]
-fn pauli_frame_session_storage_rejects_first_excess_before_allocation() {
-    // Without a stored reference, eight measurements retain 8 * (8 + 32) bytes of batch and
-    // measurement planes and each qubit retains two 32-byte frame words, so 4,194,299 qubits
-    // put the session exactly at 256 MiB.
-    let measured = "M 4194291 4194292 4194293 4194294 4194295 4194296 4194297 4194298\n";
-    let at_limit = pauli_frame_plan(measured);
+fn pauli_frame_session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte() {
+    let text = "H 0\nCX 0 1000\nM 0 1 2 3 4 5 6 7\n";
     let mode = ReferenceSampleMode::SkipReferenceSample;
+    let exact = session_storage_bytes(&pauli_frame_plan(text).inner, mode);
+    let exact_u64 = u64::try_from(exact).expect("small session");
+    let at_limit = budgeted_plan(text, MemoryBudget::from_bytes(exact_u64));
     validate_session_storage(&at_limit.inner, mode)
         .expect("admit the exact boundary without allocating its state");
-    assert_eq!(
-        session_storage_bytes(&at_limit.inner, mode),
-        u128::from(MAX_SAMPLING_SESSION_STORAGE_BYTES)
-    );
+    at_limit
+        .session_with_reference_mode(RandomPolicy::Seeded(Seed::new(1)), mode)
+        .expect("construct the session at the exact budget");
 
-    let over_limit = pauli_frame_plan(&format!("{measured}H 4194299\n"));
-    // Check admission first so a regression cannot allocate the large frame in this test.
-    validate_session_storage(&over_limit.inner, mode)
-        .expect_err("reject the first excess qubit before attempting construction");
+    let over_limit = budgeted_plan(text, MemoryBudget::from_bytes(exact_u64 - 1));
     let mut rejected = None;
     let allocated = allocation_counter::measure(|| {
         rejected = Some(
@@ -81,8 +76,8 @@ fn pauli_frame_session_storage_rejects_first_excess_before_allocation() {
     assert_eq!(
         rejected,
         Some(SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes: u128::from(MAX_SAMPLING_SESSION_STORAGE_BYTES) + 64,
-            limit_bytes: MAX_SAMPLING_SESSION_STORAGE_BYTES,
+            estimated_bytes: exact,
+            limit_bytes: exact_u64 - 1,
         })
     );
 }

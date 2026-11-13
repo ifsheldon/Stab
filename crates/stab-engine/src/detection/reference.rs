@@ -1,12 +1,10 @@
-use stab_model::Circuit;
+use stab_model::{Circuit, MemoryBudget};
 
 use super::buffers::try_false_vec;
-use super::error::{DetectionError, DetectionResult};
+use super::error::{DetectionError, DetectionResourceLimitError, DetectionResult};
 use super::frame::CircuitProgram;
 use crate::ReferenceSampleLoopPolicy;
 use crate::sampling::{program_reference_sample, reference_work_storage_bytes};
-
-const MAX_REFERENCE_SCRATCH_BYTES: u128 = 256 * 1024 * 1024;
 
 #[derive(Clone, Debug)]
 pub(super) enum ReferenceSampleSource {
@@ -34,21 +32,24 @@ pub(super) fn static_reference_sample(
     circuit: &Circuit,
     program: &CircuitProgram,
     measurement_count: usize,
+    budget: MemoryBudget,
 ) -> DetectionResult<Vec<bool>> {
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     let loop_policy = ReferenceSampleLoopPolicy::Fold;
-    let estimated_bytes = reference_work_storage_bytes(program, qubit_count, loop_policy);
-    if estimated_bytes > MAX_REFERENCE_SCRATCH_BYTES {
-        return Err(DetectionError::invalid_sampler_compilation(format!(
-            "detection reference sampling needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {MAX_REFERENCE_SCRATCH_BYTES}-byte safety limit"
-        )));
+    let estimated_bytes = reference_work_storage_bytes(program, qubit_count, loop_policy, budget);
+    if !budget.admits(estimated_bytes) {
+        return Err(DetectionResourceLimitError::detection_compiled_bytes(
+            u64::try_from(estimated_bytes).unwrap_or(u64::MAX),
+            budget.bytes(),
+        )
+        .into());
     }
     let zero_sweeps = try_false_vec(
         program.counts().sweep_bits,
         "detection reference zero-sweep record",
     )?;
     let reference_sample =
-        program_reference_sample(program, qubit_count, loop_policy, &zero_sweeps)?;
+        program_reference_sample(program, qubit_count, loop_policy, &zero_sweeps, budget)?;
     validate_reference_sample_len(&reference_sample, measurement_count)?;
     Ok(reference_sample)
 }

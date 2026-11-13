@@ -20,15 +20,12 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
     assert!(owned_records.contains(&0));
     assert!(owned_records.contains(&4096));
 
-    let error = circuit_flow_generators(&circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"))
-        .expect_err("first flow-generator expanded-work overflow");
-    let resource = error
-        .resource_limit_error()
-        .expect("typed expanded-work error");
-    assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
-    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
-    assert_eq!(resource.actual(), 1_000_002);
-    assert_eq!(resource.limit(), 1_000_000);
+    // Expanded solver work above the retired one-million cap completes.
+    assert_eq!(
+        circuit_flow_generators(&circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"))
+            .expect("uncapped flow-generator work"),
+        circuit_flow_generators(&circuit("M 0\n")).expect("single measurement flows")
+    );
 
     let error = circuit_flow_generators(&circuit("M 1000000\n"))
         .expect_err("projected flow storage overflow");
@@ -38,7 +35,8 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
     assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
     assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
     assert!(resource.actual() > resource.limit());
-    assert_eq!(resource.limit(), 512 * 1024 * 1024);
+    assert_eq!(resource.limit(), 1 << 30);
+    assert!(error.to_string().contains("memory budget"), "{error}");
 
     let mut nested = circuit("M 0\n");
     for _ in 0..257 {

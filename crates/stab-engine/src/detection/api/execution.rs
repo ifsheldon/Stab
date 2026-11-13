@@ -5,7 +5,7 @@ use stab_records::{DetectionSink, DetectorWidth, ObservableWidth};
 use super::{
     DetectionBatchBuffers, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
     DetectionRunStatus, DetectionRunSummary, DirectDetectionState, DirectDetectorFramePlan,
-    MAX_BATCH_SHOTS, MAX_DETECTION_SESSION_STORAGE_BYTES, MeasurementToDetectionPlan,
+    MAX_BATCH_SHOTS, MeasurementToDetectionPlan,
 };
 use crate::{RandomPolicy, SamplingCancellation, ShotCount, SinkFailurePhase};
 
@@ -115,7 +115,10 @@ where
 pub(super) fn validate_conversion_session_storage(
     plan: &MeasurementToDetectionPlan,
 ) -> Result<(), DetectionExecutionError> {
-    validate_session_storage(conversion_session_storage_bytes(plan))
+    validate_session_storage(
+        conversion_session_storage_bytes(plan),
+        plan.inner.converter.plan.limits.memory_budget(),
+    )
 }
 
 pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan) -> u128 {
@@ -137,7 +140,7 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
 pub(super) fn validate_direct_session_storage(
     plan: &DirectDetectorFramePlan,
 ) -> Result<(), DetectionExecutionError> {
-    validate_session_storage(direct_session_storage_bytes(plan))
+    validate_session_storage(direct_session_storage_bytes(plan), plan.memory_budget())
 }
 
 pub(super) fn direct_session_storage_bytes(plan: &DirectDetectorFramePlan) -> u128 {
@@ -149,11 +152,14 @@ pub(super) fn direct_session_storage_bytes(plan: &DirectDetectorFramePlan) -> u1
         .saturating_add(packed_batch_bytes.saturating_mul(2))
 }
 
-fn validate_session_storage(estimated_bytes: u128) -> Result<(), DetectionExecutionError> {
-    if estimated_bytes > u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) {
+fn validate_session_storage(
+    estimated_bytes: u128,
+    budget: stab_model::MemoryBudget,
+) -> Result<(), DetectionExecutionError> {
+    if !budget.admits(estimated_bytes) {
         return Err(DetectionExecutionError::SessionStorageLimit {
             estimated_bytes,
-            limit_bytes: MAX_DETECTION_SESSION_STORAGE_BYTES,
+            limit_bytes: budget.bytes(),
         });
     }
     Ok(())

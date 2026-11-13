@@ -49,34 +49,33 @@ fn pf4_error_matcher_repeat_resource_policy_is_source_owned() {
 
     let nested = Circuit::from_stim_str(
         "
-        REPEAT 100000 {
-            REPEAT 100000 {
+        REPEAT 1001 {
+            REPEAT 1000 {
                 TICK
             }
         }
         ",
     )
     .unwrap();
-    let error = explain_errors_from_circuit(&nested, None, false)
-        .expect_err("reject nested expansion")
-        .to_string();
-    assert!(error.contains("expanded repeat iterations"), "{error}");
+    // Expanded traversal above the retired one-million caps is not capped.
+    assert!(
+        explain_errors_from_circuit(&nested, None, false)
+            .expect("uncapped nested traversal")
+            .is_empty()
+    );
 }
 
 #[test]
-fn pf4_error_matcher_filter_rejects_shifted_repeat() {
+fn pf4_error_matcher_filter_refuses_shifted_repeat_keys_beyond_the_memory_budget() {
     let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").unwrap();
     let filter = DetectorErrorModel::from_dem_str(
-        "repeat 100001 {\n    error(0.1) D0\n    shift_detectors 1\n}\n",
+        "repeat 1000000000000 {\n    error(0.1) D0\n    shift_detectors 1\n}\n",
     )
     .unwrap();
     let error = explain_errors_from_circuit(&circuit, Some(&filter), false)
         .expect_err("reject oversized filter DEM")
         .to_string();
-    assert!(
-        error.contains("DEM ErrorMatcher filter currently supports repeat counts"),
-        "{error}"
-    );
+    assert!(error.contains("memory budget"), "{error}");
 }
 
 /// A filter DEM whose repeat bodies leave the detector frame unchanged must select exactly the

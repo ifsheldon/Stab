@@ -1,46 +1,29 @@
 use std::error::Error;
 
-use stab_model::{Circuit, CircuitItem, ParseLimits, RepeatNestingLimit, Target};
+use stab_model::{Circuit, CircuitItem, MemoryBudget, ParseLimits, RepeatNestingLimit, Target};
 use thiserror::Error;
 
 use crate::resources::CircuitPassStage;
 use crate::{ResourceKind, ResourceLimitError};
 
-const MAX_PROJECTED_PASS_PAYLOAD_BYTES: u64 = 512 * 1024 * 1024;
 const OPAQUE_TAG_STORAGE_MULTIPLIER: u64 = 4;
 
 /// Resource policy applied before and after a circuit pass runs.
 ///
-/// Counts describe the represented, folded circuit. Repeat counts do not multiply item, target,
-/// or argument totals. Repeat nesting is always bounded by the model's hard recursive-safety
-/// ceiling and may be tightened by callers.
+/// The memory budget bounds the projected logical payload of the input, of each pass's declared
+/// output projection, and of the returned circuit. Counts describe the represented, folded
+/// circuit and are reported but not separately capped. Repeat nesting is always bounded by the
+/// model's hard recursive-safety ceiling and may be tightened by callers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CircuitPassLimits {
-    max_represented_items: u64,
-    max_target_occurrences: u64,
-    max_argument_values: u64,
-    max_projected_payload_bytes: u64,
+    memory_budget: MemoryBudget,
     repeat_nesting: RepeatNestingLimit,
 }
 
 impl CircuitPassLimits {
-    pub const DEFAULT_MAX_REPRESENTED_ITEMS: u64 = 1_000_000;
-    pub const DEFAULT_MAX_TARGET_OCCURRENCES: u64 = 32_000_000;
-    pub const DEFAULT_MAX_ARGUMENT_VALUES: u64 = 16_000_000;
-    pub const DEFAULT_MAX_PROJECTED_PAYLOAD_BYTES: u64 = MAX_PROJECTED_PASS_PAYLOAD_BYTES;
-
-    pub const fn new(
-        max_represented_items: u64,
-        max_target_occurrences: u64,
-        max_argument_values: u64,
-        max_projected_payload_bytes: u64,
-        repeat_nesting: RepeatNestingLimit,
-    ) -> Self {
+    pub const fn new(memory_budget: MemoryBudget, repeat_nesting: RepeatNestingLimit) -> Self {
         Self {
-            max_represented_items,
-            max_target_occurrences,
-            max_argument_values,
-            max_projected_payload_bytes,
+            memory_budget,
             repeat_nesting,
         }
     }
@@ -48,29 +31,15 @@ impl CircuitPassLimits {
     /// Returns the widest policy permitted by the fixed repeat-nesting safety envelope.
     pub fn maximal() -> Self {
         Self::new(
-            u64::MAX,
-            u64::MAX,
-            u64::MAX,
-            u64::MAX,
+            MemoryBudget::from_bytes(u64::MAX),
             ParseLimits::DEFAULT_REPEAT_NESTING,
         )
     }
 
-    pub const fn max_represented_items(self) -> u64 {
-        self.max_represented_items
-    }
-
-    pub const fn max_target_occurrences(self) -> u64 {
-        self.max_target_occurrences
-    }
-
-    pub const fn max_argument_values(self) -> u64 {
-        self.max_argument_values
-    }
-
-    /// Returns the maximum admitted logical payload, excluding allocator metadata and spare capacity.
-    pub const fn max_projected_payload_bytes(self) -> u64 {
-        self.max_projected_payload_bytes
+    /// Returns the budget for admitted logical payload, excluding allocator metadata and spare
+    /// capacity.
+    pub const fn memory_budget(self) -> MemoryBudget {
+        self.memory_budget
     }
 
     pub const fn repeat_nesting(self) -> RepeatNestingLimit {
@@ -78,29 +47,8 @@ impl CircuitPassLimits {
     }
 
     #[must_use]
-    pub const fn with_max_represented_items(mut self, max_represented_items: u64) -> Self {
-        self.max_represented_items = max_represented_items;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_max_target_occurrences(mut self, max_target_occurrences: u64) -> Self {
-        self.max_target_occurrences = max_target_occurrences;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_max_argument_values(mut self, max_argument_values: u64) -> Self {
-        self.max_argument_values = max_argument_values;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_max_projected_payload_bytes(
-        mut self,
-        max_projected_payload_bytes: u64,
-    ) -> Self {
-        self.max_projected_payload_bytes = max_projected_payload_bytes;
+    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.memory_budget = memory_budget;
         self
     }
 
@@ -113,13 +61,7 @@ impl CircuitPassLimits {
 
 impl Default for CircuitPassLimits {
     fn default() -> Self {
-        Self::new(
-            Self::DEFAULT_MAX_REPRESENTED_ITEMS,
-            Self::DEFAULT_MAX_TARGET_OCCURRENCES,
-            Self::DEFAULT_MAX_ARGUMENT_VALUES,
-            Self::DEFAULT_MAX_PROJECTED_PAYLOAD_BYTES,
-            ParseLimits::DEFAULT_REPEAT_NESTING,
-        )
+        Self::new(MemoryBudget::DEFAULT, ParseLimits::DEFAULT_REPEAT_NESTING)
     }
 }
 
@@ -472,30 +414,12 @@ fn validate_block(
     repeat_nesting: &mut usize,
 ) -> Result<(), ResourceLimitError> {
     for item in circuit.items() {
-        add_and_admit(
-            represented_items,
-            1,
-            limits.max_represented_items(),
-            stage,
-            ResourceKind::RepresentedItems,
-        )?;
+        add_unbounded(represented_items, 1);
         match item {
             CircuitItem::Instruction(instruction) => {
                 add_unbounded(tag_bytes, instruction.tag_bytes().map_or(0, <[u8]>::len));
-                add_and_admit(
-                    target_occurrences,
-                    instruction.targets().len(),
-                    limits.max_target_occurrences(),
-                    stage,
-                    ResourceKind::TargetOccurrences,
-                )?;
-                add_and_admit(
-                    argument_values,
-                    instruction.args().len(),
-                    limits.max_argument_values(),
-                    stage,
-                    ResourceKind::ArgumentValues,
-                )?;
+                add_unbounded(target_occurrences, instruction.targets().len());
+                add_unbounded(argument_values, instruction.args().len());
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let next_depth = depth.saturating_add(1);
@@ -531,23 +455,6 @@ fn add_unbounded(total: &mut u64, additional: usize) {
     *total = total.saturating_add(u64::try_from(additional).unwrap_or(u64::MAX));
 }
 
-fn add_and_admit(
-    total: &mut u64,
-    additional: usize,
-    limit: u64,
-    stage: CircuitPassStage,
-    resource: ResourceKind,
-) -> Result<(), ResourceLimitError> {
-    let additional = u64::try_from(additional).unwrap_or(u64::MAX);
-    *total = total.saturating_add(additional);
-    if *total > limit {
-        return Err(ResourceLimitError::circuit_pass(
-            stage, resource, *total, limit,
-        ));
-    }
-    Ok(())
-}
-
 fn admit_resources(
     resources: CircuitPassResources,
     limits: CircuitPassLimits,
@@ -555,24 +462,9 @@ fn admit_resources(
 ) -> Result<(), ResourceLimitError> {
     for (resource, actual, limit) in [
         (
-            ResourceKind::RepresentedItems,
-            resources.represented_items(),
-            limits.max_represented_items(),
-        ),
-        (
-            ResourceKind::TargetOccurrences,
-            resources.target_occurrences(),
-            limits.max_target_occurrences(),
-        ),
-        (
-            ResourceKind::ArgumentValues,
-            resources.argument_values(),
-            limits.max_argument_values(),
-        ),
-        (
             ResourceKind::ProjectedPayloadBytes,
             resources.projected_payload_bytes(),
-            limits.max_projected_payload_bytes(),
+            limits.memory_budget().bytes(),
         ),
         (
             ResourceKind::RepeatNesting,
@@ -688,10 +580,7 @@ fn checked_resource_add(
 
 const fn resource_limit(limits: CircuitPassLimits, resource: ResourceKind) -> u64 {
     match resource {
-        ResourceKind::RepresentedItems => limits.max_represented_items(),
-        ResourceKind::TargetOccurrences => limits.max_target_occurrences(),
-        ResourceKind::ArgumentValues => limits.max_argument_values(),
-        ResourceKind::ProjectedPayloadBytes => limits.max_projected_payload_bytes(),
+        ResourceKind::ProjectedPayloadBytes => limits.memory_budget().bytes(),
         ResourceKind::RepeatNesting => limits.repeat_nesting().get() as u64,
         _ => u64::MAX,
     }

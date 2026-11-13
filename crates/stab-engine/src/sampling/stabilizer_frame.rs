@@ -1,105 +1,12 @@
+//! Generator-list stabilizer frame, kept only as the test suite's differential baseline.
+
 use std::fmt;
 
 use rand::{Rng, RngExt as _};
 use smallvec::{SmallVec, smallvec};
-use stab_algebra::{PauliBasis, PauliSign, StabilizerError, Tableau};
+use stab_algebra::PauliBasis;
 
-use super::SamplingCompileError;
-use super::reference_simulator::{LocalCliffordInverse, SignedLocalPauli};
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct LocalTableauTransform {
-    target_count: usize,
-    outputs: Vec<LocalTableauOutput>,
-    inverse: LocalCliffordInverse,
-}
-
-impl LocalTableauTransform {
-    pub(crate) fn from_tableau(tableau: &Tableau) -> Result<Self, SamplingCompileError> {
-        let target_count = tableau.len();
-        let output_count = local_basis_count(target_count)?;
-        let mut outputs = Vec::with_capacity(output_count);
-        for input_index in 0..output_count {
-            let input_bases = bases_from_index(input_index, target_count);
-            let input =
-                stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, input_bases);
-            let output = tableau.apply(&input).map_err(map_stabilizer_error)?;
-            let mut output_bases = Vec::with_capacity(target_count);
-            for target in 0..target_count {
-                let Some(basis) = output.get(target) else {
-                    return Err(SamplingCompileError::invalid_circuit(
-                        "tableau output length changed while compiling sampler",
-                    ));
-                };
-                output_bases.push(basis);
-            }
-            outputs.push(LocalTableauOutput {
-                negative: output.sign().is_negative(),
-                bases: output_bases,
-            });
-        }
-        let inverse = inverse_images(target_count, &outputs)?;
-        Ok(Self {
-            target_count,
-            outputs,
-            inverse,
-        })
-    }
-
-    pub(crate) fn target_count(&self) -> usize {
-        self.target_count
-    }
-
-    /// The images `G^-1 P G` of each target's X and Z, as consumed by the reference simulator.
-    pub(crate) fn inverse(&self) -> &LocalCliffordInverse {
-        &self.inverse
-    }
-
-    fn output(&self, index: usize) -> Option<&LocalTableauOutput> {
-        self.outputs.get(index)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct LocalTableauOutput {
-    negative: bool,
-    bases: Vec<PauliBasis>,
-}
-
-/// Inverts the forward conjugation table: if `G Q G^-1 = s P` then `G^-1 P G = s Q`.
-fn inverse_images(
-    target_count: usize,
-    outputs: &[LocalTableauOutput],
-) -> Result<LocalCliffordInverse, SamplingCompileError> {
-    let mut images = Vec::with_capacity(target_count.saturating_mul(2));
-    for target in 0..target_count {
-        for wanted in [PauliBasis::X, PauliBasis::Z] {
-            let (input_index, output) = outputs
-                .iter()
-                .enumerate()
-                .find(|(_, output)| {
-                    output.bases.iter().enumerate().all(|(index, basis)| {
-                        *basis
-                            == if index == target {
-                                wanted
-                            } else {
-                                PauliBasis::I
-                            }
-                    })
-                })
-                .ok_or_else(|| {
-                    SamplingCompileError::invalid_circuit(
-                        "local tableau transform is not invertible",
-                    )
-                })?;
-            images.push(SignedLocalPauli {
-                negative: output.negative,
-                bases: bases_from_index(input_index, target_count),
-            });
-        }
-    }
-    Ok(LocalCliffordInverse::new(images))
-}
+use super::local_tableau::LocalTableauTransform;
 
 #[derive(Clone, Debug)]
 pub(super) struct StabilizerFrame {
@@ -141,21 +48,6 @@ impl PartialEq for StabilizerFrame {
 }
 
 impl Eq for StabilizerFrame {}
-
-/// Admission estimate for a reference repeat-fold snapshot.
-///
-/// This keeps the generator-list formula used before the inverse-tableau simulator so that
-/// admission decisions do not change; it over-estimates the simulator's actual snapshot, which
-/// holds `2n` rows of `2 * ceil(n / 64)` words and `2n` sign bytes.
-pub(super) fn reference_snapshot_admission_bytes(qubit_count: usize) -> u128 {
-    (qubit_count as u128)
-        .saturating_mul(size_of::<StabilizerGenerator>() as u128)
-        .saturating_add(
-            (qubit_count as u128)
-                .saturating_mul(qubit_count as u128)
-                .saturating_mul(size_of::<PauliBasis>() as u128),
-        )
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum MeasurementRandomness {
@@ -944,32 +836,6 @@ fn reduce_span_row(row: &mut SpanRow, basis: &[Option<usize>], prior_rows: &[Spa
     }
 }
 
-fn local_basis_count(target_count: usize) -> Result<usize, SamplingCompileError> {
-    let mut count = 1usize;
-    for _ in 0..target_count {
-        count = count.checked_mul(4).ok_or_else(|| {
-            SamplingCompileError::invalid_circuit(
-                "local tableau transform has too many target basis states",
-            )
-        })?;
-    }
-    Ok(count)
-}
-
-fn bases_from_index(mut index: usize, target_count: usize) -> Vec<PauliBasis> {
-    let mut bases = Vec::with_capacity(target_count);
-    for _ in 0..target_count {
-        bases.push(match index % 4 {
-            0 => PauliBasis::I,
-            1 => PauliBasis::X,
-            2 => PauliBasis::Y,
-            _ => PauliBasis::Z,
-        });
-        index /= 4;
-    }
-    bases
-}
-
 fn basis_digit(basis: PauliBasis) -> usize {
     match basis {
         PauliBasis::I => 0,
@@ -994,6 +860,10 @@ pub(super) fn reset_correction(basis: PauliBasis) -> PauliBasis {
     }
 }
 
-fn map_stabilizer_error(error: StabilizerError) -> SamplingCompileError {
-    SamplingCompileError::invalid_circuit(error.to_string())
+#[test]
+fn reference_snapshot_admission_keeps_the_generator_list_formula() {
+    assert_eq!(
+        super::REFERENCE_SNAPSHOT_GENERATOR_BYTES,
+        size_of::<StabilizerGenerator>() as u128
+    );
 }

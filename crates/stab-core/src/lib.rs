@@ -24,11 +24,11 @@ pub use stab_model::{
     DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
     DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, DiagnosticSeverity, Estimate,
     EstimateClass, Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind,
-    GateTargetRule, MeasureRecordOffset, ModelDialect, ModelError, ModelFingerprint, ModelResult,
-    ObservableId, ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
-    ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
-    RepeatNestingLimitError, RepresentedInstructionLimit, RepresentedTargetLimit, ResourceEstimate,
-    SourceByteLimit, SourceLineLimit, Target, ValidationError, ValidationErrorCode,
+    GateTargetRule, MeasureRecordOffset, MemoryBudget, MemoryBudgetParseError, ModelDialect,
+    ModelError, ModelFingerprint, ModelResult, ObservableId, ParseError, ParseErrorCode,
+    ParseErrorContext, ParseLimits, Pauli, Probability, ProbabilityStimText, QubitId, RepeatBlock,
+    RepeatCount, RepeatNestingLimit, RepeatNestingLimitError, ResourceEstimate, Target,
+    ValidationError, ValidationErrorCode,
 };
 pub use stab_records::{
     BitPlane64Batch, BitPlane64BatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,

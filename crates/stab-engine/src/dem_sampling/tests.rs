@@ -90,7 +90,7 @@ fn odd_parity_probability_matches_repeated_independent_error_parity() {
 }
 
 #[test]
-fn replay_work_admission_bounds_one_shot_not_the_shot_count() {
+fn replay_admission_does_not_cap_the_shot_count() {
     let plan = DemSamplingPlan {
         inner: Arc::new(DemSamplingPlanInner {
             detector_count: 1,
@@ -101,13 +101,8 @@ fn replay_work_admission_bounds_one_shot_not_the_shot_count() {
             },
         }),
     };
-    plan.validate_replay_work_units_with_limits(usize::MAX, DemSamplerLimits::default())
-        .expect("replay streams any shot count whose single shot fits the limit");
-    plan.validate_replay_work_units_with_limits(
-        usize::MAX,
-        DemSamplerLimits::default().with_max_replay_work_units_per_shot(2),
-    )
-    .expect_err("a three-unit replayed shot exceeds a two-unit per-shot limit");
+    plan.validate_replay(ShotCount::new(u64::MAX))
+        .expect("replay work is not capped, so any representable shot count is admitted");
 }
 
 #[test]

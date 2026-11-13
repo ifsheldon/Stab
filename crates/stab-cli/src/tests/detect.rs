@@ -6,10 +6,10 @@ const FLIPPED_DETECTOR_AND_OBSERVABLE: &[u8] =
     b"X_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
 
 #[test]
-fn detect_and_sample_enforce_storage_without_restricting_sparse_qubit_syntax() {
-    // Detection's two frame planes and both packed batches reach 256 MiB at this ID. Sampling's
-    // wider bit-plane frame reaches its limit at a lower ID, and no single-measurement fast path
-    // exempts the full Stim qubit-ID range from that frame any more.
+fn detect_and_sample_enforce_the_memory_budget_without_restricting_sparse_qubit_syntax() {
+    // Under a 256 MiB budget, detection's two frame planes and both packed batches reach the
+    // budget at this ID. Sampling's wider bit-plane frame reaches it at a lower ID, and no
+    // single-measurement fast path exempts the full Stim qubit-ID range from that frame.
     for (command, qubit, expected_error) in [
         ("detect", 16_777_150, None),
         (
@@ -27,14 +27,23 @@ fn detect_and_sample_enforce_storage_without_restricting_sparse_qubit_syntax() {
         let input = format!("M {qubit}\nDETECTOR rec[-1]\n");
         // Sampling skips the reference sample, whose tableau would be quadratic in the ID.
         let args: &[&str] = if command == "sample" {
-            &["stab", command, "--shots", "1", "--skip_reference_sample"]
+            &[
+                "stab",
+                command,
+                "--shots",
+                "1",
+                "--skip_reference_sample",
+                "--memory-budget=256MiB",
+            ]
         } else {
-            &["stab", command, "--shots", "1"]
+            &["stab", command, "--shots", "1", "--memory-budget=256MiB"]
         };
         let result = run(args, input.as_bytes());
         match expected_error {
             None => result.assert_ok(b"0\n"),
-            Some(message) => result.assert_err(&[message, "268435456-byte safety limit"]),
+            Some(message) => {
+                result.assert_err(&[message, "268435456-byte memory budget", "--memory-budget"])
+            }
         }
     }
 }

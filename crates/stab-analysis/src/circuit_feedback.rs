@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, GateCategory, MeasureRecordOffset,
-    Pauli, QubitId, RepeatBlock, RepeatCount, Target,
+    MemoryBudget, Pauli, QubitId, RepeatBlock, RepeatCount, Target,
     advanced::{
         CircuitBuilder, ClassicalControl, ControlledPauliTargetPair,
         classify_controlled_pauli_target_pair,
@@ -13,11 +13,22 @@ use crate::{
     AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
-const MAX_FEEDBACK_REPEAT_WORK_UNITS: u64 = 1_000_000;
 const MAX_FEEDBACK_REPEAT_NESTING: usize = 256;
+/// The unrolled reversed buffer and the rebuilt output circuit each retain the expansion.
+const FEEDBACK_RETAINED_COPIES: u64 = 2;
 
+/// Inlines feedback within the default memory budget.
 pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    validate_feedback_repeat_budget(circuit)?;
+    circuit_with_inlined_feedback_with_memory_budget(circuit, MemoryBudget::DEFAULT)
+}
+
+/// Inlines feedback after admitting the conservative size of its unrolled intermediate and
+/// output circuits against `budget`. Expanded work itself is not capped.
+pub fn circuit_with_inlined_feedback_with_memory_budget(
+    circuit: &Circuit,
+    budget: MemoryBudget,
+) -> AnalysisResult<Circuit> {
+    validate_feedback_repeat_budget(circuit, budget)?;
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         AnalysisError::invalid_detector_error_model(
             "measurement count does not fit usize while inlining feedback",
@@ -351,36 +362,26 @@ fn flush_growing_loop(
     Ok(())
 }
 
-#[derive(Default)]
 struct FeedbackRepeatBudget {
-    expanded_work_units: u64,
-    repeat_iterations: u64,
+    budget: MemoryBudget,
+    projected_bytes: u64,
 }
 
 impl FeedbackRepeatBudget {
-    fn add_expanded_work_units(&mut self, count: u64) -> AnalysisResult<()> {
-        let actual = self.expanded_work_units.saturating_add(count);
-        if actual > MAX_FEEDBACK_REPEAT_WORK_UNITS {
-            return Err(feedback_resource_error(
-                ResourceKind::ExpandedOperations,
+    fn add_projected_bytes(&mut self, count: u64) -> AnalysisResult<()> {
+        let actual = self
+            .projected_bytes
+            .saturating_add(count.saturating_mul(FEEDBACK_RETAINED_COPIES));
+        if !self.budget.admits(u128::from(actual)) {
+            return Err(ResourceLimitError::memory_budget(
+                ResourceOperation::FeedbackInlining,
+                ResourceKind::MaterializedBytes,
                 actual,
-                MAX_FEEDBACK_REPEAT_WORK_UNITS,
-            ));
+                self.budget.bytes(),
+            )
+            .into());
         }
-        self.expanded_work_units = actual;
-        Ok(())
-    }
-
-    fn add_repeat_iterations(&mut self, count: u64) -> AnalysisResult<()> {
-        let actual = self.repeat_iterations.saturating_add(count);
-        if actual > MAX_FEEDBACK_REPEAT_WORK_UNITS {
-            return Err(feedback_resource_error(
-                ResourceKind::RepeatIterations,
-                actual,
-                MAX_FEEDBACK_REPEAT_WORK_UNITS,
-            ));
-        }
-        self.repeat_iterations = actual;
+        self.projected_bytes = actual;
         Ok(())
     }
 }
@@ -395,8 +396,11 @@ fn feedback_resource_error(resource: ResourceKind, actual: u64, limit: u64) -> A
     .into()
 }
 
-fn validate_feedback_repeat_budget(circuit: &Circuit) -> AnalysisResult<()> {
-    let mut budget = FeedbackRepeatBudget::default();
+fn validate_feedback_repeat_budget(circuit: &Circuit, budget: MemoryBudget) -> AnalysisResult<()> {
+    let mut budget = FeedbackRepeatBudget {
+        budget,
+        projected_bytes: 0,
+    };
     validate_feedback_repeat_budget_inner(circuit, 1, 0, &mut budget)
 }
 
@@ -416,13 +420,16 @@ fn validate_feedback_repeat_budget_inner(
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                let work_units = instruction_work_units(instruction)?.saturating_mul(multiplier);
-                budget.add_expanded_work_units(work_units)?;
+                budget.add_projected_bytes(
+                    instruction_retained_bytes(instruction).saturating_mul(multiplier),
+                )?;
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let repeat_count = repeat.repeat_count().get();
                 let repeated_multiplier = multiplier.saturating_mul(repeat_count);
-                budget.add_repeat_iterations(repeated_multiplier)?;
+                // Each unrolled iteration retains one single-iteration repeat block.
+                let block_bytes = (size_of::<CircuitItem>() + size_of::<Circuit>()) as u64;
+                budget.add_projected_bytes(block_bytes.saturating_mul(repeated_multiplier))?;
                 validate_feedback_repeat_budget_inner(
                     repeat.body(),
                     repeated_multiplier,
@@ -435,13 +442,14 @@ fn validate_feedback_repeat_budget_inner(
     Ok(())
 }
 
-fn instruction_work_units(instruction: &CircuitInstruction) -> AnalysisResult<u64> {
-    let target_count = u64::try_from(instruction.targets().len()).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
-            "feedback inlining instruction target count does not fit u64",
+/// Conservative retained bytes of one copy of `instruction` in an owned circuit.
+fn instruction_retained_bytes(instruction: &CircuitInstruction) -> u64 {
+    (size_of::<CircuitItem>() as u64)
+        .saturating_add(
+            (instruction.targets().len() as u64).saturating_mul(size_of::<Target>() as u64),
         )
-    })?;
-    Ok(target_count.max(1))
+        .saturating_add((instruction.args().len() as u64).saturating_mul(8))
+        .saturating_add(instruction.tag_bytes().map_or(0, <[u8]>::len) as u64)
 }
 
 fn rewritten_detector(
@@ -879,32 +887,36 @@ mod tests {
     }
 
     #[test]
-    fn feedback_repeat_resource_divergence_has_one_aggregate_policy() {
-        let above_old_per_block_cap = Circuit::from_stim_str("REPEAT 100001 {\nTICK\n}\n").unwrap();
-        let accepted = validate_feedback_repeat_budget(&above_old_per_block_cap);
-        assert!(
-            accepted.is_ok(),
-            "aggregate budget should admit work above the obsolete per-block cap: {accepted:?}"
+    fn feedback_unrolling_is_admitted_against_the_memory_budget_and_nesting_stays_fixed() {
+        let above_old_work_cap = Circuit::from_stim_str("REPEAT 1000001 {\nTICK\n}\n").unwrap();
+        validate_feedback_repeat_budget(&above_old_work_cap, MemoryBudget::DEFAULT).unwrap();
+
+        let one_iteration = Circuit::from_stim_str("REPEAT 1 {\nTICK\n}\n").unwrap();
+        let mut exact = FeedbackRepeatBudget {
+            budget: MemoryBudget::from_bytes(u64::MAX),
+            projected_bytes: 0,
+        };
+        validate_feedback_repeat_budget_inner(&one_iteration, 1, 0, &mut exact).unwrap();
+        let exact = exact.projected_bytes;
+        assert!(exact > 0);
+        validate_feedback_repeat_budget(&one_iteration, MemoryBudget::from_bytes(exact)).unwrap();
+        let error =
+            validate_feedback_repeat_budget(&one_iteration, MemoryBudget::from_bytes(exact - 1))
+                .unwrap_err();
+        let resource = error.resource_limit_error().unwrap();
+        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+        assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+        assert_eq!((resource.actual(), resource.limit()), (exact, exact - 1));
+        assert!(error.to_string().contains("memory budget"), "{error}");
+
+        // A compact repeat whose unrolling would retain far more than the budget is refused
+        // before any unrolled output is built.
+        let hostile = Circuit::from_stim_str("REPEAT 1000000000000 {\nTICK\n}\n").unwrap();
+        let error = circuit_with_inlined_feedback(&hostile).unwrap_err();
+        assert_eq!(
+            error.resource_limit_error().unwrap().resource(),
+            ResourceKind::MaterializedBytes
         );
-
-        let excessive_work = Circuit::from_stim_str("REPEAT 1000001 {\nTICK\n}\n").unwrap();
-        let error = validate_feedback_repeat_budget(&excessive_work).unwrap_err();
-        let resource = error.resource_limit_error().unwrap();
-        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
-        assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
-        assert_eq!(resource.actual(), 1_000_001);
-        assert_eq!(resource.limit(), MAX_FEEDBACK_REPEAT_WORK_UNITS);
-
-        let mut expanded = FeedbackRepeatBudget::default();
-        expanded
-            .add_expanded_work_units(MAX_FEEDBACK_REPEAT_WORK_UNITS)
-            .unwrap();
-        let error = expanded.add_expanded_work_units(1).unwrap_err();
-        let resource = error.resource_limit_error().unwrap();
-        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
-        assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
-        assert_eq!(resource.actual(), 1_000_001);
-        assert_eq!(resource.limit(), MAX_FEEDBACK_REPEAT_WORK_UNITS);
 
         let mut nested = Circuit::from_stim_str("TICK\n").unwrap();
         for _ in 0..=MAX_FEEDBACK_REPEAT_NESTING {
@@ -916,7 +928,7 @@ mod tests {
             ));
             nested = outer;
         }
-        let error = validate_feedback_repeat_budget(&nested).unwrap_err();
+        let error = validate_feedback_repeat_budget(&nested, MemoryBudget::DEFAULT).unwrap_err();
         let resource = error.resource_limit_error().unwrap();
         assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
         assert_eq!(resource.resource(), ResourceKind::RepeatNesting);

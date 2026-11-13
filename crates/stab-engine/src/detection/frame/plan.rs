@@ -30,12 +30,12 @@ impl DirectDetectorFramePlan {
             circuit,
             ProgramOptions::DETECTION,
             conversion_bytes,
-            limits.max_compiled_bytes(),
+            limits.memory_budget().bytes(),
         )?;
         admit_combined_compiled_storage(
             conversion_bytes,
             execution_admission.retained_bytes(),
-            limits.max_compiled_bytes(),
+            limits.memory_budget().bytes(),
         )?;
         let conversion =
             ConversionPlan::materialize_circuit_from_admission(circuit, conversion_admission)?;
@@ -44,12 +44,20 @@ impl DirectDetectorFramePlan {
             executable,
             conversion,
         };
-        admit_combined_compiled_storage(result.compiled_bytes()?, 0, limits.max_compiled_bytes())?;
+        admit_combined_compiled_storage(
+            result.compiled_bytes()?,
+            0,
+            limits.memory_budget().bytes(),
+        )?;
         Ok(result)
     }
 
     pub(in crate::detection) fn measurement_count(&self) -> usize {
         self.conversion.measurement_count
+    }
+
+    pub(in crate::detection) fn memory_budget(&self) -> stab_model::MemoryBudget {
+        self.conversion.limits.memory_budget()
     }
 
     pub(in crate::detection) fn qubit_count(&self) -> usize {

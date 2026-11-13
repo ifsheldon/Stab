@@ -6,11 +6,10 @@ use std::sync::{Arc, OnceLock};
 
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
-use stab_model::Circuit;
+use stab_model::{Circuit, MemoryBudget};
 use stab_records::{BitPlane64Batch, MeasurementBatchView, MeasurementSink, MeasurementWidth};
 use thiserror::Error;
 
-use super::stabilizer_frame::StabilizerFrame;
 use super::{compile_program, sampler_rng};
 use crate::CompilationRequestFingerprint;
 use crate::detection::frame::{CircuitProgram, PauliFrameSamplingState};
@@ -24,11 +23,11 @@ pub(super) use session_helpers::compute_stabilizer_frame_reference_sample;
 pub(super) use session_helpers::{
     compute_reference_sample, try_bool_buffer, validate_reference_width,
 };
-use session_helpers::{fill_pauli_frame_batch, sample_general_into, validate_session_storage};
+use session_helpers::{fill_pauli_frame_batch, validate_session_storage};
 
 const MAX_BATCH_SHOTS: usize = 64;
-pub(super) const MAX_EXPANDED_OPERATIONS_PER_SHOT: u64 = 1_000_000;
-pub(super) const MAX_SAMPLING_SESSION_STORAGE_BYTES: u64 = 256 * 1024 * 1024;
+/// Executable discriminator of the bit-plane Pauli frame, the only sampling executor.
+const PAULI_FRAME_EXECUTABLE_DISCRIMINATOR: u8 = 4;
 const PLAN_FINGERPRINT_DOMAIN: &[u8] = b"stab:plan-fingerprint\0";
 const EXECUTABLE_CONTRACT_DOMAIN: &[u8] = b"stab:sampling-executable-contract\0";
 
@@ -148,16 +147,27 @@ impl ReferenceSampleLoopPolicy {
 }
 
 /// Builder for immutable sampling plans.
+///
+/// The memory budget bounds the compiled program, every session's reusable storage, and the
+/// reference-simulator scratch, each admitted before it is allocated.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SamplingCompiler {
     reference_sample_loop_policy: ReferenceSampleLoopPolicy,
+    memory_budget: MemoryBudget,
 }
 
 impl SamplingCompiler {
     pub const fn new() -> Self {
         Self {
             reference_sample_loop_policy: ReferenceSampleLoopPolicy::Fold,
+            memory_budget: MemoryBudget::DEFAULT,
         }
+    }
+
+    #[must_use]
+    pub const fn memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.memory_budget = memory_budget;
+        self
     }
 
     pub const fn reference_sample_loop_policy(mut self, policy: ReferenceSampleLoopPolicy) -> Self {
@@ -168,13 +178,13 @@ impl SamplingCompiler {
     pub fn compile(self, circuit: &Circuit) -> Result<SamplingPlan, SamplingCompileError> {
         let backend = SamplingBackend::Scalar;
         let request_fingerprint = CompilationRequestFingerprint::for_sampling(circuit);
-        let (program, kind) = compile_program(circuit)?;
+        let program = compile_program(circuit, self.memory_budget)?;
         let counts = program.counts();
         let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
         let fingerprint = PlanFingerprint::for_sampling(
             request_fingerprint,
             backend,
-            kind.executable_discriminator(),
+            PAULI_FRAME_EXECUTABLE_DISCRIMINATOR,
             self.reference_sample_loop_policy,
             SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION,
         );
@@ -184,46 +194,13 @@ impl SamplingCompiler {
                 measurement_count: counts.measurements,
                 sweep_bit_count: counts.sweep_bits,
                 program,
-                kind,
+                memory_budget: self.memory_budget,
                 reference_sample_loop_policy: self.reference_sample_loop_policy,
                 reference_sample: OnceLock::new(),
                 backend,
                 request_fingerprint,
                 fingerprint,
             }),
-        })
-    }
-}
-
-#[cfg(test)]
-impl SamplingCompiler {
-    /// Compiles a plan that executes on the general stabilizer frame, which production selects
-    /// only for measurement-bearing programs above the bit-plane frame's compiled budget.
-    pub(super) fn compile_general_frame_for_test(
-        self,
-        circuit: &Circuit,
-    ) -> Result<SamplingPlan, SamplingCompileError> {
-        let program = CircuitProgram::compile(
-            circuit,
-            crate::detection::frame::ProgramOptions::GENERAL_SAMPLING,
-        )
-        .map_err(super::sampling_compile_error)?;
-        let plan = self.compile(circuit)?;
-        let inner = SamplingPlanInner {
-            program,
-            kind: SamplingPlanKind::GeneralFrame,
-            reference_sample: OnceLock::new(),
-            fingerprint: PlanFingerprint::for_sampling(
-                plan.inner.request_fingerprint,
-                plan.inner.backend,
-                SamplingPlanKind::GeneralFrame.executable_discriminator(),
-                self.reference_sample_loop_policy,
-                SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION,
-            ),
-            ..(*plan.inner).clone()
-        };
-        Ok(SamplingPlan {
-            inner: Arc::new(inner),
         })
     }
 }
@@ -420,7 +397,7 @@ pub(super) struct SamplingPlanInner {
     pub(super) measurement_count: usize,
     pub(super) sweep_bit_count: usize,
     pub(super) program: CircuitProgram,
-    pub(super) kind: SamplingPlanKind,
+    pub(super) memory_budget: MemoryBudget,
     pub(super) reference_sample_loop_policy: ReferenceSampleLoopPolicy,
     /// The all-zero-sweep reference sample, computed at most once per successful plan.
     reference_sample: OnceLock<Vec<bool>>,
@@ -451,26 +428,8 @@ impl SamplingPlanInner {
             && super::reference_state_snapshot_fits(
                 self.qubit_count,
                 self.measurement_count,
-                MAX_SAMPLING_SESSION_STORAGE_BYTES,
+                self.memory_budget,
             )
-    }
-}
-
-/// The executor a plan selected. Both walk the plan's one resolved program.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum SamplingPlanKind {
-    /// Reusable bit-plane Pauli frame, selected whenever the program fits its compiled budget.
-    PauliFrame,
-    /// Per-shot general stabilizer frame for measurement-bearing programs above that budget.
-    GeneralFrame,
-}
-
-impl SamplingPlanKind {
-    const fn executable_discriminator(self) -> u8 {
-        match self {
-            Self::GeneralFrame => 3,
-            Self::PauliFrame => 4,
-        }
     }
 }
 
@@ -482,7 +441,6 @@ enum SessionFrame {
         pending_start: usize,
         pending_count: usize,
     },
-    General(Vec<StabilizerFrame>),
 }
 
 /// Cooperative cancellation state checked between completed bounded sampling batches.
@@ -518,7 +476,7 @@ pub enum SamplingExecutionError {
     ShotCounterOverflow,
 
     #[error(
-        "sampling session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte safety limit"
+        "sampling session needs an estimated {estimated_bytes} bytes of bounded storage, exceeding the {limit_bytes}-byte memory budget; raise the memory budget to admit it"
     )]
     SessionStorageLimit {
         estimated_bytes: u128,
@@ -675,8 +633,6 @@ pub struct SamplingSession {
     rng: SmallRng,
     frame: SessionFrame,
     uses_reference_sample: bool,
-    record: Vec<bool>,
-    output: Vec<bool>,
     batch: BitPlane64Batch,
     cancellation: OnceLock<Arc<AtomicBool>>,
     total_committed_shots: u64,
@@ -713,42 +669,21 @@ impl SamplingSession {
             RandomPolicy::Entropy => sampler_rng(None),
             RandomPolicy::Seeded(seed) => sampler_rng(Some(seed.get())),
         };
-        let uses_reference_sample = match (plan.inner.kind, reference_mode) {
-            (SamplingPlanKind::PauliFrame, ReferenceSampleMode::UseReferenceSample)
-            | (SamplingPlanKind::GeneralFrame, ReferenceSampleMode::SkipReferenceSample) => true,
-            (SamplingPlanKind::PauliFrame, ReferenceSampleMode::SkipReferenceSample)
-            | (SamplingPlanKind::GeneralFrame, ReferenceSampleMode::UseReferenceSample) => false,
-        };
+        let uses_reference_sample = reference_mode == ReferenceSampleMode::UseReferenceSample;
         if uses_reference_sample {
             plan.inner.cached_reference_sample()?;
         }
         let frame = if plan.inner.measurement_count == 0 {
             SessionFrame::Empty
         } else {
-            match plan.inner.kind {
-                SamplingPlanKind::PauliFrame => SessionFrame::Pauli {
-                    state: PauliFrameSamplingState::try_new(&plan.inner.program).map_err(
-                        |error| SamplingExecutionError::SessionStorageAllocation {
-                            message: error.to_string(),
-                        },
-                    )?,
-                    pending_start: 0,
-                    pending_count: 0,
-                },
-                SamplingPlanKind::GeneralFrame => {
-                    let mut frames = Vec::new();
-                    frames.try_reserve_exact(1).map_err(|error| {
-                        SamplingExecutionError::SessionStorageAllocation {
-                            message: format!("general stabilizer frame owner: {error}"),
-                        }
-                    })?;
-                    frames.push(StabilizerFrame::try_new(plan.inner.qubit_count).map_err(
-                        |error| SamplingExecutionError::SessionStorageAllocation {
-                            message: error.to_string(),
-                        },
-                    )?);
-                    SessionFrame::General(frames)
-                }
+            SessionFrame::Pauli {
+                state: PauliFrameSamplingState::try_new(&plan.inner.program).map_err(|error| {
+                    SamplingExecutionError::SessionStorageAllocation {
+                        message: error.to_string(),
+                    }
+                })?,
+                pending_start: 0,
+                pending_count: 0,
             }
         };
         let batch = BitPlane64Batch::zeros(MAX_BATCH_SHOTS, plan.inner.measurement_count).map_err(
@@ -756,17 +691,7 @@ impl SamplingSession {
                 message: source.to_string(),
             },
         )?;
-        let (record, output) = if plan.inner.kind == SamplingPlanKind::PauliFrame {
-            (Vec::new(), Vec::new())
-        } else {
-            (
-                try_bool_buffer(plan.inner.measurement_count, "measurement record")?,
-                try_bool_buffer(plan.inner.measurement_count, "measurement output")?,
-            )
-        };
         Ok(Self {
-            record,
-            output,
             plan,
             rng,
             frame,
@@ -903,34 +828,14 @@ impl SamplingSession {
         if self.plan.inner.measurement_count == 0 {
             return Ok(());
         }
-        if self.plan.inner.kind == SamplingPlanKind::PauliFrame {
-            return fill_pauli_frame_batch(
-                &self.plan.inner.program,
-                &mut self.frame,
-                &mut self.batch,
-                session_reference(&self.plan, self.uses_reference_sample)?,
-                &mut self.rng,
-                shot_count,
-            );
-        }
-        for shot_index in 0..shot_count {
-            self.sample_shot()?;
-            if self.output.len() != self.plan.inner.measurement_count {
-                return Err(SamplingExecutionError::InternalInvariant {
-                    message: format!(
-                        "sampler produced {} bits for declared width {}",
-                        self.output.len(),
-                        self.plan.inner.measurement_count
-                    ),
-                });
-            }
-            self.batch
-                .copy_shot_from_bools(shot_index, &self.output)
-                .map_err(|source| SamplingExecutionError::InternalInvariant {
-                    message: source.to_string(),
-                })?;
-        }
-        Ok(())
+        fill_pauli_frame_batch(
+            &self.plan.inner.program,
+            &mut self.frame,
+            &mut self.batch,
+            session_reference(&self.plan, self.uses_reference_sample)?,
+            &mut self.rng,
+            shot_count,
+        )
     }
 
     #[inline(always)]
@@ -938,43 +843,6 @@ impl SamplingSession {
         self.cancellation
             .get()
             .is_some_and(|cancelled| cancelled.load(Ordering::Acquire))
-    }
-
-    fn sample_shot(&mut self) -> Result<(), SamplingExecutionError> {
-        let program = &self.plan.inner.program;
-        let reference = session_reference(&self.plan, self.uses_reference_sample)?;
-        match (self.plan.inner.kind, &mut self.frame) {
-            (_, SessionFrame::Empty) if self.plan.inner.measurement_count == 0 => {
-                self.record.clear();
-                self.output.clear();
-                Ok(())
-            }
-            (SamplingPlanKind::PauliFrame, SessionFrame::Pauli { .. }) => {
-                Err(SamplingExecutionError::InternalInvariant {
-                    message: "Pauli-frame sampling must execute through the bit-plane batch path"
-                        .to_owned(),
-                })
-            }
-            (SamplingPlanKind::GeneralFrame, SessionFrame::General(frame)) => {
-                let frame =
-                    frame
-                        .first_mut()
-                        .ok_or_else(|| SamplingExecutionError::InternalInvariant {
-                            message: "general sampling session lost its admitted frame".to_owned(),
-                        })?;
-                sample_general_into(
-                    program,
-                    frame,
-                    &mut self.record,
-                    &mut self.output,
-                    reference,
-                    &mut self.rng,
-                )
-            }
-            _ => Err(SamplingExecutionError::InternalInvariant {
-                message: "sampling plan and retained frame implementation disagree".to_owned(),
-            }),
-        }
     }
 
     const fn summary(

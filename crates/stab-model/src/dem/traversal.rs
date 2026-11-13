@@ -18,8 +18,6 @@ use super::{
 };
 use crate::{ModelError, ModelResult};
 
-const MAX_DEM_COORDINATE_SCALAR_WORK: u64 = 8_000_000;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct DemDetectorBounds {
     pub(super) min: u64,
@@ -249,23 +247,16 @@ impl<'a> FoldedDemBlock<'a> {
     }
 
     pub(super) fn coordinate_shift(&self) -> ModelResult<Vec<f64>> {
-        let mut budget = ExpansionBudget::default();
-        self.coordinate_shift_with_budget(&mut budget)
-    }
-
-    fn coordinate_shift_with_budget(&self, budget: &mut ExpansionBudget) -> ModelResult<Vec<f64>> {
         let mut shift = Vec::new();
         for item in &self.items {
             match item {
                 FoldedDemItem::Instruction(instruction)
                     if instruction.kind() == DemInstructionKind::ShiftDetectors =>
                 {
-                    budget.add_coordinate_scalars(instruction.args().len())?;
                     add_coordinate_shift_mul(&mut shift, instruction.args(), 1.0)?;
                 }
                 FoldedDemItem::Repeat { repeat, body } => {
-                    let body_shift = body.coordinate_shift_with_budget(budget)?;
-                    budget.add_coordinate_scalars(body_shift.len())?;
+                    let body_shift = body.coordinate_shift()?;
                     add_coordinate_shift_mul(
                         &mut shift,
                         &body_shift,
@@ -293,7 +284,7 @@ impl<'a> FoldedDemBlock<'a> {
                     if visitor.visit_instruction(instruction, state)?.is_break() {
                         return Ok(ControlFlow::Break(()));
                     }
-                    state.apply_instruction(instruction, expansion)?;
+                    state.apply_instruction(instruction)?;
                 }
                 FoldedDemItem::Repeat { repeat, body } => {
                     if repeat.repeat_count().get() == 0 {
@@ -308,7 +299,7 @@ impl<'a> FoldedDemBlock<'a> {
                     if visitor.exit_repeat(repeat, body, state)?.is_break() {
                         return Ok(ControlFlow::Break(()));
                     }
-                    state.advance_repeat(body, repeat.repeat_count().get(), expansion)?;
+                    state.advance_repeat(body, repeat.repeat_count().get())?;
                 }
             }
         }
@@ -439,11 +430,7 @@ impl DemTraversalState {
         self.folded_repeat_multiplicity
     }
 
-    fn apply_instruction(
-        &mut self,
-        instruction: &DemInstruction,
-        expansion: &mut ExpansionBudget,
-    ) -> ModelResult<()> {
+    fn apply_instruction(&mut self, instruction: &DemInstruction) -> ModelResult<()> {
         if instruction.kind() == DemInstructionKind::ShiftDetectors {
             self.detector_offset = self
                 .detector_offset
@@ -454,7 +441,6 @@ impl DemTraversalState {
                     )
                 })?;
             if let Some(coordinate_shift) = &mut self.coordinate_shift {
-                expansion.add_coordinate_scalars(instruction.args().len())?;
                 add_coordinate_shift_mul(coordinate_shift, instruction.args(), 1.0)?;
             }
         }
@@ -467,7 +453,6 @@ impl DemTraversalState {
         iteration: u64,
         folded: bool,
         repeat_count: u64,
-        expansion: &mut ExpansionBudget,
     ) -> ModelResult<Self> {
         let detector_offset = body
             .summary()
@@ -481,8 +466,7 @@ impl DemTraversalState {
             })?;
         let mut coordinate_shift = self.coordinate_shift.clone();
         if let Some(coordinate_shift) = &mut coordinate_shift {
-            let body_shift = body.coordinate_shift_with_budget(expansion)?;
-            expansion.add_coordinate_scalars(body_shift.len())?;
+            let body_shift = body.coordinate_shift()?;
             add_coordinate_shift_mul(coordinate_shift, &body_shift, iteration as f64)?;
         }
         let folded_repeat_multiplicity = if folded {
@@ -512,12 +496,7 @@ impl DemTraversalState {
         })
     }
 
-    fn advance_repeat(
-        &mut self,
-        body: &FoldedDemBlock<'_>,
-        repeat_count: u64,
-        expansion: &mut ExpansionBudget,
-    ) -> ModelResult<()> {
+    fn advance_repeat(&mut self, body: &FoldedDemBlock<'_>, repeat_count: u64) -> ModelResult<()> {
         self.detector_offset = body
             .summary()
             .detector_shift()?
@@ -529,8 +508,7 @@ impl DemTraversalState {
                 )
             })?;
         if let Some(coordinate_shift) = &mut self.coordinate_shift {
-            let body_shift = body.coordinate_shift_with_budget(expansion)?;
-            expansion.add_coordinate_scalars(body_shift.len())?;
+            let body_shift = body.coordinate_shift()?;
             add_coordinate_shift_mul(coordinate_shift, &body_shift, repeat_count as f64)?;
         }
         Ok(())
@@ -622,25 +600,6 @@ pub trait FoldedDemVisitor {
 #[derive(Default)]
 struct ExpansionBudget {
     used_iterations: u64,
-    coordinate_scalars: u64,
-}
-
-impl ExpansionBudget {
-    fn add_coordinate_scalars(&mut self, count: usize) -> ModelResult<()> {
-        let count = u64::try_from(count).map_err(|_| {
-            ModelError::invalid_detector_error_model("DEM coordinate scalar work does not fit u64")
-        })?;
-        self.coordinate_scalars = self.coordinate_scalars.checked_add(count).ok_or_else(|| {
-            ModelError::invalid_detector_error_model("DEM coordinate scalar work overflowed")
-        })?;
-        if self.coordinate_scalars > MAX_DEM_COORDINATE_SCALAR_WORK {
-            return Err(ModelError::invalid_detector_error_model(format!(
-                "DEM coordinate traversal currently supports at most {MAX_DEM_COORDINATE_SCALAR_WORK} coordinate scalar updates, got at least {}",
-                self.coordinate_scalars
-            )));
-        }
-        Ok(())
-    }
 }
 
 fn visit_repeat_selection<V>(
@@ -658,8 +617,7 @@ where
     match selection {
         DemRepeatSelection::Skip => Ok(ControlFlow::Continue(())),
         DemRepeatSelection::StructuralOnce => {
-            let mut iteration_state =
-                state.at_iteration(body, 0, false, repeat_count, expansion)?;
+            let mut iteration_state = state.at_iteration(body, 0, false, repeat_count)?;
             body.visit(visitor, &mut iteration_state, expansion)
         }
         DemRepeatSelection::FoldOnce => {
@@ -669,7 +627,7 @@ where
                 )
                 .into());
             }
-            let mut iteration_state = state.at_iteration(body, 0, true, repeat_count, expansion)?;
+            let mut iteration_state = state.at_iteration(body, 0, true, repeat_count)?;
             body.visit(visitor, &mut iteration_state, expansion)
         }
         DemRepeatSelection::Expand {
@@ -691,7 +649,7 @@ where
             }
             for iteration in 0..repeat_count {
                 let mut iteration_state =
-                    state.at_iteration(body, iteration, false, repeat_count, expansion)?;
+                    state.at_iteration(body, iteration, false, repeat_count)?;
                 if body
                     .visit(visitor, &mut iteration_state, expansion)?
                     .is_break()
@@ -712,7 +670,7 @@ where
                 }
                 previous = Some(iteration);
                 let mut iteration_state =
-                    state.at_iteration(body, iteration, false, repeat_count, expansion)?;
+                    state.at_iteration(body, iteration, false, repeat_count)?;
                 if body
                     .visit(visitor, &mut iteration_state, expansion)?
                     .is_break()

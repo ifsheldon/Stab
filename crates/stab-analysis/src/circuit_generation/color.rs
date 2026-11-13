@@ -19,8 +19,8 @@ use super::{
 
 /// Generates Stim-compatible triangular color-code memory circuits.
 ///
-/// Returns an error before materialization if the projected circuit exceeds the generator's
-/// 131,072-physical-qubit resource limit. This admits valid odd distances through 341.
+/// Returns an error before materialization if the projected circuit exceeds the parameters'
+/// memory budget.
 pub fn generate_color_code_circuit(params: &ColorCodeParams) -> AnalysisResult<GeneratedCircuit> {
     let ColorCodeTask::MemoryXyz = params.task;
     if params.rounds().get() < 2 {
@@ -37,7 +37,7 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> AnalysisResult<G
     }
 
     let distance = params.distance().get();
-    validate_color_generation_size(distance)?;
+    validate_color_generation_size(distance, params.memory_budget())?;
     let width = distance + (distance - 1) / 2;
     let mut data_coords = BTreeSet::new();
     let mut measure_coords = BTreeSet::new();

@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-use crate::ResourceAmount;
-
 /// Stable code classifying a sampling compilation failure.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -32,9 +30,9 @@ pub enum SamplingCompileError {
     InvalidCircuit { message: String },
 
     #[error(
-        "cannot compile circuit sampler: expanded operation work {actual} exceeds per-shot limit {limit}"
+        "cannot compile circuit sampler: the compiled program needs at least {required} bytes, exceeding the {budget}-byte memory budget; raise the memory budget to admit it"
     )]
-    ExpandedOperationLimit { actual: ResourceAmount, limit: u64 },
+    CompiledBytesLimit { required: u64, budget: u64 },
 }
 
 impl SamplingCompileError {
@@ -46,7 +44,7 @@ impl SamplingCompileError {
 
     pub const fn code(&self) -> SamplingCompileErrorCode {
         match self {
-            Self::ExpandedOperationLimit { .. } => SamplingCompileErrorCode::ResourceLimit,
+            Self::CompiledBytesLimit { .. } => SamplingCompileErrorCode::ResourceLimit,
             Self::Model(_) | Self::Analysis(_) | Self::InvalidCircuit { .. } => {
                 SamplingCompileErrorCode::InvalidCircuit
             }

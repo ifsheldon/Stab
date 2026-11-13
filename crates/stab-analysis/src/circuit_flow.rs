@@ -13,6 +13,6 @@ pub use checker::{
 };
 pub use generators::circuit_flow_generators;
 pub(crate) use generators::{
-    MAX_FLOW_GENERATOR_PROJECTED_BYTES, measurement_rich_flow_generator_projected_bytes,
+    FLOW_GENERATOR_MEMORY_BUDGET, measurement_rich_flow_generator_projected_bytes,
 };
 pub use solver::solve_for_flow_measurements;

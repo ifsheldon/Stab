@@ -99,8 +99,8 @@ fn cq2_circuit_api_flattened_transform() {
         )
     );
     assert!(
-        flattened_circuit(&circuit("REPEAT 1000001 {\n    H 0\n}\n")).is_err(),
-        "materializing above the source-owned expansion limit must fail"
+        flattened_circuit(&circuit("REPEAT 1000000000000 {\n    H 0\n}\n")).is_err(),
+        "materializing beyond the memory budget must fail"
     );
 }
 

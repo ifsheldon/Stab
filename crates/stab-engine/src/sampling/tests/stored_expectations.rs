@@ -176,36 +176,6 @@ fn determined_measurement_counts_match_the_pre_e3_stored_digest() {
 }
 
 #[test]
-fn general_frame_seeded_shots_match_the_pre_e3_stored_digest() {
-    let mut hasher = Sha256::new();
-    for (index, text) in corpus().into_iter().enumerate() {
-        let circuit = Circuit::from_stim_str(&text).expect("parse corpus circuit");
-        let plan = SamplingCompiler::new()
-            .compile(&circuit)
-            .expect("compile corpus circuit");
-        let mut rng = SmallRng::seed_from_u64(index as u64);
-        let mut frame = StabilizerFrame::try_new(plan.qubit_count()).expect("general frame");
-        let (mut record, mut output) = (Vec::new(), Vec::new());
-        for _ in 0..4 {
-            plan.sample_shot_in_mode_into(
-                &mut rng,
-                ExecutionMode::Sample,
-                &[],
-                &mut frame,
-                &mut record,
-                &mut output,
-            )
-            .expect("sample general-frame shot");
-            update_bits(&mut hasher, "shot", &output);
-        }
-    }
-    assert_eq!(
-        hex::encode(hasher.finalize()),
-        "6927eca99097c740220c8b2d01f7166c374d25fa0f1664aeedf0727476b0d9da"
-    );
-}
-
-#[test]
 fn unknown_input_counts_equal_known_input_counts_after_full_resets() {
     for (index, text) in corpus().into_iter().enumerate().skip(1).take(6) {
         let circuit = Circuit::from_stim_str(&text).expect("parse generated circuit");

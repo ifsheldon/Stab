@@ -3,7 +3,6 @@
 use stab_model::RepeatNestingLimit;
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
-use super::execute::record_lookback;
 use super::reference_simulator::{
     InverseTableauSimulator, ReferenceSimulatorError, ReferenceStateSnapshot, reset_correction,
 };
@@ -11,6 +10,7 @@ use crate::detection::frame::{
     CircuitProgram, CliffordStep, ControlledPair, ProgramEntry, ProgramInstruction,
     ReferenceClifford,
 };
+use stab_model::MeasureRecordOffset;
 
 /// Below this many repeated work units a repeat is iterated rather than snapshotted.
 const MIN_REFERENCE_FOLD_WORK: u128 = 64;
@@ -144,9 +144,6 @@ fn reference_work_units(
                 ProgramInstruction::SinglePauliNoise { targets, .. }
                 | ProgramInstruction::HeraldedErase { targets, .. }
                 | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len() as u128,
-                ProgramInstruction::ZeroProbabilityNoise { pairs, targets } => {
-                    (targets.len() / if *pairs { 2 } else { 1 }) as u128
-                }
                 ProgramInstruction::TwoQubitPauliNoise { targets, .. } => {
                     (targets.len() / 2) as u128
                 }
@@ -419,7 +416,6 @@ fn apply_instruction(
         }
         ProgramInstruction::SinglePauliNoise { .. }
         | ProgramInstruction::TwoQubitPauliNoise { .. }
-        | ProgramInstruction::ZeroProbabilityNoise { .. }
         | ProgramInstruction::CorrelatedError { .. }
         | ProgramInstruction::Observable { .. } => Ok(()),
         ProgramInstruction::ControlledPauli {
@@ -686,4 +682,16 @@ fn record_fold(reused_iterations: u64, reused_operation_dispatches: u128) {
             .saturating_add(reused_operation_dispatches);
         cell.set(stats);
     });
+}
+
+/// The record bit `offset` steps back from the end of `record`, or false before its start.
+pub(super) fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> bool {
+    let index = i64::try_from(record.len())
+        .ok()
+        .and_then(|len| len.checked_add(i64::from(offset.get())))
+        .and_then(|index| usize::try_from(index).ok());
+    index
+        .and_then(|index| record.get(index))
+        .copied()
+        .unwrap_or(false)
 }

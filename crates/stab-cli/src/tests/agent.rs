@@ -41,6 +41,7 @@ fn assert_capability_schema(report: &Value) {
             "stim_compatibility_version",
             "commands",
             "dialects",
+            "memory_budget",
             "gates",
             "codecs",
             "compilers",
@@ -59,15 +60,13 @@ fn assert_capability_schema(report: &Value) {
         assert_exact_keys(dialect, &["name", "default_parse_limits"]);
         assert_exact_keys(
             pointer(dialect, "/default_parse_limits"),
-            &[
-                "source_bytes",
-                "source_lines",
-                "represented_instructions",
-                "represented_targets",
-                "repeat_nesting",
-            ],
+            &["memory_budget_bytes", "repeat_nesting"],
         );
     }
+    assert_exact_keys(
+        pointer(report, "/memory_budget"),
+        &["option", "default_bytes", "suffixes"],
+    );
     for gate in pointer(report, "/gates")
         .as_array()
         .expect("gates are an array")
@@ -242,7 +241,12 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
 
     let report = json_stdout(&stdout);
     assert_capability_schema(&report);
-    assert_eq!(pointer(&report, "/schema_version"), 5);
+    assert_eq!(pointer(&report, "/schema_version"), 6);
+    assert_eq!(pointer(&report, "/memory_budget/option"), "--memory-budget");
+    assert_eq!(
+        pointer(&report, "/memory_budget/default_bytes"),
+        1_u64 << 30
+    );
     assert_eq!(pointer(&report, "/stim_compatibility_version"), "1.16.0");
     for limits in pointer(&report, "/dialects")
         .as_array()
@@ -250,10 +254,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
         .iter()
         .map(|dialect| pointer(dialect, "/default_parse_limits"))
     {
-        assert_eq!(pointer(limits, "/source_bytes"), 64 * 1024 * 1024);
-        assert_eq!(pointer(limits, "/source_lines"), 1_000_000);
-        assert_eq!(pointer(limits, "/represented_instructions"), 1_000_000);
-        assert_eq!(pointer(limits, "/represented_targets"), 32_000_000);
+        assert_eq!(pointer(limits, "/memory_budget_bytes"), 1_u64 << 30);
         assert_eq!(pointer(limits, "/repeat_nesting"), 256);
     }
 
@@ -315,7 +316,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
                 "input_dialect": "stim-circuit",
                 "compiler_schema_version": 6,
                 "request_fingerprint_schema_version": 1,
-                "configurable_limits": false
+                "configurable_limits": true
             },
             {
                 "operation": "m2d",
@@ -520,13 +521,13 @@ fn inspect_rejects_oversized_files_before_reading_them() {
     let temp = tempdir().expect("temp dir");
     let path = temp.path().join("large.stim");
     let file = File::create(&path).expect("create sparse input");
-    file.set_len(crate::MAX_CIRCUIT_INPUT_BYTES + 1)
-        .expect("extend sparse input");
+    file.set_len(4097).expect("extend sparse input");
 
     let args = vec![
         OsString::from("stab"),
         OsString::from("inspect"),
         path.as_os_str().to_owned(),
+        OsString::from("--memory-budget=4KiB"),
         OsString::from("--error-format=json"),
     ];
     let (status, stdout, stderr) = run_parts(args, b"ignored");
@@ -534,9 +535,12 @@ fn inspect_rejects_oversized_files_before_reading_them() {
     assert_eq!(stdout, b"");
     let diagnostic = json_stdout(&stderr);
     assert_eq!(pointer(&diagnostic, "/code"), "input-too-large");
-    assert_eq!(
-        pointer(&diagnostic, "/context/limit_bytes"),
-        crate::MAX_CIRCUIT_INPUT_BYTES
+    assert_eq!(pointer(&diagnostic, "/context/limit_bytes"), 4096);
+    assert!(
+        pointer(&diagnostic, "/help")
+            .as_str()
+            .is_some_and(|help| help.contains("--memory-budget")),
+        "{diagnostic}"
     );
 }
 

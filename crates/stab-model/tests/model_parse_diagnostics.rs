@@ -8,7 +8,6 @@ use std::hint::black_box;
 use stab_model::{
     ByteSpan, Circuit, DetectorErrorModel, DiagnosticSeverity, ModelDialect, ModelError,
     ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, RepeatNestingLimit,
-    SourceLineLimit,
 };
 
 #[test]
@@ -334,33 +333,7 @@ fn dem_byte_entrypoint_reports_invalid_utf8_at_the_first_invalid_sequence() {
 }
 
 #[test]
-fn byte_parse_limit_entrypoints_apply_custom_limits_after_utf8_decode() {
-    let line_limits = ParseLimits::default().with_source_line_limit(SourceLineLimit::new(2));
-    Circuit::from_stim_bytes_with_limits(b"H 0\nM 0\n", line_limits)
-        .expect("two circuit byte lines are admitted");
-    DetectorErrorModel::from_dem_bytes_with_limits(
-        b"error(0.1) D0\nshift_detectors 1\n",
-        line_limits,
-    )
-    .expect("two DEM byte lines are admitted");
-
-    for error in [
-        Circuit::from_stim_bytes_with_limits(b"H 0\nM 0\nTICK\n", line_limits)
-            .expect_err("third circuit byte line exceeds the policy"),
-        DetectorErrorModel::from_dem_bytes_with_limits(
-            b"error(0.1) D0\nshift_detectors 1\nlogical_observable L0\n",
-            line_limits,
-        )
-        .expect_err("third DEM byte line exceeds the policy"),
-    ] {
-        let resource = error
-            .resource_limit_error()
-            .expect("byte parser line rejection should be structured");
-        assert_eq!(resource.resource(), stab_model::ResourceKind::SourceLines);
-        assert_eq!(resource.actual(), 3);
-        assert_eq!(resource.limit(), 2);
-    }
-
+fn byte_parse_limit_entrypoints_apply_custom_nesting_limits_after_utf8_decode() {
     let repeat_limits = ParseLimits::default().with_repeat_nesting_limit(
         RepeatNestingLimit::try_new(1).expect("one repeat level is safe"),
     );

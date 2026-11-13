@@ -8,8 +8,7 @@ use std::str::FromStr;
 
 use stab_algebra::{PauliBasis, PauliString, Tableau, TableauIterator};
 use stab_analysis::{
-    ResourceKind, ResourceOperation, circuit_to_tableau, pauli_after_circuit, pauli_before_circuit,
-    tableau_to_circuit,
+    circuit_to_tableau, pauli_after_circuit, pauli_before_circuit, tableau_to_circuit,
 };
 use stab_model::{Circuit, CircuitItem};
 
@@ -146,7 +145,7 @@ fn assert_pauli_circuit_conjugation() {
 }
 
 #[test]
-fn pauli_circuit_conjugation_keeps_compact_unitaries_and_bounds_nonunitary_work() {
+fn pauli_circuit_conjugation_keeps_compact_unitaries_and_does_not_cap_nonunitary_work() {
     let folded = circuit("REPEAT 1000000000 {\n    H 0\n}\n");
     assert_eq!(
         pauli_after_circuit(&pauli("+X"), &folded).expect("compact unitary repeat"),
@@ -157,16 +156,13 @@ fn pauli_circuit_conjugation_keeps_compact_unitaries_and_bounds_nonunitary_work(
     assert!(pauli_after_circuit(&pauli("+_"), &circuit("H 1\n")).is_err());
     assert!(pauli_after_circuit(&pauli("+__"), &circuit("MXX 0 1\n")).is_err());
 
-    let excessive = circuit("REPEAT 1000001 {\n    M 0\n}\n");
-    let error = pauli_after_circuit(&pauli("+Z"), &excessive)
-        .expect_err("nonunitary expanded-work boundary");
-    let resource = error
-        .resource_limit_error()
-        .expect("typed Pauli-conjugation resource error");
-    assert_eq!(resource.operation(), ResourceOperation::PauliConjugation);
-    assert_eq!(resource.resource(), ResourceKind::ExpandedOperations);
-    assert_eq!(resource.actual(), 1_000_001);
-    assert_eq!(resource.limit(), 1_000_000);
+    // Nonunitary expansion is CPU work over one fixed-width Pauli string, so work above the
+    // retired one-million-instruction cap completes.
+    let above_retired_cap = circuit("REPEAT 1000001 {\n    M 0\n}\n");
+    assert_eq!(
+        pauli_after_circuit(&pauli("+Z"), &above_retired_cap).expect("uncapped nonunitary work"),
+        pauli("+Z")
+    );
 }
 
 fn assert_synthesis_round_trip(tableau: &Tableau) {

@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{Flow, PauliSign, PauliString};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, MeasureRecordOffset, QubitId, Target,
+    Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, MeasureRecordOffset, MemoryBudget,
+    QubitId, Target,
 };
 
 use crate::{
@@ -13,8 +14,6 @@ use crate::{
 
 use super::{TimeReversedForFlowsOptions, reversed_target_groups};
 use crate::circuit_flow::transitions::reverse_flow_transition;
-
-const MAX_MEASUREMENT_RICH_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 
 pub(super) fn requires_general_reversal(circuit: &Circuit, flows: &[Flow]) -> bool {
     flows
@@ -549,31 +548,43 @@ fn item_requires_general_reversal(item: &CircuitItem) -> bool {
     }
 }
 
+/// Measurement-rich reversal expands every repeat into the inverted circuit, its detector and
+/// coordinate maps, and the finished copy.
+const MEASUREMENT_RICH_RETAINED_COPIES: u64 = 3;
+
 fn validate_general_reversal(circuit: &Circuit) -> AnalysisResult<()> {
-    let expanded = expanded_instruction_count(circuit)?;
-    if expanded > MAX_MEASUREMENT_RICH_EXPANDED_INSTRUCTIONS {
+    let projected = projected_reversal_bytes(circuit)?
+        .checked_mul(MEASUREMENT_RICH_RETAINED_COPIES)
+        .ok_or_else(|| reverse_error("measurement-rich repeat expansion size overflowed"))?;
+    let budget = MemoryBudget::DEFAULT;
+    if !budget.admits(u128::from(projected)) {
         return Err(reverse_error(format!(
-            "measurement-rich repeat expansion requires {expanded} instructions, exceeding the {MAX_MEASUREMENT_RICH_EXPANDED_INSTRUCTIONS} instruction limit"
+            "measurement-rich repeat expansion needs at least {projected} bytes, exceeding the {}-byte memory budget",
+            budget.bytes()
         )));
     }
     validate_items(circuit.items())
 }
 
-fn expanded_instruction_count(circuit: &Circuit) -> AnalysisResult<u64> {
+/// Conservative retained bytes of one expanded copy of `circuit`, with checked arithmetic.
+fn projected_reversal_bytes(circuit: &Circuit) -> AnalysisResult<u64> {
+    let overflow = || reverse_error("measurement-rich repeat expansion size overflowed");
     let mut total = 0_u64;
     for item in circuit.items() {
-        let count = match item {
-            CircuitItem::Instruction(_) => 1,
-            CircuitItem::RepeatBlock(repeat) => expanded_instruction_count(repeat.body())?
+        let bytes = match item {
+            CircuitItem::Instruction(instruction) => (size_of::<CircuitItem>() as u64)
+                .checked_add(
+                    (instruction.targets().len() as u64)
+                        .checked_mul(size_of::<Target>() as u64)
+                        .ok_or_else(overflow)?,
+                )
+                .and_then(|bytes| bytes.checked_add(instruction.args().len() as u64 * 8))
+                .ok_or_else(overflow)?,
+            CircuitItem::RepeatBlock(repeat) => projected_reversal_bytes(repeat.body())?
                 .checked_mul(repeat.repeat_count().get())
-                .ok_or_else(|| reverse_error("measurement-rich repeat work overflowed"))?,
+                .ok_or_else(overflow)?,
         };
-        total = total
-            .checked_add(count)
-            .ok_or_else(|| reverse_error("measurement-rich repeat work overflowed"))?;
-        if total > MAX_MEASUREMENT_RICH_EXPANDED_INSTRUCTIONS {
-            return Ok(total);
-        }
+        total = total.checked_add(bytes).ok_or_else(overflow)?;
     }
     Ok(total)
 }

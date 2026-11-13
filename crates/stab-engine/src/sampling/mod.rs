@@ -2,7 +2,7 @@
 use rand::Rng;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_model::{Circuit, ModelDialect};
+use stab_model::{Circuit, MemoryBudget, ModelDialect};
 
 #[cfg(test)]
 use self::execute::{ExecutionBuffers, ExecutionMode, execute_program};
@@ -13,12 +13,16 @@ use crate::detection::{DetectionError, DetectionResourceKind};
 use crate::{CompilationDescriptor, CompilationOperation, CompilationRequestFingerprint};
 
 mod api;
+#[cfg(test)]
 mod execute;
+mod local_tableau;
+#[cfg(test)]
 mod noise;
 pub(crate) mod pauli_product;
 mod reference;
 mod reference_run;
 mod reference_simulator;
+#[cfg(test)]
 mod stabilizer_frame;
 
 pub use api::{
@@ -27,8 +31,8 @@ pub use api::{
     SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
     SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
 };
+pub(crate) use local_tableau::LocalTableauTransform;
 pub(crate) use reference::{program_reference_sample, reference_work_storage_bytes};
-pub(crate) use stabilizer_frame::LocalTableauTransform;
 
 /// Sampling compiler descriptor consumed by facade capability aggregation.
 pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
@@ -36,7 +40,7 @@ pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor:
     ModelDialect::StimCircuit,
     CompilationRequestFingerprint::SAMPLING_COMPILER_SCHEMA_VERSION,
     Some(CompilationRequestFingerprint::SCHEMA_VERSION),
-    false,
+    true,
 );
 
 impl SamplingPlan {
@@ -48,10 +52,11 @@ impl SamplingPlan {
         if self.inner.measurement_count == 0 {
             return Ok(0);
         }
-        validate_general_frame_work_storage(
+        validate_simulator_work_storage(
             self.inner.qubit_count,
             self.inner.measurement_count,
             false,
+            self.inner.memory_budget,
         )?;
         reference_run::count_determined_measurements(
             &self.inner.program,
@@ -74,10 +79,8 @@ impl SamplingPlan {
         self.inner.sweep_bit_count
     }
 
-    /// Executes one shot on the general stabilizer frame, for differential tests.
-    ///
-    /// Programs selected for the bit-plane Pauli frame omit zero-probability Pauli channels, so
-    /// on circuits containing them this stream differs from a general-frame plan's.
+    /// Executes one shot on the generator-list stabilizer frame, the differential baseline of
+    /// tests. Programs omit zero-probability Pauli channels, so this stream is a test-only one.
     #[cfg(test)]
     fn sample_shot_in_mode_into<R>(
         &self,
@@ -105,26 +108,44 @@ impl SamplingPlan {
     }
 }
 
-pub(crate) fn validate_general_frame_work_storage(
+/// Bytes of one generator in the generator-list frame that preceded the inverse-tableau
+/// reference simulator, kept so that reference snapshot admission decisions do not change.
+const REFERENCE_SNAPSHOT_GENERATOR_BYTES: u128 = 96;
+
+/// Admission estimate for a reference repeat-fold snapshot.
+///
+/// This keeps the generator-list formula used before the inverse-tableau simulator so that
+/// admission decisions do not change; it over-estimates the simulator's actual snapshot, which
+/// holds `2n` rows of `2 * ceil(n / 64)` words and `2n` sign bytes.
+fn reference_snapshot_admission_bytes(qubit_count: usize) -> u128 {
+    (qubit_count as u128)
+        .saturating_mul(REFERENCE_SNAPSHOT_GENERATOR_BYTES)
+        .saturating_add(
+            (qubit_count as u128)
+                .saturating_mul(qubit_count as u128)
+                .saturating_mul(size_of::<stab_algebra::PauliBasis>() as u128),
+        )
+}
+
+pub(crate) fn validate_simulator_work_storage(
     qubit_count: usize,
     measurement_count: usize,
     include_reference_snapshot: bool,
+    budget: MemoryBudget,
 ) -> Result<(), SamplingExecutionError> {
-    let estimated_bytes = general_frame_work_storage_bytes(
-        qubit_count,
-        measurement_count,
-        include_reference_snapshot,
-    );
-    if estimated_bytes > u128::from(api::MAX_SAMPLING_SESSION_STORAGE_BYTES) {
+    let estimated_bytes =
+        simulator_work_storage_bytes(qubit_count, measurement_count, include_reference_snapshot);
+    if !budget.admits(estimated_bytes) {
         return Err(SamplingExecutionError::SessionStorageLimit {
             estimated_bytes,
-            limit_bytes: api::MAX_SAMPLING_SESSION_STORAGE_BYTES,
+            limit_bytes: budget.bytes(),
         });
     }
     Ok(())
 }
 
-fn general_frame_work_storage_bytes(
+/// Conservative scratch storage of one reference-simulator run, including its output record.
+fn simulator_work_storage_bytes(
     qubit_count: usize,
     measurement_count: usize,
     include_reference_snapshot: bool,
@@ -137,9 +158,7 @@ fn general_frame_work_storage_bytes(
         .saturating_add(qubits.saturating_mul(256))
         .saturating_add(measurements);
     if include_reference_snapshot {
-        base.saturating_add(stabilizer_frame::reference_snapshot_admission_bytes(
-            qubit_count,
-        ))
+        base.saturating_add(reference_snapshot_admission_bytes(qubit_count))
     } else {
         base
     }
@@ -148,10 +167,13 @@ fn general_frame_work_storage_bytes(
 fn reference_state_snapshot_fits(
     qubit_count: usize,
     measurement_count: usize,
-    limit_bytes: u64,
+    budget: MemoryBudget,
 ) -> bool {
-    general_frame_work_storage_bytes(qubit_count, measurement_count, true)
-        <= u128::from(limit_bytes)
+    budget.admits(simulator_work_storage_bytes(
+        qubit_count,
+        measurement_count,
+        true,
+    ))
 }
 
 /// Converts a program-lowering failure into the sampling compiler's typed error.
@@ -163,17 +185,16 @@ fn sampling_compile_error(error: DetectionError) -> SamplingCompileError {
         | DetectionError::InvalidResultFormat { message } => {
             SamplingCompileError::InvalidCircuit { message }
         }
-        DetectionError::ResourceLimit(limit)
-            if limit.kind() == DetectionResourceKind::RepeatNesting =>
-        {
-            SamplingCompileError::invalid_circuit(format!(
+        DetectionError::ResourceLimit(limit) => match limit.kind() {
+            DetectionResourceKind::RepeatNesting => SamplingCompileError::invalid_circuit(format!(
                 "repeat nesting exceeds sampler limit {}",
                 stab_model::RepeatNestingLimit::HARD_MAX
-            ))
-        }
-        DetectionError::ResourceLimit(limit) => {
-            SamplingCompileError::invalid_circuit(limit.to_string())
-        }
+            )),
+            DetectionResourceKind::CompiledBytes => SamplingCompileError::CompiledBytesLimit {
+                required: limit.actual(),
+                budget: limit.limit(),
+            },
+        },
     }
 }
 
@@ -223,47 +244,21 @@ fn sampler_rng(seed: Option<u64>) -> SmallRng {
     SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
 }
 
-/// Compiles the one program a sampling plan executes.
+/// Compiles the one program a sampling plan executes, refusing a program whose retained
+/// storage exceeds `budget` before reserving any of it.
 fn compile_program(
     circuit: &Circuit,
-) -> Result<(CircuitProgram, api::SamplingPlanKind), SamplingCompileError> {
+    budget: MemoryBudget,
+) -> Result<CircuitProgram, SamplingCompileError> {
     use crate::detection::frame::ProgramOptions;
-    let admission = CircuitProgram::admit(circuit, ProgramOptions::SAMPLING, 0, u64::MAX)
+    let admission = CircuitProgram::admit(circuit, ProgramOptions::SAMPLING, 0, budget.bytes())
         .map_err(sampling_compile_error)?;
     let counts = admission.counts();
-    let limit = u128::from(api::MAX_EXPANDED_OPERATIONS_PER_SHOT);
-    if counts.measurements > 0 && counts.expanded_instructions > limit {
-        return Err(SamplingCompileError::ExpandedOperationLimit {
-            actual: crate::ResourceAmount::from_u128(counts.expanded_instructions),
-            limit: api::MAX_EXPANDED_OPERATIONS_PER_SHOT,
-        });
-    }
-    let fits_frame = admission.retained_bytes() <= api::MAX_SAMPLING_SESSION_STORAGE_BYTES;
-    let kind = if fits_frame {
-        api::SamplingPlanKind::PauliFrame
-    } else {
-        api::SamplingPlanKind::GeneralFrame
-    };
     if counts.measurements == 0 {
-        // No shot observes any work, so neither executor needs the program.
-        return Ok((CircuitProgram::empty(counts), kind));
+        // No shot observes any work, so the executor needs no program.
+        return Ok(CircuitProgram::empty(counts));
     }
-    if fits_frame {
-        let program =
-            CircuitProgram::materialize(circuit, &admission).map_err(sampling_compile_error)?;
-        return Ok((program, kind));
-    }
-    // A program above the frame budget falls back to the general stabilizer frame, which keeps
-    // its historical per-target work bound.
-    if counts.expanded_target_operations > limit {
-        return Err(SamplingCompileError::ExpandedOperationLimit {
-            actual: crate::ResourceAmount::from_u128(counts.expanded_target_operations),
-            limit: api::MAX_EXPANDED_OPERATIONS_PER_SHOT,
-        });
-    }
-    let program = CircuitProgram::compile(circuit, ProgramOptions::GENERAL_SAMPLING)
-        .map_err(sampling_compile_error)?;
-    Ok((program, kind))
+    CircuitProgram::materialize(circuit, &admission).map_err(sampling_compile_error)
 }
 
 #[cfg(test)]

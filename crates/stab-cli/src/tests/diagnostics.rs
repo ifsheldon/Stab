@@ -136,115 +136,95 @@ fn json_packed_format_diagnostics_include_exact_span_and_context() {
 
 #[test]
 fn json_resource_limit_diagnostic_preserves_typed_parse_context() {
-    let input = vec![b'\n'; 1_000_001];
+    // 300 bytes of source whose parsed targets exceed a 512-byte budget.
+    let mut input = String::from("H");
+    while input.len() < 300 {
+        input.push_str(" 0");
+    }
+    input.push('\n');
     let (status, stdout, stderr) = run_parts(
         [
             "stab",
             "convert",
             "--in_format=stim",
             "--out_format=stim",
+            "--memory-budget=512",
             "--error-format=json",
         ],
-        &input,
+        input.as_bytes(),
     );
 
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
-    assert_eq!(
-        only_json_line(&stderr),
-        serde_json::json!({
-            "schema_version": 1,
-            "code": "resource-limit-exceeded",
-            "severity": "error",
-            "message": "failed to parse line 1000001: circuit input has more than 1000000 lines",
-            "span": {
-                "byte_start": 1_000_000,
-                "byte_length": 0,
-            },
-            "labels": [],
-            "help": null,
-            "context": {
-                "operation": "circuit-parse",
-                "resource": "source-lines",
-                "actual": 1_000_001,
-                "limit": 1_000_000,
-            },
-        })
-    );
-}
-
-#[test]
-fn json_sampling_work_limit_preserves_typed_resource_context() {
-    let (status, stdout, stderr) = run_parts(
-        ["stab", "sample", "--shots=1", "--error-format=json"],
-        b"REPEAT 1000000 {\n    H 0\n}\nM 0\n",
-    );
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
-    assert_eq!(
-        only_json_line(&stderr),
-        serde_json::json!({
-            "schema_version": 1,
-            "code": "resource-limit-exceeded",
-            "severity": "error",
-            "message": "cannot compile circuit sampler: expanded operation work 1000001 exceeds per-shot limit 1000000",
-            "span": null,
-            "labels": [],
-            "help": null,
-            "context": {
-                "resource": "expanded-operations-per-shot",
-                "actual": "1000001",
-                "limit": "1000000",
-            },
-        })
-    );
-}
-
-#[test]
-fn json_sampling_work_above_u64_is_an_explicit_lower_bound() {
-    let circuit =
-        b"REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n";
-    let (status, stdout, stderr) = run_parts(
-        ["stab", "sample", "--shots=1", "--error-format=json"],
-        circuit,
-    );
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
-    assert_eq!(
-        only_json_line(&stderr),
-        serde_json::json!({
-            "schema_version": 1,
-            "code": "resource-limit-exceeded",
-            "severity": "error",
-            "message": "cannot compile circuit sampler: expanded operation work at least 18446744073709551615 exceeds per-shot limit 1000000",
-            "span": null,
-            "labels": [],
-            "help": null,
-            "context": {
-                "resource": "expanded-operations-per-shot",
-                "actual": "18446744073709551615",
-                "actual_is_lower_bound": true,
-                "limit": "1000000",
-            },
-        })
-    );
-
-    let (status, stdout, stderr) = run_parts(
-        ["stab", "detect", "--shots=1", "--error-format=json"],
-        circuit,
-    );
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     let diagnostic = only_json_line(&stderr);
     assert_eq!(field(&diagnostic, "/code"), "resource-limit-exceeded");
-    assert_eq!(
-        field(&diagnostic, "/context/operation"),
-        "detection-conversion"
+    assert_eq!(field(&diagnostic, "/context/operation"), "circuit-parse");
+    assert_eq!(field(&diagnostic, "/context/resource"), "retained-bytes");
+    assert_eq!(field(&diagnostic, "/context/limit"), 512);
+    assert!(field(&diagnostic, "/context/actual").as_u64() > Some(512));
+    assert!(
+        field(&diagnostic, "/message")
+            .as_str()
+            .is_some_and(|message| message.contains("512-byte memory budget")),
+        "{diagnostic}"
     );
-    assert_eq!(field(&diagnostic, "/context/actual"), 1_000_000_000_000u64);
-    assert_eq!(diagnostic.pointer("/context/actual_is_lower_bound"), None);
+    assert!(
+        field(&diagnostic, "/help")
+            .as_str()
+            .is_some_and(|help| help.contains("--memory-budget")),
+        "{diagnostic}"
+    );
+}
+
+#[test]
+fn json_sampling_budget_refusal_names_the_budget_and_how_to_raise_it() {
+    // The parsed circuit fits the budget, but the sampling session's frame does not.
+    let (status, stdout, stderr) = run_parts(
+        [
+            "stab",
+            "sample",
+            "--shots=1",
+            "--memory-budget=4KiB",
+            "--error-format=json",
+        ],
+        b"M 1000\n",
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let diagnostic = only_json_line(&stderr);
+    assert!(
+        field(&diagnostic, "/message")
+            .as_str()
+            .is_some_and(|message| message.contains("4096-byte memory budget")),
+        "{diagnostic}"
+    );
+    assert!(
+        field(&diagnostic, "/help")
+            .as_str()
+            .is_some_and(|help| help.contains("--memory-budget")),
+        "{diagnostic}"
+    );
+    let (status, stdout, _) = run_parts(
+        ["stab", "sample", "--shots=1", "--memory-budget=8MiB"],
+        b"M 1000\n",
+    );
+    assert_eq!(status, 0);
+    assert_eq!(stdout, b"0\n");
+}
+
+#[test]
+fn compact_sampling_work_far_above_u64_is_refused_by_its_record_storage() {
+    // 10^24 expanded instructions and 10^12 measurements per shot: the compact program fits, but
+    // the session's record storage exceeds the budget, so the run is refused before any work.
+    let circuit =
+        b"REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n";
+    let (status, stdout, stderr) = run_parts(["stab", "sample", "--shots=2"], circuit);
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let stderr = String::from_utf8_lossy(&stderr);
+    assert!(stderr.contains("1073741824-byte memory budget"), "{stderr}");
+    assert!(stderr.contains("--memory-budget"), "{stderr}");
 }
 
 #[test]

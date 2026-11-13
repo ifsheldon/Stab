@@ -2,24 +2,19 @@ use rand::Rng;
 
 use stab_records::BitPlane64Batch;
 
-use super::{
-    MAX_SAMPLING_SESSION_STORAGE_BYTES, ReferenceSampleMode, SamplingExecutionError,
-    SamplingPlanInner, SamplingPlanKind, SessionFrame,
-};
+use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner, SessionFrame};
 use crate::detection::frame::{CircuitProgram, PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingState};
-use crate::sampling::execute::{ExecutionBuffers, ExecutionMode, execute_program};
 use crate::sampling::reference_run::ReferenceWorkspace;
-use crate::sampling::stabilizer_frame::StabilizerFrame;
 
 pub(super) fn validate_session_storage(
     plan: &SamplingPlanInner,
     reference_mode: ReferenceSampleMode,
 ) -> Result<(), SamplingExecutionError> {
     let estimated_bytes = session_storage_bytes(plan, reference_mode);
-    if estimated_bytes > u128::from(MAX_SAMPLING_SESSION_STORAGE_BYTES) {
+    if !plan.memory_budget.admits(estimated_bytes) {
         return Err(SamplingExecutionError::SessionStorageLimit {
             estimated_bytes,
-            limit_bytes: MAX_SAMPLING_SESSION_STORAGE_BYTES,
+            limit_bytes: plan.memory_budget.bytes(),
         });
     }
     Ok(())
@@ -34,28 +29,10 @@ pub(super) fn session_storage_bytes(
     }
     let measurements = plan.measurement_count as u128;
     let mut estimated_bytes = measurements.saturating_mul(size_of::<u64>() as u128);
-    if plan.kind == SamplingPlanKind::GeneralFrame {
-        estimated_bytes = estimated_bytes.saturating_add(measurements.saturating_mul(2));
-    }
-    let stores_reference = match (plan.kind, reference_mode) {
-        (SamplingPlanKind::PauliFrame, ReferenceSampleMode::UseReferenceSample)
-        | (SamplingPlanKind::GeneralFrame, ReferenceSampleMode::SkipReferenceSample) => true,
-        (SamplingPlanKind::PauliFrame, ReferenceSampleMode::SkipReferenceSample)
-        | (SamplingPlanKind::GeneralFrame, ReferenceSampleMode::UseReferenceSample) => false,
-    };
-    if stores_reference {
+    if reference_mode == ReferenceSampleMode::UseReferenceSample {
         estimated_bytes = estimated_bytes.saturating_add(measurements);
     }
-    if plan.kind == SamplingPlanKind::PauliFrame {
-        estimated_bytes =
-            estimated_bytes.saturating_add(PauliFrameSamplingState::storage_bytes(&plan.program));
-    } else {
-        let qubits = plan.qubit_count as u128;
-        estimated_bytes = estimated_bytes
-            .saturating_add(qubits.saturating_mul(qubits).saturating_mul(4))
-            .saturating_add(qubits.saturating_mul(256));
-    }
-    estimated_bytes
+    estimated_bytes.saturating_add(PauliFrameSamplingState::storage_bytes(&plan.program))
 }
 
 pub(in crate::sampling) fn try_bool_buffer(
@@ -78,10 +55,11 @@ pub(in crate::sampling) fn compute_reference_sample(
         return Ok(Vec::new());
     }
     let needs_snapshot = plan.uses_reference_state_snapshot();
-    crate::sampling::validate_general_frame_work_storage(
+    crate::sampling::validate_simulator_work_storage(
         plan.qubit_count,
         plan.measurement_count,
         needs_snapshot,
+        plan.memory_budget,
     )?;
     let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
     ReferenceWorkspace::try_new(plan.qubit_count, needs_snapshot)?.run(
@@ -117,6 +95,9 @@ pub(in crate::sampling) fn compute_stabilizer_frame_reference_sample(
 ) -> Result<Vec<bool>, SamplingExecutionError> {
     use rand::SeedableRng as _;
     use rand::rngs::SmallRng;
+
+    use crate::sampling::execute::{ExecutionBuffers, ExecutionMode, execute_program};
+    use crate::sampling::stabilizer_frame::StabilizerFrame;
 
     let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
     let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
@@ -218,31 +199,4 @@ const fn low_bits_mask(bit_count: usize) -> u64 {
     } else {
         (1_u64 << bit_count) - 1
     }
-}
-
-pub(super) fn sample_general_into(
-    program: &CircuitProgram,
-    frame: &mut StabilizerFrame,
-    record: &mut Vec<bool>,
-    output: &mut Vec<bool>,
-    reference: Option<&[bool]>,
-    rng: &mut impl Rng,
-) -> Result<(), SamplingExecutionError> {
-    frame.reset_to_z_basis();
-    record.clear();
-    output.clear();
-    let mut correlated_error_occurred = false;
-    let mut buffers = ExecutionBuffers {
-        frame,
-        record,
-        output,
-        correlated_error_occurred: &mut correlated_error_occurred,
-    };
-    execute_program(program, &mut buffers, rng, ExecutionMode::Sample, &[])?;
-    if let Some(reference) = reference {
-        for (bit, reference_bit) in output.iter_mut().zip(reference) {
-            *bit ^= *reference_bit;
-        }
-    }
-    Ok(())
 }

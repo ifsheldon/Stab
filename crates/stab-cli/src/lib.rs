@@ -46,13 +46,65 @@ use stab_engine::{
     RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingCompiler,
     SamplingSession, Seed, ShotCount,
 };
-use stab_model::{Circuit, CircuitItem, ModelResult, Probability};
+use stab_model::{
+    Circuit, CircuitItem, MemoryBudget, MemoryBudgetParseError, ModelResult, ParseLimits,
+    Probability,
+};
 use stab_records::{
     DetsResultType, MeasurementBatchView, MeasurementSink, RecordBatchPart, RecordEncoder,
     RecordFormat, RecordPart, validate_ptb64_shot_count,
 };
 
-pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+/// Stab-native admission budget shared by every command that reads, compiles, executes, or
+/// materializes work. It bounds memory, not running time.
+#[derive(Clone, Copy, Debug, Args)]
+pub(crate) struct MemoryBudgetArg {
+    /// Memory budget in bytes, with an optional KiB, MiB, or GiB suffix. Inputs, parsed models,
+    /// compiled plans, sessions, and materialized outputs are each admitted against it before
+    /// allocation.
+    #[arg(
+        long = "memory-budget",
+        value_name = "SIZE",
+        default_value = "1GiB",
+        value_parser = parse_memory_budget
+    )]
+    memory_budget: MemoryBudget,
+}
+
+impl Default for MemoryBudgetArg {
+    fn default() -> Self {
+        Self {
+            memory_budget: MemoryBudget::DEFAULT,
+        }
+    }
+}
+
+impl MemoryBudgetArg {
+    pub(crate) const fn get(self) -> MemoryBudget {
+        self.memory_budget
+    }
+
+    pub(crate) fn parse_limits(self) -> ParseLimits {
+        ParseLimits::default().with_memory_budget(self.memory_budget)
+    }
+
+    /// The input byte cap: one past this is refused before the input is retained.
+    pub(crate) const fn input_bytes(self) -> u64 {
+        self.memory_budget.bytes()
+    }
+
+    /// The per-record text cap of streamed record inputs. A record's buffer doubles while it is
+    /// framed, so half the budget keeps the buffer itself within the budget.
+    pub(crate) fn record_bytes(self) -> usize {
+        self.memory_budget.bytes_usize() / 2
+    }
+}
+
+fn parse_memory_budget(value: &str) -> Result<MemoryBudget, String> {
+    value
+        .parse()
+        .map_err(|error: MemoryBudgetParseError| error.to_string())
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -182,6 +234,9 @@ struct GenArgs {
     #[arg(long = "out")]
     output: Option<PathBuf>,
 
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
+
     /// Accepted for Stim compatibility and ignored by `stim gen`.
     #[arg(long = "in", hide = true)]
     _input: Option<PathBuf>,
@@ -293,6 +348,9 @@ struct SampleArgs {
     /// Disable reference-sample loop folding.
     #[arg(long = "skip_loop_folding")]
     skip_loop_folding: bool,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 fn parse_stim_usize(value: &str) -> Result<usize, String> {
@@ -448,27 +506,33 @@ fn generated_circuit_text(args: &GenArgs) -> Result<String, CliError> {
     let probabilities = GeneratorProbabilities::from_args(args)?;
     let generated = match args.code {
         GeneratedCodeArg::Repetition => {
-            let params = probabilities.apply_repetition(RepetitionCodeParams::new(
-                rounds,
-                distance,
-                parse_repetition_task(&args.task)?,
-            )?);
+            let params = probabilities
+                .apply_repetition(RepetitionCodeParams::new(
+                    rounds,
+                    distance,
+                    parse_repetition_task(&args.task)?,
+                )?)
+                .with_memory_budget(args.memory.get());
             generate_repetition_code_circuit(&params)?
         }
         GeneratedCodeArg::Surface => {
-            let params = probabilities.apply_surface(SurfaceCodeParams::new(
-                rounds,
-                distance,
-                parse_surface_task(&args.task)?,
-            )?);
+            let params = probabilities
+                .apply_surface(SurfaceCodeParams::new(
+                    rounds,
+                    distance,
+                    parse_surface_task(&args.task)?,
+                )?)
+                .with_memory_budget(args.memory.get());
             generate_surface_code_circuit(&params)?
         }
         GeneratedCodeArg::Color => {
-            let params = probabilities.apply_color(ColorCodeParams::new(
-                rounds,
-                distance,
-                parse_color_task(&args.task)?,
-            )?);
+            let params = probabilities
+                .apply_color(ColorCodeParams::new(
+                    rounds,
+                    distance,
+                    parse_color_task(&args.task)?,
+                )?)
+                .with_memory_budget(args.memory.get());
             generate_color_code_circuit(&params)?
         }
     };
@@ -700,25 +764,26 @@ where
     let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
         read_limited_input_file(
             &mut input_file,
-            MAX_CIRCUIT_INPUT_BYTES,
+            args.memory.input_bytes(),
             "sample circuit input",
         )?
     } else {
-        read_limited_stdin(input, MAX_CIRCUIT_INPUT_BYTES, "sample circuit input")?
+        read_limited_stdin(input, args.memory.input_bytes(), "sample circuit input")?
     };
-    let circuit = Circuit::from_stim_bytes(&input_bytes)?;
+    let circuit = parse_circuit_bytes(&input_bytes, args.memory)?;
     let reference_sample_loop_policy = if args.skip_loop_folding {
         ReferenceSampleLoopPolicy::Iterate
     } else {
         ReferenceSampleLoopPolicy::Fold
     };
     let plan = SamplingCompiler::new()
+        .memory_budget(args.memory.get())
         .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
         .map_err(CliError::from)?;
     let skip_reference_sample = args.skip_reference_sample;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
-        one_shot_visible_measurements(&circuit)?
+        one_shot_visible_measurements(&circuit, args.memory.get())?
     } else {
         None
     };
@@ -762,8 +827,14 @@ where
     .map_err(CliError::SampleOutput)
 }
 
-pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
-    Ok(Circuit::from_stim_bytes(input)?)
+pub(crate) fn parse_circuit_bytes(
+    input: &[u8],
+    memory: MemoryBudgetArg,
+) -> Result<Circuit, CliError> {
+    Ok(Circuit::from_stim_bytes_with_limits(
+        input,
+        memory.parse_limits(),
+    )?)
 }
 
 fn write_sample_output<W>(
@@ -875,13 +946,28 @@ fn sample_write_io(error: stab_records::RecordWriteError) -> std::io::Error {
     }
 }
 
-fn one_shot_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<usize>>, CliError> {
+fn one_shot_visible_measurements(
+    circuit: &Circuit,
+    budget: MemoryBudget,
+) -> Result<Option<Vec<usize>>, CliError> {
     // Stim v1.16's one-shot tableau CLI path records heralds for feedback but does not write them.
-    if hidden_herald_measurement_count(circuit)? == 0 {
+    let Some(visible_count) = one_shot_visible_measurement_count(circuit)? else {
         return Ok(None);
+    };
+    let required = (visible_count as u128).saturating_mul(size_of::<usize>() as u128);
+    if !budget.admits(required) {
+        return Err(stab_engine::SamplingExecutionError::SessionStorageLimit {
+            estimated_bytes: required,
+            limit_bytes: budget.bytes(),
+        }
+        .into());
     }
-
     let mut visible = Vec::new();
+    visible.try_reserve_exact(visible_count).map_err(|error| {
+        stab_engine::SamplingExecutionError::SessionStorageAllocation {
+            message: format!("visible measurement index list: {error}"),
+        }
+    })?;
     let mut measurement_index = 0usize;
     for instruction in circuit.iter_flattened_instructions() {
         if !instruction.gate().produces_measurements() {

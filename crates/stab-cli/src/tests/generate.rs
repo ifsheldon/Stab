@@ -86,7 +86,9 @@ fn gen_rejects_invalid_arguments_like_arg_parse_test() {
 }
 
 #[test]
-fn gen_rejects_quadratic_outputs_before_writing() {
+fn gen_admits_generated_size_against_the_memory_budget_before_writing() {
+    // At 2048 conservative bytes per physical qubit, a 256 MiB budget admits exactly the
+    // 131,072 qubits the retired fixed cap admitted.
     for (task, distance, projected_qubits) in [
         ("rotated_memory_z", "257", "132097"),
         ("unrotated_memory_z", "182", "131769"),
@@ -103,10 +105,15 @@ fn gen_rejects_quadratic_outputs_before_writing() {
                 distance,
                 "--rounds",
                 "1",
+                "--memory-budget=256MiB",
             ],
             b"",
         )
-        .assert_err(&[projected_qubits, "current limit is 131072"]);
+        .assert_err(&[
+            &format!("{projected_qubits} physical qubits"),
+            "268435456-byte memory budget",
+            "--memory-budget",
+        ]);
     }
 
     let scratch = Scratch::new();
@@ -125,14 +132,33 @@ fn gen_rejects_quadratic_outputs_before_writing() {
             "2",
             "--out",
             &output,
+            "--memory-budget=256MiB",
         ],
         b"",
     )
-    .assert_err(&["132355", "current limit is 131072"]);
+    .assert_err(&["132355 physical qubits", "268435456-byte memory budget"]);
     assert!(
         !scratch.exists("oversized.stim"),
         "rejection must not create a partial output"
     );
+
+    // The default budget admits the distance the retired cap refused.
+    let admitted = run(
+        &[
+            "stab",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "257",
+            "--rounds",
+            "1",
+        ],
+        b"",
+    );
+    assert_eq!(admitted.status, 0, "{}", admitted.stderr_text());
 }
 
 /// Pinned Stim narrows generator probabilities to `float` and echoes `-0` in

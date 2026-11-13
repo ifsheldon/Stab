@@ -23,11 +23,11 @@ use helpers::{
 
 use super::transitions::{ReverseFlowTransition, reverse_flow_transition};
 pub(crate) use resources::{
-    MAX_FLOW_GENERATOR_PROJECTED_BYTES, measurement_rich_flow_generator_projected_bytes,
+    FLOW_GENERATOR_MEMORY_BUDGET, measurement_rich_flow_generator_projected_bytes,
     validate_measurement_rich_flow_generator_resources,
 };
 use resources::{
-    validate_flow_generator_expanded_work, validate_ignored_only_flow_generator_resources,
+    validate_flow_generator_repeat_nesting, validate_ignored_only_flow_generator_resources,
 };
 
 /// Returns signed stabilizer-flow generators for supported tableau and measurement-rich circuits.
@@ -349,7 +349,7 @@ fn composed_measurement_flow_generators(circuit: &Circuit) -> AnalysisResult<Opt
         )
     })?;
     validate_measurement_rich_flow_generator_resources(qubit_count, measurement_count)?;
-    validate_flow_generator_expanded_work(circuit)?;
+    validate_flow_generator_repeat_nesting(circuit)?;
     if !circuit_requires_reverse_flow_solver(circuit) {
         return Ok(None);
     }

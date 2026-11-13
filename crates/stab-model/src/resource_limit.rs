@@ -24,9 +24,7 @@ impl ResourceOperation {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ResourceKind {
     SourceBytes,
-    SourceLines,
-    RepresentedInstructions,
-    RepresentedTargets,
+    RetainedBytes,
     RepeatNesting,
 }
 
@@ -34,9 +32,7 @@ impl ResourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::SourceBytes => "source-bytes",
-            Self::SourceLines => "source-lines",
-            Self::RepresentedInstructions => "represented-instructions",
-            Self::RepresentedTargets => "represented-targets",
+            Self::RetainedBytes => "retained-bytes",
             Self::RepeatNesting => "repeat-nesting",
         }
     }
@@ -58,16 +54,16 @@ impl ResourceLimitError {
         dialect: ModelDialect,
         resource: ResourceKind,
         source_line: Option<usize>,
-        actual: usize,
-        limit: usize,
+        actual: u64,
+        limit: u64,
         span: ByteSpan,
     ) -> Self {
         Self {
             dialect,
             resource,
             source_line,
-            actual: actual as u64,
-            limit: limit as u64,
+            actual,
+            limit,
             span,
         }
     }
@@ -114,28 +110,18 @@ impl ResourceLimitError {
 
 impl Display for ResourceLimitError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        let raise = "raise the memory budget to admit it";
         match (self.dialect, self.resource) {
             (ModelDialect::StimCircuit, ResourceKind::SourceBytes) => write!(
                 formatter,
-                "circuit input has {} bytes, exceeding current limit {}",
+                "circuit input has {} bytes, exceeding the {}-byte memory budget; {raise}",
                 self.actual, self.limit
             ),
-            (ModelDialect::StimCircuit, ResourceKind::SourceLines) => write!(
+            (ModelDialect::StimCircuit, ResourceKind::RetainedBytes) => write!(
                 formatter,
-                "failed to parse line {}: circuit input has more than {} lines",
-                self.source_line.unwrap_or_default(),
-                self.limit
-            ),
-            (ModelDialect::StimCircuit, ResourceKind::RepresentedInstructions) => write!(
-                formatter,
-                "failed to parse line {}: represented instruction count exceeds current limit {}",
+                "failed to parse line {}: circuit input and its parsed model need at least {} bytes, exceeding the {}-byte memory budget; {raise}",
                 self.source_line.unwrap_or(0),
-                self.limit
-            ),
-            (ModelDialect::StimCircuit, ResourceKind::RepresentedTargets) => write!(
-                formatter,
-                "failed to parse line {}: represented target count exceeds current limit {}",
-                self.source_line.unwrap_or(0),
+                self.actual,
                 self.limit
             ),
             (ModelDialect::StimCircuit, ResourceKind::RepeatNesting) => write!(
@@ -146,23 +132,13 @@ impl Display for ResourceLimitError {
             ),
             (ModelDialect::DetectorErrorModel, ResourceKind::SourceBytes) => write!(
                 formatter,
-                "invalid detector error model: DEM input has {} bytes, exceeding current limit {}",
+                "invalid detector error model: DEM input has {} bytes, exceeding the {}-byte memory budget; {raise}",
                 self.actual, self.limit
             ),
-            (ModelDialect::DetectorErrorModel, ResourceKind::SourceLines) => write!(
+            (ModelDialect::DetectorErrorModel, ResourceKind::RetainedBytes) => write!(
                 formatter,
-                "invalid detector error model: DEM input has more than {} lines",
-                self.limit
-            ),
-            (ModelDialect::DetectorErrorModel, ResourceKind::RepresentedInstructions) => write!(
-                formatter,
-                "invalid detector error model: represented instruction count exceeds current limit {}",
-                self.limit
-            ),
-            (ModelDialect::DetectorErrorModel, ResourceKind::RepresentedTargets) => write!(
-                formatter,
-                "invalid detector error model: represented target count exceeds current limit {}",
-                self.limit
+                "invalid detector error model: DEM input and its parsed model need at least {} bytes, exceeding the {}-byte memory budget; {raise}",
+                self.actual, self.limit
             ),
             (ModelDialect::DetectorErrorModel, ResourceKind::RepeatNesting) => write!(
                 formatter,

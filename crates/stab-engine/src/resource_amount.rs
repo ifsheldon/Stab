@@ -15,16 +15,6 @@ impl ResourceAmount {
         }
     }
 
-    pub(crate) fn from_u128(value: u128) -> Self {
-        match u64::try_from(value) {
-            Ok(value) => Self::exact(value),
-            Err(_) => Self {
-                value: u64::MAX,
-                lower_bound: true,
-            },
-        }
-    }
-
     pub const fn value(self) -> u64 {
         self.value
     }

@@ -212,7 +212,7 @@ fn assert_malformed_measurement_references_are_rejected() {
 
 #[test]
 fn sampled_flow_preserves_sampling_storage_admission() {
-    let wide = PauliString::from_bases(PauliSign::Plus, vec![PauliBasis::X; 9_000])
+    let wide = PauliString::from_bases(PauliSign::Plus, vec![PauliBasis::X; 17_000])
         .expect("wide active Pauli");
     assert!(matches!(
         sample_if_circuit_has_stabilizer_flows(

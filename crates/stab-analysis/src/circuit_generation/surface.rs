@@ -19,9 +19,8 @@ use super::{
 
 /// Generates Stim-compatible rotated and unrotated surface-code memory circuits.
 ///
-/// Returns an error before materialization if the projected circuit exceeds the generator's
-/// 131,072-physical-qubit resource limit. This admits rotated distances through 256 and unrotated
-/// distances through 181.
+/// Returns an error before materialization if the projected circuit exceeds the parameters'
+/// memory budget.
 pub fn generate_surface_code_circuit(
     params: &SurfaceCodeParams,
 ) -> AnalysisResult<GeneratedCircuit> {
@@ -31,6 +30,7 @@ pub fn generate_surface_code_circuit(
             params.task,
             SurfaceCodeTask::RotatedMemoryX | SurfaceCodeTask::RotatedMemoryZ
         ),
+        params.memory_budget(),
     )?;
     match params.task {
         SurfaceCodeTask::RotatedMemoryX => generate_rotated_surface_code_circuit(params, true),

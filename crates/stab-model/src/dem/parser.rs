@@ -130,9 +130,6 @@ impl<'a> DemParser<'a> {
         let Some(command) = self.commands.next() else {
             return Ok(None);
         };
-        let line_number = command.line_number();
-        self.admission
-            .admit_source_line(line_number, command.source().span())?;
         Ok(Some(command))
     }
 

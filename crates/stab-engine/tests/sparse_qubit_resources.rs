@@ -24,7 +24,7 @@ fn assert_storage_limit(error: SamplingExecutionError) {
         matches!(
             error,
             SamplingExecutionError::SessionStorageLimit {
-                limit_bytes: 268_435_456,
+                limit_bytes: 1_073_741_824,
                 ..
             }
         ),
@@ -77,7 +77,7 @@ fn maximum_id_detection_compilation_stays_constant_storage() {
         .compile(&circuit)
         .expect_err("the reference sample must reject quadratic storage");
     assert!(
-        error.to_string().contains("268435456-byte safety limit"),
+        error.to_string().contains("1073741824-byte memory budget"),
         "{error}"
     );
 
@@ -89,8 +89,8 @@ fn maximum_id_detection_compilation_stays_constant_storage() {
 }
 
 #[test]
-fn sparse_general_frame_reference_work_is_rejected_before_allocation() {
-    const OVER_LIMIT_QUBIT: usize = 9_000;
+fn sparse_reference_simulator_work_is_rejected_before_allocation() {
+    const OVER_LIMIT_QUBIT: usize = 17_000;
     let circuit = Circuit::from_stim_str(&format!(
         "H {OVER_LIMIT_QUBIT}\n\
          M {OVER_LIMIT_QUBIT}\n"

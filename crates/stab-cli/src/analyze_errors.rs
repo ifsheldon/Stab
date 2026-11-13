@@ -6,14 +6,12 @@ use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
 use stab_model::Probability;
 
 use crate::{
-    CliError,
+    CliError, MemoryBudgetArg,
     input::{read_limited_input_file, read_limited_stdin},
     io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
     streaming::OutputSink,
 };
-
-const MAX_ANALYZE_ERRORS_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Args)]
 pub(crate) struct AnalyzeErrorsArgs {
@@ -53,6 +51,9 @@ pub(crate) struct AnalyzeErrorsArgs {
         value_parser = parse_probability_threshold,
     )]
     approximate_disjoint_errors: Option<Probability>,
+
+    #[command(flatten)]
+    memory: MemoryBudgetArg,
 }
 
 pub(crate) fn run_analyze_errors<R, W>(
@@ -80,17 +81,13 @@ where
     let input_bytes = if let Some(input_file) = input_file.as_mut() {
         read_limited_input_file(
             input_file,
-            MAX_ANALYZE_ERRORS_INPUT_BYTES,
+            args.memory.input_bytes(),
             "analyze_errors input",
         )?
     } else {
-        read_limited_stdin(
-            input,
-            MAX_ANALYZE_ERRORS_INPUT_BYTES,
-            "analyze_errors input",
-        )?
+        read_limited_stdin(input, args.memory.input_bytes(), "analyze_errors input")?
     };
-    let circuit = parse_circuit_bytes(&input_bytes)?;
+    let circuit = parse_circuit_bytes(&input_bytes, args.memory)?;
     let dem = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
@@ -101,6 +98,7 @@ where
             block_decomposition_from_introducing_remnant_edges: args
                 .block_decompose_from_introducing_remnant_edges,
             approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
+            memory_budget: args.memory.get(),
         },
     )?;
     let mut outputs = io.activate()?;

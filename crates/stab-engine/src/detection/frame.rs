@@ -181,7 +181,6 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 probabilities,
                 targets,
             } => self.apply_resolved_two_qubit_pauli_noise(targets, **probabilities, rng, mode),
-            ProgramInstruction::ZeroProbabilityNoise { .. } => Ok(()),
             ProgramInstruction::CorrelatedError {
                 else_branch,
                 probability,

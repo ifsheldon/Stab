@@ -117,12 +117,12 @@ fn pfm_b3_folded_traversal_counts() {
         deep_coordinate = outer;
     }
     assert_eq!(deep_coordinate.count_detectors(), Ok(0));
-    let error = deep_coordinate
-        .final_coordinate_shift()
-        .expect_err("aggregate coordinate scalar work must be bounded");
-    assert!(
-        error.to_string().contains("coordinate scalar updates"),
-        "{error}"
+    // Coordinate shifting is CPU work bounded by the represented model, not a capped resource.
+    assert_eq!(
+        deep_coordinate
+            .final_coordinate_shift()
+            .map(|shift| shift.len()),
+        Ok(32_000)
     );
 }
 
@@ -193,14 +193,11 @@ fn pfm_b3_folded_traversal_coordinates() {
         vec![107.0]
     );
 
-    let huge_full = dem("repeat 1000001 {\n    detector(1) D0\n    shift_detectors 1\n}\n");
+    let huge_full = dem("repeat 100000000 {\n    detector(1) D0\n    shift_detectors 1\n}\n");
     let error = huge_full
         .detector_coordinates()
-        .expect_err("full coordinate map has inherently expanded output");
-    assert!(
-        error.to_string().contains("at most 1000000 detectors"),
-        "{error}"
-    );
+        .expect_err("full coordinate map beyond the memory budget is refused");
+    assert!(error.to_string().contains("memory budget"), "{error}");
 
     let declaration_overflow = dem(
         "error(0) D1\nrepeat 5 {\n    repeat 5 {\n        repeat 1152921504606846975 {\n            detector(5) D0\n        }\n    }\n}\n",

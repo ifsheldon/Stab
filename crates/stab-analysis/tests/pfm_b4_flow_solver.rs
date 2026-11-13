@@ -119,7 +119,7 @@ fn pfm_b4_flow_solver_uses_implicit_sparse_query_identity_rows() {
 }
 
 #[test]
-fn pfm_b4_flow_solver_repeats_match_expansion_and_preserve_caps() {
+fn pfm_b4_flow_solver_repeats_match_expansion_without_a_work_cap() {
     let repeated = circuit("REPEAT 2 {\n    M 0\n}\n");
     let expanded = circuit("M 0\nM 0\n");
     let queries = [flow("Z -> 1"), flow("1 -> Z"), flow("X -> X")];
@@ -128,14 +128,14 @@ fn pfm_b4_flow_solver_repeats_match_expansion_and_preserve_caps() {
         solve_for_flow_measurements(&expanded, &queries).expect("solve expanded circuit")
     );
 
-    let error = solve_for_flow_measurements(
-        &circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"),
-        &[flow("Z -> 1")],
-    )
-    .expect_err("solver must preserve flow-generator expanded-work cap");
-    assert!(
-        error.to_string().contains("current limit 1000000"),
-        "{error}"
+    assert_eq!(
+        solve_for_flow_measurements(
+            &circuit("M 0\nREPEAT 1000001 {\n    TICK\n}\n"),
+            &[flow("Z -> 1")],
+        )
+        .expect("solver work above the retired cap completes"),
+        solve_for_flow_measurements(&circuit("M 0\n"), &[flow("Z -> 1")])
+            .expect("solve the unrepeated circuit")
     );
 }
 

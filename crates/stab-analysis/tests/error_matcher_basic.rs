@@ -169,26 +169,7 @@ fn error_matcher_rejects_repeat_contained_mpp_noise_until_recursive_matching_exi
 }
 
 #[test]
-fn error_matcher_rejects_nested_repeat_expansion_budget() {
-    let circuit = Circuit::from_stim_str(
-        "
-        REPEAT 100000 {
-            REPEAT 100000 {
-                TICK
-            }
-        }
-        ",
-    )
-    .expect("circuit");
-
-    let error =
-        explain_errors_from_circuit(&circuit, None, false).expect_err("reject nested expansion");
-
-    assert!(error.to_string().contains("expanded repeat iterations"));
-}
-
-#[test]
-fn error_matcher_rejects_filter_dem_repeat_expansion_budget() {
+fn error_matcher_refuses_filter_keys_beyond_the_memory_budget() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -198,7 +179,7 @@ fn error_matcher_rejects_filter_dem_repeat_expansion_budget() {
     .expect("circuit");
     let filter = DetectorErrorModel::from_dem_str(
         "
-        repeat 100001 {
+        repeat 1000000000000 {
             error(0.1) D0
             shift_detectors 1
         }
@@ -209,9 +190,5 @@ fn error_matcher_rejects_filter_dem_repeat_expansion_budget() {
     let error =
         explain_errors_from_circuit(&circuit, Some(&filter), false).expect_err("reject filter");
 
-    assert!(
-        error
-            .to_string()
-            .contains("DEM ErrorMatcher filter currently supports repeat counts")
-    );
+    assert!(error.to_string().contains("memory budget"));
 }

@@ -202,17 +202,31 @@ fn m2d_rejects_oversized_text_records() {
     let scratch = Scratch::new();
     let mut oversized = vec![b'0'; 1_048_577];
     oversized.push(b'\n');
-    m2d(&scratch, SWEEP_CX, &["--in_format=01"], &oversized)
-        .assert_err(&["m2d measurement input is too large; limit is 1048576 bytes"]);
+    m2d(
+        &scratch,
+        SWEEP_CX,
+        &["--in_format=01", "--memory-budget=2MiB"],
+        &oversized,
+    )
+    .assert_err(&[
+        "m2d measurement input has more than 1048576 bytes, exceeding the memory budget",
+        "--memory-budget",
+    ]);
 
     let sweep = scratch.file("oversized_sweep.01", &oversized);
     m2d(
         &scratch,
         SWEEP_CX,
-        &["--in_format=01", "--sweep", &sweep, "--sweep_format=01"],
+        &[
+            "--in_format=01",
+            "--sweep",
+            &sweep,
+            "--sweep_format=01",
+            "--memory-budget=2MiB",
+        ],
         b"0\n",
     )
-    .assert_err(&["m2d sweep input is too large; limit is 1048576 bytes"]);
+    .assert_err(&["m2d sweep input has more than 1048576 bytes, exceeding the memory budget"]);
 }
 
 #[test]

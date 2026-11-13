@@ -160,12 +160,13 @@ fn augmented_flow_test_circuit(
             "sampled flow witness measurement count overflowed during admission",
         )
     })?;
-    crate::sampling::validate_general_frame_work_storage(
+    crate::sampling::validate_simulator_work_storage(
         qubit_count.checked_add(1).ok_or_else(|| {
             SampledFlowError::invalid_flow("sampled flow ancilla qubit count overflowed")
         })?,
         augmented_measurements,
         true,
+        stab_model::MemoryBudget::DEFAULT,
     )?;
     let ancilla = qubit_id_from_index(qubit_count, "sampled flow ancilla qubit")?;
     let mut augmented = Circuit::new();
