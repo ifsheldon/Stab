@@ -74,3 +74,55 @@ fn agent_command_help_names_the_current_success_schema() {
 fn unknown_help_topic_exits_nonzero_with_stderr() {
     run(&["stab", "help", "not-a-topic"], b"").assert_err(&["unrecognized help topic"]);
 }
+
+/// Collects `(help topic, --long)` for every visible long flag of `command` and its nested
+/// subcommands, so `stab help plan` must also document `plan sample`'s flags.
+fn visible_long_flags(topic: &str, command: &clap::Command, flags: &mut Vec<(String, String)>) {
+    for argument in command.get_arguments() {
+        let Some(long) = argument.get_long() else {
+            continue;
+        };
+        if argument.is_hide_set() || argument.is_global_set() || matches!(long, "help" | "version")
+        {
+            continue;
+        }
+        flags.push((topic.to_string(), format!("--{long}")));
+    }
+    for subcommand in command.get_subcommands() {
+        visible_long_flags(topic, subcommand, flags);
+    }
+}
+
+/// `stab help <command>` is hand-written, so a flag added to a command's parser can silently go
+/// undocumented. Every visible long flag must be named as a whole flag, not as a prefix of a
+/// longer one such as `--out` inside `--out_format`.
+#[test]
+fn command_help_names_every_visible_long_flag() {
+    let descriptor = crate::command_descriptor();
+    let mut flags = Vec::new();
+    for command in descriptor.get_subcommands() {
+        visible_long_flags(command.get_name(), command, &mut flags);
+    }
+    assert!(
+        flags
+            .iter()
+            .any(|(topic, flag)| topic == "plan" && flag == "--shots"),
+        "nested subcommand flags must be collected: {flags:?}"
+    );
+
+    let mut missing = Vec::new();
+    for (topic, flag) in &flags {
+        let result = run(&["stab", "help", topic], b"");
+        assert_eq!(result.status, 0, "help {topic}: {}", result.stderr_text());
+        let help = result.stdout_text();
+        let named = help.match_indices(flag.as_str()).any(|(start, _)| {
+            help.get(start + flag.len()..)
+                .and_then(|rest| rest.chars().next())
+                .is_none_or(|next| !(next.is_ascii_alphanumeric() || next == '_' || next == '-'))
+        });
+        if !named {
+            missing.push(format!("{topic} {flag}"));
+        }
+    }
+    assert!(missing.is_empty(), "help omits flags: {missing:?}");
+}
