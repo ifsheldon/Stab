@@ -92,7 +92,7 @@ name = "algebra_circuit_conversions_match_stim"
 [[families]]
 id = "algebra.tableaux"
 area = "algebra"
-contract = "Tableaux preserve canonical generator access, composition, inversion, and forward and inverse Pauli actions."
+contract = "Tableaux preserve canonical generator access, composition, inversion, and forward and inverse Pauli actions, and random tableaux are uniform over the Clifford group including signs."
 stim_refs = ["src/stim/stabilizers/tableau.test.cc"]
 status = "done"
 owner = "stab-algebra"

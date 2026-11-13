@@ -352,6 +352,41 @@ fn tableaux_preserve_generators_composition_inversion_and_actions() {
     assert!(first.satisfies_invariants().expect("iterator invariants"));
     tableaus.restart().expect("restart tableau iterator");
     assert_eq!(tableaus.next(), Some(first));
+
+    assert_random_tableaux_are_uniform_over_the_clifford_group();
+}
+
+/// `Tableau::random` must be uniform over the Clifford group, signs included,
+/// like Stim's Bravyi-Maslov sampler. A Pearson chi-square over the complete
+/// one- and two-qubit groups rejects a biased sampler; the fixed seed keeps the
+/// six-sigma bound deterministic.
+fn assert_random_tableaux_are_uniform_over_the_clifford_group() {
+    let mut rng = SmallRng::seed_from_u64(0x554e_4946_4f52_4d31);
+    for (num_qubits, group_order, samples_per_element) in
+        [(1_usize, 24_usize, 500_u32), (2, 11_520, 20)]
+    {
+        let samples = group_order * usize::try_from(samples_per_element).expect("small count");
+        let mut counts = std::collections::HashMap::<String, u32>::new();
+        for _ in 0..samples {
+            let tableau = Tableau::random(num_qubits, &mut rng).expect("random tableau");
+            *counts.entry(tableau.to_string()).or_default() += 1;
+        }
+        assert_eq!(
+            counts.len(),
+            group_order,
+            "{num_qubits}-qubit Cliffords reached"
+        );
+        let expected = f64::from(samples_per_element);
+        let chi_square = counts
+            .values()
+            .map(|&count| (f64::from(count) - expected).powi(2) / expected)
+            .sum::<f64>();
+        let degrees = f64::from(u32::try_from(group_order - 1).expect("small group"));
+        assert!(
+            chi_square < degrees + 6.0 * (2.0 * degrees).sqrt(),
+            "{num_qubits}-qubit chi-square {chi_square} over {degrees} degrees of freedom"
+        );
+    }
 }
 
 #[test]

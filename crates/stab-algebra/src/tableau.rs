@@ -2,9 +2,11 @@ use std::fmt::{Display, Formatter};
 
 use rand::{Rng, RngExt as _};
 
+mod random;
+
 use super::{
-    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, SingleQubitClifford,
-    StabilizerError, StabilizerResult,
+    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
+    StabilizerResult,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -59,38 +61,37 @@ impl Tableau {
         Ok(result)
     }
 
-    /// Creates a random valid Clifford tableau using the caller-owned RNG.
+    /// Samples a uniformly random Clifford tableau using the caller-owned RNG.
     ///
-    /// Passing a seeded `rand` RNG gives deterministic Stab output. This hook samples from a
-    /// random Clifford circuit shape and is not intended to be uniform over the Clifford group or
-    /// to match Stim's C++ RNG stream. The current construction has the separate
-    /// [`crate::StabilizerResource::RandomTableauQubits`] algorithmic limit.
+    /// Every Clifford operation, including its Pauli signs, is equally likely, as in Stim's
+    /// `Tableau::random`; the Bravyi–Maslov construction is ported from Stim. Passing a seeded
+    /// `rand` RNG gives deterministic Stab output, but the stream differs from Stim's C++ RNG.
+    /// The qubit count is bounded by [`crate::StabilizerResource::RandomTableauQubits`].
     pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
         super::StabilizerResource::RandomTableauQubits.ensure(num_qubits)?;
-        let mut result = Self::identity_unchecked(num_qubits);
-        for target in 0..num_qubits {
-            let gate =
-                single_qubit_gate_tableau(num_qubits, target, SingleQubitClifford::random(rng))?;
-            result = result.then(&gate)?;
-        }
-        if num_qubits <= 1 {
-            return Ok(result);
-        }
-        for _ in 0..num_qubits.saturating_mul(4) {
-            let gate = if rng.random_bool(0.5) {
-                let control = rng.random_range(0..num_qubits);
-                let target = random_distinct_target(num_qubits, control, rng);
-                cnot_gate_tableau(num_qubits, control, target)?
-            } else {
-                let target = rng.random_range(0..num_qubits);
-                single_qubit_gate_tableau(num_qubits, target, SingleQubitClifford::random(rng))?
-            };
-            result = result.then(&gate)?;
-        }
-        Ok(result)
+        let rows = random::random_symplectic(num_qubits, rng);
+        let output = |row: u128, sign: bool| {
+            let bases = (0..num_qubits).map(|qubit| {
+                PauliBasis::from_xz(
+                    (row >> qubit) & 1 == 1,
+                    (row >> (num_qubits + qubit)) & 1 == 1,
+                )
+            });
+            PauliString::from_bases_unchecked(sign_from_bit(sign), bases)
+        };
+        let (x_rows, z_rows) = rows.split_at(num_qubits);
+        let xs = x_rows
+            .iter()
+            .map(|&row| output(row, rng.random_bool(0.5)))
+            .collect();
+        let zs = z_rows
+            .iter()
+            .map(|&row| output(row, rng.random_bool(0.5)))
+            .collect();
+        Self::from_conjugated_generators(xs, zs)
     }
 
     pub(crate) fn from_output_columns_unchecked(
@@ -628,23 +629,6 @@ fn single_basis_row(len: usize, index: usize, basis: PauliBasis) -> Vec<PauliBas
         .collect()
 }
 
-fn single_qubit_gate_tableau(
-    num_qubits: usize,
-    target: usize,
-    clifford: SingleQubitClifford,
-) -> StabilizerResult<Tableau> {
-    clifford.tableau().embedded(num_qubits, &[target])
-}
-
-fn cnot_gate_tableau(
-    num_qubits: usize,
-    control: usize,
-    target: usize,
-) -> StabilizerResult<Tableau> {
-    let local = Tableau::gate2("+XX", "+Z_", "+_X", "+ZZ")?;
-    local.embedded(num_qubits, &[control, target])
-}
-
 fn expand_pauli(
     local: &PauliString,
     targets: &[usize],
@@ -779,17 +763,6 @@ fn validate_tableau_targets(
         }
     }
     Ok(())
-}
-
-fn random_distinct_target<R>(num_qubits: usize, first: usize, rng: &mut R) -> usize
-where
-    R: Rng + ?Sized,
-{
-    let mut target = rng.random_range(0..(num_qubits - 1));
-    if target >= first {
-        target += 1;
-    }
-    target
 }
 
 fn flex_from_pauli(pauli: &PauliString) -> StabilizerResult<FlexPauliString> {

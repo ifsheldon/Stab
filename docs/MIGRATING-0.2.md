@@ -53,6 +53,8 @@ The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sort
 
 The partial `stab_analysis::mbqc_decomposition` helper, also exposed through `stab_core::analysis`, is removed without a replacement. MBQC help decomposition remains outside the selected computational API; supported circuit base-gate lowering continues through `stab_analysis::decomposed_circuit`.
 
+`Tableau::random` now samples uniformly over the Clifford group, signs included, using the Bravyi–Maslov construction ported from Stim. Earlier builds applied a bounded random gate walk whose distribution was not uniform, so seeded callers receive different tableaux for the same seed; the signature, error behavior, and `RandomTableauQubits` limit are unchanged.
+
 ## Parser Limits
 
 Circuit and DEM command boundaries accept Stim's ASCII whitespace, including vertical tabs and form feeds before commands and repeat terminators. Whitespace inside instruction arguments and targets keeps the stricter Stim grammar, and diagnostics retain exact source-byte spans.
