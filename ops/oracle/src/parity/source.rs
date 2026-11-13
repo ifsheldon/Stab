@@ -7,7 +7,6 @@ use super::{
     MAX_LEDGER_BYTES, ParityError, StimIdentity, invalid, read_regular_file_bounded,
 };
 use crate::RepoRoot;
-use crate::fixtures::FixtureId;
 
 const FRAGMENT_ROOT: &str = "oracle/stim-v1.16-parity";
 const MAX_FRAGMENTS: usize = 16;
@@ -16,7 +15,6 @@ const MAX_FRAGMENTS: usize = 16;
 #[serde(deny_unknown_fields)]
 struct Manifest {
     schema_version: u32,
-    required_fixture_ids: Vec<FixtureId>,
     stim: StimIdentity,
     family_files: Vec<FragmentPath>,
     command_surfaces: Vec<CommandSurface>,
@@ -110,16 +108,11 @@ pub(super) fn read(root: &RepoRoot) -> Result<Ledger, ParityError> {
 
     Ok(Ledger {
         schema_version: manifest.schema_version,
-        required_fixture_ids: manifest.required_fixture_ids,
         stim: manifest.stim,
         command_surfaces: manifest.command_surfaces,
         format_routes: manifest.format_routes,
         families,
     })
-}
-
-pub(crate) fn required_fixture_ids(root: &RepoRoot) -> Result<Vec<FixtureId>, ParityError> {
-    read_manifest(root).map(|(manifest, _)| manifest.required_fixture_ids)
 }
 
 fn read_manifest(root: &RepoRoot) -> Result<(Manifest, usize), ParityError> {
@@ -131,11 +124,6 @@ fn read_manifest(root: &RepoRoot) -> Result<(Manifest, usize), ParityError> {
             "schema_version is {}, expected {LEDGER_SCHEMA_VERSION}",
             manifest.schema_version
         )));
-    }
-    if manifest.required_fixture_ids.is_empty() {
-        return Err(invalid(
-            "required_fixture_ids must not be empty".to_string(),
-        ));
     }
     Ok((manifest, bytes.len()))
 }
@@ -154,22 +142,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{FragmentPath, LEDGER_PATH, required_fixture_ids};
+    use super::{FragmentPath, LEDGER_PATH, read_manifest};
     use crate::RepoRoot;
 
+    /// A ledger written for an older schema, including one that still names the
+    /// retired status-only `required_fixture_ids` list, must fail loudly instead
+    /// of being read under current semantics.
     #[test]
-    fn fixture_requirements_reject_missing_empty_and_obsolete_root_contracts() {
+    fn root_manifest_rejects_stale_schema_and_retired_fields() {
         let directory = tempfile::tempdir().expect("temporary repository");
         let root = RepoRoot {
             path: directory.path().to_path_buf(),
         };
         std::fs::create_dir(root.path.join("oracle")).expect("oracle directory");
         let source = include_str!("../../../../oracle/stim-v1.16-parity.toml");
-        let mut manifest = source.parse::<toml::Table>().expect("root manifest");
-        manifest.insert(
-            "required_fixture_ids".to_string(),
-            toml::Value::Array(vec![toml::Value::String("required".to_string())]),
-        );
+        let manifest = source.parse::<toml::Table>().expect("root manifest");
         let write = |value: &toml::Table| {
             std::fs::write(
                 root.path.join(LEDGER_PATH),
@@ -178,36 +165,24 @@ mod tests {
             .expect("write manifest")
         };
         write(&manifest);
-        required_fixture_ids(&root).expect("root requirements do not load family fragments");
+        read_manifest(&root).expect("current root manifest loads without fragments");
 
-        for (field, replacement, expected) in [
+        for (field, value, expected) in [
             (
                 "required_fixture_ids",
-                None,
-                "missing field `required_fixture_ids`",
-            ),
-            (
-                "required_fixture_ids",
-                Some(toml::Value::Array(Vec::new())),
-                "required_fixture_ids must not be empty",
+                toml::Value::Array(vec![toml::Value::String("smoke-help".to_string())]),
+                "unknown field `required_fixture_ids`",
             ),
             (
                 "schema_version",
-                Some(toml::Value::Integer(1)),
-                "schema_version is 1, expected 2",
+                toml::Value::Integer(2),
+                "schema_version is 2, expected 3",
             ),
         ] {
             let mut changed = manifest.clone();
-            match replacement {
-                Some(value) => {
-                    changed.insert(field.to_string(), value);
-                }
-                None => {
-                    changed.remove(field);
-                }
-            }
+            changed.insert(field.to_string(), value);
             write(&changed);
-            let error = required_fixture_ids(&root).expect_err("incomplete requirements must fail");
+            let error = read_manifest(&root).expect_err("stale manifest must fail");
             assert!(error.to_string().contains(expected), "{error}");
         }
     }

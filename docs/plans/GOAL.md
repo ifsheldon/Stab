@@ -17,7 +17,7 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 ## Sources Of Truth
 
 - [Active implementation plan](stim-core-parity-and-lean-evidence-plan.md) owns rationale, architecture, milestones, tests, benchmarks, and acceptance criteria.
-- `oracle/stim-v1.16-parity.toml` and its family fragments own feature and evidence status plus required supporting fixture identities.
+- `oracle/stim-v1.16-parity.toml` and its family fragments own feature and evidence status; `oracle/fixtures/manifest.csv` owns supporting pinned-Stim fixtures.
 - [Generated parity view](../stim-parity.md) owns volatile counts and must match the ledger.
 - [Architecture rules](../architecture/README.md) own durable component boundaries.
 - `benchmarks/suite.toml` is the sole active performance source; [the generated suite view](../../benchmarks/SUITE.md) must match it.

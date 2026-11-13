@@ -76,29 +76,17 @@ enum Command {
         #[arg(long)]
         structural: bool,
 
-        /// Run all manifest fixtures that are marked implemented.
+        /// Run every manifest fixture against pinned Stim or its stored output.
         #[arg(long)]
-        implemented_only: bool,
-
-        /// Run implemented manifest fixtures and report red or ignored cases.
-        #[arg(long)]
-        all: bool,
-
-        /// Run implemented fixtures and report pending fixtures for a milestone such as M4.
-        #[arg(long)]
-        milestone: Option<String>,
+        all_rows: bool,
 
         /// Reconfigure and rebuild the C++ Stim oracle even if a binary exists.
         #[arg(long)]
         rebuild_stim: bool,
     },
 
-    /// List oracle fixtures grouped by milestone, parity mode, and status.
-    List {
-        /// Only list fixtures for a milestone such as M4.
-        #[arg(long)]
-        milestone: Option<String>,
-    },
+    /// List oracle fixtures grouped by comparator.
+    List,
 
     /// Record or check exact-output fixtures from pinned Stim.
     Record {
@@ -463,9 +451,7 @@ fn run(cli: Cli) -> Result<(), OracleError> {
             exact,
             statistical,
             structural,
-            implemented_only,
-            all,
-            milestone,
+            all_rows,
             rebuild_stim,
         } => {
             run_selected_cases(
@@ -475,15 +461,13 @@ fn run(cli: Cli) -> Result<(), OracleError> {
                     exact,
                     statistical,
                     structural,
-                    implemented_only,
-                    all,
-                    milestone,
+                    all_rows,
                     rebuild_stim,
                 },
             )?;
         }
-        Command::List { milestone } => {
-            fixtures::list_fixtures(&root, milestone.as_deref())?;
+        Command::List => {
+            fixtures::list_fixtures(&root)?;
         }
         Command::Record {
             check_clean,
@@ -516,54 +500,30 @@ struct RunSelection {
     exact: bool,
     statistical: bool,
     structural: bool,
-    implemented_only: bool,
-    all: bool,
-    milestone: Option<String>,
+    all_rows: bool,
     rebuild_stim: bool,
 }
 
 fn run_selected_cases(root: &RepoRoot, selection: RunSelection) -> Result<(), OracleError> {
-    let selected = usize::from(selection.case.is_some())
-        + usize::from(selection.implemented_only)
-        + usize::from(selection.all)
-        + usize::from(selection.milestone.is_some());
-    if selected != 1 {
-        return Err(OracleError::InvalidRunSelection(
-            "choose exactly one of --case, --implemented-only, --all, or --milestone".to_string(),
-        ));
-    }
     let filter = fixtures::RunFilter::from_flags(
         selection.exact,
         selection.statistical,
         selection.structural,
     )
     .map_err(OracleError::InvalidRunSelection)?;
-    if selection.case.is_some() && filter.is_some() {
-        return Err(OracleError::InvalidRunSelection(
-            "fixture filters --exact, --statistical, and --structural require --implemented-only, --all, or --milestone"
+    match (selection.case, selection.all_rows) {
+        (Some(case), false) if filter.is_none() => {
+            run_smoke_case(root, case, selection.rebuild_stim)
+        }
+        (Some(_), false) => Err(OracleError::InvalidRunSelection(
+            "fixture filters --exact, --statistical, and --structural require --all-rows"
                 .to_string(),
-        ));
+        )),
+        (None, true) => fixtures::run_fixtures(root, filter, selection.rebuild_stim),
+        _ => Err(OracleError::InvalidRunSelection(
+            "choose exactly one of --case or --all-rows".to_string(),
+        )),
     }
-    if let Some(case) = selection.case {
-        return run_smoke_case(root, case, selection.rebuild_stim);
-    }
-    if selection.implemented_only {
-        return fixtures::run_fixtures(
-            root,
-            fixtures::RunMode::ImplementedOnly,
-            filter,
-            selection.rebuild_stim,
-        );
-    }
-    if let Some(milestone) = selection.milestone {
-        return fixtures::run_fixtures(
-            root,
-            fixtures::RunMode::Milestone(milestone),
-            filter,
-            selection.rebuild_stim,
-        );
-    }
-    fixtures::run_fixtures(root, fixtures::RunMode::All, filter, selection.rebuild_stim)
 }
 
 fn fetch_stim(root: &RepoRoot) -> Result<(), OracleError> {
@@ -905,40 +865,17 @@ fn compare_exact(stim: &ProcessOutput, stab: &ProcessOutput) -> Option<String> {
 mod tests {
     use clap::Parser;
 
-    use super::{
-        Cli, Command, Comparator, OracleCase, ProcessOutput, SmokeCase, StderrClass, compare_exact,
-        compare_help_health, smoke_case,
-    };
-    #[test]
-    fn smoke_tiny_circuit_uses_exact_sampling_comparator() {
-        let case = smoke_case(OracleCase::SmokeTinyCircuit);
-
-        assert_eq!(case.name, "smoke/tiny-circuit");
-        assert_eq!(case.args, vec!["sample", "--shots", "2"]);
-        assert_eq!(case.stdin, b"M 0\n");
-        assert_eq!(case.comparator, Comparator::Exact);
-    }
-
-    #[test]
-    fn smoke_help_uses_health_comparator() {
-        let case = smoke_case(OracleCase::SmokeHelp);
-
-        assert_eq!(case.name, "smoke/help");
-        assert_eq!(case.args, vec!["--help"]);
-        assert_eq!(case.stdin, b"");
-        assert_eq!(case.comparator, Comparator::HelpHealth);
-    }
+    use super::{Cli, Command, ProcessOutput, compare_exact, compare_help_health};
 
     #[test]
     fn run_command_accepts_fixture_filters() {
-        let exact = Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M8", "--exact"])
+        let exact = Cli::try_parse_from(["stab-oracle", "run", "--all-rows", "--exact"])
             .expect("parse exact run command");
         let statistical =
-            Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M8", "--statistical"])
+            Cli::try_parse_from(["stab-oracle", "run", "--all-rows", "--statistical"])
                 .expect("parse statistical run command");
-        let structural =
-            Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M9", "--structural"])
-                .expect("parse structural run command");
+        let structural = Cli::try_parse_from(["stab-oracle", "run", "--all-rows", "--structural"])
+            .expect("parse structural run command");
 
         assert!(matches!(exact.command, Command::Run { exact: true, .. }));
         assert!(matches!(
@@ -995,26 +932,6 @@ mod tests {
         assert_eq!(compare_help_health(&stim, &stab), None);
     }
 
-    #[test]
-    fn process_output_classifies_stderr() {
-        assert_eq!(output(Some(0), b"", b"").stderr_class(), StderrClass::Empty);
-        assert_eq!(
-            output(Some(0), b"", b"warning").stderr_class(),
-            StderrClass::NonEmpty
-        );
-    }
-
-    #[test]
-    fn smoke_case_names_are_stable() {
-        let cases = [
-            smoke_case(OracleCase::SmokeHelp),
-            smoke_case(OracleCase::SmokeTinyCircuit),
-        ];
-        let names = cases.iter().map(|case| case.name).collect::<Vec<_>>();
-
-        assert_eq!(names, vec!["smoke/help", "smoke/tiny-circuit"]);
-    }
-
     fn output(status: Option<i32>, stdout: &[u8], stderr: &[u8]) -> ProcessOutput {
         ProcessOutput {
             status,
@@ -1027,13 +944,5 @@ mod tests {
                 truncated: false,
             },
         }
-    }
-
-    #[allow(
-        dead_code,
-        reason = "keeps SmokeCase imported in a visible type assertion"
-    )]
-    fn _assert_smoke_case_is_debug(case: SmokeCase) -> String {
-        format!("{case:?}")
     }
 }

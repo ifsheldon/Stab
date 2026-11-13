@@ -13,7 +13,7 @@ version *args:
 run *args:
     cargo run -q -p stab-oracle -- run {{args}}
 
-# List oracle fixtures grouped by milestone, parity mode, and status.
+# List oracle fixtures grouped by comparator.
 [working-directory: '..']
 list *args:
     cargo run -q -p stab-oracle -- list {{args}}

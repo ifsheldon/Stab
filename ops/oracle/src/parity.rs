@@ -5,7 +5,6 @@ use clap::Subcommand;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::fixtures::{FixtureId, check_required_fixtures};
 use crate::safe_file::{self, SafeFileError};
 use crate::{OracleError, RepoRoot, STIM_COMMIT, STIM_TAG};
 
@@ -14,8 +13,6 @@ mod render;
 mod routes;
 mod runner;
 mod source;
-
-pub(crate) use source::required_fixture_ids;
 
 use commands::{is_expected_command_option, validate_command_surfaces};
 #[cfg(test)]
@@ -31,7 +28,7 @@ use runner::{collect_owner_tests, require_one_listing_match};
 const LEDGER_PATH: &str = "oracle/stim-v1.16-parity.toml";
 const GENERATED_DOC_PATH: &str = "docs/stim-parity.md";
 const STIM_GATE_DOC_PATH: &str = "doc/gates.md";
-const LEDGER_SCHEMA_VERSION: u32 = 2;
+const LEDGER_SCHEMA_VERSION: u32 = 3;
 const MAX_LEDGER_BYTES: usize = 2 * 1024 * 1024;
 const MAX_GENERATED_DOC_BYTES: usize = 4 * 1024 * 1024;
 const PRODUCT_OWNERS: [&str; 9] = [
@@ -179,7 +176,6 @@ pub(crate) enum ParityError {
 #[serde(deny_unknown_fields)]
 struct Ledger {
     schema_version: u32,
-    required_fixture_ids: Vec<FixtureId>,
     stim: StimIdentity,
     command_surfaces: Vec<CommandSurface>,
     format_routes: Vec<FormatRoute>,
@@ -627,8 +623,6 @@ fn read_and_validate(root: &RepoRoot) -> Result<Ledger, ParityError> {
     let ledger = source::read(root)?;
     let expected = expected_coverage(root)?;
     validate(root, &ledger, &expected)?;
-    check_required_fixtures(root, &ledger.required_fixture_ids)
-        .map_err(|error| invalid(error.to_string()))?;
     Ok(ledger)
 }
 

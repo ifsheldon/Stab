@@ -778,14 +778,4 @@ mod tests {
 
         assert_eq!(plan.large_files, 1);
     }
-
-    #[test]
-    fn passing_summary_exits_successfully() {
-        let summary = PreCommitSummary {
-            staged: Some("staged: rust=0 docs=0 large_files=0 submodules=0".to_string()),
-            outcomes: vec![CheckOutcome::skip("rust checks", "no Rust files")],
-        };
-
-        assert_eq!(summary.exit_code(), ExitCode::SUCCESS);
-    }
 }

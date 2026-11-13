@@ -81,7 +81,9 @@ jobs:
 
   contracts:
     name: Compatibility Contracts
-    runs-on: ubuntu-latest
+    # Pinned Stim prints DEM decimals with long double precision, which is 34
+    # digits only on 128-bit long double hosts such as the AArch64 baseline.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -91,6 +93,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           fetch-tags: true
+
+      - name: Install rustup when the runner image lacks it
+        run: |
+          if ! command -v rustup >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
 
       - name: Install native build prerequisites
         run: |
@@ -114,8 +123,14 @@ jobs:
       - name: Build and check pinned Stim gate oracle
         run: just oracle::gates
 
+      - name: Run pinned Stim probes
+        run: cargo test --locked -p stab-oracle -- --ignored pinned_stim
+
       - name: Run parity owners
         run: just oracle::parity-run
+
+      - name: Run live pinned Stim fixtures
+        run: just oracle::run --all-rows
 
       - name: Check E2E performance contract
         run: just bench::e2e-check

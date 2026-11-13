@@ -7,7 +7,7 @@ use super::paths::{fixture_file, validate_fixture_path};
 use super::statistical::{self, StatisticalSource};
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureError, FixturePathRequirement, FixtureRow,
-    RepoRoot, is_core_fixture, is_direct_rust_fixture,
+    RepoRoot, is_core_fixture,
 };
 
 const FIXTURE_INPUT_TOKEN_PREFIX: &str = "{fixture_input:";
@@ -134,7 +134,7 @@ pub(super) fn validate_row_tokens(
             }
         }
     }
-    if has_placeholder && (is_core_fixture(row) || is_direct_rust_fixture(row)) {
+    if has_placeholder && is_core_fixture(row) {
         violations.push(format!(
             "{} fixture placeholders are only supported for CLI fixture rows",
             row.id

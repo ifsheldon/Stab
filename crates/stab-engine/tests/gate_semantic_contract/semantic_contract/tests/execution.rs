@@ -1136,7 +1136,6 @@ fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
         completed_shots, expected_shots,
         "{case_id} completed statistical shots"
     );
-    emit_statistical_completion(case_id, plan.seed, completed_shots);
     for bucket in plan.buckets {
         let count = counts
             .get(bucket.name)
@@ -1161,10 +1160,4 @@ fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
             bucket.expected_probability
         );
     }
-}
-
-fn emit_statistical_completion(case_id: &str, seed: u64, completed_shots: u64) {
-    static NEXT_COMPARISON: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-    let comparison = NEXT_COMPARISON.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    println!("STAB_CQ1_STATISTICAL\t1\t{case_id}\t{seed}\t{comparison}\t{completed_shots}");
 }

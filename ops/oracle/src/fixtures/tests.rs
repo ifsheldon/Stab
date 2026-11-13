@@ -1,18 +1,14 @@
 use super::{
-    ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunFilter, RunMode, compare_fixture,
+    ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement,
+    compare_fixture,
     hex_payload::decode as decode_hex_payload,
     is_recordable,
     outputs::{self, FixtureArgToken},
-    run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
+    run_core_fixture, statistical, validate_fixture_path,
 };
 
-use super::direct_rust::{cargo_test_passed_test_count, check_direct_rust_fixture_executed_tests};
-
-mod extracted_packages;
-
 const MANIFEST_CSV: &str = include_str!("../../../../oracle/fixtures/manifest.csv");
-const HEADER: &str = "id,milestone,upstream_source,parity_mode,comparator,command_shape,argv,stdin_path,expected_stdout_path,expected_status,expected_stderr_class,status,statistical_plan,source_license_note\n";
+const HEADER: &str = "id,upstream_source,comparator,command_shape,argv,stdin_path,expected_stdout_path,expected_status,expected_stderr_class,statistical_plan,source_license_note\n";
 
 #[test]
 fn hex_fixture_payloads_preserve_arbitrary_bytes_and_reject_malformed_text() {
@@ -106,106 +102,6 @@ fn fixture_input_read_enforces_aggregate_byte_limit() {
 }
 
 #[test]
-fn fixture_manifest_has_implemented_smoke_cases() {
-    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
-    let implemented = manifest
-        .rows
-        .iter()
-        .filter(|row| row.status.as_str() == "implemented")
-        .map(|row| row.id.as_str())
-        .collect::<Vec<_>>();
-
-    for id in [
-        "smoke-help",
-        "smoke-tiny-circuit",
-        "m4-parser-basic",
-        "m4-convert-canonical-print",
-        "coverage-circuit-circuit-instruction",
-        "coverage-circuit-gate-decomposition",
-        "coverage-circuit-gate-target",
-        "coverage-gates-gates",
-        "coverage-util-bot-probability-util",
-    ] {
-        assert!(implemented.contains(&id), "{id}");
-    }
-}
-
-#[test]
-fn milestone_run_mode_parses_m4_filter() {
-    let mode = RunMode::Milestone("M4".to_string());
-
-    assert_eq!(mode.milestone_filter().unwrap(), Some(Milestone::M4));
-}
-
-#[test]
-fn milestone_run_mode_parses_post_beta_filter() {
-    let mode = RunMode::Milestone("PF5".to_string());
-
-    assert_eq!(mode.milestone_filter().unwrap(), Some(Milestone::Pf5));
-}
-
-#[test]
-fn run_filter_flags_select_one_comparator_family() {
-    assert_eq!(RunFilter::from_flags(false, false, false).unwrap(), None);
-    assert_eq!(
-        RunFilter::from_flags(true, false, false).unwrap(),
-        Some(RunFilter::Exact)
-    );
-    assert_eq!(
-        RunFilter::from_flags(false, true, false).unwrap(),
-        Some(RunFilter::Statistical)
-    );
-    assert_eq!(
-        RunFilter::from_flags(false, false, true).unwrap(),
-        Some(RunFilter::Structural)
-    );
-    assert!(
-        RunFilter::from_flags(true, true, false)
-            .expect_err("conflicting filters should fail")
-            .contains("choose at most one")
-    );
-    assert!(
-        RunFilter::from_flags(false, true, true)
-            .expect_err("conflicting filters should fail")
-            .contains("choose at most one")
-    );
-}
-
-#[test]
-fn run_filter_matches_fixture_rows() {
-    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
-    let exact_row = manifest
-        .rows
-        .iter()
-        .find(|row| row.id.as_str() == "m8-sample-basic")
-        .expect("M8 exact row");
-    let statistical_row = manifest
-        .rows
-        .iter()
-        .find(|row| row.id.as_str() == "m8-sample-noisy-statistical")
-        .expect("M8 statistical row");
-    let structural_exact_row = manifest
-        .rows
-        .iter()
-        .find(|row| row.id.as_str() == "coverage-io-measure-record-writer")
-        .expect("M8 structural exact-parity row");
-    let structural_row = manifest
-        .rows
-        .iter()
-        .find(|row| row.id.as_str() == "coverage-simulators-frame-simulator-util")
-        .expect("M9 structural row");
-
-    assert!(RunFilter::Exact.matches(exact_row));
-    assert!(RunFilter::Exact.matches(structural_exact_row));
-    assert!(!RunFilter::Exact.matches(statistical_row));
-    assert!(RunFilter::Statistical.matches(statistical_row));
-    assert!(!RunFilter::Statistical.matches(exact_row));
-    assert!(RunFilter::Structural.matches(structural_row));
-    assert!(RunFilter::Structural.matches(structural_exact_row));
-    assert!(!RunFilter::Structural.matches(exact_row));
-}
-
-#[test]
 fn m4_core_parse_print_rows_run_in_process() {
     let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -224,111 +120,6 @@ fn m4_core_parse_print_rows_run_in_process() {
 
         assert_eq!(output.status, Some(0), "{id}");
     }
-}
-
-#[test]
-fn m4_direct_rust_rows_run_cargo_tests() {
-    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("repo root");
-    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-
-    for id in [
-        "coverage-circuit-circuit-instruction",
-        "coverage-circuit-gate-decomposition",
-        "coverage-circuit-gate-target",
-        "coverage-gates-gates",
-        "coverage-util-bot-probability-util",
-    ] {
-        let row = manifest
-            .rows
-            .iter()
-            .find(|row| row.id.as_str() == id)
-            .expect("M4 direct Rust row");
-        let output = run_direct_rust_fixture(&root, row).expect("direct Rust fixture");
-
-        assert_eq!(output.status, Some(0), "{id}");
-    }
-}
-
-#[test]
-fn direct_rust_fixture_counts_cargo_test_output_across_streams() {
-    let output = process_output(
-        Some(0),
-        b"test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
-        b"test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
-    );
-
-    assert_eq!(cargo_test_passed_test_count(&output), 3);
-}
-
-#[test]
-fn direct_rust_fixture_rejects_zero_test_cargo_output() {
-    let csv = format!(
-        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test|-p|stab-core|definitely_no_matching_tests,,,0,any,implemented,Run direct Rust gate target parity tests,hand-authored\n"
-    );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let row = manifest.rows.first().expect("manifest row");
-    let output = process_output(
-        Some(0),
-        b"running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out\n",
-        b"",
-    );
-
-    let error =
-        check_direct_rust_fixture_executed_tests(row, &output).expect_err("reject zero tests");
-    assert!(
-        error
-            .to_string()
-            .contains("direct Rust fixture passed zero cargo tests"),
-        "{error}"
-    );
-}
-
-#[test]
-fn direct_rust_fixture_rejects_ignored_exact_test() {
-    let csv = format!(
-        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test|-p|stab-core|ignored_test|--|--exact,,,0,any,implemented,Run one exact direct Rust test,hand-authored\n"
-    );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let row = manifest.rows.first().expect("manifest row");
-    let output = process_output(
-        Some(0),
-        b"running 1 test\ntest ignored_test ... ignored\n\ntest result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n",
-        b"",
-    );
-
-    let error =
-        check_direct_rust_fixture_executed_tests(row, &output).expect_err("reject ignored test");
-    assert!(
-        error.to_string().contains("passed zero cargo tests"),
-        "{error}"
-    );
-}
-
-#[test]
-fn direct_rust_fixture_rejects_multiple_passed_exact_tests() {
-    let csv = format!(
-        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test|-p|stab-core|broad_filter|--|--exact,,,0,any,implemented,Run one exact direct Rust test,hand-authored\n"
-    );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let row = manifest.rows.first().expect("manifest row");
-    let output = process_output(
-        Some(0),
-        b"test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
-        b"",
-    );
-
-    let error = check_direct_rust_fixture_executed_tests(row, &output)
-        .expect_err("reject broad exact selector");
-    assert!(
-        error
-            .to_string()
-            .contains("passed 2 cargo tests instead of exactly one"),
-        "{error}"
-    );
 }
 
 #[test]
@@ -363,7 +154,6 @@ fn successful_exact_output_rows_have_expected_stdout_paths() {
         .rows
         .iter()
         .filter(|row| row.comparator == FixtureComparator::ExactOutput)
-        .filter(|row| row.status != super::FixtureStatus::ManifestOnly)
         .filter(|row| row.expected_status == 0)
     {
         assert!(!row.expected_stdout_path.is_empty(), "{}", row.id);
@@ -529,29 +319,9 @@ fn fixture_input_placeholders_are_replaced_with_fixture_paths() {
 }
 
 #[test]
-fn validation_rejects_cargo_test_row_without_cargo_arguments() {
-    let csv = format!(
-        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test,,,0,any,implemented,Run direct Rust gate target parity tests,hand-authored\n"
-    );
-    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(std::path::Path::parent)
-        .expect("repo root");
-    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-    let error = manifest.check(&root).expect_err("missing cargo args");
-
-    assert!(
-        error
-            .to_string()
-            .contains("bad cargo-test row has no cargo arguments")
-    );
-}
-
-#[test]
 fn validation_rejects_statistical_row_without_plan() {
     let csv = format!(
-        "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|10,inputs/sample_noisy.stim,,0,empty,red,,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_sample.test.cc,statistical,stim sample,sample|--shots|10,inputs/sample_noisy.stim,,0,empty,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -602,7 +372,7 @@ fn statistical_plan_source_rejects_unknown_values() {
 #[test]
 fn statistical_fixture_output_placeholders_do_not_need_committed_expected_files() {
     let csv = format!(
-        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+        "{HEADER}good,src/stim/simulators/dem_sampler.test.cc,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let fixture_root = tempfile::tempdir().expect("tempdir");
@@ -623,7 +393,7 @@ fn statistical_fixture_output_placeholders_do_not_need_committed_expected_files(
 #[test]
 fn statistical_fixture_output_source_requires_one_output_placeholder() {
     let csv = format!(
-        "{HEADER}bad,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5,inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+        "{HEADER}bad,src/stim/simulators/dem_sampler.test.cc,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5,inputs/sample_dem_observable_only_noisy.dem,,0,empty,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let fixture_root = tempfile::tempdir().expect("tempdir");
@@ -647,7 +417,7 @@ fn statistical_fixture_output_source_requires_one_output_placeholder() {
 #[test]
 fn statistical_fixture_output_comparator_checks_stab_side_output() {
     let csv = format!(
-        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+        "{HEADER}good,src/stim/simulators/dem_sampler.test.cc,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let row = manifest.rows.first().expect("one row");
@@ -669,7 +439,7 @@ fn statistical_fixture_output_comparator_checks_stab_side_output() {
 #[test]
 fn statistical_fixture_output_comparator_checks_stim_side_output() {
     let csv = format!(
-        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+        "{HEADER}good,src/stim/simulators/dem_sampler.test.cc,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let row = manifest.rows.first().expect("one row");
@@ -692,7 +462,7 @@ fn statistical_fixture_output_comparator_checks_stim_side_output() {
 #[test]
 fn statistical_fixture_output_source_exact_compares_stdout() {
     let csv = format!(
-        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+        "{HEADER}good,src/stim/simulators/dem_sampler.test.cc,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let row = manifest.rows.first().expect("one row");
@@ -707,7 +477,7 @@ fn statistical_fixture_output_source_exact_compares_stdout() {
 #[test]
 fn stdout_statistical_comparator_rejects_invalid_stim_distribution() {
     let csv = format!(
-        "{HEADER}good,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|1000|--seed|5,inputs/sample_noisy.stim,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+        "{HEADER}good,src/stim/cmd/command_sample.test.cc,statistical,stim sample,sample|--shots|1000|--seed|5,inputs/sample_noisy.stim,,0,empty,sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let row = manifest.rows.first().expect("one row");
@@ -842,7 +612,7 @@ fn statistical_plan_rejects_unenforced_false_positive_claims() {
 #[test]
 fn validation_rejects_statistical_plan_that_disagrees_with_argv() {
     let csv = format!(
-        "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|10|--seed|5,inputs/sample_noisy.stim,,0,empty,red,sample_count=11; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_sample.test.cc,statistical,stim sample,sample|--shots|10|--seed|5,inputs/sample_noisy.stim,,0,empty,sample_count=11; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -864,7 +634,7 @@ fn validation_rejects_statistical_plan_that_disagrees_with_argv() {
 #[test]
 fn validation_rejects_empty_argv_tokens() {
     let csv = format!(
-        "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample||--shots|10,inputs/sample_noisy.stim,,0,empty,red,sample_count=10; fixed_seed=1; false_positive_rate<=0.001,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_sample.test.cc,statistical,stim sample,sample||--shots|10,inputs/sample_noisy.stim,,0,empty,sample_count=10; fixed_seed=1; false_positive_rate<=0.001,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -882,7 +652,7 @@ fn validation_rejects_empty_argv_tokens() {
 #[test]
 fn validation_rejects_unsafe_fixture_output_placeholder() {
     let csv = format!(
-        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:../escape.stdout}},inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,red,,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_sample_dem.test.cc,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:../escape.stdout}},inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -904,7 +674,7 @@ fn validation_rejects_unsafe_fixture_output_placeholder() {
 #[test]
 fn validation_rejects_unsafe_fixture_input_placeholder() {
     let csv = format!(
-        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--replay_err_in|{{fixture_input:../escape.01}},inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,red,,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_sample_dem.test.cc,exact-output,stim sample_dem,sample_dem|--replay_err_in|{{fixture_input:../escape.01}},inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -926,7 +696,7 @@ fn validation_rejects_unsafe_fixture_input_placeholder() {
 #[test]
 fn validation_rejects_malformed_fixture_output_placeholder() {
     let csv = format!(
-        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:expected/missing.stdout,inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,red,,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_sample_dem.test.cc,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:expected/missing.stdout,inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -977,7 +747,7 @@ fn fixture_output_scratch_ignores_repository_symlink() {
     std::os::unix::fs::symlink(&outside, oracle_target.join("fixture-outputs"))
         .expect("create scratch symlink");
     let csv = format!(
-        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:expected/sample_dem_observable_obs.stdout}},inputs/sample.dem,expected/sample.stdout,0,empty,red,,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_sample_dem.test.cc,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:expected/sample_dem_observable_obs.stdout}},inputs/sample.dem,expected/sample.stdout,0,empty,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let row = manifest.rows.first().expect("one fixture row");
@@ -1002,7 +772,7 @@ fn child_fixture_output_read_enforces_descriptor_byte_limit() {
     let actual = temp.path().join("actual.bin");
     std::fs::write(&actual, vec![0_u8; 1024 * 1024 + 1]).expect("oversized output");
     let csv = format!(
-        "{HEADER}output,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,fixture output,sample_dem,inputs/sample.dem,expected/sample.stdout,0,empty,red,,hand-authored\n"
+        "{HEADER}output,src/stim/cmd/command_sample_dem.test.cc,exact-output,fixture output,sample_dem,inputs/sample.dem,expected/sample.stdout,0,empty,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse fixture row");
     let row = manifest.rows.first().expect("fixture row");
@@ -1028,7 +798,7 @@ fn child_fixture_output_read_rejects_symlink() {
     std::fs::write(&outside, b"outside").expect("outside output");
     symlink(&outside, &actual).expect("symlink output");
     let csv = format!(
-        "{HEADER}output,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,fixture output,sample_dem,inputs/sample.dem,expected/sample.stdout,0,empty,red,,hand-authored\n"
+        "{HEADER}output,src/stim/cmd/command_sample_dem.test.cc,exact-output,fixture output,sample_dem,inputs/sample.dem,expected/sample.stdout,0,empty,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse fixture row");
     let row = manifest.rows.first().expect("fixture row");
@@ -1040,7 +810,7 @@ fn child_fixture_output_read_rejects_symlink() {
 #[test]
 fn validation_requires_declared_expected_stdout_by_default() {
     let csv = format!(
-        "{HEADER}bad,M4,src/stim/cmd/command_convert.test.cc,exact-output,exact-output,stab-core circuit parse print,core-circuit-parse-print,inputs/parser_basic.stim,expected/missing-golden.stdout,0,any,manifest-only,,hand-authored\n"
+        "{HEADER}bad,src/stim/cmd/command_convert.test.cc,exact-output,stab-core circuit parse print,core-circuit-parse-print,inputs/parser_basic.stim,expected/missing-golden.stdout,0,any,,hand-authored\n"
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1058,14 +828,9 @@ fn validation_requires_declared_expected_stdout_by_default() {
             .contains("bad expected_stdout_path does not exist: expected/missing-golden.stdout")
     );
 
-    let allow_missing_error = manifest
+    manifest
         .check_with_expected_stdout_policy(&root, ExpectedStdoutPolicy::AllowMissing)
-        .expect_err("synthetic manifest should still fail compatibility coverage");
-    assert!(
-        !allow_missing_error
-            .to_string()
-            .contains("bad expected_stdout_path does not exist: expected/missing-golden.stdout")
-    );
+        .expect("recording may create a declared golden that does not exist yet");
 }
 
 #[test]

@@ -201,9 +201,6 @@ fn valid_ledger() -> Ledger {
     coverage.extend(option_coverage(&command_surfaces));
     Ledger {
         schema_version: LEDGER_SCHEMA_VERSION,
-        required_fixture_ids: vec![
-            FixtureId::try_from("required".to_string()).expect("fixture id"),
-        ],
         stim: StimIdentity {
             version: STIM_TAG.to_string(),
             commit: STIM_COMMIT.to_string(),

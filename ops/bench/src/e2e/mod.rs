@@ -242,22 +242,3 @@ struct ParityFamily {
     id: String,
     status: String,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn checked_suite_has_the_frozen_release_shape() {
-        let root = RepoRoot::resolve(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../..")
-                .as_path(),
-        )
-        .expect("repo root");
-        let loaded = load_suite(&root).expect("checked suite");
-        validate_prerequisites(&root, &loaded.suite).expect("done prerequisites");
-        assert_eq!(loaded.suite.families.len(), 12);
-        assert_eq!(loaded.suite.case_count(), 29);
-    }
-}

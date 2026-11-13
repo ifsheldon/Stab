@@ -50,10 +50,11 @@ Additional pinned checks are:
 
 ```text
 just oracle::result-formats --check
-just oracle::run --implemented-only
+just oracle::run --all-rows
+cargo test -p stab-oracle -- --ignored pinned_stim
 ```
 
-The result-format corpus and gate helper run the actual pinned Stim source. Parity schema version 2 names required implemented fixture IDs in the root manifest; fixture definitions own their commands, comparators, source attribution, and statistical plans. These supporting fixtures do not promote semantic family status. The old compatibility matrix and oracle tier flags are removed; benchmark tiers still select different measurement workloads.
+The result-format corpus, fixture manifest, gate helper, and pinned-Stim probes run the actual pinned Stim source. Every manifest row compares Stab against live pinned Stim or a stored pinned-Stim artifact; rows own their commands, comparators, source attribution, and statistical plans, and they do not promote semantic family status. Pinned Stim prints DEM decimals at `long double` precision, so live DEM text parity is defined on 128-bit `long double` hosts such as the AArch64 baseline, and CI runs these checks on an AArch64 runner.
 
 ## Performance
 

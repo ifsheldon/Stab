@@ -9,42 +9,18 @@ use thiserror::Error;
 
 use crate::{OracleError, RepoRoot, StderrClass, compare_exact, compare_help_health};
 
-mod direct_rust;
 mod hex_payload;
-mod milestone;
+mod id;
 mod outputs;
 mod paths;
-mod requirements;
 mod reverse_flow;
 mod statistical;
 
-use direct_rust::{is_direct_rust_fixture, run_direct_rust_fixture};
-pub(crate) use milestone::Milestone;
+pub(crate) use id::FixtureId;
 use paths::{fixture_file, validate_fixture_path};
-pub(crate) use requirements::{FixtureId, check_required_fixtures};
 use reverse_flow::core_time_reverse_flows_output;
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum RunMode {
-    ImplementedOnly,
-    All,
-    Milestone(String),
-}
-
-impl RunMode {
-    fn milestone_filter(&self) -> Result<Option<Milestone>, FixtureError> {
-        match self {
-            Self::Milestone(milestone) => parse_milestone(milestone).map(Some),
-            Self::ImplementedOnly | Self::All => Ok(None),
-        }
-    }
-
-    fn reports_pending(&self) -> bool {
-        matches!(self, Self::All | Self::Milestone(_))
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RunFilter {
@@ -69,32 +45,19 @@ impl RunFilter {
     }
 
     fn matches(self, row: &FixtureRow) -> bool {
-        match self {
-            Self::Exact => {
-                matches!(
-                    row.parity_mode,
-                    ParityMode::ExactOutput | ParityMode::ExactOutputAndStatistical
-                ) && row.comparator != FixtureComparator::Statistical
+        row.comparator
+            == match self {
+                Self::Exact => FixtureComparator::ExactOutput,
+                Self::Statistical => FixtureComparator::Statistical,
+                Self::Structural => FixtureComparator::Structural,
             }
-            Self::Statistical => row.comparator == FixtureComparator::Statistical,
-            Self::Structural => {
-                row.parity_mode == ParityMode::Structural
-                    || row.comparator == FixtureComparator::Structural
-            }
-        }
     }
-}
-
-fn parse_milestone(value: &str) -> Result<Milestone, FixtureError> {
-    Milestone::parse(value).map_err(|milestone| FixtureError::UnknownMilestone { milestone })
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 struct FixtureRow {
     id: FixtureId,
-    milestone: Milestone,
     upstream_source: String,
-    parity_mode: ParityMode,
     comparator: FixtureComparator,
     command_shape: String,
     argv: String,
@@ -102,35 +65,8 @@ struct FixtureRow {
     expected_stdout_path: String,
     expected_status: i32,
     expected_stderr_class: ExpectedStderrClass,
-    status: FixtureStatus,
     statistical_plan: String,
     source_license_note: String,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-enum ParityMode {
-    #[serde(rename = "exact-output")]
-    ExactOutput,
-    #[serde(rename = "exact-output-and-statistical")]
-    ExactOutputAndStatistical,
-    #[serde(rename = "property")]
-    Property,
-    #[serde(rename = "statistical")]
-    Statistical,
-    #[serde(rename = "structural")]
-    Structural,
-}
-
-impl ParityMode {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::ExactOutput => "exact-output",
-            Self::ExactOutputAndStatistical => "exact-output-and-statistical",
-            Self::Property => "property",
-            Self::Statistical => "statistical",
-            Self::Structural => "structural",
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
@@ -139,8 +75,6 @@ enum FixtureComparator {
     ExactOutput,
     #[serde(rename = "help-health")]
     HelpHealth,
-    #[serde(rename = "property")]
-    Property,
     #[serde(rename = "statistical")]
     Statistical,
     #[serde(rename = "structural")]
@@ -152,32 +86,8 @@ impl FixtureComparator {
         match self {
             Self::ExactOutput => "exact-output",
             Self::HelpHealth => "help-health",
-            Self::Property => "property",
             Self::Statistical => "statistical",
             Self::Structural => "structural",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-enum FixtureStatus {
-    #[serde(rename = "implemented")]
-    Implemented,
-    #[serde(rename = "ignored")]
-    Ignored,
-    #[serde(rename = "manifest-only")]
-    ManifestOnly,
-    #[serde(rename = "red")]
-    Red,
-}
-
-impl FixtureStatus {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Implemented => "implemented",
-            Self::Ignored => "ignored",
-            Self::ManifestOnly => "manifest-only",
-            Self::Red => "red",
         }
     }
 }
@@ -240,11 +150,6 @@ pub(crate) enum FixtureError {
 
     #[error("fixture manifest validation failed:\n{0}")]
     Validation(Box<str>),
-
-    #[error(
-        "unknown fixture milestone {milestone}; expected one of M0, M4, M5, M6, M7, M8, M9, M10, M11, M12, PF1, PF2, PF3, PF4, PF5, PF6, or PF7"
-    )]
-    UnknownMilestone { milestone: String },
 
     #[error("failed to read fixture file {path}: {source}")]
     ReadFile {
@@ -364,11 +269,7 @@ impl FixtureManifest {
                 expected_stdout_policy,
                 &mut violations,
             );
-            if is_direct_rust_fixture(row) && row.argv_tokens().len() < 2 {
-                violations.push(format!("{} cargo-test row has no cargo arguments", row.id));
-            }
             if row.comparator == FixtureComparator::ExactOutput
-                && row.status != FixtureStatus::ManifestOnly
                 && row.expected_status == 0
                 && row.expected_stdout_path.is_empty()
             {
@@ -376,9 +277,7 @@ impl FixtureManifest {
             }
             if matches!(
                 row.comparator,
-                FixtureComparator::Property
-                    | FixtureComparator::Statistical
-                    | FixtureComparator::Structural
+                FixtureComparator::Statistical | FixtureComparator::Structural
             ) && row.statistical_plan.is_empty()
             {
                 violations.push(format!(
@@ -386,9 +285,7 @@ impl FixtureManifest {
                     row.id
                 ));
             }
-            if row.comparator == FixtureComparator::Statistical
-                && row.status != FixtureStatus::ManifestOnly
-            {
+            if row.comparator == FixtureComparator::Statistical {
                 let argv_tokens = row.argv_tokens();
                 if let Some(reason) =
                     statistical::validate_statistical_plan(&row.statistical_plan, &argv_tokens)
@@ -439,10 +336,7 @@ impl FixtureManifest {
                 }
             }
         }
-        match crate::parity::required_fixture_ids(root) {
-            Ok(required) => self.check_required_ids(&required, &mut violations),
-            Err(error) => violations.push(error.to_string()),
-        }
+        self.check_unique_ids(&mut violations);
         if violations.is_empty() {
             Ok(())
         } else {
@@ -452,42 +346,26 @@ impl FixtureManifest {
         }
     }
 
-    fn list(&self, milestone_filter: Option<Milestone>) {
-        let mut groups: BTreeMap<(Milestone, ParityMode, FixtureStatus), Vec<&FixtureRow>> =
-            BTreeMap::new();
-        for row in self.rows.iter().filter(|row| {
-            milestone_filter
-                .map(|milestone| row.milestone == milestone)
-                .unwrap_or(true)
-        }) {
-            groups
-                .entry((row.milestone, row.parity_mode, row.status))
-                .or_default()
-                .push(row);
-        }
-        if groups.is_empty() {
-            if let Some(milestone) = milestone_filter {
-                println!(
-                    "[stab-oracle] no fixtures are declared for {}",
-                    milestone.as_str()
-                );
+    fn check_unique_ids(&self, violations: &mut Vec<String>) {
+        let mut seen = std::collections::BTreeSet::new();
+        for row in &self.rows {
+            if !seen.insert(&row.id) {
+                violations.push(format!("{} is declared more than once", row.id));
             }
-            return;
         }
-        for ((milestone, parity_mode, status), rows) in groups {
-            println!(
-                "{} / {} / {}:",
-                milestone.as_str(),
-                parity_mode.as_str(),
-                status.as_str()
-            );
+    }
+
+    fn list(&self) {
+        let mut groups: BTreeMap<FixtureComparator, Vec<&FixtureRow>> = BTreeMap::new();
+        for row in &self.rows {
+            groups.entry(row.comparator).or_default().push(row);
+        }
+        for (comparator, rows) in groups {
+            println!("{}:", comparator.as_str());
             for row in rows {
                 println!(
-                    "- {} [{}] {} -> {}",
-                    row.id,
-                    row.comparator.as_str(),
-                    row.command_shape,
-                    row.upstream_source
+                    "- {} {} -> {}",
+                    row.id, row.command_shape, row.upstream_source
                 );
             }
         }
@@ -515,10 +393,8 @@ impl FixtureRow {
     }
 }
 
-pub(crate) fn list_fixtures(root: &RepoRoot, milestone: Option<&str>) -> Result<(), OracleError> {
-    let manifest = load_manifest(root)?;
-    let milestone_filter = milestone.map(parse_milestone).transpose()?;
-    manifest.list(milestone_filter);
+pub(crate) fn list_fixtures(root: &RepoRoot) -> Result<(), OracleError> {
+    load_manifest(root)?.list();
     Ok(())
 }
 
@@ -574,91 +450,45 @@ pub(crate) fn record_fixtures(
 
 fn is_recordable(row: &FixtureRow) -> bool {
     row.comparator == FixtureComparator::ExactOutput
-        && row.status != FixtureStatus::ManifestOnly
         && (!is_core_fixture(row) || reverse_flow::is_reverse_flow_fixture(row))
         && !row.expected_stdout_path.is_empty()
 }
 
+/// Runs every manifest fixture, optionally restricted to one comparator.
 pub(crate) fn run_fixtures(
     root: &RepoRoot,
-    mode: RunMode,
     filter: Option<RunFilter>,
     rebuild_stim: bool,
 ) -> Result<(), OracleError> {
     let manifest = load_manifest(root)?;
-    let milestone_filter = mode.milestone_filter()?;
-    let reports_pending = mode.reports_pending();
     let mut stim_binary = None;
     let mut stab_binary = None;
     for row in &manifest.rows {
-        if !matches_milestone_filter(row, milestone_filter) {
-            continue;
-        }
         if filter.is_some_and(|filter| !filter.matches(row)) {
             continue;
         }
-        match row.status {
-            FixtureStatus::Implemented => {
-                let stab = if is_core_fixture(row) {
-                    run_core_fixture(root, row)?
-                } else if is_direct_rust_fixture(row) {
-                    run_direct_rust_fixture(root, row)?
-                } else {
-                    let stdin = row.stdin(root)?;
-                    let stim_binary_path =
-                        cached_stim_binary(root, rebuild_stim, &mut stim_binary)?;
-                    let stab_binary_path = cached_stab_binary(root, &mut stab_binary)?;
-                    let stim_command = outputs::prepare_command(root, row, "stim")?;
-                    let stab_command = outputs::prepare_command(root, row, "stab")?;
-                    let stim = run_prepared_fixture_process(
-                        root,
-                        &stim_binary_path,
-                        &stim_command,
-                        &stdin,
-                    )?;
-                    let stab = run_prepared_fixture_process(
-                        root,
-                        &stab_binary_path,
-                        &stab_command,
-                        &stdin,
-                    )?;
-                    compare_fixture(row, &stim, &stab)?;
-                    outputs::compare_outputs(row, &stim_command.outputs, &stab_command.outputs)?;
-                    stab
-                };
-                println!(
-                    "[stab-oracle] PASS {} status={:?} stderr_class={:?}",
-                    row.id,
-                    stab.status,
-                    stab.stderr_class()
-                );
-            }
-            FixtureStatus::Red if reports_pending => {
-                println!(
-                    "[stab-oracle] RED {} [{}] {}",
-                    row.id,
-                    row.comparator.as_str(),
-                    row.command_shape
-                );
-            }
-            FixtureStatus::Ignored if reports_pending => {
-                println!(
-                    "[stab-oracle] IGNORED {} [{}] {}",
-                    row.id,
-                    row.comparator.as_str(),
-                    row.command_shape
-                );
-            }
-            FixtureStatus::ManifestOnly if reports_pending => {
-                println!(
-                    "[stab-oracle] MANIFEST-ONLY {} [{}] {}",
-                    row.id,
-                    row.comparator.as_str(),
-                    row.command_shape
-                );
-            }
-            _ => {}
-        }
+        let stab = if is_core_fixture(row) {
+            run_core_fixture(root, row)?
+        } else {
+            let stdin = row.stdin(root)?;
+            let stim_binary_path = cached_stim_binary(root, rebuild_stim, &mut stim_binary)?;
+            let stab_binary_path = cached_stab_binary(root, &mut stab_binary)?;
+            let stim_command = outputs::prepare_command(root, row, "stim")?;
+            let stab_command = outputs::prepare_command(root, row, "stab")?;
+            let stim =
+                run_prepared_fixture_process(root, &stim_binary_path, &stim_command, &stdin)?;
+            let stab =
+                run_prepared_fixture_process(root, &stab_binary_path, &stab_command, &stdin)?;
+            compare_fixture(row, &stim, &stab)?;
+            outputs::compare_outputs(row, &stim_command.outputs, &stab_command.outputs)?;
+            stab
+        };
+        println!(
+            "[stab-oracle] PASS {} status={:?} stderr_class={:?}",
+            row.id,
+            stab.status,
+            stab.stderr_class()
+        );
     }
     Ok(())
 }
@@ -682,12 +512,6 @@ fn run_prepared_fixture_process(
         &monitored_files,
         outputs::AUXILIARY_OUTPUT_LIMIT_BYTES,
     )
-}
-
-fn matches_milestone_filter(row: &FixtureRow, milestone_filter: Option<Milestone>) -> bool {
-    milestone_filter
-        .map(|milestone| row.milestone == milestone)
-        .unwrap_or(true)
 }
 
 fn cached_stim_binary(
@@ -739,9 +563,7 @@ fn run_core_fixture(
         FixtureComparator::Structural => {
             compare_core_parse_print_structure(row, &stdin, &output.stdout.bytes)?;
         }
-        FixtureComparator::HelpHealth
-        | FixtureComparator::Property
-        | FixtureComparator::Statistical => {
+        FixtureComparator::HelpHealth | FixtureComparator::Statistical => {
             return Err(FixtureError::ComparatorMismatch {
                 id: row.id.clone(),
                 comparator: row.comparator.as_str(),
@@ -946,8 +768,8 @@ fn compare_fixture(
             Ok(statistical::StatisticalSource::FixtureOutput) => compare_exact(stim, stab),
             Err(reason) => Some(reason),
         },
-        FixtureComparator::Property | FixtureComparator::Structural => Some(format!(
-            "{} comparator is not runnable until the milestone implementation defines it",
+        FixtureComparator::Structural => Some(format!(
+            "{} comparator runs only for in-process core fixtures",
             row.comparator.as_str()
         )),
     };

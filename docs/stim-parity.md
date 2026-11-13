@@ -4,7 +4,7 @@ This file is generated from `oracle/stim-v1.16-parity.toml`. Do not edit it dire
 
 Pinned target: `v1.16.0` at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-The ledger's `required_fixture_ids` preserves named supporting fixtures from [the fixture corpus](../oracle/fixtures/manifest.csv). Each reference must resolve to one implemented fixture; these requirements do not replace canonical family evidence.
+Supporting pinned-Stim fixtures live in [the fixture corpus](../oracle/fixtures/manifest.csv) and run in CI; they do not replace canonical family evidence.
 
 ## Summary
 

@@ -168,11 +168,6 @@ fn pfm_b3_folded_traversal_sampler() {
             "the three pair mechanisms must preserve even detector parity"
         );
     }
-    emit_statistical_completion(
-        "pfm4-traversal-sampler",
-        12_648_437,
-        u64::try_from(SHOTS * 2).expect("folded statistical shots fit u64"),
-    );
     assert_probability(all_zero, SHOTS, 0.5);
     assert_probability(joint_nonzero, SHOTS, 0.5);
     assert_probability(detector_hits[0], SHOTS, 0.34);
@@ -203,8 +198,4 @@ fn assert_probability(observed: usize, shots: usize, expected: f64) {
         (observed - expected).abs() <= tolerance,
         "observed={observed} expected={expected} tolerance={tolerance}"
     );
-}
-
-fn emit_statistical_completion(case_id: &str, seed: u64, completed_shots: u64) {
-    println!("STAB_CQ1_STATISTICAL\t1\t{case_id}\t{seed}\t0\t{completed_shots}");
 }
