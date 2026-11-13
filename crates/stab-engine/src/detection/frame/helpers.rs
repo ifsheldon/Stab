@@ -51,7 +51,7 @@ pub(super) fn xor_frame_word<W: FrameWord>(
     Ok(())
 }
 
-fn frame_qubit_out_of_range(qubit: usize) -> DetectionError {
+pub(super) fn frame_qubit_out_of_range(qubit: usize) -> DetectionError {
     DetectionError::invalid_sampler_compilation(format!(
         "qubit target {qubit} is outside the detector frame state"
     ))

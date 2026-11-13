@@ -1,7 +1,7 @@
 use rand::{Rng, RngExt as _};
 use stab_algebra::PauliBasis;
 use stab_model::{
-    CircuitInstruction, Gate, GateTargetGroupKind, Pauli, Target,
+    CircuitInstruction, Pauli, Target,
     advanced::{
         ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
     },
@@ -10,16 +10,20 @@ use stab_model::{
 use super::error::{DetectionError, DetectionResult};
 use super::try_vec_with_capacity;
 
+mod clifford;
+#[cfg(test)]
+mod clifford_tests;
 mod helpers;
 mod noise;
 mod plan;
 mod program;
 mod word;
 
+use clifford::TwoQubitFrameMap;
 use helpers::{
     TWO_QUBIT_FRAME_BASES, measurement_flip_probability, measurement_record_word, pauli_basis,
     probability_list, qubit_id_index, qubit_index, single_probability_argument, try_zero_words,
-    unsupported_frame_instruction, unsupported_frame_target, zero_probability_noise,
+    unsupported_frame_instruction,
 };
 pub(in crate::detection) use noise::batch_active_mask;
 use noise::{
@@ -33,7 +37,8 @@ pub(super) use plan::{
 };
 pub(crate) use plan::{PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingPlan, PauliFrameSamplingState};
 use program::{
-    FastFrameInstruction, FastFrameOperation, FrameInstruction, FrameProgram, FrameTableauTransform,
+    FastFrameInstruction, FastFrameOperation, FrameInstruction, FrameProgram,
+    PauliProductMeasurement,
 };
 use word::FrameWord;
 
@@ -85,10 +90,13 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             match step {
                 FrameInstruction::Execute {
                     instruction,
-                    tableau,
-                } => self.execute_instruction(instruction, tableau, rng, mode)?,
+                    pair_map,
+                } => self.execute_instruction(instruction, pair_map, rng, mode)?,
                 FrameInstruction::Fast(instruction) => {
                     self.execute_fast_instruction(instruction, rng, mode)?
+                }
+                FrameInstruction::PauliProducts(measurement) => {
+                    self.measure_pauli_products(measurement, rng, mode)?
                 }
             }
         }
@@ -102,48 +110,11 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         mode: FrameExecutionMode<'_>,
     ) -> DetectionResult<()> {
         match instruction.operation {
-            FastFrameOperation::Hadamard => {
-                for &qubit in &instruction.targets {
-                    let x = self.x_word(qubit)?;
-                    let z = self.z_word(qubit)?;
-                    self.set_x_word(qubit, z)?;
-                    self.set_z_word(qubit, x)?;
-                }
-                Ok(())
+            FastFrameOperation::SingleQubitClifford(map) => {
+                self.apply_single_qubit_map(map, &instruction.targets)
             }
-            FastFrameOperation::ControlledNot => {
-                for &[control, target] in instruction.targets.as_chunks::<2>().0 {
-                    let control_x = self.x_word(control)?;
-                    let target_z = self.z_word(target)?;
-                    self.xor_x_word(target, control_x)?;
-                    self.xor_z_word(control, target_z)?;
-                }
-                Ok(())
-            }
-            FastFrameOperation::Tableau => {
-                let transform = instruction.tableau.ok_or_else(|| {
-                    DetectionError::invalid_sampler_compilation(
-                        "compiled tableau operation omitted its transform",
-                    )
-                })?;
-                let group_size = transform.target_count();
-                if group_size == 0 {
-                    return instruction.targets.is_empty().then_some(()).ok_or_else(|| {
-                        DetectionError::invalid_sampler_compilation(
-                            "compiled zero-width tableau retained qubit targets",
-                        )
-                    });
-                }
-                let groups = instruction.targets.chunks_exact(group_size);
-                if !groups.remainder().is_empty() {
-                    return Err(DetectionError::invalid_sampler_compilation(
-                        "compiled tableau target list was not grouped",
-                    ));
-                }
-                for targets in groups {
-                    self.apply_resolved_tableau_targets(targets, transform)?;
-                }
-                Ok(())
+            FastFrameOperation::TwoQubitClifford(map) => {
+                self.apply_two_qubit_map(map, &instruction.targets)
             }
             FastFrameOperation::ResetZ => {
                 for &qubit in &instruction.targets {
@@ -388,82 +359,35 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         Ok(())
     }
 
+    /// Executes the instructions that keep their circuit form in the compiled program.
+    ///
+    /// Every other instruction is lowered at compile time, so reaching another gate here is an
+    /// internal compilation error.
     fn execute_instruction(
         &mut self,
         instruction: &CircuitInstruction,
-        tableau: Option<&FrameTableauTransform>,
+        pair_map: Option<TwoQubitFrameMap>,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_>,
     ) -> DetectionResult<()> {
         match instruction.gate().canonical_name() {
-            "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => Ok(()),
-            "DETECTOR" => Ok(()),
             "OBSERVABLE_INCLUDE" => self.record_pauli_observable(instruction),
-            "R" => self.reset_targets(instruction, PauliBasis::Z, rng, mode),
             "RX" => self.reset_targets(instruction, PauliBasis::X, rng, mode),
             "RY" => self.reset_targets(instruction, PauliBasis::Y, rng, mode),
-            "M" => self.measure_targets(instruction, PauliBasis::Z, false, rng, mode),
             "MX" => self.measure_targets(instruction, PauliBasis::X, false, rng, mode),
             "MY" => self.measure_targets(instruction, PauliBasis::Y, false, rng, mode),
-            "MR" => self.measure_targets(instruction, PauliBasis::Z, true, rng, mode),
             "MRX" => self.measure_targets(instruction, PauliBasis::X, true, rng, mode),
             "MRY" => self.measure_targets(instruction, PauliBasis::Y, true, rng, mode),
-            "MXX" => self.measure_pair_products(instruction, PauliBasis::X, rng, mode),
-            "MYY" => self.measure_pair_products(instruction, PauliBasis::Y, rng, mode),
-            "MZZ" => self.measure_pair_products(instruction, PauliBasis::Z, rng, mode),
-            "MPP" => self.measure_pauli_products(instruction, rng, mode),
             "MPAD" => self.measure_pads(instruction, rng, mode),
             "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => {
-                self.apply_controlled_pauli(instruction, tableau, mode)
-            }
-            "X_ERROR" => self.apply_single_pauli_noise(
-                instruction,
-                [single_probability_argument(instruction)?.get(), 0.0, 0.0],
-                rng,
-                mode,
-            ),
-            "Y_ERROR" => self.apply_single_pauli_noise(
-                instruction,
-                [0.0, single_probability_argument(instruction)?.get(), 0.0],
-                rng,
-                mode,
-            ),
-            "Z_ERROR" => self.apply_single_pauli_noise(
-                instruction,
-                [0.0, 0.0, single_probability_argument(instruction)?.get()],
-                rng,
-                mode,
-            ),
-            "I_ERROR" | "II_ERROR" => Ok(()),
-            "DEPOLARIZE1" => {
-                let probability = single_probability_argument(instruction)?.get() / 3.0;
-                self.apply_single_pauli_noise(instruction, [probability; 3], rng, mode)
-            }
-            "DEPOLARIZE2" => {
-                let probability = single_probability_argument(instruction)?.get() / 15.0;
-                self.apply_two_qubit_pauli_noise(instruction, [probability; 15], rng, mode)
-            }
-            "PAULI_CHANNEL_1" => {
-                let probabilities = probability_list::<3>(instruction)?;
-                self.apply_single_pauli_noise(instruction, probabilities, rng, mode)
-            }
-            "PAULI_CHANNEL_2" => {
-                let probabilities = probability_list::<15>(instruction)?;
-                self.apply_two_qubit_pauli_noise(instruction, probabilities, rng, mode)
+                self.apply_controlled_pauli(instruction, pair_map, mode)
             }
             "E" => self.apply_correlated_error(instruction, false, rng, mode),
             "ELSE_CORRELATED_ERROR" => self.apply_correlated_error(instruction, true, rng, mode),
             "HERALDED_ERASE" => self.apply_heralded_erase(instruction, rng, mode),
             "HERALDED_PAULI_CHANNEL_1" => self.apply_heralded_pauli_channel(instruction, rng, mode),
-            "SPP" | "SPP_DAG" => Err(DetectionError::invalid_sampler_compilation(
-                "SPP reached detector-frame execution without compile-time lowering",
-            )),
-            _ if stab_analysis::gate_has_tableau(instruction.gate()) => {
-                self.apply_tableau_instruction(instruction, tableau)
-            }
-            _ if zero_probability_noise(instruction)? => Ok(()),
             name => Err(DetectionError::invalid_sampler_compilation(format!(
-                "detector frame execution does not support {name}"
+                "{name} reached detector-frame execution without its compile-time lowering"
             ))),
         }
     }
@@ -556,49 +480,14 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         Ok(())
     }
 
-    fn measure_pair_products(
-        &mut self,
-        instruction: &CircuitInstruction,
-        basis: PauliBasis,
-        rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
-    ) -> DetectionResult<()> {
-        let flip_probability = measurement_flip_probability(instruction)?;
-        for target_group in instruction.targets().chunks(2) {
-            let [left, right] = target_group else {
-                return Err(unsupported_frame_instruction(instruction));
-            };
-            let raw_terms = vec![
-                (qubit_index(instruction, left)?, basis, false),
-                (qubit_index(instruction, right)?, basis, false),
-            ];
-            let (terms, _) = crate::sampling::pauli_product::normalize_terms(raw_terms, false)?;
-            self.measure_pauli_product_terms(&terms, flip_probability, rng, mode)?;
-        }
-        Ok(())
-    }
-
     fn measure_pauli_products(
         &mut self,
-        instruction: &CircuitInstruction,
+        measurement: &PauliProductMeasurement,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_>,
     ) -> DetectionResult<()> {
-        let flip_probability = measurement_flip_probability(instruction)?;
-        for target_group in instruction.target_groups() {
-            let mut raw_terms = Vec::new();
-            for target in target_group {
-                if target.is_combiner() {
-                    continue;
-                }
-                let Some(pauli) = target.pauli_type() else {
-                    return Err(unsupported_frame_instruction(instruction));
-                };
-                // Static inversion belongs to the reference sample. The frame record only stores flips.
-                raw_terms.push((qubit_index(instruction, target)?, pauli_basis(pauli), false));
-            }
-            let (terms, _) = crate::sampling::pauli_product::normalize_terms(raw_terms, false)?;
-            self.measure_pauli_product_terms(&terms, flip_probability, rng, mode)?;
+        for product in measurement.products() {
+            self.measure_pauli_product_terms(product?, measurement.flip_probability(), rng, mode)?;
         }
         Ok(())
     }
@@ -653,7 +542,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     fn apply_controlled_pauli(
         &mut self,
         instruction: &CircuitInstruction,
-        tableau: Option<&FrameTableauTransform>,
+        pair_map: Option<TwoQubitFrameMap>,
         mode: FrameExecutionMode<'_>,
     ) -> DetectionResult<()> {
         let basis = match instruction.gate().canonical_name() {
@@ -665,7 +554,18 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         for target_group in instruction.targets().chunks(2) {
             match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
                 ControlledPauliTargetPair::Quantum { .. } => {
-                    self.apply_tableau_targets(instruction.gate(), target_group, tableau)?;
+                    let map = pair_map.ok_or_else(|| {
+                        DetectionError::invalid_sampler_compilation(format!(
+                            "gate {} has no compiled detector-frame map",
+                            instruction.gate().canonical_name()
+                        ))
+                    })?;
+                    let [control, target] = target_group else {
+                        return Err(unsupported_frame_instruction(instruction));
+                    };
+                    let control = qubit_index(instruction, control)?;
+                    let target = qubit_index(instruction, target)?;
+                    self.apply_two_qubit_map(map, &[control, target])?;
                 }
                 ControlledPauliTargetPair::Classical { control, target } => {
                     let active = match control {
@@ -679,268 +579,6 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 ControlledPauliTargetPair::ClassicalNoop { .. } => {}
                 ControlledPauliTargetPair::Unsupported => {
                     return Err(unsupported_frame_instruction(instruction));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn apply_tableau_instruction(
-        &mut self,
-        instruction: &CircuitInstruction,
-        tableau: Option<&FrameTableauTransform>,
-    ) -> DetectionResult<()> {
-        let targets = instruction.targets();
-        let group_size = match instruction.gate().target_group_kind() {
-            GateTargetGroupKind::Singles => 1,
-            GateTargetGroupKind::Pairs => 2,
-            GateTargetGroupKind::AllTargets if targets.is_empty() => return Ok(()),
-            GateTargetGroupKind::AllTargets => targets.len(),
-            GateTargetGroupKind::None if targets.is_empty() => return Ok(()),
-            GateTargetGroupKind::None | GateTargetGroupKind::PauliProducts => {
-                return Err(unsupported_frame_instruction(instruction));
-            }
-        };
-        for target_group in targets.chunks(group_size) {
-            self.apply_tableau_targets(instruction.gate(), target_group, tableau)?;
-        }
-        Ok(())
-    }
-
-    fn apply_tableau_targets(
-        &mut self,
-        gate: Gate,
-        targets: &[Target],
-        transform: Option<&FrameTableauTransform>,
-    ) -> DetectionResult<()> {
-        let gate_name = gate.canonical_name();
-        const MAX_LOCAL_TABLEAU_QUBITS: usize = 8;
-        let transform = transform.ok_or_else(|| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "gate {gate_name} has no compiled detector-frame tableau"
-            ))
-        })?;
-        if targets.len() != transform.target_count() {
-            return Err(DetectionError::invalid_sampler_compilation(format!(
-                "gate {gate_name} frame transform expected {} targets but got {}",
-                transform.target_count(),
-                targets.len()
-            )));
-        }
-        let mut qubits = [0_usize; MAX_LOCAL_TABLEAU_QUBITS];
-        let mut input_xs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
-        let mut input_zs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
-        for (((qubit_slot, x_slot), z_slot), target) in qubits
-            .iter_mut()
-            .zip(input_xs.iter_mut())
-            .zip(input_zs.iter_mut())
-            .zip(targets)
-        {
-            let qubit = target
-                .qubit_id()
-                .ok_or_else(|| unsupported_frame_target(gate_name, target))?;
-            let qubit = usize::try_from(qubit.get()).map_err(|_| {
-                DetectionError::invalid_sampler_compilation(format!(
-                    "qubit target {} cannot fit in this platform's usize",
-                    qubit.get()
-                ))
-            })?;
-            *qubit_slot = qubit;
-            *x_slot = self.x_word(qubit)?;
-            *z_slot = self.z_word(qubit)?;
-        }
-        let admitted_xs = input_xs.get(..targets.len()).ok_or_else(|| {
-            DetectionError::invalid_sampler_compilation(
-                "compiled detector-frame tableau exceeded its inline target storage",
-            )
-        })?;
-        let admitted_zs = input_zs.get(..targets.len()).ok_or_else(|| {
-            DetectionError::invalid_sampler_compilation(
-                "compiled detector-frame tableau exceeded its inline target storage",
-            )
-        })?;
-        let (output_xs, output_zs) = transform
-            .apply_word_planes(admitted_xs, admitted_zs)
-            .ok_or_else(|| {
-                DetectionError::invalid_sampler_compilation(
-                    "compiled detector-frame tableau rejected its admitted target count",
-                )
-            })?;
-        for (output_index, qubit) in qubits.iter().copied().take(targets.len()).enumerate() {
-            let output_x = output_xs.get(output_index).copied().ok_or_else(|| {
-                DetectionError::invalid_sampler_compilation(
-                    "compiled detector-frame X output escaped inline storage",
-                )
-            })?;
-            let output_z = output_zs.get(output_index).copied().ok_or_else(|| {
-                DetectionError::invalid_sampler_compilation(
-                    "compiled detector-frame Z output escaped inline storage",
-                )
-            })?;
-            self.set_x_word(qubit, output_x)?;
-            self.set_z_word(qubit, output_z)?;
-        }
-        Ok(())
-    }
-
-    fn apply_resolved_tableau_targets(
-        &mut self,
-        targets: &[usize],
-        transform: FrameTableauTransform,
-    ) -> DetectionResult<()> {
-        const MAX_LOCAL_TABLEAU_QUBITS: usize = 8;
-        if targets.len() != transform.target_count() {
-            return Err(DetectionError::invalid_sampler_compilation(
-                "compiled tableau transform rejected its resolved target count",
-            ));
-        }
-        let mut input_xs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
-        let mut input_zs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
-        for ((x_slot, z_slot), &qubit) in input_xs.iter_mut().zip(input_zs.iter_mut()).zip(targets)
-        {
-            *x_slot = self.x_word(qubit)?;
-            *z_slot = self.z_word(qubit)?;
-        }
-        let admitted_xs = input_xs.get(..targets.len()).ok_or_else(|| {
-            DetectionError::invalid_sampler_compilation(
-                "compiled detector-frame tableau exceeded its inline target storage",
-            )
-        })?;
-        let admitted_zs = input_zs.get(..targets.len()).ok_or_else(|| {
-            DetectionError::invalid_sampler_compilation(
-                "compiled detector-frame tableau exceeded its inline target storage",
-            )
-        })?;
-        let (output_xs, output_zs) = transform
-            .apply_word_planes(admitted_xs, admitted_zs)
-            .ok_or_else(|| {
-                DetectionError::invalid_sampler_compilation(
-                    "compiled tableau transform rejected resolved word planes",
-                )
-            })?;
-        for (index, &qubit) in targets.iter().enumerate() {
-            let output_x = output_xs.get(index).copied().ok_or_else(|| {
-                DetectionError::invalid_sampler_compilation(
-                    "compiled detector-frame X output escaped inline storage",
-                )
-            })?;
-            let output_z = output_zs.get(index).copied().ok_or_else(|| {
-                DetectionError::invalid_sampler_compilation(
-                    "compiled detector-frame Z output escaped inline storage",
-                )
-            })?;
-            self.set_x_word(qubit, output_x)?;
-            self.set_z_word(qubit, output_z)?;
-        }
-        Ok(())
-    }
-
-    fn apply_single_pauli_noise(
-        &mut self,
-        instruction: &CircuitInstruction,
-        probabilities: [f64; 3],
-        rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
-    ) -> DetectionResult<()> {
-        if !mode.samples_noise() {
-            return Ok(());
-        }
-        let targets = instruction.targets();
-        if visit_sparse_categorical_events(
-            probabilities,
-            targets.len(),
-            mode.active_mask(),
-            rng,
-            |target_index, category, lane_mask| {
-                let target = targets
-                    .get(target_index)
-                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
-                let qubit = qubit_index(instruction, target)?;
-                let basis = match category {
-                    0 => PauliBasis::X,
-                    1 => PauliBasis::Y,
-                    2 => PauliBasis::Z,
-                    _ => return Err(unsupported_frame_instruction(instruction)),
-                };
-                self.apply_pauli_mask(qubit, basis, lane_mask)
-            },
-        )? {
-            return Ok(());
-        }
-        for target in instruction.targets() {
-            let qubit = qubit_index(instruction, target)?;
-            let [x_mask, y_mask, z_mask] =
-                sample_categorical_masks(probabilities, mode.active_mask(), rng);
-            self.apply_pauli_mask(qubit, PauliBasis::X, x_mask)?;
-            self.apply_pauli_mask(qubit, PauliBasis::Y, y_mask)?;
-            self.apply_pauli_mask(qubit, PauliBasis::Z, z_mask)?;
-        }
-        Ok(())
-    }
-
-    fn apply_two_qubit_pauli_noise(
-        &mut self,
-        instruction: &CircuitInstruction,
-        probabilities: [f64; 15],
-        rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
-    ) -> DetectionResult<()> {
-        if !mode.samples_noise() {
-            return Ok(());
-        }
-        let (target_groups, unpaired) = instruction.targets().as_chunks::<2>();
-        if !unpaired.is_empty() {
-            return Err(unsupported_frame_instruction(instruction));
-        }
-        if visit_sparse_categorical_events(
-            probabilities,
-            target_groups.len(),
-            mode.active_mask(),
-            rng,
-            |target_index, category, lane_mask| {
-                let start = target_index
-                    .checked_mul(2)
-                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
-                let end = start
-                    .checked_add(2)
-                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
-                let target_group = instruction
-                    .targets()
-                    .get(start..end)
-                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
-                let [left, right] = target_group else {
-                    return Err(unsupported_frame_instruction(instruction));
-                };
-                let left = qubit_index(instruction, left)?;
-                let right = qubit_index(instruction, right)?;
-                let (left_basis, right_basis) = TWO_QUBIT_FRAME_BASES
-                    .get(category)
-                    .copied()
-                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
-                if let Some(basis) = left_basis {
-                    self.apply_pauli_mask(left, basis, lane_mask)?;
-                }
-                if let Some(basis) = right_basis {
-                    self.apply_pauli_mask(right, basis, lane_mask)?;
-                }
-                Ok(())
-            },
-        )? {
-            return Ok(());
-        }
-        for target_group in instruction.targets().chunks(2) {
-            let [left, right] = target_group else {
-                return Err(unsupported_frame_instruction(instruction));
-            };
-            let left = qubit_index(instruction, left)?;
-            let right = qubit_index(instruction, right)?;
-            let masks = sample_categorical_masks(probabilities, mode.active_mask(), rng);
-            for ((left_basis, right_basis), mask) in TWO_QUBIT_FRAME_BASES.into_iter().zip(masks) {
-                if let Some(basis) = left_basis {
-                    self.apply_pauli_mask(left, basis, mask)?;
-                }
-                if let Some(basis) = right_basis {
-                    self.apply_pauli_mask(right, basis, mask)?;
                 }
             }
         }

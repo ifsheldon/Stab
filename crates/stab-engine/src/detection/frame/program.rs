@@ -1,12 +1,14 @@
 use arrayvec::ArrayVec;
+use stab_algebra::PauliBasis;
 use stab_model::{Circuit, CircuitInstruction, CircuitItem, RepeatNestingLimit, Target};
 use std::ops::ControlFlow;
 
+use super::clifford::{FrameCliffordAction, FrameCliffordActionCache, TwoQubitFrameMap};
 use super::helpers::{
-    measurement_flip_probability, probability_list, single_probability_argument,
+    measurement_flip_probability, pauli_basis, probability_list, qubit_index,
+    single_probability_argument, unsupported_frame_instruction, unsupported_frame_target,
     zero_probability_noise,
 };
-use super::word::FrameWord;
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
@@ -15,10 +17,13 @@ use crate::detection::error::{
 pub(super) enum FrameProgramEntry {
     Execute {
         instruction: CircuitInstruction,
-        tableau: Option<FrameTableauTransform>,
+        pair_map: Option<TwoQubitFrameMap>,
     },
     Fast {
         instruction: FastFrameInstruction,
+    },
+    PauliProducts {
+        measurement: PauliProductMeasurement,
     },
     Repeat {
         count: u64,
@@ -27,20 +32,10 @@ pub(super) enum FrameProgramEntry {
     EndRepeat,
 }
 
-const MAX_LOCAL_TABLEAU_QUBITS: usize = 8;
-
-#[derive(Clone, Copy, Debug)]
-pub(super) struct FrameTableauTransform {
-    target_count: u8,
-    x_outputs: [u16; MAX_LOCAL_TABLEAU_QUBITS],
-    z_outputs: [u16; MAX_LOCAL_TABLEAU_QUBITS],
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum FastFrameOperation {
-    Hadamard,
-    ControlledNot,
-    Tableau,
+    SingleQubitClifford(super::clifford::SingleQubitFrameMap),
+    TwoQubitClifford(TwoQubitFrameMap),
     ResetZ,
     MeasureZ,
     MeasureResetZ,
@@ -56,91 +51,163 @@ pub(super) struct FastFrameInstruction {
     pub(super) operation: FastFrameOperation,
     pub(super) targets: Vec<usize>,
     pub(super) probabilities: Vec<f64>,
-    pub(super) tableau: Option<FrameTableauTransform>,
 }
 
-impl FrameTableauTransform {
-    pub(super) fn compile(instruction: &CircuitInstruction) -> DetectionResult<Option<Self>> {
-        if !stab_analysis::gate_has_tableau(instruction.gate()) {
-            return Ok(None);
-        }
-        let tableau = stab_analysis::gate_tableau(instruction.gate())?;
-        if tableau.len() > MAX_LOCAL_TABLEAU_QUBITS {
-            return Err(DetectionError::invalid_sampler_compilation(format!(
-                "gate {} has {} tableau targets, exceeding the detector-frame inline limit {MAX_LOCAL_TABLEAU_QUBITS}",
-                instruction.gate().canonical_name(),
-                tableau.len()
-            )));
-        }
-        let mut transform = Self {
-            target_count: u8::try_from(tableau.len()).map_err(|_| storage_overflow())?,
-            x_outputs: [0; MAX_LOCAL_TABLEAU_QUBITS],
-            z_outputs: [0; MAX_LOCAL_TABLEAU_QUBITS],
-        };
-        for (input, (x_output, z_output)) in transform
-            .x_outputs
-            .iter_mut()
-            .zip(transform.z_outputs.iter_mut())
-            .take(tableau.len())
-            .enumerate()
-        {
-            *x_output = encode_output(tableau.x_output(input).map_err(|error| {
-                DetectionError::invalid_sampler_compilation(error.to_string())
-            })?)?;
-            *z_output = encode_output(tableau.z_output(input).map_err(|error| {
-                DetectionError::invalid_sampler_compilation(error.to_string())
-            })?)?;
-        }
-        Ok(Some(transform))
+/// The normalized Pauli products of one `MPP` instruction, stored in one term arena.
+///
+/// Product `i` occupies `terms[product_ends[i - 1]..product_ends[i]]`, so execution walks
+/// precomputed slices and allocates nothing per batch.
+#[derive(Clone, Debug)]
+pub(super) struct PauliProductMeasurement {
+    terms: Vec<(usize, PauliBasis)>,
+    product_ends: Vec<usize>,
+    flip_probability: f64,
+}
+
+impl PauliProductMeasurement {
+    pub(super) const fn flip_probability(&self) -> f64 {
+        self.flip_probability
     }
 
-    pub(super) const fn target_count(self) -> usize {
-        self.target_count as usize
+    pub(super) fn products(
+        &self,
+    ) -> impl Iterator<Item = DetectionResult<&[(usize, PauliBasis)]>> + '_ {
+        let mut start = 0_usize;
+        self.product_ends.iter().map(move |&end| {
+            let product = self.terms.get(start..end).ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled Pauli product escaped its term arena",
+                )
+            })?;
+            start = end;
+            Ok(product)
+        })
     }
 
-    pub(super) fn apply_word_planes<W: FrameWord>(
-        self,
-        input_xs: &[W],
-        input_zs: &[W],
-    ) -> Option<([W; MAX_LOCAL_TABLEAU_QUBITS], [W; MAX_LOCAL_TABLEAU_QUBITS])> {
-        if input_xs.len() != self.target_count() || input_zs.len() != self.target_count() {
-            return None;
-        }
-        let mut output_xs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
-        let mut output_zs = [W::default(); MAX_LOCAL_TABLEAU_QUBITS];
-        for (input_index, (&input_x, &input_z)) in input_xs.iter().zip(input_zs).enumerate() {
-            let x_output = *self.x_outputs.get(input_index)?;
-            let z_output = *self.z_outputs.get(input_index)?;
-            for output_index in 0..self.target_count() {
-                if (x_output >> output_index) & 1 != 0 {
-                    *output_xs.get_mut(output_index)? ^= input_x;
+    fn compile(
+        instruction: &CircuitInstruction,
+        shape: PauliProductShape,
+    ) -> DetectionResult<Self> {
+        let mut terms = Vec::new();
+        terms.try_reserve_exact(shape.term_count).map_err(|error| {
+            DetectionError::invalid_sampler_compilation(format!(
+                "unable to reserve {} detector-frame Pauli product terms: {error}",
+                shape.term_count
+            ))
+        })?;
+        let mut product_ends = Vec::new();
+        product_ends
+            .try_reserve_exact(shape.product_count)
+            .map_err(|error| {
+                DetectionError::invalid_sampler_compilation(format!(
+                    "unable to reserve {} detector-frame Pauli products: {error}",
+                    shape.product_count
+                ))
+            })?;
+        for target_group in instruction.target_groups() {
+            let mut raw_terms = Vec::new();
+            for target in target_group {
+                if target.is_combiner() {
+                    continue;
                 }
-                if (x_output >> (MAX_LOCAL_TABLEAU_QUBITS + output_index)) & 1 != 0 {
-                    *output_zs.get_mut(output_index)? ^= input_x;
-                }
-                if (z_output >> output_index) & 1 != 0 {
-                    *output_xs.get_mut(output_index)? ^= input_z;
-                }
-                if (z_output >> (MAX_LOCAL_TABLEAU_QUBITS + output_index)) & 1 != 0 {
-                    *output_zs.get_mut(output_index)? ^= input_z;
-                }
+                let Some(pauli) = target.pauli_type() else {
+                    return Err(unsupported_frame_instruction(instruction));
+                };
+                // Static inversion belongs to the reference sample. The frame record only stores flips.
+                raw_terms.push((qubit_index(instruction, target)?, pauli_basis(pauli), false));
             }
+            let (normalized, _) =
+                crate::sampling::pauli_product::normalize_terms(raw_terms, false)?;
+            if normalized.len() > terms.capacity() - terms.len()
+                || product_ends.len() == product_ends.capacity()
+            {
+                return Err(admission_drift());
+            }
+            terms.extend_from_slice(&normalized);
+            product_ends.push(terms.len());
         }
-        Some((output_xs, output_zs))
+        if product_ends.len() != shape.product_count {
+            return Err(admission_drift());
+        }
+        Ok(Self {
+            terms,
+            product_ends,
+            flip_probability: measurement_flip_probability(instruction)?,
+        })
+    }
+
+    fn retained_bytes(&self) -> Option<usize> {
+        self.terms
+            .capacity()
+            .checked_mul(size_of::<(usize, PauliBasis)>())?
+            .checked_add(
+                self.product_ends
+                    .capacity()
+                    .checked_mul(size_of::<usize>())?,
+            )
     }
 }
 
-fn encode_output(output: &stab_algebra::PauliString) -> DetectionResult<u16> {
-    if output.len() > MAX_LOCAL_TABLEAU_QUBITS {
-        return Err(storage_overflow());
+/// The allocation-free size of a [`PauliProductMeasurement`], counted from raw targets.
+#[derive(Clone, Copy, Debug)]
+struct PauliProductShape {
+    term_count: usize,
+    product_count: usize,
+}
+
+impl PauliProductShape {
+    /// Counts one product per Pauli target that is not joined to its predecessor by a combiner,
+    /// and reserves one arena slot per raw term, since normalization only removes terms.
+    fn of(instruction: &CircuitInstruction) -> DetectionResult<Self> {
+        let mut shape = Self {
+            term_count: 0,
+            product_count: 0,
+        };
+        let mut joined = false;
+        for target in instruction.targets() {
+            if target.is_combiner() {
+                joined = true;
+                continue;
+            }
+            shape.term_count = shape
+                .term_count
+                .checked_add(1)
+                .ok_or_else(storage_overflow)?;
+            if !joined {
+                shape.product_count = shape
+                    .product_count
+                    .checked_add(1)
+                    .ok_or_else(storage_overflow)?;
+            }
+            joined = false;
+        }
+        Ok(shape)
     }
-    let mut encoded = 0_u16;
-    for index in 0..output.len() {
-        let basis = output.get(index).ok_or_else(program_shape_error)?;
-        encoded |= u16::from(basis.x_bit()) << index;
-        encoded |= u16::from(basis.z_bit()) << (MAX_LOCAL_TABLEAU_QUBITS + index);
+
+    fn retained_bytes(self) -> DetectionResult<u64> {
+        checked_add_bytes(
+            byte_product(self.term_count, size_of::<(usize, PauliBasis)>())?,
+            byte_product(self.product_count, size_of::<usize>())?,
+        )
     }
-    Ok(encoded)
+}
+
+/// How one circuit instruction is represented in the compiled frame program.
+#[derive(Clone, Copy, Debug)]
+enum LoweredFrameInstruction {
+    /// The instruction cannot change a frame or its records, so it compiles to nothing.
+    Noop,
+    /// A unitary gate whose frame action is the identity, such as a Pauli gate, or other
+    /// zero-probability noise. It compiles to nothing but still sizes the frame, because the
+    /// frame width fixes how much randomness a batch reset draws.
+    FrameIdentity,
+    Fast(FastFrameOperation),
+    PauliProducts(PauliProductShape),
+    /// Retained as a circuit instruction; controlled Paulis with classical controls carry the
+    /// frame map of their quantum pairs.
+    Execute {
+        pair_map: Option<TwoQubitFrameMap>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -171,18 +238,30 @@ impl FrameProgram {
         include_pauli_observables: bool,
     ) -> DetectionResult<FrameProgramAdmission> {
         let mut admission = FrameProgramAdmission::default();
+        let mut actions = FrameCliffordActionCache::default();
         visit_circuit(circuit, |event| {
             match event {
                 TraversalEvent::Instruction(instruction) => {
                     visit_lowered_frame_instructions(instruction, |lowered| {
                         validate_frame_instruction(lowered)?;
-                        if frame_instruction_is_noop(lowered, include_pauli_observables)? {
-                            return Ok(());
+                        let lowering = lower_frame_instruction(
+                            lowered,
+                            include_pauli_observables,
+                            &mut actions,
+                        )?;
+                        match lowering {
+                            LoweredFrameInstruction::Noop => return Ok(()),
+                            LoweredFrameInstruction::FrameIdentity => {
+                                admission.qubit_count =
+                                    admission.qubit_count.max(instruction_qubit_count(lowered)?);
+                                return Ok(());
+                            }
+                            _ => {}
                         }
                         add_admitted_entry(&mut admission)?;
                         admission.retained_bytes = checked_add_bytes(
                             admission.retained_bytes,
-                            instruction_payload_bytes(lowered)?,
+                            instruction_payload_bytes(lowered, lowering)?,
                         )?;
                         admission.qubit_count =
                             admission.qubit_count.max(instruction_qubit_count(lowered)?);
@@ -220,30 +299,42 @@ impl FrameProgram {
             })?;
         let mut repeat_markers = ArrayVec::<usize, { RepeatNestingLimit::HARD_MAX }>::new();
         let mut qubit_count = 0_usize;
+        let mut actions = FrameCliffordActionCache::default();
         visit_circuit(circuit, |event| {
             match event {
                 TraversalEvent::Instruction(instruction) => {
                     visit_lowered_frame_instructions(instruction, |lowered| {
-                        if frame_instruction_is_noop(lowered, include_pauli_observables)? {
-                            return Ok(());
-                        }
-                        qubit_count = qubit_count.max(instruction_qubit_count(lowered)?);
-                        let tableau = FrameTableauTransform::compile(lowered)?;
-                        if let Some(operation) = fast_frame_operation(lowered) {
-                            entries.push(FrameProgramEntry::Fast {
+                        let entry = match lower_frame_instruction(
+                            lowered,
+                            include_pauli_observables,
+                            &mut actions,
+                        )? {
+                            LoweredFrameInstruction::Noop => return Ok(()),
+                            LoweredFrameInstruction::FrameIdentity => {
+                                qubit_count = qubit_count.max(instruction_qubit_count(lowered)?);
+                                return Ok(());
+                            }
+                            LoweredFrameInstruction::Fast(operation) => FrameProgramEntry::Fast {
                                 instruction: FastFrameInstruction {
                                     operation,
                                     targets: try_fast_targets(lowered)?,
                                     probabilities: try_fast_probabilities(lowered, operation)?,
-                                    tableau,
                                 },
-                            });
-                        } else {
-                            entries.push(FrameProgramEntry::Execute {
-                                instruction: try_clone_execution_instruction(lowered)?,
-                                tableau,
-                            });
-                        }
+                            },
+                            LoweredFrameInstruction::PauliProducts(shape) => {
+                                FrameProgramEntry::PauliProducts {
+                                    measurement: PauliProductMeasurement::compile(lowered, shape)?,
+                                }
+                            }
+                            LoweredFrameInstruction::Execute { pair_map } => {
+                                FrameProgramEntry::Execute {
+                                    instruction: try_clone_execution_instruction(lowered)?,
+                                    pair_map,
+                                }
+                            }
+                        };
+                        qubit_count = qubit_count.max(instruction_qubit_count(lowered)?);
+                        entries.push(entry);
                         Ok(())
                     })?;
                 }
@@ -279,9 +370,7 @@ impl FrameProgram {
             || entries.len() != admission.entry_count
             || qubit_count != admission.qubit_count
         {
-            return Err(DetectionError::invalid_sampler_compilation(
-                "detector-frame materialization disagreed with allocation-free admission",
-            ));
+            return Err(admission_drift());
         }
         validate_program(&entries)?;
         let retained_bytes = materialized_retained_bytes(&entries, entries.capacity())?;
@@ -298,6 +387,11 @@ impl FrameProgram {
 
     pub(super) const fn qubit_count(&self) -> usize {
         self.qubit_count
+    }
+
+    #[cfg(test)]
+    pub(super) fn entry_count(&self) -> usize {
+        self.entries.len()
     }
 
     pub(super) fn cursor(&self) -> FrameProgramCursor<'_> {
@@ -475,46 +569,84 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Detect
     Ok(())
 }
 
-fn fast_frame_operation(instruction: &CircuitInstruction) -> Option<FastFrameOperation> {
-    match instruction.gate().canonical_name() {
-        "H" => Some(FastFrameOperation::Hadamard),
-        "R" => Some(FastFrameOperation::ResetZ),
-        "M" => Some(FastFrameOperation::MeasureZ),
-        "MR" => Some(FastFrameOperation::MeasureResetZ),
-        "MXX" => Some(FastFrameOperation::MeasureXX),
-        "MYY" => Some(FastFrameOperation::MeasureYY),
-        "MZZ" => Some(FastFrameOperation::MeasureZZ),
+fn lower_frame_instruction(
+    instruction: &CircuitInstruction,
+    include_pauli_observables: bool,
+    actions: &mut FrameCliffordActionCache,
+) -> DetectionResult<LoweredFrameInstruction> {
+    if frame_instruction_is_noop(instruction, include_pauli_observables)? {
+        return Ok(LoweredFrameInstruction::Noop);
+    }
+    let operation = match instruction.gate().canonical_name() {
+        "R" => FastFrameOperation::ResetZ,
+        "M" => FastFrameOperation::MeasureZ,
+        "MR" => FastFrameOperation::MeasureResetZ,
+        "MXX" => FastFrameOperation::MeasureXX,
+        "MYY" => FastFrameOperation::MeasureYY,
+        "MZZ" => FastFrameOperation::MeasureZZ,
         "X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "PAULI_CHANNEL_1" => {
-            Some(FastFrameOperation::SinglePauliNoise)
+            FastFrameOperation::SinglePauliNoise
         }
-        "DEPOLARIZE2" | "PAULI_CHANNEL_2" => Some(FastFrameOperation::TwoQubitPauliNoise),
-        "CX" if instruction
-            .targets()
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .all(|targets| {
-                matches!(
-                    stab_model::advanced::classify_controlled_pauli_target_pair(
-                        instruction.gate(),
-                        targets
-                    ),
-                    stab_model::advanced::ControlledPauliTargetPair::Quantum { .. }
-                )
-            }) =>
-        {
-            Some(FastFrameOperation::ControlledNot)
+        "DEPOLARIZE2" | "PAULI_CHANNEL_2" => FastFrameOperation::TwoQubitPauliNoise,
+        "MPP" => {
+            return Ok(LoweredFrameInstruction::PauliProducts(
+                PauliProductShape::of(instruction)?,
+            ));
         }
-        _ if stab_analysis::gate_has_tableau(instruction.gate())
-            && instruction
+        "OBSERVABLE_INCLUDE"
+        | "RX"
+        | "RY"
+        | "MX"
+        | "MY"
+        | "MRX"
+        | "MRY"
+        | "MPAD"
+        | "E"
+        | "ELSE_CORRELATED_ERROR"
+        | "HERALDED_ERASE"
+        | "HERALDED_PAULI_CHANNEL_1" => {
+            return Ok(LoweredFrameInstruction::Execute { pair_map: None });
+        }
+        name => {
+            let Some(action) = actions.action(instruction.gate())? else {
+                if zero_probability_noise(instruction)? {
+                    return Ok(LoweredFrameInstruction::FrameIdentity);
+                }
+                return Err(DetectionError::invalid_sampler_compilation(format!(
+                    "detector frame execution does not support {name}"
+                )));
+            };
+            let all_qubits = instruction
                 .targets()
                 .iter()
-                .all(|target| target.qubit_id().is_some()) =>
-        {
-            Some(FastFrameOperation::Tableau)
+                .all(|target| target.qubit_id().is_some());
+            match action {
+                FrameCliffordAction::Identity => return Ok(LoweredFrameInstruction::FrameIdentity),
+                FrameCliffordAction::Single(map) if all_qubits => {
+                    FastFrameOperation::SingleQubitClifford(map)
+                }
+                FrameCliffordAction::Two(map) if all_qubits => {
+                    FastFrameOperation::TwoQubitClifford(map)
+                }
+                FrameCliffordAction::Two(map)
+                    if matches!(name, "CX" | "CY" | "CZ" | "XCZ" | "YCZ") =>
+                {
+                    return Ok(LoweredFrameInstruction::Execute {
+                        pair_map: Some(map),
+                    });
+                }
+                FrameCliffordAction::Single(_) | FrameCliffordAction::Two(_) => {
+                    let target = instruction
+                        .targets()
+                        .iter()
+                        .find(|target| target.qubit_id().is_none())
+                        .ok_or_else(program_shape_error)?;
+                    return Err(unsupported_frame_target(name, target));
+                }
+            }
         }
-        _ => None,
-    }
+    };
+    Ok(LoweredFrameInstruction::Fast(operation))
 }
 
 fn instruction_qubit_count(instruction: &CircuitInstruction) -> DetectionResult<usize> {
@@ -534,16 +666,24 @@ fn instruction_qubit_count(instruction: &CircuitInstruction) -> DetectionResult<
         })
 }
 
-fn instruction_payload_bytes(instruction: &CircuitInstruction) -> DetectionResult<u64> {
-    if let Some(operation) = fast_frame_operation(instruction) {
-        return checked_add_bytes(
+fn instruction_payload_bytes(
+    instruction: &CircuitInstruction,
+    lowering: LoweredFrameInstruction,
+) -> DetectionResult<u64> {
+    match lowering {
+        LoweredFrameInstruction::Noop | LoweredFrameInstruction::FrameIdentity => Ok(0),
+        LoweredFrameInstruction::Fast(operation) => checked_add_bytes(
             byte_product(instruction.targets().len(), size_of::<usize>())?,
             byte_product(fast_probability_count(operation), size_of::<f64>())?,
-        );
+        ),
+        LoweredFrameInstruction::PauliProducts(shape) => shape.retained_bytes(),
+        LoweredFrameInstruction::Execute { .. } => {
+            let bytes =
+                stab_model::advanced::circuit_instruction_minimum_retained_heap_bytes(instruction)
+                    .ok_or_else(storage_overflow)?;
+            u64::try_from(bytes).map_err(|_| storage_overflow())
+        }
     }
-    let bytes = stab_model::advanced::circuit_instruction_minimum_retained_heap_bytes(instruction)
-        .ok_or_else(storage_overflow)?;
-    u64::try_from(bytes).map_err(|_| storage_overflow())
 }
 
 fn materialized_retained_bytes(
@@ -569,6 +709,9 @@ fn materialized_retained_bytes(
                         .and_then(|probability_bytes| target_bytes.checked_add(probability_bytes))
                 })
                 .ok_or_else(storage_overflow)?,
+            FrameProgramEntry::PauliProducts { measurement } => {
+                measurement.retained_bytes().ok_or_else(storage_overflow)?
+            }
             FrameProgramEntry::Repeat { .. } | FrameProgramEntry::EndRepeat => continue,
         };
         retained = checked_add_bytes(
@@ -605,9 +748,8 @@ const fn fast_probability_count(operation: FastFrameOperation) -> usize {
         | FastFrameOperation::MeasureZZ => 1,
         FastFrameOperation::SinglePauliNoise => 3,
         FastFrameOperation::TwoQubitPauliNoise => 15,
-        FastFrameOperation::Hadamard
-        | FastFrameOperation::ControlledNot
-        | FastFrameOperation::Tableau
+        FastFrameOperation::SingleQubitClifford(_)
+        | FastFrameOperation::TwoQubitClifford(_)
         | FastFrameOperation::ResetZ => 0,
     }
 }
@@ -626,9 +768,8 @@ fn try_fast_probabilities(
             ))
         })?;
     match operation {
-        FastFrameOperation::Hadamard
-        | FastFrameOperation::ControlledNot
-        | FastFrameOperation::Tableau
+        FastFrameOperation::SingleQubitClifford(_)
+        | FastFrameOperation::TwoQubitClifford(_)
         | FastFrameOperation::ResetZ => {}
         FastFrameOperation::MeasureZ
         | FastFrameOperation::MeasureResetZ
@@ -722,13 +863,17 @@ impl<'a> FrameProgramCursor<'a> {
             match entry {
                 FrameProgramEntry::Execute {
                     instruction,
-                    tableau,
+                    pair_map,
                 } => {
                     self.index = self.index.checked_add(1).ok_or_else(storage_overflow)?;
                     return Ok(Some(FrameInstruction::Execute {
                         instruction,
-                        tableau: tableau.as_ref(),
+                        pair_map: *pair_map,
                     }));
+                }
+                FrameProgramEntry::PauliProducts { measurement } => {
+                    self.index = self.index.checked_add(1).ok_or_else(storage_overflow)?;
+                    return Ok(Some(FrameInstruction::PauliProducts(measurement)));
                 }
                 FrameProgramEntry::Fast { instruction } => {
                     self.index = self.index.checked_add(1).ok_or_else(storage_overflow)?;
@@ -775,16 +920,19 @@ impl<'a> FrameProgramCursor<'a> {
 pub(super) enum FrameInstruction<'a> {
     Execute {
         instruction: &'a CircuitInstruction,
-        tableau: Option<&'a FrameTableauTransform>,
+        pair_map: Option<TwoQubitFrameMap>,
     },
     Fast(&'a FastFrameInstruction),
+    PauliProducts(&'a PauliProductMeasurement),
 }
 
 fn validate_program(entries: &[FrameProgramEntry]) -> DetectionResult<()> {
     let mut repeat_ends = ArrayVec::<usize, { RepeatNestingLimit::HARD_MAX }>::new();
     for (index, entry) in entries.iter().enumerate() {
         match entry {
-            FrameProgramEntry::Execute { .. } | FrameProgramEntry::Fast { .. } => {}
+            FrameProgramEntry::Execute { .. }
+            | FrameProgramEntry::Fast { .. }
+            | FrameProgramEntry::PauliProducts { .. } => {}
             FrameProgramEntry::Repeat { count, body_end } => {
                 if *count == 0
                     || *body_end <= index
@@ -838,6 +986,12 @@ fn validate_admission_bytes(
 fn storage_overflow() -> DetectionError {
     DetectionError::invalid_sampler_compilation(
         "compact detector-frame retained byte count overflowed",
+    )
+}
+
+fn admission_drift() -> DetectionError {
+    DetectionError::invalid_sampler_compilation(
+        "detector-frame materialization disagreed with allocation-free admission",
     )
 }
 
