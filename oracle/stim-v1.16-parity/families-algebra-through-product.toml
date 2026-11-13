@@ -670,7 +670,7 @@ name = "dem_counts_coordinates_and_value_lifecycle_preserves_semantics"
 [[families]]
 id = "dem-model.syntax-and-canonical-text"
 area = "dem-model"
-contract = "The .dem dialect parses and canonically renders five instruction kinds, tags, probabilities, targets, shifts, comments, and nested repeats."
+contract = "The .dem dialect parses and canonically renders five instruction kinds, tags, probabilities, targets, shifts, comments, and nested repeats, printing every argument in Stim's general format at 34 significant digits, the width pinned Stim uses on 128-bit long double hosts such as the AArch64 baseline."
 stim_refs = ["doc/file_format_dem_detector_error_model.md", "src/stim/dem/detector_error_model.test.cc"]
 coverage = ["dialect:dem"]
 status = "done"

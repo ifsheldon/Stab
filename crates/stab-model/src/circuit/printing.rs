@@ -248,12 +248,12 @@ fn escaped_tag_len(tag: &[u8]) -> usize {
     })
 }
 
-pub(crate) struct FormattedFloat {
-    text: StackText<FLOAT_BUFFER_BYTES>,
+pub(crate) struct FormattedFloat<const N: usize = FLOAT_BUFFER_BYTES> {
+    text: StackText<N>,
 }
 
-impl FormattedFloat {
-    pub(super) fn as_bytes(&self) -> &[u8] {
+impl<const N: usize> FormattedFloat<N> {
+    pub(crate) fn as_bytes(&self) -> &[u8] {
         self.text.as_bytes()
     }
 
@@ -266,19 +266,60 @@ impl FormattedFloat {
     }
 }
 
+/// Stim prints detector-error-model arguments with `long double` `digits10 + 1`
+/// significant digits; Stab fixes the 128-bit `long double` width of the pinned
+/// AArch64 baseline on every host.
+const DEM_SIGNIFICANT_DIGITS: usize = 34;
+const DEM_FLOAT_BUFFER_BYTES: usize = 48;
+
+/// How a printer renders finite doubles that hold an integral value.
+#[derive(Clone, Copy)]
+enum IntegralDoubles {
+    /// The circuit printer casts integral doubles to `int64_t`, so `-0` prints as `0`.
+    CastToInt64,
+    /// The DEM printer streams every double through `%g`, which keeps the sign of `-0`.
+    GeneralFormat,
+}
+
+/// Formats a circuit argument like Stim's six-significant-digit circuit printer.
+pub(crate) fn format_float(value: f64) -> FormattedFloat {
+    format_stim_float(value, 6, IntegralDoubles::CastToInt64)
+}
+
+/// Formats a detector-error-model argument like Stim's `%.34g` DEM printer.
+pub(crate) fn format_dem_float(value: f64) -> FormattedFloat<DEM_FLOAT_BUFFER_BYTES> {
+    format_stim_float(
+        value,
+        DEM_SIGNIFICANT_DIGITS,
+        IntegralDoubles::GeneralFormat,
+    )
+}
+
 #[allow(
     clippy::expect_used,
-    reason = "Stim's six-significant-digit f64 forms fit in the fixed 32-byte buffers"
+    reason = "callers pair each significant-digit count with a buffer that fits its longest f64 form"
 )]
-pub(crate) fn format_float(value: f64) -> FormattedFloat {
+fn format_stim_float<const N: usize>(
+    value: f64,
+    significant_digits: usize,
+    integral: IntegralDoubles,
+) -> FormattedFloat<N> {
     let mut result = StackText::new();
-    if let Some(integer) = stim_integer_like_i64(value) {
+    let integral_shortcut = match integral {
+        IntegralDoubles::CastToInt64 => true,
+        IntegralDoubles::GeneralFormat => !(value == 0.0 && value.is_sign_negative()),
+    };
+    if integral_shortcut && let Some(integer) = stim_integer_like_i64(value) {
         write!(&mut result, "{integer}").expect("integer fits in float buffer");
         return FormattedFloat { text: result };
     }
 
-    let mut scientific = StackText::<FLOAT_BUFFER_BYTES>::new();
-    write!(&mut scientific, "{value:.5e}").expect("scientific f64 fits in float buffer");
+    // `%g` chooses fixed or scientific notation from the exponent after rounding
+    // to the requested significant digits, so derive it from the rounded form.
+    let mantissa_digits = significant_digits.saturating_sub(1);
+    let mut scientific = StackText::<N>::new();
+    write!(&mut scientific, "{value:.mantissa_digits$e}")
+        .expect("scientific f64 fits in float buffer");
     let (mantissa, exponent) = scientific
         .as_str()
         .split_once('e')
@@ -287,8 +328,9 @@ pub(crate) fn format_float(value: f64) -> FormattedFloat {
         .parse::<i32>()
         .expect("Rust scientific f64 formatting uses an i32 exponent");
 
-    if (-4..6).contains(&exponent) {
-        let decimal_places = usize::try_from(5 - exponent)
+    let fixed_upper = i32::try_from(significant_digits).expect("significant digits fit i32");
+    if (-4..fixed_upper).contains(&exponent) {
+        let decimal_places = usize::try_from(fixed_upper - 1 - exponent)
             .expect("fixed-format exponent yields nonnegative decimal places");
         write!(&mut result, "{value:.decimal_places$}").expect("fixed f64 fits in float buffer");
         result.trim_decimal_float();

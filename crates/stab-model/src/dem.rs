@@ -34,6 +34,7 @@ pub(crate) mod advanced {
 
 use traversal::FoldedDemTraversal;
 
+use crate::circuit::printing::format_dem_float;
 use crate::model_bytes::PreparedModelText;
 use crate::{
     AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
@@ -46,7 +47,6 @@ type DemTargetVec = SmallVec<[DemTarget; 5]>;
 
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
 pub const MAX_DEM_REPEAT_NESTING: usize = RepeatNestingLimit::HARD_MAX;
-const DEM_FLOAT_PRECISION: i32 = 34;
 
 #[derive(Default)]
 pub struct DetectorErrorModel {
@@ -823,7 +823,7 @@ fn write_args(out: &mut String, args: &[f64]) {
         if index > 0 {
             out.push_str(", ");
         }
-        out.push_str(&format_float(*arg));
+        out.push_str(format_dem_float(*arg).as_str());
     }
     out.push(')');
 }
@@ -837,7 +837,7 @@ fn write_args_io(out: &mut impl Write, args: &[f64]) -> io::Result<()> {
         if index > 0 {
             out.write_all(b", ")?;
         }
-        out.write_all(format_float(*arg).as_bytes())?;
+        out.write_all(format_dem_float(*arg).as_bytes())?;
     }
     out.write_all(b")")
 }
@@ -865,63 +865,4 @@ fn write_indent_io(out: &mut impl Write, indent: usize) -> io::Result<()> {
 
 fn normalize_tag(tag: Option<String>) -> Option<DemTag> {
     tag.and_then(DemTag::from_string)
-}
-
-fn format_float(value: f64) -> String {
-    if let Some(integer) = stim_integer_like_i64(value) {
-        return integer.to_string();
-    }
-
-    #[allow(
-        clippy::cast_possible_truncation,
-        reason = "finite f64 base-10 exponents fit i32 and are only used for formatting"
-    )]
-    let exponent = value.abs().log10().floor() as i32;
-    if (-4..DEM_FLOAT_PRECISION).contains(&exponent) {
-        let decimal_places = usize::try_from(DEM_FLOAT_PRECISION - 1 - exponent).unwrap_or(0);
-        trim_decimal_float(format!("{value:.decimal_places$}"))
-    } else {
-        let digits_after_decimal = usize::try_from(DEM_FLOAT_PRECISION - 1).unwrap_or(0);
-        let scientific = format!("{value:.digits_after_decimal$e}");
-        let Some((mantissa, exponent)) = scientific.split_once('e') else {
-            return value.to_string();
-        };
-        let Ok(exponent) = exponent.parse::<i32>() else {
-            return value.to_string();
-        };
-        format!(
-            "{}e{}",
-            trim_decimal_float(mantissa.to_string()),
-            format_scientific_exponent(exponent)
-        )
-    }
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "Stim's C++ printer casts integral doubles to int64_t before printing"
-)]
-fn stim_integer_like_i64(value: f64) -> Option<i64> {
-    if value > i64::MIN as f64 && value < i64::MAX as f64 {
-        let integer = value as i64;
-        if integer as f64 == value {
-            return Some(integer);
-        }
-    }
-    None
-}
-
-fn trim_decimal_float(mut text: String) -> String {
-    if text.contains('.') {
-        text = text.trim_end_matches('0').trim_end_matches('.').to_string();
-    }
-    text
-}
-
-fn format_scientific_exponent(exponent: i32) -> String {
-    if exponent < 0 {
-        format!("-{:02}", exponent.abs())
-    } else {
-        format!("+{exponent:02}")
-    }
 }
