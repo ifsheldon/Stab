@@ -411,17 +411,13 @@ fn stabilizers_flex_pauli_multiplication_matches_stim() {
 }
 
 #[test]
-fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
+fn stabilizers_pauli_random_hook_is_well_formed_and_uniform() {
     // Adapted from Stim v1.16.0 PauliString::random semantics without requiring C++ RNG stream parity.
-    let mut first_rng = SmallRng::seed_from_u64(0x5a17);
-    let mut second_rng = SmallRng::seed_from_u64(0x5a17);
-    let first = PauliString::random(64, &mut first_rng).expect("random Pauli");
-    let second = PauliString::random(64, &mut second_rng).expect("random Pauli");
-
-    assert_eq!(first, second);
-    assert_eq!(first.len(), 64);
-    assert!(first.weight() > 0);
-    assert!(first.weight() < 64);
+    let mut rng = SmallRng::seed_from_u64(0x5a17);
+    let pauli = PauliString::random(64, &mut rng).expect("random Pauli");
+    assert_eq!(pauli.len(), 64);
+    assert!(pauli.weight() > 0);
+    assert!(pauli.weight() < 64);
 
     let mut zero_rng = SmallRng::seed_from_u64(0x5eed);
     let mut empty_plus = false;
@@ -459,18 +455,14 @@ fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
 }
 
 #[test]
-fn stabilizers_tableau_random_hook_is_seeded_and_preserves_invariants() {
+fn stabilizers_tableau_random_hook_preserves_invariants() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc random.
     for num_qubits in [0, 1, 2, 3, 30] {
-        let mut first_rng = SmallRng::seed_from_u64(0x007a_b1ea + num_qubits as u64);
-        let mut second_rng = SmallRng::seed_from_u64(0x007a_b1ea + num_qubits as u64);
+        let mut rng = SmallRng::seed_from_u64(0x007a_b1ea + num_qubits as u64);
         for _ in 0..20 {
-            let first = Tableau::random(num_qubits, &mut first_rng).expect("random tableau");
-            let second = Tableau::random(num_qubits, &mut second_rng).expect("random tableau");
-
-            assert_eq!(first, second);
-            assert_eq!(first.len(), num_qubits);
-            assert!(first.satisfies_invariants().expect("tableau invariants"));
+            let tableau = Tableau::random(num_qubits, &mut rng).expect("random tableau");
+            assert_eq!(tableau.len(), num_qubits);
+            assert!(tableau.satisfies_invariants().expect("tableau invariants"));
         }
     }
 

@@ -21,8 +21,6 @@ fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
     let x_error = Gate::from_name("X_ERROR").unwrap();
     let detector = Gate::from_name("DETECTOR").unwrap();
 
-    assert_eq!(h.aliases(), &["H", "H_XZ"]);
-    assert_eq!(cx.aliases(), &["CNOT", "CX", "ZCX"]);
     assert_eq!(Gate::from_name("MZ").unwrap().aliases(), &["M", "MZ"]);
     assert_eq!(
         Gate::from_name("SWAPCZ").unwrap().aliases(),

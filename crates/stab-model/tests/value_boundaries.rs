@@ -31,6 +31,21 @@ fn typed_model_values_preserve_stim_boundaries() {
         ))
     );
     assert_eq!(CircuitTick::new(u64::MAX).get(), u64::MAX);
+
+    assert_eq!(
+        MeasureRecordOffset::try_new(-1).map(MeasureRecordOffset::get),
+        Ok(-1)
+    );
+    assert_eq!(
+        MeasureRecordOffset::try_new(-((1 << 24) - 1)).map(MeasureRecordOffset::get),
+        Ok(-((1 << 24) - 1))
+    );
+    for rejected in [1, -(1 << 24)] {
+        assert!(
+            MeasureRecordOffset::try_new(rejected).is_err(),
+            "expected record offset {rejected} to be rejected"
+        );
+    }
 }
 
 #[test]
@@ -154,6 +169,7 @@ fn target_parser_distinguishes_typed_target_families() {
         ("rec[-7]", "rec[-7]"),
         ("sweep[13]", "sweep[13]"),
         ("Y42", "Y42"),
+        ("y42", "Y42"),
         ("!Z9", "!Z9"),
         ("*", "*"),
     ];

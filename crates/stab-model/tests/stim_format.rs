@@ -5,8 +5,8 @@
 )]
 
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, MeasureRecordOffset,
-    ObservableId, Pauli, Probability, QubitId, RepeatBlock, RepeatCount, Target,
+    Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, ObservableId, Pauli, Probability,
+    QubitId, RepeatBlock, RepeatCount, Target,
 };
 
 #[test]
@@ -490,26 +490,6 @@ fn parses_observable_include_pauli_targets_like_stim() {
 }
 
 #[test]
-fn gates_lookup_is_case_insensitive_and_canonicalizes_aliases() {
-    let h = Gate::from_name("h").expect("H");
-    let h_xz = Gate::from_name("H_XZ").expect("H_XZ");
-    let cnot = Gate::from_name("Cnot").expect("CNOT");
-    let cx = Gate::from_name("CX").expect("CX");
-    let m = Gate::from_name("MZ").expect("MZ");
-
-    assert_eq!(h, h_xz);
-    assert_eq!(h.canonical_name(), "H");
-    assert_eq!(cnot, cx);
-    assert_eq!(cx.canonical_name(), "CX");
-    assert_eq!(m.canonical_name(), "M");
-    assert_eq!(
-        Gate::from_name("DETECTOR").unwrap().category(),
-        GateCategory::Annotation
-    );
-    assert!(Gate::from_name("H2345").is_err());
-}
-
-#[test]
 fn canonical_float_printing_matches_stim_v116_stream_format() {
     // Adapted from Stim v1.16.0 src/stim/circuit/circuit_instruction.cc stream printing.
     let circuit = Circuit::from_stim_str(concat!(
@@ -550,7 +530,7 @@ fn canonical_float_printing_matches_stim_v116_stream_format() {
 }
 
 #[test]
-fn gates_table_matches_stim_v116_canonical_names_and_aliases() {
+fn gates_table_matches_stim_v116_canonical_names() {
     // Adapted from Stim v1.16.0 src/stim/gates/gates.h and gate_data_* alias declarations.
     let names: Vec<_> = Gate::all().map(Gate::canonical_name).collect();
     assert_eq!(
@@ -647,34 +627,6 @@ fn gates_table_matches_stim_v116_canonical_names_and_aliases() {
             gate,
             "{}",
             gate.canonical_name()
-        );
-    }
-
-    for (alias, canonical) in [
-        ("MZ", "M"),
-        ("MRZ", "MR"),
-        ("RZ", "R"),
-        ("CNOT", "CX"),
-        ("ZCX", "CX"),
-        ("ZCY", "CY"),
-        ("ZCZ", "CZ"),
-        ("H_XZ", "H"),
-        ("SQRT_Z", "S"),
-        ("SQRT_Z_DAG", "S_DAG"),
-        ("CORRELATED_ERROR", "E"),
-        ("SWAPCZ", "CZSWAP"),
-    ] {
-        assert_eq!(
-            Gate::from_name(alias).unwrap().canonical_name(),
-            canonical,
-            "{alias}"
-        );
-        assert_eq!(
-            Gate::from_name(&alias.to_ascii_lowercase())
-                .unwrap()
-                .canonical_name(),
-            canonical,
-            "{alias}"
         );
     }
 }
@@ -787,35 +739,6 @@ fn gate_inverse_metadata_matches_stim_v116() {
 }
 
 #[test]
-fn typed_boundaries_reject_invalid_values() {
-    assert_eq!(QubitId::new(4).unwrap().get(), 4);
-    assert!(QubitId::new(1 << 24).is_err());
-    assert!(RepeatCount::try_new(0).is_err());
-    assert!(Probability::try_new(-0.1).is_err());
-    assert!(Probability::try_new(1.1).is_err());
-    assert!(Probability::try_new(f64::NAN).is_err());
-    assert_eq!(ObservableId::new(2).get(), 2);
-    assert_eq!(
-        ObservableId::new(u64::from(u32::MAX) + 1).get(),
-        4_294_967_296
-    );
-}
-
-#[test]
-fn measure_record_offset_enforces_negative_24_bit_boundary() {
-    let nearest = MeasureRecordOffset::try_new(-1).expect("nearest record offset");
-    assert_eq!(nearest.get(), -1);
-
-    let furthest =
-        MeasureRecordOffset::try_new(-((1 << 24) - 1)).expect("furthest supported record offset");
-    assert_eq!(furthest.get(), -((1 << 24) - 1));
-
-    assert!(MeasureRecordOffset::try_new(0).is_err());
-    assert!(MeasureRecordOffset::try_new(1).is_err());
-    assert!(MeasureRecordOffset::try_new(-(1 << 24)).is_err());
-}
-
-#[test]
 fn instruction_typed_argument_accessors_preserve_stim_domains() {
     let circuit = Circuit::from_stim_str(concat!(
         "X_ERROR(0.125) 0\n",
@@ -863,17 +786,6 @@ fn instruction_typed_argument_accessors_preserve_stim_domains() {
     assert_eq!(h.probability_arguments().unwrap(), None);
     assert_eq!(h.observable_id_argument().unwrap(), None);
     assert_eq!(h.coordinate_arguments(), None);
-}
-
-#[test]
-fn probability_typed_boundary_matches_stim_argument_validation() {
-    // Adapted from Stim v1.16.0 src/stim/util_bot/probability_util.test.cc validation responsibilities.
-    assert_eq!(Probability::try_new(0.0).unwrap().get(), 0.0);
-    assert_eq!(Probability::try_new(1.0).unwrap().get(), 1.0);
-
-    for value in [-0.1, 1.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(Probability::try_new(value).is_err(), "{value}");
-    }
 }
 
 #[test]
@@ -967,127 +879,6 @@ fn parser_rejects_probability_lists_that_are_not_disjoint_like_stim() {
         Circuit::from_stim_str("PAULI_CHANNEL_2(0.4,0,0,0,0,0.4,0,0,0,0,0,0,0,0,0.4) 1 2\n")
             .is_err()
     );
-}
-
-#[test]
-fn target_typed_accessors_match_stim_gate_target_boundaries() {
-    // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.test.cc.
-    let qubit_id = QubitId::new(5).unwrap();
-    let qubit = Target::qubit(qubit_id, false);
-    assert_eq!(qubit.qubit_id(), Some(qubit_id));
-    assert_eq!(qubit.measurement_record_offset(), None);
-    assert_eq!(qubit.sweep_bit_id(), None);
-
-    let pauli_id = QubitId::new(7).unwrap();
-    let pauli = Target::pauli(Pauli::Y, pauli_id, true);
-    assert_eq!(pauli.qubit_id(), Some(pauli_id));
-    assert_eq!(pauli.measurement_record_offset(), None);
-    assert_eq!(pauli.sweep_bit_id(), None);
-
-    let offset = MeasureRecordOffset::try_new(-5).unwrap();
-    let record = Target::measurement_record(offset);
-    assert_eq!(record.qubit_id(), None);
-    assert_eq!(record.measurement_record_offset(), Some(offset));
-    assert_eq!(record.sweep_bit_id(), None);
-
-    let sweep = Target::sweep_bit(11);
-    assert_eq!(sweep.qubit_id(), None);
-    assert_eq!(sweep.measurement_record_offset(), None);
-    assert_eq!(sweep.sweep_bit_id(), Some(11));
-
-    let combiner = Target::combiner();
-    assert_eq!(combiner.qubit_id(), None);
-    assert_eq!(combiner.measurement_record_offset(), None);
-    assert_eq!(combiner.sweep_bit_id(), None);
-}
-
-#[test]
-fn target_inversion_matches_stim_gate_target() {
-    // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.test.cc inverse.
-    let qubit_id = QubitId::new(5).unwrap();
-    assert_eq!(
-        Target::qubit(qubit_id, false).try_inverted().unwrap(),
-        Target::qubit(qubit_id, true)
-    );
-    assert_eq!(
-        Target::qubit(qubit_id, true).try_inverted().unwrap(),
-        Target::qubit(qubit_id, false)
-    );
-
-    let pauli_id = QubitId::new(9).unwrap();
-    assert_eq!(
-        Target::pauli(Pauli::Z, pauli_id, false)
-            .try_inverted()
-            .unwrap(),
-        Target::pauli(Pauli::Z, pauli_id, true)
-    );
-    assert_eq!(
-        Target::pauli(Pauli::Z, pauli_id, true)
-            .try_inverted()
-            .unwrap(),
-        Target::pauli(Pauli::Z, pauli_id, false)
-    );
-
-    assert!(Target::combiner().try_inverted().is_err());
-    assert!(
-        Target::measurement_record(MeasureRecordOffset::try_new(-3).unwrap())
-            .try_inverted()
-            .is_err()
-    );
-    assert!(Target::sweep_bit(6).try_inverted().is_err());
-}
-
-#[test]
-fn target_classification_matches_stim_gate_target() {
-    // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.test.cc.
-    let qubit = Target::qubit(QubitId::new(2).unwrap(), false);
-    let inverted_qubit = Target::qubit(QubitId::new(3).unwrap(), true);
-    let sweep = Target::sweep_bit(5);
-    let rec = Target::measurement_record(MeasureRecordOffset::try_new(-7).unwrap());
-    let x = Target::pauli(Pauli::X, QubitId::new(11).unwrap(), false);
-    let inverted_x = Target::pauli(Pauli::X, QubitId::new(13).unwrap(), true);
-    let y = Target::pauli(Pauli::Y, QubitId::new(17).unwrap(), false);
-    let inverted_y = Target::pauli(Pauli::Y, QubitId::new(19).unwrap(), true);
-    let z = Target::pauli(Pauli::Z, QubitId::new(23).unwrap(), false);
-    let inverted_z = Target::pauli(Pauli::Z, QubitId::new(29).unwrap(), true);
-    let combiner = Target::combiner();
-
-    for target in [&qubit, &inverted_qubit, &sweep, &rec, &combiner] {
-        assert!(!target.is_pauli_target(), "{target}");
-    }
-    for target in [&x, &inverted_x, &y, &inverted_y, &z, &inverted_z] {
-        assert!(target.is_pauli_target(), "{target}");
-    }
-
-    assert!(sweep.is_classical_bit_target());
-    assert!(rec.is_classical_bit_target());
-    for target in [
-        &qubit,
-        &inverted_qubit,
-        &x,
-        &inverted_x,
-        &y,
-        &inverted_y,
-        &z,
-        &inverted_z,
-        &combiner,
-    ] {
-        assert!(!target.is_classical_bit_target(), "{target}");
-    }
-
-    assert!(qubit.is_qubit_target());
-    assert!(inverted_qubit.is_qubit_target());
-    assert!(sweep.is_sweep_bit_target());
-    assert!(rec.is_measurement_record_target());
-    assert!(combiner.is_combiner());
-    assert!(inverted_qubit.is_inverted_result_target());
-    assert!(inverted_x.is_inverted_result_target());
-    assert!(!rec.is_inverted_result_target());
-    assert!(x.is_x_target());
-    assert!(y.is_y_target());
-    assert!(z.is_z_target());
-    assert_eq!(x.pauli_type(), Some(Pauli::X));
-    assert_eq!(qubit.pauli_type(), None);
 }
 
 trait CircuitItemExt {

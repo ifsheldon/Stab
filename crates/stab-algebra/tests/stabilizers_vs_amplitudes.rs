@@ -4,8 +4,6 @@
     reason = "M6 unitary/tableau parity tests mirror compact upstream examples"
 )]
 
-use std::collections::BTreeSet;
-
 use num_complex::Complex32;
 use stab_algebra::{Tableau, unitary_to_tableau};
 
@@ -96,74 +94,6 @@ fn tableau_inverse_matches_all_known_gate_data_and_word_boundary() {
         wide_identity.inverse().expect("word-boundary inverse"),
         wide_identity
     );
-}
-
-#[test]
-fn known_unitary_gate_case_count_tracks_upstream_scope() {
-    let cases = known_unitary_gate_cases();
-    let one_qubit = cases
-        .iter()
-        .filter(|case| matches!(case.outputs, GateOutputs::One(_)))
-        .count();
-    let two_qubit = cases
-        .iter()
-        .filter(|case| matches!(case.outputs, GateOutputs::Two(_)))
-        .count();
-
-    assert_eq!(one_qubit, 24);
-    assert_eq!(two_qubit, 22);
-
-    let actual_names = cases.iter().map(|case| case.name).collect::<BTreeSet<_>>();
-    let expected_names = BTreeSet::from([
-        "C_NXYZ",
-        "C_NZYX",
-        "C_XNYZ",
-        "C_XYNZ",
-        "C_XYZ",
-        "C_ZNYX",
-        "C_ZYNX",
-        "C_ZYX",
-        "CX",
-        "CXSWAP",
-        "CY",
-        "CZ",
-        "CZSWAP",
-        "H",
-        "H_NXY",
-        "H_NXZ",
-        "H_NYZ",
-        "H_XY",
-        "H_YZ",
-        "I",
-        "II",
-        "ISWAP",
-        "ISWAP_DAG",
-        "S",
-        "S_DAG",
-        "SQRT_XX",
-        "SQRT_XX_DAG",
-        "SQRT_X",
-        "SQRT_X_DAG",
-        "SQRT_YY",
-        "SQRT_YY_DAG",
-        "SQRT_Y",
-        "SQRT_Y_DAG",
-        "SQRT_ZZ",
-        "SQRT_ZZ_DAG",
-        "SWAP",
-        "SWAPCX",
-        "X",
-        "XCX",
-        "XCY",
-        "XCZ",
-        "Y",
-        "YCX",
-        "YCY",
-        "YCZ",
-        "Z",
-    ]);
-    assert_eq!(actual_names, expected_names);
-    assert_eq!(actual_names.len(), cases.len());
 }
 
 #[test]

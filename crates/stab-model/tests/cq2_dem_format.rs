@@ -595,22 +595,3 @@ fn cq2_dem_coordinate_query_contract_matches_stim() {
             .is_err()
     );
 }
-
-#[test]
-fn cq2_dem_instruction_source_matrix_matches_stim() {
-    cq2_dem_target_value_and_parse_contract_matches_stim();
-    cq2_dem_instruction_value_validation_and_print_contract_matches_stim();
-    cq2_dem_instruction_target_groups_match_stim();
-}
-
-#[test]
-fn cq2_dem_model_source_matrix_matches_stim() {
-    cq2_dem_model_value_mutation_and_repeat_contract_matches_stim();
-}
-
-#[test]
-fn cq2_dem_validation_matrix_matches_stim() {
-    cq2_dem_target_value_and_parse_contract_matches_stim();
-    cq2_dem_instruction_value_validation_and_print_contract_matches_stim();
-    cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim();
-}

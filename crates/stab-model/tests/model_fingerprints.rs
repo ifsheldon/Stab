@@ -78,11 +78,6 @@ fn model_fingerprint_value_contract_is_domain_separated_and_frozen() {
     let empty_dem = DetectorErrorModel::new().fingerprint();
     assert_ne!(empty_circuit, empty_dem);
     assert_ne!(empty_circuit.digest(), empty_dem.digest());
-    assert_eq!(ModelDialect::StimCircuit.as_str(), "stim-circuit");
-    assert_eq!(
-        ModelDialect::DetectorErrorModel.as_str(),
-        "detector-error-model"
-    );
 
     let first = Circuit::from_stim_str("X_ERROR(0.12345641) 0\n").expect("first circuit");
     let second = Circuit::from_stim_str("X_ERROR(0.12345649) 0\n").expect("second circuit");

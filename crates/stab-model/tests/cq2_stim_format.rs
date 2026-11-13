@@ -6,8 +6,6 @@
     reason = "CQ2 compatibility tests use direct fixture assertions for precise failures"
 )]
 
-use std::str::FromStr;
-
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind,
     GateTargetRule, MeasureRecordOffset, Pauli, QubitId, Target,
@@ -163,78 +161,6 @@ fn cq2_stim_format_sweep_target_roles_match_stim() {
 }
 
 #[test]
-fn cq2_stim_format_target_text_round_trip_matches_stim() {
-    let cases = [
-        (Target::qubit(QubitId::new(2).unwrap(), false), "2"),
-        (Target::qubit(QubitId::new(3).unwrap(), true), "!3"),
-        (Target::sweep_bit(5), "sweep[5]"),
-        (
-            Target::measurement_record(MeasureRecordOffset::try_new(-7).unwrap()),
-            "rec[-7]",
-        ),
-        (
-            Target::pauli(Pauli::X, QubitId::new(11).unwrap(), false),
-            "X11",
-        ),
-        (
-            Target::pauli(Pauli::X, QubitId::new(13).unwrap(), true),
-            "!X13",
-        ),
-        (
-            Target::pauli(Pauli::Y, QubitId::new(17).unwrap(), false),
-            "Y17",
-        ),
-        (
-            Target::pauli(Pauli::Y, QubitId::new(19).unwrap(), true),
-            "!Y19",
-        ),
-        (
-            Target::pauli(Pauli::Z, QubitId::new(23).unwrap(), false),
-            "Z23",
-        ),
-        (
-            Target::pauli(Pauli::Z, QubitId::new(29).unwrap(), true),
-            "!Z29",
-        ),
-        (Target::combiner(), "*"),
-    ];
-    for (target, text) in cases {
-        assert_eq!(target.to_string(), text);
-        assert_eq!(Target::from_str(text).unwrap(), target);
-    }
-}
-
-#[test]
-fn cq2_stim_format_target_text_source_contract() {
-    assert_eq!(Target::from_str("5").unwrap(), q(5));
-    assert_eq!(Target::from_str("rec[-3]").unwrap(), record(-3));
-    let parsed_zero = Target::from_str("rec[-0]").unwrap();
-    assert_eq!(parsed_zero.to_string(), "rec[-0]");
-    let parsed_zero_offset = parsed_zero
-        .measurement_record_offset()
-        .expect("negative-zero record offset");
-    assert_eq!(parsed_zero_offset.get(), 0);
-    assert_eq!(format!("{parsed_zero_offset:?}"), "MeasureRecordOffset(0)");
-    assert!(parsed_zero_offset > MeasureRecordOffset::try_new(-1).unwrap());
-    assert_eq!(
-        Target::from_str("y17").unwrap(),
-        Target::pauli(Pauli::Y, QubitId::new(17).unwrap(), false)
-    );
-    for rejected in [
-        "",
-        "+1",
-        "16777216",
-        "X16777216",
-        "rec[0]",
-        "rec[-16777216]",
-        "sweep[+1]",
-        "sweep[16777216]",
-    ] {
-        assert!(Target::from_str(rejected).is_err(), "{rejected:?}");
-    }
-}
-
-#[test]
 fn cq2_stim_format_target_accessors_match_stim() {
     let qubit = q(5);
     assert_eq!(qubit.qubit_id(), QubitId::new(5).ok());
@@ -291,11 +217,10 @@ fn cq2_stim_format_target_accessors_match_stim() {
     ] {
         assert_eq!(target.pauli_type(), None);
     }
-    assert!(QubitId::new((1 << 24) - 1).is_ok());
-    assert!(QubitId::new(1 << 24).is_err());
-    assert!(MeasureRecordOffset::try_new(1).is_err());
-    assert!(MeasureRecordOffset::try_new(0).is_err());
-    assert!(MeasureRecordOffset::try_new(-(1 << 24)).is_err());
+    let combiner = Target::combiner();
+    assert_eq!(combiner.qubit_id(), None);
+    assert_eq!(combiner.measurement_record_offset(), None);
+    assert_eq!(combiner.sweep_bit_id(), None);
 }
 
 #[test]

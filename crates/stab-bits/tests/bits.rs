@@ -2,32 +2,236 @@
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::needless_range_loop,
-    reason = "M5 property tests construct in-range fixtures and direct assertions keep failing cases readable"
+    reason = "bit-kernel property tests construct in-range fixtures and direct assertions keep failing cases readable"
 )]
 
 use proptest::prelude::*;
-use stab_bits::{BitBlock, BitError, BitMatrix, BitSlice, BitVec};
+use stab_bits::{BitBlock, BitError, BitLen, BitMatrix, BitSlice, BitVec};
 
-#[test]
-fn bits_bit_ref_and_tail_boundaries_follow_stim() {
-    // Adapted from Stim v1.16.0 src/stim/mem/bit_ref.test.cc and simd_bits.test.cc boundary cases.
-    for len in [0, 1, 63, 64, 65, 127, 128, 129] {
-        let mut bits = BitVec::zeros(len);
-        assert_eq!(bits.len(), len);
-        assert_eq!(bits.get(len), None);
-        if len > 0 {
-            bits.set(len - 1, true).expect("set last bit");
-            assert_eq!(bits.get(len - 1), Some(true));
-            bits.set(len - 1, false).expect("clear last bit");
-            assert_eq!(bits.get(len - 1), Some(false));
+const WORD_BITS: usize = u64::BITS as usize;
+
+/// Word, SIMD-block, and multi-block edges that every width-driven property must visit.
+const BOUNDARY_WIDTHS: &[usize] = &[
+    0, 1, 63, 64, 65, 127, 128, 129, 255, 256, 257, 511, 512, 513, 1023, 1024, 1025,
+];
+
+fn bit_width() -> impl Strategy<Value = usize> {
+    prop_oneof![proptest::sample::select(BOUNDARY_WIDTHS), 0_usize..1100]
+}
+
+/// Source words for one operand, including dirty tail bits and surplus words that
+/// `BitVec::from_words_truncated` must discard.
+fn padded_words(width: usize) -> impl Strategy<Value = Vec<u64>> {
+    let count = width.div_ceil(WORD_BITS);
+    proptest::collection::vec(any::<u64>(), count..=count + 2)
+}
+
+fn width_with_three_operands() -> impl Strategy<Value = (usize, Vec<u64>, Vec<u64>, Vec<u64>)> {
+    bit_width().prop_flat_map(|width| {
+        (
+            Just(width),
+            padded_words(width),
+            padded_words(width),
+            padded_words(width),
+        )
+    })
+}
+
+proptest! {
+    #[test]
+    fn bits_bitvec_truncation_views_and_access_match_words(
+        (len, words) in bit_width().prop_flat_map(|width| (Just(width), padded_words(width))),
+    ) {
+        // Adapted from Stim v1.16.0 src/stim/mem/bit_ref.test.cc and simd_bits.test.cc boundary cases.
+        let bit_len = BitLen::new(len);
+        prop_assert_eq!(bit_len.get(), len);
+        prop_assert_eq!(bit_len.word_count(), len.div_ceil(WORD_BITS));
+        prop_assert_eq!(BitLen::from(len), bit_len);
+
+        let mut bits = BitVec::from_words_truncated(len, words.clone());
+        prop_assert_eq!(bits.len(), len);
+        prop_assert_eq!(bits.is_empty(), len == 0);
+        assert_matches_reference(&bits, |index| word_bit(&words, index));
+
+        let view = bits.as_bitslice();
+        prop_assert_eq!(view.len(), len);
+        prop_assert_eq!(view.is_empty(), len == 0);
+        prop_assert_eq!(view.words(), bits.words());
+        prop_assert_eq!(view.popcount(), bits.popcount());
+        for index in 0..=len {
+            prop_assert_eq!(view.get(index), bits.get(index));
         }
-        assert!(bits.set(len, true).is_err());
+        let mut copied = BitVec::zeros(len);
+        copied.copy_from_bitslice(&view).expect("same-width copy");
+        prop_assert_eq!(&copied, &bits);
+
+        for index in [0, len / 2, len.saturating_sub(1)] {
+            if index < len {
+                let original = word_bit(&words, index);
+                bits.set(index, !original).expect("toggle in-range bit");
+                prop_assert_eq!(bits.get(index), Some(!original));
+                bits.set(index, original).expect("restore in-range bit");
+            }
+        }
+        prop_assert_eq!(&bits, &copied);
+        prop_assert_eq!(
+            bits.set(len, true),
+            Err(BitError::BitIndexOutOfRange { index: len, len })
+        );
     }
 
-    let truncated = BitVec::from_words_truncated(65, vec![u64::MAX, u64::MAX, u64::MAX]);
-    assert_eq!(truncated.word_count(), 2);
-    assert_eq!(truncated.words(), &[u64::MAX, 1]);
-    assert_eq!(truncated.popcount(), 65);
+    #[test]
+    fn bits_bitvec_logical_ops_match_scalar_reference(
+        (len, left_words, right_words, mask_words) in width_with_three_operands(),
+    ) {
+        let left = BitVec::from_words_truncated(len, left_words.clone());
+        let right = BitVec::from_words_truncated(len, right_words.clone());
+        let mask = BitVec::from_words_truncated(len, mask_words.clone());
+        let l = |index| word_bit(&left_words, index);
+        let r = |index| word_bit(&right_words, index);
+        let m = |index| word_bit(&mask_words, index);
+
+        let mut xored = left.clone();
+        xored.xor_assign(&right.as_bitslice()).expect("same-width XOR");
+        assert_matches_reference(&xored, |index| l(index) ^ r(index));
+
+        let mut anded = left.clone();
+        anded.and_assign(&right.as_bitslice()).expect("same-width AND");
+        assert_matches_reference(&anded, |index| l(index) & r(index));
+
+        let mut ored = left.clone();
+        ored.or_assign(&right.as_bitslice()).expect("same-width OR");
+        assert_matches_reference(&ored, |index| l(index) | r(index));
+
+        let mut masked = left;
+        masked
+            .masked_xor_assign(&right.as_bitslice(), &mask.as_bitslice())
+            .expect("same-width masked XOR");
+        assert_matches_reference(&masked, |index| l(index) ^ (r(index) & m(index)));
+
+        masked.clear();
+        assert_matches_reference(&masked, |_| false);
+    }
+
+    #[test]
+    fn bits_range_xor_matches_scalar_reference(
+        (len, target_words, source_words) in bit_width()
+            .prop_flat_map(|width| (Just(width), padded_words(width), padded_words(width))),
+        raw_target_start in 0_usize..2048,
+        raw_source_start in 0_usize..2048,
+        raw_count in 0_usize..2048,
+    ) {
+        let target_start = raw_target_start % (len + 1);
+        let source_start = raw_source_start % (len + 1);
+        let max_count = (len - target_start).min(len - source_start);
+        let count = raw_count % (max_count + 1);
+
+        let mut actual = BitVec::from_words_truncated(len, target_words.clone());
+        let source = BitVec::from_words_truncated(len, source_words.clone());
+        actual
+            .xor_range_from(target_start, &source.as_bitslice(), source_start, count)
+            .expect("range xor");
+
+        assert_matches_reference(&actual, |index| {
+            let flipped = (target_start..target_start + count).contains(&index)
+                && word_bit(&source_words, index - target_start + source_start);
+            word_bit(&target_words, index) ^ flipped
+        });
+    }
+
+    #[test]
+    fn bits_bit_block_word_ops_match_scalar_reference(
+        left_words in any::<[u64; 4]>(),
+        right_words in any::<[u64; 4]>(),
+    ) {
+        // Adapted from Stim v1.16.0 src/stim/mem/simd_word.test.cc bitwise and popcount checks.
+        let left = BitBlock::from_words(left_words);
+        let right = BitBlock::from_words(right_words);
+        let xor: [u64; 4] = std::array::from_fn(|index| left_words[index] ^ right_words[index]);
+        let and: [u64; 4] = std::array::from_fn(|index| left_words[index] & right_words[index]);
+        let or: [u64; 4] = std::array::from_fn(|index| left_words[index] | right_words[index]);
+
+        prop_assert_eq!(left.words(), left_words);
+        prop_assert_eq!(left.xor(right).words(), xor);
+        prop_assert_eq!(left.and(right).words(), and);
+        prop_assert_eq!(left.or(right).words(), or);
+        prop_assert_eq!((left ^ right).words(), xor);
+        prop_assert_eq!((left & right).words(), and);
+        prop_assert_eq!((left | right).words(), or);
+        prop_assert_eq!((!left).words(), left_words.map(|word| !word));
+        prop_assert_eq!(left.popcount(), reference_popcount_words(&left_words));
+
+        let mut assigned = left;
+        assigned ^= right;
+        prop_assert_eq!(assigned.words(), xor);
+        assigned = left;
+        assigned &= right;
+        prop_assert_eq!(assigned.words(), and);
+        assigned = left;
+        assigned |= right;
+        prop_assert_eq!(assigned.words(), or);
+    }
+
+    #[test]
+    fn bits_bit_matrix_transpose_matches_scalar_reference(
+        rows in 0usize..18,
+        cols in 0usize..130,
+        set_seed in proptest::collection::vec((0usize..18, 0usize..130), 0..80),
+    ) {
+        let mut matrix = BitMatrix::zeros(rows, cols).expect("matrix");
+        let mut expected = vec![vec![false; cols]; rows];
+        for (row, col) in set_seed {
+            if row < rows && col < cols {
+                matrix.set(row, col, true).expect("set matrix bit");
+                expected[row][col] = true;
+            }
+        }
+
+        let transposed = matrix.transpose().expect("transpose");
+        prop_assert_eq!(transposed.rows(), cols);
+        prop_assert_eq!(transposed.cols(), rows);
+        for row in 0..rows {
+            for col in 0..cols {
+                prop_assert_eq!(transposed.get(col, row), Some(expected[row][col]));
+            }
+        }
+    }
+
+    #[test]
+    fn bits_bit_matrix_row_ops_match_scalar_reference(
+        (cols, source_words, target_words, mask_words) in width_with_three_operands(),
+    ) {
+        let s = |col| word_bit(&source_words, col);
+        let t = |col| word_bit(&target_words, col);
+        let m = |col| word_bit(&mask_words, col);
+        let mut matrix = BitMatrix::zeros(3, cols).expect("matrix");
+        prop_assert_eq!(matrix.rows(), 3);
+        prop_assert_eq!(matrix.cols(), cols);
+        set_matrix_row(&mut matrix, 0, s);
+        set_matrix_row(&mut matrix, 1, t);
+        let mask = BitVec::from_words_truncated(cols, mask_words.clone());
+
+        matrix.xor_row_into(0, 1).expect("row XOR");
+        assert_row(&matrix, 1, |col| t(col) ^ s(col));
+        matrix
+            .masked_xor_row_into(0, 1, &mask.as_bitslice())
+            .expect("masked row XOR");
+        let combined = |col| t(col) ^ s(col) ^ (s(col) & m(col));
+        assert_row(&matrix, 1, combined);
+        matrix.swap_rows(0, 1).expect("row swap");
+        assert_row(&matrix, 0, combined);
+        assert_row(&matrix, 1, s);
+
+        // Aliased source and target rows must follow Stim's in-place semantics.
+        set_matrix_row(&mut matrix, 2, s);
+        matrix.xor_row_into(2, 2).expect("self row XOR");
+        assert_row(&matrix, 2, |_| false);
+        set_matrix_row(&mut matrix, 2, s);
+        matrix
+            .masked_xor_row_into(2, 2, &mask.as_bitslice())
+            .expect("self masked row XOR");
+        assert_row(&matrix, 2, |col| s(col) & !m(col));
+    }
 }
 
 #[test]
@@ -51,6 +255,23 @@ fn bits_dirty_tail_padding_is_ignored_and_canonicalized() {
     ored.or_assign(&dirty).expect("or dirty-padded slice");
     assert_eq!(ored.words(), &[u64::MAX, 1]);
     assert!(ored.not_zero());
+
+    let one_word = [0_u64];
+    assert_eq!(
+        BitSlice::new(&one_word, 65),
+        Err(BitError::LengthMismatch {
+            left: 64,
+            right: 65
+        })
+    );
+    let empty_words: [u64; 0] = [];
+    assert!(BitSlice::new(&empty_words, 0).is_ok());
+    assert_ne!(BitVec::zeros(64), BitVec::zeros(65));
+    let zero_65 = [0_u64, 0];
+    assert_ne!(
+        BitSlice::new(&one_word, 64).expect("64-bit view"),
+        BitSlice::new(&zero_65, 65).expect("65-bit view")
+    );
 }
 
 #[test]
@@ -80,136 +301,54 @@ fn bits_bitvec_owned_storage_contract_preserves_tail_and_resize_semantics() {
 }
 
 #[test]
-fn bits_bit_block_word_ops_match_scalar_reference() {
-    // Adapted from Stim v1.16.0 src/stim/mem/simd_word.test.cc bitwise and popcount checks.
-    let left = BitBlock::from_words([0xFFFF_0000_FFFF_0000, 0x0123_4567_89AB_CDEF, 0, u64::MAX]);
-    let right = BitBlock::from_words([
-        0x00FF_00FF_00FF_00FF,
-        0xFFFF_0000_FFFF_0000,
-        u64::MAX,
-        0x0F0F_0F0F_0F0F_0F0F,
-    ]);
-
-    assert_eq!(
-        left.xor(right).words(),
-        [
-            0xFF00_00FF_FF00_00FF,
-            0xFEDC_4567_7654_CDEF,
-            u64::MAX,
-            0xF0F0_F0F0_F0F0_F0F0,
-        ]
-    );
-    assert_eq!(
-        left.and(right).words(),
-        [
-            0x00FF_0000_00FF_0000,
-            0x0123_0000_89AB_0000,
-            0,
-            0x0F0F_0F0F_0F0F_0F0F,
-        ]
-    );
-    assert_eq!(
-        left.or(right).popcount(),
-        reference_popcount_words(&left.or(right).words())
-    );
-    assert_eq!((left ^ right).words(), left.xor(right).words());
-    assert_eq!((left & right).words(), left.and(right).words());
-    assert_eq!((left | right).words(), left.or(right).words());
-    assert_eq!((!left).words(), left.words().map(|word| !word));
-
-    let mut assigned = left;
-    assigned ^= right;
-    assert_eq!(assigned, left.xor(right));
-    assigned = left;
-    assigned &= right;
-    assert_eq!(assigned, left.and(right));
-    assigned = left;
-    assigned |= right;
-    assert_eq!(assigned, left.or(right));
-    assert_eq!(BitBlock::default(), BitBlock::ZERO);
-    assert_eq!(BitBlock::ONES.popcount(), 256);
-}
-
-#[test]
-fn bits_bit_util_scalar_helpers_cover_boundaries() {
-    let mut left = BitVec::from_words_truncated(256, vec![0b1010_u64, 0b0101, u64::MAX, 0]);
-    let right = BitVec::from_words_truncated(256, vec![0b1100_u64, 0b0011, 0, u64::MAX]);
-    let mask = BitVec::from_words_truncated(256, vec![0b0110_u64, u64::MAX, u64::MAX, 0]);
-
-    left.masked_xor_assign(&right.as_bitslice(), &mask.as_bitslice())
-        .expect("masked xor");
-    assert_eq!(left.words(), &[0b1110, 0b0110, u64::MAX, 0]);
-    assert_eq!(left.popcount(), 69);
-}
-
-#[test]
-fn bits_bitvec_multi_block_boundaries_match_reference() {
-    for len in [255, 256, 257, 511, 512, 513, 1024, 1025] {
-        let left_bools = patterned_bools(len, 3);
-        let right_bools = patterned_bools(len, 5);
-        let mask_bools = patterned_bools(len, 7);
-        let left = bitvec_from_bools(&left_bools);
-        let right = bitvec_from_bools(&right_bools);
-        let mask = bitvec_from_bools(&mask_bools);
-
-        let mut xor_actual = left.clone();
-        xor_actual.xor_assign(&right.as_bitslice()).expect("xor");
-        assert_eq!(
-            bools_from_bitvec(&xor_actual),
-            left_bools
-                .iter()
-                .zip(&right_bools)
-                .map(|(left, right)| *left ^ *right)
-                .collect::<Vec<_>>()
-        );
-
-        let mut masked_actual = left;
-        masked_actual
-            .masked_xor_assign(&right.as_bitslice(), &mask.as_bitslice())
-            .expect("masked xor");
-        assert_eq!(
-            bools_from_bitvec(&masked_actual),
-            xor_expected_with_mask(&left_bools, &right_bools, &mask_bools)
-        );
-    }
-}
-
-#[test]
-fn bits_xor_rejects_unequal_width_without_mutation() {
+fn bits_width_and_range_mismatches_are_rejected_without_mutation() {
     let mut left = BitVec::from_words_truncated(257, vec![0x55aa_1234_9876_cdef; 5]);
     let before = left.clone();
     let right = BitVec::from_words_truncated(256, vec![0xf0f0_0f0f_dead_beef; 4]);
-
-    let error = left
-        .xor_assign(&right.as_bitslice())
-        .expect_err("unequal widths must be rejected before scalar or SIMD mutation");
-
-    assert_eq!(
-        error,
-        BitError::LengthMismatch {
-            left: 257,
-            right: 256
-        }
-    );
-    assert_eq!(left, before);
-}
-
-#[cfg(feature = "portable-simd")]
-#[test]
-fn bits_portable_xor_reuses_owned_storage_without_allocating() {
-    let bit_count = 65_537;
-    let mut left = BitVec::from_words_truncated(bit_count, vec![0x55aa_1234_9876_cdef; 1_025]);
-    let right = BitVec::from_words_truncated(bit_count, vec![0xf0f0_0f0f_dead_beef; 1_025]);
-
-    let allocations = allocation_counter::measure(|| {
-        left.xor_assign(&right.as_bitslice())
-            .expect("same-width xor");
+    let same_width = BitVec::zeros(257);
+    let mismatch = Err(BitError::LengthMismatch {
+        left: 257,
+        right: 256,
     });
 
-    assert_eq!(allocations.count_total, 0);
-    assert_eq!(allocations.bytes_total, 0);
-    assert_eq!(left.words()[0], 0xa55a_1d3b_46db_7300);
-    assert_eq!(left.words()[1_024], 0);
+    assert_eq!(left.xor_assign(&right.as_bitslice()), mismatch);
+    assert_eq!(left.and_assign(&right.as_bitslice()), mismatch);
+    assert_eq!(left.or_assign(&right.as_bitslice()), mismatch);
+    assert_eq!(
+        left.masked_xor_assign(&same_width.as_bitslice(), &right.as_bitslice()),
+        mismatch
+    );
+    assert_eq!(left.copy_from_bitslice(&right.as_bitslice()), mismatch);
+    assert_eq!(left, before);
+
+    let source = BitVec::zeros(65);
+    let mut target = BitVec::from_words_truncated(65, vec![u64::MAX; 2]);
+    let target_before = target.clone();
+    assert_eq!(
+        target.xor_range_from(64, &source.as_bitslice(), 0, 2),
+        Err(BitError::BitRangeOutOfRange {
+            start: 64,
+            end: 66,
+            len: 65
+        })
+    );
+    assert_eq!(
+        target.xor_range_from(0, &source.as_bitslice(), 64, 2),
+        Err(BitError::BitRangeOutOfRange {
+            start: 64,
+            end: 66,
+            len: 65
+        })
+    );
+    assert_eq!(
+        target.xor_range_from(usize::MAX, &source.as_bitslice(), 0, 1),
+        Err(BitError::BitRangeOutOfRange {
+            start: usize::MAX,
+            end: usize::MAX,
+            len: 65
+        })
+    );
+    assert_eq!(target, target_before);
 }
 
 #[test]
@@ -242,128 +381,6 @@ fn bits_range_xor_word_chunk_edges_match_reference() {
         }
         assert_eq!(bools_from_bitvec(&actual), expected);
     }
-}
-
-proptest! {
-    #[test]
-    fn bits_bitvec_simd_ops_match_scalar_reference(
-        len in 0usize..257,
-        left_seed in proptest::collection::vec(any::<bool>(), 0..257),
-        right_seed in proptest::collection::vec(any::<bool>(), 0..257),
-        mask_seed in proptest::collection::vec(any::<bool>(), 0..257),
-    ) {
-        let left_bools = resize_bools(left_seed, len);
-        let right_bools = resize_bools(right_seed, len);
-        let mask_bools = resize_bools(mask_seed, len);
-        let left = bitvec_from_bools(&left_bools);
-        let right = bitvec_from_bools(&right_bools);
-        let mask = bitvec_from_bools(&mask_bools);
-
-        let mut xor_actual = left.clone();
-        xor_actual.xor_assign(&right.as_bitslice()).expect("xor");
-        let xor_expected = left_bools.iter().zip(&right_bools).map(|(left, right)| *left ^ *right).collect::<Vec<_>>();
-        prop_assert_eq!(bools_from_bitvec(&xor_actual), xor_expected);
-
-        let mut and_actual = left.clone();
-        and_actual.and_assign(&right.as_bitslice()).expect("and");
-        let and_expected = left_bools.iter().zip(&right_bools).map(|(left, right)| *left & *right).collect::<Vec<_>>();
-        prop_assert_eq!(bools_from_bitvec(&and_actual), and_expected);
-
-        let mut or_actual = left.clone();
-        or_actual.or_assign(&right.as_bitslice()).expect("or");
-        let or_expected = left_bools.iter().zip(&right_bools).map(|(left, right)| *left | *right).collect::<Vec<_>>();
-        prop_assert_eq!(bools_from_bitvec(&or_actual), or_expected);
-
-        let mut masked_actual = left;
-        masked_actual
-            .masked_xor_assign(&right.as_bitslice(), &mask.as_bitslice())
-            .expect("masked xor");
-        let masked_expected = xor_expected_with_mask(&left_bools, &right_bools, &mask_bools);
-        prop_assert_eq!(bools_from_bitvec(&masked_actual), masked_expected);
-    }
-
-    #[test]
-    fn bits_range_xor_matches_scalar_reference(
-        len in 1usize..257,
-        target_seed in proptest::collection::vec(any::<bool>(), 1..257),
-        source_seed in proptest::collection::vec(any::<bool>(), 1..257),
-        raw_target_start in 0usize..257,
-        raw_source_start in 0usize..257,
-        raw_count in 0usize..257,
-    ) {
-        let target_bools = resize_bools(target_seed, len);
-        let source_bools = resize_bools(source_seed, len);
-        let target_start = raw_target_start % len;
-        let source_start = raw_source_start % len;
-        let max_count = (len - target_start).min(len - source_start);
-        let count = raw_count % (max_count + 1);
-
-        let mut actual = bitvec_from_bools(&target_bools);
-        let source = bitvec_from_bools(&source_bools);
-        actual
-            .xor_range_from(target_start, &source.as_bitslice(), source_start, count)
-            .expect("range xor");
-
-        let mut expected = target_bools;
-        for offset in 0..count {
-            if source_bools[source_start + offset] {
-                let target = target_start + offset;
-                expected[target] = !expected[target];
-            }
-        }
-        prop_assert_eq!(bools_from_bitvec(&actual), expected);
-    }
-
-    #[test]
-    fn bits_bit_matrix_transpose_matches_scalar_reference(
-        rows in 0usize..18,
-        cols in 0usize..130,
-        set_seed in proptest::collection::vec((0usize..18, 0usize..130), 0..80),
-    ) {
-        let mut matrix = BitMatrix::zeros(rows, cols).expect("matrix");
-        let mut expected = vec![vec![false; cols]; rows];
-        for (row, col) in set_seed {
-            if row < rows && col < cols {
-                matrix.set(row, col, true).expect("set matrix bit");
-                expected[row][col] = true;
-            }
-        }
-
-        let transposed = matrix.transpose().expect("transpose");
-        prop_assert_eq!(transposed.rows(), cols);
-        prop_assert_eq!(transposed.cols(), rows);
-        for row in 0..rows {
-            for col in 0..cols {
-                prop_assert_eq!(transposed.get(col, row), Some(expected[row][col]));
-            }
-        }
-    }
-
-    #[test]
-    fn bits_bit_matrix_masked_row_xor_matches_scalar_reference(
-        cols in 0usize..257,
-        source_seed in proptest::collection::vec(any::<bool>(), 0..257),
-        target_seed in proptest::collection::vec(any::<bool>(), 0..257),
-        mask_seed in proptest::collection::vec(any::<bool>(), 0..257),
-    ) {
-        let source_bools = resize_bools(source_seed, cols);
-        let target_bools = resize_bools(target_seed, cols);
-        let mask_bools = resize_bools(mask_seed, cols);
-        let mut matrix = BitMatrix::zeros(2, cols).expect("matrix");
-        set_matrix_row(&mut matrix, 0, &source_bools);
-        set_matrix_row(&mut matrix, 1, &target_bools);
-        let mask = bitvec_from_bools(&mask_bools);
-
-        matrix
-            .masked_xor_row_into(0, 1, &mask.as_bitslice())
-            .expect("masked row xor");
-
-        let expected = xor_expected_with_mask(&target_bools, &source_bools, &mask_bools);
-        for (col, expected) in expected.into_iter().enumerate() {
-            prop_assert_eq!(matrix.get(1, col), Some(expected));
-        }
-    }
-
 }
 
 #[test]
@@ -401,12 +418,45 @@ fn bits_bit_matrix_row_operations_match_stim_bit_table_cases() {
         .transpose_square_in_place()
         .expect("square transpose");
     assert_eq!(transposed, identity);
+
+    let identity = BitMatrix::identity(65).expect("identity matrix");
+    for row in 0..65 {
+        for col in 0..65 {
+            assert_eq!(identity.get(row, col), Some(row == col));
+        }
+    }
 }
 
 #[test]
-fn bits_bit_matrix_rejects_storage_size_overflow() {
-    assert!(BitMatrix::zeros(usize::MAX, 65).is_err());
+fn bits_bit_matrix_rejects_out_of_range_access_and_oversized_shapes() {
+    assert_eq!(
+        BitMatrix::zeros(usize::MAX, 65),
+        Err(BitError::MatrixSizeOverflow {
+            rows: usize::MAX,
+            cols: 65
+        })
+    );
     assert!(BitMatrix::zeros(1, usize::MAX).is_err());
+
+    let mut matrix = BitMatrix::zeros(2, 65).expect("matrix");
+    assert_eq!(
+        matrix.row(2),
+        Err(BitError::RowIndexOutOfRange { row: 2, rows: 2 })
+    );
+    assert_eq!(matrix.get(2, 0), None);
+    assert_eq!(matrix.get(0, 65), None);
+    assert_eq!(
+        matrix.set(0, 65, true),
+        Err(BitError::BitIndexOutOfRange { index: 65, len: 65 })
+    );
+    let short_mask = BitVec::zeros(64);
+    assert_eq!(
+        matrix.masked_xor_row_into(0, 1, &short_mask.as_bitslice()),
+        Err(BitError::LengthMismatch {
+            left: 65,
+            right: 64
+        })
+    );
 }
 
 #[test]
@@ -464,6 +514,174 @@ fn bits_bit_matrix_copies_packed_bytes_at_word_boundaries() {
     }
 }
 
+/// The transpose property stays below 18 rows, so these fixed shapes own the
+/// 64-row tile crossings and the square in-place kernel.
+#[test]
+fn bits_bit_matrix_transpose_crosses_64_row_tiles() {
+    for (rows, cols) in [
+        (0, 65),
+        (65, 0),
+        (63, 65),
+        (64, 64),
+        (65, 63),
+        (128, 129),
+        (255, 257),
+        (256, 256),
+        (257, 255),
+    ] {
+        let matrix = patterned_matrix(rows, cols);
+        let original = matrix.clone();
+        let transposed = matrix.transpose().expect("transpose");
+        assert_eq!(matrix, original, "allocating transpose mutated its source");
+        assert_eq!(transposed.rows(), cols);
+        assert_eq!(transposed.cols(), rows);
+        for row in 0..rows {
+            for col in 0..cols {
+                assert_eq!(transposed.get(col, row), Some(matrix_pattern(row, col)));
+            }
+        }
+        assert_eq!(transposed.transpose().expect("double transpose"), matrix);
+    }
+
+    for &size in &[0, 1, 63, 64, 65, 129, 255, 256, 257] {
+        let mut matrix = patterned_matrix(size, size);
+        let original = matrix.clone();
+        let expected = original
+            .transpose()
+            .expect("allocating reference transpose");
+        matrix
+            .transpose_square_in_place()
+            .expect("square transpose");
+        assert_eq!(matrix, expected, "in-place transpose size={size}");
+        matrix
+            .transpose_square_in_place()
+            .expect("square double transpose");
+        assert_eq!(matrix, original);
+    }
+
+    let mut rectangular = BitMatrix::zeros(2, 3).expect("rectangular matrix");
+    rectangular.set(1, 2, true).expect("set rectangular bit");
+    let rectangular_before = rectangular.clone();
+    assert_eq!(
+        rectangular.transpose_square_in_place(),
+        Err(BitError::NotSquareMatrix { rows: 2, cols: 3 })
+    );
+    assert_eq!(rectangular, rectangular_before);
+}
+
+#[test]
+fn bits_preallocated_kernels_do_not_allocate() {
+    let mut bits = BitVec::from_words_truncated(4093, vec![0x55aa_1234_9876_cdef; 64]);
+    let rhs = BitVec::from_words_truncated(4093, vec![0xf0f0_0f0f_dead_beef; 64]);
+    let mask = BitVec::from_words_truncated(4093, vec![0x0123_4567_89ab_cdef; 64]);
+    let mut matrix = patterned_matrix(3, 4093);
+    let mut square = BitMatrix::zeros(256, 256).expect("in-place allocation fixture");
+    for row in 0..256 {
+        square
+            .set(row, (row * 73 + 19) % 256, true)
+            .expect("set in-place fixture bit");
+    }
+
+    let allocations = allocation_counter::measure(|| {
+        for _ in 0..128 {
+            bits.xor_assign(&rhs.as_bitslice()).expect("XOR");
+            bits.and_assign(&rhs.as_bitslice()).expect("AND");
+            bits.or_assign(&rhs.as_bitslice()).expect("OR");
+            bits.masked_xor_assign(&rhs.as_bitslice(), &mask.as_bitslice())
+                .expect("masked XOR");
+            std::hint::black_box(bits.words());
+
+            matrix.xor_row_into(0, 1).expect("row XOR");
+            matrix
+                .masked_xor_row_into(0, 1, &mask.as_bitslice())
+                .expect("masked row XOR");
+            matrix
+                .masked_xor_row_into(2, 2, &mask.as_bitslice())
+                .expect("self masked row XOR");
+            matrix.swap_rows(0, 1).expect("row swap");
+            std::hint::black_box(matrix.row(2).expect("row view"));
+        }
+        square
+            .transpose_square_in_place()
+            .expect("in-place transpose");
+    });
+    assert_eq!(allocations.count_total, 0, "{allocations:?}");
+    assert_eq!(allocations.bytes_total, 0, "{allocations:?}");
+
+    let allocating = BitMatrix::zeros(256, 256).expect("allocating transpose fixture");
+    let allocating_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(allocating.transpose().expect("allocating transpose"));
+    });
+    assert_eq!(
+        allocating_allocations.count_total, 1,
+        "allocating transpose must allocate one result buffer: {allocating_allocations:?}"
+    );
+    assert_eq!(
+        allocating_allocations.bytes_total,
+        256 * 256 / 8,
+        "allocating transpose requested unexpected storage: {allocating_allocations:?}"
+    );
+}
+
+fn word_bit(words: &[u64], index: usize) -> bool {
+    words
+        .get(index / WORD_BITS)
+        .is_some_and(|word| word >> (index % WORD_BITS) & 1 == 1)
+}
+
+/// Checks every logical bit, the out-of-range accessor, storage size, canonical
+/// tail padding, and the popcount/not-zero summaries against a scalar reference.
+fn assert_matches_reference(actual: &BitVec, expected: impl Fn(usize) -> bool) {
+    let len = actual.len();
+    for index in 0..len {
+        assert_eq!(actual.get(index), Some(expected(index)), "index={index}");
+    }
+    assert_eq!(actual.get(len), None);
+    assert_eq!(actual.word_count(), len.div_ceil(WORD_BITS));
+    let tail = len % WORD_BITS;
+    if tail != 0 {
+        let last = actual.words().last().copied().expect("non-empty tail word");
+        assert_eq!(last >> tail, 0, "dirty padding above logical width {len}");
+    }
+    let ones = (0..len).filter(|index| expected(*index)).count();
+    assert_eq!(actual.popcount(), ones);
+    assert_eq!(actual.not_zero(), ones != 0);
+}
+
+fn set_matrix_row(matrix: &mut BitMatrix, row: usize, value: impl Fn(usize) -> bool) {
+    for col in 0..matrix.cols() {
+        matrix.set(row, col, value(col)).expect("set matrix bit");
+    }
+}
+
+fn assert_row(matrix: &BitMatrix, row: usize, expected: impl Fn(usize) -> bool) {
+    let view = matrix.row(row).expect("matrix row");
+    assert_eq!(view.len(), matrix.cols());
+    for col in 0..matrix.cols() {
+        assert_eq!(view.get(col), Some(expected(col)), "row={row} col={col}");
+    }
+}
+
+fn patterned_matrix(rows: usize, cols: usize) -> BitMatrix {
+    let mut matrix = BitMatrix::zeros(rows, cols).expect("bounded matrix");
+    for row in 0..rows {
+        for col in 0..cols {
+            if matrix_pattern(row, col) {
+                matrix.set(row, col, true).expect("set matrix bit");
+            }
+        }
+    }
+    matrix
+}
+
+fn matrix_pattern(row: usize, col: usize) -> bool {
+    row.wrapping_mul(29)
+        .wrapping_add(col.wrapping_mul(43))
+        .wrapping_add(row ^ col)
+        % 19
+        < 8
+}
+
 fn bitvec_from_bools(bits: &[bool]) -> BitVec {
     let mut out = BitVec::zeros(bits.len());
     for (index, bit) in bits.iter().enumerate() {
@@ -478,28 +696,9 @@ fn bools_from_bitvec(bits: &BitVec) -> Vec<bool> {
         .collect()
 }
 
-fn resize_bools(mut bits: Vec<bool>, len: usize) -> Vec<bool> {
-    bits.resize(len, false);
-    bits
-}
-
 fn patterned_bools(len: usize, seed: usize) -> Vec<bool> {
     (0..len)
         .map(|index| (index.wrapping_mul(17).wrapping_add(seed) % 11) < 5)
-        .collect()
-}
-
-fn set_matrix_row(matrix: &mut BitMatrix, row: usize, bits: &[bool]) {
-    for (col, bit) in bits.iter().enumerate() {
-        matrix.set(row, col, *bit).expect("set matrix bit");
-    }
-}
-
-fn xor_expected_with_mask(left: &[bool], right: &[bool], mask: &[bool]) -> Vec<bool> {
-    left.iter()
-        .zip(right)
-        .zip(mask)
-        .map(|((left, right), mask)| *left ^ (*right & *mask))
         .collect()
 }
 

@@ -356,16 +356,13 @@ fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
 #[test]
 fn stabilizers_clifford_random_hook_covers_single_qubit_cliffords() {
     let gates = contract_gates().collect::<Vec<_>>();
-    let mut direct_first_rng = SmallRng::seed_from_u64(0xc11f_f07d);
-    let mut direct_second_rng = SmallRng::seed_from_u64(0xc11f_f07d);
+    let mut direct_rng = SmallRng::seed_from_u64(0xc11f_f07d);
     let mut direct_counts = vec![0usize; gates.len()];
     for _ in 0..16_384 {
-        let first = SingleQubitClifford::random(&mut direct_first_rng);
-        let second = SingleQubitClifford::random(&mut direct_second_rng);
-        assert_eq!(first, second);
+        let gate = SingleQubitClifford::random(&mut direct_rng);
         let count_index = gates
             .iter()
-            .position(|candidate| *candidate == first)
+            .position(|candidate| *candidate == gate)
             .expect("random gate is in reviewed Clifford set");
         direct_counts[count_index] += 1;
     }

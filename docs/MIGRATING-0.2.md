@@ -49,7 +49,7 @@ There are no `advanced` or `experimental` tiers. Low-level APIs and extension co
 
 The CLI composes owner errors into private human or JSON diagnostics. Library callers should preserve typed owner errors or define an application-specific aggregate only where a workflow genuinely crosses domains.
 
-The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sorted` APIs are removed without compatibility aliases. Sparse result codecs and sparse reverse-frame analysis remain supported through their independent owners. The tests-only numerical wrappers `is_power_of_2`, `floor_lg2`, and `first_set_bit` are also removed; callers can use Rust's integer bit operations directly.
+The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sorted` APIs are removed without compatibility aliases. Sparse result codecs and sparse reverse-frame analysis remain supported through their independent owners. The tests-only numerical wrappers `is_power_of_2`, `floor_lg2`, and `first_set_bit` are also removed; callers can use Rust's integer bit operations directly. `Gate::stim_name_hash`, which exposed Stim's internal gate-table hash, is removed without replacement.
 
 The partial `stab_analysis::mbqc_decomposition` helper, also exposed through `stab_core::analysis`, is removed without a replacement. MBQC help decomposition remains outside the selected computational API; supported circuit base-gate lowering continues through `stab_analysis::decomposed_circuit`.
 
