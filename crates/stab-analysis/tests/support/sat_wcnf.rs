@@ -1,6 +1,8 @@
 #![allow(
+    dead_code,
     clippy::expect_used,
-    reason = "the independent SAT oracle uses compact parser assertions"
+    clippy::indexing_slicing,
+    reason = "the independent SAT oracle indexes variables it validated while parsing; test crates use a subset"
 )]
 
 #[derive(Debug)]
@@ -16,8 +18,116 @@ struct Wcnf {
     clauses: Vec<Clause>,
 }
 
+/// Exhaustive optimum over every assignment; only for instances with a handful of variables.
 pub(crate) fn optimum(source: &str) -> Option<usize> {
     Wcnf::parse(source).optimum()
+}
+
+/// Exact optimum by branch and bound with unit propagation over hard clauses.
+///
+/// Independent of the encoder: it reads only the WCNF text. Search cost grows with the optimum,
+/// not the variable count, so it handles small-distance QEC instances that are far beyond
+/// [`optimum`].
+pub(crate) fn optimum_by_branch_and_bound(source: &str) -> Option<usize> {
+    let wcnf = Wcnf::parse(source);
+    let mut occurrences = vec![Vec::new(); wcnf.variables];
+    for (index, clause) in wcnf.clauses.iter().enumerate() {
+        for &literal in &clause.literals {
+            occurrences[variable_of(literal)].push(index);
+        }
+    }
+    let mut search = BranchAndBound {
+        wcnf: &wcnf,
+        occurrences,
+        best: None,
+    };
+    let assignment = vec![None; wcnf.variables];
+    let all_variables = (0..wcnf.variables).collect();
+    search.branch(assignment, all_variables);
+    search.best
+}
+
+fn variable_of(literal: i64) -> usize {
+    usize::try_from(literal.unsigned_abs())
+        .expect("WCNF literal fits the target pointer width")
+        .checked_sub(1)
+        .expect("nonzero WCNF literal")
+}
+
+struct BranchAndBound<'a> {
+    wcnf: &'a Wcnf,
+    occurrences: Vec<Vec<usize>>,
+    best: Option<usize>,
+}
+
+impl BranchAndBound<'_> {
+    fn branch(&mut self, mut assignment: Vec<Option<bool>>, touched: Vec<usize>) {
+        if !self.propagate(&mut assignment, touched) {
+            return;
+        }
+        let cost = self
+            .wcnf
+            .clauses
+            .iter()
+            .filter(|clause| clause.weight < self.wcnf.top)
+            .filter(|clause| {
+                clause.literals.iter().all(|&literal| {
+                    assignment[variable_of(literal)].is_some_and(|value| value != (literal > 0))
+                })
+            })
+            .map(|clause| clause.weight)
+            .sum::<usize>();
+        if self.best.is_some_and(|best| cost >= best) {
+            return;
+        }
+        let Some(variable) = assignment.iter().position(Option::is_none) else {
+            self.best = Some(cost);
+            return;
+        };
+        for value in [false, true] {
+            let mut next = assignment.clone();
+            next[variable] = Some(value);
+            self.branch(next, vec![variable]);
+        }
+    }
+
+    /// Unit propagation over hard clauses touching newly assigned variables; false on conflict.
+    fn propagate(&self, assignment: &mut [Option<bool>], mut pending: Vec<usize>) -> bool {
+        while let Some(variable) = pending.pop() {
+            for &index in &self.occurrences[variable] {
+                let clause = &self.wcnf.clauses[index];
+                if clause.weight < self.wcnf.top {
+                    continue;
+                }
+                let mut unassigned = None;
+                let mut unassigned_count = 0;
+                let mut satisfied = false;
+                for &literal in &clause.literals {
+                    match assignment[variable_of(literal)] {
+                        Some(value) if value == (literal > 0) => {
+                            satisfied = true;
+                            break;
+                        }
+                        Some(_) => {}
+                        None => {
+                            unassigned = Some(literal);
+                            unassigned_count += 1;
+                        }
+                    }
+                }
+                if satisfied || unassigned_count > 1 {
+                    continue;
+                }
+                let Some(literal) = unassigned else {
+                    return false;
+                };
+                let forced = variable_of(literal);
+                assignment[forced] = Some(literal > 0);
+                pending.push(forced);
+            }
+        }
+        true
+    }
 }
 
 impl Wcnf {

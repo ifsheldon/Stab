@@ -560,20 +560,6 @@ fn pf6_hypergraph_search_many_observables_preserves_high_observable_id() {
     );
 }
 
-#[test]
-fn pf6_generated_sat_wcnf_qec_encoding_is_structural() {
-    let surface = generated_small_rotated_surface_code_dem(true).unwrap();
-    assert_unweighted_wcnf_shape(&shortest_error_sat_problem(&surface).unwrap());
-    assert_weighted_wcnf_shape(&likeliest_error_sat_problem(&surface, 100).unwrap());
-
-    let repetition = generated_small_repetition_code_dem().unwrap();
-    assert_unweighted_wcnf_shape(&shortest_error_sat_problem(&repetition).unwrap());
-    assert_weighted_wcnf_shape(&likeliest_error_sat_problem(&repetition, 100).unwrap());
-
-    let ungraphlike_surface = generated_small_rotated_surface_code_dem(false).unwrap();
-    assert_unweighted_wcnf_shape(&shortest_error_sat_problem(&ungraphlike_surface).unwrap());
-}
-
 // The generated QEC models are loop-folded so search must expand shifted repeat blocks.
 fn generated_rotated_surface_code_dem() -> AnalysisResult<DetectorErrorModel> {
     generated_rotated_surface_code_dem_with_options(ErrorAnalyzerOptions {
@@ -619,46 +605,6 @@ fn generated_repetition_code_dem() -> AnalysisResult<DetectorErrorModel> {
         generated.circuit(),
         ErrorAnalyzerOptions {
             fold_loops: true,
-            decompose_errors: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-}
-
-fn generated_small_rotated_surface_code_dem(
-    decompose_errors: bool,
-) -> AnalysisResult<DetectorErrorModel> {
-    let probability = Probability::try_new(0.001)?;
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(3)?,
-        CodeDistance::try_new(3)?,
-        SurfaceCodeTask::RotatedMemoryX,
-    )?
-    .with_after_clifford_depolarization(probability)
-    .with_before_measure_flip_probability(probability)
-    .with_after_reset_flip_probability(probability)
-    .with_before_round_data_depolarization(probability);
-    let generated = generate_surface_code_circuit(&params)?;
-    circuit_to_detector_error_model(
-        generated.circuit(),
-        ErrorAnalyzerOptions {
-            decompose_errors,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-}
-
-fn generated_small_repetition_code_dem() -> AnalysisResult<DetectorErrorModel> {
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(4)?,
-        CodeDistance::try_new(5)?,
-        RepetitionCodeTask::Memory,
-    )?
-    .with_before_round_data_depolarization(Probability::try_new(0.01)?);
-    let generated = generate_repetition_code_circuit(&params)?;
-    circuit_to_detector_error_model(
-        generated.circuit(),
-        ErrorAnalyzerOptions {
             decompose_errors: true,
             ..ErrorAnalyzerOptions::default()
         },
@@ -927,76 +873,4 @@ fn assert_strictly_increasing(values: &[u64], label: &str) {
             .all(|window| matches!(window, [left, right] if left < right)),
         "search output should not repeat {label} targets inside one error row: {values:?}"
     );
-}
-
-fn assert_unweighted_wcnf_shape(wcnf: &str) {
-    let header = parse_wcnf_header(wcnf);
-    assert!(header.variables > 1, "{wcnf}");
-    assert!(header.clauses > header.variables, "{wcnf}");
-    assert_eq!(header.top_weight, header.clauses + 1, "{wcnf}");
-    assert_eq!(wcnf.lines().skip(1).count(), header.clauses, "{wcnf}");
-    assert!(wcnf.lines().skip(1).any(|line| line.starts_with("1 -")));
-    assert!(
-        wcnf.lines()
-            .skip(1)
-            .any(|line| line.starts_with(&format!("{} ", header.top_weight))),
-        "{wcnf}"
-    );
-}
-
-fn assert_weighted_wcnf_shape(wcnf: &str) {
-    let header = parse_wcnf_header(wcnf);
-    assert!(header.variables > 1, "{wcnf}");
-    assert!(header.clauses > header.variables, "{wcnf}");
-    assert!(header.top_weight > header.clauses, "{wcnf}");
-    assert_eq!(wcnf.lines().skip(1).count(), header.clauses, "{wcnf}");
-    assert!(
-        wcnf.lines()
-            .skip(1)
-            .filter_map(first_wcnf_weight)
-            .any(|weight| weight == header.top_weight),
-        "{wcnf}"
-    );
-    assert!(
-        wcnf.lines()
-            .skip(1)
-            .filter_map(first_wcnf_weight)
-            .any(|weight| weight > 0 && weight < header.top_weight),
-        "{wcnf}"
-    );
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct WcnfHeader {
-    variables: usize,
-    clauses: usize,
-    top_weight: usize,
-}
-
-fn parse_wcnf_header(wcnf: &str) -> WcnfHeader {
-    let header = wcnf.lines().next().expect("WCNF header");
-    let fields = header.split_whitespace().collect::<Vec<_>>();
-    assert_eq!(fields.first(), Some(&"p"), "{header}");
-    assert_eq!(fields.get(1), Some(&"wcnf"), "{header}");
-    WcnfHeader {
-        variables: fields
-            .get(2)
-            .expect("variable count")
-            .parse()
-            .expect("numeric variable count"),
-        clauses: fields
-            .get(3)
-            .expect("clause count")
-            .parse()
-            .expect("numeric clause count"),
-        top_weight: fields
-            .get(4)
-            .expect("top weight")
-            .parse()
-            .expect("numeric top weight"),
-    }
-}
-
-fn first_wcnf_weight(line: &str) -> Option<usize> {
-    line.split_whitespace().next()?.parse().ok()
 }
