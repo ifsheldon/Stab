@@ -258,6 +258,41 @@ Hostile-input protection means memory safety, no panics, checked arithmetic, bou
 - Every remaining limit is an invariant, the nesting bound, a byte budget, or an explicit search budget.
 - A hostile compact input can be cancelled, and cannot exhaust memory, overflow, recurse without bound, or panic.
 
+### Checkpoint (2026-11-14): Caps Removed, One Memory Budget
+
+Tasks 1 through 4 and task 7 landed in `c31908f4`; tasks 5 and 6 are separate changes.
+
+Every count cap and CPU-work cap is removed, and each allocation they bounded is admitted in bytes against one typed `stab_model::MemoryBudget` that defaults to 1 GiB and is exposed as `--memory-budget <SIZE>`.
+The [resource policy inventory](../architecture/a2-resource-policy-inventory.md) classifies the 64 remaining limit constants and names every removed one.
+The general stabilizer-frame sampling fallback that E3 kept for programs above 256 MiB is deleted, and such a program is refused against the budget.
+
+The limit-probe workloads from [Review Evidence](#review-evidence), all of which the previous binary refused, now run at the default budget.
+Times are single runs with peak resident memory, against pinned Stim on the same host.
+
+| Workload | Stab | Stim |
+| --- | ---: | ---: |
+| `detect`, 1.5M-line circuit | 0.32 s, 359 MB | 0.16 s, 127 MB |
+| `sample_dem`, 1.5M-line model | 0.41 s, 538 MB | 0.36 s, 309 MB |
+| `detect`, 147 MB flattened d=7 circuit | 1.22 s, 1.35 GB | 0.88 s, 389 MB |
+| `detect`, d=35 with 1000 rounds | 0.05 s, 46 MB | 0.06 s, 48 MB |
+| `detect`, repetition code with 200k rounds, 64 shots | 0.01 s, 16 MB | 0.10 s, 17 MB |
+| `sample`, repetition code with 5M rounds | 0.49 s, 415 MB | 0.66 s, 6 MB |
+| `detect`, repetition code with 5M rounds | 0.53 s, 326 MB | 2.06 s, 398 MB |
+| `gen`, surface code at distance 400 | 0.56 s, 310 MB | 0.86 s, 343 MB |
+
+The review's `gen` row at distance 200,001 was a Stim refusal, not a 0.00 s run: Stim accepts distances 2 through 2047 only, and Stab keeps that invariant.
+
+Review checks: 66 seeded outputs of already-admitted workloads are byte-identical to the E3 binary, and compact hostile inputs (a $10^{12}$-iteration measuring repeat, a $4 \times 10^9$ observable index, a $10^{12}$ detector id, a $10^{12}$-iteration shifting DEM repeat, one measurement at the top qubit index for a million shots) are refused in 0.00 s at about 3 MB with a typed error naming the budget.
+
+Open after this checkpoint:
+
+- Budgets are per operation, so one command retains a small multiple of the budget; the 147 MB flattened circuit peaks at 1.35 GB under the 1 GiB default.
+- Parser charges cover declarations and targets but not arguments or tags, so retained bytes can exceed the charge by a constant factor of the source size.
+- Memory at large widths is well above Stim's for some shapes, most visibly 415 MB against 6 MB for a 5M-round `sample`, because records are held per batch where Stim streams.
+- Detecting regions keep a 128-level nesting bound, because 256 levels overflowed a 2 MiB debug test stack; the traversal needs to become iterative first.
+- Time reversal, missing detectors, flow generation, detecting regions, the ErrorMatcher filter, and sampled flows admit against the default budget and take no caller budget yet.
+- Until task 5 lands, a compact input that fits the budget runs until its work is done.
+
 ## Milestone E5: Faster Error Analysis
 
 ### Tasks
