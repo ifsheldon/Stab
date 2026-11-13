@@ -134,3 +134,55 @@ fn gen_rejects_quadratic_outputs_before_writing() {
         "rejection must not create a partial output"
     );
 }
+
+/// Pinned Stim narrows generator probabilities to `float` and echoes `-0` in
+/// the header; Stab keeps the canonical `f64` probability, so only header
+/// comments for negative zero and gate arguments below the `float` range differ.
+/// Stim also writes the header before rejecting an unsupported generator shape;
+/// Stab validates first and writes nothing.
+#[test]
+fn gen_keeps_double_precision_parameters_and_validates_before_writing() {
+    let mut args: Vec<&str> = REPETITION.to_vec();
+    args.extend(["--after_clifford_depolarization", "1e-40"]);
+    let tiny = run(&args, b"");
+    assert_eq!(tiny.status, 0, "{}", tiny.stderr_text());
+    assert!(
+        tiny.stdout_text().contains("DEPOLARIZE2(1e-40) "),
+        "{}",
+        tiny.stdout_text()
+    );
+
+    let mut args: Vec<&str> = REPETITION.to_vec();
+    args.extend(["--after_clifford_depolarization=-0"]);
+    let negative_zero = run(&args, b"");
+    assert_eq!(negative_zero.status, 0, "{}", negative_zero.stderr_text());
+    assert!(
+        negative_zero
+            .stdout_text()
+            .contains("# after_clifford_depolarization: 0\n"),
+        "{}",
+        negative_zero.stdout_text()
+    );
+
+    let unsupported = run(
+        &[
+            "stab",
+            "gen",
+            "--code",
+            "color_code",
+            "--task",
+            "memory_xyz",
+            "--distance",
+            "3",
+            "--rounds",
+            "1",
+        ],
+        b"",
+    );
+    assert_eq!(unsupported.status, 1);
+    assert!(
+        unsupported.stdout.is_empty(),
+        "{}",
+        unsupported.stdout_text()
+    );
+}

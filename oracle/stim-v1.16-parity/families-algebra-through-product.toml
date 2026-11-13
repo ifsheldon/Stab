@@ -513,6 +513,22 @@ kind = "lib"
 name = "tests::args::repeated_flags_and_arguments_after_terminator_are_rejected"
 
 [[families]]
+id = "cli.argument-values"
+area = "cli"
+contract = "Computational commands reject an empty boolean value, a missing or empty integer or seed value, and an empty probability threshold instead of substituting a default."
+stim_refs = ["src/stim/util_bot/arg_parse.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim reads `--flag=` as true, a missing --shots as one shot, a missing --seed as seed 0, and an empty --approximate_disjoint_errors as 1, silently replacing what the user typed; Stab reports a usage error."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::args::empty_and_missing_flag_values_are_rejected"
+
+[[families]]
 id = "cli.convert"
 area = "cli"
 contract = "convert accepts every nondeprecated Stim option and routes typed circuit, DEM, explicit-layout, primary-output, and observable-output arguments."
@@ -938,6 +954,22 @@ package = "stab-analysis"
 kind = "test"
 target = "circuit_generation"
 name = "cq2_generation_color_matches_complete_pinned_stim_case"
+
+[[families]]
+id = "generation.parameter-precision"
+area = "generation"
+contract = "Generator probabilities keep their canonical double-precision value, so negative zero prints as 0 and probabilities below single-precision range are preserved, and unsupported generator shapes are rejected before any output is written."
+stim_refs = ["src/stim/cmd/command_gen.cc", "src/stim/gen/gen_surface_code.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim stores generator parameters as float, echoing -0 in the header and rounding probabilities below about 1.2e-38 (for example 1e-40 becomes 9.99995e-41), and writes the header before rejecting an unsupported task; Stab keeps the typed probability and validates first."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::generate::gen_keeps_double_precision_parameters_and_validates_before_writing"
 
 [[families]]
 id = "generation.parameters-and-noise"
