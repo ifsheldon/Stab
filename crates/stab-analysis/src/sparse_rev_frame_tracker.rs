@@ -802,7 +802,7 @@ impl SparseReverseFrameTracker {
                 ))
             })?;
             let index = self.record_index_from_offset(offset.get())?;
-            self.toggle_record_target(index, detector);
+            toggle_target(self.declared_record_targets(index), detector);
         }
         Ok(())
     }
@@ -824,7 +824,10 @@ impl SparseReverseFrameTracker {
             match target {
                 Target::MeasurementRecord { offset } => {
                     let index = self.record_index_from_offset(offset.get())?;
-                    self.toggle_record_sensitivity(index, &sensitivity);
+                    toggle_targets(
+                        self.declared_record_targets(index),
+                        sensitivity.iter().copied(),
+                    );
                 }
                 Target::Pauli { pauli, id, .. } => {
                     self.toggle_product_sensitivity(
@@ -876,6 +879,16 @@ impl SparseReverseFrameTracker {
         for target in sensitivity {
             self.toggle_record_target(index, *target);
         }
+    }
+
+    /// Record sensitivity touched by a `DETECTOR` or `OBSERVABLE_INCLUDE` declaration.
+    ///
+    /// Like pinned Stim's `rec_bits[index].xor_item(...)` (sparse_rev_frame_tracker.cc:837/850),
+    /// the entry stays present even when duplicate record targets cancel it to empty; only undoing
+    /// the measurement removes it. Entry presence is part of the shifted-copy comparison that picks
+    /// the folded loop period, so dropping cancelled entries folds different iterations than Stim.
+    fn declared_record_targets(&mut self, index: usize) -> &mut BTreeSet<DemTarget> {
+        self.rec_bits.entry(index).or_default()
     }
 
     fn toggle_record_target(&mut self, index: usize, target: DemTarget) {

@@ -17,7 +17,7 @@ type TaggedErrorKey = (Vec<DemTarget>, Option<AnalyzerTag>);
 const MAX_PROBLEM_TERMS: usize = 64;
 
 pub(super) fn decompose_tagged_error_probabilities(
-    probabilities: BTreeMap<TaggedErrorKey, Probability>,
+    mut probabilities: BTreeMap<TaggedErrorKey, Probability>,
     block_remnant_edges: bool,
     ignore_failures: bool,
 ) -> AnalysisResult<BTreeMap<TaggedErrorKey, Probability>> {
@@ -26,28 +26,40 @@ pub(super) fn decompose_tagged_error_probabilities(
             .iter()
             .map(|((targets, _tag), probability)| (targets, *probability)),
     );
-    let mut decomposed = BTreeMap::new();
-    for ((targets, tag), probability) in probabilities {
-        let targets = if probability.get() == 0.0 {
-            // Pinned Stim's rewrite scan skips zero-probability classes
-            // (error_analyzer.cc:1519-1521).
-            targets
-        } else {
-            decompose_targets(
-                &targets,
-                &known_graphlike,
-                block_remnant_edges,
-                ignore_failures,
-            )?
-        };
-        let key = (targets, tag);
-        if let Some(existing) = decomposed.get_mut(&key) {
+    // Pinned Stim plans every rewrite against the undecomposed classes, then moves each rewritten
+    // class's current probability onto its decomposed key with `add_error`, in class order
+    // (error_analyzer.cc:1516-1578). The merge rounds asymmetrically (see `xor_probability`), so
+    // rewritten classes must merge into the classes already present, in that order, for
+    // byte-exact probabilities.
+    let mut rewrites = Vec::new();
+    for ((targets, tag), probability) in &probabilities {
+        // Pinned Stim's rewrite scan skips zero-probability, empty, and graphlike classes
+        // (error_analyzer.cc:1519-1526).
+        if probability.get() == 0.0 || targets.is_empty() || is_graphlike(targets) {
+            continue;
+        }
+        let decomposed = decompose_targets(
+            targets,
+            &known_graphlike,
+            block_remnant_edges,
+            ignore_failures,
+        )?;
+        rewrites.push(((targets.clone(), tag.clone()), decomposed));
+    }
+    for (original, decomposed) in rewrites {
+        let probability = probabilities.remove(&original).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "error decomposition lost a planned rewrite class",
+            )
+        })?;
+        let key = (decomposed, original.1);
+        if let Some(existing) = probabilities.get_mut(&key) {
             *existing = xor_probability(*existing, probability)?;
         } else {
-            decomposed.insert(key, probability);
+            probabilities.insert(key, probability);
         }
     }
-    Ok(decomposed)
+    Ok(probabilities)
 }
 
 fn decompose_targets(
