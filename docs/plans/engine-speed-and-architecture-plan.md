@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1, E2, E5, and E6 are complete; E3 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1, E2, E3, E5, and E6 are complete; E4 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -183,6 +183,32 @@ That cost belongs to E3, which retires `SampleProgram`, so E3 now carries a spee
 
 - The engine has one circuit program type, one repeat interpreter, and one circuit walker.
 - `sample` and `detect` derive admission from the same counts.
+
+### Checkpoint (2026-11-14)
+
+E3 landed. `CircuitProgram` is the only compiled form; the Pauli frame, the reference simulator, the determined-measurement count, sweep correction, and detection conversion walk it through one cursor; and the `m2d` reference compiles without a sampling plan. `SampleProgram` and `DirectZ` are deleted.
+
+Seeded `sample`, `detect`, and `m2d` output is byte-identical to the previous build on 39 comparisons. It changes only for a circuit of exactly one non-reset measurement with a nonzero flip or preceding single-qubit Pauli channel, the shape `DirectZ` used to take.
+
+Best of three interleaved runs on one pinned core, in milliseconds:
+
+| Workload | Before | After | Stim |
+| --- | ---: | ---: | ---: |
+| `CZ` and `S` layers, 1 shot, reference skipped | 1054.7 | 20.7 | 14.9 |
+| `CZ` and `S` layers, 20,000 shots | 1102.8 | 69.2 | 106.7 |
+| `CX` and `H` layers, 20,000 shots | 91.3 | 67.0 | 118.9 |
+| Random Clifford, 1200 qubits, 2000 shots | 323.6 | 98.6 | 302.1 |
+| `sample`, d=11, 300,000 shots | 201.2 | 199.9 | 251.8 |
+| `detect`, d=11, 350,000 shots | 300.7 | 301.5 | 285.1 |
+
+Deviations and consequences:
+
+- General-frame sampling is reachable for programs above the 256 MiB plan budget, so `GeneralFrame`, `sample_general_into`, `sampling/noise.rs`, and `StabilizerFrame` remain as that fallback over the unified program. E4 decides whether a byte budget replaces the fallback.
+- The conversion executor and the sampling-estimate walker stay separate because their semantics differ from program execution.
+- `sample` counts expanded instructions as `detect` does, so a d=25 circuit with 1000 rounds is admitted by both. Limit values are unchanged.
+- `count_determined_measurements` with unknown input undercounted after full resets and is corrected.
+- Without `DirectZ`, one measurement on a very high qubit index is refused on storage limits, as `detect` already did.
+- The executable-contract schema moved from 5 to 6.
 
 ## Milestone E4: Limit Policy Reset
 
