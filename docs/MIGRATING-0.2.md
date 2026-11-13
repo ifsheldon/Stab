@@ -13,7 +13,7 @@ Stab 0.2 is a coordinated breaking Rust API release. Stim v1.16.0 semantics rema
 | `stab-analysis` | Pure transforms, generation, circuit-to-DEM analysis, flow analysis, search, SAT, and error matching |
 | `stab-engine` | Compilers, immutable plans, mutable sessions, sampling, conversion, and typed batch delivery |
 | `stab-decoder` | Decoder model views, truth-hidden inputs, caller-owned predictions, and reusable decoder sessions |
-| `stab-kernels-simd` | Dependency-free Nightly portable-SIMD leaf kernels, not a simulation backend |
+| `stab-kernels-simd` | Slice-level SIMD leaf kernels built on `fearless_simd` with per-call instruction-set selection, not a simulation backend |
 | `stab-core` | A small facade over the product crates |
 | `stab-cli` | The `stab` command-line binary |
 

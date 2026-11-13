@@ -5,11 +5,6 @@ mod portable;
 mod scalar;
 mod transpose;
 
-#[cfg(feature = "portable-simd")]
-use portable as selected;
-#[cfg(not(feature = "portable-simd"))]
-use scalar as selected;
-
 use std::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Deref, DerefMut, Not, Range,
 };
@@ -134,7 +129,7 @@ impl BitBlock {
     }
 
     pub fn xor(self, rhs: Self) -> Self {
-        Self::from_words(selected::xor_block(self.words, rhs.words))
+        Self::from_words(scalar::xor_block(self.words, rhs.words))
     }
 
     pub fn and(self, rhs: Self) -> Self {
@@ -359,7 +354,7 @@ impl BitVec {
 
     pub fn xor_assign(&mut self, rhs: &BitSlice<'_>) -> BitResult<()> {
         ensure_same_bit_len(self.len(), rhs.len())?;
-        selected::xor_assign_words(&mut self.words, rhs.words());
+        xor_assign_word_slices(&mut self.words, rhs.words())?;
         self.mask_unused_tail_bits();
         Ok(())
     }
@@ -603,8 +598,7 @@ impl BitMatrix {
             return Ok(());
         }
         let (source_words, target_words) = self.row_pair_words_mut(source, target)?;
-        selected::xor_assign_words(target_words, source_words);
-        Ok(())
+        xor_assign_word_slices(target_words, source_words)
     }
 
     pub fn masked_xor_row_into(
@@ -835,6 +829,18 @@ fn checked_range(start: usize, bit_count: usize, len: usize) -> BitResult<()> {
         return Err(BitError::BitRangeOutOfRange { start, end, len });
     }
     Ok(())
+}
+
+fn xor_assign_word_slices(lhs: &mut [u64], rhs: &[u64]) -> BitResult<()> {
+    #[cfg(feature = "portable-simd")]
+    {
+        portable::xor_assign_words(lhs, rhs)
+    }
+    #[cfg(not(feature = "portable-simd"))]
+    {
+        scalar::xor_assign_words(lhs, rhs);
+        Ok(())
+    }
 }
 
 fn ensure_same_bit_len(left: usize, right: usize) -> BitResult<()> {

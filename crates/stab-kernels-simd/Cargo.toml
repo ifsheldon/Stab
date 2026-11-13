@@ -2,7 +2,7 @@
 name = "stab-kernels-simd"
 version.workspace = true
 edition.workspace = true
-description = "Dependency-free portable-SIMD word kernels for Stab."
+description = "Slice-level SIMD word kernels for Stab, built on fearless_simd."
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -11,3 +11,10 @@ keywords.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+fearless_simd = { workspace = true }
+fearless_simd_macros = { workspace = true }
+
+[dev-dependencies]
+fearless_simd = { workspace = true, features = ["force_support_fallback"] }

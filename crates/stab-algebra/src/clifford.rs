@@ -565,7 +565,7 @@ impl CliffordString {
             inv_z2z: rhs.inv_z2z.words(),
         };
         let CliffordNonIdentityCounts { before, after } =
-            clifford_right_multiply_words(left, right);
+            clifford_right_multiply_words(left, right)?;
         self.non_identity_count = self
             .non_identity_count
             .checked_sub(before)
