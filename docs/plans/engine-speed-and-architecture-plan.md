@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1, E2, E5, and the output half of E6 are complete; the input half of E6 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1, E2, E5, and E6 are complete; E3 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -324,7 +324,15 @@ Behavior change: with buffered output a write failure is detected later, so the 
 
 After E1, E2, and this half of E6, every one of the 25 suite cases is under the `1.25x` ceiling in the smoke tier.
 
-The input half of E6 (tasks 1 reader side, 3, 5, and 6) remains.
+The input half of E6 then landed: `RecordStreamReader` yields packed batches for all six formats and absorbs the CLI's `m2d` and replay readers, input is buffered without per-read zero fill, record storage is allocated fallibly after the first frame is proven, and the unused visitors and record types are deleted.
+
+Output of `convert` across all 36 format pairs, `m2d`, and replay is identical to the previous build on 60 comparisons, including malformed input, except that a huge declared width is now a typed error instead of a process abort.
+
+Two tasks were deliberately not completed as written.
+`convert` takes its counts from the model but still compiles the engine plan once, because that compilation is what rejects detectors without measurements and applies the record-width limit.
+Replay input is still parsed twice, because decoding once while producing no partial output on malformed input would hold every record in memory.
+
+Open items: `hits` and `dets` input remain far slower than `b8` because the shared integer grammar dominates, and replay from sparse `hits` is about seven times slower than Stim because the engine walks every error for every shot instead of only the recorded hits.
 
 ## Milestone E7: Wider Detection Frames
 
