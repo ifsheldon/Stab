@@ -861,104 +861,102 @@ fn zero_shots_touch_neither_sink_nor_seeded_rng() {
     assert_eq!(actual.observables, expected.observables);
 }
 
+/// DEM work limits bound one shot: a model whose single shot exceeds the limit
+/// is rejected before RNG advancement or sink mutation for any nonzero shot
+/// count, while a model that fits streams arbitrarily many shots.
 #[test]
 fn work_limits_reject_before_rng_or_sink_and_leave_session_reusable() {
-    let sampler = compile_dem("error(0.5) D0\n");
-    let limits = DemSamplerLimits::default().with_max_sampled_error_applications(1);
+    let sampler = compile_dem("error(0.5) D0\nerror(0.25) D1\n");
+    let tight = DemSamplerLimits::default().with_max_sampled_error_applications_per_shot(1);
+    let exact = tight.with_max_sampled_error_applications_per_shot(2);
+
     let mut session = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), limits)
+        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), tight)
         .expect("limited session");
     let mut rejected = CollectSink::default();
     let error = session
-        .run(ShotCount::new(2), &mut rejected)
-        .expect_err("reject excessive detector-only work");
+        .run(ShotCount::new(1), &mut rejected)
+        .expect_err("a two-application shot exceeds a one-application limit");
     assert_eq!(error.progress().committed_shots().get(), 0);
     assert_eq!(rejected.write_calls, 0);
     assert_eq!(rejected.finish_calls, 0);
     assert!(!session.is_poisoned());
-
-    let mut accepted = CollectSink::default();
+    let mut sampled_errors = CollectSink::default();
     session
-        .run(ShotCount::new(1), &mut accepted)
-        .expect("reuse after preflight rejection");
-    let mut control = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), limits)
-        .expect("limited control session");
-    let mut expected = CollectSink::default();
-    control
-        .run(ShotCount::new(1), &mut expected)
-        .expect("control sample");
-    assert_eq!(accepted.detectors, expected.detectors);
+        .run_with_sampled_errors(ShotCount::new(1), &mut sampled_errors)
+        .expect_err("sampled-error output admits the same per-shot work");
+    assert_eq!(sampled_errors.write_calls, 0);
+    assert!(!session.is_poisoned());
 
-    let mut sampled_error_session = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), limits)
-        .expect("limited sampled-error session");
-    let mut sampled_error_sink = CollectSink::default();
-    sampled_error_session
-        .run_with_sampled_errors(ShotCount::new(2), &mut sampled_error_sink)
-        .expect_err("reject excessive sampled-error work");
-    assert_eq!(sampled_error_sink.write_calls, 0);
-    assert_eq!(sampled_error_sink.finish_calls, 0);
-    assert!(!sampled_error_session.is_poisoned());
-    let mut sampled_after_rejection = CollectSink::default();
-    sampled_error_session
-        .run_with_sampled_errors(ShotCount::new(1), &mut sampled_after_rejection)
-        .expect("sample after sampled-error rejection");
-    let mut sampled_control = sampler
-        .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), limits)
-        .expect("sampled-error control session");
-    let mut sampled_expected = CollectSink::default();
-    sampled_control
-        .run_with_sampled_errors(ShotCount::new(1), &mut sampled_expected)
-        .expect("sampled-error control run");
-    assert_eq!(
-        sampled_after_rejection.sampled_errors,
-        sampled_expected.sampled_errors
-    );
+    // At the exact per-shot limit, far more total work than the limit streams.
+    for run_with_sampled_errors in [false, true] {
+        let mut accepted = CollectSink::default();
+        let mut control = CollectSink::default();
+        let mut exact_session = sampler
+            .session_with_limits(RandomPolicy::Seeded(Seed::new(22)), exact)
+            .expect("exact-limit session");
+        let mut control_session = sampler
+            .session(RandomPolicy::Seeded(Seed::new(22)))
+            .expect("default-limit session");
+        if run_with_sampled_errors {
+            exact_session
+                .run_with_sampled_errors(ShotCount::new(1000), &mut accepted)
+                .expect("per-shot work at the exact limit streams many shots");
+            control_session
+                .run_with_sampled_errors(ShotCount::new(1000), &mut control)
+                .expect("control run");
+            assert_eq!(accepted.sampled_errors, control.sampled_errors);
+        } else {
+            exact_session
+                .run(ShotCount::new(1000), &mut accepted)
+                .expect("per-shot work at the exact limit streams many shots");
+            control_session
+                .run(ShotCount::new(1000), &mut control)
+                .expect("control run");
+        }
+        assert_eq!(accepted.detectors, control.detectors);
+    }
+
+    // Replay work per shot is detectors + observables + errors = 4 here.
     let plan = sampler.plan();
-    plan.validate_sampled_error_work_units_with_limits(1, limits)
-        .expect("one sampled-error application reaches the exact work limit");
-    plan.validate_sampled_error_work_units_with_limits(2, limits)
-        .expect_err("the first excess sampled-error application must reject");
-
-    let replay_limits = DemSamplerLimits::default().with_max_replay_work_units(2);
-    let replay_admission = sampler
-        .plan()
-        .validate_replay_with_limits(ShotCount::new(2), replay_limits)
-        .expect_err("plan replay admission must reject excessive work");
+    let tight_replay = DemSamplerLimits::default().with_max_replay_work_units_per_shot(3);
+    let replay_admission = plan
+        .validate_replay_with_limits(ShotCount::new(1), tight_replay)
+        .expect_err("plan replay admission must reject an excessive shot");
     let DemError::ResourceLimit(resource) = replay_admission else {
         panic!("plan replay admission must expose typed resource context");
     };
     assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
-    assert_eq!(resource.actual(), 4);
-    assert_eq!(resource.limit(), 2);
-    let error = sampler
-        .plan()
-        .replay_session_with_limits(ShotCount::new(2), replay_limits)
+    assert_eq!((resource.actual(), resource.limit()), (4, 3));
+    let error = plan
+        .replay_session_with_limits(ShotCount::new(1), tight_replay)
         .expect_err("reject replay work before delivery");
     let DemSamplingExecutionError::InvalidRequest(DemError::ResourceLimit(resource)) = error else {
         panic!("replay session must expose typed resource context");
     };
     assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
-    assert_eq!((resource.actual(), resource.limit()), (4, 2));
 
-    let exact_replay_limits = replay_limits.with_max_replay_work_units(4);
-    plan.validate_replay_with_limits(ShotCount::new(2), exact_replay_limits)
-        .expect("two replay records reach the exact four-unit work limit");
-    let mut exact_replay = plan
-        .replay_session_with_limits(ShotCount::new(2), exact_replay_limits)
-        .expect("construct exact-limit replay session");
+    let exact_replay = tight_replay.with_max_replay_work_units_per_shot(4);
+    let mut replay = plan
+        .replay_session_with_limits(ShotCount::new(3), exact_replay)
+        .expect("three shots at the exact per-shot replay limit");
     let mut replayed = CollectSink::default();
-    exact_replay
-        .run(&[vec![true], vec![false]], &mut replayed)
-        .expect("replay at the exact work limit");
-    assert_eq!(replayed.detectors, vec![vec![true], vec![false]]);
+    replay
+        .run(
+            &[vec![true, false], vec![false, true], vec![true, true]],
+            &mut replayed,
+        )
+        .expect("replay at the exact per-shot limit");
+    assert_eq!(
+        replayed.detectors,
+        vec![vec![true, false], vec![false, true], vec![true, true]]
+    );
 }
 
 #[test]
 fn replay_session_admits_work_and_poisoning_before_record_widths() {
     let sampler = compile_dem("error(0.25) D0\nerror(0.5) D1\n");
-    let limits = DemSamplerLimits::default().with_max_replay_work_units(2);
+    let limits = DemSamplerLimits::default().with_max_replay_work_units_per_shot(2);
     let work_error = sampler
         .plan()
         .replay_session_with_limits(ShotCount::new(2), limits)
@@ -970,7 +968,7 @@ fn replay_session_admits_work_and_poisoning_before_record_widths() {
         panic!("replay work error must expose typed resource context");
     };
     assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
-    assert_eq!(resource.actual(), 8);
+    assert_eq!(resource.actual(), 4);
     assert_eq!(resource.limit(), 2);
     let mut poisoned = sampler
         .plan()

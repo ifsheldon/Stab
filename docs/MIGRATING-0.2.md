@@ -53,6 +53,8 @@ The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sort
 
 The partial `stab_analysis::mbqc_decomposition` helper, also exposed through `stab_core::analysis`, is removed without a replacement. MBQC help decomposition remains outside the selected computational API; supported circuit base-gate lowering continues through `stab_analysis::decomposed_circuit`.
 
+`DemSamplerLimits` work limits now bound one shot instead of the whole request: `with_max_sampled_error_applications` and `with_max_replay_work_units` (and their getters) are renamed with a `_per_shot` suffix, and a session streams any number of shots whose single-shot work fits. The former total-work caps rejected ordinary workloads such as 100,000 shots of a distance-11 surface-code model.
+
 `Tableau::random` now samples uniformly over the Clifford group, signs included, using the Bravyi–Maslov construction ported from Stim. Earlier builds applied a bounded random gate walk whose distribution was not uniform, so seeded callers receive different tableaux for the same seed; the signature, error behavior, and `RandomTableauQubits` limit are unchanged.
 
 ## Parser Limits

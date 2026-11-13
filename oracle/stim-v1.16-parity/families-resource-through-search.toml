@@ -201,12 +201,12 @@ name = "pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries"
 [[families]]
 id = "resource-safety.dem-sampling-work-limits"
 area = "resource-safety"
-contract = "DEM sampling rejects detector and sampled-error work above typed limits before RNG advancement or sink mutation and leaves the sampling session reusable; replay work rejects owned-session construction before record traversal or sink mutation."
+contract = "DEM sampling rejects a model whose single shot exceeds the typed per-shot detector or sampled-error work limit before RNG advancement or sink mutation and leaves the session reusable, while streaming any shot count whose shots fit; replay rejects owned-session construction for an excessive per-shot replay width before record traversal or sink mutation."
 stim_refs = ["src/stim/simulators/dem_sampler.test.cc"]
 status = "divergence"
 owner = "stab-engine"
 divergence_kind = "resource-limit"
-rationale = "Stab gives DEM sampling explicit caller-visible work admission instead of relying on host allocation failure."
+rationale = "Stab gives DEM sampling explicit caller-visible per-shot work admission instead of relying on host allocation failure; like Stim, it streams arbitrarily many shots of an admitted model."
 [families.evidence]
 status = "verified"
 [families.evidence.test]

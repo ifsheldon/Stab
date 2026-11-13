@@ -149,13 +149,13 @@ impl DemSamplingPlan {
         limits: DemSamplerLimits,
     ) -> DemResult<()> {
         let units_per_shot = self.replay_work_units_per_shot()?;
-        let total_units = shots.checked_mul(units_per_shot).ok_or_else(|| {
-            DemError::invalid_sampler_compilation("DEM sampler replay work overflowed")
-        })?;
-        if total_units > limits.max_replay_work_units() {
+        if shots == 0 {
+            return Ok(());
+        }
+        if units_per_shot > limits.max_replay_work_units_per_shot() {
             return Err(DemResourceLimitError::replay_work_units(
-                total_units,
-                limits.max_replay_work_units(),
+                units_per_shot,
+                limits.max_replay_work_units_per_shot(),
             )
             .into());
         }
@@ -300,15 +300,10 @@ impl DemSamplingPlan {
         if error_applications_per_shot == 0 || shots == 0 {
             return Ok(());
         }
-        let work_units = shots
-            .checked_mul(error_applications_per_shot)
-            .ok_or_else(|| {
-                DemError::invalid_sampler_compilation("DEM sampler sample work overflowed")
-            })?;
-        if work_units > limits.max_sampled_error_applications() {
+        if error_applications_per_shot > limits.max_sampled_error_applications_per_shot() {
             return Err(DemResourceLimitError::sampled_error_applications(
-                work_units,
-                limits.max_sampled_error_applications(),
+                error_applications_per_shot,
+                limits.max_sampled_error_applications_per_shot(),
             )
             .into());
         }

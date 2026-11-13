@@ -71,17 +71,17 @@ impl Display for DemResourceLimitError {
         match self.kind {
             DemResourceKind::SampledErrorApplications => write!(
                 formatter,
-                "cannot compile circuit sampler: DEM sampler would apply {} sampled errors; current limit is {}",
+                "cannot compile DEM sampler: one shot would apply {} sampled errors; current per-shot limit is {}",
                 self.actual, self.limit
             ),
             DemResourceKind::ReplayWorkUnits => write!(
                 formatter,
-                "cannot compile circuit sampler: DEM sampler would require {} replay work units; current limit is {}",
+                "cannot compile DEM sampler: one replayed shot would require {} work units; current per-shot limit is {}",
                 self.actual, self.limit
             ),
             DemResourceKind::ActiveBatchBytes => write!(
                 formatter,
-                "cannot compile circuit sampler: DEM sampling session would require at least {} active batch bytes; current limit is {}",
+                "cannot compile DEM sampler: the sampling session would require at least {} active batch bytes; current limit is {}",
                 self.actual, self.limit
             ),
         }
@@ -96,7 +96,7 @@ pub enum DemError {
     #[error(transparent)]
     Model(#[from] stab_model::ModelError),
 
-    #[error("cannot compile circuit sampler: {message}")]
+    #[error("cannot compile DEM sampler: {message}")]
     InvalidSamplerCompilation { message: String },
 
     #[error("invalid result format data: {message}")]

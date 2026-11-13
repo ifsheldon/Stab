@@ -248,9 +248,9 @@ fn inputs_and_admission_precede_output_creation_and_truncation() {
             ],
             files: &[("errors.01", b"0\n"), ("output.01", b"sentinel\n")],
             stdin: b"error(0) D0\n",
-            stderr: &["64000002 replay work units; current limit is 64000000"],
-            // Work admission happens before replay-prefix scanning.
-            not_in_stderr: &["ended before shot"],
+            // A large replay request is admitted per shot, then the short replay
+            // prefix is rejected before any output is created.
+            stderr: &["replay error input has 1 records but --shots requested 32000001"],
             ..DEFAULT
         },
         // Like Stim, zero shots still validate declared input paths.
