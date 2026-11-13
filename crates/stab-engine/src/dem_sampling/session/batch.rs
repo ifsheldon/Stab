@@ -243,7 +243,7 @@ pub(super) fn validate_session_storage(
     Ok(())
 }
 
-fn session_storage_bytes(
+pub(super) fn session_storage_bytes(
     plan: &DemSamplingPlan,
     output_shots: usize,
     sample_shots: usize,

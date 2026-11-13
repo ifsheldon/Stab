@@ -258,8 +258,6 @@ mod tests {
     )]
 
     use super::*;
-    use rand::SeedableRng as _;
-    use rand::rngs::SmallRng;
 
     fn indexed_range(
         probability: f64,
@@ -315,23 +313,7 @@ mod tests {
             Err(IndexedRangeError::ShotRangeOverflow)
         );
     }
-
-    #[test]
-    fn sparse_and_dense_sampling_have_expected_frequencies() {
-        let mut rng = SmallRng::seed_from_u64(91);
-        for probability in [0.001, 0.25, 0.75] {
-            let mut ones = 0_u32;
-            let mut words = [0_u64; INDEXED_BLOCK_WORDS];
-            for _ in 0..128 {
-                sample_words(probability, &mut words, &mut RandSource(&mut rng));
-                ones += words.iter().map(|word| word.count_ones()).sum::<u32>();
-            }
-            let trials = (words.len() * u64::BITS as usize * 128) as f64;
-            let observed = f64::from(ones) / trials;
-            assert!(
-                (observed - probability).abs() < 0.01,
-                "p={probability}, observed={observed}"
-            );
-        }
-    }
 }
+
+#[cfg(test)]
+mod statistical_tests;

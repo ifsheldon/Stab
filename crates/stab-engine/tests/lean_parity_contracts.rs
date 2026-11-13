@@ -273,10 +273,11 @@ fn sampling_noise_complete_contract() {
         );
     }
 
-    const SHOTS: u64 = 8_192;
-    const MAX_ABSOLUTE_ERROR: f64 = 0.04;
-    // Hoeffding gives at most 2*exp(-2*8192*0.04^2) per assertion. Across this
-    // matrix, the family-wide false-failure budget is below 3e-10.
+    const SHOTS: u64 = 100_000;
+    // Each nondegenerate rate must lie within 5.5 binomial standard deviations
+    // (two-sided tail about 3.8e-8 per assertion, below 1e-6 across the matrix).
+    // At this sample size that rejects a 3-5% relative bias in the 0.1-0.5 range.
+    const SIGMAS: f64 = 5.5;
     struct StatisticalCase {
         name: &'static str,
         source: &'static str,
@@ -344,8 +345,9 @@ fn sampling_noise_complete_contract() {
             if expected_rate == 0.0 || expected_rate == 1.0 {
                 assert_eq!(observed_rate, expected_rate, "{} bit {bit}", case.name);
             } else {
+                let sigma = (expected_rate * (1.0 - expected_rate) / SHOTS as f64).sqrt();
                 assert!(
-                    (observed_rate - expected_rate).abs() <= MAX_ABSOLUTE_ERROR,
+                    (observed_rate - expected_rate).abs() <= SIGMAS * sigma,
                     "{} bit {bit}: expected {expected_rate:.5}, observed {observed_rate:.5}",
                     case.name
                 );
@@ -374,8 +376,9 @@ fn sampling_noise_complete_contract() {
             .filter(|record| record.as_slice() == pattern)
             .count() as f64
             / SHOTS as f64;
+        let sigma = (expected_rate * (1.0 - expected_rate) / SHOTS as f64).sqrt();
         assert!(
-            (observed_rate - expected_rate).abs() <= MAX_ABSOLUTE_ERROR,
+            (observed_rate - expected_rate).abs() <= SIGMAS * sigma,
             "correlated branch {pattern:?}: expected {expected_rate:.5}, observed {observed_rate:.5}"
         );
     }

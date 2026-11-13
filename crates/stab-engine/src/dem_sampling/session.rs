@@ -1069,6 +1069,9 @@ fn preflight_execution_error<SinkError>(
 }
 
 #[cfg(test)]
+mod storage_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::DemSamplingCompiler;

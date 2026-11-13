@@ -64,10 +64,11 @@ pub(crate) use surface::{
 mod statistical_plan;
 
 #[cfg(test)]
-pub(crate) use statistical_plan::GateContractStatisticalPlan;
+pub(crate) use statistical_plan::{GateContractStatisticalPlan, PAULI_CHANNEL_2_PROBABILITIES};
 #[cfg(test)]
 pub(crate) use statistical_plan::{
     gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
+    gate_contract_statistical_tolerance,
 };
 
 #[allow(

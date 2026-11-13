@@ -174,7 +174,10 @@ fn gate_surface_contract_pauli_channels() {
     );
     let plan = statistical_plan("pfm3-contract-pauli-channels");
     let pc1 = "PAULI_CHANNEL_1(0.1,0.2,0.3) 0\n";
-    let pc2 = "PAULI_CHANNEL_2(0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04) 0 1\n";
+    let pc2_arguments = super::super::super::PAULI_CHANNEL_2_PROBABILITIES
+        .map(|probability| probability.to_string())
+        .join(",");
+    let pc2 = &format!("PAULI_CHANNEL_2({pc2_arguments}) 0 1\n");
 
     let mut sampler_counts = count_single_pauli_samples(
         &sample_records(&bell_measurement_circuit(pc1), plan),
@@ -209,10 +212,7 @@ fn gate_surface_contract_pauli_channels() {
     assert_all_semantic_surfaces_execute(&bell_detection_circuit(pc1));
     assert_all_semantic_surfaces_execute(&two_bell_detection_circuit(pc2));
     assert_empty_target_semantic_noop("PAULI_CHANNEL_1", "(0.1,0.2,0.3)");
-    assert_empty_target_semantic_noop(
-        "PAULI_CHANNEL_2",
-        "(0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04,0.04)",
-    );
+    assert_empty_target_semantic_noop("PAULI_CHANNEL_2", &format!("({pc2_arguments})"));
 }
 
 #[test]
@@ -239,10 +239,9 @@ fn gate_surface_contract_depolarization() {
         &sample_records(&bell_measurement_circuit(depol1), plan),
         "depol1-",
     );
-    sampler_counts.extend(count_identity_vs_nonidentity_samples(
+    sampler_counts.extend(count_two_pauli_samples(
         &sample_records(&two_bell_measurement_circuit(depol2), plan),
-        "depol2-ii",
-        "depol2-nonidentity",
+        "depol2-",
     ));
     assert_statistical_counts(plan.case_id, &sampler_counts);
 
@@ -250,10 +249,9 @@ fn gate_surface_contract_depolarization() {
         &sample_detections(&bell_detection_circuit(depol1), plan),
         "depol1-",
     );
-    detection_counts.extend(count_identity_vs_nonidentity_detection(
+    detection_counts.extend(count_two_pauli_detection(
         &sample_detections(&two_bell_detection_circuit(depol2), plan),
-        "depol2-ii",
-        "depol2-nonidentity",
+        "depol2-",
     ));
     assert_statistical_counts(plan.case_id, &detection_counts);
 
@@ -261,10 +259,9 @@ fn gate_surface_contract_depolarization() {
         &sample_detections(&single_pauli_frame_circuit(depol1), plan),
         "depol1-",
     );
-    frame_counts.extend(count_identity_vs_nonidentity_frame(
+    frame_counts.extend(count_two_pauli_frame(
         &sample_detections(&two_pauli_frame_circuit(depol2), plan),
-        "depol2-ii",
-        "depol2-nonidentity",
+        "depol2-",
     ));
     assert_statistical_counts(plan.case_id, &frame_counts);
 
@@ -677,11 +674,31 @@ fn count_two_paulis<'a>(
     records: impl Iterator<Item = &'a [bool]>,
     prefix: &str,
 ) -> StatisticalCounts {
-    assert_eq!(prefix, "pc2-");
-    let names = [
-        "pc2-ii", "pc2-ix", "pc2-iy", "pc2-iz", "pc2-xi", "pc2-xx", "pc2-xy", "pc2-xz", "pc2-yi",
-        "pc2-yx", "pc2-yy", "pc2-yz", "pc2-zi", "pc2-zx", "pc2-zy", "pc2-zz",
-    ];
+    let names = match prefix {
+        "pc2-" => [
+            "pc2-ii", "pc2-ix", "pc2-iy", "pc2-iz", "pc2-xi", "pc2-xx", "pc2-xy", "pc2-xz",
+            "pc2-yi", "pc2-yx", "pc2-yy", "pc2-yz", "pc2-zi", "pc2-zx", "pc2-zy", "pc2-zz",
+        ],
+        "depol2-" => [
+            "depol2-ii",
+            "depol2-ix",
+            "depol2-iy",
+            "depol2-iz",
+            "depol2-xi",
+            "depol2-xx",
+            "depol2-xy",
+            "depol2-xz",
+            "depol2-yi",
+            "depol2-yx",
+            "depol2-yy",
+            "depol2-yz",
+            "depol2-zi",
+            "depol2-zx",
+            "depol2-zy",
+            "depol2-zz",
+        ],
+        other => panic!("unknown two-Pauli prefix {other}"),
+    };
     let mut counts = StatisticalCounts::new(&names);
     for record in records {
         let [a, b, c, d] = record else {
@@ -705,61 +722,6 @@ fn pauli_index(bits: &[bool; 2]) -> usize {
         [true, true] => 2,
         [true, false] => 3,
     }
-}
-
-fn count_identity_vs_nonidentity_samples(
-    records: &[Vec<bool>],
-    identity: &'static str,
-    nonidentity: &'static str,
-) -> StatisticalCounts {
-    count_identity_vs_nonidentity(records.iter().map(Vec::as_slice), identity, nonidentity)
-}
-
-fn count_identity_vs_nonidentity_detection(
-    output: &super::DetectionOutput,
-    identity: &'static str,
-    nonidentity: &'static str,
-) -> StatisticalCounts {
-    count_identity_vs_nonidentity(
-        output
-            .records
-            .iter()
-            .map(|record| record.detectors.as_slice()),
-        identity,
-        nonidentity,
-    )
-}
-
-fn count_identity_vs_nonidentity_frame(
-    output: &super::DetectionOutput,
-    identity: &'static str,
-    nonidentity: &'static str,
-) -> StatisticalCounts {
-    count_identity_vs_nonidentity(
-        output
-            .records
-            .iter()
-            .map(|record| record.observables.as_slice()),
-        identity,
-        nonidentity,
-    )
-}
-
-fn count_identity_vs_nonidentity<'a>(
-    records: impl Iterator<Item = &'a [bool]>,
-    identity: &'static str,
-    nonidentity: &'static str,
-) -> StatisticalCounts {
-    let mut counts = StatisticalCounts::new(&[identity, nonidentity]);
-    for record in records {
-        let name = if record.iter().all(|bit| !bit) {
-            identity
-        } else {
-            nonidentity
-        };
-        counts.increment(name);
-    }
-    counts
 }
 
 fn count_heralded_samples(records: &[Vec<bool>], erase: bool) -> StatisticalCounts {

@@ -380,3 +380,6 @@ fn storage_overflow() -> DetectionError {
         "direct detector-frame retained byte count overflowed",
     )
 }
+
+#[cfg(test)]
+mod sparse_noise_tests;

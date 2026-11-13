@@ -318,3 +318,5 @@ fn warmed_session_allocation_does_not_scale_with_shot_count() {
         std::hint::black_box(sink.digest);
     }
 }
+
+mod storage_policy;

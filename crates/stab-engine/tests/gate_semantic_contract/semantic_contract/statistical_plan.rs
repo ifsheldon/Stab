@@ -10,15 +10,21 @@ pub(crate) struct GateContractStatisticalPlan {
     pub shots: u64,
     pub seed: u64,
     pub sigma_multiplier: f64,
-    pub absolute_probability_floor: f64,
     pub independent_comparisons_per_attempt: u32,
     pub shot_batches_per_attempt: u32,
     pub buckets: &'static [GateContractStatisticalBucket],
 }
 
-const STATISTICAL_SHOTS: u64 = 100_000;
+/// Every bucket is a two-sided binomial bound at `STATISTICAL_SIGMA` standard deviations with no
+/// absolute floor.
+///
+/// False-positive budget: one full run makes about 220 bucket comparisons. The 6-sigma two-sided
+/// normal tail is about 2e-9, so re-seeding every plan trips a false failure with probability
+/// below 1e-6; the seeds are fixed, so any failure is deterministic. Power: 150,000 shots make
+/// 6 sigma narrower than a 10% relative bias for every bucket at or above p=0.025, the smallest
+/// declared bucket, which `a_ten_percent_relative_bias_is_rejected_in_every_bucket` enforces.
+const STATISTICAL_SHOTS: u64 = 150_000;
 const STATISTICAL_SIGMA: f64 = 6.0;
-const STATISTICAL_ABSOLUTE_FLOOR: f64 = 0.01;
 
 const MPP_BUCKETS: &[GateContractStatisticalBucket] =
     &[bucket("mpp-zero", 0.75), bucket("mpp-one", 0.25)];
@@ -37,27 +43,34 @@ const PAULI_NOISE_BUCKETS: &[GateContractStatisticalBucket] = &[
     bucket("y", 0.25),
     bucket("z", 0.25),
 ];
+/// `PAULI_CHANNEL_2` arguments in Stim order (IX, IY, ..., ZZ). Every entry is distinct and
+/// each neighbour pair differs by at least 11% relative, so any permutation of the channel table
+/// moves some bucket by more than the 10% relative bias the plan is powered to reject.
+pub(crate) const PAULI_CHANNEL_2_PROBABILITIES: [f64; 15] = [
+    0.025, 0.028, 0.032, 0.036, 0.04, 0.045, 0.05, 0.056, 0.063, 0.07, 0.078, 0.087, 0.097, 0.108,
+    0.12,
+];
 const PAULI_CHANNEL_BUCKETS: &[GateContractStatisticalBucket] = &[
     bucket("pc1-i", 0.4),
     bucket("pc1-x", 0.1),
     bucket("pc1-y", 0.2),
     bucket("pc1-z", 0.3),
-    bucket("pc2-ii", 0.4),
-    bucket("pc2-ix", 0.04),
-    bucket("pc2-iy", 0.04),
-    bucket("pc2-iz", 0.04),
-    bucket("pc2-xi", 0.04),
-    bucket("pc2-xx", 0.04),
-    bucket("pc2-xy", 0.04),
-    bucket("pc2-xz", 0.04),
-    bucket("pc2-yi", 0.04),
-    bucket("pc2-yx", 0.04),
-    bucket("pc2-yy", 0.04),
-    bucket("pc2-yz", 0.04),
-    bucket("pc2-zi", 0.04),
-    bucket("pc2-zx", 0.04),
-    bucket("pc2-zy", 0.04),
-    bucket("pc2-zz", 0.04),
+    bucket("pc2-ii", 0.065),
+    bucket("pc2-ix", PAULI_CHANNEL_2_PROBABILITIES[0]),
+    bucket("pc2-iy", PAULI_CHANNEL_2_PROBABILITIES[1]),
+    bucket("pc2-iz", PAULI_CHANNEL_2_PROBABILITIES[2]),
+    bucket("pc2-xi", PAULI_CHANNEL_2_PROBABILITIES[3]),
+    bucket("pc2-xx", PAULI_CHANNEL_2_PROBABILITIES[4]),
+    bucket("pc2-xy", PAULI_CHANNEL_2_PROBABILITIES[5]),
+    bucket("pc2-xz", PAULI_CHANNEL_2_PROBABILITIES[6]),
+    bucket("pc2-yi", PAULI_CHANNEL_2_PROBABILITIES[7]),
+    bucket("pc2-yx", PAULI_CHANNEL_2_PROBABILITIES[8]),
+    bucket("pc2-yy", PAULI_CHANNEL_2_PROBABILITIES[9]),
+    bucket("pc2-yz", PAULI_CHANNEL_2_PROBABILITIES[10]),
+    bucket("pc2-zi", PAULI_CHANNEL_2_PROBABILITIES[11]),
+    bucket("pc2-zx", PAULI_CHANNEL_2_PROBABILITIES[12]),
+    bucket("pc2-zy", PAULI_CHANNEL_2_PROBABILITIES[13]),
+    bucket("pc2-zz", PAULI_CHANNEL_2_PROBABILITIES[14]),
 ];
 const DEPOLARIZATION_BUCKETS: &[GateContractStatisticalBucket] = &[
     bucket("depol1-i", 0.4),
@@ -65,7 +78,21 @@ const DEPOLARIZATION_BUCKETS: &[GateContractStatisticalBucket] = &[
     bucket("depol1-y", 0.2),
     bucket("depol1-z", 0.2),
     bucket("depol2-ii", 0.25),
-    bucket("depol2-nonidentity", 0.75),
+    bucket("depol2-ix", 0.05),
+    bucket("depol2-iy", 0.05),
+    bucket("depol2-iz", 0.05),
+    bucket("depol2-xi", 0.05),
+    bucket("depol2-xx", 0.05),
+    bucket("depol2-xy", 0.05),
+    bucket("depol2-xz", 0.05),
+    bucket("depol2-yi", 0.05),
+    bucket("depol2-yx", 0.05),
+    bucket("depol2-yy", 0.05),
+    bucket("depol2-yz", 0.05),
+    bucket("depol2-zi", 0.05),
+    bucket("depol2-zx", 0.05),
+    bucket("depol2-zy", 0.05),
+    bucket("depol2-zz", 0.05),
 ];
 const CORRELATED_ERROR_BUCKETS: &[GateContractStatisticalBucket] = &[
     bucket("no-error", 0.3),
@@ -219,7 +246,6 @@ const fn statistical_plan(
         shots: STATISTICAL_SHOTS,
         seed,
         sigma_multiplier: STATISTICAL_SIGMA,
-        absolute_probability_floor: STATISTICAL_ABSOLUTE_FLOOR,
         independent_comparisons_per_attempt,
         shot_batches_per_attempt,
         buckets,
@@ -235,6 +261,15 @@ pub(crate) fn gate_contract_statistical_plan(
         .find(|plan| plan.case_id == case_id)
 }
 
+/// Two-sided half-width, in probability units, accepted for one bucket of `plan`.
+pub(crate) fn gate_contract_statistical_tolerance(
+    plan: &GateContractStatisticalPlan,
+    expected_probability: f64,
+) -> f64 {
+    plan.sigma_multiplier
+        * (expected_probability * (1.0 - expected_probability) / plan.shots as f64).sqrt()
+}
+
 pub(crate) fn gate_contract_statistical_count_is_accepted(
     count: u64,
     shots: u64,
@@ -246,4 +281,64 @@ pub(crate) fn gate_contract_statistical_count_is_accepted(
     }
     let observed = count as f64 / shots as f64;
     (observed - expected_probability).abs() <= allowed_delta
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The bound must have the power to reject a 10% relative bias in every declared bucket at
+    /// the plan's own shot count, in both directions, while accepting the exact expectation. The
+    /// `PAULI_CHANNEL_2` table is spaced wider than that bias, so any permutation of it fails.
+    #[test]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "rounded expected counts are nonnegative and bounded by the plan's shot count"
+    )]
+    fn sigma_bounds_reject_a_ten_percent_relative_bias_in_every_bucket() {
+        for plan in GATE_CONTRACT_STATISTICAL_PLANS {
+            for bucket in plan.buckets {
+                let tolerance =
+                    gate_contract_statistical_tolerance(plan, bucket.expected_probability);
+                let expected = plan.shots as f64 * bucket.expected_probability;
+                assert!(
+                    gate_contract_statistical_count_is_accepted(
+                        expected.round() as u64,
+                        plan.shots,
+                        bucket.expected_probability,
+                        tolerance,
+                    ),
+                    "{} bucket {} rejects its own expectation",
+                    plan.case_id,
+                    bucket.name
+                );
+                for biased in [expected * 1.1, expected * 0.9] {
+                    assert!(
+                        !gate_contract_statistical_count_is_accepted(
+                            biased.round() as u64,
+                            plan.shots,
+                            bucket.expected_probability,
+                            tolerance,
+                        ),
+                        "{} bucket {} (p={}) accepts a 10% relative bias at {} shots: \
+                         tolerance {tolerance:.6}",
+                        plan.case_id,
+                        bucket.name,
+                        bucket.expected_probability,
+                        plan.shots
+                    );
+                }
+            }
+        }
+        for pair in PAULI_CHANNEL_2_PROBABILITIES.windows(2) {
+            let &[smaller, larger] = pair else {
+                panic!("windows(2) yields pairs");
+            };
+            assert!(
+                larger > smaller * 1.1,
+                "{smaller} and {larger} are too close for a permuted table to fail"
+            );
+        }
+    }
 }

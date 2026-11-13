@@ -11,6 +11,7 @@ use std::error::Error;
 use super::super::{
     GateSemanticFamily, GateSurface, GateSurfaceBehavior, GateSurfaceContractExt,
     GateTargetPattern, gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
+    gate_contract_statistical_tolerance,
 };
 use super::SamplingFixture;
 use crate::{
@@ -150,7 +151,7 @@ fn gate_surface_contract_fixed_tableau() {
         let sampler = SamplingFixture::compile(&actual_circuit).expect("compile inverse pair");
         assert!(
             sampler
-                .sample_zero_one_with_seed(8, Some(11))
+                .sample_zero_one_with_seed(257, Some(11))
                 .iter()
                 .all(|record| record.iter().all(|bit| !bit)),
             "{} followed by {} must preserve |0>",
@@ -901,8 +902,8 @@ fn assert_exact_reference_and_samples(text: &str, expected: &[bool]) {
     );
     let sampler = SamplingFixture::compile(&circuit).expect("compile deterministic sampler");
     assert_eq!(
-        sampler.sample_zero_one_with_seed(4, Some(5)),
-        vec![expected.to_vec(); 4]
+        sampler.sample_zero_one_with_seed(257, Some(5)),
+        vec![expected.to_vec(); 257]
     );
 }
 
@@ -923,8 +924,8 @@ fn assert_noiseless_reference_and_flipped_samples(
     );
     let sampler = SamplingFixture::compile(&circuit).expect("compile deterministic sampler");
     assert_eq!(
-        sampler.sample_zero_one_with_seed(4, Some(5)),
-        vec![expected_samples.to_vec(); 4]
+        sampler.sample_zero_one_with_seed(257, Some(5)),
+        vec![expected_samples.to_vec(); 257]
     );
 }
 
@@ -1166,12 +1167,7 @@ fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
             .unwrap_or_else(|| panic!("{case_id} missing bucket {}", bucket.name));
         let count = u64::try_from(count).expect("statistical bucket count fits u64");
         let observed = count as f64 / plan.shots as f64;
-        let standard_deviation =
-            (bucket.expected_probability * (1.0 - bucket.expected_probability) / plan.shots as f64)
-                .sqrt();
-        let allowed_delta = plan
-            .absolute_probability_floor
-            .max(plan.sigma_multiplier * standard_deviation);
+        let allowed_delta = gate_contract_statistical_tolerance(plan, bucket.expected_probability);
         assert!(
             gate_contract_statistical_count_is_accepted(
                 count,

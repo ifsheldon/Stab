@@ -16,6 +16,8 @@ use stab_model::Gate;
 use stab_records::{MeasurementBatchView, MeasurementSink};
 use std::fmt::Write as _;
 
+mod reference_differential;
+
 #[derive(Clone, Debug, PartialEq)]
 struct TestSampler {
     plan: SamplingPlan,

@@ -8,12 +8,9 @@
 
 use std::convert::Infallible;
 
-use stab_records::{BitPlane64Batch, MeasurementSink};
+use stab_records::MeasurementSink;
 
-use super::super::test_support::{
-    convert_measurements_to_detection_events, convert_measurements_to_detection_events_with_sweep,
-    sample_detection_events,
-};
+use super::super::test_support::convert_measurements_to_detection_events_with_sweep;
 use super::*;
 use crate::detection::DetectionRecordBuffer;
 use crate::{DetectionResourceKind, Seed};
@@ -156,46 +153,7 @@ fn run_plan(plan: &DetectionSamplingPlan, shots: u64, seed: u64) -> CollectSink 
 
 fn assert_send_sync<T: Send + Sync>() {}
 
-#[test]
-fn plans_are_shareable_and_streamed_conversion_matches_materialized_output() {
-    assert_send_sync::<MeasurementToDetectionPlan>();
-    assert_send_sync::<DetectionSamplingPlan>();
-
-    let circuit =
-        circuit("X 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n");
-    let measurements = vec![
-        vec![false, false],
-        vec![false, true],
-        vec![true, false],
-        vec![true, true],
-    ];
-    let expected = convert_measurements_to_detection_events(
-        &circuit,
-        &measurements,
-        ReferenceSampleMode::UseReferenceSample,
-    )
-    .expect("materialize detection conversion");
-    let plan = MeasurementToDetectionCompiler::new()
-        .compile(&circuit)
-        .expect("compile conversion plan");
-    let cloned = plan.clone();
-    assert_eq!(cloned.measurement_width().get(), 2);
-    assert_eq!(cloned.sweep_width().get(), 0);
-    assert_eq!(cloned.detector_width().get(), expected.detector_count);
-    assert_eq!(cloned.observable_width().get(), expected.observable_count);
-
-    let input = packed(&measurements, 2);
-    let mut session = plan.session().expect("create conversion session");
-    let mut sink = CollectSink::default();
-    let summary = session
-        .run(MeasurementBatchView::new(input.view()), None, &mut sink)
-        .expect("stream conversion");
-
-    assert_eq!(summary.committed_shots(), ShotCount::new(4));
-    assert_eq!(sink.records, expected.records);
-    assert_eq!(sink.batch_sizes, vec![4]);
-    assert_eq!(sink.finish_count, 1);
-}
+mod m2d_oracle;
 
 #[test]
 fn measurement_sink_transaction_preserves_sweep_semantics_and_sink_lifecycle() {
@@ -339,66 +297,6 @@ fn sweep_batches_and_reference_modes_match_materialized_conversion() {
             )
             .expect("stream sweep conversion");
         assert_eq!(sink.records, expected.records);
-    }
-}
-
-#[test]
-fn packed_and_bit_plane_batches_match_scalar_conversion_at_batch_boundaries() {
-    let circuit = circuit(
-        "X 1\nCX sweep[0] 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n",
-    );
-    for shot_count in [1, 17, 63, 64] {
-        let measurements = (0..shot_count)
-            .map(|shot| vec![shot % 3 == 0, shot % 5 < 2])
-            .collect::<Vec<_>>();
-        let sweeps = (0..shot_count)
-            .map(|shot| vec![shot % 2 == 0])
-            .collect::<Vec<_>>();
-        let packed_measurements = packed(&measurements, 2);
-        let packed_sweeps = packed(&sweeps, 1);
-        let plane_measurements = BitPlane64Batch::from_shot_major(packed_measurements.view())
-            .expect("transpose measurements");
-        let plane_sweeps =
-            BitPlane64Batch::from_shot_major(packed_sweeps.view()).expect("transpose sweeps");
-
-        for mode in [
-            ReferenceSampleMode::UseReferenceSample,
-            ReferenceSampleMode::SkipReferenceSample,
-        ] {
-            let expected = convert_measurements_to_detection_events_with_sweep(
-                &circuit,
-                &measurements,
-                &sweeps,
-                mode,
-            )
-            .expect("materialize scalar conversion");
-            let plan = MeasurementToDetectionCompiler::new()
-                .reference_sample_mode(mode)
-                .compile(&circuit)
-                .expect("compile batch conversion");
-
-            let mut packed_session = plan.session().expect("create packed session");
-            let mut packed_sink = CollectSink::default();
-            packed_session
-                .run(
-                    MeasurementBatchView::new(packed_measurements.view()),
-                    Some(MeasurementBatchView::new(packed_sweeps.view())),
-                    &mut packed_sink,
-                )
-                .expect("convert packed batch");
-            assert_eq!(packed_sink.records, expected.records);
-
-            let mut plane_session = plan.session().expect("create bit-plane session");
-            let mut plane_sink = CollectSink::default();
-            plane_session
-                .run(
-                    MeasurementBatchView::from_bit_planes(plane_measurements.view()),
-                    Some(MeasurementBatchView::from_bit_planes(plane_sweeps.view())),
-                    &mut plane_sink,
-                )
-                .expect("convert bit-plane batch");
-            assert_eq!(plane_sink.records, expected.records);
-        }
     }
 }
 
@@ -576,22 +474,19 @@ fn forgotten_incremental_transaction_cannot_rebind_another_sink() {
 }
 
 #[test]
-fn direct_detection_sampling_matches_materialized_conversion() {
+fn direct_detection_sampling_reports_widths_and_bounded_batches() {
     for (circuit_text, measurements, detectors, observables) in [
         ("X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n", 1, 1, 0),
         ("RX 0\nZ_ERROR(0.25) 0\nOBSERVABLE_INCLUDE(0) X0\n", 0, 0, 1),
     ] {
-        let circuit = circuit(circuit_text);
-        let expected =
-            sample_detection_events(&circuit, 129, Some(31)).expect("legacy detection sample");
         let plan = DetectionSamplingCompiler::new()
-            .compile(&circuit)
+            .compile(&circuit(circuit_text))
             .expect("compile detection sampling");
         assert_eq!(plan.measurement_width().get(), measurements);
         assert_eq!(plan.detector_width().get(), detectors);
         assert_eq!(plan.observable_width().get(), observables);
         let actual = run_plan(&plan, 129, 31);
-        assert_eq!(actual.records, expected.records);
+        assert_eq!(actual.records.len(), 129);
         assert_eq!(actual.batch_sizes, vec![64, 64, 1]);
         assert_eq!(actual.finish_count, 1);
     }
@@ -1030,6 +925,51 @@ fn direct_session_storage_rejects_first_excess_before_allocation() {
         rejected = Some(
             over_limit
                 .session(RandomPolicy::Seeded(Seed::new(1)))
+                .expect_err("public construction must use the same admission"),
+        );
+    });
+    assert_eq!(allocated.bytes_total, 0);
+    assert_eq!(
+        rejected,
+        Some(DetectionExecutionError::SessionStorageLimit {
+            estimated_bytes: u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES) + 16,
+            limit_bytes: MAX_DETECTION_SESSION_STORAGE_BYTES,
+        })
+    );
+}
+
+#[test]
+fn conversion_session_storage_rejects_first_excess_before_allocation() {
+    // The sampling compiler bounds expanded measurements at 1,000,000 and sweep targets are
+    // bounded too, so the 256 MiB conversion limit is reached through the sweep-correction frame,
+    // which retains two eight-byte planes per qubit. Eight measurements, one sweep bit, and one
+    // detector retain 600 more bytes (measurement slots and planes, sweep and detector planes, a
+    // 512-byte packed batch, and the frame's measurement and detector planes), so a sweep target
+    // on qubit 16,777,173 lands exactly on 256 MiB.
+    let compile = |sweep_target: u64| {
+        MeasurementToDetectionCompiler::new()
+            .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
+            .compile(&circuit(&format!(
+                "CX sweep[0] {sweep_target}\nM 0 0 0 0 0 0 0 0\nDETECTOR rec[-1]\n"
+            )))
+            .expect("compile conversion storage boundary")
+    };
+    let at_limit = compile(16_777_173);
+    execution::validate_conversion_session_storage(&at_limit)
+        .expect("admit the exact boundary without allocating its state");
+    assert_eq!(
+        execution::conversion_session_storage_bytes(&at_limit),
+        u128::from(MAX_DETECTION_SESSION_STORAGE_BYTES)
+    );
+
+    let over_limit = compile(16_777_174);
+    execution::validate_conversion_session_storage(&over_limit)
+        .expect_err("reject the first excess qubit before attempting construction");
+    let mut rejected = None;
+    let allocated = allocation_counter::measure(|| {
+        rejected = Some(
+            over_limit
+                .session()
                 .expect_err("public construction must use the same admission"),
         );
     });
