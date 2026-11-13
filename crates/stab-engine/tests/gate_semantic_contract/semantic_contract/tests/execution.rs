@@ -123,8 +123,12 @@ impl StatisticalCounts {
 
 #[test]
 fn gate_surface_contract_fixed_tableau() {
-    let gates = gates_in_families(&[GateSemanticFamily::FixedTableau]);
-    assert!(!gates.is_empty());
+    // Every gate with a fixed tableau, including the controlled gates whose
+    // classical-control targets place them in other semantic families.
+    let gates = Gate::all()
+        .filter(|gate| gate_tableau(*gate).is_ok())
+        .collect::<Vec<_>>();
+    assert_eq!(gates.len(), 46, "every fixed-tableau gate case executes");
     for gate in gates {
         assert_gate_matches_declared_tableau(gate);
         let inverse = gate.inverse().expect("fixed-tableau inverse");
@@ -522,6 +526,26 @@ fn gate_surface_contract_spp_multiple() {
         let decomposed = decomposed_circuit(&original).expect("decompose grouped SPP");
         assert_circuit_semantics_equal(&original, &decomposed, text);
         assert_all_semantic_surfaces_execute(text);
+    }
+}
+
+/// Pins SPP against hand-written phase-product circuits, not the decomposition under test.
+///
+/// The measured bases are deterministic only after the phase rotation, so the sign of the
+/// rotation (SPP versus SPP_DAG) changes the reference sample.
+#[test]
+fn variable_target_spp_matches_hard_coded_phase_product_decompositions() {
+    for (spp, explicit) in [
+        (
+            "SPP X0\nMY 0\nDETECTOR rec[-1]\n",
+            "H 0\nS 0\nH 0\nMY 0\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "SPP X0*X1\nMPP Y0*X1\nDETECTOR rec[-1]\n",
+            "H 0\nH 1\nCX 1 0\nS 0\nCX 1 0\nH 1\nH 0\nMPP Y0*X1\nDETECTOR rec[-1]\n",
+        ),
+    ] {
+        assert_circuit_semantics_equal(&circuit(spp), &circuit(explicit), spp);
     }
 }
 

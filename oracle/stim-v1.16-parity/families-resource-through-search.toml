@@ -781,8 +781,8 @@ status = "verified"
 [families.evidence.test]
 package = "stab-engine"
 kind = "test"
-target = "gate_semantic_execution"
-name = "fixed_tableau_gates_execute_across_current_public_surfaces"
+target = "gate_semantic_contract"
+name = "gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau"
 
 [[families]]
 id = "sampling.circuit-remaining-gate-target-surface"

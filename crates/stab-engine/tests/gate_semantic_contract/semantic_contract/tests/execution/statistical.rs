@@ -57,6 +57,10 @@ fn gate_surface_contract_mpp_stochastic() {
             .to_string(),
         "error(0.25) D0\n"
     );
+    assert_independent_pair_flips(
+        "pfm3-contract-mpp-independent-products",
+        "X 1\nMPP(0.25) Z0 Z1\n",
+    );
 }
 
 #[test]
@@ -116,6 +120,24 @@ fn gate_surface_contract_mpad_stochastic() {
             .to_string(),
         "error(0.25) D0\n"
     );
+    assert_independent_pair_flips("pfm3-contract-mpad-independent-targets", "MPAD(0.25) 0 1\n");
+}
+
+/// A stochastic multi-target measurement must flip each result independently, not share a draw.
+fn assert_independent_pair_flips(case_id: &'static str, text: &str) {
+    let plan = statistical_plan(case_id);
+    let sampler = SamplingFixture::compile(&circuit(text)).expect("compile two-result sampler");
+    let mut counts = StatisticalCounts::new(&["pair-00", "pair-01", "pair-10", "pair-11"]);
+    for record in sampler.sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed)) {
+        counts.increment(match record.as_slice() {
+            [false, false] => "pair-00",
+            [false, true] => "pair-01",
+            [true, false] => "pair-10",
+            [true, true] => "pair-11",
+            other => panic!("expected two measurement results, got {other:?}"),
+        });
+    }
+    assert_statistical_counts(case_id, &counts);
 }
 
 #[test]

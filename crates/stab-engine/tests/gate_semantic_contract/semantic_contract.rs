@@ -1,75 +1,54 @@
 use super::{Gate, GateCategory};
 
-macro_rules! define_gate_contract_enum {
-    (
-        $(#[$meta:meta])*
-        $visibility:vis enum $name:ident {
-            $($variant:ident => $wire_name:literal),+ $(,)?
-        }
-    ) => {
-        $(#[$meta])*
-        $visibility enum $name {
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(super) enum GateSemanticFamily {
+    Annotation,
+    ControlFlow,
+    MeasurementPad,
+    Measurement,
+    MeasureReset,
+    Reset,
+    FixedTableau,
+    ForwardClassicalControl,
+    SymmetricClassicalControl,
+    ReverseClassicalControl,
+    Depolarization,
+    PauliNoise,
+    IdentityNoise,
+    PauliChannel,
+    CorrelatedError,
+    HeraldedNoise,
+    PauliProductMeasurement,
+    PauliProductPhase,
+    PairMeasurement,
+}
+
+/// Declares the enum and its exhaustive `ALL` list from one variant list.
+macro_rules! define_gate_surfaces {
+    ($($variant:ident),+ $(,)?) => {
+        #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+        pub(crate) enum GateSurface {
             $($variant),+
         }
 
-        impl $name {
-            #[cfg(test)]
+        impl GateSurface {
             pub(super) const ALL: [Self; [$(stringify!($variant)),+].len()] = [
                 $(Self::$variant),+
             ];
-            #[cfg(test)]
-            pub(super) const NAMES: [&'static str; [$(stringify!($variant)),+].len()] = [
-                $(Self::$variant.as_str()),+
-            ];
-
-            #[cfg(test)]
-            pub(super) const fn as_str(self) -> &'static str {
-                match self {
-                    $(Self::$variant => $wire_name),+
-                }
-            }
         }
     };
 }
 
-define_gate_contract_enum! {
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub(super) enum GateSemanticFamily {
-        Annotation => "annotation",
-        ControlFlow => "control-flow",
-        MeasurementPad => "measurement-pad",
-        Measurement => "measurement",
-        MeasureReset => "measure-reset",
-        Reset => "reset",
-        FixedTableau => "fixed-tableau",
-        ForwardClassicalControl => "forward-classical-control",
-        SymmetricClassicalControl => "symmetric-classical-control",
-        ReverseClassicalControl => "reverse-classical-control",
-        Depolarization => "depolarization",
-        PauliNoise => "pauli-noise",
-        IdentityNoise => "identity-noise",
-        PauliChannel => "pauli-channel",
-        CorrelatedError => "correlated-error",
-        HeraldedNoise => "heralded-noise",
-        PauliProductMeasurement => "pauli-product-measurement",
-        PauliProductPhase => "pauli-product-phase",
-        PairMeasurement => "pair-measurement",
-    }
-}
-
 #[cfg(test)]
-define_gate_contract_enum! {
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub(crate) enum GateSurface {
-        Parser => "parser",
-        MeasurementSampler => "measurement-sampler",
-        ReferenceSampler => "reference-sampler",
-        DetectionConverter => "detection-converter",
-        DetectorFrame => "detector-frame",
-        DetectionSampler => "detection-sampler",
-        ErrorAnalyzer => "error-analyzer",
-        FlowGenerator => "flow-generator",
-    }
+define_gate_surfaces! {
+    Parser,
+    MeasurementSampler,
+    ReferenceSampler,
+    DetectionConverter,
+    DetectorFrame,
+    DetectionSampler,
+    ErrorAnalyzer,
+    FlowGenerator,
 }
 
 #[cfg(test)]

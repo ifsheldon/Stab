@@ -13,6 +13,7 @@ use stab_records::{MeasurementBatchView, MeasurementSink};
 
 #[derive(Debug, Eq, PartialEq)]
 enum TestSinkError {
+    Write,
     Finish,
 }
 
@@ -22,14 +23,24 @@ struct ProbeSink {
     write_calls: usize,
     finish_calls: usize,
     cancel_after_write: Option<SamplingCancellation>,
+    fail_write_call: Option<usize>,
     fail_finish: bool,
 }
+
+// Compiled sampling plans are shared across worker threads by cloning.
+const _: fn() = || {
+    fn assert_shareable<T: Clone + Send + Sync>() {}
+    assert_shareable::<SamplingPlan>();
+};
 
 impl MeasurementSink for ProbeSink {
     type Error = TestSinkError;
 
     fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
         self.write_calls += 1;
+        if self.fail_write_call == Some(self.write_calls) {
+            return Err(TestSinkError::Write);
+        }
         for shot_index in 0..batch.shot_count() {
             let record = (0..batch.width().get())
                 .map(|bit_index| {
@@ -220,4 +231,70 @@ fn pre_cancelled_finish_failure_poisons_and_rejects_the_session() {
         (rejected_sink.write_calls, rejected_sink.finish_calls),
         (0, 0)
     );
+}
+
+#[test]
+fn mid_run_sink_failures_poison_after_committing_written_batches() {
+    let plan = noisy_plan();
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(37)))
+        .expect("construct write-failure session");
+    let mut failing_sink = ProbeSink {
+        fail_write_call: Some(2),
+        ..ProbeSink::default()
+    };
+
+    match session.run(ShotCount::new(70), &mut failing_sink) {
+        Err(RunError::Sink {
+            phase,
+            source,
+            progress,
+        }) => {
+            assert_eq!(phase, SinkFailurePhase::WriteBatch);
+            assert_eq!(source, TestSinkError::Write);
+            assert_eq!(progress.committed_shots(), ShotCount::new(64));
+            assert_eq!(progress.attempted_batch_shots(), ShotCount::new(6));
+        }
+        other => panic!("expected second-batch sink failure, got {other:?}"),
+    }
+    assert_eq!(
+        (failing_sink.write_calls, failing_sink.finish_calls),
+        (2, 0)
+    );
+    assert!(session.is_poisoned());
+
+    let mut rejected_sink = ProbeSink::default();
+    assert!(matches!(
+        session.run(ShotCount::new(1), &mut rejected_sink),
+        Err(RunError::Engine {
+            source: SamplingExecutionError::SessionPoisoned,
+            ..
+        })
+    ));
+    assert_eq!(
+        (rejected_sink.write_calls, rejected_sink.finish_calls),
+        (0, 0)
+    );
+
+    let mut finish_session = plan
+        .session(RandomPolicy::Seeded(Seed::new(41)))
+        .expect("construct finish-failure session");
+    let mut finish_sink = ProbeSink {
+        fail_finish: true,
+        ..ProbeSink::default()
+    };
+    match finish_session.run(ShotCount::new(5), &mut finish_sink) {
+        Err(RunError::Sink {
+            phase,
+            source,
+            progress,
+        }) => {
+            assert_eq!(phase, SinkFailurePhase::Finish);
+            assert_eq!(source, TestSinkError::Finish);
+            assert_eq!(progress.committed_shots(), ShotCount::new(5));
+            assert_eq!(progress.attempted_batch_shots(), ShotCount::new(0));
+        }
+        other => panic!("expected finish failure after written shots, got {other:?}"),
+    }
+    assert!(finish_session.is_poisoned());
 }

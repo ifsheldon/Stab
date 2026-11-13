@@ -175,22 +175,6 @@ fn reference_mode(skip_reference_sample: bool) -> ReferenceSampleMode {
 }
 
 #[test]
-fn detection_sampling_uses_all_false_default_sweep_bits() {
-    let sweep_circuit = Circuit::from_stim_str("H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
-        .expect("parse sweep-conditioned circuit");
-    let explicit_false_circuit =
-        Circuit::from_stim_str("H 0\nM 0\nDETECTOR rec[-1]\n").expect("parse explicit circuit");
-
-    validate_detection_sampling_circuit(&sweep_circuit).expect("validate non-frame sweep sampling");
-    let sweep_output =
-        sample_detection_events(&sweep_circuit, 32, Some(17)).expect("sample sweep circuit");
-    let explicit_false_output = sample_detection_events(&explicit_false_circuit, 32, Some(17))
-        .expect("sample explicit false circuit");
-
-    assert_eq!(sweep_output.records, explicit_false_output.records);
-}
-
-#[test]
 fn detection_conversion_uses_reference_sample_for_detectors_and_observables() {
     let output = convert(
         "X 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n",

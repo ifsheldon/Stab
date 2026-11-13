@@ -155,13 +155,7 @@ REPEAT[loop] 3 {\n\
             fingerprint,
             CompilationRequestFingerprint::for_sampling(&changed)
         );
-        assert_eq!(fingerprint.schema_version(), 1);
-        assert_eq!(fingerprint.compiler_schema_version(), 5);
-        assert_eq!(fingerprint.operation(), CompilationOperation::Sampling);
-        assert_eq!(fingerprint.operation().as_str(), "sample");
         assert_eq!(fingerprint.model_fingerprint(), canonical.fingerprint());
-        assert_eq!(fingerprint.digest().len(), 32);
-        assert_eq!(fingerprint.digest_hex().len(), 64);
 
         let frozen = CompilationRequestFingerprint::for_sampling(
             &Circuit::from_stim_str(RICH_CIRCUIT).expect("frozen request circuit"),

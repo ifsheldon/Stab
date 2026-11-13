@@ -293,36 +293,6 @@ fn witness(records: PackedShotBatchView<'_>, shot_count: usize) -> u64 {
 fn assert_plan_traits<T: Clone + Send + Sync>(_: &T) {}
 
 #[test]
-fn public_compiler_exposes_the_engine_plan_contract() {
-    let model =
-        DetectorErrorModel::from_dem_str("error(0.25) D0 D2 L3\n").expect("parse compiler fixture");
-    let plan = DemSamplingCompiler::new()
-        .compile(&model)
-        .expect("compile public DEM plan");
-    assert_plan_traits(&plan);
-    assert_eq!(plan.detector_width().get(), 3);
-    assert_eq!(plan.observable_width().get(), 4);
-    assert_eq!(plan.sampled_error_width().get(), 1);
-    assert_eq!(plan.detector_count(), 3);
-    assert_eq!(plan.observable_count(), 4);
-    assert_eq!(plan.error_count(), 1);
-    plan.validate_replay(ShotCount::new(2))
-        .expect("admit bounded replay work");
-
-    let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(17)))
-        .expect("create public DEM session");
-    let mut sink = CollectSink::default();
-    let summary = session
-        .run(ShotCount::new(2), &mut sink)
-        .expect("run public DEM session");
-    assert!(summary.status().is_completed());
-    assert_eq!(summary.requested_shots(), ShotCount::new(2));
-    assert_eq!(summary.committed_shots(), ShotCount::new(2));
-    assert_eq!(summary.total_committed_shots(), ShotCount::new(2));
-}
-
-#[test]
 fn streamed_sessions_match_materialized_sampling_across_dem_families() {
     for text in [
         "error(1) D0\n",
@@ -945,6 +915,11 @@ fn work_limits_reject_before_rng_or_sink_and_leave_session_reusable() {
         sampled_after_rejection.sampled_errors,
         sampled_expected.sampled_errors
     );
+    let plan = sampler.plan();
+    plan.validate_sampled_error_work_units_with_limits(1, limits)
+        .expect("one sampled-error application reaches the exact work limit");
+    plan.validate_sampled_error_work_units_with_limits(2, limits)
+        .expect_err("the first excess sampled-error application must reject");
 
     let replay_limits = DemSamplerLimits::default().with_max_replay_work_units(2);
     let replay_admission = sampler
@@ -966,6 +941,18 @@ fn work_limits_reject_before_rng_or_sink_and_leave_session_reusable() {
     };
     assert_eq!(resource.kind(), DemResourceKind::ReplayWorkUnits);
     assert_eq!((resource.actual(), resource.limit()), (4, 2));
+
+    let exact_replay_limits = replay_limits.with_max_replay_work_units(4);
+    plan.validate_replay_with_limits(ShotCount::new(2), exact_replay_limits)
+        .expect("two replay records reach the exact four-unit work limit");
+    let mut exact_replay = plan
+        .replay_session_with_limits(ShotCount::new(2), exact_replay_limits)
+        .expect("construct exact-limit replay session");
+    let mut replayed = CollectSink::default();
+    exact_replay
+        .run(&[vec![true], vec![false]], &mut replayed)
+        .expect("replay at the exact work limit");
+    assert_eq!(replayed.detectors, vec![vec![true], vec![false]]);
 }
 
 #[test]

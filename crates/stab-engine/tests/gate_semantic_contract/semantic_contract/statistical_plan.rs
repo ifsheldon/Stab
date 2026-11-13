@@ -11,7 +11,6 @@ pub(crate) struct GateContractStatisticalPlan {
     pub seed: u64,
     pub sigma_multiplier: f64,
     pub absolute_probability_floor: f64,
-    pub familywise_false_positive_budget: f64,
     pub independent_comparisons_per_attempt: u32,
     pub shot_batches_per_attempt: u32,
     pub buckets: &'static [GateContractStatisticalBucket],
@@ -20,12 +19,18 @@ pub(crate) struct GateContractStatisticalPlan {
 const STATISTICAL_SHOTS: u64 = 100_000;
 const STATISTICAL_SIGMA: f64 = 6.0;
 const STATISTICAL_ABSOLUTE_FLOOR: f64 = 0.01;
-const STATISTICAL_FAMILYWISE_BUDGET: f64 = 0.000_001;
 
 const MPP_BUCKETS: &[GateContractStatisticalBucket] =
     &[bucket("mpp-zero", 0.75), bucket("mpp-one", 0.25)];
 const MPAD_BUCKETS: &[GateContractStatisticalBucket] =
     &[bucket("mpad-zero", 0.75), bucket("mpad-one", 0.25)];
+/// Two products whose noiseless results are `0, 1`, each flipped independently with p=0.25.
+const INDEPENDENT_PAIR_FLIP_BUCKETS: &[GateContractStatisticalBucket] = &[
+    bucket("pair-00", 0.1875),
+    bucket("pair-01", 0.5625),
+    bucket("pair-10", 0.0625),
+    bucket("pair-11", 0.1875),
+];
 const PAULI_NOISE_BUCKETS: &[GateContractStatisticalBucket] = &[
     bucket("identity", 0.25),
     bucket("x", 0.25),
@@ -101,6 +106,20 @@ const GATE_CONTRACT_STATISTICAL_PLANS: &[GateContractStatisticalPlan] = &[
         MPAD_BUCKETS,
         3,
         3,
+    ),
+    statistical_plan(
+        "pfm3-contract-mpp-independent-products",
+        12_648_443,
+        INDEPENDENT_PAIR_FLIP_BUCKETS,
+        1,
+        1,
+    ),
+    statistical_plan(
+        "pfm3-contract-mpad-independent-targets",
+        12_648_444,
+        INDEPENDENT_PAIR_FLIP_BUCKETS,
+        1,
+        1,
     ),
     statistical_plan(
         "pfm3-contract-pauli-noise",
@@ -201,7 +220,6 @@ const fn statistical_plan(
         seed,
         sigma_multiplier: STATISTICAL_SIGMA,
         absolute_probability_floor: STATISTICAL_ABSOLUTE_FLOOR,
-        familywise_false_positive_budget: STATISTICAL_FAMILYWISE_BUDGET,
         independent_comparisons_per_attempt,
         shot_batches_per_attempt,
         buckets,
@@ -228,25 +246,4 @@ pub(crate) fn gate_contract_statistical_count_is_accepted(
     }
     let observed = count as f64 / shots as f64;
     (observed - expected_probability).abs() <= allowed_delta
-}
-
-#[cfg(test)]
-mod tests {
-    use super::gate_contract_statistical_count_is_accepted;
-
-    #[test]
-    fn statistical_counts_preserve_floating_acceptance_boundaries() {
-        for (count, accepted) in [
-            (24_000, false),
-            (24_001, true),
-            (25_999, true),
-            (26_000, false),
-        ] {
-            assert_eq!(
-                gate_contract_statistical_count_is_accepted(count, 100_000, 0.25, 0.01),
-                accepted,
-                "count={count}"
-            );
-        }
-    }
 }

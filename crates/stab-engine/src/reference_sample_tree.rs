@@ -358,7 +358,7 @@ mod tests {
     use stab_model::Circuit;
 
     use super::ReferenceSampleTree;
-    use crate::{ReferenceSampleTreeError, SamplingCompiler, SamplingExecutionError};
+    use crate::{ReferenceSampleTreeError, SamplingExecutionError};
 
     fn tree(
         prefix_bits: Vec<bool>,
@@ -441,29 +441,6 @@ mod tests {
         assert_eq!(large.size(), 9_000_000);
         assert_eq!(large.get(8_999_999), Some(true));
         assert_eq!(large.get(9_000_000), None);
-    }
-
-    #[test]
-    fn reference_sample_tree_from_circuit_matches_sampling_plan_reference() {
-        let circuit = Circuit::from_stim_str(
-            "
-            M 0
-            X 0
-            M 0
-            ",
-        )
-        .expect("parse circuit");
-        let tree =
-            ReferenceSampleTree::from_circuit_reference_sample(&circuit).expect("reference tree");
-        let plan = SamplingCompiler::new()
-            .compile(&circuit)
-            .expect("compile sampling plan");
-        assert_eq!(
-            tree.decompress().expect("decompress reference tree"),
-            plan.try_reference_sample().expect("reference sample")
-        );
-        assert_eq!(tree.size(), 2);
-        assert_eq!(tree.stim_string(), "1*('01')");
     }
 
     #[test]

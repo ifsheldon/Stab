@@ -526,27 +526,37 @@ fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
 }
 
 #[test]
-fn samples_m8_basic_measurements_as_zeroes() {
-    assert_eq!(
-        samples(
+fn deterministic_circuits_sample_expected_records() {
+    for (source, expected) in [
+        (
             include_str!("../../../../oracle/fixtures/inputs/sample_basic.stim"),
-            2
+            &[false, false][..],
         ),
-        vec![vec![false, false], vec![false, false]]
-    );
+        ("H 0\nS 0\nS 0\nH 0\nM 0\n", &[true]),
+        ("H 0\nMX 0\n", &[false]),
+        ("X 0\nH 0\nMX 0\n", &[true]),
+        ("H 0\nS 0\nMY 0\n", &[false]),
+        ("H 0\nZ 0\nS 0\nMY 0\n", &[true]),
+        ("X 0\nM 0\nCX rec[-1] 1\nM 1\n", &[true, true]),
+        ("M 0\nCX rec[-1] 1\nM 1\n", &[false, false]),
+        ("X 0\nM 0\nCY rec[-1] 1\nM 1\n", &[true, true]),
+        ("H 1\nX 0\nM 0\nCZ rec[-1] 1\nMX 1\n", &[true, true]),
+        ("X 0\nSWAP 0 1\nM 0 1\n", &[false, true]),
+        (
+            "H 0\nCX 0 1\nMPP X0*X1 Z0*Z1 !Y0*Y1\n",
+            &[false, false, false],
+        ),
+    ] {
+        assert_eq!(samples(source, 2), vec![expected.to_vec(); 2], "{source:?}");
+    }
 }
 
 #[test]
 fn samples_single_qubit_clifford_measurements() {
-    assert_eq!(samples("H 0\nS 0\nS 0\nH 0\nM 0\n", 3), vec![vec![true]; 3]);
-
     let circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse circuit");
     let sampler = TestSampler::compile(&circuit).expect("compile sampler");
-    let first = sampler.sample_zero_one_with_seed(1000, Some(5));
-    let second = sampler.sample_zero_one_with_seed(1000, Some(5));
-    assert_eq!(first, second);
-
-    let hits = first.iter().filter(|shot| shot == &&vec![true]).count();
+    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
+    let hits = shots.iter().filter(|shot| shot == &&vec![true]).count();
     assert!(
         (400..=600).contains(&hits),
         "expected roughly 500 H-basis measurement hits, got {hits}"
@@ -566,14 +576,6 @@ fn can_sample_against_zero_reference_sample() {
         sampler.sample_zero_one_with_seed_and_reference_mode(3, Some(5), true),
         vec![vec![false]; 3]
     );
-}
-
-#[test]
-fn samples_x_and_y_basis_measurements_deterministically() {
-    assert_eq!(samples("H 0\nMX 0\n", 1), vec![vec![false]]);
-    assert_eq!(samples("X 0\nH 0\nMX 0\n", 1), vec![vec![true]]);
-    assert_eq!(samples("H 0\nS 0\nMY 0\n", 1), vec![vec![false]]);
-    assert_eq!(samples("H 0\nZ 0\nS 0\nMY 0\n", 1), vec![vec![true]]);
 }
 
 #[test]
@@ -608,26 +610,6 @@ fn reset_and_measure_reset_use_their_measurement_basis() {
             "MRY should reset to +Y after reporting"
         );
     }
-}
-
-#[test]
-fn measurement_record_feedback_applies_local_paulis() {
-    assert_eq!(
-        samples("X 0\nM 0\nCX rec[-1] 1\nM 1\n", 1),
-        vec![vec![true, true]]
-    );
-    assert_eq!(
-        samples("M 0\nCX rec[-1] 1\nM 1\n", 1),
-        vec![vec![false, false]]
-    );
-    assert_eq!(
-        samples("X 0\nM 0\nCY rec[-1] 1\nM 1\n", 1),
-        vec![vec![true, true]]
-    );
-    assert_eq!(
-        samples("H 1\nX 0\nM 0\nCZ rec[-1] 1\nMX 1\n", 1),
-        vec![vec![true, true]]
-    );
 }
 
 #[test]
@@ -739,27 +721,11 @@ fn qubit_cx_and_feedback_cx_can_coexist() {
 }
 
 #[test]
-fn two_qubit_tableau_gates_act_on_stabilizer_frame() {
-    assert_eq!(
-        samples("X 0\nSWAP 0 1\nM 0 1\n", 1),
-        vec![vec![false, true]]
-    );
-}
-
-#[test]
 fn pair_measurement_inversions_flip_product_results() {
     for shot in samples("MXX 0 1 0 !1 !0 1 !0 !1\n", 100) {
         let first = shot.first().copied().expect("first MXX result");
         assert_eq!(shot, vec![first, !first, !first, first]);
     }
-}
-
-#[test]
-fn mpp_measures_pauli_products_with_inversions() {
-    assert_eq!(
-        samples("H 0\nCX 0 1\nMPP X0*X1 Z0*Z1 !Y0*Y1\n", 1),
-        vec![vec![false, false, false]]
-    );
 }
 
 #[test]

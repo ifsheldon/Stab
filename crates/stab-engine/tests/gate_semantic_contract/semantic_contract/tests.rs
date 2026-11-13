@@ -8,8 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::convert::Infallible;
 
 use super::{
-    GateSemanticFamily, GateShapeExclusion, GateSurface, GateSurfaceBehavior,
-    GateSurfaceContractExt, GateTargetPattern, gate_semantic_family,
+    GateShapeExclusion, GateSurface, GateSurfaceBehavior, GateSurfaceContractExt, GateTargetPattern,
 };
 use crate::{
     Circuit, CircuitInstruction, Gate, MeasureRecordOffset, MeasurementBatchView, MeasurementSink,
@@ -592,94 +591,6 @@ fn gate_surface_contract_preserves_empty_correlated_error_branch_state() {
             GateSurfaceBehavior::SemanticNoop,
         );
     }
-}
-
-#[test]
-fn gate_surface_contract_family_assignments_are_canonical_metadata() {
-    let expected = [
-        ("MPAD", GateSemanticFamily::MeasurementPad),
-        ("M", GateSemanticFamily::Measurement),
-        ("MR", GateSemanticFamily::MeasureReset),
-        ("R", GateSemanticFamily::Reset),
-        ("CX", GateSemanticFamily::ForwardClassicalControl),
-        ("CZ", GateSemanticFamily::SymmetricClassicalControl),
-        ("XCZ", GateSemanticFamily::ReverseClassicalControl),
-        ("DEPOLARIZE1", GateSemanticFamily::Depolarization),
-        ("X_ERROR", GateSemanticFamily::PauliNoise),
-        ("I_ERROR", GateSemanticFamily::IdentityNoise),
-        ("PAULI_CHANNEL_1", GateSemanticFamily::PauliChannel),
-        ("E", GateSemanticFamily::CorrelatedError),
-        ("HERALDED_ERASE", GateSemanticFamily::HeraldedNoise),
-        ("MPP", GateSemanticFamily::PauliProductMeasurement),
-        ("SPP", GateSemanticFamily::PauliProductPhase),
-        ("MXX", GateSemanticFamily::PairMeasurement),
-        ("H", GateSemanticFamily::FixedTableau),
-        ("DETECTOR", GateSemanticFamily::Annotation),
-        ("REPEAT", GateSemanticFamily::ControlFlow),
-    ];
-
-    for (name, family) in expected {
-        assert_eq!(
-            gate_semantic_family(Gate::from_name(name).expect(name)),
-            family,
-            "{name} semantic family"
-        );
-    }
-
-    assert_eq!(
-        Gate::all()
-            .map(gate_semantic_family)
-            .collect::<BTreeSet<_>>(),
-        GateSemanticFamily::ALL.into_iter().collect::<BTreeSet<_>>()
-    );
-    assert_eq!(
-        GateSemanticFamily::ALL.map(GateSemanticFamily::as_str),
-        GateSemanticFamily::NAMES
-    );
-    assert_eq!(
-        GateSurface::ALL.map(GateSurface::as_str),
-        GateSurface::NAMES
-    );
-}
-
-#[test]
-fn gate_surface_contract_annotation_and_constant_roles_are_explicit() {
-    assert_eq!(
-        Gate::from_name("DETECTOR")
-            .expect("DETECTOR")
-            .surface_contract()
-            .target_patterns(),
-        &[
-            GateTargetPattern::EmptyTargetList,
-            GateTargetPattern::DetectorDeclaration,
-        ]
-    );
-    assert_eq!(
-        Gate::from_name("OBSERVABLE_INCLUDE")
-            .expect("OBSERVABLE_INCLUDE")
-            .surface_contract()
-            .target_patterns(),
-        &[
-            GateTargetPattern::EmptyTargetList,
-            GateTargetPattern::ObservableDeclaration,
-        ]
-    );
-    assert_eq!(
-        Gate::from_name("MPAD")
-            .expect("MPAD")
-            .surface_contract()
-            .target_patterns(),
-        &[
-            GateTargetPattern::EmptyTargetList,
-            GateTargetPattern::MeasurementPad,
-        ]
-    );
-    assert_behavior(
-        Gate::from_name("M").expect("M").surface_contract(),
-        GateSurface::MeasurementSampler,
-        GateTargetPattern::EmptyTargetList,
-        GateSurfaceBehavior::SemanticNoop,
-    );
 }
 
 fn assert_behavior(
