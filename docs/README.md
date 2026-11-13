@@ -6,8 +6,8 @@ This directory contains Stab's active plans, architecture records, generated par
 
 - [plans/GOAL.md](plans/GOAL.md) is the short current execution contract.
 - [plans/stim-core-parity-and-lean-evidence-plan.md](plans/stim-core-parity-and-lean-evidence-plan.md) owns the active rationale, milestones, tests, benchmarks, and acceptance criteria.
-- [plans/fearless-simd-stable-rust-plan.md](plans/fearless-simd-stable-rust-plan.md) owns the active move from Nightly portable SIMD to `fearless_simd` on Stable Rust 1.100; it changes no parity scope.
-- [plans/engine-speed-and-architecture-plan.md](plans/engine-speed-and-architecture-plan.md) owns the user-scale speed, admission-limit, and execution-architecture work from the November review; it starts after the fearless SIMD plan.
+- [plans/fearless-simd-stable-rust-plan.md](plans/fearless-simd-stable-rust-plan.md) records the completed move from Nightly portable SIMD to `fearless_simd` on Stable Rust 1.100; it changed no parity scope.
+- [plans/engine-speed-and-architecture-plan.md](plans/engine-speed-and-architecture-plan.md) owns the user-scale speed, admission-limit, and execution-architecture work from the November review; it is active.
 - [stim-parity.md](stim-parity.md) is the generated Stim v1.16.0 feature and evidence view. Its source is `oracle/stim-v1.16-parity.toml` and the bounded family fragments it names.
 - [architecture/](architecture/) owns durable product dependency rules and architecture decisions.
 - [MIGRATING-0.2.md](MIGRATING-0.2.md) covers the component-crate and public-path migration.

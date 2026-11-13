@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Approved on 2026-11-14 to start after the fearless SIMD plan. No milestone has started. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # Fearless SIMD And Stable Rust Plan
 
-Status: Approved on 2026-11-14 and active. S1 and S2 are complete; S3 is next. This plan is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and changes no parity scope.
+Status: Complete on 2026-11-14 through S4, with the S5 reference recorded from the smoke tier. Formal evidence is deferred to the engine plan's closing run. This plan is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and changes no parity scope.
 
 ## Summary
 
@@ -192,6 +192,28 @@ Conclusions:
 - No Nightly toolchain is installed or referenced by the workspace, CI, or active documentation.
 - Adopting 1.98 through 1.100 language or library features is out of scope here and needs its own measured change where a benchmarked path is involved.
 
+### Checkpoint (2026-11-14)
+
+S4 landed at `f285fcb4`. Stable 1.100 Clippy fired `chunks_exact_to_as_chunks` at 22 sites and `manual_slice_fill` at one; each was converted with the same remainder handling and no lint was silenced. No test expectation changed on the new compiler.
+
+Paired end-to-end timings of the Nightly-built and Stable-built CLI, best of five interleaved runs on one pinned core, in milliseconds:
+
+| Workload | Nightly | Stable 1.100 | Stable / Nightly |
+| --- | ---: | ---: | ---: |
+| `sample`, d=11, 300,000 shots | 236.7 | 238.8 | 1.01 |
+| `sample`, d=25, 25,000 shots | 1959.7 | 2006.4 | 1.02 |
+| `sample`, d=7, 1000 rounds, 100,000 shots | 2637.6 | 2666.3 | 1.01 |
+| `detect`, d=11, 350,000 shots, `b8` | 328.6 | 333.8 | 1.02 |
+| `detect`, d=11, 300,000 shots, `hits` | 1266.4 | 1277.5 | 1.01 |
+| `detect`, color code d=9, 200,000 shots | 80.1 | 81.3 | 1.02 |
+| `m2d`, d=11, 200,000 records | 120.2 | 119.6 | 1.00 |
+| `analyze_errors --decompose_errors`, d=21 | 872.1 | 827.8 | 0.95 |
+| `analyze_errors --fold_loops`, d=21 | 191.6 | 182.6 | 0.95 |
+| `sample_dem`, d=11, 100,000 shots | 317.1 | 311.1 | 0.98 |
+| `CZ` and `S` layer circuit, 20,000 shots | 2318.6 | 2146.2 | 0.93 |
+
+The compiler change is neutral for sampling and detection and slightly faster for analysis.
+
 ## Milestone S5: Controlled Evidence
 
 ### Tasks
@@ -204,6 +226,40 @@ Conclusions:
 
 - The pair passes correctness, memory, and offline replay, and no case is slower relative to Stim than it was before this plan.
 - No gate is relaxed and no failing case is reported as passing.
+
+### Checkpoint (2026-11-14)
+
+A full-tier run on `1bfbcef8` was refused because swap pages were read during timing, so the reference recorded here is the smoke tier on the same clean revision, bundle `target/benchmarks/2026-11-14-s5-stable-1.100-smoke`. Smoke timing is diagnostic and promotes no claim. All 25 cases pass correctness and memory.
+
+| Case | Stab/Stim |
+| --- | ---: |
+| `generate.surface-large` | 0.739 |
+| `generate.color-large` | 0.771 |
+| `convert.sparse-r8-wide` | 0.806 |
+| `convert.dense-b8-to-01` | 0.176 |
+| `convert.typed-dets-wide` | 0.867 |
+| `sample-surface.medium` | 0.916 |
+| `sample-surface.large` | 0.909 |
+| `sample-surface.d25-b8` | 6.962 |
+| `sample-folded-ptb64.large` | 1.089 |
+| `detect-observables.medium` | 1.089 |
+| `detect-observables.large` | 0.997 |
+| `detect-observables.d11-b8` | 1.102 |
+| `detect-observables.d11-sparse-hits` | 1.540 |
+| `detect-observables.color-d9-b8` | 1.460 |
+| `m2d.sweep-medium` | 1.053 |
+| `m2d.sweep-large` | 1.060 |
+| `m2d.surface-d11` | 0.545 |
+| `analyze-folded.large` | 1.131 |
+| `analyze-decompose.d15` | 1.167 |
+| `analyze-decompose.d25` | 1.228 |
+| `sample-dem.medium` | 1.086 |
+| `sample-dem.large` | 1.006 |
+| `sample-dem.surface-d11-side-outputs` | 4.366 |
+| `qec-cli-pipeline.large` | 1.003 |
+| `qec-rust-pipeline.large` | n/a |
+
+The five cases above the `1.25x` ceiling match the list recorded under S2 within smoke noise, and none belongs to this plan. A formal full-and-soak pair needs swap disabled on the host and is left to the engine plan's closing evidence.
 
 ## Sequencing
 
