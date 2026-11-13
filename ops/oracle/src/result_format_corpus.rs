@@ -241,7 +241,7 @@ mod tests {
     fn committed_result_format_corpus_is_structurally_valid() {
         let root = RepoRoot::resolve(std::path::Path::new("../..")).expect("repo root");
         let checked = load(&root).expect("load corpus");
-        assert_eq!(checked.cases().len(), 62);
-        assert_eq!(checked.accepted_count(), 20);
+        assert_eq!(checked.cases().len(), 83);
+        assert_eq!(checked.accepted_count(), 31);
     }
 }

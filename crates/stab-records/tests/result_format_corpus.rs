@@ -17,8 +17,11 @@ use stab_records::{
 const fn sample_format(format: ResultFormat) -> RecordFormat {
     match format {
         ResultFormat::ZeroOne => RecordFormat::ZeroOne,
+        ResultFormat::B8 => RecordFormat::B8,
+        ResultFormat::R8 => RecordFormat::R8,
         ResultFormat::Hits => RecordFormat::Hits,
         ResultFormat::Dets => RecordFormat::Dets,
+        ResultFormat::Ptb64 => RecordFormat::Ptb64,
     }
 }
 

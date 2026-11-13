@@ -3,6 +3,11 @@
     reason = "fingerprint contract tests use direct fixture assertions"
 )]
 
+mod fingerprint_schema;
+
+use fingerprint_schema::{
+    CIRCUIT_DIALECT, DEM_DIALECT, SchemaHead, SchemaItem, SchemaTarget, schema_digest,
+};
 use stab_model::{
     Circuit, DemRepeatBlock, DemRepeatCount, DetectorErrorModel, ModelDialect, ModelFingerprint,
     RepeatBlock, RepeatCount, RepeatNestingLimit,
@@ -182,4 +187,232 @@ fn nested_dem(depth: usize) -> DetectorErrorModel {
         body = outer;
     }
     body
+}
+
+fn gate(
+    name: &'static str,
+    args: Vec<f64>,
+    targets: Vec<SchemaTarget>,
+    tag: Option<&[u8]>,
+) -> SchemaItem {
+    SchemaItem::Instruction {
+        head: SchemaHead::Gate(name),
+        args,
+        targets,
+        tag: tag.map(<[u8]>::to_vec),
+    }
+}
+
+fn dem(kind: u8, args: Vec<f64>, targets: Vec<SchemaTarget>, tag: Option<&[u8]>) -> SchemaItem {
+    SchemaItem::Instruction {
+        head: SchemaHead::DemKind(kind),
+        args,
+        targets,
+        tag: tag.map(<[u8]>::to_vec),
+    }
+}
+
+fn repeat(count: u64, tag: Option<&[u8]>, body: Vec<SchemaItem>) -> SchemaItem {
+    SchemaItem::Repeat {
+        count,
+        tag: tag.map(<[u8]>::to_vec),
+        body,
+    }
+}
+
+fn qubit(id: u32, inverted: bool) -> SchemaTarget {
+    SchemaTarget::Qubit { id, inverted }
+}
+
+fn pauli(pauli: u8, id: u32, inverted: bool) -> SchemaTarget {
+    SchemaTarget::Pauli {
+        pauli,
+        id,
+        inverted,
+    }
+}
+
+fn hex(digest: [u8; 32]) -> String {
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Re-encodes hand-described models byte-for-byte from the schema-v1 document and requires the
+/// product fingerprint to match, so field order, widths, discriminators, signed-zero handling,
+/// alias canonicalization, exact tag bytes, and depth-first repeat nesting are all pinned.
+#[test]
+fn product_fingerprints_match_independent_schema_v1_encodings() {
+    let rich_circuit = [
+        gate(
+            "X_ERROR",
+            vec![0.12345641],
+            vec![qubit(0, false)],
+            Some("π".as_bytes()),
+        ),
+        gate("M", vec![], vec![qubit(1, true)], None),
+        gate(
+            "CX",
+            vec![],
+            vec![SchemaTarget::Sweep(7), qubit(2, false)],
+            None,
+        ),
+        gate(
+            "MPP",
+            vec![],
+            vec![
+                pauli(1, 0, true),
+                SchemaTarget::Combiner,
+                pauli(2, 1, false),
+                SchemaTarget::Combiner,
+                pauli(3, 2, true),
+            ],
+            None,
+        ),
+        gate(
+            "DETECTOR",
+            vec![-0.0, 1.25],
+            vec![
+                SchemaTarget::Record {
+                    offset: 0,
+                    negative_zero: true,
+                },
+                SchemaTarget::Record {
+                    offset: -1,
+                    negative_zero: false,
+                },
+            ],
+            Some(b"coord"),
+        ),
+        repeat(
+            3,
+            Some(b"loop"),
+            vec![gate("H", vec![], vec![qubit(3, false)], None)],
+        ),
+    ];
+    let digest = schema_digest(CIRCUIT_DIALECT, &rich_circuit);
+    assert_eq!(
+        hex(digest),
+        "78361913886a45606681a49071b1689ad37758308655e69f28ed68675046f3dd",
+        "the independent encoder must reproduce the documented frozen circuit vector"
+    );
+    assert_eq!(
+        Circuit::from_stim_str(RICH_CIRCUIT)
+            .expect("rich circuit")
+            .fingerprint()
+            .digest(),
+        digest
+    );
+
+    let rich_dem = [
+        dem(
+            1,
+            vec![0.12345641],
+            vec![
+                SchemaTarget::Detector(0),
+                SchemaTarget::Observable(1),
+                SchemaTarget::Separator,
+                SchemaTarget::Detector(2),
+            ],
+            Some("ε".as_bytes()),
+        ),
+        dem(
+            2,
+            vec![-0.0, 2.5],
+            vec![SchemaTarget::Detector(3)],
+            Some(b"coord"),
+        ),
+        dem(3, vec![], vec![SchemaTarget::Observable(4)], Some(b"obs")),
+        dem(
+            4,
+            vec![-0.0, 7.25],
+            vec![SchemaTarget::Numeric(9)],
+            Some(b"shift"),
+        ),
+        repeat(
+            3,
+            Some(b"loop"),
+            vec![dem(1, vec![0.25], vec![SchemaTarget::Detector(5)], None)],
+        ),
+    ];
+    let digest = schema_digest(DEM_DIALECT, &rich_dem);
+    assert_eq!(
+        hex(digest),
+        "a9da2cfcc5bbb92bdf4f50a9da5a5669f7f50909baaf7700a9aece756d554c65",
+        "the independent encoder must reproduce the documented frozen DEM vector"
+    );
+    assert_eq!(
+        DetectorErrorModel::from_dem_str(RICH_DEM)
+            .expect("rich DEM")
+            .fingerprint()
+            .digest(),
+        digest
+    );
+
+    // A sibling after a nested block distinguishes depth-first nesting from any other traversal;
+    // opaque tags must hash their exact unescaped bytes.
+    let nested_circuit = Circuit::from_stim_bytes(
+        b"REPEAT 2 {\n    REPEAT[\xff\\C] 1 {\n        CNOT 0 1\n    }\n    M 0\n}\nH[\xfe] 16777215\n",
+    )
+    .expect("nested circuit");
+    let expected = [
+        repeat(
+            2,
+            None,
+            vec![
+                repeat(
+                    1,
+                    Some(b"\xff]"),
+                    vec![gate(
+                        "CX",
+                        vec![],
+                        vec![qubit(0, false), qubit(1, false)],
+                        None,
+                    )],
+                ),
+                gate("M", vec![], vec![qubit(0, false)], None),
+            ],
+        ),
+        gate("H", vec![], vec![qubit(16_777_215, false)], Some(b"\xfe")),
+    ];
+    assert_eq!(
+        nested_circuit.fingerprint().digest(),
+        schema_digest(CIRCUIT_DIALECT, &expected)
+    );
+
+    let nested_dem = DetectorErrorModel::from_dem_bytes(
+        b"repeat 2 {\n    repeat[\xff] 1 {\n        error(1) D1152921504606846975 ^ L4294967295\n    }\n    shift_detectors(-0, 1e308) 18\n}\ndetector(5e-324) D0\n",
+    )
+    .expect("nested DEM");
+    let expected = [
+        repeat(
+            2,
+            None,
+            vec![
+                repeat(
+                    1,
+                    Some(b"\xff"),
+                    vec![dem(
+                        1,
+                        vec![1.0],
+                        vec![
+                            SchemaTarget::Detector((1 << 60) - 1),
+                            SchemaTarget::Separator,
+                            SchemaTarget::Observable(u64::from(u32::MAX)),
+                        ],
+                        None,
+                    )],
+                ),
+                dem(4, vec![0.0, 1e308], vec![SchemaTarget::Numeric(18)], None),
+            ],
+        ),
+        dem(
+            2,
+            vec![f64::from_bits(1)],
+            vec![SchemaTarget::Detector(0)],
+            None,
+        ),
+    ];
+    assert_eq!(
+        nested_dem.fingerprint().digest(),
+        schema_digest(DEM_DIALECT, &expected)
+    );
 }

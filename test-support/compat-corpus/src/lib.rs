@@ -116,10 +116,16 @@ impl CheckedCase {
 pub enum ResultFormat {
     #[serde(rename = "01")]
     ZeroOne,
+    #[serde(rename = "b8")]
+    B8,
+    #[serde(rename = "r8")]
+    R8,
     #[serde(rename = "hits")]
     Hits,
     #[serde(rename = "dets")]
     Dets,
+    #[serde(rename = "ptb64")]
+    Ptb64,
 }
 
 impl ResultFormat {
@@ -127,8 +133,11 @@ impl ResultFormat {
     pub const fn name(self) -> &'static str {
         match self {
             Self::ZeroOne => "01",
+            Self::B8 => "b8",
+            Self::R8 => "r8",
             Self::Hits => "hits",
             Self::Dets => "dets",
+            Self::Ptb64 => "ptb64",
         }
     }
 }

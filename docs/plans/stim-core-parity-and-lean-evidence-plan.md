@@ -158,7 +158,7 @@ P0 completed in `07ebf4c8` with 132 atomic families, 50 independently executable
 ### Tasks
 
 1. Organize tests by behavior family and product owner instead of qualification bureaucracy.
-2. Preserve the independent 62-case result-format corpus, path-alias matrix, bounded process-supervisor tests, decoder conformance tests, and external circuit-pass proof.
+2. Preserve the independent result-format corpus (83 cases since P10, covering all six formats), path-alias matrix, bounded process-supervisor tests, decoder conformance tests, and external circuit-pass proof.
 3. Replace manually mirrored gate expectation tables with canonical model metadata plus pinned-Stim differential checks.
 4. Move shared corpus schema and decoding support into one internal test-support owner; leave semantic assertions in the crate and CLI that own the behavior.
 5. Delete per-export qualification cases, structural-only fixtures, duplicate compatibility rows, and tests whose only claim is a derive, type name, re-export, constant, marker inequality, static label, or private pointer identity.
