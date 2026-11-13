@@ -1,3 +1,7 @@
+//! Contracts for every CLI file role. This module owns the alias matrix: explicit input/output
+//! aliases are rejected before any role is created or truncated. `preflight` owns ordering: inputs
+//! open and work is admitted before outputs are touched, and oversized inputs are rejected unread.
+
 #![cfg(unix)]
 
 use std::collections::BTreeMap;
@@ -7,7 +11,9 @@ use std::path::{Path, PathBuf};
 
 use tempfile::tempdir;
 
-use super::run_from;
+use crate::run_from;
+
+mod preflight;
 
 #[derive(Clone, Copy, Debug)]
 enum AliasKind {
@@ -27,154 +33,37 @@ enum CommandFixture {
     Convert,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct RolePair {
-    command: CommandFixture,
-    first: &'static str,
-    second: &'static str,
-}
-
-const ROLE_PAIRS: &[RolePair] = &[
-    RolePair {
-        command: CommandFixture::Sample,
-        first: "--in",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::Detect,
-        first: "--in",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::Detect,
-        first: "--in",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::Detect,
-        first: "--out",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::M2d,
-        first: "--circuit",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::M2d,
-        first: "--circuit",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::M2d,
-        first: "--in",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::M2d,
-        first: "--in",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::M2d,
-        first: "--sweep",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::M2d,
-        first: "--sweep",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::M2d,
-        first: "--out",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::AnalyzeErrors,
-        first: "--in",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--in",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--in",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--in",
-        second: "--err_out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--replay_err_in",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--replay_err_in",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--replay_err_in",
-        second: "--err_out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--out",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--out",
-        second: "--err_out",
-    },
-    RolePair {
-        command: CommandFixture::SampleDem,
-        first: "--obs_out",
-        second: "--err_out",
-    },
-    RolePair {
-        command: CommandFixture::Convert,
-        first: "--in",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::Convert,
-        first: "--in",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::Convert,
-        first: "--circuit",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::Convert,
-        first: "--circuit",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::Convert,
-        first: "--dem",
-        second: "--out",
-    },
-    RolePair {
-        command: CommandFixture::Convert,
-        first: "--dem",
-        second: "--obs_out",
-    },
-    RolePair {
-        command: CommandFixture::Convert,
-        first: "--out",
-        second: "--obs_out",
-    },
+/// Every pair of explicit file roles that one command accepts; aliasing any pair must fail
+/// before any output is created or truncated.
+const ROLE_PAIRS: &[(CommandFixture, &str, &str)] = &[
+    (CommandFixture::Sample, "--in", "--out"),
+    (CommandFixture::Detect, "--in", "--out"),
+    (CommandFixture::Detect, "--in", "--obs_out"),
+    (CommandFixture::Detect, "--out", "--obs_out"),
+    (CommandFixture::M2d, "--circuit", "--out"),
+    (CommandFixture::M2d, "--circuit", "--obs_out"),
+    (CommandFixture::M2d, "--in", "--out"),
+    (CommandFixture::M2d, "--in", "--obs_out"),
+    (CommandFixture::M2d, "--sweep", "--out"),
+    (CommandFixture::M2d, "--sweep", "--obs_out"),
+    (CommandFixture::M2d, "--out", "--obs_out"),
+    (CommandFixture::AnalyzeErrors, "--in", "--out"),
+    (CommandFixture::SampleDem, "--in", "--out"),
+    (CommandFixture::SampleDem, "--in", "--obs_out"),
+    (CommandFixture::SampleDem, "--in", "--err_out"),
+    (CommandFixture::SampleDem, "--replay_err_in", "--out"),
+    (CommandFixture::SampleDem, "--replay_err_in", "--obs_out"),
+    (CommandFixture::SampleDem, "--replay_err_in", "--err_out"),
+    (CommandFixture::SampleDem, "--out", "--obs_out"),
+    (CommandFixture::SampleDem, "--out", "--err_out"),
+    (CommandFixture::SampleDem, "--obs_out", "--err_out"),
+    (CommandFixture::Convert, "--in", "--out"),
+    (CommandFixture::Convert, "--in", "--obs_out"),
+    (CommandFixture::Convert, "--circuit", "--out"),
+    (CommandFixture::Convert, "--circuit", "--obs_out"),
+    (CommandFixture::Convert, "--dem", "--out"),
+    (CommandFixture::Convert, "--dem", "--obs_out"),
+    (CommandFixture::Convert, "--out", "--obs_out"),
 ];
 
 #[test]
@@ -307,11 +196,11 @@ fn special_output_files_are_streamed_without_regular_file_truncation() {
 }
 
 fn assert_alias_matrix(kind: AliasKind) {
-    for pair in ROLE_PAIRS {
+    for &(command, first, second) in ROLE_PAIRS {
         let directory = tempdir().expect("temporary directory");
-        let mut fixture = Fixture::new(pair.command, directory.path());
-        fixture.alias(pair.second, pair.first, kind);
-        fixture.assert_rejected(pair.first, pair.second);
+        let mut fixture = Fixture::new(command, directory.path());
+        fixture.alias(second, first, kind);
+        fixture.assert_rejected(first, second);
     }
 }
 

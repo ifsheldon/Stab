@@ -114,7 +114,7 @@ status = "verified"
 [families.evidence.test]
 package = "stab-cli"
 kind = "lib"
-name = "tests::path_alias::hardlink_file_role_aliases_fail_without_truncation"
+name = "tests::io_roles::hardlink_file_role_aliases_fail_without_truncation"
 
 [[families]]
 id = "resource-safety.cli-file-lexical-identities"
@@ -130,7 +130,7 @@ status = "verified"
 [families.evidence.test]
 package = "stab-cli"
 kind = "lib"
-name = "tests::path_alias::explicit_direct_file_role_aliases_fail_without_truncation"
+name = "tests::io_roles::explicit_direct_file_role_aliases_fail_without_truncation"
 
 [[families]]
 id = "resource-safety.cli-file-normalized-identities"
@@ -146,7 +146,7 @@ status = "verified"
 [families.evidence.test]
 package = "stab-cli"
 kind = "lib"
-name = "tests::path_alias::normalized_relative_file_role_aliases_fail_without_truncation"
+name = "tests::io_roles::normalized_relative_file_role_aliases_fail_without_truncation"
 
 [[families]]
 id = "resource-safety.cli-file-symlink-identities"
@@ -162,7 +162,7 @@ status = "verified"
 [families.evidence.test]
 package = "stab-cli"
 kind = "lib"
-name = "tests::path_alias::symlink_file_role_aliases_fail_without_truncation"
+name = "tests::io_roles::symlink_file_role_aliases_fail_without_truncation"
 
 [[families]]
 id = "resource-safety.cli-standard-stream-identities"
@@ -653,7 +653,7 @@ status = "verified"
 [families.evidence.test]
 package = "stab-cli"
 kind = "lib"
-name = "tests::m9::m2d_rejects_ptb64_observable_output_like_stim"
+name = "tests::m2d::m2d_rejects_ptb64_observable_output_like_stim"
 
 [[families]]
 id = "result-formats.routes-m2d-ptb64-output-rejection"
@@ -668,7 +668,7 @@ status = "verified"
 [families.evidence.test]
 package = "stab-cli"
 kind = "lib"
-name = "tests::m9::m2d_rejects_ptb64_detector_output_like_stim"
+name = "tests::m2d::m2d_rejects_ptb64_detector_output_like_stim"
 
 [[families]]
 id = "result-formats.routes-sample"

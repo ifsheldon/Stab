@@ -1,10 +1,12 @@
+//! `stab sample` behavior not covered by the pinned-Stim manifest rows.
+
 use std::ffi::OsString;
 
 use stab_records::{BitPlane64Batch, MeasurementBatchView, MeasurementSink};
 use tempfile::tempdir;
 
-use super::run_from;
-use crate::{CliSampleSink, SampleOutFormatArg};
+use super::support::{Scratch, run};
+use crate::{CliSampleSink, SampleOutFormatArg, run_from};
 
 #[test]
 fn warmed_cli_sample_encoding_has_no_record_count_dependent_allocation() {
@@ -161,71 +163,96 @@ fn zero_shot_sample_ignores_invalid_stdin() {
     assert_eq!(stderr, b"");
 }
 
-struct FailingWriter {
-    kind: std::io::ErrorKind,
+#[test]
+fn sample_skip_reference_sample_reports_raw_heralded_records() {
+    // `--shots=1` and `--shots=2` of this circuit are pinned-Stim manifest rows; the raw
+    // frame record with the reference removed is Stab's own contract.
+    run(
+        &["stab", "sample", "--shots=1", "--skip_reference_sample"],
+        include_bytes!("../../../../oracle/fixtures/inputs/sample_heralded.stim"),
+    )
+    .assert_ok(b"011001001\n");
+    run(
+        &["stab", "sample", "--skip_reference_sample"],
+        b"H 0\nS 0\nS 0\nH 0\nM 0\n",
+    )
+    .assert_ok(b"0\n");
 }
 
-impl std::io::Write for FailingWriter {
-    fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
-        Err(std::io::Error::from(self.kind))
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Err(std::io::Error::from(self.kind))
+#[test]
+fn sample_writes_whole_ptb64_groups() {
+    let group = [0; 8].into_iter().chain([0xff; 8]).collect::<Vec<u8>>();
+    for (shots, groups) in [("0", 0), ("64", 1), ("128", 2)] {
+        run(
+            &["stab", "sample", "--shots", shots, "--out_format=ptb64"],
+            b"X 1\nM 0 1\n",
+        )
+        .assert_ok(group.repeat(groups));
     }
 }
 
 #[test]
-fn broken_output_pipe_exits_141_with_empty_stderr_like_stim() {
-    // Pinned Stim dies silently via SIGPIPE when its stdout pipe closes
-    // (decision D2); a broken-pipe-rooted failure must report nothing and
-    // exit with the same shell-visible 141 status.
-    for argv in [
-        vec!["stab", "sample", "--shots", "4"],
-        vec!["stab", "detect", "--shots", "4"],
-        vec![
+fn sample_seed_makes_noisy_output_reproducible() {
+    let input = include_bytes!("../../../../oracle/fixtures/inputs/sample_noisy.stim");
+    let first = run(&["stab", "sample", "--shots=1000", "--seed=5"], input);
+    let second = run(&["stab", "sample", "--shots=1000", "--seed=5"], input);
+    assert_eq!(first.status, 0);
+    assert_eq!(first.stderr_text(), "");
+    assert_eq!(first, second);
+}
+
+#[test]
+fn sample_rejects_values_past_stim_i64_cli_bound() {
+    for flag in ["--seed", "--shots"] {
+        run(&["stab", "sample", flag, "9223372036854775808"], b"M 0\n")
+            .assert_err(&["greater than Stim's i64 maximum"]);
+    }
+}
+
+#[test]
+fn sample_loop_folding_flag_preserves_reference_results() {
+    let circuit = b"REPEAT 512 {\n    H 0\n    M 0\n    R 0\n}\n";
+    // The frame sampler computes and removes the deterministic reference only in
+    // `--skip_reference_sample` mode, so this combination exercises loop selection.
+    let folded = run(
+        &["stab", "sample", "--skip_reference_sample", "--seed=5"],
+        circuit,
+    );
+    let iterated = run(
+        &[
             "stab",
-            "gen",
-            "--code",
-            "repetition_code",
-            "--task",
-            "memory",
-            "--distance",
-            "3",
-            "--rounds",
-            "2",
+            "sample",
+            "--skip_reference_sample",
+            "--skip_loop_folding",
+            "--seed=5",
         ],
-    ] {
-        let mut stderr = Vec::new();
-        let code = run_from(
-            argv.iter().map(OsString::from),
-            "X 0\nM 0\nDETECTOR rec[-1]\n".as_bytes(),
-            FailingWriter {
-                kind: std::io::ErrorKind::BrokenPipe,
-            },
-            &mut stderr,
-        );
-        assert_eq!(code, 141, "{argv:?}");
-        assert!(stderr.is_empty(), "{argv:?}: {stderr:?}");
-    }
+        circuit,
+    );
+
+    assert_eq!(folded.status, 0);
+    assert_eq!(folded, iterated);
+    assert_eq!(folded.stdout.len(), 513);
+    assert_eq!(folded.stdout.last(), Some(&b'\n'));
+    assert!(folded.stderr.is_empty());
 }
 
 #[test]
-fn genuine_output_write_failures_still_report_a_diagnostic() {
-    let mut stderr = Vec::new();
-    let code = run_from(
-        ["stab", "sample", "--shots", "4"]
-            .iter()
-            .map(OsString::from),
-        "X 0\nM 0\n".as_bytes(),
-        FailingWriter {
-            kind: std::io::ErrorKind::StorageFull,
-        },
-        &mut stderr,
-    );
-    assert_eq!(code, 1);
-    assert!(
-        !stderr.is_empty(),
-        "non-pipe output failures must keep their diagnostics"
-    );
+fn sample_reads_and_writes_paths() {
+    let scratch = Scratch::new();
+    let input = scratch.file("input.stim", "X 0\nMR 0\nMR 0\n");
+    let output = scratch.path("output.01");
+    run(
+        &[
+            "stab",
+            "sample",
+            "--shots=1",
+            "--in",
+            &input,
+            "--out",
+            &output,
+        ],
+        b"",
+    )
+    .assert_ok(b"");
+    assert_eq!(scratch.read("output.01"), b"10\n");
 }

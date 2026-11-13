@@ -1,23 +1,16 @@
+//! `stab convert` layout, format, and streaming behavior beyond the pinned-Stim manifest rows
+//! and the checked result-format corpus.
+
 use tempfile::tempdir;
 
-use crate::run_from;
-
-fn run_cli(args: &[&str], input: &[u8]) -> (i32, Vec<u8>, String) {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(args.iter().copied(), input, &mut stdout, &mut stderr);
-    (
-        status,
-        stdout,
-        String::from_utf8(stderr).expect("stderr is utf-8"),
-    )
-}
+use super::support::{Scratch, run};
+use crate::{MAX_CIRCUIT_INPUT_BYTES, run_from};
 
 fn run_ok(args: &[&str], input: &[u8]) -> Vec<u8> {
-    let (status, stdout, stderr) = run_cli(args, input);
-    assert_eq!(status, 0, "stderr: {stderr}");
-    assert_eq!(stderr, "");
-    stdout
+    let result = run(args, input);
+    assert_eq!(result.status, 0, "stderr: {}", result.stderr_text());
+    assert_eq!(result.stderr_text(), "");
+    result.stdout
 }
 
 fn write_fixture(name: &str, text: &str) -> (tempfile::TempDir, String) {
@@ -91,77 +84,6 @@ fn convert_measurements_with_circuit_types_m_to_dets() {
             input,
         );
         assert_eq!(String::from_utf8(output).unwrap(), expected, "{format}");
-    }
-}
-
-#[test]
-fn convert_sparse_duplicate_tokens_set_typed_bits() {
-    assert_eq!(
-        run_ok(
-            &[
-                "stab",
-                "convert",
-                "--in_format",
-                "dets",
-                "--out_format",
-                "01",
-                "--num_measurements",
-                "2",
-            ],
-            b"shot M1 M1\n",
-        ),
-        b"01\n"
-    );
-}
-
-#[test]
-fn convert_dets_uses_distinct_namespaces_and_strict_separators() {
-    assert_eq!(
-        run_ok(
-            &[
-                "stab",
-                "convert",
-                "--in_format",
-                "dets",
-                "--out_format",
-                "01",
-                "--num_measurements",
-                "1",
-                "--num_detectors",
-                "1",
-                "--num_observables",
-                "1",
-            ],
-            b"shot M0 D0 L0\n",
-        ),
-        b"111\n"
-    );
-
-    for malformed in [
-        b"shotM0\n".as_slice(),
-        b"shot  M0\n",
-        b"shot M0 \n",
-        b"shot\tM0\n",
-        b"shot M0\tD0\n",
-    ] {
-        let (status, stdout, stderr) = run_cli(
-            &[
-                "stab",
-                "convert",
-                "--in_format",
-                "dets",
-                "--out_format",
-                "01",
-                "--num_measurements",
-                "1",
-                "--num_detectors",
-                "1",
-            ],
-            malformed,
-        );
-        assert_eq!(status, 1, "input: {malformed:?}");
-        assert_eq!(stdout, Vec::<u8>::new(), "input: {malformed:?}");
-        assert!(!stderr.is_empty(), "input: {malformed:?}");
     }
 }
 
@@ -441,27 +363,6 @@ fn convert_b8_to_b8_keeps_non_byte_aligned_padding_canonical() {
 }
 
 #[test]
-fn convert_rejects_incomplete_ptb64_output_group() {
-    let (status, stdout, stderr) = run_cli(
-        &[
-            "stab",
-            "convert",
-            "--in_format",
-            "01",
-            "--out_format",
-            "ptb64",
-            "--bits_per_shot",
-            "2",
-        ],
-        b"10\n",
-    );
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, Vec::<u8>::new());
-    assert!(stderr.contains("groups of 64"));
-}
-
-#[test]
 fn convert_rejects_layout_and_format_failures() {
     let (_dir, circuit_path) = write_fixture("layout.stim", "M 0\n");
     let failure_cases: Vec<(Vec<&str>, &[u8], &str)> = vec![
@@ -565,124 +466,27 @@ fn convert_rejects_layout_and_format_failures() {
     ];
 
     for (args, input, expected) in failure_cases {
-        let (status, stdout, stderr) = run_cli(&args, input);
-        assert_eq!(status, 1, "{args:?}");
-        assert_eq!(stdout, Vec::<u8>::new(), "{args:?}");
-        assert!(stderr.contains(expected), "{args:?}: {stderr}");
+        run(&args, input).assert_err(&[expected]);
     }
-}
-
-#[test]
-fn convert_reports_missing_input_output_and_layout_paths() {
-    let missing = "/tmp/stab-this-path-should-not-exist/fixture";
-    for (args, input, expect_empty_stdout) in [
-        (
-            vec!["stab", "convert", "--in", missing, "--bits_per_shot", "1"],
-            b"1\n".as_slice(),
-            true,
-        ),
-        (
-            vec!["stab", "convert", "--circuit", missing, "--types", "M"],
-            b"1\n".as_slice(),
-            true,
-        ),
-        (
-            vec!["stab", "convert", "--dem", missing],
-            b"1\n".as_slice(),
-            true,
-        ),
-        (
-            vec!["stab", "convert", "--out", missing, "--bits_per_shot", "1"],
-            b"1\n".as_slice(),
-            true,
-        ),
-        (
-            vec![
-                "stab",
-                "convert",
-                "--obs_out",
-                missing,
-                "--num_measurements",
-                "1",
-                "--num_observables",
-                "1",
-            ],
-            b"11\n".as_slice(),
-            false,
-        ),
-    ] {
-        let (status, stdout, stderr) = run_cli(&args, input);
-        assert_eq!(status, 1, "{args:?}");
-        if expect_empty_stdout {
-            assert_eq!(stdout, Vec::<u8>::new(), "{args:?}");
-        }
-        assert!(!stderr.is_empty(), "{args:?}");
-    }
-}
-
-#[test]
-fn stim_extension_rejects_irrelevant_roles_without_touching_them() {
-    let directory = tempdir().expect("temp dir");
-    let observable_output = directory.path().join("observables.01");
-    std::fs::write(&observable_output, "keep\n").expect("seed observable output");
-    let observable_output = observable_output.to_str().expect("utf-8 path");
-
-    let (status, stdout, stderr) = run_cli(
-        &[
-            "stab",
-            "convert",
-            "--in_format=stim",
-            "--out_format=stim",
-            "--obs_out",
-            observable_output,
-        ],
-        b"H 0\n",
-    );
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, Vec::<u8>::new());
-    assert!(stderr.contains("--obs_out"), "{stderr}");
-    assert_eq!(
-        std::fs::read_to_string(observable_output).expect("read observable output"),
-        "keep\n"
-    );
-
-    let missing_circuit = directory.path().join("missing.stim");
-    let missing_circuit = missing_circuit.to_str().expect("utf-8 path");
-    let (status, stdout, stderr) = run_cli(
-        &[
-            "stab",
-            "convert",
-            "--in_format=stim",
-            "--out_format=stim",
-            "--circuit",
-            missing_circuit,
-        ],
-        b"H 0\n",
-    );
-    assert_eq!(status, 1);
-    assert_eq!(stdout, Vec::<u8>::new());
-    assert!(stderr.contains("--circuit"), "{stderr}");
-    assert!(!stderr.contains("failed to read"), "{stderr}");
 }
 
 #[test]
 fn convert_preserves_successful_record_prefix_before_later_parse_error() {
-    let (status, stdout, stderr) = run_cli(
+    let result = run(
         &["stab", "convert", "--in_format=01", "--bits_per_shot=3"],
         b"101\n1",
     );
 
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"101\n");
-    assert!(!stderr.is_empty());
+    assert_eq!(result.status, 1);
+    assert_eq!(result.stdout, b"101\n");
+    result.assert_stderr_contains(&[]);
 }
 
 #[test]
 fn convert_requires_explicit_in_format_like_stim() {
     // Pinned Stim rejects convert without --in_format ("Must specify a value for enum flag
     // '--in_format'."); the previous silent 01 default turned that error into output.
-    let (status, stdout, stderr) = run_cli(
+    run(
         &[
             "stab",
             "convert",
@@ -692,17 +496,15 @@ fn convert_requires_explicit_in_format_like_stim() {
             "b8",
         ],
         b"01\n10\n",
-    );
-    assert_eq!(status, 1);
-    assert_eq!(stdout, Vec::<u8>::new());
-    assert!(stderr.contains("--in_format"), "{stderr}");
+    )
+    .assert_err(&["--in_format"]);
 
     // The failing invocation must not open or truncate an existing --out target.
     let dir = tempdir().expect("temp dir");
     let out_path = dir.path().join("existing.b8");
     std::fs::write(&out_path, b"sentinel").expect("write sentinel");
     let out = out_path.to_str().expect("utf-8 path");
-    let (status, _, _) = run_cli(
+    let status = run(
         &[
             "stab",
             "convert",
@@ -714,10 +516,158 @@ fn convert_requires_explicit_in_format_like_stim() {
             out,
         ],
         b"01\n",
-    );
+    )
+    .status;
     assert_eq!(status, 1);
     assert_eq!(
         std::fs::read(&out_path).expect("read sentinel"),
         b"sentinel"
+    );
+}
+
+#[test]
+fn convert_stim_canonicalizes_stdin_and_path_circuits() {
+    run(
+        &["stab", "convert", "--in_format=stim", "--out_format=stim"],
+        b"# comment\nH 0\nH 1\nM 0\nM 1\n",
+    )
+    .assert_ok(b"H 0 1\nM 0 1\n");
+
+    let scratch = Scratch::new();
+    let input = scratch.file("input.stim", "CX 0 1\nCX 2 3\n");
+    let output = scratch.path("output.stim");
+    run(
+        &[
+            "stab",
+            "convert",
+            "--in_format=stim",
+            "--out_format=stim",
+            "--in",
+            &input,
+            "--out",
+            &output,
+        ],
+        b"",
+    )
+    .assert_ok(b"");
+    assert_eq!(scratch.read("output.stim"), b"CX 0 1 2 3\n");
+}
+
+/// One streamed conversion record: 2048 bits, so 256 b8-packed bytes.
+const STREAMING_RECORD_BYTES: usize = 256;
+
+/// Synthesizes a deterministic b8 record stream larger than the retired 64 MiB whole-input cap
+/// without materializing it.
+struct PatternInput {
+    remaining: usize,
+    offset: usize,
+}
+
+impl PatternInput {
+    fn over_retired_cap() -> Self {
+        Self {
+            remaining: over_retired_cap_len(),
+            offset: 0,
+        }
+    }
+
+    fn byte_at(offset: usize) -> u8 {
+        u8::try_from(offset % 251).unwrap_or(0)
+    }
+}
+
+impl std::io::Read for PatternInput {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let step = self.remaining.min(buffer.len()).min(64 * 1024);
+        for slot in buffer.iter_mut().take(step) {
+            *slot = Self::byte_at(self.offset);
+            self.offset += 1;
+        }
+        self.remaining -= step;
+        Ok(step)
+    }
+}
+
+fn over_retired_cap_len() -> usize {
+    usize::try_from(MAX_CIRCUIT_INPUT_BYTES).expect("cap fits usize") + STREAMING_RECORD_BYTES
+}
+
+/// Verifies streamed output against the synthesized pattern without buffering it.
+#[derive(Debug, Default)]
+struct PatternVerifier {
+    verified: usize,
+    mismatch: Option<usize>,
+}
+
+impl std::io::Write for PatternVerifier {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        for byte in buffer {
+            if self.mismatch.is_none() && *byte != PatternInput::byte_at(self.verified) {
+                self.mismatch = Some(self.verified);
+            }
+            self.verified += 1;
+        }
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+const WIDE_B8_COPY: [&str; 5] = [
+    "stab",
+    "convert",
+    "--in_format=b8",
+    "--out_format=b8",
+    "--bits_per_shot=2048",
+];
+
+/// The shared streaming record reader replaced convert's whole-input 64 MiB cap, so an input past
+/// the retired cap must now convert successfully. The fixture is synthesized by the test instead
+/// of committed.
+#[test]
+fn convert_streams_inputs_past_the_retired_whole_input_cap() {
+    assert_eq!(over_retired_cap_len() % STREAMING_RECORD_BYTES, 0);
+    let mut stdout = PatternVerifier::default();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        WIDE_B8_COPY,
+        PatternInput::over_retired_cap(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0, "stderr: {}", String::from_utf8_lossy(&stderr));
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    assert_eq!(stdout.verified, over_retired_cap_len());
+    assert_eq!(stdout.mismatch, None);
+}
+
+/// Streamed conversion must hold memory bounded by the record size, not the input length: peak
+/// allocation while converting an over-64-MiB input stays orders of magnitude below the input.
+#[test]
+fn convert_peak_memory_is_bounded_while_streaming_an_over_cap_input() {
+    const PEAK_ALLOCATION_BOUND_BYTES: u64 = 8 * 1024 * 1024;
+
+    let mut stdout = PatternVerifier::default();
+    let mut stderr = Vec::new();
+    let mut status = -1;
+    let allocations = allocation_counter::measure(|| {
+        status = run_from(
+            WIDE_B8_COPY,
+            PatternInput::over_retired_cap(),
+            &mut stdout,
+            &mut stderr,
+        );
+    });
+
+    assert_eq!(status, 0, "stderr: {}", String::from_utf8_lossy(&stderr));
+    assert_eq!(stdout.verified, over_retired_cap_len());
+    assert_eq!(stdout.mismatch, None);
+    assert!(
+        allocations.bytes_max < PEAK_ALLOCATION_BOUND_BYTES,
+        "streaming convert held {} bytes at peak for an over-cap input: {allocations:?}",
+        allocations.bytes_max
     );
 }

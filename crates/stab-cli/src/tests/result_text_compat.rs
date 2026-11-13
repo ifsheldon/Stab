@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus};
 use tempfile::tempdir;
 
-use crate::run_from;
+use super::support::run_cli;
 
 #[test]
 fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
@@ -29,10 +29,10 @@ fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
             OsString::from("--num_observables"),
             OsString::from(layout.observables().to_string()),
         ];
-        let (status, stdout, stderr) = run_cli_owned(convert_args, case.input());
-        assert_acceptance(case, "convert", status, &stderr);
+        let result = run_cli(convert_args, case.input());
+        assert_acceptance(case, "convert", result.status, result.stderr_text());
         if let Some(expected) = case.canonical_01() {
-            assert_eq!(stdout, expected, "{} convert output", case.id());
+            assert_eq!(result.stdout, expected, "{} convert output", case.id());
         }
 
         let Some(width) = case.measurement_only_width() else {
@@ -40,7 +40,7 @@ fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
         };
         let circuit_path = dir.path().join(format!("{}.stim", case.id()));
         std::fs::write(&circuit_path, measurement_circuit(width)).expect("write corpus circuit");
-        let (status, _, stderr) = run_cli_owned(
+        let result = run_cli(
             vec![
                 OsString::from("stab"),
                 OsString::from("m2d"),
@@ -54,11 +54,11 @@ fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
             ],
             case.input(),
         );
-        assert_acceptance(case, "m2d", status, &stderr);
+        assert_acceptance(case, "m2d", result.status, result.stderr_text());
 
         let replay_path = dir.path().join(format!("{}.replay", case.id()));
         std::fs::write(&replay_path, case.input()).expect("write corpus replay");
-        let (status, _, stderr) = run_cli_owned(
+        let result = run_cli(
             vec![
                 OsString::from("stab"),
                 OsString::from("sample_dem"),
@@ -71,19 +71,13 @@ fn checked_corpus_matches_convert_and_applicable_streaming_cli_paths() {
             ],
             measurement_dem(width).as_bytes(),
         );
-        assert_acceptance(case, "sample_dem replay", status, &stderr);
+        assert_acceptance(
+            case,
+            "sample_dem replay",
+            result.status,
+            result.stderr_text(),
+        );
     }
-}
-
-fn run_cli_owned(args: Vec<OsString>, input: &[u8]) -> (i32, Vec<u8>, String) {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(args, input, &mut stdout, &mut stderr);
-    (
-        status,
-        stdout,
-        String::from_utf8(stderr).expect("stderr is UTF-8"),
-    )
 }
 
 fn assert_acceptance(case: &CheckedCase, path: &str, status: i32, stderr: &str) {

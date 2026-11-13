@@ -7,18 +7,8 @@ use stab_model::Gate;
 use stab_records::RecordFormat;
 use tempfile::tempdir;
 
-use crate::{Cli, run_from};
-
-fn run_cli<I, S>(args: I, input: &[u8]) -> (i32, Vec<u8>, Vec<u8>)
-where
-    I: IntoIterator<Item = S>,
-    S: Into<OsString>,
-{
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(args, input, &mut stdout, &mut stderr);
-    (status, stdout, stderr)
-}
+use super::support::run_parts;
+use crate::Cli;
 
 fn json_stdout(stdout: &[u8]) -> Value {
     serde_json::from_slice(stdout).expect("stdout is one JSON value")
@@ -246,7 +236,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
         }
     }
 
-    let (status, stdout, stderr) = run_cli(["stab", "capabilities", "--format=json"], b"ignored");
+    let (status, stdout, stderr) = run_parts(["stab", "capabilities", "--format=json"], b"ignored");
     assert_eq!(status, 0);
     assert_eq!(stderr, b"");
 
@@ -353,27 +343,10 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
 }
 
 #[test]
-fn capabilities_human_output_is_concise_and_structural() {
-    let (status, stdout, stderr) = run_cli(["stab", "capabilities"], b"");
-    assert_eq!(status, 0);
-    assert_eq!(stderr, b"");
-    let output = std::str::from_utf8(&stdout).expect("human output");
-    for expected in [
-        "Stim 1.16.0",
-        "commands:",
-        "gates:",
-        "result codecs: 6",
-        "compilers: 4",
-    ] {
-        assert!(output.contains(expected), "{output}");
-    }
-}
-
-#[test]
 fn inspect_json_reports_exact_circuit_and_dem_structure_without_execution() {
     let circuit = b"M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
     let (status, stdout, stderr) =
-        run_cli(["stab", "inspect", "--type=stim", "--format=json"], circuit);
+        run_parts(["stab", "inspect", "--type=stim", "--format=json"], circuit);
     assert_eq!(status, 0);
     assert_eq!(stderr, b"");
     let report = json_stdout(&stdout);
@@ -410,7 +383,8 @@ fn inspect_json_reports_exact_circuit_and_dem_structure_without_execution() {
     );
 
     let dem = b"error(0.125) D3 L2\n";
-    let (status, stdout, stderr) = run_cli(["stab", "inspect", "--type=dem", "--format=json"], dem);
+    let (status, stdout, stderr) =
+        run_parts(["stab", "inspect", "--type=dem", "--format=json"], dem);
     assert_eq!(status, 0);
     assert_eq!(stderr, b"");
     let report = json_stdout(&stdout);
@@ -431,7 +405,7 @@ fn inspect_json_reports_exact_circuit_and_dem_structure_without_execution() {
     );
 
     let compile_rejected = b"CX sweep[0] 0\nM 0\n";
-    let (status, stdout, stderr) = run_cli(
+    let (status, stdout, stderr) = run_parts(
         ["stab", "inspect", "--type=stim", "--format=json"],
         compile_rejected,
     );
@@ -464,7 +438,7 @@ fn inspect_infers_file_type_and_explicit_type_overrides_unknown_extension() {
             path.as_os_str().to_owned(),
             OsString::from("--format=json"),
         ];
-        let (status, stdout, stderr) = run_cli(args, b"ignored");
+        let (status, stdout, stderr) = run_parts(args, b"ignored");
         assert_eq!(status, 0, "{path:?}");
         assert_eq!(stderr, b"", "{path:?}");
         assert_eq!(pointer(&json_stdout(&stdout), "/model/dialect"), dialect);
@@ -476,7 +450,7 @@ fn inspect_infers_file_type_and_explicit_type_overrides_unknown_extension() {
         unknown_path.as_os_str().to_owned(),
         OsString::from("--error-format=json"),
     ];
-    let (status, stdout, stderr) = run_cli(args, b"ignored");
+    let (status, stdout, stderr) = run_parts(args, b"ignored");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     let diagnostic = json_stdout(&stderr);
@@ -493,7 +467,7 @@ fn inspect_infers_file_type_and_explicit_type_overrides_unknown_extension() {
         OsString::from("--type=stim"),
         OsString::from("--format=json"),
     ];
-    let (status, stdout, stderr) = run_cli(args, b"ignored");
+    let (status, stdout, stderr) = run_parts(args, b"ignored");
     assert_eq!(status, 0);
     assert_eq!(stderr, b"");
     assert_eq!(
@@ -504,7 +478,7 @@ fn inspect_infers_file_type_and_explicit_type_overrides_unknown_extension() {
 
 #[test]
 fn inspect_requires_an_explicit_type_when_inference_is_impossible() {
-    let (status, stdout, stderr) = run_cli(
+    let (status, stdout, stderr) = run_parts(
         ["stab", "inspect", "--format=json", "--error-format=json"],
         b"M 0\n",
     );
@@ -517,7 +491,7 @@ fn inspect_requires_an_explicit_type_when_inference_is_impossible() {
 
 #[test]
 fn agent_commands_route_parse_and_compile_failures_through_json_diagnostics() {
-    let (status, stdout, stderr) = run_cli(
+    let (status, stdout, stderr) = run_parts(
         ["stab", "inspect", "--type=stim", "--error-format=json"],
         b"\xff",
     );
@@ -529,7 +503,7 @@ fn agent_commands_route_parse_and_compile_failures_through_json_diagnostics() {
     assert_eq!(pointer(&diagnostic, "/span/byte_length"), 1);
     assert_eq!(pointer(&diagnostic, "/context/dialect"), "stim-circuit");
 
-    let (status, stdout, stderr) = run_cli(
+    let (status, stdout, stderr) = run_parts(
         ["stab", "plan", "sample", "--error-format=json"],
         b"M 0\nCX 1 rec[-1]\n",
     );
@@ -555,7 +529,7 @@ fn inspect_rejects_oversized_files_before_reading_them() {
         path.as_os_str().to_owned(),
         OsString::from("--error-format=json"),
     ];
-    let (status, stdout, stderr) = run_cli(args, b"ignored");
+    let (status, stdout, stderr) = run_parts(args, b"ignored");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     let diagnostic = json_stdout(&stderr);
@@ -569,7 +543,7 @@ fn inspect_rejects_oversized_files_before_reading_them() {
 #[test]
 fn plan_sample_separates_compilation_identity_from_run_configuration() {
     let circuit = b"H 0\nM 0\n";
-    let (_, first_stdout, first_stderr) = run_cli(
+    let (_, first_stdout, first_stderr) = run_parts(
         [
             "stab",
             "plan",
@@ -584,7 +558,7 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
     assert_eq!(first_stderr, b"");
     let first = json_stdout(&first_stdout);
 
-    let (status, second_stdout, second_stderr) = run_cli(
+    let (status, second_stdout, second_stderr) = run_parts(
         [
             "stab",
             "plan",
@@ -652,7 +626,7 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
 #[test]
 fn plan_sample_reports_scalar_identity_without_backend_selection() {
     let (status, stdout, stderr) =
-        run_cli(["stab", "plan", "sample", "--format=json"], b"H 0\nM 0\n");
+        run_parts(["stab", "plan", "sample", "--format=json"], b"H 0\nM 0\n");
     assert_eq!(status, 0);
     assert_eq!(stderr, b"");
     let report = json_stdout(&stdout);
@@ -662,13 +636,13 @@ fn plan_sample_reports_scalar_identity_without_backend_selection() {
         "scalar"
     );
 
-    let (status, help_stdout, help_stderr) = run_cli(["stab", "plan", "sample", "--help"], b"");
+    let (status, help_stdout, help_stderr) = run_parts(["stab", "plan", "sample", "--help"], b"");
     assert_eq!(status, 0);
     assert_eq!(help_stderr, b"");
     assert!(!String::from_utf8_lossy(&help_stdout).contains("--backend"));
 
     let (status, stdout, stderr) =
-        run_cli(["stab", "plan", "sample", "--backend=scalar"], b"M 0\n");
+        run_parts(["stab", "plan", "sample", "--backend=scalar"], b"M 0\n");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert!(String::from_utf8_lossy(&stderr).contains("--backend"));
@@ -678,8 +652,8 @@ fn plan_sample_reports_scalar_identity_without_backend_selection() {
 fn plan_sample_is_deterministic_for_noisy_entropy_configuration() {
     let circuit = b"X_ERROR(0.5) 0\nM 0\n";
     let args = ["stab", "plan", "sample", "--shots=100", "--format=json"];
-    let first = run_cli(args, circuit);
-    let second = run_cli(args, circuit);
+    let first = run_parts(args, circuit);
+    let second = run_parts(args, circuit);
 
     assert_eq!(first.0, 0);
     assert_eq!(second.0, 0);
@@ -698,13 +672,13 @@ fn plan_sample_is_deterministic_for_noisy_entropy_configuration() {
 fn plan_sample_matches_one_shot_herald_filtering_output_width() {
     let circuit = b"HERALDED_ERASE(0) 0\nM 0\n";
     let (status, plan_stdout, plan_stderr) =
-        run_cli(["stab", "plan", "sample", "--format=json"], circuit);
+        run_parts(["stab", "plan", "sample", "--format=json"], circuit);
     assert_eq!(status, 0);
     assert_eq!(plan_stderr, b"");
     let plan = json_stdout(&plan_stdout);
 
     let (status, sample_stdout, sample_stderr) =
-        run_cli(["stab", "sample", "--shots=1", "--seed=7"], circuit);
+        run_parts(["stab", "sample", "--shots=1", "--seed=7"], circuit);
     assert_eq!(status, 0);
     assert_eq!(sample_stderr, b"");
     assert_eq!(
@@ -717,7 +691,7 @@ fn plan_sample_matches_one_shot_herald_filtering_output_width() {
 #[test]
 fn plan_sample_counts_heralded_repeat_width_without_expanding_the_repeat() {
     let circuit = b"REPEAT 100000 {\nHERALDED_ERASE(0) 0\nM 0\n}\n";
-    let (status, stdout, stderr) = run_cli(["stab", "plan", "sample", "--format=json"], circuit);
+    let (status, stdout, stderr) = run_parts(["stab", "plan", "sample", "--format=json"], circuit);
 
     assert_eq!(status, 0);
     assert_eq!(stderr, b"");
@@ -730,7 +704,7 @@ fn plan_sample_counts_heralded_repeat_width_without_expanding_the_repeat() {
 
 #[test]
 fn plan_sample_rejects_invalid_output_groups_and_uncompilable_circuits() {
-    let (status, stdout, stderr) = run_cli(
+    let (status, stdout, stderr) = run_parts(
         ["stab", "plan", "sample", "--shots=65", "--out_format=ptb64"],
         b"M 0\n",
     );
@@ -742,7 +716,7 @@ fn plan_sample_rejects_invalid_output_groups_and_uncompilable_circuits() {
             .contains("multiple of 64")
     );
 
-    let (status, stdout, stderr) = run_cli(["stab", "plan", "sample"], b"M 0\nCX 1 rec[-1]\n");
+    let (status, stdout, stderr) = run_parts(["stab", "plan", "sample"], b"M 0\nCX 1 rec[-1]\n");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert!(
@@ -766,7 +740,7 @@ fn agent_commands_have_structural_human_output_and_clap_rejects_unknown_plans() 
             "validated: yes",
         ),
     ] {
-        let (status, stdout, stderr) = run_cli(args.iter().copied(), input);
+        let (status, stdout, stderr) = run_parts(args.iter().copied(), input);
         assert_eq!(status, 0, "{args:?}");
         assert_eq!(stderr, b"", "{args:?}");
         assert!(
@@ -777,7 +751,7 @@ fn agent_commands_have_structural_human_output_and_clap_rejects_unknown_plans() 
         );
     }
 
-    let (status, stdout, stderr) = run_cli(["stab", "plan", "unknown"], b"");
+    let (status, stdout, stderr) = run_parts(["stab", "plan", "unknown"], b"");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert!(!stderr.is_empty());

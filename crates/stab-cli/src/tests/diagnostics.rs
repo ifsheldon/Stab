@@ -1,17 +1,10 @@
 use std::ffi::OsString;
-use std::io::{self, Write};
 
 use serde_json::Value;
 use tempfile::tempdir;
 
+use super::support::{FailAfterOneWrite, FailingWriter, FlushFailWriter, run_parts};
 use crate::{diagnostics::probe_error_format, run_from};
-
-fn run_cli(args: &[&str], input: &[u8]) -> (i32, Vec<u8>, Vec<u8>) {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(args.iter().copied(), input, &mut stdout, &mut stderr);
-    (status, stdout, stderr)
-}
 
 fn json_lines(stderr: &[u8]) -> Vec<Value> {
     std::str::from_utf8(stderr)
@@ -32,7 +25,7 @@ fn field<'a>(value: &'a Value, pointer: &str) -> &'a Value {
 }
 
 fn assert_invalid_utf8_diagnostic(args: &[&str], dialect: &str) {
-    let (status, stdout, stderr) = run_cli(args, b"\xc3");
+    let (status, stdout, stderr) = run_parts(args, b"\xc3");
     assert_eq!(status, 1, "{args:?}");
     assert_eq!(stdout, b"", "{args:?}");
     let diagnostic = only_json_line(&stderr);
@@ -52,30 +45,9 @@ fn assert_invalid_utf8_diagnostic(args: &[&str], dialect: &str) {
 }
 
 #[test]
-fn human_result_format_diagnostic_remains_byte_exact() {
-    let (status, stdout, stderr) = run_cli(
-        &[
-            "stab",
-            "convert",
-            "--in_format=01",
-            "--out_format=b8",
-            "--bits_per_shot=2",
-        ],
-        b"0\n",
-    );
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
-    assert_eq!(
-        stderr,
-        b"error: invalid result format data: 01 record ended after 1 bits; expected 2 bits\n"
-    );
-}
-
-#[test]
 fn json_result_format_diagnostic_has_schema_span_and_typed_context() {
-    let (status, stdout, stderr) = run_cli(
-        &[
+    let (status, stdout, stderr) = run_parts(
+        [
             "stab",
             "convert",
             "--in_format=01",
@@ -147,7 +119,7 @@ fn json_packed_format_diagnostics_include_exact_span_and_context() {
     ];
 
     for (args, input, expected_code, expected_context) in cases {
-        let (status, stdout, stderr) = run_cli(args, input);
+        let (status, stdout, stderr) = run_parts(args, input);
         assert_eq!(status, 1, "{args:?}");
         assert_eq!(stdout, b"", "{args:?}");
         let diagnostic = only_json_line(&stderr);
@@ -165,8 +137,8 @@ fn json_packed_format_diagnostics_include_exact_span_and_context() {
 #[test]
 fn json_resource_limit_diagnostic_preserves_typed_parse_context() {
     let input = vec![b'\n'; 1_000_001];
-    let (status, stdout, stderr) = run_cli(
-        &[
+    let (status, stdout, stderr) = run_parts(
+        [
             "stab",
             "convert",
             "--in_format=stim",
@@ -203,8 +175,8 @@ fn json_resource_limit_diagnostic_preserves_typed_parse_context() {
 
 #[test]
 fn json_sampling_work_limit_preserves_typed_resource_context() {
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "sample", "--shots=1", "--error-format=json"],
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "sample", "--shots=1", "--error-format=json"],
         b"REPEAT 1000000 {\n    H 0\n}\nM 0\n",
     );
 
@@ -233,8 +205,8 @@ fn json_sampling_work_limit_preserves_typed_resource_context() {
 fn json_sampling_work_above_u64_is_an_explicit_lower_bound() {
     let circuit =
         b"REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        H 0\n    }\n    M 0\n}\n";
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "sample", "--shots=1", "--error-format=json"],
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "sample", "--shots=1", "--error-format=json"],
         circuit,
     );
 
@@ -259,8 +231,8 @@ fn json_sampling_work_above_u64_is_an_explicit_lower_bound() {
         })
     );
 
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "detect", "--shots=1", "--error-format=json"],
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "detect", "--shots=1", "--error-format=json"],
         circuit,
     );
     assert_eq!(status, 1);
@@ -373,21 +345,21 @@ fn json_invalid_utf8_diagnostics_cover_circuit_and_dem_side_files() {
 
 #[test]
 fn model_cli_paths_accept_opaque_metadata_bytes_and_preserve_stim_conversion() {
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "convert", "--in_format=stim", "--out_format=stim"],
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "convert", "--in_format=stim", "--out_format=stim"],
         b"H[\xff] 0 # \xfe\n",
     );
     assert_eq!(status, 0);
     assert_eq!(stdout, b"H[\xff] 0\n");
     assert_eq!(stderr, b"");
 
-    let (status, stdout, stderr) = run_cli(&["stab", "sample", "--shots=1"], b"M 0 # \xff\n");
+    let (status, stdout, stderr) = run_parts(["stab", "sample", "--shots=1"], b"M 0 # \xff\n");
     assert_eq!(status, 0);
     assert_eq!(stdout, b"0\n");
     assert_eq!(stderr, b"");
 
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "inspect", "--type=dem", "--format=json"],
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "inspect", "--type=dem", "--format=json"],
         b"error[\xff](0) D0\n",
     );
     assert_eq!(status, 0);
@@ -405,7 +377,7 @@ fn json_circuit_parse_diagnostic_preserves_code_span_context_and_human_mode() {
         "--out_format=stim",
         "--error-format=json",
     ];
-    let (status, stdout, stderr) = run_cli(&json_args, input);
+    let (status, stdout, stderr) = run_parts(json_args, input);
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert_eq!(
@@ -429,7 +401,7 @@ fn json_circuit_parse_diagnostic_preserves_code_span_context_and_human_mode() {
     );
 
     let human_args = ["stab", "convert", "--in_format=stim", "--out_format=stim"];
-    let (status, stdout, stderr) = run_cli(&human_args, input);
+    let (status, stdout, stderr) = run_parts(human_args, input);
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert_eq!(
@@ -449,7 +421,7 @@ fn parser_diagnostics_bound_attacker_controlled_text_in_human_and_json_output() 
         "--out_format=stim",
         "--error-format=json",
     ];
-    let (status, stdout, stderr) = run_cli(&json_args, input.as_bytes());
+    let (status, stdout, stderr) = run_parts(json_args, input.as_bytes());
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert!(stderr.len() <= 1_024);
@@ -470,7 +442,7 @@ fn parser_diagnostics_bound_attacker_controlled_text_in_human_and_json_output() 
     assert!(instruction.ends_with(" [truncated; original length: 16384 bytes]"));
 
     let human_args = ["stab", "convert", "--in_format=stim", "--out_format=stim"];
-    let (status, stdout, stderr) = run_cli(&human_args, input.as_bytes());
+    let (status, stdout, stderr) = run_parts(human_args, input.as_bytes());
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     assert!(stderr.len() <= 264);
@@ -483,8 +455,8 @@ fn parser_diagnostics_bound_attacker_controlled_text_in_human_and_json_output() 
 
 #[test]
 fn json_dem_parse_diagnostic_preserves_numeric_location_and_typed_context() {
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "inspect", "--type=dem", "--error-format=json"],
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "inspect", "--type=dem", "--error-format=json"],
         b"error(0.1) D1152921504606846976\n",
     );
     assert_eq!(status, 1);
@@ -502,7 +474,7 @@ fn json_dem_parse_diagnostic_preserves_numeric_location_and_typed_context() {
 
 #[test]
 fn clap_errors_use_json_only_for_one_unambiguous_request() {
-    let (status, stdout, stderr) = run_cli(&["stab", "--error-format=json", "nope"], b"");
+    let (status, stdout, stderr) = run_parts(["stab", "--error-format=json", "nope"], b"");
     assert_eq!(status, 1);
     assert_eq!(stdout, b"");
     let diagnostic = only_json_line(&stderr);
@@ -512,8 +484,8 @@ fn clap_errors_use_json_only_for_one_unambiguous_request() {
         "invalid-subcommand"
     );
 
-    let (_, _, duplicate_stderr) = run_cli(
-        &["stab", "--error-format=json", "--error-format=json", "nope"],
+    let (_, _, duplicate_stderr) = run_parts(
+        ["stab", "--error-format=json", "--error-format=json", "nope"],
         b"",
     );
     assert!(
@@ -539,7 +511,7 @@ fn help_and_version_remain_successful_human_stdout() {
         &["stab", "--error-format=json", "--help"][..],
         &["stab", "--error-format=json", "--version"][..],
     ] {
-        let (status, stdout, stderr) = run_cli(args, b"");
+        let (status, stdout, stderr) = run_parts(args, b"");
         assert_eq!(status, 0, "{args:?}");
         assert!(!stdout.is_empty(), "{args:?}");
         assert_eq!(stderr, b"", "{args:?}");
@@ -552,16 +524,16 @@ fn help_and_version_remain_successful_human_stdout() {
 
 #[test]
 fn global_error_format_can_precede_named_commands_and_help_topics() {
-    let (status, stdout, stderr) = run_cli(
-        &["stab", "--error-format=json", "sample", "--shots=1"],
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "--error-format=json", "sample", "--shots=1"],
         b"M 0\n",
     );
     assert_eq!(status, 0);
     assert_eq!(stdout, b"0\n");
     assert_eq!(stderr, b"");
 
-    let (status, stdout, stderr) = run_cli(
-        &[
+    let (status, stdout, stderr) = run_parts(
+        [
             "stab",
             "--error-format=json",
             "convert",
@@ -576,7 +548,7 @@ fn global_error_format_can_precede_named_commands_and_help_topics() {
     assert_eq!(stderr, b"");
 
     let args = &["stab", "--error-format=json", "help", "sample"];
-    let (status, stdout, stderr) = run_cli(args, b"");
+    let (status, stdout, stderr) = run_parts(args, b"");
     assert_eq!(status, 0);
     assert!(stdout.starts_with(b"stab sample\n"));
     assert_eq!(stderr, b"");
@@ -589,8 +561,8 @@ fn m2d_streaming_diagnostic_shifts_second_record_span_to_input_offset() {
     std::fs::write(&circuit_path, "M 0 1\nDETECTOR rec[-1]\n").expect("write circuit");
     let circuit_path = circuit_path.to_str().expect("UTF-8 path");
 
-    let (status, stdout, stderr) = run_cli(
-        &[
+    let (status, stdout, stderr) = run_parts(
+        [
             "stab",
             "m2d",
             "--circuit",
@@ -649,8 +621,8 @@ fn json_mode_preserves_alias_rejection_before_truncation() {
     std::fs::write(&path, sentinel).expect("write input");
     let path = path.to_str().expect("UTF-8 path");
 
-    let (status, stdout, stderr) = run_cli(
-        &[
+    let (status, stdout, stderr) = run_parts(
+        [
             "stab",
             "convert",
             "--in_format=01",
@@ -697,7 +669,7 @@ fn json_mode_reports_the_original_output_writer_failure() {
     assert!(
         field(&diagnostic, "/message")
             .as_str()
-            .is_some_and(|message| message.contains("injected writer failure"))
+            .is_some_and(|message| message.contains("intentional write stop"))
     );
 }
 
@@ -721,7 +693,7 @@ fn json_sample_writer_failure_preserves_phase_and_progress() {
     assert!(
         field(&diagnostic, "/message")
             .as_str()
-            .is_some_and(|message| message.contains("injected second-batch failure"))
+            .is_some_and(|message| message.contains("intentional second-batch stop"))
     );
 }
 
@@ -731,7 +703,7 @@ fn json_sample_flush_failure_preserves_finish_phase_and_progress() {
     let status = run_from(
         ["stab", "sample", "--shots=65", "--error-format=json"],
         b"M 0\n".as_slice(),
-        FlushFailWriter,
+        FlushFailWriter::default(),
         &mut stderr,
     );
 
@@ -745,49 +717,6 @@ fn json_sample_flush_failure_preserves_finish_phase_and_progress() {
     assert!(
         field(&diagnostic, "/message")
             .as_str()
-            .is_some_and(|message| message.contains("injected finish failure"))
+            .is_some_and(|message| message.contains("intentional finish failure"))
     );
-}
-
-struct FailingWriter;
-
-impl Write for FailingWriter {
-    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
-        Err(io::Error::other("injected writer failure"))
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-struct FailAfterOneWrite {
-    writes: usize,
-}
-
-struct FlushFailWriter;
-
-impl Write for FlushFailWriter {
-    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-        Ok(buffer.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Err(io::Error::other("injected finish failure"))
-    }
-}
-
-impl Write for FailAfterOneWrite {
-    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-        self.writes += 1;
-        if self.writes > 1 {
-            return Err(io::Error::other("injected second-batch failure"));
-        }
-        Ok(buffer.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }

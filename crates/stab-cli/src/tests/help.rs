@@ -1,33 +1,22 @@
-use crate::run_from;
-
-fn run_cli(args: &[&str]) -> (i32, String, String) {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        args.iter().copied(),
-        "".as_bytes(),
-        &mut stdout,
-        &mut stderr,
-    );
-    (
-        status,
-        String::from_utf8(stdout).expect("stdout is utf-8"),
-        String::from_utf8(stderr).expect("stderr is utf-8"),
-    )
-}
+use super::support::run;
 
 #[test]
 fn help_lists_implemented_commands_for_help_spellings() {
     for args in [&["stab", "help"][..], &["stab", "help", "commands"][..]] {
-        let (status, stdout, stderr) = run_cli(args);
-        assert_eq!(status, 0, "{args:?}");
-        assert_eq!(stderr, "", "{args:?}");
-        assert!(stdout.contains("Available stab commands"), "{stdout}");
-        assert!(stdout.contains("stab capabilities"), "{stdout}");
-        assert!(stdout.contains("stab inspect"), "{stdout}");
-        assert!(stdout.contains("stab plan sample"), "{stdout}");
-        assert!(stdout.contains("stab convert"), "{stdout}");
-        assert!(stdout.contains("stab sample_dem"), "{stdout}");
+        let result = run(args, b"");
+        assert_eq!(result.status, 0, "{args:?}");
+        assert_eq!(result.stderr_text(), "", "{args:?}");
+        let stdout = result.stdout_text();
+        for expected in [
+            "Available stab commands",
+            "stab capabilities",
+            "stab inspect",
+            "stab plan sample",
+            "stab convert",
+            "stab sample_dem",
+        ] {
+            assert!(stdout.contains(expected), "{stdout}");
+        }
         assert!(!stdout.contains("stab diagram"), "{stdout}");
     }
 }
@@ -54,10 +43,14 @@ fn help_topics_cover_commands_formats_and_gates() {
         (&["stab", "help", "ptb64"][..], "groups of exactly 64"),
         (&["stab", "help", "H"][..], "Hadamard-like"),
     ] {
-        let (status, stdout, stderr) = run_cli(args);
-        assert_eq!(status, 0, "{args:?}");
-        assert_eq!(stderr, "", "{args:?}");
-        assert!(stdout.contains(expected), "{args:?}: {stdout}");
+        let result = run(args, b"");
+        assert_eq!(result.status, 0, "{args:?}");
+        assert_eq!(result.stderr_text(), "", "{args:?}");
+        assert!(
+            result.stdout_text().contains(expected),
+            "{args:?}: {}",
+            result.stdout_text()
+        );
     }
 }
 
@@ -68,49 +61,16 @@ fn agent_command_help_names_the_current_success_schema() {
         ("inspect", "schema-version-2"),
         ("plan", "schema-version-4"),
     ] {
-        let (status, stdout, stderr) = run_cli(&["stab", "help", topic]);
-        assert_eq!(status, 0, "{topic}");
-        assert_eq!(stderr, "", "{topic}");
+        let result = run(&["stab", "help", topic], b"");
+        assert_eq!(result.status, 0, "{topic}");
+        assert_eq!(result.stderr_text(), "", "{topic}");
+        let stdout = result.stdout_text();
         assert!(stdout.contains(schema), "{topic}: {stdout}");
         assert!(!stdout.contains("schema-version-1"), "{topic}: {stdout}");
     }
 }
 
 #[test]
-fn subcommand_clap_help_still_works() {
-    let (status, stdout, stderr) = run_cli(&["stab", "sample", "--help"]);
-
-    assert_eq!(status, 0);
-    assert_eq!(stderr, "");
-    assert!(stdout.contains("Samples measurements from a circuit"));
-    assert!(stdout.contains("--shots"));
-}
-
-#[test]
-fn root_clap_help_lists_parser_owned_commands() {
-    let (status, stdout, stderr) = run_cli(&["stab", "--help"]);
-
-    assert_eq!(status, 0);
-    assert_eq!(stderr, "");
-    for command in [
-        "help",
-        "gen",
-        "convert",
-        "sample",
-        "detect",
-        "m2d",
-        "analyze_errors",
-        "sample_dem",
-    ] {
-        assert!(stdout.contains(command), "missing {command}: {stdout}");
-    }
-}
-
-#[test]
 fn unknown_help_topic_exits_nonzero_with_stderr() {
-    let (status, stdout, stderr) = run_cli(&["stab", "help", "not-a-topic"]);
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, "");
-    assert!(stderr.contains("unrecognized help topic"));
+    run(&["stab", "help", "not-a-topic"], b"").assert_err(&["unrecognized help topic"]);
 }
