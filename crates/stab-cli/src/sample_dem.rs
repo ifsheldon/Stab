@@ -1,5 +1,5 @@
-use std::io::{BufReader, Read, Write};
-use std::path::PathBuf;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use stab_engine::{
@@ -9,20 +9,23 @@ use stab_engine::{
 use stab_model::DetectorErrorModel;
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
-    RecordFormat, RecordStreamReadError, RecordStreamReader, for_each_sparse_record,
-    read_measurement_records, validate_ptb64_shot_count,
+    HitsDuplicates, RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader,
+    validate_ptb64_shot_count,
 };
 
 use super::{
     CliError, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DemSampleBatchEncoder, DetectionObservableOutputMode},
-    input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
+    input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
 };
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
 const MAX_SAMPLE_DEM_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+const REPLAY_TEXT_RECORD_KIND: &str = "sample_dem replay text record";
+/// Replay records delivered to the engine per transaction batch.
+const REPLAY_BATCH_SHOTS: usize = u64::BITS as usize;
 
 enum SampleDemExecution {
     Replay {
@@ -148,7 +151,7 @@ where
     let shots = dem_shot_count(args.shots)?;
     if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
         plan.validate_replay(shots).map_err(CliError::from)?;
-        validate_replay_prefix(
+        validate_replay_input(
             replay_input,
             args.replay_err_in_format,
             plan.error_count(),
@@ -204,35 +207,24 @@ where
         encoder,
     };
     let result = match &mut execution {
-        SampleDemExecution::Replay { input, session } => {
-            let mut replay_record = Vec::new();
-            replay_record
-                .try_reserve_exact(plan.error_count())
-                .map_err(|error| {
-                    invalid_result_format(format!(
-                        "sample_dem replay record could not reserve {} bits: {error}",
-                        plan.error_count()
-                    ))
-                })?;
-            let mut transaction = session
-                .start_transaction(&mut sink)
-                .map_err(map_dem_run_error)?;
-            for_each_replay_error_record(
+        SampleDemExecution::Replay { input, session } => (|| {
+            let mut replay = ReplayInput::new(
                 input,
                 args.replay_err_in_format,
                 plan.error_count(),
                 args.shots,
-                |error_record| {
-                    replay_record.clear();
-                    replay_record.extend_from_slice(error_record);
-                    transaction
-                        .write_batch(std::slice::from_ref(&replay_record))
-                        .map(|_| ())
-                        .map_err(map_dem_run_error)
-                },
             )?;
+            let mut transaction = session
+                .start_transaction(&mut sink)
+                .map_err(map_dem_run_error)?;
+            replay.for_each_batch(|batch| {
+                transaction
+                    .write_packed_batch(batch)
+                    .map(|_| ())
+                    .map_err(map_dem_run_error)
+            })?;
             transaction.finish().map(|_| ()).map_err(map_dem_run_error)
-        }
+        })(),
         SampleDemExecution::Sample(session) if args.error_output.is_some() => session
             .run_with_sampled_errors(shots, &mut sink)
             .map(|_| ())
@@ -345,299 +337,187 @@ fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
     Ok(())
 }
 
-fn for_each_replay_error_record<F>(
-    input: &mut InputFile,
-    format: RecordFormatArg,
-    error_count: usize,
-    expected_shots: usize,
-    visit: F,
-) -> Result<(), CliError>
-where
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    match format {
-        RecordFormatArg::Ptb64 => {
-            for_each_ptb64_replay_error_record(input, error_count, expected_shots, visit)
-        }
-        RecordFormatArg::B8 => {
-            for_each_b8_replay_error_record(input, error_count, expected_shots, visit)
-        }
-        RecordFormatArg::R8 => {
-            for_each_r8_replay_error_record(input, error_count, expected_shots, visit)
-        }
-        RecordFormatArg::ZeroOne | RecordFormatArg::Hits | RecordFormatArg::Dets => {
-            for_each_line_replay_error_record(input, format, error_count, expected_shots, visit)
-        }
-        RecordFormatArg::Stim => Err(CliError::UnsupportedDetectionFormat { format: "stim" }),
-    }
-}
-
-fn validate_replay_prefix(
+/// Checks that the replay file holds `expected_shots` well-formed records before any output
+/// file is activated, so a malformed replay produces no partial output, then rewinds it.
+///
+/// This pass decodes into the reader's reusable batch and discards the records: keeping them
+/// for delivery would need storage proportional to the whole replay instead of one batch.
+fn validate_replay_input(
     input: &mut InputFile,
     format: RecordFormatArg,
     error_count: usize,
     expected_shots: usize,
 ) -> Result<(), CliError> {
-    for_each_replay_error_record(input, format, error_count, expected_shots, |_record| Ok(()))?;
+    {
+        let mut replay = ReplayInput::new(&mut *input, format, error_count, expected_shots)?;
+        replay.skip_all()?;
+    }
     input.rewind()
 }
 
-/// Transport adapter over the shared [`RecordStreamReader`]: streams exactly `expected_shots`
-/// ptb64 replay records and keeps sample_dem's replay-shaped diagnostics.
-fn for_each_ptb64_replay_error_record<F>(
-    input: &mut InputFile,
+/// The sampled-error replay stream: exactly `expected_shots` records from the Records reader,
+/// rendered with sample_dem's replay diagnostics. Input beyond those records is ignored.
+struct ReplayInput<'a> {
+    reader: RecordStreamReader<Box<dyn Read + 'a>>,
+    path: PathBuf,
+    format: RecordFormat,
     error_count: usize,
     expected_shots: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    let path = input.path().to_path_buf();
-    if expected_shots == 0 {
-        return Ok(());
-    }
-    if error_count == 0 {
-        return Err(invalid_result_format(
-            "ptb64 input cannot represent a nonzero number of zero-width records",
-        ));
-    }
-    let bytes_per_group = error_count
-        .checked_mul(8)
-        .ok_or(CliError::MeasurementCountOverflow)?;
-    let expected_bytes = bytes_per_group
-        .checked_mul(expected_shots / 64)
-        .ok_or(CliError::MeasurementCountOverflow)?;
-    let mut reader = RecordStreamReader::ptb64(&mut *input, error_count);
-    let truncated = |bytes_read: usize| {
-        invalid_result_format(format!(
-            "ptb64 input expected at least {expected_bytes} bytes for {expected_shots} records with {error_count} bits each, got {bytes_read}"
-        ))
-    };
-    for _ in 0..expected_shots {
-        match reader.next_record() {
-            Ok(Some(record)) => visit(record)?,
-            Ok(None) => return Err(truncated(reader.bytes_read())),
-            Err(RecordStreamReadError::Io(source)) => {
-                return Err(CliError::ReadPath { path, source });
-            }
-            Err(RecordStreamReadError::Format(error)) => {
-                // A trailing partial group keeps the replay contract's byte-count diagnostic.
-                if error.code() == RecordFormatErrorCode::InvalidPackedLength {
-                    return Err(truncated(reader.bytes_read()));
-                }
-                return Err(record_stream_error(
-                    RecordStreamReadError::Format(error),
-                    Some(&path),
-                ));
-            }
-        }
-    }
-    Ok(())
 }
 
-fn for_each_b8_replay_error_record<F>(
-    input: &mut InputFile,
-    error_count: usize,
-    expected_shots: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    let path = input.path().to_path_buf();
-    let bytes_per_record = error_count.div_ceil(8);
-    if bytes_per_record == 0 && expected_shots > 0 {
-        return Err(invalid_result_format(
-            "b8 input cannot represent zero-width records",
-        ));
-    }
-    let mut record_bytes = vec![0u8; bytes_per_record];
-    for records_read in 0..expected_shots {
-        let mut offset = 0usize;
-        while offset < record_bytes.len() {
-            let remaining = record_bytes
-                .get_mut(offset..)
-                .ok_or_else(|| invalid_result_format("b8 replay byte cursor was out of range"))?;
-            match input.read(remaining) {
-                Ok(0) if offset == 0 => {
-                    return Err(CliError::ReplayErrorRecordCountMismatch {
-                        expected: expected_shots,
-                        actual: records_read,
-                    });
-                }
-                Ok(0) => {
-                    return Err(invalid_result_format(format!(
-                        "b8 input ended after {offset} bytes of a {bytes_per_record}-byte record"
-                    )));
-                }
-                Ok(count) => offset += count,
-                Err(source) => {
-                    return Err(CliError::ReadPath {
-                        path: path.clone(),
-                        source,
-                    });
-                }
-            }
+impl<'a> ReplayInput<'a> {
+    fn new(
+        input: &'a mut InputFile,
+        format: RecordFormatArg,
+        error_count: usize,
+        expected_shots: usize,
+    ) -> Result<Self, CliError> {
+        let format = sample_dem_record_format(format)?;
+        if format == RecordFormat::Ptb64 && error_count > 0 {
+            ptb64_expected_bytes(error_count, expected_shots)?;
         }
-        let records = read_measurement_records(&record_bytes, RecordFormat::B8, error_count)?;
-        let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-            invalid_result_format(format!(
-                "b8 replay record decoded into {} records",
-                records.len()
-            ))
-        })?;
-        visit(&record)?;
-    }
-    Ok(())
-}
-
-fn for_each_line_replay_error_record<F>(
-    input: &mut InputFile,
-    format: RecordFormatArg,
-    error_count: usize,
-    expected_shots: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    let record_format = format.required_record_format()?;
-    let path = input.path().to_path_buf();
-    let mut reader = BufReader::new(input);
-    let mut records_read = 0usize;
-    let mut skipped_dets_blank_bytes = 0usize;
-    let mut byte_offset = 0usize;
-    while records_read < expected_shots {
-        let Some(line) = read_limited_line(
-            &mut reader,
-            Some(&path),
+        let path = input.path().to_path_buf();
+        let source: Box<dyn Read + 'a> = Box::new(input);
+        let reader = RecordStreamReader::measurements(
+            source,
+            format,
+            error_count,
             MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES,
-            "sample_dem replay text record",
-        )?
-        else {
-            return Err(CliError::ReplayErrorRecordCountMismatch {
-                expected: expected_shots,
-                actual: records_read,
-            });
-        };
-        let record_byte_offset = byte_offset;
-        byte_offset =
-            byte_offset
-                .checked_add(line.len())
-                .ok_or(CliError::InputByteOffsetOverflow {
-                    kind: "sample_dem replay text record",
-                })?;
-        let parsed = if format == RecordFormatArg::Hits {
-            vec![
-                read_hits_replay_record(&line, error_count).map_err(|error| match error {
-                    CliError::Record(source) => CliError::InputRecord {
-                        byte_offset: record_byte_offset,
-                        source,
-                    },
-                    error => error,
-                })?,
-            ]
-        } else {
-            read_measurement_records(&line, record_format, error_count).map_err(|source| {
-                CliError::InputRecord {
-                    byte_offset: record_byte_offset,
-                    source,
+        )
+        .with_framing(RecordFraming::Records)
+        .with_hits_duplicates(HitsDuplicates::Set)
+        .with_blank_dets_line_budget();
+        Ok(Self {
+            reader,
+            path,
+            format,
+            error_count,
+            expected_shots,
+        })
+    }
+
+    /// Hands every expected record to `write` in batches of at most 64 records.
+    fn for_each_batch(
+        &mut self,
+        mut write: impl FnMut(stab_records::PackedShotBatchView<'_>) -> Result<(), CliError>,
+    ) -> Result<(), CliError> {
+        let mut delivered = 0_usize;
+        while delivered < self.expected_shots {
+            let wanted = (self.expected_shots - delivered).min(REPLAY_BATCH_SHOTS);
+            match self.reader.read_batch(wanted) {
+                Ok(Some(batch)) => {
+                    delivered += batch.shot_count();
+                    write(batch)?;
                 }
-            })?
-        };
-        if format == RecordFormatArg::Dets && parsed.is_empty() {
-            skipped_dets_blank_bytes =
-                checked_text_replay_scan_bytes(skipped_dets_blank_bytes, line.len())?;
-            continue;
-        }
-        let [record] = <[Vec<bool>; 1]>::try_from(parsed).map_err(|records| {
-            invalid_result_format(format!(
-                "replay record decoded into {} records",
-                records.len()
-            ))
-        })?;
-        visit(&record)?;
-        records_read += 1;
-        skipped_dets_blank_bytes = 0;
-    }
-    Ok(())
-}
-
-fn read_hits_replay_record(input: &[u8], error_count: usize) -> Result<Vec<bool>, CliError> {
-    let mut record = None;
-    for_each_sparse_record(input, RecordFormat::Hits, error_count, |hits| {
-        if record.is_some() {
-            return Err(FormatError::new(
-                RecordFormatErrorCode::InvalidData,
-                "HITS replay line decoded into multiple records",
-                None,
-            ));
-        }
-        let mut decoded = vec![false; error_count];
-        for hit in hits {
-            let index = usize::try_from(*hit).map_err(|_| {
-                FormatError::new(
-                    RecordFormatErrorCode::InvalidData,
-                    format!("HITS replay index {hit} does not fit usize"),
-                    None,
-                )
-            })?;
-            let bit = decoded.get_mut(index).ok_or_else(|| {
-                FormatError::new(
-                    RecordFormatErrorCode::InvalidData,
-                    format!("HITS replay index {index} exceeds error count {error_count}"),
-                    None,
-                )
-            })?;
-            *bit = true;
-        }
-        record = Some(decoded);
-        Ok(())
-    })?;
-    record.ok_or_else(|| invalid_result_format("HITS replay line did not contain one record"))
-}
-
-fn checked_text_replay_scan_bytes(current: usize, added: usize) -> Result<usize, CliError> {
-    let updated = current.saturating_add(added);
-    if updated > MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES {
-        return Err(CliError::InputTooLarge {
-            kind: "sample_dem replay text record",
-            limit: u64::try_from(MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES).unwrap_or(u64::MAX),
-        });
-    }
-    Ok(updated)
-}
-
-/// Transport adapter over the shared [`RecordStreamReader`]: streams exactly `expected_shots`
-/// r8 replay records and keeps sample_dem's replay-count diagnostics.
-fn for_each_r8_replay_error_record<F>(
-    input: &mut InputFile,
-    error_count: usize,
-    expected_shots: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    let path = input.path().to_path_buf();
-    let mut reader = RecordStreamReader::measurements(
-        &mut *input,
-        RecordFormat::R8,
-        error_count,
-        MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES,
-    );
-    for records_read in 0..expected_shots {
-        match reader.next_record() {
-            Ok(Some(record)) => visit(record)?,
-            Ok(None) => {
-                return Err(CliError::ReplayErrorRecordCountMismatch {
-                    expected: expected_shots,
-                    actual: records_read,
-                });
+                Ok(None) => return Err(self.shortfall_error(delivered)),
+                Err(error) => return Err(self.read_error(error)),
             }
-            Err(error) => return Err(record_stream_error(error, Some(&path))),
+        }
+        Ok(())
+    }
+
+    /// Decodes and discards every expected record.
+    fn skip_all(&mut self) -> Result<(), CliError> {
+        let skipped = self
+            .reader
+            .skip_records(self.expected_shots)
+            .map_err(|error| self.read_error(error))?;
+        if skipped < self.expected_shots {
+            return Err(self.shortfall_error(skipped));
+        }
+        Ok(())
+    }
+
+    fn shortfall_error(&self, actual: usize) -> CliError {
+        if self.format == RecordFormat::Ptb64 {
+            return self.ptb64_truncated_error();
+        }
+        CliError::ReplayErrorRecordCountMismatch {
+            expected: self.expected_shots,
+            actual,
         }
     }
-    Ok(())
+
+    fn ptb64_truncated_error(&self) -> CliError {
+        match ptb64_expected_bytes(self.error_count, self.expected_shots) {
+            Ok(expected_bytes) => invalid_result_format(format!(
+                "ptb64 input expected at least {expected_bytes} bytes for {} records with {} bits each, got {}",
+                self.expected_shots,
+                self.error_count,
+                self.reader.bytes_read()
+            )),
+            Err(error) => error,
+        }
+    }
+
+    fn read_error(&self, error: RecordStreamReadError) -> CliError {
+        replay_read_error(error, self.format, &self.path, || {
+            self.ptb64_truncated_error()
+        })
+    }
+}
+
+/// Bytes of the PTB64 groups that hold `expected_shots` records of `error_count` bits.
+fn ptb64_expected_bytes(error_count: usize, expected_shots: usize) -> Result<usize, CliError> {
+    error_count
+        .checked_mul(8)
+        .and_then(|bytes_per_group| bytes_per_group.checked_mul(expected_shots / 64))
+        .ok_or(CliError::MeasurementCountOverflow)
+}
+
+/// Renders a Records reader failure with sample_dem's established replay diagnostics.
+fn replay_read_error(
+    error: RecordStreamReadError,
+    format: RecordFormat,
+    path: &Path,
+    ptb64_truncated: impl FnOnce() -> CliError,
+) -> CliError {
+    match error {
+        RecordStreamReadError::Io(source) => CliError::ReadPath {
+            path: path.to_path_buf(),
+            source,
+        },
+        RecordStreamReadError::Format(error)
+            if format == RecordFormat::Ptb64
+                && error.code() == RecordFormatErrorCode::InvalidPackedLength =>
+        {
+            // A trailing partial group keeps the replay contract's byte-count diagnostic.
+            ptb64_truncated()
+        }
+        RecordStreamReadError::Record {
+            byte_offset,
+            source,
+        }
+        | RecordStreamReadError::UnterminatedRecord {
+            byte_offset,
+            source,
+            ..
+        } => CliError::InputRecord {
+            byte_offset,
+            source,
+        },
+        RecordStreamReadError::RecordTooLarge { limit } => CliError::InputTooLarge {
+            kind: REPLAY_TEXT_RECORD_KIND,
+            limit: u64::try_from(limit).unwrap_or(u64::MAX),
+        },
+        RecordStreamReadError::ByteOffsetOverflow => CliError::InputByteOffsetOverflow {
+            kind: REPLAY_TEXT_RECORD_KIND,
+        },
+        RecordStreamReadError::TruncatedRecord {
+            bytes_read,
+            record_bytes,
+        } => invalid_result_format(format!(
+            "b8 input ended after {bytes_read} bytes of a {record_bytes}-byte record"
+        )),
+        RecordStreamReadError::ZeroWidthRecords if format == RecordFormat::Ptb64 => {
+            invalid_result_format(
+                "ptb64 input cannot represent a nonzero number of zero-width records",
+            )
+        }
+        RecordStreamReadError::ZeroWidthRecords => {
+            invalid_result_format("b8 input cannot represent zero-width records")
+        }
+        error @ (RecordStreamReadError::Format(_)
+        | RecordStreamReadError::NonEmptyZeroWidthInput) => record_stream_error(error, Some(path)),
+    }
 }

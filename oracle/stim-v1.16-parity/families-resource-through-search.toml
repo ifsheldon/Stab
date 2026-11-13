@@ -456,7 +456,7 @@ name = "pauli_circuit_conjugation_keeps_compact_unitaries_and_bounds_nonunitary_
 [[families]]
 id = "resource-safety.record-streaming-dense-packed-bounds"
 area = "resource-safety"
-contract = "Dense and packed streaming readers keep allocation bounded by record width or PTB64 group size, independent of record count and duplicate sparse tokens."
+contract = "The packed streaming record reader keeps allocation bounded by one transport buffer, the declared record width, and one PTB64 group, independent of record count and duplicate sparse tokens."
 stim_refs = ["src/stim/io/measure_record_reader.test.cc"]
 status = "divergence"
 owner = "stab-records"
@@ -468,24 +468,7 @@ status = "verified"
 package = "stab-records"
 kind = "test"
 target = "resource_contracts"
-name = "dense_and_packed_streaming_allocations_follow_width_not_record_count"
-
-[[families]]
-id = "resource-safety.record-streaming-sparse-token-bounds"
-area = "resource-safety"
-contract = "Sparse and typed-token streaming readers reuse storage across records while bounding allocation by the largest record's token shape instead of total record count."
-stim_refs = ["src/stim/io/measure_record_reader.test.cc"]
-status = "divergence"
-owner = "stab-records"
-divergence_kind = "resource-limit"
-rationale = "Stab exposes and tests an explicit largest-record streaming-storage guarantee beyond Stim's compatibility contract."
-[families.evidence]
-status = "verified"
-[families.evidence.test]
-package = "stab-records"
-kind = "test"
-target = "resource_contracts"
-name = "sparse_and_token_streaming_allocations_follow_largest_record_not_record_count"
+name = "packed_streaming_allocations_follow_width_not_record_count"
 
 [[families]]
 id = "resource-safety.sampling-expanded-work-limit"
@@ -727,7 +710,7 @@ name = "sample_dem_real_process_covers_primary_side_and_replay_routes"
 [[families]]
 id = "result-formats.streaming-and-typed-dets"
 area = "result-formats"
-contract = "Streaming dense, packed, sparse, typed-token, and typed-DETS sinks preserve namespaces and duplicate semantics."
+contract = "The packed streaming record reader decodes every sample format across transport splits and batch sizes, resolves typed-DETS namespaces, and preserves HITS toggle and DETS set duplicate semantics."
 stim_refs = ["src/stim/io/measure_record_reader.test.cc", "src/stim/io/sparse_shot.test.cc"]
 status = "done"
 owner = "stab-records"
@@ -737,22 +720,7 @@ status = "verified"
 package = "stab-records"
 kind = "lib"
 target = "stab_records"
-name = "result_streaming::tests::streaming_and_typed_dets_contract"
-
-[[families]]
-id = "result-formats.streaming-cancellation"
-area = "result-formats"
-contract = "Every generic dense, packed, sparse, PTB64, and typed DETS visitor stops after the first callback failure and preserves the visitor error class."
-stim_refs = ["src/stim/io/measure_record_reader.test.cc"]
-status = "done"
-owner = "stab-records"
-[families.evidence]
-status = "verified"
-[families.evidence.test]
-package = "stab-records"
-kind = "lib"
-target = "stab_records"
-name = "result_streaming::tests::generic_streaming_preserves_the_first_visitor_error"
+name = "record_stream::tests::packed_stream_preserves_typed_dets_namespaces_and_duplicate_semantics"
 
 [[families]]
 id = "sampling.circuit-common-measurement-and-reset"

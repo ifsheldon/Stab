@@ -8,7 +8,8 @@ use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 use super::bit_plane::{SampledErrorPlanes, sample_into_planes};
 use super::buffers::try_false_vec;
 use super::program::{
-    DemSampleBlock, apply_error_record_block, compile_block, reset_detection_record, usize_from_u64,
+    DemSampleBlock, ErrorRecordBits, apply_error_record_block, compile_block,
+    reset_detection_record, usize_from_u64,
 };
 use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
 use super::{DemError, DemResourceLimitError, DemResult, DemSamplerLimits};
@@ -252,38 +253,38 @@ impl DemSamplingPlan {
         )
     }
 
-    pub(super) fn validate_error_record_width(
+    pub(super) fn validate_error_record_width<B: ErrorRecordBits + ?Sized>(
         &self,
-        error_record: &[bool],
+        error_record: &B,
         shot_index: Option<usize>,
     ) -> DemResult<()> {
-        if error_record.len() == self.error_count() {
+        if error_record.bit_len() == self.error_count() {
             return Ok(());
         }
         if let Some(shot_index) = shot_index {
             return Err(DemError::invalid_result_format(format!(
                 "DEM error record {shot_index} expected {} bits, got {}",
                 self.error_count(),
-                error_record.len()
+                error_record.bit_len()
             )));
         }
         Err(DemError::invalid_result_format(format!(
             "DEM error record expected {} bits, got {}",
             self.error_count(),
-            error_record.len()
+            error_record.bit_len()
         )))
     }
 
-    pub(super) fn detection_record_from_error_record_into(
+    pub(super) fn detection_record_from_error_record_into<B: ErrorRecordBits + ?Sized>(
         &self,
-        error_record: &[bool],
+        error_record: &B,
         record: &mut DetectionRecordBuffer,
     ) -> DemResult<()> {
         self.validate_error_record_width(error_record, None)?;
         reset_detection_record(record, self.detector_count(), self.observable_count());
         let mut cursor = 0;
         apply_error_record_block(&self.inner.operations, 0, error_record, &mut cursor, record)?;
-        if cursor != error_record.len() {
+        if cursor != error_record.bit_len() {
             return Err(DemError::invalid_result_format(
                 "DEM error record had unused trailing bits",
             ));

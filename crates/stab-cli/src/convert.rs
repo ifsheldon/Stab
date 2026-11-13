@@ -2,11 +2,11 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use clap::Args;
-use stab_engine::{detection_record_width, measurement_record_count};
-use stab_model::{Circuit, CircuitItem, DetectorErrorModel, RepeatBlock};
+use stab_engine::detection_record_width;
+use stab_model::{Circuit, DetectorErrorModel};
 use stab_records::{
-    DetsLayout, DetsResultType, FormatError, FormatErrorCode, PackedShotBatch, RecordEncoder,
-    RecordPart, RecordStreamReader,
+    DetsLayout, DetsResultType, FormatError, FormatErrorCode, PackedShotBatch, PackedShotBatchView,
+    RecordBatchPart, RecordEncoder, RecordStreamReader,
 };
 
 use crate::{
@@ -24,6 +24,11 @@ use crate::{
 /// memory bounded without rejecting any input that route accepted, because no record in a
 /// cap-compliant input could exceed it.
 const MAX_CONVERT_RECORD_BYTES: usize = 64 * 1024 * 1024;
+
+/// Upper bound on the packed bytes one conversion batch holds, so very wide records are
+/// converted a few at a time instead of reserving 64 rows at once.
+const CONVERT_BATCH_BYTES: usize = 1024 * 1024;
+const CONVERT_BATCH_RECORDS: usize = u64::BITS as usize;
 
 #[derive(Debug, Args)]
 pub(crate) struct ConvertArgs {
@@ -90,13 +95,6 @@ struct ConvertLayout {
     include_observables: bool,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct ConvertRecordParts<'a> {
-    measurements: &'a [bool],
-    detectors: &'a [bool],
-    observables: &'a [bool],
-}
-
 impl ConvertLayout {
     fn from_explicit_counts(args: &ConvertArgs) -> Self {
         Self {
@@ -118,16 +116,13 @@ impl ConvertLayout {
     }
 
     fn overwrite_circuit_counts(&mut self, circuit: &Circuit, types: &str) -> Result<(), CliError> {
-        self.num_measurements = measurement_record_count(circuit)?;
-        self.num_observables = circuit_observable_count(circuit)?;
-        let detection_width = detection_record_width(circuit)?;
-        self.num_detectors = detection_width
-            .checked_sub(self.num_observables)
-            .ok_or_else(|| {
-                invalid_result_format(
-                    "circuit detector/observable counts were internally inconsistent",
-                )
-            })?;
+        // Compiling the conversion plan still validates measurement-record targets and the
+        // detection conversion limits before any count is trusted; the counts come from the
+        // model, which agrees with the plan on every circuit the plan accepts.
+        detection_record_width(circuit)?;
+        self.num_measurements = usize_from_u64(circuit.count_measurements()?, "measurement count")?;
+        self.num_detectors = usize_from_u64(circuit.count_detectors()?, "detector count")?;
+        self.num_observables = usize_from_u64(circuit.count_observables()?, "observable count")?;
         self.include_measurements = false;
         self.include_detectors = false;
         self.include_observables = false;
@@ -156,36 +151,6 @@ impl ConvertLayout {
                 .ok_or(CliError::MeasurementCountOverflow)?;
         }
         Ok(width)
-    }
-
-    fn parts<'a>(self, record: &'a [bool]) -> Result<ConvertRecordParts<'a>, CliError> {
-        let mut offset = 0usize;
-        let measurements = if self.include_measurements {
-            take_slice(record, &mut offset, self.num_measurements)?
-        } else {
-            &[]
-        };
-        let detectors = if self.include_detectors {
-            take_slice(record, &mut offset, self.num_detectors)?
-        } else {
-            &[]
-        };
-        let observables = if self.include_observables {
-            take_slice(record, &mut offset, self.num_observables)?
-        } else {
-            &[]
-        };
-        if offset != record.len() {
-            return Err(invalid_result_format(format!(
-                "convert record had {} bits but layout consumed {offset}",
-                record.len()
-            )));
-        }
-        Ok(ConvertRecordParts {
-            measurements,
-            detectors,
-            observables,
-        })
     }
 
     /// Width of the primary output record, which omits observables routed to `--obs_out`.
@@ -376,7 +341,6 @@ fn convert_record_reader<'a>(
 ) -> Result<RecordStreamReader<Box<dyn Read + 'a>>, CliError> {
     let width = layout.input_width()?;
     Ok(match format {
-        RecordFormatArg::Ptb64 => RecordStreamReader::ptb64(input, width),
         RecordFormatArg::Dets => {
             RecordStreamReader::dets(input, layout.dets_layout()?, MAX_CONVERT_RECORD_BYTES)
         }
@@ -431,38 +395,19 @@ where
                 })
         })
         .transpose()?;
-    let mut parts = ConvertParts::try_new(layout)?;
-    let packed_input = args.in_format == RecordFormatArg::B8 && layout.single_part().is_some();
+    let batch_records = convert_batch_records(layout.input_width()?);
+    let mut parts = ConvertParts::new(layout);
 
     let conversion_result = (|| -> Result<(), CliError> {
         loop {
-            let has_record = if packed_input {
-                match reader.next_b8_packed_record() {
-                    Ok(Some(record)) => {
-                        parts.load_b8(record)?;
-                        true
-                    }
-                    Ok(None) => false,
-                    Err(error) => return Err(record_stream_error(error, input_path)),
-                }
-            } else {
-                match reader.next_record() {
-                    Ok(Some(record)) => {
-                        parts.load_bools(layout.parts(record)?)?;
-                        true
-                    }
-                    Ok(None) => false,
-                    Err(error) => return Err(record_stream_error(error, input_path)),
-                }
+            let batch = match reader.read_batch(batch_records) {
+                Ok(Some(batch)) => batch,
+                Ok(None) => break,
+                Err(error) => return Err(record_stream_error(error, input_path)),
             };
-            if !has_record {
-                break;
-            }
-            parts.with_record(split_observables, |record, observable| {
+            parts.with_batch(batch, split_observables, |record, observable| {
                 primary_sink.write_with(|output| {
-                    primary
-                        .write_record(record, output)
-                        .map_err(record_write_io)
+                    primary.write_batch(record, output).map_err(record_write_io)
                 })?;
                 if let Some(encoder) = observables.as_mut() {
                     let sink = observable_sink.as_mut().ok_or(CliError::IoPlanInvariant {
@@ -470,7 +415,7 @@ where
                     })?;
                     sink.write_with(|output| {
                         encoder
-                            .write_record(observable, output)
+                            .write_batch(observable, output)
                             .map_err(record_write_io)
                     })?;
                 }
@@ -509,75 +454,91 @@ fn validate_complete_groups(encoder: &RecordEncoder) -> Result<(), CliError> {
     }
 }
 
-/// Reusable packed storage for one converted record's measurement, detector, and observable
-/// columns, handed to the shared encoder as typed parts.
+/// Records per conversion batch: up to 64, fewer when records are wide.
+fn convert_batch_records(width: usize) -> usize {
+    let row_bytes = width.div_ceil(u8::BITS as usize).max(1);
+    (CONVERT_BATCH_BYTES / row_bytes).clamp(1, CONVERT_BATCH_RECORDS)
+}
+
+/// Splits decoded conversion batches into measurement, detector, and observable column groups
+/// for the shared encoder. Column storage is allocated only after a batch has been decoded.
 struct ConvertParts {
     layout: ConvertLayout,
-    measurements: PackedShotBatch,
-    detectors: PackedShotBatch,
-    observables: PackedShotBatch,
+    columns: Option<[PackedShotBatch; 3]>,
 }
 
 impl ConvertParts {
-    fn try_new(layout: ConvertLayout) -> Result<Self, CliError> {
-        let width = |included: bool, count: usize| if included { count } else { 0 };
-        Ok(Self {
+    const fn new(layout: ConvertLayout) -> Self {
+        Self {
             layout,
-            measurements: PackedShotBatch::zeros(
-                1,
-                width(layout.include_measurements, layout.num_measurements),
-            )?,
-            detectors: PackedShotBatch::zeros(
-                1,
-                width(layout.include_detectors, layout.num_detectors),
-            )?,
-            observables: PackedShotBatch::zeros(
-                1,
-                width(layout.include_observables, layout.num_observables),
-            )?,
-        })
-    }
-
-    fn load_bools(&mut self, parts: ConvertRecordParts<'_>) -> Result<(), CliError> {
-        self.measurements
-            .copy_shot_from_bools(0, parts.measurements)?;
-        self.detectors.copy_shot_from_bools(0, parts.detectors)?;
-        self.observables
-            .copy_shot_from_bools(0, parts.observables)?;
-        Ok(())
-    }
-
-    /// Loads a raw B8 frame into the layout's only included column group.
-    fn load_b8(&mut self, record: &[u8]) -> Result<(), CliError> {
-        let target = match self.layout.single_part() {
-            Some(DetsResultType::Measurement) => &mut self.measurements,
-            Some(DetsResultType::Detector) => &mut self.detectors,
-            Some(DetsResultType::Observable) => &mut self.observables,
-            None => {
-                return Err(CliError::IoPlanInvariant {
-                    message: "packed b8 conversion requires exactly one included record type",
-                });
-            }
-        };
-        target.copy_shot_from_b8(0, record)?;
-        Ok(())
+            columns: None,
+        }
     }
 
     /// Calls `write` with the primary record's parts and the observable-output record's parts.
-    fn with_record(
-        &self,
+    fn with_batch(
+        &mut self,
+        batch: PackedShotBatchView<'_>,
         split_observables: bool,
-        write: impl FnOnce(&[RecordPart<'_>], &[RecordPart<'_>]) -> Result<(), CliError>,
+        write: impl FnOnce(&[RecordBatchPart<'_>], &[RecordBatchPart<'_>]) -> Result<(), CliError>,
     ) -> Result<(), CliError> {
-        let measurements = RecordPart::new(DetsResultType::Measurement, self.measurements.shot(0)?);
-        let detectors = RecordPart::new(DetsResultType::Detector, self.detectors.shot(0)?);
-        let observables = RecordPart::new(DetsResultType::Observable, self.observables.shot(0)?);
-        if split_observables {
-            write(&[measurements, detectors], &[observables])
-        } else {
-            write(&[measurements, detectors, observables], &[])
+        let layout = self.layout;
+        let included = |include: bool, count: usize| if include { count } else { 0 };
+        let widths = [
+            (
+                DetsResultType::Measurement,
+                included(layout.include_measurements, layout.num_measurements),
+            ),
+            (
+                DetsResultType::Detector,
+                included(layout.include_detectors, layout.num_detectors),
+            ),
+            (
+                DetsResultType::Observable,
+                included(layout.include_observables, layout.num_observables),
+            ),
+        ];
+        let shots = batch.shot_count();
+        let single = layout.single_part();
+        let columns = match &mut self.columns {
+            Some(columns) if columns[0].shot_count() >= shots => columns,
+            columns => columns.insert([
+                PackedShotBatch::zeros(shots, column_width(widths[0].1, single, widths[0].0))?,
+                PackedShotBatch::zeros(shots, column_width(widths[1].1, single, widths[1].0))?,
+                PackedShotBatch::zeros(shots, column_width(widths[2].1, single, widths[2].0))?,
+            ]),
+        };
+        let mut offset = 0_usize;
+        for ((namespace, width), column) in widths.iter().zip(columns.iter_mut()) {
+            if *width > 0 && single != Some(*namespace) {
+                column.copy_columns_from(batch, offset, shots)?;
+            }
+            offset = offset
+                .checked_add(*width)
+                .ok_or(CliError::MeasurementCountOverflow)?;
         }
+        let mut views = Vec::with_capacity(widths.len());
+        for ((namespace, _), column) in widths.iter().zip(columns.iter()) {
+            let records = if single == Some(*namespace) {
+                batch
+            } else {
+                column.view_prefix(shots)?
+            };
+            views.push(RecordBatchPart::new(*namespace, records));
+        }
+        let (primary, observables) = if split_observables {
+            views.split_at(2)
+        } else {
+            (views.as_slice(), &[][..])
+        };
+        write(primary, observables)
     }
+}
+
+/// Columns stored outside the decoded batch: none for the layout's only included type, which
+/// is encoded straight from the batch.
+fn column_width(width: usize, single: Option<DetsResultType>, namespace: DetsResultType) -> usize {
+    if single == Some(namespace) { 0 } else { width }
 }
 
 fn parse_convert_types(types: &str, layout: &mut ConvertLayout) -> Result<(), CliError> {
@@ -600,44 +561,6 @@ fn set_type_flag(flag: &mut bool, result_type: char) -> Result<(), CliError> {
     Ok(())
 }
 
-fn circuit_observable_count(circuit: &Circuit) -> Result<usize, CliError> {
-    let mut max_observable = None;
-    visit_circuit_observables(circuit, &mut max_observable)?;
-    max_observable
-        .map(|id| id.checked_add(1).ok_or(CliError::MeasurementCountOverflow))
-        .transpose()?
-        .map(|count| usize::try_from(count).map_err(|_| CliError::MeasurementCountOverflow))
-        .transpose()
-        .map(|count| count.unwrap_or(0))
-}
-
-fn visit_circuit_observables(
-    circuit: &Circuit,
-    max_observable: &mut Option<u64>,
-) -> Result<(), CliError> {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE"
-                    && let Some(observable) = instruction.observable_id_argument()?
-                {
-                    let id = observable.get();
-                    *max_observable = Some(max_observable.map_or(id, |current| current.max(id)));
-                }
-            }
-            CircuitItem::RepeatBlock(repeat) => visit_repeat_observables(repeat, max_observable)?,
-        }
-    }
-    Ok(())
-}
-
-fn visit_repeat_observables(
-    repeat: &RepeatBlock,
-    max_observable: &mut Option<u64>,
-) -> Result<(), CliError> {
-    visit_circuit_observables(repeat.body(), max_observable)
-}
-
 fn read_side_input(
     io: &mut PendingIo,
     role: FileRole,
@@ -657,24 +580,6 @@ where
     let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     primary_output.write_with(|writer| writer.write_all(primary))?;
     primary_output.flush()
-}
-
-fn take_slice<'a>(
-    record: &'a [bool],
-    offset: &mut usize,
-    len: usize,
-) -> Result<&'a [bool], CliError> {
-    let end = offset
-        .checked_add(len)
-        .ok_or(CliError::MeasurementCountOverflow)?;
-    let slice = record.get(*offset..end).ok_or_else(|| {
-        invalid_result_format(format!(
-            "convert record expected slice {offset}..{end} within {} bits",
-            record.len()
-        ))
-    })?;
-    *offset = end;
-    Ok(slice)
 }
 
 fn usize_from_u64(value: u64, kind: &'static str) -> Result<usize, CliError> {

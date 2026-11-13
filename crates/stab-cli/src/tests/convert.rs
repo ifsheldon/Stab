@@ -671,3 +671,62 @@ fn convert_peak_memory_is_bounded_while_streaming_an_over_cap_input() {
         allocations.bytes_max
     );
 }
+
+#[test]
+fn convert_takes_model_counts_that_agree_with_the_engine_conversion_plan() {
+    // REPEAT bodies multiply counts, observables may be declared only through
+    // OBSERVABLE_INCLUDE (including Pauli targets and inside REPEAT), heralded noise records
+    // measurements, and a circuit may have no detectors at all.
+    let circuits = [
+        "M 0 1\nREPEAT 3 {\n M 0\n DETECTOR rec[-1]\n OBSERVABLE_INCLUDE(4) rec[-1]\n}\n",
+        "REPEAT 2 {\n REPEAT 5 {\n MR 0 1\n DETECTOR rec[-1] rec[-2]\n }\n}\n",
+        "M 0\nOBSERVABLE_INCLUDE(2) X0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        "H 0\nM 0 1 2\n",
+        "H 0\n",
+        "MPP X0*X1 Z2\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n",
+        "M 0\nREPEAT 4 {\n OBSERVABLE_INCLUDE(7) rec[-1]\n}\n",
+        "HERALDED_ERASE(0.1) 0\nM 0\nDETECTOR rec[-1] rec[-2]\nHERALDED_PAULI_CHANNEL_1(0, 1, 0, 0) 1\n",
+    ];
+    for text in circuits {
+        let circuit = crate::parse_circuit_bytes(text.as_bytes()).expect("valid circuit");
+        let measurements = circuit.count_measurements().expect("measurement count");
+        let detectors = circuit.count_detectors().expect("detector count");
+        let observables = circuit.count_observables().expect("observable count");
+        assert_eq!(
+            u64::try_from(stab_engine::measurement_record_count(&circuit).expect("plan"))
+                .expect("count fits u64"),
+            measurements,
+            "{text}"
+        );
+        assert_eq!(
+            u64::try_from(stab_engine::detection_record_width(&circuit).expect("plan"))
+                .expect("width fits u64"),
+            detectors + observables,
+            "{text}"
+        );
+    }
+
+    // The engine plan still rejects circuits whose records it cannot resolve.
+    let (_dir, circuit) = write_fixture("bad.stim", "DETECTOR rec[-1]\n");
+    let result = run(
+        &[
+            "stab",
+            "convert",
+            "--in_format",
+            "01",
+            "--out_format",
+            "dets",
+            "--circuit",
+            &circuit,
+            "--types",
+            "MDL",
+        ],
+        b"",
+    );
+    assert_eq!(result.status, 1);
+    assert!(
+        result.stderr_text().contains("is not available"),
+        "{}",
+        result.stderr_text()
+    );
+}

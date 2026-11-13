@@ -87,7 +87,7 @@ All of these compile on `nightly-2026-06-20` except the `Atomic::from_mut*` APIs
 
 ### Most relevant
 
-- **`DropGuard` (1.100)** runs a closure on drop unless `DropGuard::dismiss` is called. It suits rollback-on-error code such as the `self.buffer.truncate(old_len)` error path in `crates/stab-records/src/record_stream.rs:468`, and partial-output cleanup in `ops/release`.
+- **`DropGuard` (1.100)** runs a closure on drop unless `DropGuard::dismiss` is called. It suits rollback-on-error code such as partial-output cleanup in `ops/release`.
 - **`str::trim_prefix` / `trim_suffix`, `[T]::trim_*`, `Path::trim_prefix` (1.100)** replace `strip_prefix(x).unwrap_or(original)`. Current sites include `crates/stab-model/src/circuit/parser.rs:778`, `ops/architecture/src/markdown.rs:633`, and `ops/architecture/src/workflow_actions.rs:75`.
 - **Workspace `default-features` override (1.99, Cargo, edition 2024 members only)**: `dep = { workspace = true, default-features = false }` is now honored even when the workspace definition enables defaults. This lets product crates trim features from shared `[workspace.dependencies]` entries.
 - **`[lints.cargo]` with `cargo::unused_dependencies` (1.100, warn by default)** helps keep the dependency graph minimal, in line with ADR 0007. It only fires when every target that could use a dependency is built, and it never reports dev-dependencies.

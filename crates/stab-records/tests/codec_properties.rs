@@ -1,28 +1,28 @@
 #![allow(
     clippy::expect_used,
+    clippy::indexing_slicing,
     clippy::panic,
-    reason = "codec properties report the exact format, width, and bytes that violated a contract"
+    reason = "codec properties report the exact format, width, and bytes that violated a contract, and the reference decoder indexes inputs whose bounds it has just checked"
 )]
 
 //! Generated properties for every result-record codec.
 //!
-//! Hostile bytes at arbitrary widths must decode to records or a typed `FormatError` through
-//! every reader, and all readers (materialized, dense, packed, sparse, chunked streaming, and the
-//! raw b8 frame path) must agree on acceptance and content. Written records must match
-//! independent reference encoders and decode back unchanged.
+//! Hostile bytes at arbitrary widths must decode to records or a typed error through every
+//! reader. The materialized readers and the packed streaming reader, under both framings and at
+//! arbitrary batch sizes and transport splits, must agree with a simple per-bit reference decoder
+//! on acceptance and content, and the streaming reader must report the same diagnostic code as
+//! the materialized reader. Written records must match independent reference encoders and decode
+//! back unchanged.
 
 use std::io::Read;
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config, FileFailurePersistence, RngAlgorithm, RngSeed};
-use stab_bits::BitSlice;
 use stab_records::{
-    BitPlane64Batch, DetsLayout, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder,
-    RecordFormat, RecordResult, RecordStreamError, RecordStreamReader, for_each_dets_packed_record,
-    for_each_dets_record, for_each_dets_sparse_shot, for_each_dets_token_record,
-    for_each_packed_record, for_each_ptb64_record, for_each_record, for_each_sparse_record,
+    BitPlane64Batch, DetsLayout, DetsResultType, FormatErrorCode, PackedShotBatch, RecordBatchPart,
+    RecordEncoder, RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader,
     read_dets_records, read_measurement_records, read_ptb64_records, read_ptb64_records_all,
-    read_records, try_for_each_record, write_bit_plane_64_batch, write_records,
+    read_records, write_bit_plane_64_batch, write_records,
 };
 
 const FORMATS: [RecordFormat; 6] = [
@@ -35,8 +35,7 @@ const FORMATS: [RecordFormat; 6] = [
 ];
 
 /// Delivers two short reads at salt-chosen boundaries, then the remainder, so streaming decoders
-/// must resume frames split across transport reads. Long trickles are avoided because each refill
-/// grows the stream buffer by a fixed chunk.
+/// must resume frames split across transport reads.
 struct Chunked<'a> {
     data: &'a [u8],
     limits: [usize; 2],
@@ -110,162 +109,272 @@ fn config(seed: u64, cases: u32) -> Config {
     }
 }
 
-fn bits(record: BitSlice<'_>) -> Vec<bool> {
-    (0..record.len())
-        .map(|index| record.get(index).expect("index below record length"))
-        .collect()
-}
-
-fn sparse_to_dense(indices: &[u64], width: usize, toggle: bool) -> Option<Vec<bool>> {
-    let mut dense = vec![false; width];
-    for index in indices {
-        let bit = dense.get_mut(usize::try_from(*index).ok()?)?;
-        *bit = if toggle { !*bit } else { true };
-    }
-    Some(dense)
-}
-
-fn stream_all(mut reader: RecordStreamReader<Chunked<'_>>) -> Result<Vec<Vec<bool>>, String> {
+/// Drains a packed reader in batches of `batch` records, returning every record as dense bits,
+/// or the first failure.
+fn stream_all<R: Read>(
+    mut reader: RecordStreamReader<R>,
+    batch: usize,
+) -> Result<Vec<Vec<bool>>, RecordStreamReadError> {
     let mut records = Vec::new();
-    loop {
-        match reader.next_record() {
-            Ok(Some(record)) => records.push(record.to_vec()),
-            Ok(None) => return Ok(records),
-            Err(error) => return Err(error.to_string()),
+    while let Some(view) = reader.read_batch(batch)? {
+        for shot in 0..view.shot_count() {
+            let row = view.shot(shot)?;
+            records.push(
+                (0..row.len())
+                    .map(|bit| row.get(bit) == Some(true))
+                    .collect(),
+            );
         }
     }
+    Ok(records)
 }
 
-fn assert_same(
-    reader: &str,
-    actual: Result<Vec<Vec<bool>>, String>,
-    expected: &RecordResult<Vec<Vec<bool>>>,
-    context: &str,
-) {
-    match (actual, expected) {
-        (Ok(actual), Ok(expected)) => assert_eq!(&actual, expected, "{reader}: {context}"),
-        (Err(_), Err(_)) => {}
-        (actual, expected) => panic!(
-            "{reader} disagreed with read_records on acceptance: {context}\n{reader}: {actual:?}\nread_records: {expected:?}"
-        ),
+fn error_code(error: &RecordStreamReadError) -> Option<FormatErrorCode> {
+    match error {
+        RecordStreamReadError::Format(error)
+        | RecordStreamReadError::Record { source: error, .. }
+        | RecordStreamReadError::UnterminatedRecord { source: error, .. } => Some(error.code()),
+        _ => None,
     }
 }
 
-/// Checks every generic measurement-shaped reader against `read_records`.
+/// A deliberately simple per-bit decoder for one whole input, written from the format grammar
+/// rather than from the product decoders. `None` means the input is malformed.
+fn reference_decode(input: &[u8], format: RecordFormat, width: usize) -> Option<Vec<Vec<bool>>> {
+    match format {
+        RecordFormat::ZeroOne => reference_zero_one(input, width),
+        RecordFormat::B8 => {
+            let bytes = width.div_ceil(8);
+            if bytes == 0 || !input.len().is_multiple_of(bytes) {
+                return None;
+            }
+            Some(
+                input
+                    .chunks(bytes)
+                    .map(|chunk| {
+                        (0..width)
+                            .map(|bit| chunk[bit / 8] >> (bit % 8) & 1 == 1)
+                            .collect()
+                    })
+                    .collect(),
+            )
+        }
+        RecordFormat::R8 => reference_r8_decode(input, width),
+        RecordFormat::Hits => reference_hits(input, width),
+        RecordFormat::Dets => reference_dets(input, width),
+        RecordFormat::Ptb64 => {
+            if width == 0 || !input.len().is_multiple_of(8 * width) {
+                return None;
+            }
+            let mut records = Vec::new();
+            for group in input.chunks(8 * width) {
+                for shot in 0..64 {
+                    records.push(
+                        (0..width)
+                            .map(|bit| group[bit * 8 + shot / 8] >> (shot % 8) & 1 == 1)
+                            .collect(),
+                    );
+                }
+            }
+            Some(records)
+        }
+        other => panic!("no reference decoder for {other:?}"),
+    }
+}
+
+/// Consumes a record terminator: `\n`, or `\r\n`.
+fn reference_newline(input: &[u8], offset: &mut usize) -> Option<()> {
+    match input.get(*offset)? {
+        b'\n' => *offset += 1,
+        b'\r' if input.get(*offset + 1) == Some(&b'\n') => *offset += 2,
+        _ => return None,
+    }
+    Some(())
+}
+
+fn reference_zero_one(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
+    let mut records = Vec::new();
+    let mut offset = 0;
+    while offset < input.len() {
+        let mut record = Vec::new();
+        for _ in 0..width {
+            match input.get(offset)? {
+                b'0' => record.push(false),
+                b'1' => record.push(true),
+                _ => return None,
+            }
+            offset += 1;
+        }
+        reference_newline(input, &mut offset)?;
+        records.push(record);
+    }
+    Some(records)
+}
+
+fn reference_r8_decode(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
+    let mut records = Vec::new();
+    let mut offset = 0;
+    while offset < input.len() {
+        let mut record = vec![false; width];
+        let mut position = 0;
+        loop {
+            let run = usize::from(*input.get(offset)?);
+            offset += 1;
+            position += run;
+            if position > width {
+                return None;
+            }
+            if run == 255 {
+                continue;
+            }
+            if position == width {
+                break;
+            }
+            record[position] = true;
+            position += 1;
+        }
+        records.push(record);
+    }
+    Some(records)
+}
+
+fn reference_unsigned(input: &[u8], offset: &mut usize) -> Option<u64> {
+    let start = *offset;
+    let mut value = 0_u64;
+    while let Some(digit @ b'0'..=b'9') = input.get(*offset) {
+        value = value
+            .checked_mul(10)?
+            .checked_add(u64::from(digit - b'0'))?;
+        *offset += 1;
+    }
+    (*offset > start).then_some(value)
+}
+
+fn reference_hits(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
+    let mut records = Vec::new();
+    let mut offset = 0;
+    while offset < input.len() {
+        let mut record = vec![false; width];
+        if reference_newline(input, &mut offset).is_none() {
+            loop {
+                let index = usize::try_from(reference_unsigned(input, &mut offset)?).ok()?;
+                let bit = record.get_mut(index)?;
+                *bit = !*bit;
+                match input.get(offset)? {
+                    b',' => offset += 1,
+                    b'\n' => {
+                        offset += 1;
+                        break;
+                    }
+                    b'\r' => {
+                        offset += 1;
+                        match input.get(offset)? {
+                            b'\n' => {
+                                offset += 1;
+                                break;
+                            }
+                            b',' => offset += 1,
+                            _ => return None,
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+        } else if input.get(offset - 1) != Some(&b'\n') {
+            return None;
+        }
+        records.push(record);
+    }
+    Some(records)
+}
+
+fn reference_dets(input: &[u8], width: usize) -> Option<Vec<Vec<bool>>> {
+    let mut records = Vec::new();
+    let mut offset = 0;
+    loop {
+        while matches!(input.get(offset), Some(b' ' | b'\n' | b'\r' | b'\t')) {
+            offset += 1;
+        }
+        if offset == input.len() {
+            return Some(records);
+        }
+        if input.get(offset..offset + 4)? != b"shot" {
+            return None;
+        }
+        offset += 4;
+        let mut record = vec![false; width];
+        loop {
+            let mut next = input.get(offset).copied();
+            if next == Some(b'\r') {
+                offset += 1;
+                next = input.get(offset).copied();
+            }
+            match next {
+                None => {
+                    records.push(record);
+                    return Some(records);
+                }
+                Some(b'\n') => {
+                    offset += 1;
+                    break;
+                }
+                Some(b' ') if input.get(offset + 1) == Some(&b'M') => {
+                    offset += 2;
+                    let index = usize::try_from(reference_unsigned(input, &mut offset)?).ok()?;
+                    *record.get_mut(index)? = true;
+                }
+                _ => return None,
+            }
+        }
+        records.push(record);
+    }
+}
+
+/// Checks the materialized readers and the packed streaming reader against the reference.
 fn check_generic_readers(format: RecordFormat, width: usize, input: &[u8]) {
     let context = format!(
         "format={} width={width} input_len={}",
         format.as_str(),
         input.len()
     );
+    let reference = reference_decode(input, format, width);
     let expected = read_records(input, format, width);
-    if let Ok(records) = &expected {
-        assert!(
-            records.iter().all(|record| record.len() == width),
-            "decoded record width differs: {context}"
-        );
+    match (&reference, &expected) {
+        (Some(reference), Ok(expected)) => assert_eq!(reference, expected, "{context}"),
+        (None, Err(_)) => {}
+        _ => panic!(
+            "read_records disagreed with the reference decoder: {context}\n{expected:?}\n{reference:?}"
+        ),
     }
-
-    assert_same(
-        "read_measurement_records",
-        read_measurement_records(input, format, width).map_err(|error| error.to_string()),
-        &expected,
-        &context,
+    assert_eq!(
+        read_measurement_records(input, format, width).ok(),
+        expected.as_ref().ok().cloned(),
+        "read_measurement_records: {context}"
     );
 
-    let mut dense = Vec::new();
-    let result = for_each_record(input, format, width, |record| {
-        dense.push(record.to_vec());
-        Ok(())
-    });
-    assert_same(
-        "for_each_record",
-        result.map(|()| dense).map_err(|error| error.to_string()),
-        &expected,
-        &context,
-    );
-
-    let mut packed = Vec::new();
-    let result = for_each_packed_record(input, format, width, |record| {
-        packed.push(bits(record));
-        Ok(())
-    });
-    assert_same(
-        "for_each_packed_record",
-        result.map(|()| packed).map_err(|error| error.to_string()),
-        &expected,
-        &context,
-    );
-
-    let mut sparse = Vec::new();
-    let result = for_each_sparse_record(input, format, width, |record| {
-        sparse.push(
-            sparse_to_dense(record, width, format == RecordFormat::Hits)
-                .expect("sparse index exceeded the declared width"),
-        );
-        Ok(())
-    });
-    assert_same(
-        "for_each_sparse_record",
-        result.map(|()| sparse).map_err(|error| error.to_string()),
-        &expected,
-        &context,
-    );
-
-    let streamed = stream_all(RecordStreamReader::measurements(
-        Chunked::new(input, input.len() * 31 + width),
-        format,
-        width,
-        usize::MAX,
-    ));
-    assert_same("RecordStreamReader", streamed, &expected, &context);
-
-    if format == RecordFormat::B8 {
-        let mut reader = RecordStreamReader::measurements(
-            Chunked::new(input, input.len() * 7 + width + 5),
+    for framing in [RecordFraming::Stream, RecordFraming::Records] {
+        let batch = 1 + (input.len() + width) % 70;
+        let reader = RecordStreamReader::measurements(
+            Chunked::new(input, input.len() * 31 + width),
             format,
             width,
             usize::MAX,
-        );
-        let mut frames = Vec::new();
-        let framed = loop {
-            match reader.next_b8_packed_record() {
-                Ok(Some(frame)) => frames.push(
-                    (0..width)
-                        .map(|bit| {
-                            frame
-                                .get(bit / 8)
-                                .is_some_and(|byte| byte >> (bit % 8) & 1 == 1)
-                        })
-                        .collect(),
-                ),
-                Ok(None) => break Ok(frames),
-                Err(error) => break Err(error.to_string()),
+        )
+        .with_framing(framing);
+        let streamed = stream_all(reader, batch);
+        match (&streamed, &expected) {
+            (Ok(streamed), Ok(expected)) => {
+                assert_eq!(streamed, expected, "{framing:?} batch={batch}: {context}");
             }
-        };
-        assert_same("next_b8_packed_record", framed, &expected, &context);
-    }
-
-    // A visitor error cancels decoding immediately after the first delivered record.
-    let mut visited = 0_usize;
-    let cancelled = try_for_each_record(input, format, width, |_| {
-        visited += 1;
-        Err("stop")
-    });
-    match (&expected, cancelled) {
-        (Ok(records), Ok(())) => assert!(records.is_empty(), "visitor error ignored: {context}"),
-        (Ok(records), Err(RecordStreamError::Visitor(_))) => {
-            assert!(!records.is_empty(), "{context}");
-            assert_eq!(
-                visited, 1,
-                "decoding continued after cancellation: {context}"
-            );
-        }
-        (_, Err(RecordStreamError::Format(_)) | Ok(())) | (Err(_), Err(_)) => {
-            assert!(
-                visited <= 1,
-                "decoding continued after cancellation: {context}"
-            );
+            (Err(error), Err(expected)) if framing == RecordFraming::Stream => assert_eq!(
+                error_code(error),
+                Some(expected.code()),
+                "streamed diagnostic differs: {context}\n{error:?}\n{expected:?}"
+            ),
+            (Err(_), Err(_)) => {}
+            (streamed, expected) => panic!(
+                "{framing:?} streaming disagreed on acceptance: {context}\n{streamed:?}\n{expected:?}"
+            ),
         }
     }
 }
@@ -273,80 +382,27 @@ fn check_generic_readers(format: RecordFormat, width: usize, input: &[u8]) {
 fn check_dets_layout_readers(layout: DetsLayout, input: &[u8]) {
     let context = format!("layout={layout:?} input_len={}", input.len());
     let expected = read_dets_records(input, layout);
-
-    let mut dense = Vec::new();
-    let result = for_each_dets_record(input, layout, |record| {
-        dense.push(record.to_vec());
-        Ok(())
-    });
-    assert_same(
-        "for_each_dets_record",
-        result.map(|()| dense).map_err(|error| error.to_string()),
-        &expected,
-        &context,
-    );
-
-    let mut packed = Vec::new();
-    let result = for_each_dets_packed_record(input, layout, |record| {
-        packed.push(bits(record));
-        Ok(())
-    });
-    assert_same(
-        "for_each_dets_packed_record",
-        result.map(|()| packed).map_err(|error| error.to_string()),
-        &expected,
-        &context,
-    );
-
-    let mut tokens = Vec::new();
-    let result = for_each_dets_token_record(input, layout, |record| {
-        let mut dense = vec![false; layout.total_bits()];
-        for token in record {
-            let offset = match token.result_type() {
-                DetsResultType::Measurement => 0,
-                DetsResultType::Detector => layout.measurements(),
-                DetsResultType::Observable => layout.measurements() + layout.detectors(),
-            };
-            *dense
-                .get_mut(offset + token.index())
-                .expect("token index exceeded its namespace") = true;
-        }
-        tokens.push(dense);
-        Ok(())
-    });
-    assert_same(
-        "for_each_dets_token_record",
-        result.map(|()| tokens).map_err(|error| error.to_string()),
-        &expected,
-        &context,
-    );
-
-    let mut shots = 0_usize;
-    let sparse = for_each_dets_sparse_shot(input, layout, |_| {
-        shots += 1;
-        Ok(())
-    });
-    match (&expected, sparse) {
-        (Ok(records), Ok(())) => assert_eq!(records.len(), shots, "{context}"),
-        (Err(_), Err(_)) => {}
-        (expected, sparse) => {
-            panic!("SparseShot acceptance differs: {context}\n{expected:?}\n{sparse:?}")
-        }
-    }
-
-    let streamed = stream_all(RecordStreamReader::dets(
+    let reader = RecordStreamReader::dets(
         Chunked::new(input, input.len() * 13 + layout.total_bits()),
         layout,
         usize::MAX,
-    ));
-    assert_same("RecordStreamReader::dets", streamed, &expected, &context);
+    );
+    match (stream_all(reader, 1 + input.len() % 5), &expected) {
+        (Ok(streamed), Ok(expected)) => assert_eq!(&streamed, expected, "{context}"),
+        (Err(error), Err(expected)) => {
+            assert_eq!(error_code(&error), Some(expected.code()), "{context}");
+        }
+        (streamed, expected) => {
+            panic!("typed DETS streaming disagreed: {context}\n{streamed:?}\n{expected:?}")
+        }
+    }
 }
 
 proptest! {
     #![proptest_config(config(0xc0de_c0de_0001, 2048))]
 
     #[test]
-    fn hostile_bytes_agree_across_every_generic_reader(
+    fn hostile_bytes_agree_with_the_reference_decoder_across_every_reader(
         format in prop::sample::select(FORMATS.to_vec()),
         width in width(),
         input in hostile_bytes(),
@@ -373,17 +429,6 @@ proptest! {
         check_generic_readers(RecordFormat::Ptb64, width, &input);
         let context = format!("width={width} max_shots={max_shots} input_len={}", input.len());
         let bounded = read_ptb64_records(&input, width, max_shots);
-        let mut visited = Vec::new();
-        let streamed = for_each_ptb64_record(&input, width, max_shots, |record| {
-            visited.push(record.to_vec());
-            Ok(())
-        });
-        assert_same(
-            "for_each_ptb64_record",
-            streamed.map(|()| visited).map_err(|error| error.to_string()),
-            &bounded,
-            &context,
-        );
         if let Ok(records) = &bounded {
             prop_assert_eq!(records.len(), max_shots, "{}", context);
             let whole_groups = input
@@ -563,12 +608,21 @@ proptest! {
             context
         );
         prop_assert_eq!(
-            stream_all(RecordStreamReader::measurements(
-                Chunked::new(&encoded, encoded.len() + width),
-                format,
-                width,
-                usize::MAX,
-            ))
+            reference_decode(&encoded, format, width).expect("reference decode"),
+            records.clone(),
+            "{}",
+            context
+        );
+        prop_assert_eq!(
+            stream_all(
+                RecordStreamReader::measurements(
+                    Chunked::new(&encoded, encoded.len() + width),
+                    format,
+                    width,
+                    usize::MAX,
+                ),
+                1 + records.len() % 67,
+            )
             .expect("stream decode"),
             records,
             "{}",

@@ -4,7 +4,8 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use stab_records::{DemSampleSink, FormatError as RecordsFormatError};
+use stab_bits::BitSlice;
+use stab_records::{DemSampleSink, FormatError as RecordsFormatError, PackedShotBatchView};
 use thiserror::Error;
 
 use super::buffers::try_zero_words;
@@ -483,12 +484,24 @@ impl DemSamplingSession {
 
     fn fill_replay_batch(
         &mut self,
-        error_records: &[Vec<bool>],
+        error_records: ReplayRecords<'_>,
+        range: std::ops::Range<usize>,
     ) -> Result<(), DemSamplingExecutionError> {
-        for (shot_index, error_record) in error_records.iter().enumerate() {
-            self.plan
-                .detection_record_from_error_record_into(error_record, &mut self.record)
-                .map_err(DemSamplingExecutionError::InvalidRequest)?;
+        let first = range.start;
+        for record_index in range {
+            let shot_index = record_index - first;
+            let error_record = error_records
+                .record(record_index)
+                .map_err(internal_format_error)?;
+            match error_record {
+                ReplayRecord::Dense(bits) => self
+                    .plan
+                    .detection_record_from_error_record_into(bits, &mut self.record),
+                ReplayRecord::Packed(bits) => self
+                    .plan
+                    .detection_record_from_error_record_into(&bits, &mut self.record),
+            }
+            .map_err(DemSamplingExecutionError::InvalidRequest)?;
             self.batch
                 .copy_replay_record(shot_index, &self.record, error_record)?;
         }
@@ -591,6 +604,59 @@ impl DemSamplingSession {
             committed_shots: ShotCount::new(committed_shots),
             total_committed_shots: ShotCount::new(self.total_committed_shots),
         }
+    }
+}
+
+/// Replay records supplied as dense caller records or as one packed shot-major batch.
+#[derive(Clone, Copy)]
+enum ReplayRecords<'a> {
+    Dense(&'a [Vec<bool>]),
+    Packed(PackedShotBatchView<'a>),
+}
+
+/// One replay record borrowed from [`ReplayRecords`].
+#[derive(Clone, Copy)]
+pub(super) enum ReplayRecord<'a> {
+    Dense(&'a [bool]),
+    Packed(BitSlice<'a>),
+}
+
+impl<'a> ReplayRecords<'a> {
+    fn len(self) -> usize {
+        match self {
+            Self::Dense(records) => records.len(),
+            Self::Packed(records) => records.shot_count(),
+        }
+    }
+
+    fn record(self, index: usize) -> Result<ReplayRecord<'a>, RecordsFormatError> {
+        match self {
+            Self::Dense(records) => records
+                .get(index)
+                .map(|record| ReplayRecord::Dense(record))
+                .ok_or_else(|| {
+                    RecordsFormatError::new(
+                        stab_records::FormatErrorCode::InvalidData,
+                        format!("replay record {index} is out of range"),
+                        None,
+                    )
+                }),
+            Self::Packed(records) => records.shot(index).map(ReplayRecord::Packed),
+        }
+    }
+
+    fn validate_width(
+        self,
+        plan: &DemSamplingPlan,
+        index: usize,
+        shot_index: usize,
+    ) -> Result<(), DemSamplingExecutionError> {
+        let record = self.record(index).map_err(internal_format_error)?;
+        match record {
+            ReplayRecord::Dense(bits) => plan.validate_error_record_width(bits, Some(shot_index)),
+            ReplayRecord::Packed(bits) => plan.validate_error_record_width(&bits, Some(shot_index)),
+        }
+        .map_err(DemSamplingExecutionError::InvalidRequest)
     }
 }
 
@@ -747,7 +813,7 @@ impl DemReplaySession {
         for (shot_index, error_record) in error_records.iter().enumerate() {
             self.session
                 .plan
-                .validate_error_record_width(error_record, Some(shot_index))
+                .validate_error_record_width(error_record.as_slice(), Some(shot_index))
                 .map_err(preflight_error)?;
         }
         let mut transaction = self.start_transaction(sink)?;
@@ -761,7 +827,7 @@ impl DemReplaySession {
 
     fn write_batch_to<Sink>(
         &mut self,
-        error_records: &[Vec<bool>],
+        error_records: ReplayRecords<'_>,
         sink: &mut Sink,
     ) -> Result<DemReplayBatchStatus, DemSamplingRunError<Sink::Error>>
     where
@@ -818,7 +884,7 @@ impl DemReplaySession {
                     error_records.len() as u64,
                 ),
             })?;
-        for (local_index, error_record) in error_records.iter().enumerate() {
+        for local_index in 0..error_records.len() {
             let shot_index =
                 first_shot
                     .checked_add(local_index)
@@ -829,11 +895,10 @@ impl DemReplaySession {
                             error_records.len() as u64,
                         ),
                     })?;
-            self.session
-                .plan
-                .validate_error_record_width(error_record, Some(shot_index))
+            error_records
+                .validate_width(&self.session.plan, local_index, shot_index)
                 .map_err(|source| DemSamplingRunError::Engine {
-                    source: DemSamplingExecutionError::InvalidRequest(source),
+                    source,
                     progress: DemSamplingRunProgress::new(
                         self.committed_shots,
                         error_records.len() as u64,
@@ -841,13 +906,20 @@ impl DemReplaySession {
                 })?;
         }
 
-        for records in error_records.chunks(self.session.batch.capacity()) {
+        let chunk_shots = self.session.batch.capacity().max(1);
+        let mut chunk_start = 0_usize;
+        while chunk_start < error_records.len() {
+            let chunk_end = chunk_start
+                .saturating_add(chunk_shots)
+                .min(error_records.len());
+            let records = chunk_start..chunk_end;
+            chunk_start = chunk_end;
             if self.session.is_cancelled() {
                 self.cancelled = true;
                 return Ok(DemReplayBatchStatus::Cancelled);
             }
             let batch_shots = records.len();
-            if let Err(source) = self.session.fill_replay_batch(records) {
+            if let Err(source) = self.session.fill_replay_batch(error_records, records) {
                 self.session.poisoned = true;
                 self.finished = true;
                 return Err(DemSamplingRunError::Engine {
@@ -990,7 +1062,20 @@ where
         &mut self,
         error_records: &[Vec<bool>],
     ) -> Result<DemReplayBatchStatus, DemSamplingRunError<Sink::Error>> {
-        self.session.write_batch_to(error_records, self.sink)
+        self.session
+            .write_batch_to(ReplayRecords::Dense(error_records), self.sink)
+    }
+
+    /// Delivers at most 64 packed replay records without finalizing this transaction.
+    ///
+    /// Every shot of the batch is one sampled-error record of exactly the plan's error count,
+    /// with the same validation, work accounting, and limits as [`Self::write_batch`].
+    pub fn write_packed_batch(
+        &mut self,
+        error_records: PackedShotBatchView<'_>,
+    ) -> Result<DemReplayBatchStatus, DemSamplingRunError<Sink::Error>> {
+        self.session
+            .write_batch_to(ReplayRecords::Packed(error_records), self.sink)
     }
 
     /// Finalizes the same sink that received every preceding replay batch.

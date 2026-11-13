@@ -1,4 +1,4 @@
-use std::io::{BufRead, Read};
+use std::io::Read;
 use std::path::Path;
 
 #[cfg(test)]
@@ -11,13 +11,21 @@ use stab_records::{FormatError, FormatErrorCode, RecordStreamReadError};
 use crate::CliError;
 use crate::io_plan::InputFile;
 
-/// Maps a shared [`stab_records::RecordStreamReader`] failure onto the CLI's
+/// Maps a stream-framed [`stab_records::RecordStreamReader`] failure onto the CLI's
 /// transport-aware error surface: transport failures keep their path context and format
 /// violations keep their typed diagnostics.
+///
+/// Record-framed failures carry command-specific vocabulary, so callers that enable record
+/// framing render them before falling back here.
 pub(crate) fn record_stream_error(error: RecordStreamReadError, path: Option<&Path>) -> CliError {
     match error {
         RecordStreamReadError::Io(source) => read_stream_error(path, source),
         RecordStreamReadError::Format(error) => CliError::from(error),
+        error => CliError::Record(FormatError::new(
+            FormatErrorCode::InvalidData,
+            error.to_string(),
+            None,
+        )),
     }
 }
 
@@ -107,59 +115,6 @@ where
     Ok(input)
 }
 
-pub(crate) fn read_limited_line<R>(
-    reader: &mut R,
-    path: Option<&Path>,
-    limit: usize,
-    kind: &'static str,
-) -> Result<Option<Vec<u8>>, CliError>
-where
-    R: BufRead + ?Sized,
-{
-    let mut line = Vec::new();
-    loop {
-        let (consumed, found_newline) = {
-            let available = reader
-                .fill_buf()
-                .map_err(|source| read_stream_error(path, source))?;
-            if available.is_empty() {
-                return if line.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(line))
-                };
-            }
-            let consumed = available
-                .iter()
-                .position(|byte| *byte == b'\n')
-                .map_or(available.len(), |index| index + 1);
-            if line
-                .len()
-                .checked_add(consumed)
-                .is_none_or(|length| length > limit)
-            {
-                return Err(CliError::InputTooLarge {
-                    kind,
-                    limit: u64::try_from(limit).unwrap_or(u64::MAX),
-                });
-            }
-            let chunk = available.get(..consumed).ok_or_else(|| {
-                CliError::Record(FormatError::new(
-                    FormatErrorCode::InvalidData,
-                    format!("{kind} byte range was out of bounds"),
-                    None,
-                ))
-            })?;
-            line.extend_from_slice(chunk);
-            (consumed, chunk.last() == Some(&b'\n'))
-        };
-        reader.consume(consumed);
-        if found_newline {
-            return Ok(Some(line));
-        }
-    }
-}
-
 fn reject_oversized_input(len: usize, kind: &'static str, limit: u64) -> Result<(), CliError> {
     if u64::try_from(len).unwrap_or(u64::MAX) > limit {
         return Err(CliError::InputTooLarge { kind, limit });
@@ -174,48 +129,5 @@ fn read_stream_error(path: Option<&Path>, source: std::io::Error) -> CliError {
             source,
         },
         None => CliError::ReadInput(source),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io::Cursor;
-
-    use super::*;
-
-    #[test]
-    fn limited_line_rejects_before_consuming_an_over_limit_chunk() {
-        let mut reader = Cursor::new(vec![b'0'; 17]);
-        let error =
-            read_limited_line(&mut reader, None, 16, "bounded line").expect_err("over-limit line");
-
-        assert!(matches!(
-            error,
-            CliError::InputTooLarge {
-                kind: "bounded line",
-                limit: 16
-            }
-        ));
-        assert_eq!(reader.position(), 0);
-        assert_eq!(reader.fill_buf().expect("remaining buffer").len(), 17);
-    }
-
-    #[test]
-    fn limited_line_accumulates_bounded_chunks_and_preserves_unterminated_eof() {
-        let input = Cursor::new(b"012345\nabc".to_vec());
-        let mut reader = std::io::BufReader::with_capacity(3, input);
-
-        assert_eq!(
-            read_limited_line(&mut reader, None, 7, "bounded line").expect("first line"),
-            Some(b"012345\n".to_vec())
-        );
-        assert_eq!(
-            read_limited_line(&mut reader, None, 7, "bounded line").expect("EOF line"),
-            Some(b"abc".to_vec())
-        );
-        assert_eq!(
-            read_limited_line(&mut reader, None, 7, "bounded line").expect("EOF"),
-            None
-        );
     }
 }

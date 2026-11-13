@@ -1,8 +1,36 @@
 use stab_model::advanced::{FoldedDemBlock, FoldedDemItem, dem_instruction_detector_shift};
 use stab_model::{DemInstruction, DemInstructionKind, DemTarget};
 
+use stab_bits::BitSlice;
+
 use super::{DemError, DemResult};
 use crate::DetectionRecordBuffer;
+
+/// One replayed sampled-error record, read one error bit at a time in DEM order.
+pub(super) trait ErrorRecordBits {
+    fn bit_len(&self) -> usize;
+    fn bit(&self, index: usize) -> Option<bool>;
+}
+
+impl ErrorRecordBits for [bool] {
+    fn bit_len(&self) -> usize {
+        self.len()
+    }
+
+    fn bit(&self, index: usize) -> Option<bool> {
+        self.get(index).copied()
+    }
+}
+
+impl ErrorRecordBits for BitSlice<'_> {
+    fn bit_len(&self) -> usize {
+        self.len()
+    }
+
+    fn bit(&self, index: usize) -> Option<bool> {
+        self.get(index)
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct DemSampleBlock {
@@ -181,17 +209,17 @@ fn compile_instruction(
     Ok(())
 }
 
-pub(super) fn apply_error_record_block(
+pub(super) fn apply_error_record_block<B: ErrorRecordBits + ?Sized>(
     block: &DemSampleBlock,
     detector_shift: u64,
-    error_record: &[bool],
+    error_record: &B,
     cursor: &mut usize,
     record: &mut DetectionRecordBuffer,
 ) -> DemResult<()> {
     for operation in &block.operations {
         match operation {
             DemSampleOperation::Error(error) => {
-                let occurred = *error_record.get(*cursor).ok_or_else(|| {
+                let occurred = error_record.bit(*cursor).ok_or_else(|| {
                     DemError::invalid_result_format("DEM error record ended early")
                 })?;
                 *cursor = cursor.checked_add(1).ok_or_else(|| {

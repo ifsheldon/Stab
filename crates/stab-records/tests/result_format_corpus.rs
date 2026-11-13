@@ -5,13 +5,12 @@
     reason = "corpus tests use explicit panic messages to identify the exact fixture and reader that violated the checked oracle"
 )]
 
-use stab_bits::BitSlice;
-use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, Layout, ResultFormat};
+use std::io::Read;
+
+use stab_compat_corpus::{Acceptance, CheckedCase, CheckedCorpus, ResultFormat};
 use stab_records::{
-    DetsLayout, DetsResultType, DetsToken, RecordFormat, RecordResult, SparseShot,
-    for_each_dets_packed_record, for_each_dets_record, for_each_dets_sparse_shot,
-    for_each_dets_token_record, for_each_packed_record, for_each_record, for_each_sparse_record,
-    read_dets_records, read_measurement_records, read_records,
+    DetsLayout, RecordFormat, RecordFraming, RecordStreamReader, read_dets_records,
+    read_measurement_records, read_records,
 };
 
 const fn sample_format(format: ResultFormat) -> RecordFormat {
@@ -88,29 +87,18 @@ fn check_width_readers(
         expected,
     );
 
-    let mut dense = Vec::new();
-    let dense_result = for_each_record(input, format, width, |record| {
-        dense.push(record.to_vec());
-        Ok(())
-    })
-    .map(|()| dense);
-    assert_records(case.id(), "dense visitor", dense_result, expected);
-
-    let mut packed = Vec::new();
-    let packed_result = for_each_packed_record(input, format, width, |record| {
-        packed.push(bits(record));
-        Ok(())
-    })
-    .map(|()| packed);
-    assert_records(case.id(), "packed visitor", packed_result, expected);
-
-    let mut sparse = Vec::new();
-    let sparse_result = for_each_sparse_record(input, format, width, |record| {
-        sparse.push(record.to_vec());
-        Ok(())
-    })
-    .map(|()| sparse_to_dense(&sparse, width, case.format()));
-    assert_records(case.id(), "sparse visitor", sparse_result, expected);
+    for framing in [RecordFraming::Stream, RecordFraming::Records] {
+        for batch in [1, 64] {
+            let reader = RecordStreamReader::measurements(input, format, width, usize::MAX)
+                .with_framing(framing);
+            assert_records(
+                case.id(),
+                &format!("packed stream {framing:?} batch {batch}"),
+                stream_all(reader, batch),
+                expected,
+            );
+        }
+    }
 }
 
 fn check_typed_dets_readers(
@@ -131,66 +119,45 @@ fn check_typed_dets_readers(
         expected,
     );
 
-    let mut dense = Vec::new();
-    let dense_result = for_each_dets_record(input, layout, |record| {
-        dense.push(record.to_vec());
-        Ok(())
-    })
-    .map(|()| dense);
-    assert_records(case.id(), "typed dense visitor", dense_result, expected);
-
-    let mut packed = Vec::new();
-    let packed_result = for_each_dets_packed_record(input, layout, |record| {
-        packed.push(bits(record));
-        Ok(())
-    })
-    .map(|()| packed);
-    assert_records(case.id(), "typed packed visitor", packed_result, expected);
-
-    let mut token_records = Vec::new();
-    let token_result = for_each_dets_token_record(input, layout, |record| {
-        token_records.push(record.to_vec());
-        Ok(())
-    });
-    let token_accepted = token_result.is_ok();
-    let token_dense_result =
-        token_result.map(|()| typed_tokens_to_dense(&token_records, corpus_layout));
-    assert_records(
-        case.id(),
-        "typed token visitor",
-        token_dense_result,
-        expected,
-    );
-
-    let mut sparse_shots = Vec::new();
-    let sparse_shot_result = for_each_dets_sparse_shot(input, layout, |shot| {
-        sparse_shots.push(shot.clone());
-        Ok(())
-    });
-    match (case.acceptance(), sparse_shot_result, token_accepted) {
-        (Acceptance::Accepted, Ok(()), true) => {
-            assert_eq!(
-                sparse_shots,
-                typed_tokens_to_sparse_shots(&token_records, corpus_layout),
-                "{} SparseShot visitor",
-                case.id()
-            );
-        }
-        (Acceptance::Rejected, Err(_), false) => {}
-        (expected_acceptance, sparse_result, tokens_result) => {
-            panic!(
-                "{} SparseShot/token acceptance mismatch: expected {expected_acceptance:?}, sparse={sparse_result:?}, tokens={tokens_result:?}",
-                case.id()
-            );
-        }
+    for batch in [1, 64] {
+        assert_records(
+            case.id(),
+            &format!("typed packed stream batch {batch}"),
+            stream_all(RecordStreamReader::dets(input, layout, usize::MAX), batch),
+            expected,
+        );
     }
     Ok(())
 }
 
-fn assert_records(
+/// Drains the packed streaming reader into dense records, or its first failure as text.
+fn stream_all<R: Read>(
+    mut reader: RecordStreamReader<R>,
+    batch: usize,
+) -> Result<Vec<Vec<bool>>, String> {
+    let mut records = Vec::new();
+    loop {
+        match reader.read_batch(batch) {
+            Ok(Some(view)) => {
+                for shot in 0..view.shot_count() {
+                    let row = view.shot(shot).map_err(|error| error.to_string())?;
+                    records.push(
+                        (0..row.len())
+                            .map(|bit| row.get(bit) == Some(true))
+                            .collect(),
+                    );
+                }
+            }
+            Ok(None) => return Ok(records),
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+}
+
+fn assert_records<E: std::fmt::Display>(
     case_id: &str,
     reader: &str,
-    actual: RecordResult<Vec<Vec<bool>>>,
+    actual: Result<Vec<Vec<bool>>, E>,
     expected: Option<&[Vec<bool>]>,
 ) {
     match (actual, expected) {
@@ -205,104 +172,4 @@ fn assert_records(
             panic!("{case_id} through {reader} unexpectedly rejected: {error}");
         }
     }
-}
-
-fn bits(record: BitSlice<'_>) -> Vec<bool> {
-    (0..record.len())
-        .map(|index| {
-            let Some(bit) = record.get(index) else {
-                panic!("packed record index {index} was out of range");
-            };
-            bit
-        })
-        .collect()
-}
-
-fn sparse_to_dense(
-    sparse_records: &[Vec<u64>],
-    width: usize,
-    format: ResultFormat,
-) -> Vec<Vec<bool>> {
-    sparse_records
-        .iter()
-        .map(|record| {
-            let mut dense = vec![false; width];
-            for index in record {
-                let Ok(index) = usize::try_from(*index) else {
-                    panic!("sparse index {index} did not fit usize");
-                };
-                let Some(bit) = dense.get_mut(index) else {
-                    panic!("sparse index {index} exceeded width {width}");
-                };
-                if format == ResultFormat::Hits {
-                    *bit = !*bit;
-                } else {
-                    *bit = true;
-                }
-            }
-            dense
-        })
-        .collect()
-}
-
-fn typed_tokens_to_dense(records: &[Vec<DetsToken>], layout: Layout) -> Vec<Vec<bool>> {
-    records
-        .iter()
-        .map(|record| {
-            let width = layout.total_bits().expect("validated layout");
-            let mut dense = vec![false; width];
-            for token in record {
-                let offset = match token.result_type() {
-                    DetsResultType::Measurement => 0,
-                    DetsResultType::Detector => layout.measurements(),
-                    DetsResultType::Observable => layout.measurements() + layout.detectors(),
-                };
-                let Some(index) = offset.checked_add(token.index()) else {
-                    panic!("typed DETS offset overflowed");
-                };
-                let width = dense.len();
-                let Some(bit) = dense.get_mut(index) else {
-                    panic!("typed DETS index {index} exceeded width {width}");
-                };
-                *bit = true;
-            }
-            dense
-        })
-        .collect()
-}
-
-fn typed_tokens_to_sparse_shots(records: &[Vec<DetsToken>], layout: Layout) -> Vec<SparseShot> {
-    records
-        .iter()
-        .map(|record| {
-            let mut hits = Vec::new();
-            let mut observables = vec![false; layout.observables()];
-            for token in record {
-                match token.result_type() {
-                    DetsResultType::Measurement => {
-                        let Ok(index) = u64::try_from(token.index()) else {
-                            panic!("measurement DETS index did not fit u64");
-                        };
-                        hits.push(index);
-                    }
-                    DetsResultType::Detector => {
-                        let Some(index) = layout.measurements().checked_add(token.index()) else {
-                            panic!("detector DETS offset overflowed");
-                        };
-                        let Ok(index) = u64::try_from(index) else {
-                            panic!("detector DETS index did not fit u64");
-                        };
-                        hits.push(index);
-                    }
-                    DetsResultType::Observable => {
-                        let Some(bit) = observables.get_mut(token.index()) else {
-                            panic!("observable DETS index exceeded mask");
-                        };
-                        *bit = !*bit;
-                    }
-                }
-            }
-            SparseShot::new(hits, observables)
-        })
-        .collect()
 }

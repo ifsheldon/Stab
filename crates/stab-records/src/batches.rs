@@ -1,4 +1,4 @@
-use stab_bits::{BitMatrix, BitSlice};
+use stab_bits::{BitMatrix, BitSlice, BitWordsMut};
 
 use crate::{
     CorrectionWidth, DetectorWidth, FormatError, FormatErrorCode, MeasurementWidth,
@@ -102,6 +102,68 @@ impl PackedShotBatch {
             .map_err(bit_storage_error)
     }
 
+    /// Replaces one shot with a packed bit slice of exactly this batch's width.
+    pub fn copy_shot_from_bits(
+        &mut self,
+        shot_index: usize,
+        bits: BitSlice<'_>,
+    ) -> RecordResult<()> {
+        if bits.len() != self.bits_per_shot() {
+            return Err(FormatError::invalid_data(format!(
+                "packed shot has {} bits but the batch expects {}",
+                bits.len(),
+                self.bits_per_shot()
+            )));
+        }
+        let mut words = self.shot_words_mut(shot_index)?;
+        let source = bits.words().get(..words.len()).ok_or_else(|| {
+            FormatError::invalid_data("packed shot storage was shorter than its declared width")
+        })?;
+        words.copy_from_slice(source);
+        Ok(())
+    }
+
+    /// Replaces every row of the first `shot_count` shots with the source bit columns
+    /// `source_start..source_start + self.bits_per_shot()`.
+    ///
+    /// The copy moves whole words with shifts, so splitting a record into column groups costs
+    /// one pass over its words rather than one step per bit.
+    pub fn copy_columns_from(
+        &mut self,
+        source: PackedShotBatchView<'_>,
+        source_start: usize,
+        shot_count: usize,
+    ) -> RecordResult<()> {
+        let width = self.bits_per_shot();
+        let source_end = source_start
+            .checked_add(width)
+            .ok_or_else(|| FormatError::invalid_data("packed column range overflowed"))?;
+        if source_end > source.bits_per_shot()
+            || shot_count > source.shot_count()
+            || shot_count > self.shot_count()
+        {
+            return Err(FormatError::invalid_data(format!(
+                "packed column range {source_start}..{source_end} of {shot_count} shots escapes a {}x{} source or {}x{width} target",
+                source.shot_count(),
+                source.bits_per_shot(),
+                self.shot_count(),
+            )));
+        }
+        for shot_index in 0..shot_count {
+            let row = source.shot(shot_index)?;
+            let mut words = self.shot_words_mut(shot_index)?;
+            copy_bit_range(row.words(), source_start, &mut words);
+        }
+        Ok(())
+    }
+
+    /// Borrows one shot's storage words; bits beyond the declared width are cleared on drop.
+    pub(crate) fn shot_words_mut(&mut self, shot_index: usize) -> RecordResult<BitWordsMut<'_>> {
+        self.storage
+            .row_words_mut(shot_index)
+            .map_err(bit_storage_error)
+    }
+
     pub fn shot(&self, shot_index: usize) -> RecordResult<BitSlice<'_>> {
         self.storage.row(shot_index).map_err(bit_storage_error)
     }
@@ -176,6 +238,20 @@ impl<'a> PackedShotBatchView<'a> {
             )));
         }
         self.storage.row(shot_index).map_err(bit_storage_error)
+    }
+
+    /// Borrows the first `shot_count` records of this view.
+    pub fn prefix(self, shot_count: usize) -> RecordResult<Self> {
+        if shot_count > self.shot_count {
+            return Err(FormatError::invalid_data(format!(
+                "packed shot prefix has {shot_count} records but the view contains only {}",
+                self.shot_count
+            )));
+        }
+        Ok(Self {
+            storage: self.storage,
+            shot_count,
+        })
     }
 
     /// Copies this shot-major batch into one packed word per result-bit plane.
@@ -645,6 +721,23 @@ fn batch_width_mismatch(label: &str, actual: usize, expected: usize) -> FormatEr
             expected_bits: expected,
         },
     )
+}
+
+/// Fills `target` with the source bits starting at `source_start`; source words past the end
+/// read as zero and the caller's guard masks the target's tail.
+fn copy_bit_range(source: &[u64], source_start: usize, target: &mut [u64]) {
+    const WORD_BITS: usize = u64::BITS as usize;
+    let word_offset = source_start / WORD_BITS;
+    let shift = source_start % WORD_BITS;
+    let word = |index: usize| source.get(index).copied().unwrap_or(0);
+    for (index, target_word) in target.iter_mut().enumerate() {
+        let low = word(word_offset + index);
+        *target_word = if shift == 0 {
+            low
+        } else {
+            (low >> shift) | (word(word_offset + index + 1) << (WORD_BITS - shift))
+        };
+    }
 }
 
 fn bit_storage_error(error: stab_bits::BitError) -> FormatError {

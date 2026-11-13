@@ -22,7 +22,7 @@ DETS retains independent `M`, `D`, and `L` namespaces.
 
 Codecs implement sinks over compatible batch views.
 
-Record-at-a-time visitors remain bounded adapters.
+Record input streams decode into packed shot-major batches; the record-at-a-time visitors were removed in E6 because no product caller used them.
 
 ## Consequences
 

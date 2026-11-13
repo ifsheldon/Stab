@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
@@ -9,14 +9,14 @@ use stab_engine::{
 };
 use stab_records::{
     ByteSpan, DetectionBatchView, DetectionSink, FormatError, FormatErrorCode,
-    MeasurementBatchView, PackedShotBatch, RecordFormat, RecordStreamReader,
-    read_measurement_records, validate_ptb64_shot_count,
+    MeasurementBatchView, PackedShotBatchView, RecordFormat, RecordFraming, RecordStreamReadError,
+    RecordStreamReader, validate_ptb64_shot_count,
 };
 
 use crate::{
     CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
-    input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
+    input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
@@ -229,9 +229,9 @@ where
     } else {
         circuit
     };
-    let measurement_input = open_m2d_input_or_stdin(io.take_input(FileRole::Input), input);
+    let measurement_input = io.take_input(FileRole::Input);
     let observable_mode = observable_output_mode(args.append_observables);
-    let sweep_input = io.take_input(FileRole::Sweep).map(open_m2d_input);
+    let sweep_input = io.take_input(FileRole::Sweep);
     let plan = MeasurementToDetectionCompiler::new()
         .reference_sample_mode(reference_sample_mode(args.skip_reference_sample))
         .compile(&circuit)
@@ -247,30 +247,19 @@ where
             .map(|_| detection_record_format(args.obs_out_format))
             .transpose()?,
     )?;
-    let mut measurements = M2dRecordStream::from_open_input(
-        measurement_input,
-        args.in_format,
-        plan.measurement_width().get(),
-        "m2d measurement input",
-    )?;
-    let mut sweeps = sweep_input
-        .map(|sweep_input| {
-            M2dRecordStream::from_open_input(
-                sweep_input,
-                args.sweep_format,
-                plan.sweep_width().get(),
-                "m2d sweep input",
-            )
-        })
-        .transpose()?;
-    let mut measurement_batch =
-        PackedShotBatch::zeros(M2D_BATCH_SHOTS, plan.measurement_width().get())
-            .map_err(CliError::from)?;
-    let mut sweep_batch = sweeps
-        .as_ref()
-        .map(|_| PackedShotBatch::zeros(M2D_BATCH_SHOTS, plan.sweep_width().get()))
-        .transpose()
-        .map_err(CliError::from)?;
+    let mut measurements = match measurement_input {
+        Some(file) => M2dInput::from_file(file, args.in_format, plan.measurement_width().get()),
+        None => M2dInput::new(
+            Box::new(input),
+            None,
+            args.in_format,
+            plan.measurement_width().get(),
+            M2D_MEASUREMENT_KIND,
+        ),
+    };
+    let mut sweeps = sweep_input.map(|file| {
+        M2dInput::from_file(file, args.sweep_format, plan.sweep_width().get()).into_sweep()
+    });
     let mut outputs = io.activate()?;
     let primary = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     let observable = outputs
@@ -285,99 +274,39 @@ where
         let mut delivery = session
             .start_transaction(&mut sink)
             .map_err(CliError::from)?;
-        let mut batch_len = 0_usize;
-        if let Some(sweeps) = sweeps.as_mut() {
-            loop {
-                let has_measurement =
-                    match measurements.next_record_into_batch(&mut measurement_batch, batch_len) {
-                        Ok(has_record) => has_record,
-                        Err(error) => {
-                            write_m2d_batch(
-                                &mut delivery,
-                                &measurement_batch,
-                                sweep_batch.as_ref(),
-                                batch_len,
-                            )?;
-                            return Err(error);
-                        }
-                    };
-                if has_measurement {
-                    let has_sweep = match sweeps.next_record_into_batch(
-                        sweep_batch.as_mut().ok_or(CliError::IoPlanInvariant {
-                            message: "m2d sweep stream lost its packed batch",
-                        })?,
-                        batch_len,
-                    ) {
-                        Ok(has_record) => has_record,
-                        Err(error) => {
-                            write_m2d_batch(
-                                &mut delivery,
-                                &measurement_batch,
-                                sweep_batch.as_ref(),
-                                batch_len,
-                            )?;
-                            return Err(error);
-                        }
-                    };
-                    if !has_sweep {
-                        write_m2d_batch(
-                            &mut delivery,
-                            &measurement_batch,
-                            sweep_batch.as_ref(),
-                            batch_len,
-                        )?;
-                        return Err(invalid_result_format(
-                            "m2d measurement input has more records than sweep input",
-                        ));
-                    }
-                    batch_len += 1;
-                    if batch_len == M2D_BATCH_SHOTS {
-                        write_m2d_batch(
-                            &mut delivery,
-                            &measurement_batch,
-                            sweep_batch.as_ref(),
-                            batch_len,
-                        )?;
-                        batch_len = 0;
-                    }
-                } else {
-                    write_m2d_batch(
-                        &mut delivery,
-                        &measurement_batch,
-                        sweep_batch.as_ref(),
-                        batch_len,
-                    )?;
-                    if sweeps.finish_empty_b8_zero_width_sweep_after_measurement_eof()? {
-                        return finish_m2d(delivery);
-                    }
-                    if !sweeps.has_next_record()? {
-                        return finish_m2d(delivery);
-                    }
-                    return Err(invalid_result_format(
-                        "m2d sweep input has more records than measurement input",
-                    ));
-                }
+        while let Some(measurement_batch) = measurements.read_batch(M2D_BATCH_SHOTS)? {
+            let shots = measurement_batch.shot_count();
+            let Some(sweeps) = sweeps.as_mut() else {
+                write_m2d_batch(&mut delivery, measurement_batch, None)?;
+                continue;
+            };
+            let Some(sweep_batch) = sweeps.read_batch(shots)? else {
+                return Err(invalid_result_format(
+                    "m2d measurement input has more records than sweep input",
+                ));
+            };
+            let paired = sweep_batch.shot_count();
+            let measurement_batch = if paired < shots {
+                measurement_batch.prefix(paired)?
+            } else {
+                measurement_batch
+            };
+            write_m2d_batch(&mut delivery, measurement_batch, Some(sweep_batch))?;
+            if paired < shots {
+                // The sweep input ended or failed before this measurement batch did.
+                sweeps.read_batch(1)?;
+                return Err(invalid_result_format(
+                    "m2d measurement input has more records than sweep input",
+                ));
             }
         }
-        loop {
-            let has_measurement =
-                match measurements.next_record_into_batch(&mut measurement_batch, batch_len) {
-                    Ok(has_record) => has_record,
-                    Err(error) => {
-                        write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
-                        return Err(error);
-                    }
-                };
-            if !has_measurement {
-                break;
-            }
-            batch_len += 1;
-            if batch_len == M2D_BATCH_SHOTS {
-                write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
-                batch_len = 0;
-            }
+        if let Some(sweeps) = sweeps.as_mut()
+            && sweeps.has_more_records()?
+        {
+            return Err(invalid_result_format(
+                "m2d sweep input has more records than measurement input",
+            ));
         }
-        write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
         finish_m2d(delivery)
     })();
     flush_before_failure(result, || sink.flush_outputs())
@@ -449,27 +378,17 @@ where
 
 fn write_m2d_batch<Sink>(
     delivery: &mut MeasurementToDetectionTransaction<'_, '_, Sink>,
-    measurement_batch: &PackedShotBatch,
-    sweep_batch: Option<&PackedShotBatch>,
-    shot_count: usize,
+    measurements: PackedShotBatchView<'_>,
+    sweeps: Option<PackedShotBatchView<'_>>,
 ) -> Result<(), CliError>
 where
     Sink: DetectionSink<Error = CliError>,
 {
-    if shot_count == 0 {
-        return Ok(());
-    }
-    let measurements = MeasurementBatchView::new(
-        measurement_batch
-            .view_prefix(shot_count)
-            .map_err(CliError::from)?,
-    );
-    let sweeps = sweep_batch
-        .map(|batch| batch.view_prefix(shot_count).map(MeasurementBatchView::new))
-        .transpose()
-        .map_err(CliError::from)?;
     delivery
-        .write_batch_with_sweep(measurements, sweeps)
+        .write_batch_with_sweep(
+            MeasurementBatchView::new(measurements),
+            sweeps.map(MeasurementBatchView::new),
+        )
         .map(|_| ())
         .map_err(map_detection_run_error)
 }
@@ -577,352 +496,141 @@ fn invalid_result_format(message: impl Into<String>) -> CliError {
     ))
 }
 
-fn read_error(path: Option<&PathBuf>, source: std::io::Error) -> CliError {
-    if let Some(path) = path {
-        return CliError::ReadPath {
-            path: path.clone(),
-            source,
-        };
-    }
-    CliError::ReadInput(source)
-}
+const M2D_MEASUREMENT_KIND: &str = "m2d measurement input";
+const M2D_SWEEP_KIND: &str = "m2d sweep input";
 
-/// Per-record decode source for one m2d input stream.
+/// One m2d record input: the Records stream reader plus the m2d diagnostic vocabulary.
 ///
-/// The r8 and ptb64 formats decode through the shared
-/// [`stab_records::RecordStreamReader`]; the text and b8 formats keep m2d's
-/// line-framed and zero-width-sweep-aware local transports.
-enum M2dRecordDecoder<'a> {
-    Shared(RecordStreamReader<Box<dyn BufRead + 'a>>),
-    Local(Box<dyn BufRead + 'a>),
-}
-
-struct M2dRecordStream<'a> {
-    decoder: M2dRecordDecoder<'a>,
+/// Decoding, framing, and zero-width sweep handling belong to the reader; this adapter only
+/// names the input in diagnostics and keeps Stim-format inputs failing at their first read.
+struct M2dInput<'a> {
+    reader: Option<RecordStreamReader<Box<dyn Read + 'a>>>,
     input_path: Option<PathBuf>,
     format: RecordFormatArg,
-    bits_per_record: usize,
     kind: &'static str,
-    text_byte_offset: usize,
-    empty_b8_zero_width_sweep_checked: bool,
-    b8_record_bytes: Vec<u8>,
 }
 
-struct M2dOpenInput<'a> {
-    reader: Box<dyn BufRead + 'a>,
-    input_path: Option<PathBuf>,
-}
-
-fn open_m2d_input_or_stdin<'a, R>(
-    input_file: Option<InputFile>,
-    stdin: &'a mut R,
-) -> M2dOpenInput<'a>
-where
-    R: Read + 'a,
-{
-    let Some(input_file) = input_file else {
-        return M2dOpenInput {
-            reader: Box::new(BufReader::new(stdin)),
-            input_path: None,
-        };
-    };
-    open_m2d_input(input_file)
-}
-
-fn open_m2d_input(input_file: InputFile) -> M2dOpenInput<'static> {
-    let input_path = input_file.path().to_path_buf();
-    M2dOpenInput {
-        reader: Box::new(BufReader::new(input_file)),
-        input_path: Some(input_path),
-    }
-}
-
-impl<'a> M2dRecordStream<'a> {
-    fn from_open_input(
-        input: M2dOpenInput<'a>,
+impl<'a> M2dInput<'a> {
+    fn new(
+        source: Box<dyn Read + 'a>,
+        input_path: Option<PathBuf>,
         format: RecordFormatArg,
         bits_per_record: usize,
         kind: &'static str,
-    ) -> Result<Self, CliError> {
-        let decoder = match format {
-            RecordFormatArg::R8 => M2dRecordDecoder::Shared(RecordStreamReader::measurements(
-                input.reader,
-                RecordFormat::R8,
+    ) -> Self {
+        let reader = format.record_format().map(|record_format| {
+            RecordStreamReader::measurements(
+                source,
+                record_format,
                 bits_per_record,
                 MAX_M2D_TEXT_RECORD_BYTES,
-            )),
-            RecordFormatArg::Ptb64 if bits_per_record > 0 => {
-                M2dRecordDecoder::Shared(RecordStreamReader::ptb64(input.reader, bits_per_record))
-            }
-            _ => M2dRecordDecoder::Local(input.reader),
-        };
-        let b8_bytes = if format == RecordFormatArg::B8 {
-            bits_per_record.div_ceil(u8::BITS as usize)
-        } else {
-            0
-        };
-        let mut b8_record_bytes = Vec::new();
-        b8_record_bytes
-            .try_reserve_exact(b8_bytes)
-            .map_err(|error| {
-                invalid_result_format(format!(
-                    "{kind} could not reserve its {b8_bytes}-byte b8 record buffer: {error}"
-                ))
-            })?;
-        b8_record_bytes.resize(b8_bytes, 0);
-        Ok(Self {
-            decoder,
-            input_path: input.input_path,
+            )
+            .with_framing(RecordFraming::Records)
+        });
+        Self {
+            reader,
+            input_path,
+            format,
+            kind,
+        }
+    }
+
+    fn from_file(file: InputFile, format: RecordFormatArg, bits_per_record: usize) -> Self {
+        let input_path = Some(file.path().to_path_buf());
+        Self::new(
+            Box::new(file),
+            input_path,
             format,
             bits_per_record,
-            kind,
-            text_byte_offset: 0,
-            empty_b8_zero_width_sweep_checked: false,
-            b8_record_bytes,
-        })
-    }
-
-    fn is_b8_zero_width_sweep(&self) -> bool {
-        self.kind == "m2d sweep input"
-            && self.format == RecordFormatArg::B8
-            && self.bits_per_record == 0
-    }
-
-    fn finish_empty_b8_zero_width_sweep_after_measurement_eof(&mut self) -> Result<bool, CliError> {
-        if !self.is_b8_zero_width_sweep() {
-            return Ok(false);
-        }
-        self.validate_empty_b8_zero_width_sweep()?;
-        Ok(true)
-    }
-
-    fn next_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
-        match self.format {
-            RecordFormatArg::ZeroOne | RecordFormatArg::Hits | RecordFormatArg::Dets => {
-                self.next_text_record()
-            }
-            RecordFormatArg::B8 => Err(CliError::IoPlanInvariant {
-                message: "m2d b8 records must decode directly into their packed batch",
-            }),
-            RecordFormatArg::R8 => self.next_shared_record(),
-            RecordFormatArg::Ptb64 => {
-                if self.bits_per_record == 0 {
-                    return Err(invalid_result_format(format!(
-                        "{} ptb64 input cannot infer a shot count for zero-width records",
-                        self.kind
-                    )));
-                }
-                self.next_shared_record()
-            }
-            RecordFormatArg::Stim => Err(CliError::UnsupportedConversion),
-        }
-    }
-
-    fn has_next_record(&mut self) -> Result<bool, CliError> {
-        if self.format != RecordFormatArg::B8 {
-            return self.next_record().map(|record| record.is_some());
-        }
-        if self.b8_record_bytes.is_empty() {
-            self.validate_empty_b8_zero_width_sweep()?;
-            return Ok(false);
-        }
-        self.read_next_b8_record_bytes()
-            .map(|read| matches!(read, RecordRead::Complete))
-    }
-
-    fn next_record_into_batch(
-        &mut self,
-        batch: &mut PackedShotBatch,
-        shot_index: usize,
-    ) -> Result<bool, CliError> {
-        if self.format == RecordFormatArg::B8 {
-            return self.next_b8_record_into_batch(batch, shot_index);
-        }
-        let Some(record) = self.next_record()? else {
-            return Ok(false);
-        };
-        batch
-            .copy_shot_from_bools(shot_index, &record)
-            .map_err(CliError::from)?;
-        Ok(true)
-    }
-
-    fn next_shared_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
-        let M2dRecordDecoder::Shared(reader) = &mut self.decoder else {
-            return Err(CliError::IoPlanInvariant {
-                message: "m2d record stream lost its shared decoder",
-            });
-        };
-        match reader.next_record() {
-            Ok(record) => Ok(record.map(<[bool]>::to_vec)),
-            Err(error) => Err(record_stream_error(error, self.input_path.as_deref())),
-        }
-    }
-
-    fn local_reader<'stream>(
-        decoder: &'stream mut M2dRecordDecoder<'a>,
-    ) -> Result<&'stream mut Box<dyn BufRead + 'a>, CliError> {
-        match decoder {
-            M2dRecordDecoder::Local(reader) => Ok(reader),
-            M2dRecordDecoder::Shared(_) => Err(CliError::IoPlanInvariant {
-                message: "m2d record stream lost its local decoder",
-            }),
-        }
-    }
-
-    fn next_text_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
-        loop {
-            let line = {
-                let reader = Self::local_reader(&mut self.decoder)?;
-                read_limited_line(
-                    reader.as_mut(),
-                    self.input_path.as_deref(),
-                    MAX_M2D_TEXT_RECORD_BYTES,
-                    self.kind,
-                )?
-            };
-            let Some(line) = line else {
-                return Ok(None);
-            };
-            let record_byte_offset = self.text_byte_offset;
-            self.text_byte_offset = self
-                .text_byte_offset
-                .checked_add(line.len())
-                .ok_or(CliError::InputByteOffsetOverflow { kind: self.kind })?;
-            validate_m2d_text_record_terminator(&line, self.format, self.kind).map_err(
-                |source| CliError::InputRecord {
-                    byte_offset: record_byte_offset,
-                    source,
-                },
-            )?;
-            let record_format = self.format.required_record_format()?;
-            let records = read_measurement_records(&line, record_format, self.bits_per_record)
-                .map_err(|source| CliError::InputRecord {
-                    byte_offset: record_byte_offset,
-                    source,
-                })?;
-            if self.format == RecordFormatArg::Dets && records.is_empty() {
-                continue;
-            }
-            let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
-                invalid_result_format(format!(
-                    "{} record decoded into {} records",
-                    self.kind,
-                    records.len()
-                ))
-            })?;
-            return Ok(Some(record));
-        }
-    }
-
-    fn next_b8_record_into_batch(
-        &mut self,
-        batch: &mut PackedShotBatch,
-        shot_index: usize,
-    ) -> Result<bool, CliError> {
-        if self.b8_record_bytes.is_empty() {
-            if self.is_b8_zero_width_sweep() {
-                self.validate_empty_b8_zero_width_sweep()?;
-                batch
-                    .copy_shot_from_b8(shot_index, &[])
-                    .map_err(CliError::from)?;
-                return Ok(true);
-            }
-            return Err(invalid_result_format(format!(
-                "{} b8 input cannot represent zero-width records",
-                self.kind
-            )));
-        }
-        match self.read_next_b8_record_bytes()? {
-            RecordRead::Complete => {
-                batch
-                    .copy_shot_from_b8(shot_index, &self.b8_record_bytes)
-                    .map_err(CliError::from)?;
-                Ok(true)
-            }
-            RecordRead::EofBeforeRecord => Ok(false),
-        }
-    }
-
-    fn read_next_b8_record_bytes(&mut self) -> Result<RecordRead, CliError> {
-        let reader = Self::local_reader(&mut self.decoder)?;
-        read_m2d_exact_record_bytes(
-            reader.as_mut(),
-            self.input_path.as_ref(),
-            &mut self.b8_record_bytes,
-            self.kind,
+            M2D_MEASUREMENT_KIND,
         )
     }
 
-    fn validate_empty_b8_zero_width_sweep(&mut self) -> Result<(), CliError> {
-        if self.empty_b8_zero_width_sweep_checked {
-            return Ok(());
-        }
-        let mut byte = [0u8; 1];
-        let reader = Self::local_reader(&mut self.decoder)?;
-        match reader.read(&mut byte) {
-            Ok(0) => {
-                self.empty_b8_zero_width_sweep_checked = true;
-                Ok(())
-            }
-            Ok(_) => Err(invalid_result_format(
-                "m2d sweep input b8 zero-width input must be empty",
-            )),
-            Err(source) => Err(read_error(self.input_path.as_ref(), source)),
-        }
+    /// Relabels this input as the sweep stream, whose zero-width `b8` form must be empty and
+    /// then supplies an empty record for every measurement record.
+    fn into_sweep(mut self) -> Self {
+        self.kind = M2D_SWEEP_KIND;
+        self.reader = self
+            .reader
+            .map(RecordStreamReader::with_empty_zero_width_input);
+        self
+    }
+
+    fn reader(&mut self) -> Result<&mut RecordStreamReader<Box<dyn Read + 'a>>, CliError> {
+        self.reader.as_mut().ok_or(CliError::UnsupportedConversion)
+    }
+
+    fn read_batch(
+        &mut self,
+        max_records: usize,
+    ) -> Result<Option<PackedShotBatchView<'_>>, CliError> {
+        let (format, kind, input_path) = (self.format, self.kind, self.input_path.clone());
+        self.reader()?
+            .read_batch(max_records)
+            .map_err(|error| m2d_read_error(error, format, kind, input_path.as_deref()))
+    }
+
+    fn has_more_records(&mut self) -> Result<bool, CliError> {
+        let (format, kind, input_path) = (self.format, self.kind, self.input_path.clone());
+        self.reader()?
+            .has_more_records()
+            .map_err(|error| m2d_read_error(error, format, kind, input_path.as_deref()))
     }
 }
 
-fn validate_m2d_text_record_terminator(
-    line: &[u8],
+/// Renders a Records reader failure with m2d's established diagnostics.
+fn m2d_read_error(
+    error: RecordStreamReadError,
     format: RecordFormatArg,
-    kind: &str,
-) -> Result<(), FormatError> {
-    match format {
-        RecordFormatArg::ZeroOne | RecordFormatArg::Hits if !line.ends_with(b"\n") => {
-            Err(FormatError::new(
+    kind: &'static str,
+    input_path: Option<&std::path::Path>,
+) -> CliError {
+    match error {
+        RecordStreamReadError::Record {
+            byte_offset,
+            source,
+        } => CliError::InputRecord {
+            byte_offset,
+            source,
+        },
+        RecordStreamReadError::UnterminatedRecord {
+            byte_offset,
+            line_len,
+            ..
+        } => CliError::InputRecord {
+            byte_offset,
+            source: FormatError::new(
                 FormatErrorCode::MissingRecordTerminator,
-                format!("{} {} record must end with a newline", kind, format.name()),
-                ByteSpan::try_new(line.len(), 0),
+                format!("{kind} {} record must end with a newline", format.name()),
+                ByteSpan::try_new(line_len, 0),
+            ),
+        },
+        RecordStreamReadError::RecordTooLarge { limit } => CliError::InputTooLarge {
+            kind,
+            limit: u64::try_from(limit).unwrap_or(u64::MAX),
+        },
+        RecordStreamReadError::ByteOffsetOverflow => CliError::InputByteOffsetOverflow { kind },
+        RecordStreamReadError::TruncatedRecord {
+            bytes_read,
+            record_bytes,
+        } => invalid_result_format(format!(
+            "{kind} ended after {bytes_read} bytes of a {record_bytes}-byte record"
+        )),
+        RecordStreamReadError::ZeroWidthRecords if format == RecordFormatArg::Ptb64 => {
+            invalid_result_format(format!(
+                "{kind} ptb64 input cannot infer a shot count for zero-width records"
             ))
         }
-        _ => Ok(()),
-    }
-}
-
-enum RecordRead {
-    Complete,
-    EofBeforeRecord,
-}
-
-fn read_m2d_exact_record_bytes<R>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    buffer: &mut [u8],
-    kind: &'static str,
-) -> Result<RecordRead, CliError>
-where
-    R: Read + ?Sized,
-{
-    let mut offset = 0usize;
-    while offset < buffer.len() {
-        let remaining = buffer
-            .get_mut(offset..)
-            .ok_or_else(|| invalid_result_format("m2d byte cursor was out of range"))?;
-        match reader.read(remaining) {
-            Ok(0) if offset == 0 => return Ok(RecordRead::EofBeforeRecord),
-            Ok(0) => {
-                return Err(invalid_result_format(format!(
-                    "{kind} ended after {offset} bytes of a {}-byte record",
-                    buffer.len()
-                )));
-            }
-            Ok(count) => offset += count,
-            Err(error) if error.kind() == ErrorKind::Interrupted => {}
-            Err(source) => return Err(read_error(input_path, source)),
+        RecordStreamReadError::ZeroWidthRecords => invalid_result_format(format!(
+            "{kind} b8 input cannot represent zero-width records"
+        )),
+        RecordStreamReadError::NonEmptyZeroWidthInput => {
+            invalid_result_format(format!("{kind} b8 zero-width input must be empty"))
+        }
+        error @ (RecordStreamReadError::Io(_) | RecordStreamReadError::Format(_)) => {
+            record_stream_error(error, input_path)
         }
     }
-    Ok(RecordRead::Complete)
 }
 
 enum DeferredDetectOutputs<'a, W>

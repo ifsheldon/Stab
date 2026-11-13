@@ -1,12 +1,12 @@
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     reason = "diagnostic contract tests must extract the exact expected failure"
 )]
 
 use stab_records::{
     ByteSpan, DetsLayout, DetsResultType, FormatError, FormatErrorCode, FormatErrorContext,
-    RecordFormat, for_each_packed_record, for_each_ptb64_record, for_each_ptb64_record_all,
-    for_each_record, for_each_sparse_record, read_dets_records, read_ptb64_records,
+    RecordFormat, RecordStreamReadError, RecordStreamReader, read_dets_records, read_ptb64_records,
     read_ptb64_records_all, read_records,
 };
 
@@ -245,7 +245,7 @@ fn ptb64_reports_exact_whole_input_prefix_and_width_diagnostics() {
     );
     for error in [
         read_ptb64_records_all(&partial_group, 1).expect_err("materialized whole input"),
-        for_each_ptb64_record_all(&partial_group, 1, |_| Ok(())).expect_err("streamed whole input"),
+        streamed_error(&partial_group, RecordFormat::Ptb64, 1),
     ] {
         assert_diagnostic(&error, whole_input);
     }
@@ -259,12 +259,10 @@ fn ptb64_reports_exact_whole_input_prefix_and_width_diagnostics() {
         },
         "ptb64 input expected at least 8 bytes for 64 records with 1 bits each, got 7",
     );
-    for error in [
-        read_ptb64_records(&partial_group, 1, 64).expect_err("materialized prefix"),
-        for_each_ptb64_record(&partial_group, 1, 64, |_| Ok(())).expect_err("streamed prefix"),
-    ] {
-        assert_diagnostic(&error, prefix);
-    }
+    assert_diagnostic(
+        &read_ptb64_records(&partial_group, 1, 64).expect_err("materialized prefix"),
+        prefix,
+    );
 
     let overflow = read_ptb64_records_all(b"", usize::MAX).expect_err("record width overflow");
     assert_diagnostic(
@@ -308,14 +306,23 @@ fn assert_record_views(
 ) {
     let errors = [
         read_records(input, format, bits_per_record).expect_err("materialized reader"),
-        for_each_record(input, format, bits_per_record, |_| Ok(())).expect_err("dense reader"),
-        for_each_packed_record(input, format, bits_per_record, |_| Ok(()))
-            .expect_err("packed reader"),
-        for_each_sparse_record(input, format, bits_per_record, |_| Ok(()))
-            .expect_err("sparse reader"),
+        streamed_error(input, format, bits_per_record),
     ];
     for error in errors {
         assert_diagnostic(&error, expected);
+    }
+}
+
+/// Drains the packed streaming reader one record at a time and returns its format failure.
+fn streamed_error(input: &[u8], format: RecordFormat, bits_per_record: usize) -> FormatError {
+    let mut reader = RecordStreamReader::measurements(input, format, bits_per_record, usize::MAX);
+    loop {
+        match reader.read_batch(1) {
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("streamed {format:?} input unexpectedly ended cleanly"),
+            Err(RecordStreamReadError::Format(error)) => return error,
+            Err(error) => panic!("streamed {format:?} input failed outside its grammar: {error}"),
+        }
     }
 }
 

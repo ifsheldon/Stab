@@ -80,28 +80,6 @@ where
     Ok(())
 }
 
-pub(crate) fn for_each_hits<F>(
-    input: &[u8],
-    bits_per_record: usize,
-    mut visit: F,
-) -> RecordResult<()>
-where
-    F: FnMut(&[u64]) -> RecordResult<()>,
-{
-    let mut hits = Vec::new();
-    for_each_hits_event(input, bits_per_record, |event| match event {
-        HitsEvent::RecordStart => {
-            hits.clear();
-            Ok(())
-        }
-        HitsEvent::Hit(index) => {
-            hits.push(index);
-            Ok(())
-        }
-        HitsEvent::RecordEnd => visit(&hits),
-    })
-}
-
 pub(crate) fn for_each_hits_event<F>(
     input: &[u8],
     bits_per_record: usize,
@@ -187,28 +165,6 @@ where
         visit(HitsEvent::RecordEnd)?;
     }
     Ok(())
-}
-
-pub(crate) fn for_each_dets_tokens<F>(
-    input: &[u8],
-    layout: DetsLayout,
-    mut visit: F,
-) -> RecordResult<()>
-where
-    F: FnMut(&[DetsToken]) -> RecordResult<()>,
-{
-    let mut tokens = Vec::new();
-    for_each_dets_event(input, layout, |event| match event {
-        DetsEvent::RecordStart => {
-            tokens.clear();
-            Ok(())
-        }
-        DetsEvent::Token(token) => {
-            tokens.push(token);
-            Ok(())
-        }
-        DetsEvent::RecordEnd => visit(&tokens),
-    })
 }
 
 pub(crate) fn for_each_dets_event<F>(

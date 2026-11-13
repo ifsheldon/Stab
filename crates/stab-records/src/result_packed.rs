@@ -138,32 +138,6 @@ pub(crate) fn ptb64_bytes_per_group(bits_per_record: usize) -> RecordResult<usiz
     })
 }
 
-/// Unpacks one b8-packed record chunk into a caller-owned dense record buffer.
-pub(crate) fn unpack_b8_chunk_into(chunk: &[u8], record: &mut [bool]) {
-    for (bit_index, bit) in record.iter_mut().enumerate() {
-        *bit = chunk.get(bit_index / 8).copied().unwrap_or(0) & (1u8 << (bit_index % 8)) != 0;
-    }
-}
-
-/// Reads one ptb64 group's measurement-major words out of its raw group bytes.
-pub(crate) fn extend_ptb64_group_words(group_bytes: &[u8], words: &mut Vec<u64>) {
-    words.clear();
-    words.extend(
-        group_bytes
-            .as_chunks::<8>()
-            .0
-            .iter()
-            .map(|word_bytes| u64::from_le_bytes(*word_bytes)),
-    );
-}
-
-/// Fills a dense record with one shot's bits from a ptb64 group's measurement-major words.
-pub(crate) fn fill_record_from_ptb64_words(words: &[u64], shot_offset: usize, record: &mut [bool]) {
-    for (bit, word) in record.iter_mut().zip(words) {
-        *bit = word & (1u64 << shot_offset) != 0;
-    }
-}
-
 #[inline]
 pub(crate) fn decode_next_r8_record<F>(
     input: &[u8],

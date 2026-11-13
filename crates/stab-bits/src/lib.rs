@@ -513,7 +513,7 @@ impl BitMatrix {
                 right: self.cols(),
             });
         }
-        let row_words = self.row_words_mut(row)?;
+        let row_words = self.raw_row_words_mut(row)?;
         row_words.fill(0);
         for (index, bit) in bits.iter().copied().enumerate() {
             if bit {
@@ -541,7 +541,7 @@ impl BitMatrix {
         }
         let bit_len = self.cols.get();
         let tail_mask = self.cols.last_word_mask();
-        let row_words = self.row_words_mut(row)?;
+        let row_words = self.raw_row_words_mut(row)?;
         row_words.fill(0);
         let (chunks, remainder) = bytes.as_chunks::<{ size_of::<u64>() }>();
         let mut words = row_words.iter_mut();
@@ -569,6 +569,18 @@ impl BitMatrix {
         Ok(())
     }
 
+    /// Borrows one row's storage words for direct word-level writes.
+    ///
+    /// Bits written beyond [`Self::cols`] in the final word are cleared when the guard drops, so
+    /// the row keeps the matrix's zero-tail invariant.
+    pub fn row_words_mut(&mut self, row: usize) -> BitResult<BitWordsMut<'_>> {
+        let bit_len = self.cols;
+        Ok(BitWordsMut {
+            words: self.raw_row_words_mut(row)?,
+            bit_len,
+        })
+    }
+
     pub fn row(&self, row: usize) -> BitResult<BitSlice<'_>> {
         self.ensure_row(row)?;
         let range = self.row_range(row).ok_or(BitError::RowIndexOutOfRange {
@@ -589,7 +601,7 @@ impl BitMatrix {
         self.ensure_row(source)?;
         self.ensure_row(target)?;
         if source == target {
-            self.row_words_mut(target)?.fill(0);
+            self.raw_row_words_mut(target)?.fill(0);
             return Ok(());
         }
         let (source_words, target_words) = self.row_pair_words_mut(source, target)?;
@@ -606,7 +618,7 @@ impl BitMatrix {
         self.ensure_row(target)?;
         ensure_same_bit_len(self.cols(), mask.len())?;
         if source == target {
-            let target_words = self.row_words_mut(target)?;
+            let target_words = self.raw_row_words_mut(target)?;
             scalar::and_not_assign_words(target_words, mask.words());
         } else {
             let (source_words, target_words) = self.row_pair_words_mut(source, target)?;
@@ -711,7 +723,7 @@ impl BitMatrix {
         Some(start..end)
     }
 
-    fn row_words_mut(&mut self, row: usize) -> BitResult<&mut [u64]> {
+    fn raw_row_words_mut(&mut self, row: usize) -> BitResult<&mut [u64]> {
         self.ensure_row(row)?;
         let range = self.row_range(row).ok_or(BitError::RowIndexOutOfRange {
             row,

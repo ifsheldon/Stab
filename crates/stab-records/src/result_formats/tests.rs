@@ -8,34 +8,6 @@
 use super::*;
 
 #[test]
-fn measure_record_records_lookback_and_writes_unwritten_results() {
-    let mut record = MeasureRecord::new(20);
-    record.record_result(true);
-    assert_eq!(record.lookback(1), Some(true));
-    record.record_result(false);
-    assert_eq!(record.lookback(1), Some(false));
-    assert_eq!(record.lookback(2), Some(true));
-    for _ in 0..50 {
-        record.record_result(true);
-        record.record_result(false);
-    }
-    assert_eq!(record.storage_len(), 102);
-
-    let mut writer =
-        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
-    record
-        .write_unwritten_results_to(&mut writer)
-        .expect("write unwritten results");
-    assert_eq!(
-        writer.into_bytes(),
-        (0..102)
-            .map(|index| if index % 2 == 0 { b'1' } else { b'0' })
-            .collect::<Vec<_>>()
-    );
-    assert!(record.storage_len() <= 40);
-}
-
-#[test]
 fn measure_record_writer_handles_empty_dets_records_and_long_r8_gaps() {
     let mut writer = MeasureRecordWriter::try_new(RecordFormat::Dets).expect("per-record format");
     writer.write_end();
@@ -215,79 +187,4 @@ fn codecs_and_strict_grammars_contract() {
     assert!(read_ptb64_records(&ptb64[..31], 4, 64).is_err());
     assert!(read_ptb64_records_all(&ptb64[..31], 4).is_err());
     assert!(read_ptb64_records_all(&ptb64, 0).is_err());
-}
-
-#[test]
-fn measure_record_batch_writes_shot_major_01_records() {
-    let s0 = vec![true, false, true, false, true];
-    let s1 = vec![false, true, false, true, false];
-    let mut batch = MeasureRecordBatch::new(5, 20);
-    assert_eq!(batch.stored(), 0);
-    batch.record_result(s0.clone()).unwrap();
-    assert_eq!(batch.lookback(1), Some(s0.as_slice()));
-    batch.record_result(s1.clone()).unwrap();
-    assert_eq!(batch.lookback(1), Some(s1.as_slice()));
-    assert_eq!(batch.lookback(2), Some(s0.as_slice()));
-    for _ in 0..50 {
-        batch.record_result(s0.clone()).unwrap();
-        batch.record_result(s1.clone()).unwrap();
-    }
-    assert_eq!(batch.unwritten(), 102);
-
-    let mut writer = MeasureRecordBatchWriter::new(5, RecordFormat::ZeroOne);
-    batch
-        .final_write_unwritten_results_to(&mut writer, &[false; 5])
-        .unwrap();
-    let output = writer.write_end().expect("encode batch");
-    for shot_index in 0..5 {
-        for sample_index in 0..102 {
-            assert_eq!(
-                output[shot_index * 103 + sample_index],
-                b'0' + u8::from((shot_index + sample_index + 1) % 2 == 1)
-            );
-        }
-        assert_eq!(output[shot_index * 103 + 102], b'\n');
-    }
-    assert!(batch.stored() <= 20);
-}
-
-#[test]
-fn measure_record_batch_records_zero_result_to_edit() {
-    let mut batch = MeasureRecordBatch::new(5, 2);
-    batch.record_zero_result_to_edit()[2] = true;
-    assert_eq!(batch.stored(), 1);
-    assert_eq!(
-        batch.lookback(1),
-        Some([false, false, true, false, false].as_slice())
-    );
-    batch.record_zero_result_to_edit()[3] = true;
-    assert_eq!(
-        batch.lookback(1),
-        Some([false, false, false, true, false].as_slice())
-    );
-}
-
-#[test]
-fn sparse_shot_matches_upstream_equality_string_and_mask_behavior() {
-    assert_eq!(
-        SparseShot::new(Vec::new(), vec![false; 64]),
-        SparseShot::new(Vec::new(), vec![false; 64])
-    );
-    assert_ne!(
-        SparseShot::new(Vec::new(), vec![false; 64]),
-        SparseShot::new(vec![2], vec![false; 64])
-    );
-    let mut mask = vec![false; 64];
-    mask[2] = true;
-    let shot = SparseShot::new(vec![1, 2, 3], mask.clone());
-    assert_eq!(
-        shot.stim_debug_string(),
-        "SparseShot{{1, 2, 3}, __1_____________________________________________________________}"
-    );
-    assert_eq!(shot.obs_mask_as_u64(), 4);
-
-    let mut wide_mask = vec![false; 125];
-    wide_mask[1] = true;
-    wide_mask[64] = true;
-    assert_eq!(SparseShot::new(Vec::new(), wide_mask).obs_mask_as_u64(), 2);
 }

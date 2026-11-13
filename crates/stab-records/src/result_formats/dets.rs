@@ -21,21 +21,21 @@ impl DetsResultType {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct DetsToken {
+pub(crate) struct DetsToken {
     result_type: DetsResultType,
     index: usize,
 }
 
 impl DetsToken {
-    pub const fn new(result_type: DetsResultType, index: usize) -> Self {
+    pub(crate) const fn new(result_type: DetsResultType, index: usize) -> Self {
         Self { result_type, index }
     }
 
-    pub const fn result_type(self) -> DetsResultType {
+    pub(crate) const fn result_type(self) -> DetsResultType {
         self.result_type
     }
 
-    pub const fn index(self) -> usize {
+    pub(crate) const fn index(self) -> usize {
         self.index
     }
 }

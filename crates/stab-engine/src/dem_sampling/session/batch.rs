@@ -1,7 +1,7 @@
 use stab_records::{BitPlane64BatchView, DemSampleBatchView, DetectionBatchView, PackedShotBatch};
 
 use super::{
-    DemSamplingExecutionError, MAX_BATCH_SHOTS, MAX_DEM_SESSION_STORAGE_BYTES,
+    DemSamplingExecutionError, MAX_BATCH_SHOTS, MAX_DEM_SESSION_STORAGE_BYTES, ReplayRecord,
     internal_format_error,
 };
 use crate::DetectionRecordBuffer;
@@ -57,7 +57,7 @@ impl SessionBatch {
         &mut self,
         shot_index: usize,
         record: &DetectionRecordBuffer,
-        error_record: &[bool],
+        error_record: ReplayRecord<'_>,
     ) -> Result<(), DemSamplingExecutionError> {
         self.detectors
             .copy_shot_from_bools(shot_index, &record.detectors)
@@ -65,13 +65,16 @@ impl SessionBatch {
         self.observables
             .copy_shot_from_bools(shot_index, &record.observables)
             .map_err(internal_format_error)?;
-        self.sampled_errors
-            .as_mut()
-            .ok_or_else(|| DemSamplingExecutionError::InternalInvariant {
+        let sampled_errors = self.sampled_errors.as_mut().ok_or_else(|| {
+            DemSamplingExecutionError::InternalInvariant {
                 message: "DEM replay omitted its reusable sampled-error batch".to_owned(),
-            })?
-            .copy_shot_from_bools(shot_index, error_record)
-            .map_err(internal_format_error)
+            }
+        })?;
+        match error_record {
+            ReplayRecord::Dense(bits) => sampled_errors.copy_shot_from_bools(shot_index, bits),
+            ReplayRecord::Packed(bits) => sampled_errors.copy_shot_from_bits(shot_index, bits),
+        }
+        .map_err(internal_format_error)
     }
 
     pub(super) fn view(
