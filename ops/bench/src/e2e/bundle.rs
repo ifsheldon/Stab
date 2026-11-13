@@ -207,7 +207,7 @@ fn validate_release_source(root: &RepoRoot, measured_source: &str) -> Result<(),
         &root.path,
     )?;
     let range = format!("{measured_source}..HEAD");
-    let changed = super::execution::command_output(
+    let changed = super::commands::command_output(
         Path::new("git"),
         &["diff", "--name-only", "--diff-filter=ACDMRTUXB", &range],
         b"",

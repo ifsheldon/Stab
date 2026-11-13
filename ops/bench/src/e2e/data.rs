@@ -16,13 +16,27 @@ pub(super) struct OutputWitness {
     pub(super) one_bits: Option<u64>,
 }
 
+/// Produces case inputs that come from running the pinned binaries.
+pub(super) trait PinnedInputs {
+    /// A circuit generated identically by pinned Stim and Stab.
+    fn circuit(&mut self, args: &[String]) -> Result<Vec<u8>, String>;
+    /// A generated circuit analyzed into identical DEM text by both binaries.
+    fn dem(&mut self, circuit: &[String], analyze: &[String]) -> Result<Vec<u8>, String>;
+    /// Records sampled once by pinned Stim from a generated circuit.
+    fn stim_records(&mut self, circuit: &[String], sample: &[String]) -> Result<Vec<u8>, String>;
+}
+
 pub(super) fn materialize(
     recipe: &DataRecipe,
-    mut generated_circuit: impl FnMut(&[String]) -> Result<Vec<u8>, String>,
+    pinned: &mut impl PinnedInputs,
 ) -> Result<Vec<u8>, String> {
     match recipe {
         DataRecipe::Empty => Ok(Vec::new()),
-        DataRecipe::GeneratedCircuit { args } => generated_circuit(args),
+        DataRecipe::GeneratedCircuit { args } => pinned.circuit(args),
+        DataRecipe::GeneratedDem { circuit, analyze } => pinned.dem(circuit, analyze),
+        DataRecipe::SampledRecords {
+            circuit, sample, ..
+        } => pinned.stim_records(circuit, sample),
         DataRecipe::FoldedCircuit {
             qubits,
             repeat_blocks,

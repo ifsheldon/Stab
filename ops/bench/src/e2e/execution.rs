@@ -9,6 +9,7 @@ use sha2::{Digest as _, Sha256};
 use tempfile::TempDir;
 
 use super::bundle::{file_sha256, publish_bundle};
+use super::commands::{PinnedCommands, checked_success, command_output, run_command};
 use super::data::{OutputWitness, materialize, validate_output, validate_semantic_work};
 use super::host::{HostProfile, validate_host_after};
 use super::model::{
@@ -23,14 +24,9 @@ use super::rust_pipeline::{RustWorkerReceipt, execute as execute_rust_pipeline, 
 use super::statistics::{PairOrder, PairedTiming, StabTiming};
 use super::{LoadedSuite, load_suite, validate_prerequisites};
 use crate::error::BenchError;
-use crate::process::{
-    Launcher, OutputPolicy, ProcessEnvironment, ProcessLaunch, ProcessLimits, ProcessRequest,
-    ProcessResult, run_bounded_process, run_checked_status,
-};
+use crate::process::run_checked_status;
 use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_cli, validate_stim_source};
-
-const STDERR_LIMIT_BYTES: usize = 64 << 10;
 
 #[derive(Clone, Debug, Args)]
 pub(crate) struct RunArgs {
@@ -388,8 +384,8 @@ impl<'a> PreparedCase<'a> {
             .prefix("case-")
             .tempdir_in(&scratch)
             .map_err(|source| BenchError::E2e(format!("cannot create case scratch: {source}")))?;
-        let generator =
-            |args: &[String]| generated_circuit(binaries, args, &root.path, policy, cpu);
+        let mut pinned =
+            PinnedCommands::new(&binaries.stim, &binaries.stab, &root.path, policy, cpu);
         let (stdin_recipe, command_args, file_specs) = match &case.workload {
             Workload::Cli {
                 args, stdin, files, ..
@@ -399,7 +395,7 @@ impl<'a> PreparedCase<'a> {
             }
         };
         let stdin = stdin_recipe
-            .map(|recipe| materialize(recipe, generator))
+            .map(|recipe| materialize(recipe, &mut pinned))
             .transpose()
             .map_err(BenchError::E2e)?
             .unwrap_or_default();
@@ -410,10 +406,7 @@ impl<'a> PreparedCase<'a> {
                 let recipe = file.data.as_ref().ok_or_else(|| {
                     BenchError::E2e(format!("input file {} has no data", file.name))
                 })?;
-                let bytes = materialize(recipe, |args| {
-                    generated_circuit(binaries, args, &root.path, policy, cpu)
-                })
-                .map_err(BenchError::E2e)?;
+                let bytes = materialize(recipe, &mut pinned).map_err(BenchError::E2e)?;
                 fs::write(&path, bytes).map_err(|source| {
                     BenchError::E2e(format!("cannot write {}: {source}", path.display()))
                 })?;
@@ -954,42 +947,6 @@ struct RustMeasurement {
     output_sha256: String,
 }
 
-fn generated_circuit(
-    binaries: &Binaries,
-    args: &[String],
-    working_directory: &Path,
-    policy: &Policy,
-    cpu: Option<usize>,
-) -> Result<Vec<u8>, String> {
-    let args = args.iter().map(OsString::from).collect::<Vec<_>>();
-    let stim = run_command(
-        &binaries.stim,
-        &args,
-        b"",
-        working_directory,
-        true,
-        cpu,
-        policy,
-    )
-    .map_err(|source| source.to_string())?;
-    let stab = run_command(
-        &binaries.stab,
-        &args,
-        b"",
-        working_directory,
-        true,
-        cpu,
-        policy,
-    )
-    .map_err(|source| source.to_string())?;
-    checked_success(&binaries.stim, &stim).map_err(|source| source.to_string())?;
-    checked_success(&binaries.stab, &stab).map_err(|source| source.to_string())?;
-    if stim.stdout != stab.stdout {
-        return Err("generated circuit differs from pinned Stim".to_string());
-    }
-    Ok(stim.stdout)
-}
-
 fn compare_exact_outputs(
     stdout: &OutputContract,
     files: &[PreparedFile],
@@ -1036,97 +993,6 @@ fn substitute_args(args: &[String], files: &[PreparedFile]) -> Result<Vec<OsStri
         .collect()
 }
 
-fn run_command(
-    binary: &Path,
-    args: &[OsString],
-    stdin: &[u8],
-    working_directory: &Path,
-    capture: bool,
-    cpu: Option<usize>,
-    policy: &Policy,
-) -> Result<ProcessResult, BenchError> {
-    let output_policy = if capture {
-        OutputPolicy::Capture {
-            maximum_bytes: policy.maximum_output_bytes,
-        }
-    } else {
-        OutputPolicy::Discard
-    };
-    let launcher = Launcher::current_bench()
-        .map_err(|source| BenchError::E2e(format!("locate measurement launcher: {source}")))?;
-    run_bounded_process(&ProcessRequest {
-        launch: ProcessLaunch::Measured(launcher),
-        program: binary.to_path_buf(),
-        args: args.to_vec(),
-        stdin: stdin.to_vec(),
-        working_directory: working_directory.to_path_buf(),
-        environment: ProcessEnvironment::Inherit,
-        affinity_cpu: cpu,
-        limits: ProcessLimits {
-            stdin_bytes: stdin.len(),
-            stdout: output_policy,
-            stderr: OutputPolicy::Capture {
-                maximum_bytes: STDERR_LIMIT_BYTES,
-            },
-            regular_file_bytes: Some(policy.maximum_output_bytes as u64),
-            timeout: Duration::from_secs(policy.command_timeout_seconds),
-        },
-    })
-    .map_err(BenchError::from)
-}
-
-fn checked_success(binary: &Path, result: &ProcessResult) -> Result<(), BenchError> {
-    if result.status == Some(0) && result.stderr_bytes == 0 {
-        return Ok(());
-    }
-    Err(BenchError::E2e(format!(
-        "{} failed with status {:?} and stderr {}",
-        binary.display(),
-        result.status,
-        String::from_utf8_lossy(&result.stderr)
-    )))
-}
-
-pub(super) fn command_output(
-    binary: &Path,
-    args: &[&str],
-    stdin: &[u8],
-    working_directory: &Path,
-    maximum_output: usize,
-    cpu: Option<usize>,
-    timeout_seconds: u64,
-) -> Result<Vec<u8>, BenchError> {
-    let args = args.iter().map(OsString::from).collect::<Vec<_>>();
-    let result = run_bounded_process(&ProcessRequest {
-        launch: ProcessLaunch::Direct,
-        program: binary.to_path_buf(),
-        args,
-        stdin: stdin.to_vec(),
-        working_directory: working_directory.to_path_buf(),
-        environment: ProcessEnvironment::Inherit,
-        affinity_cpu: cpu,
-        limits: ProcessLimits {
-            stdin_bytes: stdin.len(),
-            stdout: OutputPolicy::Capture {
-                maximum_bytes: maximum_output,
-            },
-            stderr: OutputPolicy::Capture {
-                maximum_bytes: maximum_output,
-            },
-            regular_file_bytes: None,
-            timeout: Duration::from_secs(timeout_seconds),
-        },
-    })?;
-    if result.status != Some(0) {
-        return Err(BenchError::E2e(format!(
-            "{} failed: {}",
-            binary.display(),
-            String::from_utf8_lossy(&result.stderr)
-        )));
-    }
-    Ok(result.stdout)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1142,10 +1008,7 @@ mod tests {
         let loaded = load_suite(&root).expect("suite");
         let selected = select_cases(
             &loaded.suite,
-            &[
-                "convert-dense".to_string(),
-                "generate-surface.large".to_string(),
-            ],
+            &["convert".to_string(), "generate.surface-large".to_string()],
         )
         .expect("selection");
         assert_eq!(
@@ -1154,9 +1017,10 @@ mod tests {
                 .map(|case| case.id.as_str())
                 .collect::<Vec<_>>(),
             [
-                "generate-surface.large",
-                "convert-dense.01-to-b8",
-                "convert-dense.b8-to-01"
+                "generate.surface-large",
+                "convert.sparse-r8-wide",
+                "convert.dense-b8-to-01",
+                "convert.typed-dets-wide"
             ]
         );
         assert!(select_cases(&loaded.suite, &["missing".to_string()]).is_err());

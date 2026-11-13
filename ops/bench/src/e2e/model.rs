@@ -204,6 +204,18 @@ pub(super) enum DataRecipe {
     GeneratedCircuit {
         args: Vec<String>,
     },
+    /// A generated circuit that both binaries analyze into byte-identical DEM text.
+    GeneratedDem {
+        circuit: Vec<String>,
+        analyze: Vec<String>,
+    },
+    /// Records sampled once by pinned Stim from a generated circuit, so both
+    /// binaries consume identical stochastic input.
+    SampledRecords {
+        circuit: Vec<String>,
+        sample: Vec<String>,
+        records: usize,
+    },
     FoldedCircuit {
         qubits: usize,
         repeat_blocks: usize,
@@ -534,6 +546,34 @@ fn validate_data(recipe: &DataRecipe, qualified: &str, errors: &mut Vec<String>)
     match recipe {
         DataRecipe::Empty => {}
         DataRecipe::GeneratedCircuit { args } => validate_args(args, qualified, errors),
+        DataRecipe::GeneratedDem { circuit, analyze } => {
+            validate_args(circuit, qualified, errors);
+            validate_args(analyze, qualified, errors);
+            if analyze.first().map(String::as_str) != Some("analyze_errors") {
+                errors.push(format!(
+                    "case {qualified} DEM recipe must run analyze_errors"
+                ));
+            }
+        }
+        DataRecipe::SampledRecords {
+            circuit,
+            sample,
+            records,
+        } => {
+            validate_args(circuit, qualified, errors);
+            validate_args(sample, qualified, errors);
+            let shots = argument_u64(sample, "--shots");
+            if sample.first().map(String::as_str) != Some("sample")
+                || argument_u64(sample, "--seed").is_none()
+                || shots.is_none()
+                || shots != u64::try_from(*records).ok()
+                || *records == 0
+            {
+                errors.push(format!(
+                    "case {qualified} sampled-record recipe needs seeded sample with --shots equal to records"
+                ));
+            }
+        }
         DataRecipe::FoldedCircuit {
             qubits,
             repeat_blocks,
@@ -681,7 +721,9 @@ fn validate_cli_semantic_work(
 
 fn recipe_record_count(recipe: &DataRecipe) -> Option<u64> {
     let count = match recipe {
-        DataRecipe::Records { records, .. } | DataRecipe::TypedDets { records, .. } => *records,
+        DataRecipe::Records { records, .. }
+        | DataRecipe::TypedDets { records, .. }
+        | DataRecipe::SampledRecords { records, .. } => *records,
         _ => return None,
     };
     u64::try_from(count).ok()

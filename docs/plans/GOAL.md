@@ -31,7 +31,7 @@ Superseded plans, progress reports, qualification inventories, and benchmark man
 2. The controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/b4a758db169fd343c93f2b84a5b1d68558c9e6c3/` each cover all 29 release cases and pass correctness, memory, `1.25x` Stim parity, and seeded `1.15x` Stab self-regression.
 3. Full worst median and confidence upper ratios are `1.179210x` and `1.190196x`; soak values are `1.163228x` and `1.199477x`. Maximum Stab peak RSS is `51,896,320` bytes for full and `52,101,120` bytes for soak.
 4. Both bundles replay offline. They used CPU 0, recorded temperatures at or below `39 C`, ran with no configured swap and unchanged swap counters, and `/swap.img` was restored afterward at its prior priority `-2`. No benchmark process remained.
-5. Workload definitions, timing identity, and the accepted self-regression baselines are unchanged. The historical `a8b56db3` pair remains the explicitly unseeded source of the first reviewed baseline; the `ef986632` pair remains evidence for its original source.
+5. P10 replaced the timing boundary (`e2e-user-workflow-v3`), the workload matrix, and the self-regression baselines, so items 1-4 describe the retired suite; superseded bundles remain in Git history.
 6. Controlled x86-64 timing remains unqualified. Cross-architecture CI proves correctness and contracts, not x86-64 performance.
 
 ## Release Use
