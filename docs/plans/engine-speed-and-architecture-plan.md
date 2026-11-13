@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 and E2 are complete; E6 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1, E2, E5, and the output half of E6 are complete; the input half of E6 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -255,6 +255,27 @@ Hostile-input protection means memory safety, no panics, checked arithmetic, bou
 
 - The `analyze_errors` profile is no longer dominated by allocator and float-formatting frames.
 
+### Checkpoint (2026-11-14)
+
+E5 landed. Tracker sensitivities are sorted XOR sets, errors accumulate through one hashed lookup against an interned arena, each DEM float is formatted once, Clifford actions come from per-gate tables, un-reversal works in place, and the CLI streams the model.
+
+Output is byte-identical to the previous build on 88 circuit and flag combinations, including stderr and exit status.
+
+Best of three interleaved runs on one pinned core, in milliseconds:
+
+| Workload | Before | After | Stim |
+| --- | ---: | ---: | ---: |
+| `--decompose_errors`, d=15 | 290.6 | 141.3 | 247.0 |
+| `--decompose_errors`, d=21 | 852.2 | 400.6 | 711.9 |
+| `--decompose_errors`, d=25 | 1509.2 | 734.0 | 1229.0 |
+| `--fold_loops --decompose_errors`, d=21 | 190.3 | 80.0 | 151.0 |
+| Unrolled, d=7, 1000 rounds | 2515.8 | 1204.7 | 2826.2 |
+| `--decompose_errors`, d=15, 150 rounds | 3103.1 | 1528.6 | 2689.9 |
+
+Peak memory for the d=25 case fell from 190 MB to 108 MB against Stim's 121 MB.
+
+Open item: `PAULI_CHANNEL_1` probabilities differ from Stim in the last printed digit in some analyses; this predates E5 and is unchanged by it.
+
 ## Milestone E6: Records Owns Codecs
 
 ### Tasks
@@ -280,6 +301,30 @@ Hostile-input protection means memory safety, no panics, checked arithmetic, bou
 
 - The CLI contains no format-specific encode or decode loop.
 - No output path issues one system call per record.
+
+### Checkpoint (2026-11-14)
+
+The output half of E6 landed at `588328e9`: one `RecordEncoder` in `stab-records` serves every CLI output route in all six formats, and standard output and output files are buffered with explicit flushes.
+
+Output bytes are identical to the previous build on 53 command and format combinations.
+
+Best of three interleaved runs on one pinned core, in milliseconds:
+
+| Workload | Before | After | Stim |
+| --- | ---: | ---: | ---: |
+| `sample_dem`, d=11, sampled errors as `hits` | 6385.2 | 651.4 | 1444.8 |
+| `detect`, d=11, 300,000 shots, `hits` | 1258.8 | 346.9 | 825.7 |
+| `detect`, d=11, 99,968 shots, `ptb64` | 891.4 | 92.9 | 83.8 |
+| `sample`, d=11, 100,000 shots, `01` | 685.9 | 76.5 | 636.8 |
+| `convert`, `b8` to `hits`, 200,000 records | 2128.5 | 555.1 | 6161.8 |
+
+Writing 8192 `ptb64` shots to a file now issues 26 writes instead of 184,448.
+
+Behavior change: with buffered output a write failure is detected later, so the committed-shot count in the diagnostic counts shots accepted by the writer and not shots on the device. Exit status and error class are unchanged.
+
+After E1, E2, and this half of E6, every one of the 25 suite cases is under the `1.25x` ceiling in the smoke tier.
+
+The input half of E6 (tasks 1 reader side, 3, 5, and 6) remains.
 
 ## Milestone E7: Wider Detection Frames
 
