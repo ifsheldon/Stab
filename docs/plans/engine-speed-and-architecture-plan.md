@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 is complete; E2 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -87,6 +87,30 @@ Reported by review agents and not independently re-run: the 323 ms to 7.7 ms ref
 
 - One reference simulator exists and no operation-count threshold selects between implementations.
 - Session creation performs no reference computation when the plan already holds one.
+
+### Checkpoint (2026-11-14)
+
+E1 landed at `b06f4e00`. One word-packed inverse-tableau simulator replaced `CssReferenceTableau` and the reference role of `StabilizerFrame`, the reference is cached on the plan, and repeat folding compares stabilizer states so memory rounds fold.
+
+Deviation: the simulator still consumes the `SampleProgram` operation stream, and re-driving it from the unified program moves to E3. `StabilizerFrame` remains for general-frame sampling and as the differential test baseline until E3.
+
+Seeded `sample` output is byte-identical to the previous implementation on 26 comparisons covering surface, color, repetition, and random Clifford circuits up to 2000 qubits.
+
+Single-shot `sample`, best of three interleaved runs on one pinned core, in milliseconds:
+
+| Circuit | Before | After | Stim |
+| --- | ---: | ---: | ---: |
+| Rotated memory X, d=11 | 25.7 | 3.9 | 3.6 |
+| Rotated memory X, d=21 | 770.0 | 14.1 | 14.3 |
+| Rotated memory X, d=25 | 1798.6 | 22.9 | 24.8 |
+| d=7, 1000 rounds | 272.2 | 8.9 | 9.4 |
+| Random Clifford, 1200 qubits | 2305.5 | 323.3 | 311.1 |
+| Random loop, 400 qubits, 300 iterations | 4828.3 | 146.6 | 218.4 |
+| Random loop, 2000 qubits, 50 iterations | 24,101.7 | 651.8 | 2190.2 |
+
+The suite's `sample-surface.d25-b8` case moved from `6.96x` to `1.09x` Stim in the smoke tier.
+
+Open items: generic Clifford gates in the reference cost about five times Stim's on a `CZ` and `S` layer circuit (72 ms against about 15 ms), loops with a period above one are not folded, and admission estimates still reflect the old simulator's storage so the limits milestone must revisit them.
 
 ## Milestone E2: Complete Frame Kernels
 
