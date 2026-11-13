@@ -48,8 +48,8 @@ use stab_engine::{
 };
 use stab_model::{Circuit, CircuitItem, ModelResult, Probability};
 use stab_records::{
-    BitPlane64Batch, MeasureRecordWriter, MeasurementBatchView, MeasurementSink, RecordFormat,
-    validate_ptb64_shot_count,
+    DetsResultType, MeasurementBatchView, MeasurementSink, RecordBatchPart, RecordEncoder,
+    RecordFormat, RecordPart, validate_ptb64_shot_count,
 };
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
@@ -262,14 +262,6 @@ impl SampleOutFormatArg {
             Self::Dets => RecordFormat::Dets,
         }
     }
-
-    fn stream_writer(self) -> Result<Option<MeasureRecordWriter>, stab_records::FormatError> {
-        let format = self.record_format();
-        if format == RecordFormat::Ptb64 {
-            return Ok(None);
-        }
-        MeasureRecordWriter::try_new(format).map(Some)
-    }
 }
 
 #[derive(Debug, Args)]
@@ -342,12 +334,15 @@ where
 ///
 /// When standard input or output is a regular file, commands also reject
 /// that file aliasing a named input or output before truncating anything.
+///
+/// Standard output passes through the same 64 KiB buffer as output files, and every command
+/// flushes it before reporting success, so a failure on the final bytes still exits non-zero.
 pub fn run_process() -> i32 {
     let streams = StandardStreams::capture();
     run_with_streams(
         std::env::args_os(),
         std::io::stdin().lock(),
-        std::io::stdout().lock(),
+        io_plan::buffered_output(std::io::stdout().lock()),
         std::io::stderr().lock(),
         &streams,
     )
@@ -739,15 +734,17 @@ where
         .session_with_reference_mode(random_policy, reference_mode)
         .map_err(CliError::from)?;
     let shots = ShotCount::try_from(args.shots).map_err(CliError::from)?;
-    let writer = args.out_format.stream_writer()?;
+    let output_width = visible_measurements
+        .as_ref()
+        .map_or(plan.measurement_width().get(), Vec::len);
+    let encoder = RecordEncoder::try_new(args.out_format.record_format(), output_width)?;
     let mut outputs = io.activate()?;
     if let Some(mut output) = outputs.take(FileRole::Output) {
         return write_sample_output(
             &mut session,
             shots,
-            args.out_format,
             visible_measurements.as_deref(),
-            writer,
+            encoder,
             &mut output,
         )
         .map_err(|source| CliError::SamplePath {
@@ -758,9 +755,8 @@ where
     write_sample_output(
         &mut session,
         shots,
-        args.out_format,
         visible_measurements.as_deref(),
-        writer,
+        encoder,
         stdout,
     )
     .map_err(CliError::SampleOutput)
@@ -773,30 +769,67 @@ pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
 fn write_sample_output<W>(
     session: &mut SamplingSession,
     shots: ShotCount,
-    format: SampleOutFormatArg,
     visible_measurements: Option<&[usize]>,
-    writer: Option<MeasureRecordWriter>,
+    encoder: RecordEncoder,
     output: &mut W,
 ) -> Result<(), RunError<std::io::Error>>
 where
     W: Write,
 {
     let mut sink = CliSampleSink {
-        format,
         visible_measurements,
-        filtered_record: visible_measurements.map(|indices| Vec::with_capacity(indices.len())),
-        writer,
+        filtered_record: Vec::new(),
+        encoder,
         output,
     };
     session.run(shots, &mut sink).map(|_| ())
 }
 
+/// Routes sampled measurements to the shared encoder.
+///
+/// The only routing decision is Stim's one-shot herald rule: when `visible_measurements` is
+/// present, each record keeps just those measurement columns.
 struct CliSampleSink<'a, W> {
-    format: SampleOutFormatArg,
     visible_measurements: Option<&'a [usize]>,
-    filtered_record: Option<Vec<bool>>,
-    writer: Option<MeasureRecordWriter>,
+    filtered_record: Vec<u64>,
+    encoder: RecordEncoder,
     output: &'a mut W,
+}
+
+impl<W> CliSampleSink<'_, W>
+where
+    W: Write,
+{
+    fn write_visible_columns(
+        &mut self,
+        batch: MeasurementBatchView<'_>,
+        indices: &[usize],
+    ) -> std::io::Result<()> {
+        for shot_index in 0..batch.shot_count() {
+            self.filtered_record.clear();
+            self.filtered_record.resize(indices.len().div_ceil(64), 0);
+            for (output_index, index) in indices.iter().enumerate() {
+                let bit = batch.get(shot_index, *index).ok_or_else(|| {
+                    std::io::Error::other(format!(
+                        "internal sample layout index {index} exceeded record width {}",
+                        batch.width().get()
+                    ))
+                })?;
+                if bit && let Some(word) = self.filtered_record.get_mut(output_index / 64) {
+                    *word |= 1 << (output_index % 64);
+                }
+            }
+            let bits = stab_bits::BitSlice::new(&self.filtered_record, indices.len())
+                .map_err(std::io::Error::other)?;
+            self.encoder
+                .write_record(
+                    &[RecordPart::new(DetsResultType::Measurement, bits)],
+                    self.output,
+                )
+                .map_err(sample_write_io)?;
+        }
+        Ok(())
+    }
 }
 
 impl<W> MeasurementSink for CliSampleSink<'_, W>
@@ -806,78 +839,39 @@ where
     type Error = std::io::Error;
 
     fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
-        if self.format == SampleOutFormatArg::Ptb64 {
-            if batch.shot_count() != 64 {
-                return Err(std::io::Error::other(format!(
-                    "ptb64 sample batch expected 64 shots, got {}",
-                    batch.shot_count()
-                )));
-            }
-            let converted;
-            let planes = if let Some(bit_planes) = batch.bit_planes() {
-                bit_planes
-            } else {
-                converted =
-                    BitPlane64Batch::from_shot_major(batch.shot_major_records().ok_or_else(
-                        || std::io::Error::other("measurement batch has no storage"),
-                    )?)
-                    .map_err(std::io::Error::other)?;
-                converted.view()
-            };
-            for bit_index in 0..planes.bits_per_shot() {
-                let plane = planes.plane(bit_index).map_err(std::io::Error::other)?;
-                let word = plane.words().first().copied().ok_or_else(|| {
-                    std::io::Error::other(
-                        "ptb64 sample plane has no backing word for a 64-shot batch",
-                    )
-                })?;
-                self.output.write_all(&word.to_le_bytes())?;
-            }
-            return Ok(());
+        if let Some(indices) = self.visible_measurements {
+            return self.write_visible_columns(batch, indices);
         }
-
-        let writer = self.writer.as_mut().ok_or_else(|| {
-            std::io::Error::other("non-ptb64 sample sink has no result-format writer")
-        })?;
-        if let (Some(indices), Some(filtered_record)) =
-            (self.visible_measurements, self.filtered_record.as_mut())
-        {
-            for shot_index in 0..batch.shot_count() {
-                filtered_record.clear();
-                for index in indices {
-                    let bit = batch.get(shot_index, *index).ok_or_else(|| {
-                        std::io::Error::other(format!(
-                            "internal sample layout index {index} exceeded record width {}",
-                            batch.width().get()
-                        ))
-                    })?;
-                    filtered_record.push(bit);
-                }
-                writer.write_bits(filtered_record);
-                writer.write_end();
-            }
-        } else if let Some(bit_planes) = batch.bit_planes() {
-            writer
-                .write_bit_plane_batch(bit_planes)
-                .map_err(std::io::Error::other)?;
+        let result = if let Some(bit_planes) = batch.bit_planes() {
+            self.encoder
+                .write_bit_planes(bit_planes, DetsResultType::Measurement, self.output)
         } else {
-            writer
-                .write_packed_batch(
-                    batch
-                        .shot_major_records()
-                        .ok_or_else(|| std::io::Error::other("measurement batch has no storage"))?,
-                )
-                .map_err(std::io::Error::other)?;
-        }
-        self.output.write_all(writer.buffered_bytes())?;
-        writer
-            .clear_buffered_bytes()
-            .map_err(std::io::Error::other)?;
-        Ok(())
+            let records = batch
+                .shot_major_records()
+                .ok_or_else(|| std::io::Error::other("measurement batch has no storage"))?;
+            self.encoder.write_batch(
+                &[RecordBatchPart::new(DetsResultType::Measurement, records)],
+                self.output,
+            )
+        };
+        result.map_err(sample_write_io)
     }
 
     fn finish(&mut self) -> Result<(), Self::Error> {
+        let pending = self.encoder.pending_group_records();
+        if pending != 0 {
+            return Err(std::io::Error::other(format!(
+                "ptb64 sample output ended with {pending} records outside a complete 64-record group"
+            )));
+        }
         self.output.flush()
+    }
+}
+
+fn sample_write_io(error: stab_records::RecordWriteError) -> std::io::Error {
+    match error {
+        stab_records::RecordWriteError::Io(error) => error,
+        stab_records::RecordWriteError::Format(error) => std::io::Error::other(error),
     }
 }
 

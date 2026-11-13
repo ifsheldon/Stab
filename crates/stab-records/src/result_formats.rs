@@ -1,12 +1,11 @@
 use crate::{
-    BitPlane64BatchView, FormatError, PackedShotBatch, PackedShotBatchView, RecordResult,
+    BitPlane64BatchView, FormatError, RecordResult,
     result_packed::{
         b8_bytes_per_record, decode_next_r8_record, ptb64_prefix_layout,
         ptb64_record_count as packed_ptb64_record_count,
     },
     result_text::HitsEvent,
 };
-use stab_bits::BitSlice;
 
 mod capabilities;
 mod dets;
@@ -39,46 +38,6 @@ impl TryFrom<RecordFormat> for PerRecordFormat {
             )),
         }
     }
-}
-
-const ZERO_ONE_LINES_BY_BYTE: [[u8; 16]; 256] = zero_one_lines_by_byte();
-const ZERO_ONE_BITS_BY_BYTE: [[u8; 8]; 256] = zero_one_bits_by_byte();
-
-#[allow(
-    clippy::indexing_slicing,
-    reason = "const table indices are bounded by the byte and bit loop limits"
-)]
-const fn zero_one_bits_by_byte() -> [[u8; 8]; 256] {
-    let mut table = [[0_u8; 8]; 256];
-    let mut byte = 0;
-    while byte < 256 {
-        let mut bit = 0;
-        while bit < 8 {
-            table[byte][bit] = if byte & (1 << bit) == 0 { b'0' } else { b'1' };
-            bit += 1;
-        }
-        byte += 1;
-    }
-    table
-}
-
-#[allow(
-    clippy::indexing_slicing,
-    reason = "const table indices are bounded by the byte and bit loop limits"
-)]
-const fn zero_one_lines_by_byte() -> [[u8; 16]; 256] {
-    let mut table = [[0_u8; 16]; 256];
-    let mut byte = 0;
-    while byte < 256 {
-        let mut bit = 0;
-        while bit < 8 {
-            table[byte][bit * 2] = if byte & (1 << bit) == 0 { b'0' } else { b'1' };
-            table[byte][bit * 2 + 1] = b'\n';
-            bit += 1;
-        }
-        byte += 1;
-    }
-    table
 }
 
 pub fn write_records(records: &[Vec<bool>], format: RecordFormat) -> RecordResult<Vec<u8>> {
@@ -428,16 +387,11 @@ pub struct MeasureRecordWriter {
     hits_first: bool,
     dets_started: bool,
     dets_type: u8,
-    b8_transpose: Option<PackedShotBatch>,
 }
 
 impl MeasureRecordWriter {
     pub fn try_new(format: RecordFormat) -> RecordResult<Self> {
-        Self::try_with_capacity(format, 0)
-    }
-
-    pub fn try_with_capacity(format: RecordFormat, capacity: usize) -> RecordResult<Self> {
-        let mut writer = Self {
+        Ok(Self {
             format: PerRecordFormat::try_from(format)?,
             output: Vec::new(),
             index: 0,
@@ -447,18 +401,6 @@ impl MeasureRecordWriter {
             hits_first: true,
             dets_started: false,
             dets_type: b'M',
-            b8_transpose: None,
-        };
-        writer.reserve_output(capacity)?;
-        Ok(writer)
-    }
-
-    #[inline]
-    pub(crate) fn reserve_output(&mut self, additional: usize) -> RecordResult<()> {
-        self.output.try_reserve(additional).map_err(|error| {
-            FormatError::invalid_result_format(format!(
-                "result writer could not reserve {additional} output bytes: {error}"
-            ))
         })
     }
 
@@ -489,219 +431,12 @@ impl MeasureRecordWriter {
         }
     }
 
-    pub fn write_packed_record(&mut self, record: BitSlice<'_>) -> RecordResult<()> {
-        if self.format == PerRecordFormat::B8 && self.b8_bit_index == 0 {
-            self.write_byte_aligned_b8_record(record)?;
-            return Ok(());
-        }
-        for bit_index in 0..record.len() {
-            let bit = record.get(bit_index).ok_or_else(|| {
-                FormatError::invalid_result_format(
-                    "packed record bit index escaped the declared width",
-                )
-            })?;
-            self.write_bit(bit);
-        }
-        Ok(())
-    }
-
-    fn write_byte_aligned_b8_record(&mut self, record: BitSlice<'_>) -> RecordResult<()> {
-        let full_bytes = record.len() / 8;
-        let tail_bits = record.len() % 8;
-        let mut remaining = full_bytes;
-        for word in record.words() {
-            let bytes = word.to_le_bytes();
-            let copy_count = remaining.min(bytes.len());
-            self.output
-                .extend_from_slice(bytes.get(..copy_count).ok_or_else(|| {
-                    FormatError::invalid_result_format(
-                        "packed B8 word escaped its fixed byte representation",
-                    )
-                })?);
-            remaining -= copy_count;
-            if remaining == 0 {
-                break;
-            }
-        }
-        if remaining != 0 {
-            return Err(FormatError::invalid_result_format(
-                "packed record omitted bytes inside its declared width",
-            ));
-        }
-        if tail_bits != 0 {
-            let word_index = full_bytes / size_of::<u64>();
-            let byte_index = full_bytes % size_of::<u64>();
-            let tail = record
-                .words()
-                .get(word_index)
-                .map(|word| word.to_le_bytes())
-                .and_then(|bytes| bytes.get(byte_index).copied())
-                .ok_or_else(|| {
-                    FormatError::invalid_result_format(
-                        "packed record omitted its declared tail byte",
-                    )
-                })?;
-            self.b8_byte = tail & ((1_u8 << tail_bits) - 1);
-            self.b8_bit_index = u8::try_from(tail_bits).map_err(|_| {
-                FormatError::invalid_result_format("B8 tail width did not fit its writer state")
-            })?;
-        }
-        self.index = self.index.checked_add(record.len()).ok_or_else(|| {
-            FormatError::invalid_result_format("packed B8 record index overflowed")
-        })?;
-        Ok(())
-    }
-
-    pub fn write_packed_batch(&mut self, batch: PackedShotBatchView<'_>) -> RecordResult<()> {
-        if self.format == PerRecordFormat::ZeroOne
-            && batch.bits_per_shot() == 1
-            && self.is_at_record_boundary()
-        {
-            for shot_index in 0..batch.shot_count() {
-                let bit = batch.get(shot_index, 0).ok_or_else(|| {
-                    FormatError::invalid_result_format(
-                        "packed record bit index escaped the declared width",
-                    )
-                })?;
-                self.output
-                    .extend_from_slice(if bit { b"1\n" } else { b"0\n" });
-            }
-            return Ok(());
-        }
-        for shot_index in 0..batch.shot_count() {
-            self.write_packed_record(batch.shot(shot_index)?)?;
-            self.write_end();
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub fn write_bit_plane_batch(&mut self, batch: BitPlane64BatchView<'_>) -> RecordResult<()> {
-        if self.format == PerRecordFormat::B8 && self.is_at_record_boundary() {
-            let mut packed = match self.b8_transpose.take() {
-                Some(packed)
-                    if packed.shot_count() == batch.shot_count()
-                        && packed.bits_per_shot() == batch.bits_per_shot() =>
-                {
-                    packed
-                }
-                _ => PackedShotBatch::zeros(batch.shot_count(), batch.bits_per_shot())?,
-            };
-            packed.copy_from_bit_planes(batch)?;
-            let result = self.write_packed_batch(packed.view());
-            self.b8_transpose = Some(packed);
-            return result;
-        }
-        if self.format == PerRecordFormat::ZeroOne
-            && batch.bits_per_shot() == 1
-            && self.is_at_record_boundary()
-        {
-            let word = batch.plane(0)?.words().first().copied().unwrap_or_default();
-            return self.write_zero_one_single_plane(word, batch.shot_count());
-        }
-        for shot_index in 0..batch.shot_count() {
-            for bit_index in 0..batch.bits_per_shot() {
-                let bit = batch.get(bit_index, shot_index).ok_or_else(|| {
-                    FormatError::invalid_result_format(
-                        "bit-plane record index escaped the declared dimensions",
-                    )
-                })?;
-                self.write_bit(bit);
-            }
-            self.write_end();
-        }
-        Ok(())
-    }
-
-    #[inline]
-    fn write_zero_one_single_plane(&mut self, word: u64, shot_count: usize) -> RecordResult<()> {
-        let mut encoded = [0_u8; 128];
-        let mut encoded_len = 0_usize;
-        let mut remaining_shots = shot_count;
-        for input_byte in word.to_le_bytes() {
-            if remaining_shots == 0 {
-                break;
-            }
-            let shots_in_byte = remaining_shots.min(8);
-            let bytes_in_chunk = shots_in_byte * 2;
-            let pattern = ZERO_ONE_LINES_BY_BYTE
-                .get(usize::from(input_byte))
-                .and_then(|line| line.get(..bytes_in_chunk))
-                .ok_or_else(|| {
-                    FormatError::invalid_result_format(
-                        "single-plane 01 lookup escaped its fixed table",
-                    )
-                })?;
-            let next_len = encoded_len.checked_add(bytes_in_chunk).ok_or_else(|| {
-                FormatError::invalid_result_format("single-plane 01 output length overflowed")
-            })?;
-            encoded
-                .get_mut(encoded_len..next_len)
-                .ok_or_else(|| {
-                    FormatError::invalid_result_format(
-                        "single-plane 01 output escaped its fixed batch",
-                    )
-                })?
-                .copy_from_slice(pattern);
-            encoded_len = next_len;
-            remaining_shots -= shots_in_byte;
-        }
-        self.output
-            .extend_from_slice(encoded.get(..encoded_len).ok_or_else(|| {
-                FormatError::invalid_result_format("single-plane 01 output escaped its fixed batch")
-            })?);
-        Ok(())
-    }
-
-    #[allow(
-        clippy::indexing_slicing,
-        reason = "every u8 value is a valid index into the 256-entry encoding table"
-    )]
     pub fn write_bytes(&mut self, bytes: &[u8]) {
-        if self.format == PerRecordFormat::ZeroOne {
-            for byte in bytes {
-                self.output
-                    .extend_from_slice(&ZERO_ONE_BITS_BY_BYTE[usize::from(*byte)]);
-                self.index += 8;
-            }
-            return;
-        }
         for byte in bytes {
             for bit_index in 0..8 {
                 self.write_bit(byte & (1u8 << bit_index) != 0);
             }
         }
-    }
-
-    /// Returns encoded bytes currently retained by this compatibility writer.
-    ///
-    /// Streaming adapters should inspect this only at record boundaries.
-    pub fn buffered_bytes(&self) -> &[u8] {
-        &self.output
-    }
-
-    /// Clears emitted bytes while retaining allocation and completed-record encoding state.
-    ///
-    /// Clearing an incomplete record is rejected so streaming adapters cannot silently discard a
-    /// prefix and continue with corrupt state.
-    pub fn clear_buffered_bytes(&mut self) -> RecordResult<()> {
-        if !self.is_at_record_boundary() {
-            return Err(FormatError::invalid_result_format(
-                "result writer bytes can be cleared only at a completed record boundary",
-            ));
-        }
-        self.output.clear();
-        Ok(())
-    }
-
-    fn is_at_record_boundary(&self) -> bool {
-        self.index == 0
-            && self.b8_byte == 0
-            && self.b8_bit_index == 0
-            && self.r8_false_run == 0
-            && self.hits_first
-            && !self.dets_started
-            && self.dets_type == b'M'
     }
 
     pub fn write_bit(&mut self, bit: bool) {

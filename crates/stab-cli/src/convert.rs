@@ -5,16 +5,17 @@ use clap::Args;
 use stab_engine::{detection_record_width, measurement_record_count};
 use stab_model::{Circuit, CircuitItem, DetectorErrorModel, RepeatBlock};
 use stab_records::{
-    DetsLayout, DetsResultType, FormatError, FormatErrorCode, MeasureRecordWriter,
-    RecordStreamReader,
+    DetsLayout, DetsResultType, FormatError, FormatErrorCode, PackedShotBatch, RecordEncoder,
+    RecordPart, RecordStreamReader,
 };
 
 use crate::{
     CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg,
+    batch_output::record_write_io,
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
-    streaming::{FileOutputSink, OutputSink, write_ptb64_group},
+    streaming::{FileOutputSink, OutputSink},
 };
 
 /// Upper bound on one framed text record's bytes while streaming conversion input.
@@ -23,9 +24,6 @@ use crate::{
 /// memory bounded without rejecting any input that route accepted, because no record in a
 /// cap-compliant input could exceed it.
 const MAX_CONVERT_RECORD_BYTES: usize = 64 * 1024 * 1024;
-
-/// Bounded encoder output retained between transport writes.
-const CONVERT_OUTPUT_CHUNK_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Args)]
 pub(crate) struct ConvertArgs {
@@ -188,6 +186,39 @@ impl ConvertLayout {
             detectors,
             observables,
         })
+    }
+
+    /// Width of the primary output record, which omits observables routed to `--obs_out`.
+    fn primary_width(self, split_observables: bool) -> Result<usize, CliError> {
+        let width = self.input_width()?;
+        if split_observables {
+            return width
+                .checked_sub(self.observable_width())
+                .ok_or(CliError::MeasurementCountOverflow);
+        }
+        Ok(width)
+    }
+
+    fn observable_width(self) -> usize {
+        if self.include_observables {
+            self.num_observables
+        } else {
+            0
+        }
+    }
+
+    /// The only included record type, when exactly one is included.
+    fn single_part(self) -> Option<DetsResultType> {
+        match (
+            self.include_measurements,
+            self.include_detectors,
+            self.include_observables,
+        ) {
+            (true, false, false) => Some(DetsResultType::Measurement),
+            (false, true, false) => Some(DetsResultType::Detector),
+            (false, false, true) => Some(DetsResultType::Observable),
+            _ => None,
+        }
     }
 
     fn dets_layout(self) -> Result<DetsLayout, CliError> {
@@ -371,30 +402,23 @@ where
     W: Write,
 {
     let mut reader = convert_record_reader(input, args.in_format, layout)?;
+    let split_observables = args.obs_output.is_some();
+    let mut primary = RecordEncoder::try_new(
+        args.out_format.required_record_format()?,
+        layout.primary_width(split_observables)?,
+    )?;
+    let mut observables = args
+        .obs_output
+        .as_ref()
+        .map(|_| -> Result<RecordEncoder, CliError> {
+            Ok(RecordEncoder::try_new(
+                args.obs_out_format.required_record_format()?,
+                layout.observable_width(),
+            )?)
+        })
+        .transpose()?;
     let mut outputs = io.activate()?;
     let mut primary_sink = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
-    if args.in_format == RecordFormatArg::B8
-        && args.out_format == RecordFormatArg::B8
-        && args.obs_output.is_none()
-    {
-        return stream_b8_identity_records(
-            &mut reader,
-            input_path,
-            layout.input_width()?,
-            &mut primary_sink,
-        );
-    }
-    if args.in_format == RecordFormatArg::B8
-        && args.out_format == RecordFormatArg::ZeroOne
-        && args.obs_output.is_none()
-    {
-        return stream_b8_to_zero_one_records(
-            &mut reader,
-            input_path,
-            layout.input_width()?,
-            &mut primary_sink,
-        );
-    }
     let mut observable_sink = args
         .obs_output
         .as_ref()
@@ -407,333 +431,151 @@ where
                 })
         })
         .transpose()?;
-    let mut primary = ConvertOutput::new(args.out_format)?;
-    let mut observables = args
-        .obs_output
-        .as_ref()
-        .map(|_| ConvertOutput::new(args.obs_out_format))
-        .transpose()?;
+    let mut parts = ConvertParts::try_new(layout)?;
+    let packed_input = args.in_format == RecordFormatArg::B8 && layout.single_part().is_some();
 
     let conversion_result = (|| -> Result<(), CliError> {
         loop {
-            let record = match reader.next_record() {
-                Ok(Some(record)) => record,
-                Ok(None) => break,
-                Err(error) => return Err(record_stream_error(error, input_path)),
+            let has_record = if packed_input {
+                match reader.next_b8_packed_record() {
+                    Ok(Some(record)) => {
+                        parts.load_b8(record)?;
+                        true
+                    }
+                    Ok(None) => false,
+                    Err(error) => return Err(record_stream_error(error, input_path)),
+                }
+            } else {
+                match reader.next_record() {
+                    Ok(Some(record)) => {
+                        parts.load_bools(layout.parts(record)?)?;
+                        true
+                    }
+                    Ok(None) => false,
+                    Err(error) => return Err(record_stream_error(error, input_path)),
+                }
             };
-            let parts = layout.parts(record)?;
-            primary.write_primary(parts, observables.is_some())?;
-            primary.flush_ready(false, |ready| {
-                primary_sink.write_with(|writer| writer.write_all(ready))
-            })?;
-            if let Some(observable_output) = observables.as_mut() {
-                observable_output.write_observables(parts.observables)?;
-                observable_output.flush_ready(false, |ready| {
-                    observable_sink
-                        .as_mut()
-                        .ok_or(CliError::IoPlanInvariant {
-                            message: "convert observable encoder has no output sink",
-                        })?
-                        .write_with(|writer| writer.write_all(ready))
-                })?;
+            if !has_record {
+                break;
             }
+            parts.with_record(split_observables, |record, observable| {
+                primary_sink.write_with(|output| {
+                    primary
+                        .write_record(record, output)
+                        .map_err(record_write_io)
+                })?;
+                if let Some(encoder) = observables.as_mut() {
+                    let sink = observable_sink.as_mut().ok_or(CliError::IoPlanInvariant {
+                        message: "convert observable encoder has no output sink",
+                    })?;
+                    sink.write_with(|output| {
+                        encoder
+                            .write_record(observable, output)
+                            .map_err(record_write_io)
+                    })?;
+                }
+                Ok(())
+            })?;
         }
-        primary.validate_finish()?;
-        if let Some(observable_output) = observables.as_ref() {
-            observable_output.validate_finish()?;
+        validate_complete_groups(&primary)?;
+        if let Some(encoder) = observables.as_ref() {
+            validate_complete_groups(encoder)?;
         }
         Ok(())
     })();
 
-    let primary_flush_result = primary.flush_ready(true, |ready| {
-        primary_sink.write_with(|writer| writer.write_all(ready))
-    });
-    let observable_flush_result = if let Some(observable_output) = observables.as_mut() {
-        observable_output.flush_ready(true, |ready| {
-            observable_sink
-                .as_mut()
-                .ok_or(CliError::IoPlanInvariant {
-                    message: "convert observable output has no output sink",
-                })?
-                .write_with(|writer| writer.write_all(ready))
-        })
-    } else {
-        Ok(())
-    };
+    // Unbuffered output reported a failing destination at the write that hit it, before a
+    // later input or layout error, so pending bytes are flushed first and a flush failure takes
+    // precedence. A write failure is returned as is, because retrying that stream repeats it.
+    if matches!(
+        conversion_result,
+        Err(CliError::WriteOutput(_) | CliError::WritePath { .. })
+    ) {
+        return conversion_result;
+    }
+    let primary_flush_result = primary_sink.flush();
+    let observable_flush_result = observable_sink
+        .as_mut()
+        .map_or(Ok(()), FileOutputSink::flush);
     primary_flush_result?;
     observable_flush_result?;
     conversion_result
 }
 
-fn stream_b8_to_zero_one_records<R, W>(
-    reader: &mut RecordStreamReader<R>,
-    input_path: Option<&Path>,
-    bits_per_record: usize,
-    output: &mut OutputSink<'_, W>,
-) -> Result<(), CliError>
-where
-    R: Read,
-    W: Write,
-{
-    let mut encoded = ConvertOutput::new(RecordFormatArg::ZeroOne)?;
-    let conversion_result = (|| -> Result<(), CliError> {
-        loop {
-            let record = match reader.next_b8_packed_record() {
-                Ok(Some(record)) => record,
-                Ok(None) => break,
-                Err(error) => return Err(record_stream_error(error, input_path)),
-            };
-            encoded.write_b8_zero_one_record(record, bits_per_record)?;
-            encoded.flush_ready(false, |ready| {
-                output.write_with(|writer| writer.write_all(ready))
-            })?;
-        }
-        Ok(())
-    })();
-    let flush_result = encoded.flush_ready(true, |ready| {
-        output.write_with(|writer| writer.write_all(ready))
-    });
-    flush_result?;
-    conversion_result
-}
-
-fn stream_b8_identity_records<R, W>(
-    reader: &mut RecordStreamReader<R>,
-    input_path: Option<&Path>,
-    bits_per_record: usize,
-    output: &mut OutputSink<'_, W>,
-) -> Result<(), CliError>
-where
-    R: Read,
-    W: Write,
-{
-    let tail_bits = bits_per_record % 8;
-    let tail_mask = if tail_bits == 0 {
-        u8::MAX
-    } else {
-        u8::MAX >> (8 - tail_bits)
-    };
-    loop {
-        let record = match reader.next_b8_packed_record() {
-            Ok(Some(record)) => record,
-            Ok(None) => return Ok(()),
-            Err(error) => return Err(record_stream_error(error, input_path)),
-        };
-        output.write_with(|writer| {
-            if tail_bits == 0 {
-                return writer.write_all(record);
-            }
-            let Some((last, prefix)) = record.split_last() else {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "b8 identity conversion produced an empty record frame",
-                ));
-            };
-            writer.write_all(prefix)?;
-            writer.write_all(&[*last & tail_mask])
-        })?;
+fn validate_complete_groups(encoder: &RecordEncoder) -> Result<(), CliError> {
+    match encoder.pending_group_records() {
+        0 => Ok(()),
+        count => Err(CliError::IncompletePtb64OutputGroup { count }),
     }
 }
 
-struct ConvertOutput {
-    format: RecordFormatArg,
-    writer: Option<MeasureRecordWriter>,
-    output: Vec<u8>,
-    ptb64_group: Vec<Vec<bool>>,
-    flush_failed: bool,
+/// Reusable packed storage for one converted record's measurement, detector, and observable
+/// columns, handed to the shared encoder as typed parts.
+struct ConvertParts {
+    layout: ConvertLayout,
+    measurements: PackedShotBatch,
+    detectors: PackedShotBatch,
+    observables: PackedShotBatch,
 }
 
-impl ConvertOutput {
-    fn new(format: RecordFormatArg) -> Result<Self, CliError> {
-        if format == RecordFormatArg::Stim {
-            return Err(CliError::UnsupportedConversion);
-        }
-        let writer = if format == RecordFormatArg::Ptb64 {
-            None
-        } else {
-            Some(
-                MeasureRecordWriter::try_with_capacity(
-                    format.required_record_format()?,
-                    CONVERT_OUTPUT_CHUNK_BYTES,
-                )
-                .map_err(CliError::from)?,
-            )
-        };
+impl ConvertParts {
+    fn try_new(layout: ConvertLayout) -> Result<Self, CliError> {
+        let width = |included: bool, count: usize| if included { count } else { 0 };
         Ok(Self {
-            format,
-            writer,
-            output: Vec::new(),
-            ptb64_group: Vec::new(),
-            flush_failed: false,
+            layout,
+            measurements: PackedShotBatch::zeros(
+                1,
+                width(layout.include_measurements, layout.num_measurements),
+            )?,
+            detectors: PackedShotBatch::zeros(
+                1,
+                width(layout.include_detectors, layout.num_detectors),
+            )?,
+            observables: PackedShotBatch::zeros(
+                1,
+                width(layout.include_observables, layout.num_observables),
+            )?,
         })
     }
 
-    fn write_primary(
-        &mut self,
-        parts: ConvertRecordParts<'_>,
+    fn load_bools(&mut self, parts: ConvertRecordParts<'_>) -> Result<(), CliError> {
+        self.measurements
+            .copy_shot_from_bools(0, parts.measurements)?;
+        self.detectors.copy_shot_from_bools(0, parts.detectors)?;
+        self.observables
+            .copy_shot_from_bools(0, parts.observables)?;
+        Ok(())
+    }
+
+    /// Loads a raw B8 frame into the layout's only included column group.
+    fn load_b8(&mut self, record: &[u8]) -> Result<(), CliError> {
+        let target = match self.layout.single_part() {
+            Some(DetsResultType::Measurement) => &mut self.measurements,
+            Some(DetsResultType::Detector) => &mut self.detectors,
+            Some(DetsResultType::Observable) => &mut self.observables,
+            None => {
+                return Err(CliError::IoPlanInvariant {
+                    message: "packed b8 conversion requires exactly one included record type",
+                });
+            }
+        };
+        target.copy_shot_from_b8(0, record)?;
+        Ok(())
+    }
+
+    /// Calls `write` with the primary record's parts and the observable-output record's parts.
+    fn with_record(
+        &self,
         split_observables: bool,
+        write: impl FnOnce(&[RecordPart<'_>], &[RecordPart<'_>]) -> Result<(), CliError>,
     ) -> Result<(), CliError> {
-        if self.format == RecordFormatArg::Ptb64 {
-            let mut bits = Vec::with_capacity(
-                parts.measurements.len()
-                    + parts.detectors.len()
-                    + if split_observables {
-                        0
-                    } else {
-                        parts.observables.len()
-                    },
-            );
-            bits.extend_from_slice(parts.measurements);
-            bits.extend_from_slice(parts.detectors);
-            if !split_observables {
-                bits.extend_from_slice(parts.observables);
-            }
-            return self.write_ptb64_record(bits);
-        }
-        if self.format == RecordFormatArg::Dets {
-            let types = [
-                (DetsResultType::Measurement, parts.measurements),
-                (DetsResultType::Detector, parts.detectors),
-                (
-                    DetsResultType::Observable,
-                    if split_observables {
-                        &[][..]
-                    } else {
-                        parts.observables
-                    },
-                ),
-            ];
-            return self.write_typed_dets_record(&types);
-        }
-
-        let writer = self.writer_mut()?;
-        writer.write_bits(parts.measurements);
-        writer.write_bits(parts.detectors);
-        if !split_observables {
-            writer.write_bits(parts.observables);
-        }
-        writer.write_end();
-        Ok(())
-    }
-
-    fn write_observables(&mut self, observables: &[bool]) -> Result<(), CliError> {
-        if self.format == RecordFormatArg::Dets {
-            return self.write_typed_dets_record(&[(DetsResultType::Observable, observables)]);
-        }
-        self.write_bits_record(observables)
-    }
-
-    fn write_bits_record(&mut self, bits: &[bool]) -> Result<(), CliError> {
-        if self.format == RecordFormatArg::Ptb64 {
-            return self.write_ptb64_record(bits.to_vec());
-        }
-        let writer = self.writer_mut()?;
-        writer.write_bits(bits);
-        writer.write_end();
-        Ok(())
-    }
-
-    fn write_b8_zero_one_record(
-        &mut self,
-        packed: &[u8],
-        bits_per_record: usize,
-    ) -> Result<(), CliError> {
-        if self.format != RecordFormatArg::ZeroOne {
-            return Err(CliError::IoPlanInvariant {
-                message: "packed b8 fast path requires a 01 output encoder",
-            });
-        }
-        let full_bytes = bits_per_record / 8;
-        let tail_bits = bits_per_record % 8;
-        let writer = self.writer_mut()?;
-        let prefix = packed.get(..full_bytes).ok_or_else(|| {
-            invalid_result_format("b8 record omitted bytes inside its declared width")
-        })?;
-        writer.write_bytes(prefix);
-        if tail_bits != 0 {
-            let tail = packed
-                .get(full_bytes)
-                .copied()
-                .ok_or_else(|| invalid_result_format("b8 record omitted its declared tail byte"))?;
-            for bit_index in 0..tail_bits {
-                writer.write_bit(tail & (1 << bit_index) != 0);
-            }
-        }
-        writer.write_end();
-        Ok(())
-    }
-
-    fn write_typed_dets_record(
-        &mut self,
-        types: &[(DetsResultType, &[bool])],
-    ) -> Result<(), CliError> {
-        let writer = self.writer_mut()?;
-        for (result_type, bits) in types {
-            writer.begin_dets_result_type(*result_type);
-            writer.write_bits(bits);
-        }
-        writer.write_end();
-        Ok(())
-    }
-
-    fn writer_mut(&mut self) -> Result<&mut MeasureRecordWriter, CliError> {
-        self.writer.as_mut().ok_or(CliError::IoPlanInvariant {
-            message: "convert non-ptb64 encoder has no result writer",
-        })
-    }
-
-    fn write_ptb64_record(&mut self, bits: Vec<bool>) -> Result<(), CliError> {
-        self.ptb64_group.push(bits);
-        if self.ptb64_group.len() == 64 {
-            write_ptb64_group(&self.ptb64_group, &mut self.output)
-                .map_err(CliError::WriteOutput)?;
-            self.ptb64_group.clear();
-        }
-        Ok(())
-    }
-
-    fn validate_finish(&self) -> Result<(), CliError> {
-        if !self.ptb64_group.is_empty() {
-            return Err(CliError::IncompletePtb64OutputGroup {
-                count: self.ptb64_group.len(),
-            });
-        }
-        Ok(())
-    }
-
-    fn ready_bytes(&self) -> &[u8] {
-        self.writer
-            .as_ref()
-            .map_or(self.output.as_slice(), MeasureRecordWriter::buffered_bytes)
-    }
-
-    fn clear_ready(&mut self) -> Result<(), CliError> {
-        if let Some(writer) = self.writer.as_mut() {
-            writer.clear_buffered_bytes().map_err(CliError::from)
+        let measurements = RecordPart::new(DetsResultType::Measurement, self.measurements.shot(0)?);
+        let detectors = RecordPart::new(DetsResultType::Detector, self.detectors.shot(0)?);
+        let observables = RecordPart::new(DetsResultType::Observable, self.observables.shot(0)?);
+        if split_observables {
+            write(&[measurements, detectors], &[observables])
         } else {
-            self.output.clear();
-            Ok(())
-        }
-    }
-
-    fn flush_ready(
-        &mut self,
-        force: bool,
-        write: impl FnOnce(&[u8]) -> Result<(), CliError>,
-    ) -> Result<(), CliError> {
-        if self.flush_failed {
-            return Ok(());
-        }
-        let ready = self.ready_bytes();
-        if ready.is_empty() || (!force && ready.len() < CONVERT_OUTPUT_CHUNK_BYTES) {
-            return Ok(());
-        }
-        match write(ready) {
-            Ok(()) => self.clear_ready(),
-            Err(error) => {
-                self.flush_failed = true;
-                Err(error)
-            }
+            write(&[measurements, detectors, observables], &[])
         }
     }
 }
@@ -814,7 +656,7 @@ where
     let mut outputs = io.activate()?;
     let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     primary_output.write_with(|writer| writer.write_all(primary))?;
-    Ok(())
+    primary_output.flush()
 }
 
 fn take_slice<'a>(

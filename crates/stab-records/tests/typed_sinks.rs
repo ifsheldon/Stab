@@ -108,64 +108,6 @@ fn compatibility_writer_matches_stim_byte_layouts() {
 }
 
 #[test]
-fn compatibility_writer_can_drain_completed_chunks_and_continue() {
-    for (format, first, second) in [
-        (
-            RecordFormat::ZeroOne,
-            b"101\n".as_slice(),
-            b"010\n".as_slice(),
-        ),
-        (RecordFormat::B8, &[0x05], &[0x02]),
-        (RecordFormat::R8, &[0, 1, 0], &[1, 1]),
-        (RecordFormat::Hits, b"0,2\n".as_slice(), b"1\n".as_slice()),
-        (
-            RecordFormat::Dets,
-            b"shot M0 M2\n".as_slice(),
-            b"shot M1\n".as_slice(),
-        ),
-    ] {
-        let mut writer = MeasureRecordWriter::try_new(format).expect("per-record format");
-        writer.write_bits(&[true, false, true]);
-        writer.write_end();
-        assert_eq!(writer.buffered_bytes(), first);
-
-        writer
-            .clear_buffered_bytes()
-            .expect("clear completed record bytes");
-        assert!(writer.buffered_bytes().is_empty());
-
-        writer.write_bits(&[false, true, false]);
-        writer.write_end();
-        assert_eq!(writer.buffered_bytes(), second);
-    }
-
-    let mut incomplete = MeasureRecordWriter::try_new(RecordFormat::B8).expect("per-record format");
-    incomplete.write_bit(true);
-    assert!(incomplete.clear_buffered_bytes().is_err());
-}
-
-#[test]
-fn single_bit_zero_one_shortcuts_compose_with_incremental_writer_state() -> RecordResult<()> {
-    let packed = PackedShotBatch::from_records(&[vec![false]], 1)?;
-    let planes = BitPlane64Batch::from_shot_major(packed.view())?;
-
-    let mut packed_writer =
-        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
-    packed_writer.write_bit(true);
-    packed_writer.write_packed_batch(packed.view())?;
-    assert_eq!(packed_writer.buffered_bytes(), b"10\n");
-    packed_writer.clear_buffered_bytes()?;
-
-    let mut plane_writer =
-        MeasureRecordWriter::try_new(RecordFormat::ZeroOne).expect("per-record format");
-    plane_writer.write_bit(true);
-    plane_writer.write_bit_plane_batch(planes.view())?;
-    assert_eq!(plane_writer.buffered_bytes(), b"10\n");
-    plane_writer.clear_buffered_bytes()?;
-    Ok(())
-}
-
-#[test]
 fn measurement_codec_reserves_known_record_counts_without_changing_bytes() -> RecordResult<()> {
     let records = patterned_records(65, 1, 3);
     let batch = PackedShotBatch::from_records(&records, 1)?;

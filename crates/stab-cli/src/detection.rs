@@ -19,7 +19,7 @@ use crate::{
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
-    streaming::{FileOutputSink, OutputSink},
+    streaming::{FileOutputSink, OutputSink, flush_before_failure},
 };
 
 const MAX_M2D_TEXT_RECORD_BYTES: usize = 1_048_576;
@@ -281,103 +281,106 @@ where
         observable,
         encoder,
     };
-    let mut delivery = session
-        .start_transaction(&mut sink)
-        .map_err(CliError::from)?;
-    let mut batch_len = 0_usize;
-    if let Some(sweeps) = sweeps.as_mut() {
+    let result = (|| -> Result<(), CliError> {
+        let mut delivery = session
+            .start_transaction(&mut sink)
+            .map_err(CliError::from)?;
+        let mut batch_len = 0_usize;
+        if let Some(sweeps) = sweeps.as_mut() {
+            loop {
+                let has_measurement =
+                    match measurements.next_record_into_batch(&mut measurement_batch, batch_len) {
+                        Ok(has_record) => has_record,
+                        Err(error) => {
+                            write_m2d_batch(
+                                &mut delivery,
+                                &measurement_batch,
+                                sweep_batch.as_ref(),
+                                batch_len,
+                            )?;
+                            return Err(error);
+                        }
+                    };
+                if has_measurement {
+                    let has_sweep = match sweeps.next_record_into_batch(
+                        sweep_batch.as_mut().ok_or(CliError::IoPlanInvariant {
+                            message: "m2d sweep stream lost its packed batch",
+                        })?,
+                        batch_len,
+                    ) {
+                        Ok(has_record) => has_record,
+                        Err(error) => {
+                            write_m2d_batch(
+                                &mut delivery,
+                                &measurement_batch,
+                                sweep_batch.as_ref(),
+                                batch_len,
+                            )?;
+                            return Err(error);
+                        }
+                    };
+                    if !has_sweep {
+                        write_m2d_batch(
+                            &mut delivery,
+                            &measurement_batch,
+                            sweep_batch.as_ref(),
+                            batch_len,
+                        )?;
+                        return Err(invalid_result_format(
+                            "m2d measurement input has more records than sweep input",
+                        ));
+                    }
+                    batch_len += 1;
+                    if batch_len == M2D_BATCH_SHOTS {
+                        write_m2d_batch(
+                            &mut delivery,
+                            &measurement_batch,
+                            sweep_batch.as_ref(),
+                            batch_len,
+                        )?;
+                        batch_len = 0;
+                    }
+                } else {
+                    write_m2d_batch(
+                        &mut delivery,
+                        &measurement_batch,
+                        sweep_batch.as_ref(),
+                        batch_len,
+                    )?;
+                    if sweeps.finish_empty_b8_zero_width_sweep_after_measurement_eof()? {
+                        return finish_m2d(delivery);
+                    }
+                    if !sweeps.has_next_record()? {
+                        return finish_m2d(delivery);
+                    }
+                    return Err(invalid_result_format(
+                        "m2d sweep input has more records than measurement input",
+                    ));
+                }
+            }
+        }
         loop {
             let has_measurement =
                 match measurements.next_record_into_batch(&mut measurement_batch, batch_len) {
                     Ok(has_record) => has_record,
                     Err(error) => {
-                        write_m2d_batch(
-                            &mut delivery,
-                            &measurement_batch,
-                            sweep_batch.as_ref(),
-                            batch_len,
-                        )?;
+                        write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
                         return Err(error);
                     }
                 };
-            if has_measurement {
-                let has_sweep = match sweeps.next_record_into_batch(
-                    sweep_batch.as_mut().ok_or(CliError::IoPlanInvariant {
-                        message: "m2d sweep stream lost its packed batch",
-                    })?,
-                    batch_len,
-                ) {
-                    Ok(has_record) => has_record,
-                    Err(error) => {
-                        write_m2d_batch(
-                            &mut delivery,
-                            &measurement_batch,
-                            sweep_batch.as_ref(),
-                            batch_len,
-                        )?;
-                        return Err(error);
-                    }
-                };
-                if !has_sweep {
-                    write_m2d_batch(
-                        &mut delivery,
-                        &measurement_batch,
-                        sweep_batch.as_ref(),
-                        batch_len,
-                    )?;
-                    return Err(invalid_result_format(
-                        "m2d measurement input has more records than sweep input",
-                    ));
-                }
-                batch_len += 1;
-                if batch_len == M2D_BATCH_SHOTS {
-                    write_m2d_batch(
-                        &mut delivery,
-                        &measurement_batch,
-                        sweep_batch.as_ref(),
-                        batch_len,
-                    )?;
-                    batch_len = 0;
-                }
-            } else {
-                write_m2d_batch(
-                    &mut delivery,
-                    &measurement_batch,
-                    sweep_batch.as_ref(),
-                    batch_len,
-                )?;
-                if sweeps.finish_empty_b8_zero_width_sweep_after_measurement_eof()? {
-                    return finish_m2d(delivery);
-                }
-                if !sweeps.has_next_record()? {
-                    return finish_m2d(delivery);
-                }
-                return Err(invalid_result_format(
-                    "m2d sweep input has more records than measurement input",
-                ));
+            if !has_measurement {
+                break;
+            }
+            batch_len += 1;
+            if batch_len == M2D_BATCH_SHOTS {
+                write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
+                batch_len = 0;
             }
         }
-    }
-    loop {
-        let has_measurement =
-            match measurements.next_record_into_batch(&mut measurement_batch, batch_len) {
-                Ok(has_record) => has_record,
-                Err(error) => {
-                    write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
-                    return Err(error);
-                }
-            };
-        if !has_measurement {
-            break;
-        }
-        batch_len += 1;
-        if batch_len == M2D_BATCH_SHOTS {
-            write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
-            batch_len = 0;
-        }
-    }
-    write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
-    finish_m2d(delivery)
+        write_m2d_batch(&mut delivery, &measurement_batch, None, batch_len)?;
+        finish_m2d(delivery)
+    })();
+    flush_before_failure(result, || sink.flush_outputs())
 }
 
 struct M2dBatchSink<'a, W>
@@ -387,6 +390,19 @@ where
     primary: OutputSink<'a, W>,
     observable: Option<FileOutputSink>,
     encoder: DetectionBatchEncoder,
+}
+
+impl<W> M2dBatchSink<'_, W>
+where
+    W: Write,
+{
+    fn flush_outputs(&mut self) -> Result<(), CliError> {
+        self.primary.flush()?;
+        if let Some(observable) = self.observable.as_mut() {
+            observable.flush()?;
+        }
+        Ok(())
+    }
 }
 
 impl<W> DetectionSink for M2dBatchSink<'_, W>

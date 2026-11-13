@@ -112,7 +112,8 @@ where
         } else {
             writer.write_all(&output_bytes)
         }
-    })
+    })?;
+    output.flush()
 }
 
 fn parse_probability_threshold(value: &str) -> Result<Probability, String> {

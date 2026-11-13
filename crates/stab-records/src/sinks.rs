@@ -1,9 +1,7 @@
-use stab_bits::BitSlice;
-
 use crate::{
-    BitPlane64Batch, DemSampleBatchView, DetectionBatchView, DetectorWidth, DetsResultType,
-    FormatError, MeasureRecordWriter, MeasurementBatchView, MeasurementWidth, ObservableWidth,
-    PackedShotBatch, RecordFormat, RecordResult, SampledErrorWidth, write_bit_plane_64_batch,
+    DemSampleBatchView, DetectionBatchView, DetectorWidth, DetsResultType, EncodedSizeEstimate,
+    FormatError, MeasurementBatchView, MeasurementWidth, ObservableWidth, RecordBatchPart,
+    RecordEncoder, RecordFormat, RecordResult, RecordWriteError, SampledErrorWidth,
 };
 
 /// Receives complete batches of measurement records.
@@ -37,19 +35,19 @@ pub trait DemSampleSink {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MeasurementCodecSink {
     width: MeasurementWidth,
-    encoder: PackedRecordEncoder,
+    output: EncodedOutput,
 }
 
 impl MeasurementCodecSink {
     pub fn try_new(format: RecordFormat, width: MeasurementWidth) -> RecordResult<Self> {
         Ok(Self {
             width,
-            encoder: PackedRecordEncoder::try_new(format, width.get())?,
+            output: EncodedOutput::try_new(format, width.get())?,
         })
     }
 
     pub const fn format(&self) -> RecordFormat {
-        self.encoder.format()
+        self.output.encoder.format()
     }
 
     pub const fn width(&self) -> MeasurementWidth {
@@ -57,20 +55,25 @@ impl MeasurementCodecSink {
     }
 
     pub fn reserve_records(&mut self, record_count: usize) -> RecordResult<()> {
-        self.encoder.reserve_upfront_records(record_count)
+        if self.output.finished {
+            return Err(FormatError::invalid_data(
+                "cannot reserve result records after sink finalization",
+            ));
+        }
+        self.output.reserve_records(record_count)
     }
 
     pub fn into_bytes(mut self) -> RecordResult<Vec<u8>> {
         self.finish()?;
-        self.encoder.into_bytes()
+        Ok(self.output.bytes)
     }
 }
 
 impl MeasurementSink for MeasurementCodecSink {
     type Error = FormatError;
 
-    #[inline(always)]
     fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> RecordResult<()> {
+        self.output.ensure_open()?;
         if batch.width() != self.width {
             return Err(width_mismatch(
                 "measurement",
@@ -78,19 +81,24 @@ impl MeasurementSink for MeasurementCodecSink {
                 self.width.get(),
             ));
         }
-        self.encoder.prepare_records(batch.shot_count())?;
-        if let Some(records) = batch.shot_major_records() {
-            return self.encoder.write_measurement_batch(records);
-        }
-        self.encoder.write_measurement_bit_planes(
-            batch
+        self.output.reserve_records(batch.shot_count())?;
+        let EncodedOutput { encoder, bytes, .. } = &mut self.output;
+        let result = if let Some(records) = batch.shot_major_records() {
+            encoder.write_batch(
+                &[RecordBatchPart::new(DetsResultType::Measurement, records)],
+                bytes,
+            )
+        } else {
+            let planes = batch
                 .bit_planes()
-                .ok_or_else(|| FormatError::invalid_data("measurement batch has no storage"))?,
-        )
+                .ok_or_else(|| FormatError::invalid_data("measurement batch has no storage"))?;
+            encoder.write_bit_planes(planes, DetsResultType::Measurement, bytes)
+        };
+        result.map_err(in_memory_error)
     }
 
     fn finish(&mut self) -> RecordResult<()> {
-        self.encoder.finish()
+        self.output.finish()
     }
 }
 
@@ -99,7 +107,7 @@ impl MeasurementSink for MeasurementCodecSink {
 pub struct DetectionCodecSink {
     detector_width: DetectorWidth,
     observable_width: ObservableWidth,
-    encoder: PackedRecordEncoder,
+    output: EncodedOutput,
 }
 
 impl DetectionCodecSink {
@@ -115,12 +123,12 @@ impl DetectionCodecSink {
         Ok(Self {
             detector_width,
             observable_width,
-            encoder: PackedRecordEncoder::try_new(format, total_width)?,
+            output: EncodedOutput::try_new(format, total_width)?,
         })
     }
 
     pub const fn format(&self) -> RecordFormat {
-        self.encoder.format()
+        self.output.encoder.format()
     }
 
     pub const fn detector_width(&self) -> DetectorWidth {
@@ -133,7 +141,7 @@ impl DetectionCodecSink {
 
     pub fn into_bytes(mut self) -> RecordResult<Vec<u8>> {
         self.finish()?;
-        self.encoder.into_bytes()
+        Ok(self.output.bytes)
     }
 
     fn validate_batch(&self, batch: DetectionBatchView<'_>) -> RecordResult<()> {
@@ -153,37 +161,22 @@ impl DetectionCodecSink {
         }
         Ok(())
     }
-
-    fn validate_finish(&self) -> RecordResult<()> {
-        self.encoder.validate_finish()
-    }
 }
 
 impl DetectionSink for DetectionCodecSink {
     type Error = FormatError;
 
     fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> RecordResult<()> {
+        self.output.ensure_open()?;
         self.validate_batch(batch)?;
-        self.encoder.prepare_records(batch.shot_count())?;
-        for shot_index in 0..batch.shot_count() {
-            let detectors = batch.detectors().shot(shot_index)?;
-            let observables = batch.observables().shot(shot_index)?;
-            self.encoder.write_parts(&[
-                RecordPart {
-                    result_type: DetsResultType::Detector,
-                    bits: detectors,
-                },
-                RecordPart {
-                    result_type: DetsResultType::Observable,
-                    bits: observables,
-                },
-            ])?;
-        }
-        Ok(())
+        self.output.write_batch(&[
+            RecordBatchPart::new(DetsResultType::Detector, batch.detectors()),
+            RecordBatchPart::new(DetsResultType::Observable, batch.observables()),
+        ])
     }
 
     fn finish(&mut self) -> RecordResult<()> {
-        self.encoder.finish()
+        self.output.finish()
     }
 }
 
@@ -212,7 +205,7 @@ impl DemSampleEncodedRecords {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DemSampleCodecSink {
     detection: DetectionCodecSink,
-    sampled_errors: Option<(SampledErrorWidth, PackedRecordEncoder)>,
+    sampled_errors: Option<(SampledErrorWidth, EncodedOutput)>,
 }
 
 impl DemSampleCodecSink {
@@ -224,7 +217,7 @@ impl DemSampleCodecSink {
     ) -> RecordResult<Self> {
         let sampled_errors = sampled_errors
             .map(|(format, width)| {
-                PackedRecordEncoder::try_new(format, width.get()).map(|encoder| (width, encoder))
+                EncodedOutput::try_new(format, width.get()).map(|output| (width, output))
             })
             .transpose()?;
         Ok(Self {
@@ -251,14 +244,9 @@ impl DemSampleCodecSink {
 
     pub fn into_records(mut self) -> RecordResult<DemSampleEncodedRecords> {
         self.finish()?;
-        let detection_records = self.detection.encoder.into_bytes()?;
-        let sampled_error_records = self
-            .sampled_errors
-            .map(|(_, encoder)| encoder.into_bytes())
-            .transpose()?;
         Ok(DemSampleEncodedRecords {
-            detection_records,
-            sampled_error_records,
+            detection_records: self.detection.output.bytes,
+            sampled_error_records: self.sampled_errors.map(|(_, output)| output.bytes),
         })
     }
 
@@ -288,228 +276,95 @@ impl DemSampleSink for DemSampleCodecSink {
     fn write_batch(&mut self, batch: DemSampleBatchView<'_>) -> RecordResult<()> {
         self.validate_batch(batch)?;
         self.detection.write_batch(batch.detection())?;
-        if let (Some(records), Some((_, encoder))) =
+        if let (Some(records), Some((_, output))) =
             (batch.sampled_errors(), self.sampled_errors.as_mut())
         {
-            encoder.prepare_records(records.shot_count())?;
-            for shot_index in 0..records.shot_count() {
-                encoder.write_parts(&[RecordPart {
-                    result_type: DetsResultType::Measurement,
-                    bits: records.shot(shot_index)?,
-                }])?;
-            }
+            output.ensure_open()?;
+            output.write_batch(&[RecordBatchPart::new(DetsResultType::Measurement, records)])?;
         }
         Ok(())
     }
 
     fn finish(&mut self) -> RecordResult<()> {
-        self.detection.validate_finish()?;
-        if let Some((_, encoder)) = &self.sampled_errors {
-            encoder.validate_finish()?;
+        self.detection.output.validate_finish()?;
+        if let Some((_, output)) = &self.sampled_errors {
+            output.validate_finish()?;
         }
-        self.detection.finish()?;
-        if let Some((_, encoder)) = &mut self.sampled_errors {
-            encoder.finish()?;
+        self.detection.output.finish()?;
+        if let Some((_, output)) = &mut self.sampled_errors {
+            output.finish()?;
         }
         Ok(())
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-struct RecordPart<'a> {
-    result_type: DetsResultType,
-    bits: BitSlice<'a>,
-}
-
+/// One encoder draining into caller-owned in-memory output with a finalization latch.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct PackedRecordEncoder {
-    format: RecordFormat,
-    width: usize,
-    record_writer: Option<MeasureRecordWriter>,
-    ptb64: Option<Ptb64Buffer>,
-    reserved_records: usize,
+struct EncodedOutput {
+    encoder: RecordEncoder,
+    bytes: Vec<u8>,
     finished: bool,
 }
 
-impl PackedRecordEncoder {
+impl EncodedOutput {
     fn try_new(format: RecordFormat, width: usize) -> RecordResult<Self> {
-        let (record_writer, ptb64) = match format {
-            RecordFormat::Ptb64 => (
-                None,
-                Some(Ptb64Buffer {
-                    records: PackedShotBatch::zeros(64, width)?,
-                    pending_shots: 0,
-                    output: Vec::new(),
-                }),
-            ),
-            format => (Some(MeasureRecordWriter::try_new(format)?), None),
-        };
         Ok(Self {
-            format,
-            width,
-            record_writer,
-            ptb64,
-            reserved_records: 0,
+            encoder: RecordEncoder::try_new(format, width)?,
+            bytes: Vec::new(),
             finished: false,
         })
     }
 
-    const fn format(&self) -> RecordFormat {
-        self.format
-    }
-
-    fn reserve_upfront_records(&mut self, record_count: usize) -> RecordResult<()> {
-        if self.finished {
-            return Err(FormatError::invalid_data(
-                "cannot reserve result records after sink finalization",
-            ));
-        }
-        let additional_records = record_count.saturating_sub(self.reserved_records);
-        self.reserve_output_for_records(additional_records)?;
-        self.reserved_records = self.reserved_records.max(record_count);
-        Ok(())
-    }
-
-    #[inline]
-    fn prepare_records(&mut self, record_count: usize) -> RecordResult<()> {
+    fn ensure_open(&self) -> RecordResult<()> {
         if self.finished {
             return Err(FormatError::invalid_data(
                 "cannot write a result batch after sink finalization",
             ));
         }
-        if self.reserved_records >= record_count {
-            self.reserved_records -= record_count;
-            return Ok(());
-        }
-        self.reserved_records = 0;
-        self.reserve_output_for_records(record_count)
+        Ok(())
     }
 
-    fn reserve_output_for_records(&mut self, record_count: usize) -> RecordResult<()> {
-        let additional = if let Some(buffer) = &self.ptb64 {
-            let complete_groups = buffer
-                .pending_shots
+    fn reserve_records(&mut self, record_count: usize) -> RecordResult<()> {
+        let format = self.encoder.format();
+        let width = self.encoder.width();
+        let additional = if format == RecordFormat::Ptb64 {
+            let complete_groups = self
+                .encoder
+                .pending_group_records()
                 .checked_add(record_count)
                 .ok_or_else(|| FormatError::invalid_data("ptb64 record count overflowed"))?
                 / 64;
             complete_groups
-                .checked_mul(self.width)
+                .checked_mul(width)
                 .and_then(|words| words.checked_mul(size_of::<u64>()))
                 .ok_or_else(|| FormatError::invalid_data("ptb64 output size overflowed"))?
         } else {
-            match self.format.estimate_output_bytes(record_count, self.width) {
-                crate::EncodedSizeEstimate::Exact(bytes) => bytes,
-                crate::EncodedSizeEstimate::Unknown => 0,
+            match format.estimate_output_bytes(record_count, width) {
+                EncodedSizeEstimate::Exact(bytes) => bytes,
+                EncodedSizeEstimate::Unknown => 0,
             }
         };
-        if additional == 0 {
-            return Ok(());
-        }
-        if let Some(writer) = &mut self.record_writer {
-            writer.reserve_output(additional)?;
-        } else if let Some(buffer) = &mut self.ptb64 {
-            buffer.output.try_reserve(additional).map_err(|error| {
-                FormatError::invalid_data(format!(
-                    "ptb64 writer could not reserve {additional} output bytes: {error}"
-                ))
-            })?;
-        }
-        Ok(())
+        self.bytes.try_reserve(additional).map_err(|error| {
+            FormatError::invalid_data(format!(
+                "result sink could not reserve {additional} output bytes: {error}"
+            ))
+        })
     }
 
-    fn write_measurement_batch(
-        &mut self,
-        batch: crate::PackedShotBatchView<'_>,
-    ) -> RecordResult<()> {
-        if self.finished {
-            return Err(FormatError::invalid_data(
-                "cannot write a result batch after sink finalization",
-            ));
-        }
-        if batch.bits_per_shot() != self.width {
-            return Err(width_mismatch("result", batch.bits_per_shot(), self.width));
-        }
-        if self.ptb64.is_some() {
-            for shot_index in 0..batch.shot_count() {
-                self.write_parts(&[RecordPart {
-                    result_type: DetsResultType::Measurement,
-                    bits: batch.shot(shot_index)?,
-                }])?;
-            }
-            return Ok(());
-        }
-        self.record_writer
-            .as_mut()
-            .ok_or_else(|| FormatError::invalid_data("record codec has no active encoding state"))?
-            .write_packed_batch(batch)
-    }
-
-    #[inline]
-    fn write_measurement_bit_planes(
-        &mut self,
-        batch: crate::BitPlane64BatchView<'_>,
-    ) -> RecordResult<()> {
-        if self.finished {
-            return Err(FormatError::invalid_data(
-                "cannot write a result batch after sink finalization",
-            ));
-        }
-        if batch.bits_per_shot() != self.width {
-            return Err(width_mismatch("result", batch.bits_per_shot(), self.width));
-        }
-        if let Some(buffer) = &mut self.ptb64 {
-            return buffer.write_bit_planes(batch);
-        }
-        self.record_writer
-            .as_mut()
-            .ok_or_else(|| FormatError::invalid_data("record codec has no active encoding state"))?
-            .write_bit_plane_batch(batch)
-    }
-
-    fn write_parts(&mut self, parts: &[RecordPart<'_>]) -> RecordResult<()> {
-        if self.finished {
-            return Err(FormatError::invalid_data(
-                "cannot write a result batch after sink finalization",
-            ));
-        }
-        let actual_width = parts.iter().try_fold(0_usize, |total, part| {
-            total
-                .checked_add(part.bits.len())
-                .ok_or_else(|| FormatError::invalid_data("result record width overflowed"))
-        })?;
-        if actual_width != self.width {
-            return Err(width_mismatch("result", actual_width, self.width));
-        }
-
-        if let Some(buffer) = &mut self.ptb64 {
-            buffer.write_parts(parts)?;
-            return Ok(());
-        }
-
-        let writer = self.record_writer.as_mut().ok_or_else(|| {
-            FormatError::invalid_data("record codec has no active encoding state")
-        })?;
-        if self.format == RecordFormat::Dets {
-            for part in parts {
-                writer.begin_dets_result_type(part.result_type);
-                writer.write_packed_record(part.bits)?;
-            }
-        } else {
-            for part in parts {
-                writer.write_packed_record(part.bits)?;
-            }
-        }
-        writer.write_end();
-        Ok(())
+    fn write_batch(&mut self, parts: &[RecordBatchPart<'_>]) -> RecordResult<()> {
+        self.ensure_open()?;
+        let shot_count = parts.first().map_or(0, |part| part.records().shot_count());
+        self.reserve_records(shot_count)?;
+        self.encoder
+            .write_batch(parts, &mut self.bytes)
+            .map_err(in_memory_error)
     }
 
     fn validate_finish(&self) -> RecordResult<()> {
-        if let Some(buffer) = &self.ptb64
-            && buffer.pending_shots != 0
-        {
+        let pending = self.encoder.pending_group_records();
+        if pending != 0 {
             return Err(FormatError::invalid_data(format!(
-                "ptb64 sink requires complete groups of 64 records, got {} trailing records",
-                buffer.pending_shots
+                "ptb64 sink requires complete groups of 64 records, got {pending} trailing records"
             )));
         }
         Ok(())
@@ -523,87 +378,15 @@ impl PackedRecordEncoder {
         self.finished = true;
         Ok(())
     }
-
-    fn into_bytes(mut self) -> RecordResult<Vec<u8>> {
-        self.finish()?;
-        match (self.record_writer, self.ptb64) {
-            (Some(writer), None) => Ok(writer.into_bytes()),
-            (None, Some(buffer)) => Ok(buffer.output),
-            _ => Err(FormatError::invalid_data(
-                "record codec finished with inconsistent encoding state",
-            )),
-        }
-    }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct Ptb64Buffer {
-    records: PackedShotBatch,
-    pending_shots: usize,
-    output: Vec<u8>,
-}
-
-impl Ptb64Buffer {
-    fn write_parts(&mut self, parts: &[RecordPart<'_>]) -> RecordResult<()> {
-        let mut output_bit = 0;
-        for part in parts {
-            for input_bit in 0..part.bits.len() {
-                let bit = part.bits.get(input_bit).ok_or_else(|| {
-                    FormatError::invalid_data(
-                        "packed record bit escaped its declared width while buffering ptb64",
-                    )
-                })?;
-                self.records.set(self.pending_shots, output_bit, bit)?;
-                output_bit = output_bit.checked_add(1).ok_or_else(|| {
-                    FormatError::invalid_data("ptb64 buffered record width overflowed")
-                })?;
-            }
+/// Writing into a `Vec<u8>` cannot fail, so only encoding errors reach in-memory sinks.
+fn in_memory_error(error: RecordWriteError) -> FormatError {
+    match error {
+        RecordWriteError::Format(error) => error,
+        RecordWriteError::Io(error) => {
+            FormatError::invalid_data(format!("in-memory result output failed: {error}"))
         }
-        self.pending_shots += 1;
-        if self.pending_shots == 64 {
-            let planes = BitPlane64Batch::from_shot_major(self.records.view())?;
-            self.output
-                .extend_from_slice(&write_bit_plane_64_batch(planes.view())?);
-            self.pending_shots = 0;
-        }
-        Ok(())
-    }
-
-    fn write_bit_planes(&mut self, batch: crate::BitPlane64BatchView<'_>) -> RecordResult<()> {
-        if self.pending_shots == 0 && batch.shot_count() == 64 {
-            for bit_index in 0..batch.bits_per_shot() {
-                let word = batch
-                    .plane(bit_index)?
-                    .words()
-                    .first()
-                    .copied()
-                    .ok_or_else(|| {
-                        FormatError::invalid_data(
-                            "64-shot bit plane did not contain its required storage word",
-                        )
-                    })?;
-                self.output.extend_from_slice(&word.to_le_bytes());
-            }
-            return Ok(());
-        }
-        for shot_index in 0..batch.shot_count() {
-            for bit_index in 0..batch.bits_per_shot() {
-                let value = batch.get(bit_index, shot_index).ok_or_else(|| {
-                    FormatError::invalid_data(
-                        "bit-plane record escaped its declared dimensions while buffering ptb64",
-                    )
-                })?;
-                self.records.set(self.pending_shots, bit_index, value)?;
-            }
-            self.pending_shots += 1;
-            if self.pending_shots == 64 {
-                let planes = BitPlane64Batch::from_shot_major(self.records.view())?;
-                self.output
-                    .extend_from_slice(&write_bit_plane_64_batch(planes.view())?);
-                self.pending_shots = 0;
-            }
-        }
-        Ok(())
     }
 }
 

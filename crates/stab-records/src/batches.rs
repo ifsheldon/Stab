@@ -916,49 +916,7 @@ mod tests {
     }
 
     #[test]
-    fn typed_writers_match_record_adapters() {
-        let records = vec![
-            vec![true, false, true, false, true],
-            vec![false, true, false, true, false],
-        ];
-        let batch = PackedShotBatch::from_records(&records, 5).unwrap();
-        for format in [
-            crate::RecordFormat::ZeroOne,
-            crate::RecordFormat::B8,
-            crate::RecordFormat::R8,
-            crate::RecordFormat::Hits,
-            crate::RecordFormat::Dets,
-        ] {
-            let mut bits_writer =
-                crate::MeasureRecordWriter::try_new(format).expect("per-record format");
-            for record in &records {
-                bits_writer.write_bits(record);
-                bits_writer.write_end();
-            }
-            assert_eq!(
-                bits_writer.into_bytes(),
-                crate::write_records(&records, format).expect("encode records")
-            );
-
-            let mut writer =
-                crate::MeasureRecordWriter::try_new(format).expect("per-record format");
-            writer
-                .write_packed_record(batch.view().shot(0).unwrap())
-                .unwrap();
-            writer.write_end();
-            writer
-                .write_packed_batch(
-                    PackedShotBatch::from_records(&records[1..], 5)
-                        .unwrap()
-                        .view(),
-                )
-                .unwrap();
-            assert_eq!(
-                writer.into_bytes(),
-                crate::write_records(&records, format).expect("encode records")
-            );
-        }
-
+    fn bit_plane_ptb64_batches_match_record_adapters() {
         let records_64 = (0..64)
             .map(|shot| {
                 (0..17)

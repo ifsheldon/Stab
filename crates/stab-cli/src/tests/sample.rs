@@ -2,7 +2,9 @@
 
 use std::ffi::OsString;
 
-use stab_records::{BitPlane64Batch, MeasurementBatchView, MeasurementSink};
+use stab_records::{
+    BitPlane64Batch, MeasurementBatchView, MeasurementSink, RecordEncoder, RecordFormat,
+};
 use tempfile::tempdir;
 
 use super::support::{Scratch, run};
@@ -32,10 +34,10 @@ fn warmed_cli_sample_encoding_has_no_record_count_dependent_allocation() {
     ] {
         let mut output = std::io::sink();
         let mut sink = CliSampleSink {
-            format,
             visible_measurements: None,
-            filtered_record: None,
-            writer: format.stream_writer().expect("construct sample writer"),
+            filtered_record: Vec::new(),
+            encoder: RecordEncoder::try_new(format.record_format(), 2_048)
+                .expect("construct sample encoder"),
             output: &mut output,
         };
         let view = MeasurementBatchView::from_bit_planes(batch.view());
@@ -70,12 +72,11 @@ fn warmed_filtered_cli_sample_encoding_reuses_projection_storage() {
     let batch = BitPlane64Batch::zeros(64, 2_048).expect("construct wide batch");
     let visible = (0..2_048).step_by(2).collect::<Vec<_>>();
     let mut output = std::io::sink();
-    let format = SampleOutFormatArg::B8;
     let mut sink = CliSampleSink {
-        format,
         visible_measurements: Some(&visible),
-        filtered_record: Some(Vec::with_capacity(visible.len())),
-        writer: format.stream_writer().expect("construct sample writer"),
+        filtered_record: Vec::new(),
+        encoder: RecordEncoder::try_new(RecordFormat::B8, visible.len())
+            .expect("construct sample encoder"),
         output: &mut output,
     };
     let view = MeasurementBatchView::from_bit_planes(batch.view());

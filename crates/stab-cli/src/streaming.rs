@@ -20,6 +20,11 @@ impl FileOutputSink {
             source,
         })
     }
+
+    /// Flushes buffered bytes, reporting a failure exactly like a failed write.
+    pub(crate) fn flush(&mut self) -> Result<(), CliError> {
+        self.write_with(|writer| writer.flush())
+    }
 }
 
 pub(crate) enum OutputSink<'a, W>
@@ -50,35 +55,29 @@ where
             Self::File(sink) => sink.write_with(write),
         }
     }
+
+    /// Flushes buffered bytes, reporting a failure exactly like a failed write.
+    pub(crate) fn flush(&mut self) -> Result<(), CliError> {
+        self.write_with(|writer| writer.flush())
+    }
 }
 
-pub(crate) fn write_ptb64_group<W>(records: &[Vec<bool>], output: &mut W) -> io::Result<()>
-where
-    W: Write + ?Sized,
-{
-    let bits_per_record = records.first().map_or(0, Vec::len);
-    let mut words = vec![0u64; bits_per_record];
-    for (shot_index, record) in records.iter().enumerate() {
-        if record.len() != bits_per_record {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "internal sampler emitted non-uniform ptb64 records",
-            ));
-        }
-        for (bit_index, bit) in record.iter().enumerate() {
-            if *bit {
-                let word = words.get_mut(bit_index).ok_or_else(|| {
-                    io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "internal sampler emitted ptb64 bit outside the record width",
-                    )
-                })?;
-                *word |= 1u64 << shot_index;
-            }
+/// Reports a pending output failure ahead of a later input or layout failure.
+///
+/// Unbuffered output surfaced a full device or closed pipe at the write that hit it, before a
+/// later malformed record could stop the command. Buffered output can still hold those bytes when
+/// such an error arrives, so this flushes them first and reports a flush failure in its place.
+/// Output failures are returned unchanged, because retrying the failed stream only repeats them.
+pub(crate) fn flush_before_failure(
+    result: Result<(), CliError>,
+    flush: impl FnOnce() -> Result<(), CliError>,
+) -> Result<(), CliError> {
+    match result {
+        Ok(()) => Ok(()),
+        Err(error @ (CliError::WriteOutput(_) | CliError::WritePath { .. })) => Err(error),
+        Err(error) => {
+            flush()?;
+            Err(error)
         }
     }
-    for word in words {
-        output.write_all(&word.to_le_bytes())?;
-    }
-    Ok(())
 }

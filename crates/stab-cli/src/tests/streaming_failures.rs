@@ -219,3 +219,90 @@ fn genuine_output_write_failures_still_report_a_diagnostic() {
         "non-pipe output failures must keep their diagnostics"
     );
 }
+
+/// The binary wraps standard output in [`crate::io_plan::buffered_output`]; these runs use the
+/// same wrapper, so a failure while spilling the buffer mid-stream and a failure only at the
+/// final flush must both exit non-zero with the existing diagnostic.
+#[test]
+fn buffered_stdout_reports_mid_stream_and_flush_only_failures() {
+    let mut inner = FailAfterOneWrite::default();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--shots=200000"],
+        b"M 0\n".as_slice(),
+        crate::io_plan::buffered_output(&mut inner),
+        &mut stderr,
+    );
+    assert_eq!(status, 1);
+    // The first spill succeeds and the second fails; dropping the buffer may retry once more.
+    assert!(inner.writes >= 2);
+    let stderr = String::from_utf8(stderr).expect("UTF-8 stderr");
+    assert!(
+        stderr.contains("sampling sink write-batch failed"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("intentional second-batch stop"), "{stderr}");
+
+    for args in [
+        &["stab", "sample", "--shots=64"][..],
+        &["stab", "detect", "--shots=64"],
+        &["stab", "sample_dem", "--shots=64"],
+        &[
+            "stab",
+            "convert",
+            "--in_format=01",
+            "--out_format=hits",
+            "--bits_per_shot=3",
+        ],
+    ] {
+        let mut inner = FlushFailWriter::default();
+        let mut stderr = Vec::new();
+        let stdin: &[u8] = match args.get(1).copied().unwrap_or_default() {
+            "convert" => b"101\n",
+            "sample_dem" => b"error(0.5) D0\n",
+            _ => b"M 0\nDETECTOR rec[-1]\n",
+        };
+        let status = run_from(
+            args.iter().copied(),
+            stdin,
+            crate::io_plan::buffered_output(&mut inner),
+            &mut stderr,
+        );
+        assert_eq!(status, 1, "{args:?}");
+        assert!(
+            inner.bytes > 0,
+            "{args:?}: buffered bytes never reached the writer"
+        );
+        let stderr = String::from_utf8(stderr).expect("UTF-8 stderr");
+        assert!(
+            stderr.contains("intentional finish failure"),
+            "{args:?}: {stderr}"
+        );
+    }
+}
+
+/// Many small records reach buffered standard output in buffer-sized writes, not one per record
+/// or one per 64-shot batch.
+#[test]
+fn buffered_stdout_writes_many_records_in_bounded_chunks() {
+    let circuit = "X_ERROR(0.3) 0 1 2 3 4 5 6 7 8 9 10\nM 0 1 2 3 4 5 6 7 8 9 10\n";
+    for format in ["ptb64", "01", "hits", "dets", "r8", "b8"] {
+        let mut inner = CountingWriter::default();
+        let mut stderr = Vec::new();
+        let format_arg = format!("--out_format={format}");
+        let status = run_from(
+            ["stab", "sample", "--shots=8192", "--seed=5", &format_arg],
+            circuit.as_bytes(),
+            crate::io_plan::buffered_output(&mut inner),
+            &mut stderr,
+        );
+        assert_eq!(status, 0, "{format}: {}", String::from_utf8_lossy(&stderr));
+        let half_buffers = inner.bytes / (crate::io_plan::OUTPUT_BUFFER_BYTES / 2);
+        assert!(
+            inner.nonempty_writes <= half_buffers + 1,
+            "{format}: {} writes for {} bytes",
+            inner.nonempty_writes,
+            inner.bytes
+        );
+    }
+}

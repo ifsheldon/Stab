@@ -17,7 +17,7 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config, FileFailurePersistence, RngAlgorithm, RngSeed};
 use stab_bits::BitSlice;
 use stab_records::{
-    BitPlane64Batch, DetsLayout, DetsResultType, MeasureRecordWriter, PackedShotBatch,
+    BitPlane64Batch, DetsLayout, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder,
     RecordFormat, RecordResult, RecordStreamError, RecordStreamReader, for_each_dets_packed_record,
     for_each_dets_record, for_each_dets_sparse_shot, for_each_dets_token_record,
     for_each_packed_record, for_each_ptb64_record, for_each_record, for_each_sparse_record,
@@ -539,11 +539,17 @@ proptest! {
             out
         } else {
             let packed = PackedShotBatch::from_records(&records, width).expect("packed batch");
-            let mut writer = MeasureRecordWriter::try_new(format).expect("per-record writer");
-            writer.write_packed_batch(packed.view()).expect("packed encode");
-            writer.into_bytes()
+            let mut encoder = RecordEncoder::try_new(format, width).expect("record encoder");
+            let mut out = Vec::new();
+            encoder
+                .write_batch(
+                    &[RecordBatchPart::new(DetsResultType::Measurement, packed.view())],
+                    &mut out,
+                )
+                .expect("packed encode");
+            out
         };
-        prop_assert_eq!(&batch_encoded, &encoded, "packed writer differs: {}", context);
+        prop_assert_eq!(&batch_encoded, &encoded, "record encoder differs: {}", context);
 
         // Zero-width b8 and ptb64 records carry no bytes, so their count is not recoverable.
         if width == 0 && matches!(format, RecordFormat::B8 | RecordFormat::Ptb64) {

@@ -1,9 +1,14 @@
+//! Output routing for detection and DEM-sample batches.
+//!
+//! The CLI decides which stream receives which columns: detectors with observables appended,
+//! prepended, or split into `--obs_out`, and sampled errors into `--err_out`. Every byte is
+//! produced by the Records-owned [`RecordEncoder`].
+
 use std::io::{self, Write};
 
-use stab_bits::BitSlice;
 use stab_records::{
-    BitPlane64Batch, DemSampleBatchView, DetectionBatchView, DetsResultType, FormatError,
-    FormatErrorCode, MeasureRecordWriter, PackedShotBatchView, RecordFormat,
+    DemSampleBatchView, DetectionBatchView, DetsResultType, FormatError, FormatErrorCode,
+    PackedShotBatchView, RecordBatchPart, RecordEncoder, RecordFormat, RecordWriteError,
 };
 
 use crate::{
@@ -22,8 +27,8 @@ pub(crate) struct DetectionBatchEncoder {
     detector_width: usize,
     observable_width: usize,
     observable_mode: DetectionObservableOutputMode,
-    primary: RecordBatchEncoder,
-    observable: Option<RecordBatchEncoder>,
+    primary: RecordEncoder,
+    observable: Option<RecordEncoder>,
 }
 
 impl DetectionBatchEncoder {
@@ -46,9 +51,9 @@ impl DetectionBatchEncoder {
             detector_width,
             observable_width,
             observable_mode,
-            primary: RecordBatchEncoder::try_new(primary_format, primary_width)?,
+            primary: RecordEncoder::try_new(primary_format, primary_width)?,
             observable: observable_format
-                .map(|format| RecordBatchEncoder::try_new(format, observable_width))
+                .map(|format| RecordEncoder::try_new(format, observable_width))
                 .transpose()?,
         })
     }
@@ -64,13 +69,23 @@ impl DetectionBatchEncoder {
     {
         self.validate_batch(batch)?;
         self.validate_observable_route(observable_output.is_some())?;
+        let detectors = RecordBatchPart::new(DetsResultType::Detector, batch.detectors());
+        let observables = RecordBatchPart::new(DetsResultType::Observable, batch.observables());
+        let primary_parts = match self.observable_mode {
+            DetectionObservableOutputMode::DetectorsOnly => &[detectors][..],
+            DetectionObservableOutputMode::Append => &[detectors, observables],
+            DetectionObservableOutputMode::Prepend => &[observables, detectors],
+        };
         primary_output.write_with(|output| {
             self.primary
-                .write_detection_batch(batch, self.observable_mode, output)
+                .write_batch(primary_parts, output)
+                .map_err(record_write_io)
         })?;
         if let (Some(encoder), Some(output)) = (&mut self.observable, observable_output) {
             output.write_with(|output| {
-                encoder.write_single_batch(batch.observables(), DetsResultType::Observable, output)
+                encoder
+                    .write_batch(&[observables], output)
+                    .map_err(record_write_io)
             })?;
         }
         Ok(())
@@ -85,13 +100,13 @@ impl DetectionBatchEncoder {
         W: Write,
     {
         self.validate_observable_route(observable_output.is_some())?;
-        self.primary.validate_finish()?;
+        validate_complete_groups(&self.primary)?;
         if let Some(observable) = &self.observable {
-            observable.validate_finish()?;
+            validate_complete_groups(observable)?;
         }
-        primary_output.write_with(|output| output.flush())?;
+        primary_output.flush()?;
         if let Some(output) = observable_output {
-            output.write_with(|output| output.flush())?;
+            output.flush()?;
         }
         Ok(())
     }
@@ -127,7 +142,7 @@ impl DetectionBatchEncoder {
 pub(crate) struct DemSampleBatchEncoder {
     detection: DetectionBatchEncoder,
     sampled_error_width: usize,
-    sampled_errors: Option<RecordBatchEncoder>,
+    sampled_errors: Option<RecordEncoder>,
 }
 
 impl DemSampleBatchEncoder {
@@ -150,7 +165,7 @@ impl DemSampleBatchEncoder {
             )?,
             sampled_error_width,
             sampled_errors: sampled_error_format
-                .map(|format| RecordBatchEncoder::try_new(format, sampled_error_width))
+                .map(|format| RecordEncoder::try_new(format, sampled_error_width))
                 .transpose()?,
         })
     }
@@ -173,9 +188,7 @@ impl DemSampleBatchEncoder {
             &mut self.sampled_errors,
             sampled_error_output,
         ) {
-            output.write_with(|output| {
-                encoder.write_single_batch(records, DetsResultType::Measurement, output)
-            })?;
+            output.write_with(|output| write_single(encoder, records, output))?;
         }
         Ok(())
     }
@@ -195,11 +208,11 @@ impl DemSampleBatchEncoder {
             });
         }
         if let Some(sampled_errors) = &self.sampled_errors {
-            sampled_errors.validate_finish()?;
+            validate_complete_groups(sampled_errors)?;
         }
         self.detection.finish(primary_output, observable_output)?;
         if let Some(output) = sampled_error_output {
-            output.write_with(|output| output.flush())?;
+            output.flush()?;
         }
         Ok(())
     }
@@ -230,176 +243,36 @@ impl DemSampleBatchEncoder {
     }
 }
 
-enum RecordBatchEncoder {
-    Records {
-        format: RecordFormat,
-        width: usize,
-        writer: MeasureRecordWriter,
-    },
-    Ptb64 {
-        planes: BitPlane64Batch,
-        pending_shots: usize,
-    },
+/// Sampled errors use the measurement namespace, so DETS writes them as `M<index>` tokens.
+fn write_single(
+    encoder: &mut RecordEncoder,
+    records: PackedShotBatchView<'_>,
+    output: &mut dyn Write,
+) -> io::Result<()> {
+    encoder
+        .write_batch(
+            &[RecordBatchPart::new(DetsResultType::Measurement, records)],
+            output,
+        )
+        .map_err(record_write_io)
 }
 
-impl RecordBatchEncoder {
-    fn try_new(format: RecordFormat, width: usize) -> Result<Self, CliError> {
-        if format == RecordFormat::Ptb64 {
-            return Ok(Self::Ptb64 {
-                planes: BitPlane64Batch::zeros(64, width).map_err(CliError::from)?,
-                pending_shots: 0,
-            });
-        }
-        Self::records(format, width)
-    }
-
-    fn records(format: RecordFormat, width: usize) -> Result<Self, CliError> {
-        Ok(Self::Records {
-            format,
-            width,
-            writer: MeasureRecordWriter::try_new(format).map_err(CliError::from)?,
-        })
-    }
-
-    fn write_detection_batch(
-        &mut self,
-        batch: DetectionBatchView<'_>,
-        observable_mode: DetectionObservableOutputMode,
-        output: &mut dyn Write,
-    ) -> io::Result<()> {
-        for shot_index in 0..batch.shot_count() {
-            let detectors = batch.detectors().shot(shot_index).map_err(format_io)?;
-            let observables = batch.observables().shot(shot_index).map_err(format_io)?;
-            let mut output_bit = 0;
-            if observable_mode == DetectionObservableOutputMode::Prepend {
-                self.write_part(DetsResultType::Observable, observables, &mut output_bit)?;
-            }
-            self.write_part(DetsResultType::Detector, detectors, &mut output_bit)?;
-            if observable_mode == DetectionObservableOutputMode::Append {
-                self.write_part(DetsResultType::Observable, observables, &mut output_bit)?;
-            }
-            self.finish_record(output_bit, output)?;
-        }
-        self.flush_records(output)
-    }
-
-    fn write_single_batch(
-        &mut self,
-        batch: PackedShotBatchView<'_>,
-        result_type: DetsResultType,
-        output: &mut dyn Write,
-    ) -> io::Result<()> {
-        for shot_index in 0..batch.shot_count() {
-            let record = batch.shot(shot_index).map_err(format_io)?;
-            let mut output_bit = 0;
-            self.write_part(result_type, record, &mut output_bit)?;
-            self.finish_record(output_bit, output)?;
-        }
-        self.flush_records(output)
-    }
-
-    fn write_part(
-        &mut self,
-        result_type: DetsResultType,
-        bits: BitSlice<'_>,
-        output_bit: &mut usize,
-    ) -> io::Result<()> {
-        match self {
-            Self::Records { format, writer, .. } => {
-                if *format == RecordFormat::Dets {
-                    writer.begin_dets_result_type(result_type);
-                }
-                writer.write_packed_record(bits).map_err(format_io)?;
-            }
-            Self::Ptb64 {
-                planes,
-                pending_shots,
-            } => {
-                for bit_index in 0..bits.len() {
-                    let bit = bits.get(bit_index).ok_or_else(|| {
-                        io::Error::other(
-                            "packed result bit escaped its declared width during PTB64 routing",
-                        )
-                    })?;
-                    planes
-                        .set(*output_bit, *pending_shots, bit)
-                        .map_err(format_io)?;
-                    *output_bit = output_bit
-                        .checked_add(1)
-                        .ok_or_else(|| io::Error::other("PTB64 routed result width overflowed"))?;
-                }
-                return Ok(());
-            }
-        }
-        *output_bit = output_bit
-            .checked_add(bits.len())
-            .ok_or_else(|| io::Error::other("routed result width overflowed"))?;
-        Ok(())
-    }
-
-    fn finish_record(&mut self, actual_width: usize, output: &mut dyn Write) -> io::Result<()> {
-        let expected_width = self.width();
-        if actual_width != expected_width {
-            return Err(io::Error::other(format!(
-                "routed result has width {actual_width} but the encoder expects {expected_width}"
-            )));
-        }
-        match self {
-            Self::Records { writer, .. } => writer.write_end(),
-            Self::Ptb64 {
-                planes,
-                pending_shots,
-            } => {
-                *pending_shots += 1;
-                if *pending_shots == 64 {
-                    for bit_index in 0..planes.bits_per_shot() {
-                        let word = planes
-                            .plane(bit_index)
-                            .map_err(format_io)?
-                            .words()
-                            .first()
-                            .copied()
-                            .ok_or_else(|| {
-                                io::Error::other("PTB64 plane omitted its required 64-shot word")
-                            })?;
-                        output.write_all(&word.to_le_bytes())?;
-                    }
-                    *pending_shots = 0;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn flush_records(&mut self, output: &mut dyn Write) -> io::Result<()> {
-        let Self::Records { writer, .. } = self else {
-            return Ok(());
-        };
-        output.write_all(writer.buffered_bytes())?;
-        writer.clear_buffered_bytes().map_err(format_io)
-    }
-
-    fn validate_finish(&self) -> Result<(), CliError> {
-        if let Self::Ptb64 { pending_shots, .. } = self
-            && *pending_shots != 0
-        {
-            return Err(CliError::IncompletePtb64OutputGroup {
-                count: *pending_shots,
-            });
-        }
-        Ok(())
-    }
-
-    fn width(&self) -> usize {
-        match self {
-            Self::Records { width, .. } => *width,
-            Self::Ptb64 { planes, .. } => planes.bits_per_shot(),
-        }
+fn validate_complete_groups(encoder: &RecordEncoder) -> Result<(), CliError> {
+    match encoder.pending_group_records() {
+        0 => Ok(()),
+        count => Err(CliError::IncompletePtb64OutputGroup { count }),
     }
 }
 
-fn format_io(error: impl std::fmt::Display) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+/// Keeps writer failures as the original I/O error, so the existing write diagnostics and the
+/// broken-pipe exit path see them unchanged, and reports encoder layout errors as invalid data.
+pub(crate) fn record_write_io(error: RecordWriteError) -> io::Error {
+    match error {
+        RecordWriteError::Io(error) => error,
+        RecordWriteError::Format(error) => {
+            io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+        }
+    }
 }
 
 fn invalid_result_format(message: impl Into<String>) -> CliError {
@@ -411,79 +284,4 @@ fn invalid_result_format(message: impl Into<String>) -> CliError {
 }
 
 #[cfg(test)]
-mod tests {
-    use stab_records::{DetectionBatchView, PackedShotBatch};
-
-    use super::{DetectionObservableOutputMode, DetsResultType, RecordBatchEncoder, RecordFormat};
-
-    #[test]
-    fn detection_batch_encoding_preserves_namespace_order_across_partitions() {
-        let detectors =
-            PackedShotBatch::from_records(&[vec![true, false]], 2).expect("detector records");
-        let observables =
-            PackedShotBatch::from_records(&[vec![true]], 1).expect("observable records");
-        let first = DetectionBatchView::try_new(detectors.view(), observables.view())
-            .expect("detection batch");
-        let detectors =
-            PackedShotBatch::from_records(&[vec![false, true]], 2).expect("detector records");
-        let observables =
-            PackedShotBatch::from_records(&[vec![false]], 1).expect("observable records");
-        let second = DetectionBatchView::try_new(detectors.view(), observables.view())
-            .expect("detection batch");
-
-        let mut encoder = RecordBatchEncoder::try_new(RecordFormat::Dets, 3).expect("DETS encoder");
-        let mut output = Vec::new();
-        encoder
-            .write_detection_batch(first, DetectionObservableOutputMode::Prepend, &mut output)
-            .expect("first batch");
-        encoder
-            .write_detection_batch(second, DetectionObservableOutputMode::Prepend, &mut output)
-            .expect("second batch");
-        encoder.validate_finish().expect("complete output");
-
-        assert_eq!(output, b"shot L0 D0\nshot D1\n");
-    }
-
-    #[test]
-    fn sampled_error_dets_output_uses_measurement_namespace() {
-        let errors = PackedShotBatch::from_records(&[vec![true, false, true]], 3)
-            .expect("sampled-error records");
-        let mut encoder = RecordBatchEncoder::try_new(RecordFormat::Dets, 3).expect("DETS encoder");
-        let mut output = Vec::new();
-
-        encoder
-            .write_single_batch(errors.view(), DetsResultType::Measurement, &mut output)
-            .expect("sampled-error batch");
-
-        assert_eq!(output, b"shot M0 M2\n");
-    }
-
-    #[test]
-    fn ptb64_routing_writes_complete_groups_and_rejects_a_trailing_record() {
-        let records = (0..64).map(|shot| vec![shot % 2 == 0]).collect::<Vec<_>>();
-        let records =
-            PackedShotBatch::from_records(&records, 1).expect("complete PTB64 record group");
-        let mut encoder =
-            RecordBatchEncoder::try_new(RecordFormat::Ptb64, 1).expect("PTB64 encoder");
-        let mut output = Vec::new();
-
-        encoder
-            .write_single_batch(records.view(), DetsResultType::Measurement, &mut output)
-            .expect("complete PTB64 group");
-        encoder.validate_finish().expect("complete output");
-        assert_eq!(output, 0x5555_5555_5555_5555_u64.to_le_bytes());
-
-        let trailing =
-            PackedShotBatch::from_records(&[vec![true]], 1).expect("trailing record batch");
-        encoder
-            .write_single_batch(trailing.view(), DetsResultType::Measurement, &mut output)
-            .expect("buffer trailing record");
-        let error = encoder
-            .validate_finish()
-            .expect_err("trailing PTB64 record should be rejected");
-        assert!(matches!(
-            error,
-            crate::CliError::IncompletePtb64OutputGroup { count: 1 }
-        ));
-    }
-}
+mod tests;

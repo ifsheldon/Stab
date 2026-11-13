@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 
 use same_file::Handle;
@@ -119,26 +119,92 @@ impl Seek for InputFile {
     }
 }
 
+/// Bytes buffered in front of every command output stream, file or standard output.
+pub(crate) const OUTPUT_BUFFER_BYTES: usize = 64 * 1024;
+
+/// Wraps a command output stream in the shared output buffer.
+///
+/// Dropping a [`BufWriter`] flushes but discards any error, so every successful command path
+/// must flush explicitly and surface the result; a drop-time flush only happens on paths that are
+/// already reporting a failure.
+pub(crate) fn buffered_output<W>(output: W) -> BufWriter<W>
+where
+    W: Write,
+{
+    BufWriter::with_capacity(OUTPUT_BUFFER_BYTES, output)
+}
+
+/// An activated output file whose writes pass through [`buffered_output`].
 #[derive(Debug)]
 pub(crate) struct OutputFile {
     role: FileRole,
     path: PathBuf,
-    identity: Handle,
+    writer: BufWriter<OutputTarget>,
 }
 
 impl OutputFile {
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
+
+    /// Builds an output file over an injected writer so tests can observe write and flush calls.
+    #[cfg(test)]
+    pub(crate) fn probe(path: &Path, writer: Box<dyn Write>) -> Self {
+        Self {
+            role: FileRole::Output,
+            path: path.to_path_buf(),
+            writer: buffered_output(OutputTarget::Probe(writer)),
+        }
+    }
 }
 
 impl Write for OutputFile {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        self.identity.as_file_mut().write(buffer)
+        self.writer.write(buffer)
+    }
+
+    fn write_all(&mut self, buffer: &[u8]) -> std::io::Result<()> {
+        self.writer.write_all(buffer)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.identity.as_file_mut().flush()
+        self.writer.flush()
+    }
+}
+
+/// The destination behind an output file's buffer.
+enum OutputTarget {
+    /// The retained handle opened and alias-checked during preflight.
+    Retained(Handle),
+    #[cfg(test)]
+    Probe(Box<dyn Write>),
+}
+
+impl std::fmt::Debug for OutputTarget {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Retained(handle) => formatter.debug_tuple("Retained").field(handle).finish(),
+            #[cfg(test)]
+            Self::Probe(_) => formatter.write_str("Probe"),
+        }
+    }
+}
+
+impl Write for OutputTarget {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Retained(handle) => handle.as_file_mut().write(buffer),
+            #[cfg(test)]
+            Self::Probe(writer) => writer.write(buffer),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Retained(handle) => handle.as_file_mut().flush(),
+            #[cfg(test)]
+            Self::Probe(writer) => writer.flush(),
+        }
     }
 }
 
@@ -312,7 +378,7 @@ impl PendingIo {
                 Ok(OutputFile {
                     role: output.role,
                     path: output.path.clone(),
-                    identity,
+                    writer: buffered_output(OutputTarget::Retained(identity)),
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;

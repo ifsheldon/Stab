@@ -18,7 +18,7 @@ use super::{
     batch_output::{DemSampleBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
-    streaming::{FileOutputSink, OutputSink},
+    streaming::{FileOutputSink, OutputSink, flush_before_failure},
 };
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
@@ -203,7 +203,7 @@ where
         sampled_errors,
         encoder,
     };
-    match &mut execution {
+    let result = match &mut execution {
         SampleDemExecution::Replay { input, session } => {
             let mut replay_record = Vec::new();
             replay_record
@@ -241,7 +241,8 @@ where
             .run(shots, &mut sink)
             .map(|_| ())
             .map_err(map_dem_run_error),
-    }
+    };
+    flush_before_failure(result, || sink.flush_outputs())
 }
 
 struct SampleDemBatchSink<'a, W>
@@ -252,6 +253,22 @@ where
     observable: Option<FileOutputSink>,
     sampled_errors: Option<FileOutputSink>,
     encoder: DemSampleBatchEncoder,
+}
+
+impl<W> SampleDemBatchSink<'_, W>
+where
+    W: Write,
+{
+    fn flush_outputs(&mut self) -> Result<(), CliError> {
+        self.primary.flush()?;
+        for output in [self.observable.as_mut(), self.sampled_errors.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            output.flush()?;
+        }
+        Ok(())
+    }
 }
 
 impl<W> DemSampleSink for SampleDemBatchSink<'_, W>

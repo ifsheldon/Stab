@@ -2,6 +2,7 @@
 
 mod batches;
 mod diagnostics;
+mod encoder;
 mod estimate;
 mod record_stream;
 mod result_formats;
@@ -19,6 +20,7 @@ pub use batches::{
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext,
 };
+pub use encoder::{RecordBatchPart, RecordEncoder, RecordPart, RecordWriteError};
 pub use estimate::EncodedSizeEstimate;
 pub use record_stream::{RecordStreamReadError, RecordStreamReader};
 pub use result_formats::{
