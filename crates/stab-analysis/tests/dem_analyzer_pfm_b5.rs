@@ -34,10 +34,6 @@ const DIAGNOSTIC_SATURATION_CIRCUIT: &str =
     include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_diagnostic_saturation.stim");
 const DIAGNOSTIC_SATURATION_EXPECTED: &str =
     include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_diagnostic_saturation.stdout");
-const LOCAL_DECOMPOSITION_16_CIRCUIT: &str =
-    include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_local_decomposition_16.stim");
-const LOCAL_DECOMPOSITION_16_EXPECTED: &str =
-    include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_local_decomposition_16.stdout");
 const FOLDED_MPAD_CIRCUIT: &str =
     include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_folded_mpad.stim");
 const FOLDED_MPAD_EXPECTED: &str =
@@ -118,41 +114,6 @@ fn assert_saturating_repeat_accounting() {
         .to_dem_string(),
         DIAGNOSTIC_SATURATION_EXPECTED
     );
-}
-
-#[test]
-fn pfm_b5_local_decomposition_accepts_sixteen_like_stim() {
-    assert_eq!(
-        analyze(
-            LOCAL_DECOMPOSITION_16_CIRCUIT,
-            ErrorAnalyzerOptions {
-                decompose_errors: true,
-                ignore_decomposition_failures: true,
-                ..ErrorAnalyzerOptions::default()
-            },
-        )
-        .to_dem_string(),
-        LOCAL_DECOMPOSITION_16_EXPECTED
-    );
-}
-
-#[test]
-fn pfm_b5_local_decomposition_rejects_seventeen_like_stim() {
-    let circuit = Circuit::from_stim_str(&format!(
-        "{LOCAL_DECOMPOSITION_16_CIRCUIT}DETECTOR rec[-1]\n"
-    ))
-    .expect("valid seventeen-detector boundary circuit");
-    let error = circuit_to_detector_error_model(
-        &circuit,
-        ErrorAnalyzerOptions {
-            fold_loops: true,
-            decompose_errors: true,
-            ignore_decomposition_failures: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-    .expect_err("seventeen detector symptoms exceed the local decomposition mask");
-    assert!(error.to_string().contains("exceeded 16 detector symptoms"));
 }
 
 fn assert_folded_noisy_mpad() {

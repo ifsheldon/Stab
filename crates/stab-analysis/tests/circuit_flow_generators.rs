@@ -11,323 +11,152 @@ use stab_analysis::{
 };
 use stab_model::Circuit;
 
-#[test]
-fn circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
-    assert_eq!(
-        circuit_flow_generators(&circuit("")).expect("empty generators"),
-        Vec::<Flow>::new()
-    );
-    assert_eq!(generator_strings("X 0\n"), vec!["X -> X", "Z -> -Z"]);
-    assert_eq!(generator_strings("H 0\n"), vec!["X -> Z", "Z -> X"]);
-    assert_eq!(generator_strings("S 0\n"), vec!["X -> Y", "Z -> Z"]);
-    assert_eq!(generator_strings("S_DAG 0\n"), vec!["X -> -Y", "Z -> Z"]);
-}
-
-#[test]
-fn circuit_flow_generators_match_stim_negative_zero_feedback() {
-    assert_eq!(
-        generator_strings("M 0\nDETECTOR rec[-0]\n"),
-        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0\nCX rec[-0] 1\nM 1\n"),
-        vec![
+/// Exact generator strings recorded from pinned Stim v1.16.0 (C++ and Python
+/// `circuit_flow_generators` tests plus direct probes). Rows already owned by the pinned
+/// `pfm_b4_flow_evidence` generator matrix are not repeated here.
+const GENERATOR_GOLDENS: &[(&str, &[&str])] = &[
+    // Negative-zero record lookbacks resolve like Stim.
+    (
+        "M 0\nDETECTOR rec[-0]\n",
+        &["1 -> Z xor rec[0]", "Z -> rec[0]"],
+    ),
+    (
+        "M 0\nCX rec[-0] 1\nM 1\n",
+        &[
             "1 -> _Z xor rec[1]",
             "1 -> Z_ xor rec[0]",
             "_Z -> 1",
             "Z_ -> rec[0]",
-        ]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_composed_unitary_matches_stim() {
-    assert_eq!(
-        generator_strings(
-            "
-            SQRT_X 0
-            S 0
-        ",
-        ),
-        vec!["X -> Y", "Z -> X"]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_reset_fast_paths_preserve_idle_qubits() {
-    assert_eq!(
-        generator_strings("R 1\n"),
-        vec!["1 -> _Z", "X_ -> X_", "Z_ -> Z_"]
-    );
-    assert_eq!(
-        generator_strings("MR 1\n"),
-        vec!["1 -> _Z", "_Z -> rec[0]", "X_ -> X_", "Z_ -> Z_"]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_promotes_spp_measurement_row_unitary_examples() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
-    assert_eq!(generator_strings("SPP Z0\n"), vec!["X -> Y", "Z -> Z"]);
-    assert_eq!(generator_strings("SPP X0 Z0\n"), vec!["X -> Y", "Z -> X"]);
-    assert_eq!(
-        generator_strings("SPP X0*X1\n"),
-        vec!["_X -> _X", "_Z -> -XY", "X_ -> X_", "Z_ -> -YX"]
-    );
-    assert_eq!(generator_strings("SPP_DAG Z0\n"), vec!["X -> -Y", "Z -> Z"]);
-}
-
-#[test]
-fn circuit_flow_generators_two_qubit_unitary_order_matches_stim() {
-    assert_eq!(
-        generator_strings("ISWAP 3 1 2 3\n"),
-        vec![
-            "___X -> _YZ_",
-            "___Z -> _Z__",
-            "__X_ -> __ZY",
-            "__Z_ -> ___Z",
-            "_X__ -> -_ZXZ",
-            "_Z__ -> __Z_",
-            "X___ -> X___",
-            "Z___ -> Z___",
-        ]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
-    assert_eq!(
-        generator_strings("M 0\n"),
-        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0 0\n"),
-        vec!["1 -> rec[0] xor rec[1]", "1 -> Z xor rec[1]", "Z -> rec[1]",]
-    );
-    assert_eq!(
-        generator_strings("MX 0\n"),
-        vec!["1 -> X xor rec[0]", "X -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("MY 0\n"),
-        vec!["1 -> Y xor rec[0]", "Y -> rec[0]"]
-    );
-    assert_eq!(generator_strings("R 0\n"), vec!["1 -> Z"]);
-    assert_eq!(generator_strings("RX 0\n"), vec!["1 -> X"]);
-    assert_eq!(generator_strings("RY 0\n"), vec!["1 -> Y"]);
-    assert_eq!(generator_strings("MR 0\n"), vec!["1 -> Z", "Z -> rec[0]"]);
-    assert_eq!(generator_strings("MRX 0\n"), vec!["1 -> X", "X -> rec[0]"]);
-    assert_eq!(generator_strings("MRY 0\n"), vec!["1 -> Y", "Y -> rec[0]"]);
-    assert_eq!(generator_strings("MR !0\n"), vec!["1 -> Z", "Z -> -rec[0]"]);
-    assert_eq!(
-        generator_strings("MRX !0\n"),
-        vec!["1 -> X", "X -> -rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("MRY !0\n"),
-        vec!["1 -> Y", "Y -> -rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("MR !0 1\n"),
-        vec!["1 -> _Z", "1 -> Z_", "_Z -> rec[1]", "Z_ -> -rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("MPAD 0 1 1 0\n"),
-        vec!["1 -> rec[0]", "1 -> rec[3]", "1 -> -rec[1]", "1 -> -rec[2]"]
-    );
-    assert_eq!(
-        generator_strings("MPAD 1 0\n"),
-        vec!["1 -> rec[0]", "1 -> -rec[1]"]
-    );
-    assert_eq!(
-        generator_strings("MPAD 1 0\nTICK\n"),
-        vec!["1 -> rec[0]", "1 -> -rec[1]"]
-    );
-    assert_eq!(
-        generator_strings("M 0\nMPAD 1 0\n"),
-        vec![
+        ],
+    ),
+    // Reset fast paths keep idle lower qubits.
+    ("R 1\n", &["1 -> _Z", "X_ -> X_", "Z_ -> Z_"]),
+    (
+        "MR 1\n",
+        &["1 -> _Z", "_Z -> rec[0]", "X_ -> X_", "Z_ -> Z_"],
+    ),
+    // Single-instruction measurements and resets in every basis, with inversion.
+    ("MX 0\n", &["1 -> X xor rec[0]", "X -> rec[0]"]),
+    ("MY 0\n", &["1 -> Y xor rec[0]", "Y -> rec[0]"]),
+    ("RX 0\n", &["1 -> X"]),
+    ("RY 0\n", &["1 -> Y"]),
+    ("MRX 0\n", &["1 -> X", "X -> rec[0]"]),
+    ("MRY 0\n", &["1 -> Y", "Y -> rec[0]"]),
+    ("MR !0\n", &["1 -> Z", "Z -> -rec[0]"]),
+    ("MRX !0\n", &["1 -> X", "X -> -rec[0]"]),
+    ("MRY !0\n", &["1 -> Y", "Y -> -rec[0]"]),
+    (
+        "MR !0 1\n",
+        &["1 -> _Z", "1 -> Z_", "_Z -> rec[1]", "Z_ -> -rec[0]"],
+    ),
+    // MPAD values are records, not simulated qubits.
+    ("MPAD 1 0\n", &["1 -> rec[0]", "1 -> -rec[1]"]),
+    ("MPAD 1 0\nTICK\n", &["1 -> rec[0]", "1 -> -rec[1]"]),
+    ("MPAD 0\nTICK\n", &["1 -> rec[0]"]),
+    ("H 0\nMPAD 1\n", &["1 -> -rec[0]", "X -> Z", "Z -> X"]),
+    (
+        "M 0\nMPAD 1 0\n",
+        &[
             "1 -> rec[1]",
             "1 -> -rec[2]",
             "1 -> Z xor rec[0]",
             "Z -> rec[0]",
-        ]
-    );
-    assert_eq!(
-        generator_strings("M 0\nCX rec[-1] 0\n"),
-        vec!["1 -> Z", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0\nXCZ 0 rec[-1]\n"),
-        vec!["1 -> Z", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0\nCY rec[-1] 1\n"),
-        vec![
-            "1 -> Z_ xor rec[0]",
-            "_X -> _X xor rec[0]",
-            "_Z -> _Z xor rec[0]",
-            "Z_ -> rec[0]",
-        ]
-    );
-    for text in [
-        "CX sweep[0] 0\n",
-        "CX 0 sweep[0]\n",
-        "CY sweep[0] 0\n",
-        "CY 0 sweep[0]\n",
-        "CZ sweep[0] 0\n",
-        "CZ 0 sweep[0]\n",
-        "XCZ sweep[0] 0\n",
-        "XCZ 0 sweep[0]\n",
-        "YCZ sweep[0] 0\n",
-        "YCZ 0 sweep[0]\n",
-    ] {
-        assert_eq!(generator_strings(text), vec!["X -> X", "Z -> Z"], "{text}");
-    }
-    assert_eq!(
-        generator_strings("M 0\nCY sweep[0] 1\n"),
-        vec!["1 -> Z_ xor rec[0]", "_X -> _X", "_Z -> _Z", "Z_ -> rec[0]",]
-    );
-    assert_eq!(
-        generator_strings("M 0\nCX sweep[0] 0\n"),
-        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0\nCX 0 sweep[0]\n"),
-        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0 1\nCX sweep[0] 0 sweep[1] 1\n"),
-        vec![
+        ],
+    ),
+    // Sweep-controlled Paulis are no-ops on either side, with or without measurements.
+    ("CX sweep[0] 0\n", &["X -> X", "Z -> Z"]),
+    ("CX 0 sweep[0]\n", &["X -> X", "Z -> Z"]),
+    ("CY sweep[0] 0\n", &["X -> X", "Z -> Z"]),
+    ("CY 0 sweep[0]\n", &["X -> X", "Z -> Z"]),
+    ("CZ sweep[0] 0\n", &["X -> X", "Z -> Z"]),
+    ("CZ 0 sweep[0]\n", &["X -> X", "Z -> Z"]),
+    ("XCZ sweep[0] 0\n", &["X -> X", "Z -> Z"]),
+    ("XCZ 0 sweep[0]\n", &["X -> X", "Z -> Z"]),
+    ("YCZ sweep[0] 0\n", &["X -> X", "Z -> Z"]),
+    ("YCZ 0 sweep[0]\n", &["X -> X", "Z -> Z"]),
+    (
+        "XCZ 1 sweep[0]\n",
+        &["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
+    ),
+    (
+        "YCZ 1 sweep[0]\n",
+        &["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
+    ),
+    (
+        "CX sweep[0] 1\n",
+        &["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
+    ),
+    (
+        "CY sweep[0] 1\n",
+        &["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
+    ),
+    (
+        "CZ sweep[0] 1\n",
+        &["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
+    ),
+    (
+        "CZ 1 sweep[0]\n",
+        &["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
+    ),
+    (
+        "M 0\nCY sweep[0] 1\n",
+        &["1 -> Z_ xor rec[0]", "_X -> _X", "_Z -> _Z", "Z_ -> rec[0]"],
+    ),
+    (
+        "M 0\nCX sweep[0] 0\n",
+        &["1 -> Z xor rec[0]", "Z -> rec[0]"],
+    ),
+    (
+        "M 0\nCX 0 sweep[0]\n",
+        &["1 -> Z xor rec[0]", "Z -> rec[0]"],
+    ),
+    (
+        "M 0 1\nCX sweep[0] 0 sweep[1] 1\n",
+        &[
             "1 -> _Z xor rec[1]",
             "1 -> Z_ xor rec[0]",
             "_Z -> rec[1]",
             "Z_ -> rec[0]",
-        ]
-    );
-    assert_eq!(
-        generator_strings("M 0\nCZ 0 sweep[0]\n"),
-        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0\nXCZ 0 sweep[0]\n"),
-        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("M 0\nYCZ 0 sweep[0]\n"),
-        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
-    );
-    assert_eq!(
-        generator_strings("MPP X0*X1\nCX rec[-1] 0\n"),
-        vec![
+        ],
+    ),
+    (
+        "M 0\nCZ 0 sweep[0]\n",
+        &["1 -> Z xor rec[0]", "Z -> rec[0]"],
+    ),
+    (
+        "M 0\nXCZ 0 sweep[0]\n",
+        &["1 -> Z xor rec[0]", "Z -> rec[0]"],
+    ),
+    (
+        "M 0\nYCZ 0 sweep[0]\n",
+        &["1 -> Z xor rec[0]", "Z -> rec[0]"],
+    ),
+    // Product measurements: feedback, self-cancelling products, and inversion.
+    (
+        "MPP X0*X1\nCX rec[-1] 0\n",
+        &[
             "1 -> XX xor rec[0]",
             "_X -> _X",
             "X_ -> _X xor rec[0]",
             "ZZ -> ZZ xor rec[0]",
-        ]
-    );
-    assert_eq!(
-        generator_strings("MXX 2 0\n"),
-        vec![
-            "1 -> X_X xor rec[0]",
-            "__X -> __X",
-            "_X_ -> _X_",
-            "_Z_ -> _Z_",
-            "X__ -> __X xor rec[0]",
-            "Z_Z -> Z_Z",
-        ]
-    );
-    assert_eq!(
-        generator_strings("MYY 3 1 2 3\n"),
-        vec![
-            "1 -> __YY xor rec[1]",
-            "1 -> _Y_Y xor rec[0]",
-            "___Y -> ___Y",
-            "__Y_ -> ___Y xor rec[1]",
-            "_XZZ -> _ZZX xor rec[0]",
-            "_ZZZ -> _ZZZ",
-            "X___ -> X___",
-            "Z___ -> Z___",
-        ]
-    );
-    assert_eq!(
-        generator_strings("MZZ 3 1 2 3\n"),
-        vec![
-            "1 -> __ZZ xor rec[1]",
-            "1 -> _Z_Z xor rec[0]",
-            "___Z -> ___Z",
-            "__Z_ -> ___Z xor rec[1]",
-            "_XXX -> _XXX",
-            "_Z__ -> ___Z xor rec[0]",
-            "X___ -> X___",
-            "Z___ -> Z___",
-        ]
-    );
-    assert_eq!(
-        generator_strings("MPP Y0*Y1 Y2*Y3\n"),
-        vec![
-            "1 -> __YY xor rec[1]",
-            "1 -> YY__ xor rec[0]",
-            "___Y -> ___Y",
-            "__XZ -> __ZX xor rec[1]",
-            "__ZZ -> __ZZ",
-            "_Y__ -> _Y__",
-            "XZ__ -> ZX__ xor rec[0]",
-            "ZZ__ -> ZZ__",
-        ]
-    );
-    assert_eq!(
-        generator_strings("MPP X0*X0\n"),
-        vec!["1 -> rec[0]", "X -> X", "Z -> Z"]
-    );
-    assert_eq!(
-        generator_strings("MPP !X0*X0\n"),
-        vec!["1 -> -rec[0]", "X -> X", "Z -> Z"]
-    );
-    assert_eq!(
-        generator_strings("MPP X0 X1*X1\n"),
-        vec![
+        ],
+    ),
+    ("MPP X0*X0\n", &["1 -> rec[0]", "X -> X", "Z -> Z"]),
+    ("MPP !X0*X0\n", &["1 -> -rec[0]", "X -> X", "Z -> Z"]),
+    (
+        "MPP X0 X1*X1\n",
+        &[
             "1 -> rec[1]",
             "1 -> X_ xor rec[0]",
             "_X -> _X",
             "_Z -> _Z",
             "X_ -> rec[0]",
-        ]
-    );
-    assert_eq!(
-        generator_strings(
-            "
-            HERALDED_ERASE(0.04) 1
-            HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1
-            TICK
-            MPP X0*Y1*Z2 Z0*Z1
-        ",
-        ),
-        vec![
-            "1 -> rec[0]",
-            "1 -> rec[1]",
-            "1 -> XYZ xor rec[2]",
-            "1 -> ZZ_ xor rec[3]",
-            "__Z -> __Z",
-            "_ZX -> _ZX",
-            "XXX -> _ZY xor rec[2]",
-            "Z_X -> _ZX xor rec[3]",
-        ]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_measurement_promotes_multi_target_heralded_noise_mpp_subset() {
-    // Expected strings were probed from pinned Stim v1.16.0.
-    assert_eq!(
-        generator_strings(
-            "
-            HERALDED_ERASE(0.04) 0 2
-            MPP X0*X1*Z2
-        ",
-        ),
-        vec![
+        ],
+    ),
+    // Multi-target heralded noise before a product measurement.
+    (
+        "HERALDED_ERASE(0.04) 0 2\nMPP X0*X1*Z2\n",
+        &[
             "1 -> rec[0]",
             "1 -> rec[1]",
             "1 -> XXZ xor rec[2]",
@@ -336,16 +165,11 @@ fn circuit_flow_generators_measurement_promotes_multi_target_heralded_noise_mpp_
             "_ZX -> _ZX",
             "X__ -> _XZ xor rec[2]",
             "Z_X -> Z_X",
-        ]
-    );
-    assert_eq!(
-        generator_strings(
-            "
-            HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 0 2
-            MPP X0*Y1*Z2
-        ",
-        ),
-        vec![
+        ],
+    ),
+    (
+        "HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 0 2\nMPP X0*Y1*Z2\n",
+        &[
             "1 -> rec[0]",
             "1 -> rec[1]",
             "1 -> XYZ xor rec[2]",
@@ -354,17 +178,11 @@ fn circuit_flow_generators_measurement_promotes_multi_target_heralded_noise_mpp_
             "_ZX -> _ZX",
             "X__ -> _YZ xor rec[2]",
             "Z_X -> Z_X",
-        ]
-    );
-    assert_eq!(
-        generator_strings(
-            "
-            HERALDED_ERASE(0.04) 0 2
-            HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1 2
-            MPP X0*Y1*Z2
-        ",
-        ),
-        vec![
+        ],
+    ),
+    (
+        "HERALDED_ERASE(0.04) 0 2\nHERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1 2\nMPP X0*Y1*Z2\n",
+        &[
             "1 -> rec[0]",
             "1 -> rec[1]",
             "1 -> rec[2]",
@@ -375,55 +193,53 @@ fn circuit_flow_generators_measurement_promotes_multi_target_heralded_noise_mpp_
             "_ZX -> _ZX",
             "X__ -> _YZ xor rec[4]",
             "Z_X -> Z_X",
-        ]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_promotes_python_multi_target_examples() {
-    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators_test.py.
-    assert_eq!(
-        generator_strings("M 1 2\n"),
-        vec![
+        ],
+    ),
+    // Python multi-target examples on offset qubits.
+    (
+        "M 1 2\n",
+        &[
             "1 -> __Z xor rec[1]",
             "1 -> _Z_ xor rec[0]",
             "__Z -> rec[1]",
             "_Z_ -> rec[0]",
             "X__ -> X__",
             "Z__ -> Z__",
-        ]
-    );
-    assert_eq!(
-        generator_strings("MX 1 2\n"),
-        vec![
+        ],
+    ),
+    (
+        "MX 1 2\n",
+        &[
             "1 -> __X xor rec[1]",
             "1 -> _X_ xor rec[0]",
             "__X -> rec[1]",
             "_X_ -> rec[0]",
             "X__ -> X__",
             "Z__ -> Z__",
-        ]
-    );
-    let expected_pair_y_generators = vec![
-        "1 -> ___YY xor rec[1]",
-        "1 -> _YY__ xor rec[0]",
-        "____Y -> ____Y",
-        "___XZ -> ___ZX xor rec[1]",
-        "___ZZ -> ___ZZ",
-        "__Y__ -> __Y__",
-        "_XZ__ -> _ZX__ xor rec[0]",
-        "_ZZ__ -> _ZZ__",
-        "X____ -> X____",
-        "Z____ -> Z____",
-    ];
-    assert_eq!(
-        generator_strings("MYY 1 2 3 4\n"),
-        expected_pair_y_generators
-    );
-    assert_eq!(
-        generator_strings("MPP Y1*Y2 Y3*Y4\n"),
-        expected_pair_y_generators
-    );
+        ],
+    ),
+    ("MYY 1 2 3 4\n", PAIR_Y_GENERATORS),
+    ("MPP Y1*Y2 Y3*Y4\n", PAIR_Y_GENERATORS),
+];
+
+const PAIR_Y_GENERATORS: &[&str] = &[
+    "1 -> ___YY xor rec[1]",
+    "1 -> _YY__ xor rec[0]",
+    "____Y -> ____Y",
+    "___XZ -> ___ZX xor rec[1]",
+    "___ZZ -> ___ZZ",
+    "__Y__ -> __Y__",
+    "_XZ__ -> _ZX__ xor rec[0]",
+    "_ZZ__ -> _ZZ__",
+    "X____ -> X____",
+    "Z____ -> Z____",
+];
+
+#[test]
+fn circuit_flow_generators_match_stim_goldens() {
+    for &(text, expected) in GENERATOR_GOLDENS {
+        assert_eq!(generator_strings(text), expected, "{text}");
+    }
 }
 
 #[test]
@@ -1052,29 +868,6 @@ fn circuit_flow_generators_measurement_subset_supports_measurement_free_mixed_sw
 }
 
 #[test]
-fn sweep_controlled_noops_match_stim_generator_order() {
-    for instruction in [
-        "XCZ 1 sweep[0]",
-        "YCZ 1 sweep[0]",
-        "CX sweep[0] 1",
-        "CY sweep[0] 1",
-        "CZ sweep[0] 1",
-        "CZ 1 sweep[0]",
-    ] {
-        assert_eq!(
-            generator_strings(&format!("{instruction}\n")),
-            ["_X -> _X", "_Z -> _Z", "X_ -> X_", "Z_ -> Z_"],
-            "{instruction}"
-        );
-    }
-}
-
-#[test]
-fn circuit_flow_generators_measurement_subset_ignores_noise_without_measurements() {
-    assert_eq!(generator_strings("X_ERROR(0.1) 0\n"), ["X -> X", "Z -> Z"]);
-}
-
-#[test]
 fn circuit_flow_generators_measurement_subset_folds_ignored_only_circuits_without_caps() {
     let high = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 2048\n"))
         .expect("high-index ignored annotation generators");
@@ -1093,15 +886,6 @@ fn circuit_flow_generators_measurement_subset_folds_ignored_only_circuits_withou
     assert_eq!(
         generator_strings("H 0\nX_ERROR(0.1) 0\n"),
         ["X -> Z", "Z -> X"]
-    );
-}
-
-#[test]
-fn circuit_flow_generators_measurement_subset_excludes_mpad_values_from_simulated_qubits() {
-    assert_eq!(generator_strings("MPAD 0\nTICK\n"), ["1 -> rec[0]"]);
-    assert_eq!(
-        generator_strings("H 0\nMPAD 1\n"),
-        ["1 -> -rec[0]", "X -> Z", "Z -> X"]
     );
 }
 

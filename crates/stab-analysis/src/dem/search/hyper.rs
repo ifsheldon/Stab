@@ -1,9 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fmt::{Display, Formatter};
 
 use stab_model::{
-    DemDetectorId, DemInstruction, DemItem, DemObservableId, DemTarget, DetectorErrorModel,
-    Probability,
+    DemDetectorId, DemInstruction, DemItem, DemTarget, DetectorErrorModel, Probability,
 };
 
 use super::{
@@ -40,33 +38,6 @@ impl Edge {
             .ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model("hypergraph edge term count overflowed")
             })
-    }
-}
-
-impl Display for Edge {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut text = String::new();
-        match self.detectors.len() {
-            0 => text.push_str("[silent]"),
-            1 => {
-                text.push_str("[boundary] ");
-                let detector = self.detectors.iter().next().ok_or(std::fmt::Error)?;
-                text.push_str(&format_detector(*detector));
-            }
-            _ => {
-                for (index, detector) in self.detectors.iter().enumerate() {
-                    if index > 0 {
-                        text.push(' ');
-                    }
-                    text.push_str(&format_detector(*detector));
-                }
-            }
-        }
-        for observable in self.observables.iter() {
-            text.push(' ');
-            text.push_str(&format_observable(observable));
-        }
-        f.write_str(&text)
     }
 }
 
@@ -391,19 +362,6 @@ impl Graph {
     }
 }
 
-impl Display for Graph {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for (index, node) in self.nodes.iter().enumerate() {
-            writeln!(f, "{index}:")?;
-            for edge_id in &node.edge_ids {
-                let edge = self.edges.get(*edge_id).ok_or(std::fmt::Error)?;
-                writeln!(f, "    {edge}")?;
-            }
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct SearchState {
     detectors: BTreeSet<DemDetectorId>,
@@ -471,21 +429,6 @@ impl SearchState {
             None,
         )?);
         Ok(())
-    }
-}
-
-impl Display for SearchState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut text = String::new();
-        for detector in &self.detectors {
-            text.push_str(&format_detector(*detector));
-            text.push(' ');
-        }
-        for observable in self.observables.iter() {
-            text.push_str(&format_observable(observable));
-            text.push(' ');
-        }
-        f.write_str(&text)
     }
 }
 
@@ -735,14 +678,6 @@ fn toggled_dem_targets(
         }
     }
     Ok((detectors, observables))
-}
-
-fn format_detector(detector: DemDetectorId) -> String {
-    format!("D{}", detector.get())
-}
-
-fn format_observable(observable: DemObservableId) -> String {
-    format!("L{}", observable.get())
 }
 
 #[cfg(test)]

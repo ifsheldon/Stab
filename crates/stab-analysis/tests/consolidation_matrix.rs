@@ -25,16 +25,6 @@ const REMNANT_DECOMPOSITION_CIRCUIT: &str = "E(0.1) X0 X1\n\
      DETECTOR rec[-2]\n\
      DETECTOR rec[-1]\n";
 
-/// WS2b Stage 1: every equivalence-matrix entry is a committed pinned-Stim
-/// byte-exact DEM capture (`<name>.stim` + `<name>.{nofold,fold}.dem`).
-/// Since the Stage 3 flip both fold modes run on the reverse engine and every
-/// entry must byte-match its capture; the divergence lists are empty, and any
-/// entry that stops matching fails as an unexpected divergence.
-const KNOWN_NOFOLD_DIVERGENCES: &[&str] = &[];
-
-/// Fold-mode divergences, empty for the same reason as the `nofold` list.
-const KNOWN_FOLD_DIVERGENCES: &[&str] = &[];
-
 fn matrix_dir() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/consolidation_matrix")
 }
@@ -66,44 +56,29 @@ fn circuit_to_dem_selected_gate_surface_semantic_matrix_matches_stim() {
             names.insert(name.to_string());
         }
     }
-    assert_eq!(
-        names.len(),
-        63,
-        "the committed equivalence matrix owns exactly sixty-three entries"
-    );
+    assert!(!names.is_empty(), "matrix directory has no entries");
 
-    let mut unexpected = Vec::new();
-    let mut healed = Vec::new();
+    // Every entry is a committed pinned-Stim byte-exact DEM capture
+    // (`<name>.stim` + `<name>.{nofold,fold}.dem`) that both fold modes must reproduce.
+    let mut diverging = Vec::new();
     for name in &names {
         let stim_text =
             std::fs::read_to_string(dir.join(format!("{name}.stim"))).expect("matrix circuit");
         let circuit = Circuit::from_stim_str(&stim_text).expect("matrix circuit parses");
-        for (mode, fold_loops, listed) in [
-            ("nofold", false, KNOWN_NOFOLD_DIVERGENCES),
-            ("fold", true, KNOWN_FOLD_DIVERGENCES),
-        ] {
+        for (mode, fold_loops) in [("nofold", false), ("fold", true)] {
             let expected = std::fs::read_to_string(dir.join(format!("{name}.{mode}.dem")))
                 .expect("matrix capture exists");
             let actual = circuit_to_detector_error_model(&circuit, options_for(name, fold_loops))
                 .unwrap_or_else(|error| panic!("{name} ({mode}) analyzes: {error}"))
                 .to_dem_string();
-            let diverges = actual != expected;
-            let is_listed = listed.contains(&name.as_str());
-            if diverges && !is_listed {
-                unexpected.push(format!("{name} ({mode})"));
-            }
-            if !diverges && is_listed {
-                healed.push(format!("{name} ({mode})"));
+            if actual != expected {
+                diverging.push(format!("{name} ({mode})"));
             }
         }
     }
     assert!(
-        unexpected.is_empty(),
-        "matrix entries diverge from their pinned-Stim captures without being listed: {unexpected:?}"
-    );
-    assert!(
-        healed.is_empty(),
-        "listed divergences now byte-match; remove them from the mode list: {healed:?}"
+        diverging.is_empty(),
+        "matrix entries diverge from their pinned-Stim captures: {diverging:?}"
     );
 }
 

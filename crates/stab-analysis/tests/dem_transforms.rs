@@ -266,8 +266,9 @@ fn pf4_dem_materialized_rounded_keeps_zero_probability_errors() {
     );
 }
 
+/// Canonical owner for DEM flattening, lazy flattened iteration, and probability rounding.
 #[test]
-fn cq2_dem_flattened_iteration_contract_matches_stim() {
+fn cq2_dem_materialized_transform_matrix_matches_stim() {
     let model = DetectorErrorModel::from_dem_str(
         "error(0.125) D0\n\
          repeat[tag] 2 {\n\
@@ -312,10 +313,8 @@ fn cq2_dem_flattened_iteration_contract_matches_stim() {
         .expect("bounded lazy prefix");
     assert_eq!(first.len(), 3);
     assert!(flattened_detector_error_model(&huge).is_err());
-}
 
-#[test]
-fn cq2_dem_compact_transform_contract_matches_stim() {
+    // Rounding keeps tags and coordinates and rounds tiny probabilities to zero.
     let model = DetectorErrorModel::from_dem_str(
         "error[first](0.01000002) D0 D1\n\
          repeat[outer] 2 {\n\
@@ -335,6 +334,28 @@ fn cq2_dem_compact_transform_contract_matches_stim() {
         )
         .expect("rounded reference")
     );
+    assert_eq!(
+        rounded_detector_error_model(
+            &DetectorErrorModel::from_dem_str("error(0.000001) D0\n").expect("tiny error"),
+            2,
+        )
+        .expect("round tiny error")
+        .to_dem_string(),
+        "error(0) D0\n"
+    );
+}
+
+/// Canonical owner for recursive DEM tag removal.
+#[test]
+fn cq2_dem_compact_transform_contract_matches_stim() {
+    let model = DetectorErrorModel::from_dem_str(
+        "error[first](0.01000002) D0 D1\n\
+         repeat[outer] 2 {\n\
+             error[inner](0.123456789) D1 D2 L3\n\
+             detector[coords](0.0200000334, 0.12345) D0\n\
+         }\n",
+    )
+    .expect("transform DEM");
     let stripped = detector_error_model_without_tags(&model);
     assert_eq!(
         stripped,
@@ -349,21 +370,6 @@ fn cq2_dem_compact_transform_contract_matches_stim() {
     );
     assert!(!stripped.to_dem_string().contains('['));
     assert!(model.to_dem_string().contains("[first]"));
-    assert_eq!(
-        rounded_detector_error_model(
-            &DetectorErrorModel::from_dem_str("error(0.000001) D0\n").expect("tiny error"),
-            2,
-        )
-        .expect("round tiny error")
-        .to_dem_string(),
-        "error(0) D0\n"
-    );
-}
-
-#[test]
-fn cq2_dem_materialized_transform_matrix_matches_stim() {
-    cq2_dem_flattened_iteration_contract_matches_stim();
-    cq2_dem_compact_transform_contract_matches_stim();
 }
 
 #[test]

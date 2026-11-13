@@ -59,10 +59,6 @@ impl ObservableMask {
         self.observables.is_empty()
     }
 
-    pub(super) fn iter(&self) -> impl Iterator<Item = DemObservableId> + '_ {
-        self.observables.iter().copied()
-    }
-
     pub(super) fn push_targets(&self, targets: &mut Vec<DemTarget>) -> AnalysisResult<()> {
         for observable in &self.observables {
             targets.push(DemTarget::logical_observable(observable.get())?);

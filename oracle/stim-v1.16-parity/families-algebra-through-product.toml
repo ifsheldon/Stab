@@ -116,8 +116,8 @@ status = "verified"
 [families.evidence.test]
 package = "stab-analysis"
 kind = "test"
-target = "generated_qec_dem"
-name = "generated_qec_dem_rotated_surface_code_semantics_match_pinned_stim"
+target = "consolidation_matrix"
+name = "circuit_to_dem_selected_gate_surface_semantic_matrix_matches_stim"
 
 [[families]]
 id = "analysis.circuit-to-dem-error-decomposition"

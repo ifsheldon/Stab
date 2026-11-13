@@ -728,10 +728,3 @@ fn sparse_rev_frame_tracker_accepts_mpad_and_discards_record_sensitivity() {
     expected.measurement_count = 1;
     assert_eq!(actual, expected);
 }
-
-#[test]
-fn sparse_rev_frame_tracker_target_pauli_mapping_is_explicit() {
-    assert_eq!(TrackerBasis::from_pauli(Pauli::X), TrackerBasis::X);
-    assert_eq!(TrackerBasis::from_pauli(Pauli::Y), TrackerBasis::Y);
-    assert_eq!(TrackerBasis::from_pauli(Pauli::Z), TrackerBasis::Z);
-}

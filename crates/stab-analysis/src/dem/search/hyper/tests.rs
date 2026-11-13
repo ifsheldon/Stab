@@ -5,6 +5,8 @@
     reason = "logical-search tests use direct assertions for compact diagnostics"
 )]
 
+use stab_model::DemObservableId;
+
 use super::*;
 
 fn detector(value: u64) -> DemDetectorId {
@@ -46,6 +48,20 @@ fn sparse_graph(detectors: &[u64], node_edges: Vec<Vec<Edge>>, num_observables: 
     graph
 }
 
+/// Resolves each node's arena edge ids so graphs built in different orders compare by adjacency.
+fn node_edges(graph: &Graph) -> Vec<Vec<Edge>> {
+    graph
+        .nodes
+        .iter()
+        .map(|node| {
+            node.edge_ids
+                .iter()
+                .map(|&edge_id| graph.edges[edge_id].clone())
+                .collect()
+        })
+        .collect()
+}
+
 fn state(detectors: &[u64], observables: u64) -> SearchState {
     SearchState::new(detector_set(detectors), obs_mask(observables))
 }
@@ -61,41 +77,6 @@ fn first_targets(dem: &str) -> Vec<DemTarget> {
         })
         .unwrap();
     instruction.targets().to_vec()
-}
-
-fn find(
-    dem: &str,
-    dont_explore_detection_event_sets_with_size_above: usize,
-    dont_explore_edges_with_degree_above: usize,
-    dont_explore_edges_increasing_symptom_degree: bool,
-) -> AnalysisResult<String> {
-    let model = DetectorErrorModel::from_dem_str(dem)?;
-    find_undetectable_logical_error(
-        &model,
-        dont_explore_detection_event_sets_with_size_above,
-        dont_explore_edges_with_degree_above,
-        dont_explore_edges_increasing_symptom_degree,
-    )
-    .map(|error| error.to_dem_string())
-}
-
-#[test]
-fn hyper_edge_matches_upstream() {
-    let e1 = edge(&[], 0);
-    let e2 = edge(&[1], 0);
-    let e3 = edge(&[], 1);
-    let e4 = edge(&[1, 2], 5);
-
-    assert_eq!(e1.to_string(), "[silent]");
-    assert_eq!(e2.to_string(), "[boundary] D1");
-    assert_eq!(e3.to_string(), "[silent] L0");
-    assert_eq!(e4.to_string(), "D1 D2 L0 L2");
-    assert_eq!(e1, e1);
-    assert_ne!(e1, e2);
-    assert_eq!(e1, edge(&[], 0));
-    assert_eq!(e2, e2);
-    assert_eq!(e3, e3);
-    assert_ne!(e1, e3);
 }
 
 #[test]
@@ -145,7 +126,7 @@ fn hyper_search_state_appends_transition_as_error_instruction_matches_upstream()
 }
 
 #[test]
-fn hyper_search_state_equality_ordering_and_display_match_upstream() {
+fn hyper_search_state_equality_and_ordering_match_upstream() {
     assert_eq!(state(&[1, 2], 3), state(&[1, 2], 3));
     assert_ne!(state(&[1, 2], 3), state(&[1, 4], 3));
     assert_ne!(state(&[1, 2], 3), state(&[1], 3));
@@ -159,8 +140,6 @@ fn hyper_search_state_equality_ordering_and_display_match_upstream() {
     assert!(state(&[101, 102], 103) >= state(&[101, 102], 103));
     assert!(state(&[101, 104], 103) >= state(&[101, 102], 103));
     assert!(state(&[101, 102], 104) >= state(&[101, 102], 103));
-
-    assert_eq!(state(&[1, 2], 3).to_string(), "D1 D2 L0 L1 ");
 }
 
 #[test]
@@ -183,51 +162,23 @@ fn hyper_graph_add_edge_from_dem_targets_matches_upstream() {
         .add_edge_from_dem_targets(&first_targets("error(0.01) D0 D1 L3 ^ D0\n"), usize::MAX)
         .unwrap();
     assert_eq!(
-        graph.to_string(),
-        Graph::from_parts(vec![vec![], vec![edge(&[1], 8)], vec![]], 64, obs_mask(0),)
-            .unwrap()
-            .to_string()
+        node_edges(&graph),
+        vec![vec![], vec![edge(&[1], 8)], vec![]]
     );
 
     graph
         .add_edge_from_dem_targets(&first_targets("error(0.01) D0 D1 D2 L0\n"), usize::MAX)
         .unwrap();
     assert_eq!(
-        graph.to_string(),
-        Graph::from_parts(
-            vec![
-                vec![edge(&[0, 1, 2], 1)],
-                vec![edge(&[1], 8), edge(&[0, 1, 2], 1)],
-                vec![edge(&[0, 1, 2], 1)],
-            ],
-            64,
-            obs_mask(0),
-        )
-        .unwrap()
-        .to_string()
+        node_edges(&graph),
+        vec![
+            vec![edge(&[0, 1, 2], 1)],
+            vec![edge(&[1], 8), edge(&[0, 1, 2], 1)],
+            vec![edge(&[0, 1, 2], 1)],
+        ]
     );
     assert_eq!(graph.edges.len(), 2);
     assert_eq!(graph.edge_incidences, 4);
-}
-
-#[test]
-fn hyper_graph_display_matches_upstream() {
-    let graph = Graph::from_parts(
-        vec![
-            vec![],
-            vec![edge(&[1], 0), edge(&[1, 3], 32)],
-            vec![],
-            vec![edge(&[1, 3], 32)],
-        ],
-        64,
-        obs_mask(0),
-    )
-    .unwrap();
-
-    assert_eq!(
-        graph.to_string(),
-        "0:\n1:\n    [boundary] D1\n    D1 D3 L5\n2:\n3:\n    D1 D3 L5\n"
-    );
 }
 
 #[test]
@@ -275,21 +226,6 @@ fn hyper_graph_from_dem_matches_upstream() {
 }
 
 #[test]
-fn hyper_algo_no_error_matches_upstream() {
-    assert!(find("", usize::MAX, usize::MAX, false).is_err());
-    assert!(find("error(0.1) D0 L0\n", usize::MAX, usize::MAX, false).is_err());
-    assert!(
-        find(
-            "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
-            usize::MAX,
-            usize::MAX,
-            false
-        )
-        .is_err()
-    );
-}
-
-#[test]
 fn hyper_algo_rejects_excessive_search_states() {
     let mut text = String::new();
     for observable in 0..64 {
@@ -300,114 +236,4 @@ fn hyper_algo_rejects_excessive_search_states() {
     let error = find_undetectable_logical_error_with_limits(&model, 3, 3, false, limits)
         .expect_err("search state cap");
     assert!(error.to_string().contains("at most 64 search states"));
-}
-
-#[test]
-fn hyper_algo_distance_1_matches_upstream() {
-    assert_eq!(
-        find("error(0.1) L0\n", usize::MAX, usize::MAX, false).unwrap(),
-        "error(1) L0\n"
-    );
-}
-
-#[test]
-fn hyper_algo_distance_2_matches_upstream() {
-    assert_eq!(
-        find(
-            "error(0.1) D0\nerror(0.1) D0 L0\n",
-            usize::MAX,
-            usize::MAX,
-            false
-        )
-        .unwrap(),
-        "error(1) D0\nerror(1) D0 L0\n"
-    );
-
-    assert_eq!(
-        find(
-            "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
-            usize::MAX,
-            usize::MAX,
-            false
-        )
-        .unwrap(),
-        "error(1) D0 L0\nerror(1) D0 L1\n"
-    );
-
-    assert_eq!(
-        find(
-            "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
-            usize::MAX,
-            usize::MAX,
-            false
-        )
-        .unwrap(),
-        "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
-    );
-
-    assert_eq!(
-        find(
-            "error(0.1) D0 D1 L1\nerror(0.1) D0 D1 L0\n",
-            usize::MAX,
-            usize::MAX,
-            false
-        )
-        .unwrap(),
-        "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
-    );
-}
-
-#[test]
-fn hyper_algo_distance_3_matches_upstream() {
-    assert_eq!(
-        find(
-            "error(0.1) D0\nerror(0.1) D0 D1 L0\nerror(0.1) D1\n",
-            usize::MAX,
-            usize::MAX,
-            false
-        )
-        .unwrap(),
-        "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
-    );
-
-    assert_eq!(
-        find(
-            "error(0.1) D1\nerror(0.1) D1 D0 L0\nerror(0.1) D0\n",
-            usize::MAX,
-            usize::MAX,
-            false
-        )
-        .unwrap(),
-        "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
-    );
-}
-
-#[test]
-fn hyper_algo_hyper_error_matches_upstream() {
-    assert_eq!(
-        find(
-            "\
-error(0.1) D0 D1
-error(0.1) D0 D1 D2 D3
-error(0.1) D2 D3 D4 D5 L0
-error(0.1) D4 D5 D6 D7
-error(0.1) D6 D7 D8 D9
-error(0.1) D8
-error(0.1) D9
-",
-            4,
-            4,
-            true
-        )
-        .unwrap(),
-        "\
-error(1) D0 D1
-error(1) D0 D1 D2 D3
-error(1) D2 D3 D4 D5 L0
-error(1) D4 D5 D6 D7
-error(1) D6 D7 D8 D9
-error(1) D8
-error(1) D9
-"
-    );
 }

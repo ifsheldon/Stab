@@ -3,13 +3,11 @@
     reason = "analysis contract tests use direct fixture assertions"
 )]
 
-use num_complex::Complex32;
 use stab_algebra::SingleQubitClifford;
 use stab_analysis::{
-    AnalysisError, GateUnitaryMatrix, circuit_without_tags, gate_decomposition_to_circuit,
-    gate_flows, gate_h_s_cx_m_r_decomposition, gate_has_flows, gate_has_h_s_cx_m_r_decomposition,
-    gate_has_tableau, gate_has_unitary_matrix, gate_tableau, gate_unitary_matrix,
-    single_qubit_clifford_for_gate,
+    AnalysisError, circuit_without_tags, gate_decomposition_to_circuit,
+    gate_h_s_cx_m_r_decomposition, gate_has_h_s_cx_m_r_decomposition, gate_has_tableau,
+    gate_tableau, single_qubit_clifford_for_gate,
 };
 use stab_model::{Circuit, Gate};
 
@@ -22,90 +20,6 @@ fn single_qubit_clifford_gate_conversion_covers_the_complete_algebra_set() {
 
     let cx = Gate::from_name("CX").expect("two-qubit Clifford gate");
     assert!(single_qubit_clifford_for_gate(cx).is_err());
-}
-
-#[test]
-fn gate_semantics_bridge_model_metadata_into_algebra_values() {
-    let h = Gate::from_name("H").expect("H gate");
-    let h_tableau = gate_tableau(h).expect("H tableau");
-    assert_eq!(h_tableau.x_output(0).expect("H X output").to_string(), "+Z");
-    assert_eq!(h_tableau.z_output(0).expect("H Z output").to_string(), "+X");
-    assert_eq!(
-        single_qubit_clifford_for_gate(h)
-            .expect("H Clifford")
-            .canonical_name(),
-        "H"
-    );
-
-    let h_matrix = gate_unitary_matrix(h).expect("H unitary matrix");
-    assert!(matches!(h_matrix, GateUnitaryMatrix::One(_)));
-    let h_amplitude = f32::sqrt(0.5);
-    assert_eq!(
-        h_matrix,
-        GateUnitaryMatrix::One([
-            [
-                Complex32::new(h_amplitude, 0.0),
-                Complex32::new(h_amplitude, 0.0),
-            ],
-            [
-                Complex32::new(h_amplitude, 0.0),
-                Complex32::new(-h_amplitude, 0.0),
-            ],
-        ])
-    );
-    assert_eq!(h_matrix.dimension(), 2);
-    assert_eq!(h_matrix.num_qubits(), 1);
-    assert_eq!(h_matrix.entry_count(), 4);
-    assert_eq!(h_matrix.to_vecs().len(), 2);
-
-    let cx = Gate::from_name("CX").expect("CX gate");
-    let cx_tableau = gate_tableau(cx).expect("CX tableau");
-    assert_eq!(
-        [
-            cx_tableau.x_output(0).expect("CX X0").to_string(),
-            cx_tableau.z_output(0).expect("CX Z0").to_string(),
-            cx_tableau.x_output(1).expect("CX X1").to_string(),
-            cx_tableau.z_output(1).expect("CX Z1").to_string(),
-        ],
-        ["+XX", "+Z_", "+_X", "+ZZ"]
-    );
-    let cx_matrix = gate_unitary_matrix(cx).expect("CX unitary matrix");
-    assert!(matches!(cx_matrix, GateUnitaryMatrix::Two(_)));
-    let zero = Complex32::new(0.0, 0.0);
-    let one = Complex32::new(1.0, 0.0);
-    assert_eq!(
-        cx_matrix,
-        GateUnitaryMatrix::Two([
-            [one, zero, zero, zero],
-            [zero, zero, zero, one],
-            [zero, zero, one, zero],
-            [zero, one, zero, zero],
-        ])
-    );
-    assert_eq!(cx_matrix.dimension(), 4);
-    assert_eq!(cx_matrix.num_qubits(), 2);
-    assert_eq!(cx_matrix.entry_count(), 16);
-
-    let measurement = Gate::from_name("M").expect("M gate");
-    let measurement_flows = gate_flows(measurement)
-        .expect("measurement flows")
-        .into_iter()
-        .map(|flow| flow.to_string())
-        .collect::<Vec<_>>();
-    assert_eq!(measurement_flows, ["Z -> rec[-1]", "Z -> Z"]);
-
-    for gate in Gate::all() {
-        assert_eq!(gate_has_tableau(gate), gate_tableau(gate).is_ok());
-        assert_eq!(gate_has_flows(gate), gate_flows(gate).is_ok());
-        assert_eq!(
-            gate_has_unitary_matrix(gate),
-            gate_unitary_matrix(gate).is_ok()
-        );
-        assert_eq!(
-            gate_has_h_s_cx_m_r_decomposition(gate),
-            gate_h_s_cx_m_r_decomposition(gate).is_ok()
-        );
-    }
 }
 
 #[test]

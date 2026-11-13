@@ -428,570 +428,476 @@ fn circuit_inverse_qec_simplifies_measure_reset_pass_through_detector_parity() {
     }
 }
 
-#[test]
-fn time_reversed_for_flows_unitary_subset_supports_flow_past_end() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec flow-past-end coverage.
-    let input = circuit("H 0\n");
-    let flows = [flow("X300*Z0 -> X300*X0")];
+/// One time-reversal row: `(name, circuit, flows, keep measurements, expected circuit and
+/// flows)`. `None` expectations come from Python examples that only require the reversed
+/// circuit to satisfy the reversed flows.
+type ReversalCase = (
+    &'static str,
+    &'static str,
+    &'static [&'static str],
+    bool,
+    Option<(&'static str, &'static [&'static str])>,
+);
 
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse flows");
-
-    assert_eq!(actual_circuit, input);
-    assert_eq!(actual_flows, vec![flow("X300*X0 -> X300*Z0")]);
-}
-
-#[test]
-fn time_reversed_for_flows_unitary_subset_supports_extra_idle_qubits() {
-    // Adapted from Stim v1.16.0 Python time_reversed_for_flows examples.
-    let input = circuit("H 2\n");
-    let flows = [flow("X300 -> X300"), flow("X2*Z301 -> Z2*Z301")];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse extra qubits");
-
-    assert_eq!(actual_circuit, input);
-    assert_eq!(
-        actual_flows,
-        vec![flow("X300 -> X300"), flow("Z2*Z301 -> X2*Z301")]
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_unitary_subset_validates_general_unitaries_with_tableau() {
-    let swap = circuit("SWAP 0 1\n");
-    let swap_flows = [flow("X0 -> X1"), flow("Z1 -> Z0")];
-    let (_actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&swap, &swap_flows).expect("time reverse swap flows");
-    assert_eq!(actual_flows, vec![flow("X1 -> X0"), flow("Z0 -> Z1")]);
-
-    let sqrt_x = circuit("SQRT_X 0\n");
-    let sqrt_x_flows = [flow("X0 -> X0"), flow("Z0 -> -Y0")];
-    let (_actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&sqrt_x, &sqrt_x_flows).expect("time reverse sqrt_x flows");
-    assert_eq!(actual_flows, vec![flow("X0 -> X0"), flow("Y0 -> Z0")]);
-
-    let iswap = circuit("ISWAP 0 1\n");
-    let iswap_flows = [flow("X0 -> Z0*Y1"), flow("X1 -> Y0*Z1")];
-    let (_actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&iswap, &iswap_flows).expect("time reverse iswap flows");
-    assert_eq!(actual_flows, vec![flow("Z0*Y1 -> X0"), flow("Y0*Z1 -> X1")]);
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_reverses_pair_measurement() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec flow_through_mzz coverage.
-    let input = circuit("MZZ 0 1\n");
-    let flows = [
-        flow("X0*X1 -> Y0*Y1 xor rec[-1]"),
-        flow("X0*X1 -> X0*X1"),
-        flow("Z0 -> Z1 xor rec[-1]"),
-        flow("Z0 -> Z0"),
-    ];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse MZZ flows");
-
-    assert_eq!(actual_circuit, input);
-    assert_eq!(
-        actual_flows,
-        vec![
-            flow("Y0*Y1 -> X0*X1 xor rec[-1]"),
-            flow("X0*X1 -> X0*X1"),
-            flow("Z1 -> Z0 xor rec[-1]"),
-            flow("Z0 -> Z0"),
-        ]
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_covers_selected_bases() {
-    for (circuit_text, input_flow, expected_flow) in [
-        ("MX 0\n", "1 -> X0 xor rec[-1]", "X0 -> rec[-1]"),
-        ("MY 0\n", "1 -> Y0 xor rec[-1]", "Y0 -> rec[-1]"),
-        ("MXX 0 1\n", "1 -> X0*X1 xor rec[-1]", "X0*X1 -> rec[-1]"),
-        ("MYY 0 1\n", "1 -> Y0*Y1 xor rec[-1]", "Y0*Y1 -> rec[-1]"),
-    ] {
-        let input = circuit(circuit_text);
-        let (actual_circuit, actual_flows) =
-            circuit_time_reversed_for_flows(&input, &[flow(input_flow)])
-                .expect("time reverse selected measurement basis");
-
-        assert_eq!(actual_circuit, input, "{circuit_text}");
-        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
-    }
-}
-
-#[test]
-fn pfm_b1_python_measurement_ordering_m() {
-    // Adapted from Stim v1.16.0 Python test_measurement_ordering.
-    let input = circuit("M 0 1\n");
-    let input_flows = [flow("1 -> Z0 xor rec[-2]"), flow("1 -> Z1 xor rec[-1]")];
-
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &input_flows)
-        .expect("reverse multi-target measurement ordering");
-
-    assert_eq!(flows.len(), input_flows.len());
-    assert!(circuit_has_all_unsigned_stabilizer_flows(&inverse, &flows));
-}
-
-#[test]
-fn pfm_b1_python_measurement_ordering_mzz() {
-    // Adapted from Stim v1.16.0 Python test_measurement_ordering_2.
-    let input = circuit("MZZ 0 1 2 3\n");
-    let input_flows = [
-        flow("1 -> Z0*Z1 xor rec[-2]"),
-        flow("1 -> Z2*Z3 xor rec[-1]"),
-    ];
-
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &input_flows)
-        .expect("reverse pair-measurement ordering");
-
-    assert_eq!(flows.len(), input_flows.len());
-    assert!(circuit_has_all_unsigned_stabilizer_flows(&inverse, &flows));
-}
-
-#[test]
-fn pfm_b1_python_measurement_ordering_mr() {
-    // Adapted from Stim v1.16.0 Python test_measurement_ordering_3.
-    let input = circuit("MR 0 1\n");
-    let input_flows = [
-        flow("Z0 -> rec[-2]"),
-        flow("Z1 -> rec[-1]"),
-        flow("1 -> Z0"),
-        flow("1 -> Z1"),
-    ];
-
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &input_flows)
-        .expect("reverse multi-target measure-reset ordering");
-
-    assert_eq!(flows.len(), input_flows.len());
-    assert!(circuit_has_all_unsigned_stabilizer_flows(&inverse, &flows));
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_turns_measurements_into_resets() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec measurement-to-reset reversal behavior.
-    for (circuit_text, input_flow, expected_circuit, expected_flow) in [
-        ("M 0\n", "Z0 -> rec[-1]", "R 0\n", "1 -> Z0"),
-        ("M 0\n", "Z0 -> _ xor rec[-1]", "R 0\n", "_ -> Z0"),
-        ("MX 0\n", "X0 -> rec[-1]", "RX 0\n", "1 -> X0"),
-        ("MY 0\n", "Y0 -> rec[-1]", "RY 0\n", "1 -> Y0"),
-    ] {
-        let (actual_circuit, actual_flows) =
-            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-                .expect("time reverse reset-convertible measurement");
-
-        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
-        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
-    }
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_can_keep_measurements() {
-    // Adapted from Stim v1.16.0 Python time_reversed_for_flows
-    // dont_turn_measurements_into_resets example.
-    let options = TimeReversedForFlowsOptions {
-        dont_turn_measurements_into_resets: true,
-    };
-    let input = circuit("M 0\n");
-    let flows = [flow("Z0 -> rec[-1]")];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows_with_options(&input, &flows, options)
-            .expect("time reverse measurement without converting to reset");
-
-    assert_eq!(actual_circuit, input);
-    assert_eq!(actual_flows, vec![flow("1 -> Z0 xor rec[-1]")]);
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_reverses_measure_resets() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec measure-reset reversal behavior.
-    for (circuit_text, reset_flow, record_flow, expected_reset, expected_record) in [
-        (
-            "MR 0\n",
-            "1 -> Z0",
-            "Z0 -> rec[-1]",
-            "Z0 -> rec[-1]",
-            "1 -> Z0",
-        ),
-        (
-            "MRX 0\n",
-            "1 -> X0",
-            "X0 -> rec[-1]",
-            "X0 -> rec[-1]",
-            "1 -> X0",
-        ),
-        (
-            "MRY 0\n",
-            "1 -> Y0",
-            "Y0 -> rec[-1]",
-            "Y0 -> rec[-1]",
-            "1 -> Y0",
-        ),
-    ] {
-        let input = circuit(circuit_text);
-        let input_flows = [flow(reset_flow), flow(record_flow)];
-
-        let (actual_circuit, actual_flows) = circuit_time_reversed_for_flows(&input, &input_flows)
-            .expect("time reverse selected measure-reset basis");
-
-        assert_eq!(actual_circuit, input, "{circuit_text}");
-        assert_eq!(
-            actual_flows,
-            vec![flow(expected_reset), flow(expected_record)],
-            "{circuit_text}"
-        );
-    }
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_reverses_multi_target_measure_resets() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec measurement_ordering_3 coverage.
-    let input = circuit("MR 0 1\n");
-    let input_flows = [
-        flow("Z0 -> rec[-2]"),
-        flow("Z1 -> rec[-1]"),
-        flow("1 -> Z0"),
-        flow("1 -> Z1"),
-        flow("1 -> Z0*Z1"),
-    ];
-
-    let (actual_circuit, actual_flows) = circuit_time_reversed_for_flows(&input, &input_flows)
-        .expect("time reverse multi-target measure-reset");
-
-    assert_eq!(actual_circuit, circuit("MR 1 0\n"));
-    assert_eq!(
-        actual_flows,
-        vec![
-            flow("1 -> Z0"),
-            flow("1 -> Z1"),
-            flow("Z0 -> rec[-1]"),
-            flow("Z1 -> rec[-2]"),
-            flow("Z0*Z1 -> rec[-2] xor rec[-1]"),
-        ]
-    );
-
-    for (circuit_text, expected_circuit, input_flow, expected_flow) in [
-        (
-            "MRX 0 1\n",
-            "MRX 1 0\n",
-            "1 -> X0*X1",
-            "X0*X1 -> rec[-2] xor rec[-1]",
-        ),
-        (
-            "MRY 0 1\n",
-            "MRY 1 0\n",
-            "1 -> Y0*Y1",
-            "Y0*Y1 -> rec[-2] xor rec[-1]",
-        ),
-    ] {
-        let (actual_circuit, actual_flows) =
-            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-                .expect("time reverse multi-target measure-reset basis");
-
-        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
-        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
-    }
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_reverses_inverted_measure_resets() {
-    // Adapted from Stim v1.16.0 inverted measure-reset time_reversed_for_flows behavior.
-    for (circuit_text, input_flows, expected_circuit, expected_flows) in [
-        (
-            "MR !0\n",
-            vec!["1 -> Z0", "Z0 -> rec[-1]"],
-            "MR !0\n",
-            vec!["Z0 -> rec[-1]", "1 -> Z0"],
-        ),
-        (
-            "MR !0 1\n",
-            vec!["Z0*Z1 -> rec[-2] xor rec[-1]", "1 -> Z0", "1 -> Z1"],
-            "MR 1 !0\n",
-            vec!["1 -> Z0*Z1", "Z0 -> rec[-1]", "Z1 -> rec[-2]"],
-        ),
-        (
-            "MR 0 !1\n",
-            vec!["Z0*Z1 -> rec[-2] xor rec[-1]", "1 -> Z0", "1 -> Z1"],
-            "MR !1 0\n",
-            vec!["1 -> Z0*Z1", "Z0 -> rec[-1]", "Z1 -> rec[-2]"],
-        ),
-        (
-            "MRX !0\n",
-            vec!["1 -> X0", "X0 -> rec[-1]"],
-            "MRX !0\n",
-            vec!["X0 -> rec[-1]", "1 -> X0"],
-        ),
-        (
-            "MRY 0 !1\n",
-            vec!["Y0*Y1 -> rec[-2] xor rec[-1]", "1 -> Y0*Y1"],
-            "MRY !1 0\n",
-            vec!["1 -> Y0*Y1", "Y0*Y1 -> rec[-2] xor rec[-1]"],
-        ),
-    ] {
-        let actual_input_flows = input_flows.into_iter().map(flow).collect::<Vec<_>>();
-
-        let (actual_circuit, actual_flows) =
-            circuit_time_reversed_for_flows(&circuit(circuit_text), &actual_input_flows)
-                .expect("time reverse inverted measure-reset targets");
-
-        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
-        assert_eq!(
-            actual_flows,
-            expected_flows.into_iter().map(flow).collect::<Vec<_>>(),
-            "{circuit_text}"
-        );
-    }
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_reverses_resets() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec reset-to-measurement reversal behavior.
-    for (circuit_text, input_flow, expected_circuit, expected_flow) in [
-        ("R 0\n", "1 -> Z0", "M 0\n", "Z0 -> rec[-1]"),
-        ("RX 0\n", "1 -> X0", "MX 0\n", "X0 -> rec[-1]"),
-        ("RY 0\n", "1 -> Y0", "MY 0\n", "Y0 -> rec[-1]"),
-    ] {
-        let (actual_circuit, actual_flows) =
-            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-                .expect("time reverse selected reset basis");
-
-        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
-        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
-    }
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_reverses_multi_target_resets() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec two_to_one reset ordering.
-    let input = circuit("R 0 1\n");
-    let input_flows = [flow("1 -> Z0"), flow("1 -> Z1"), flow("1 -> Z0*Z1")];
-
-    let (actual_circuit, actual_flows) = circuit_time_reversed_for_flows(&input, &input_flows)
-        .expect("time reverse multi-target reset");
-
-    assert_eq!(actual_circuit, circuit("M 1 0\n"));
-    assert_eq!(
-        actual_flows,
-        vec![
-            flow("Z0 -> rec[-1]"),
-            flow("Z1 -> rec[-2]"),
-            flow("Z0*Z1 -> rec[-2] xor rec[-1]"),
-        ]
-    );
-
-    for (circuit_text, expected_circuit, input_flow, expected_flow) in [
-        (
-            "RX 0 1\n",
-            "MX 1 0\n",
-            "1 -> X0*X1",
-            "X0*X1 -> rec[-2] xor rec[-1]",
-        ),
-        (
-            "RY 0 1\n",
-            "MY 1 0\n",
-            "1 -> Y0*Y1",
-            "Y0*Y1 -> rec[-2] xor rec[-1]",
-        ),
-    ] {
-        let (actual_circuit, actual_flows) =
-            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-                .expect("time reverse multi-target reset basis");
-
-        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
-        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
-    }
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&circuit("R 0 1 2\n"), &[flow("1 -> Z0*Z1*Z2")])
-            .expect("time reverse three-target reset");
-
-    assert_eq!(actual_circuit, circuit("M 2 1 0\n"));
-    assert_eq!(
-        actual_flows,
-        vec![flow("Z0*Z1*Z2 -> rec[-3] xor rec[-2] xor rec[-1]")]
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_supports_flow_flip() {
-    // Adapted from Stim v1.16.0 circuit_inverse_qec flow_flip coverage.
-    let input = circuit(
-        "
-        MY 0
-        MRX 0
-        MR 1
-        R 0
-    ",
-    );
-    let input_flows = [
-        flow("Y0*Z1 -> rec[-3] xor rec[-1]"),
-        flow("1 -> Z0*Z1"),
-        flow("1 -> Z1"),
-        flow("1 -> Z0"),
-    ];
-
-    let (actual_circuit, actual_flows) =
-        circuit_time_reversed_for_flows(&input, &input_flows).expect("time reverse flow_flip");
-
-    assert_eq!(
-        actual_circuit,
-        circuit(
-            "
-            M 0
-            MR 1
-            MRX 0
-            RY 0
-            "
-        )
-    );
-    assert_eq!(
-        actual_flows,
-        vec![
-            flow("1 -> Y0*Z1"),
-            flow("Z0*Z1 -> rec[-3] xor rec[-2]"),
-            flow("Z1 -> rec[-2]"),
-            flow("Z0 -> rec[-3]"),
-        ]
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_general_engine_handles_flow_flip_variants() {
-    let input = circuit("MY 0\nMRX 0\nMR 1\nR 0\n");
-    let (single_inverse, single_flows) =
-        circuit_time_reversed_for_flows(&input, &[flow("1 -> Z0")])
-            .expect("reverse one selected flow");
-    assert_eq!(single_inverse, circuit("M 0\nMR 1\nMRX 0\nMY 0\n"));
-    assert_eq!(single_flows, vec![flow("Z0 -> rec[-4]")]);
-
-    let reordered = [
-        flow("1 -> Z0"),
-        flow("1 -> Z1"),
-        flow("1 -> Z0*Z1"),
-        flow("Y0*Z1 -> rec[-3] xor rec[-1]"),
-    ];
-    let (reordered_inverse, reordered_flows) = circuit_time_reversed_for_flows(&input, &reordered)
-        .expect("reverse reordered selected flows");
-    assert_eq!(reordered_inverse, circuit("M 0\nMR 1\nMRX 0\nRY 0\n"));
-    assert_eq!(
-        reordered_flows,
-        vec![
-            flow("Z0 -> rec[-3]"),
-            flow("Z1 -> rec[-2]"),
-            flow("Z0*Z1 -> rec[-3] xor rec[-2]"),
-            flow("1 -> Y0*Z1"),
-        ]
-    );
-
-    let invalid = circuit("MY 0\nMRX 0\nMR 1\nRY 0\n");
-    let error = circuit_time_reversed_for_flows(
-        &invalid,
+/// Exact Stim v1.16.0 `time_reversed_for_flows` examples (C++ `circuit_inverse_qec` tests, Python
+/// examples, and direct probes) beyond the pinned common matrix. Every row additionally checks
+/// that the reversed circuit satisfies every reversed flow.
+const REVERSAL_CASES: &[ReversalCase] = &[
+    (
+        "flow past the end of the circuit",
+        "H 0\n",
+        &["X300*Z0 -> X300*X0"],
+        false,
+        Some(("H 0\n", &["X300*X0 -> X300*Z0"])),
+    ),
+    (
+        "extra idle flow qubits",
+        "H 2\n",
+        &["X300 -> X300", "X2*Z301 -> Z2*Z301"],
+        false,
+        Some(("H 2\n", &["X300 -> X300", "Z2*Z301 -> X2*Z301"])),
+    ),
+    (
+        "SWAP",
+        "SWAP 0 1\n",
+        &["X0 -> X1", "Z1 -> Z0"],
+        false,
+        Some(("SWAP 0 1\n", &["X1 -> X0", "Z0 -> Z1"])),
+    ),
+    (
+        "SQRT_X",
+        "SQRT_X 0\n",
+        &["X0 -> X0", "Z0 -> -Y0"],
+        false,
+        Some(("SQRT_X_DAG 0\n", &["X0 -> X0", "Y0 -> Z0"])),
+    ),
+    (
+        "ISWAP",
+        "ISWAP 0 1\n",
+        &["X0 -> Z0*Y1", "X1 -> Y0*Z1"],
+        false,
+        Some(("ISWAP_DAG 0 1\n", &["Z0*Y1 -> X0", "Y0*Z1 -> X1"])),
+    ),
+    (
+        "flow through MZZ",
+        "MZZ 0 1\n",
         &[
-            flow("Y0*Z1 -> rec[-3] xor rec[-1]"),
-            flow("1 -> Z0*Z1"),
-            flow("1 -> Z1"),
-            flow("1 -> Z0"),
+            "X0*X1 -> Y0*Y1 xor rec[-1]",
+            "X0*X1 -> X0*X1",
+            "Z0 -> Z1 xor rec[-1]",
+            "Z0 -> Z0",
         ],
-    )
-    .expect_err("anticommuting variant is rejected")
-    .to_string();
-    assert!(error.contains("anti-commuted"), "{error}");
-}
+        false,
+        Some((
+            "MZZ 0 1\n",
+            &[
+                "Y0*Y1 -> X0*X1 xor rec[-1]",
+                "X0*X1 -> X0*X1",
+                "Z1 -> Z0 xor rec[-1]",
+                "Z0 -> Z0",
+            ],
+        )),
+    ),
+    (
+        "retained MX",
+        "MX 0\n",
+        &["1 -> X0 xor rec[-1]"],
+        false,
+        Some(("MX 0\n", &["X0 -> rec[-1]"])),
+    ),
+    (
+        "retained MY",
+        "MY 0\n",
+        &["1 -> Y0 xor rec[-1]"],
+        false,
+        Some(("MY 0\n", &["Y0 -> rec[-1]"])),
+    ),
+    (
+        "retained MXX",
+        "MXX 0 1\n",
+        &["1 -> X0*X1 xor rec[-1]"],
+        false,
+        Some(("MXX 0 1\n", &["X0*X1 -> rec[-1]"])),
+    ),
+    (
+        "retained MYY",
+        "MYY 0 1\n",
+        &["1 -> Y0*Y1 xor rec[-1]"],
+        false,
+        Some(("MYY 0 1\n", &["Y0*Y1 -> rec[-1]"])),
+    ),
+    (
+        "Python measurement ordering M",
+        "M 0 1\n",
+        &["1 -> Z0 xor rec[-2]", "1 -> Z1 xor rec[-1]"],
+        false,
+        None,
+    ),
+    (
+        "Python measurement ordering MZZ",
+        "MZZ 0 1 2 3\n",
+        &["1 -> Z0*Z1 xor rec[-2]", "1 -> Z2*Z3 xor rec[-1]"],
+        false,
+        None,
+    ),
+    (
+        "Python measurement ordering MR",
+        "MR 0 1\n",
+        &["Z0 -> rec[-2]", "Z1 -> rec[-1]", "1 -> Z0", "1 -> Z1"],
+        false,
+        None,
+    ),
+    (
+        "M with explicit empty output becomes R",
+        "M 0\n",
+        &["Z0 -> _ xor rec[-1]"],
+        false,
+        Some(("R 0\n", &["_ -> Z0"])),
+    ),
+    (
+        "MX becomes RX",
+        "MX 0\n",
+        &["X0 -> rec[-1]"],
+        false,
+        Some(("RX 0\n", &["1 -> X0"])),
+    ),
+    (
+        "MY becomes RY",
+        "MY 0\n",
+        &["Y0 -> rec[-1]"],
+        false,
+        Some(("RY 0\n", &["1 -> Y0"])),
+    ),
+    (
+        "dont_turn_measurements_into_resets keeps M",
+        "M 0\n",
+        &["Z0 -> rec[-1]"],
+        true,
+        Some(("M 0\n", &["1 -> Z0 xor rec[-1]"])),
+    ),
+    (
+        "MR",
+        "MR 0\n",
+        &["1 -> Z0", "Z0 -> rec[-1]"],
+        false,
+        Some(("MR 0\n", &["Z0 -> rec[-1]", "1 -> Z0"])),
+    ),
+    (
+        "MRX",
+        "MRX 0\n",
+        &["1 -> X0", "X0 -> rec[-1]"],
+        false,
+        Some(("MRX 0\n", &["X0 -> rec[-1]", "1 -> X0"])),
+    ),
+    (
+        "MRY",
+        "MRY 0\n",
+        &["1 -> Y0", "Y0 -> rec[-1]"],
+        false,
+        Some(("MRY 0\n", &["Y0 -> rec[-1]", "1 -> Y0"])),
+    ),
+    (
+        "multi-target MR",
+        "MR 0 1\n",
+        &[
+            "Z0 -> rec[-2]",
+            "Z1 -> rec[-1]",
+            "1 -> Z0",
+            "1 -> Z1",
+            "1 -> Z0*Z1",
+        ],
+        false,
+        Some((
+            "MR 1 0\n",
+            &[
+                "1 -> Z0",
+                "1 -> Z1",
+                "Z0 -> rec[-1]",
+                "Z1 -> rec[-2]",
+                "Z0*Z1 -> rec[-2] xor rec[-1]",
+            ],
+        )),
+    ),
+    (
+        "multi-target MRX",
+        "MRX 0 1\n",
+        &["1 -> X0*X1"],
+        false,
+        Some(("MRX 1 0\n", &["X0*X1 -> rec[-2] xor rec[-1]"])),
+    ),
+    (
+        "multi-target MRY",
+        "MRY 0 1\n",
+        &["1 -> Y0*Y1"],
+        false,
+        Some(("MRY 1 0\n", &["Y0*Y1 -> rec[-2] xor rec[-1]"])),
+    ),
+    (
+        "inverted MR",
+        "MR !0\n",
+        &["1 -> Z0", "Z0 -> rec[-1]"],
+        false,
+        Some(("MR !0\n", &["Z0 -> rec[-1]", "1 -> Z0"])),
+    ),
+    (
+        "inverted first MR target",
+        "MR !0 1\n",
+        &["Z0*Z1 -> rec[-2] xor rec[-1]", "1 -> Z0", "1 -> Z1"],
+        false,
+        Some((
+            "MR 1 !0\n",
+            &["1 -> Z0*Z1", "Z0 -> rec[-1]", "Z1 -> rec[-2]"],
+        )),
+    ),
+    (
+        "inverted second MR target",
+        "MR 0 !1\n",
+        &["Z0*Z1 -> rec[-2] xor rec[-1]", "1 -> Z0", "1 -> Z1"],
+        false,
+        Some((
+            "MR !1 0\n",
+            &["1 -> Z0*Z1", "Z0 -> rec[-1]", "Z1 -> rec[-2]"],
+        )),
+    ),
+    (
+        "inverted MRX",
+        "MRX !0\n",
+        &["1 -> X0", "X0 -> rec[-1]"],
+        false,
+        Some(("MRX !0\n", &["X0 -> rec[-1]", "1 -> X0"])),
+    ),
+    (
+        "inverted second MRY target",
+        "MRY 0 !1\n",
+        &["Y0*Y1 -> rec[-2] xor rec[-1]", "1 -> Y0*Y1"],
+        false,
+        Some((
+            "MRY !1 0\n",
+            &["1 -> Y0*Y1", "Y0*Y1 -> rec[-2] xor rec[-1]"],
+        )),
+    ),
+    (
+        "R becomes M",
+        "R 0\n",
+        &["1 -> Z0"],
+        false,
+        Some(("M 0\n", &["Z0 -> rec[-1]"])),
+    ),
+    (
+        "RX becomes MX",
+        "RX 0\n",
+        &["1 -> X0"],
+        false,
+        Some(("MX 0\n", &["X0 -> rec[-1]"])),
+    ),
+    (
+        "RY becomes MY",
+        "RY 0\n",
+        &["1 -> Y0"],
+        false,
+        Some(("MY 0\n", &["Y0 -> rec[-1]"])),
+    ),
+    (
+        "multi-target R",
+        "R 0 1\n",
+        &["1 -> Z0", "1 -> Z1", "1 -> Z0*Z1"],
+        false,
+        Some((
+            "M 1 0\n",
+            &[
+                "Z0 -> rec[-1]",
+                "Z1 -> rec[-2]",
+                "Z0*Z1 -> rec[-2] xor rec[-1]",
+            ],
+        )),
+    ),
+    (
+        "multi-target RX",
+        "RX 0 1\n",
+        &["1 -> X0*X1"],
+        false,
+        Some(("MX 1 0\n", &["X0*X1 -> rec[-2] xor rec[-1]"])),
+    ),
+    (
+        "multi-target RY",
+        "RY 0 1\n",
+        &["1 -> Y0*Y1"],
+        false,
+        Some(("MY 1 0\n", &["Y0*Y1 -> rec[-2] xor rec[-1]"])),
+    ),
+    (
+        "three-target R",
+        "R 0 1 2\n",
+        &["1 -> Z0*Z1*Z2"],
+        false,
+        Some((
+            "M 2 1 0\n",
+            &["Z0*Z1*Z2 -> rec[-3] xor rec[-2] xor rec[-1]"],
+        )),
+    ),
+    (
+        "flow flip",
+        "MY 0\nMRX 0\nMR 1\nR 0\n",
+        &[
+            "Y0*Z1 -> rec[-3] xor rec[-1]",
+            "1 -> Z0*Z1",
+            "1 -> Z1",
+            "1 -> Z0",
+        ],
+        false,
+        Some((
+            "M 0\nMR 1\nMRX 0\nRY 0\n",
+            &[
+                "1 -> Y0*Z1",
+                "Z0*Z1 -> rec[-3] xor rec[-2]",
+                "Z1 -> rec[-2]",
+                "Z0 -> rec[-3]",
+            ],
+        )),
+    ),
+    (
+        "flow flip with one selected flow",
+        "MY 0\nMRX 0\nMR 1\nR 0\n",
+        &["1 -> Z0"],
+        false,
+        Some(("M 0\nMR 1\nMRX 0\nMY 0\n", &["Z0 -> rec[-4]"])),
+    ),
+    (
+        "flow flip with reordered flows",
+        "MY 0\nMRX 0\nMR 1\nR 0\n",
+        &[
+            "1 -> Z0",
+            "1 -> Z1",
+            "1 -> Z0*Z1",
+            "Y0*Z1 -> rec[-3] xor rec[-1]",
+        ],
+        false,
+        Some((
+            "M 0\nMR 1\nMRX 0\nRY 0\n",
+            &[
+                "Z0 -> rec[-3]",
+                "Z1 -> rec[-2]",
+                "Z0*Z1 -> rec[-3] xor rec[-2]",
+                "1 -> Y0*Z1",
+            ],
+        )),
+    ),
+    (
+        "measurements across a TICK",
+        "M 0\nTICK\nM 1\n",
+        &["Z0 -> rec[-2]"],
+        false,
+        Some(("M 1\nTICK\nR 0\n", &["1 -> Z0"])),
+    ),
+    (
+        "duplicate M targets",
+        "M 0 0\n",
+        &["1 -> Z0 xor rec[-1]"],
+        false,
+        Some(("M 0 0\n", &["Z0 -> rec[-2]"])),
+    ),
+    (
+        "duplicate MX targets",
+        "MX 0 0\n",
+        &["1 -> X0 xor rec[-1]"],
+        false,
+        Some(("MX 0 0\n", &["X0 -> rec[-2]"])),
+    ),
+    (
+        "duplicate MY targets",
+        "MY 0 0\n",
+        &["1 -> Y0 xor rec[-1]"],
+        false,
+        Some(("MY 0 0\n", &["Y0 -> rec[-2]"])),
+    ),
+    (
+        "overlapping MZZ targets",
+        "MZZ 0 1 1 2\n",
+        &["1 -> Z0*Z1 xor rec[-2]"],
+        false,
+        Some(("MZZ 1 2 0 1\n", &["Z0*Z1 -> rec[-1]"])),
+    ),
+];
 
 #[test]
-fn time_reversed_for_flows_unitary_subset_rejects_unsatisfied_general_unitary_flow() {
-    let error = circuit_time_reversed_for_flows(&circuit("SWAP 0 1\n"), &[flow("X0 -> X0")])
-        .expect_err("swap does not preserve X0")
-        .to_string();
-
-    assert!(
-        error.contains("requires input circuit to satisfy flow 0"),
-        "{error}"
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_unitary_subset_rejects_large_repeated_unitary_outside_folded_subset() {
-    let input = circuit(
-        "
-        REPEAT 1000001 {
-            SWAP 0 1
+fn time_reversed_for_flows_matches_stim_and_reversed_flows_hold() {
+    for &(name, input, input_flows, keep_measurements, expected) in REVERSAL_CASES {
+        let input_flows = input_flows
+            .iter()
+            .map(|text| flow(text))
+            .collect::<Vec<_>>();
+        let options = TimeReversedForFlowsOptions {
+            dont_turn_measurements_into_resets: keep_measurements,
+        };
+        let (actual, actual_flows) =
+            circuit_time_reversed_for_flows_with_options(&circuit(input), &input_flows, options)
+                .expect(name);
+        assert_eq!(actual_flows.len(), input_flows.len(), "{name}");
+        assert!(
+            circuit_has_all_unsigned_stabilizer_flows(&actual, &actual_flows),
+            "{name}: reversed circuit must satisfy the reversed flows"
+        );
+        if let Some((expected_circuit, expected_flows)) = expected {
+            assert_eq!(actual, circuit(expected_circuit), "{name}");
+            assert_eq!(
+                actual_flows,
+                expected_flows
+                    .iter()
+                    .map(|text| flow(text))
+                    .collect::<Vec<_>>(),
+                "{name}"
+            );
         }
-    ",
-    );
-    let error = circuit_time_reversed_for_flows(&input, &[flow("X0 -> X1")])
-        .expect_err("large repeated SWAP is not folded by the scoped validator")
-        .to_string();
-
-    assert!(error.contains("folded sparse validation"), "{error}");
+    }
 }
 
 #[test]
-fn time_reversed_for_flows_unitary_subset_rejects_unsatisfied_flow() {
-    let error = circuit_time_reversed_for_flows(&circuit("H 0\n"), &[flow("Z0 -> Z0")])
-        .expect_err("flow is not satisfied")
-        .to_string();
-
-    assert!(
-        error.contains("requires input circuit to satisfy flow 0"),
-        "{error}"
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_measurement_rich_subset_rejects_unsatisfied_flows() {
-    let error = circuit_time_reversed_for_flows(&circuit("M 0\n"), &[flow("X0 -> rec[-1]")])
-        .expect_err("measurement-rich flow is not satisfied")
-        .to_string();
-
-    assert!(
-        error.contains("didn't satisfy one of the given flows"),
-        "{error}"
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_general_engine_handles_multiple_measurements() {
-    let input = circuit("M 0\nTICK\nM 1\n");
-    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[flow("Z0 -> rec[-2]")])
-        .expect("reverse multi-instruction measurement flow");
-
-    assert_eq!(inverse, circuit("M 1\nTICK\nR 0\n"));
-    assert_eq!(flows, vec![flow("1 -> Z0")]);
-}
-
-#[test]
-fn time_reversed_for_flows_matches_stim_duplicate_measurement_targets() {
-    for (circuit_text, input_flow, expected_circuit, expected_flow) in [
-        ("M 0 0\n", "1 -> Z0 xor rec[-1]", "M 0 0\n", "Z0 -> rec[-2]"),
+fn time_reversed_for_flows_rejects_flows_the_input_does_not_satisfy() {
+    for (name, input, input_flows, expected_error) in [
         (
-            "MX 0 0\n",
-            "1 -> X0 xor rec[-1]",
-            "MX 0 0\n",
-            "X0 -> rec[-2]",
+            "unitary flow",
+            "H 0\n",
+            &["Z0 -> Z0"][..],
+            "requires input circuit to satisfy flow 0",
         ),
         (
-            "MY 0 0\n",
-            "1 -> Y0 xor rec[-1]",
-            "MY 0 0\n",
-            "Y0 -> rec[-2]",
+            "general unitary flow",
+            "SWAP 0 1\n",
+            &["X0 -> X0"][..],
+            "requires input circuit to satisfy flow 0",
         ),
         (
-            "MZZ 0 1 1 2\n",
-            "1 -> Z0*Z1 xor rec[-2]",
-            "MZZ 1 2 0 1\n",
-            "Z0*Z1 -> rec[-1]",
+            "large repeated unitary outside the folded subset",
+            "REPEAT 1000001 {\n    SWAP 0 1\n}\n",
+            &["X0 -> X1"][..],
+            "folded sparse validation",
+        ),
+        (
+            "measurement flow",
+            "M 0\n",
+            &["X0 -> rec[-1]"][..],
+            "didn't satisfy one of the given flows",
+        ),
+        (
+            "anticommuting flow-flip variant",
+            "MY 0\nMRX 0\nMR 1\nRY 0\n",
+            &[
+                "Y0*Z1 -> rec[-3] xor rec[-1]",
+                "1 -> Z0*Z1",
+                "1 -> Z1",
+                "1 -> Z0",
+            ][..],
+            "anti-commuted",
         ),
     ] {
-        let (actual_circuit, actual_flows) =
-            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-                .expect("reverse Stim-accepted duplicate measurement targets");
-
-        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
-        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
+        let input_flows = input_flows
+            .iter()
+            .map(|text| flow(text))
+            .collect::<Vec<_>>();
+        let error = circuit_time_reversed_for_flows(&circuit(input), &input_flows)
+            .expect_err(name)
+            .to_string();
+        assert!(error.contains(expected_error), "{name}: {error}");
     }
 }
 

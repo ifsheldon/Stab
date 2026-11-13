@@ -59,6 +59,12 @@ fn missing_detectors_common_semantic_matrix_matches_stim() -> Result<(), Box<dyn
             "",
         ),
         (
+            "duplicate covering detectors",
+            "R 0\nM 0\nDETECTOR rec[-1]\nDETECTOR rec[-1]\n",
+            false,
+            "",
+        ),
+        (
             "uncovered deterministic measurement",
             "R 0\nM 0\n",
             false,
@@ -221,11 +227,6 @@ fn pf5_missing_detectors_clifford_tracks_two_qubit_and_swap_gates()
         "entangled Z0 is not deterministic",
     )?;
     Ok(())
-}
-
-#[test]
-fn pf5_missing_detectors_feedback_matches_stim() -> Result<(), Box<dyn std::error::Error>> {
-    require_missing_eq("M 0\nCX rec[-1] 1\nM 1\n", true, "", "measurement feedback")
 }
 
 #[test]

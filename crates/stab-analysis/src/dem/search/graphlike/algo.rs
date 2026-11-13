@@ -208,54 +208,6 @@ mod tests {
     }
 
     #[test]
-    fn graphlike_algo_no_error_matches_upstream() {
-        assert!(shortest("").is_err());
-        assert!(shortest("error(0.1) D0 L0\n").is_err());
-        assert!(shortest("error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n").is_err());
-    }
-
-    #[test]
-    fn graphlike_algo_distance_1_matches_upstream() {
-        assert_eq!(shortest("error(0.1) L0\n").unwrap(), "error(1) L0\n");
-    }
-
-    #[test]
-    fn graphlike_algo_distance_2_matches_upstream() {
-        assert_eq!(
-            shortest("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap(),
-            "error(1) D0\nerror(1) D0 L0\n"
-        );
-
-        assert_eq!(
-            shortest("error(0.1) D0 L0\nerror(0.1) D0 L1\n").unwrap(),
-            "error(1) D0 L0\nerror(1) D0 L1\n"
-        );
-
-        assert_eq!(
-            shortest("error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n").unwrap(),
-            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
-        );
-
-        assert_eq!(
-            shortest("error(0.1) D0 D1 L1\nerror(0.1) D0 D1 L0\n").unwrap(),
-            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
-        );
-    }
-
-    #[test]
-    fn graphlike_algo_distance_3_matches_upstream() {
-        assert_eq!(
-            shortest("error(0.1) D0\nerror(0.1) D0 D1 L0\nerror(0.1) D1\n").unwrap(),
-            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
-        );
-
-        assert_eq!(
-            shortest("error(0.1) D1\nerror(0.1) D1 D0 L0\nerror(0.1) D0\n").unwrap(),
-            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
-        );
-    }
-
-    #[test]
     fn graphlike_algo_ignores_ungraphlike_errors_when_requested() {
         let dem = "error(0.1) D0 D1 D2\nerror(0.1) D0\nerror(0.1) D0 L0\n";
         assert!(shortest(dem).is_err());

@@ -6,14 +6,11 @@ pub use algo::{
 };
 
 use std::collections::BTreeSet;
-use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
 #[cfg(test)]
 use stab_model::DemItem;
-use stab_model::{
-    DemDetectorId, DemInstruction, DemObservableId, DemTarget, DetectorErrorModel, Probability,
-};
+use stab_model::{DemDetectorId, DemInstruction, DemTarget, DetectorErrorModel, Probability};
 
 use super::{
     arena_index::ArenaIndex,
@@ -48,20 +45,6 @@ impl Edge {
             .ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model("graphlike edge term count overflowed")
             })
-    }
-}
-
-impl Display for Edge {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut text = match self.detector {
-            Some(detector) => format_detector(detector),
-            None => "[boundary]".to_string(),
-        };
-        for observable in self.observables.iter() {
-            text.push(' ');
-            text.push_str(&format_observable(observable));
-        }
-        f.write_str(&text)
     }
 }
 
@@ -104,15 +87,6 @@ impl Node {
         self.edge_index
             .insert_reserved(edge_hash, edge_index, &self.edges);
         budget.commit_unique_edge(admission)?;
-        Ok(())
-    }
-}
-
-impl Display for Node {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for edge in &self.edges {
-            writeln!(f, "    {edge}")?;
-        }
         Ok(())
     }
 }
@@ -361,16 +335,6 @@ impl Graph {
     }
 }
 
-impl Display for Graph {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for (index, node) in self.nodes.iter().enumerate() {
-            writeln!(f, "{index}:")?;
-            write!(f, "{node}")?;
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Eq)]
 pub(super) struct SearchState {
     detector_active: Option<DemDetectorId>,
@@ -442,26 +406,6 @@ impl SearchState {
     }
 }
 
-impl Display for SearchState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let (detector_active, detector_held) = self.canonical_detectors();
-        let mut text = String::new();
-        if let Some(detector) = detector_active {
-            text.push_str(&format_detector(detector));
-            text.push(' ');
-        }
-        if let Some(detector) = detector_held {
-            text.push_str(&format_detector(detector));
-            text.push(' ');
-        }
-        for observable in self.observables.iter() {
-            text.push_str(&format_observable(observable));
-            text.push(' ');
-        }
-        f.write_str(&text)
-    }
-}
-
 impl Hash for SearchState {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.canonical_detectors().hash(state);
@@ -510,19 +454,13 @@ fn toggle_detector(targets: &mut BTreeSet<DemDetectorId>, detector: Option<DemDe
     }
 }
 
-fn format_detector(detector: DemDetectorId) -> String {
-    format!("D{}", detector.get())
-}
-
-fn format_observable(observable: DemObservableId) -> String {
-    format!("L{}", observable.get())
-}
-
 #[cfg(test)]
 #[allow(clippy::expect_used, reason = "tests use direct assertions")]
 #[allow(clippy::unwrap_used, reason = "tests use direct assertions")]
 mod tests {
     use std::collections::hash_map::DefaultHasher;
+
+    use stab_model::DemObservableId;
 
     use super::*;
 
@@ -567,41 +505,24 @@ mod tests {
     }
 
     #[test]
-    fn graphlike_edge_matches_upstream() {
+    fn graphlike_edge_and_node_equality_match_upstream() {
         let e1 = Edge::new(None, obs_mask(0));
         let e2 = Edge::new(Some(detector(1)), obs_mask(0));
         let e3 = Edge::new(None, obs_mask(1));
-        let e4 = Edge::new(None, obs_mask(5));
-
-        assert_eq!(e1.to_string(), "[boundary]");
-        assert_eq!(e2.to_string(), "D1");
-        assert_eq!(e3.to_string(), "[boundary] L0");
-        assert_eq!(e4.to_string(), "[boundary] L0 L2");
-        assert_eq!(e1, e1);
-        assert_ne!(e1, e2);
         assert_eq!(e1, Edge::new(None, obs_mask(0)));
-        assert_eq!(e2, e2);
-        assert_eq!(e3, e3);
+        assert_ne!(e1, e2);
         assert_ne!(e1, e3);
-    }
 
-    #[test]
-    fn graphlike_node_matches_upstream() {
+        // Node equality compares only the outward edges, never the lookup index.
         let n1 = Node::default();
         let n2 = Node::new(vec![Edge::new(None, obs_mask(0))]);
         let n3 = Node::new(vec![
             Edge::new(Some(detector(1)), obs_mask(5)),
             Edge::new(None, obs_mask(8)),
         ]);
-
-        assert_eq!(n1.to_string(), "");
-        assert_eq!(n2.to_string(), "    [boundary]\n");
-        assert_eq!(n3.to_string(), "    D1 L0 L2\n    [boundary] L3\n");
-        assert_eq!(n1, n1);
-        assert_ne!(n1, n2);
         assert_eq!(n1, Node::default());
-        assert_eq!(n2, n2);
-        assert_eq!(n3, n3);
+        assert_eq!(n2, Node::new(vec![Edge::new(None, obs_mask(0))]));
+        assert_ne!(n1, n2);
         assert_ne!(n1, n3);
     }
 
@@ -802,27 +723,6 @@ mod tests {
     }
 
     #[test]
-    fn graphlike_graph_string_matches_upstream() {
-        let graph = Graph::from_parts(
-            vec![
-                Node::default(),
-                Node::new(vec![
-                    Edge::new(None, obs_mask(0)),
-                    Edge::new(Some(detector(3)), obs_mask(32)),
-                ]),
-                Node::default(),
-                Node::new(vec![Edge::new(Some(detector(1)), obs_mask(32))]),
-            ],
-            64,
-            obs_mask(0),
-        );
-        assert_eq!(
-            graph.to_string(),
-            "0:\n1:\n    [boundary]\n    D3 L5\n2:\n3:\n    D1 L5\n"
-        );
-    }
-
-    #[test]
     fn graphlike_graph_add_edges_from_separable_targets_matches_upstream() {
         let mut g = Graph::new(4, 64);
 
@@ -935,19 +835,6 @@ mod tests {
     }
 
     #[test]
-    fn graphlike_search_state_construct_matches_upstream() {
-        let empty = SearchState::new(None, None, ObservableMask::new());
-        assert_eq!(empty.detector_active, None);
-        assert_eq!(empty.detector_held, None);
-        assert_eq!(empty.observables, obs_mask(0));
-
-        let full = state(Some(2), Some(1), 3);
-        assert_eq!(full.detector_active, Some(detector(2)));
-        assert_eq!(full.detector_held, Some(detector(1)));
-        assert_eq!(full.observables, obs_mask(3));
-    }
-
-    #[test]
     fn graphlike_search_state_is_undetected_matches_upstream() {
         assert!(!state(Some(1), Some(2), 3).is_undetected());
         assert!(!state(Some(1), Some(2), 2).is_undetected());
@@ -955,21 +842,6 @@ mod tests {
         assert!(state(Some(1), Some(1), 3).is_undetected());
         assert!(state(None, None, 32).is_undetected());
         assert!(state(None, None, 0).is_undetected());
-    }
-
-    #[test]
-    fn graphlike_search_state_canonical_matches_upstream() {
-        assert_eq!(
-            state(Some(1), Some(2), 3).canonical(),
-            state(Some(1), Some(2), 3)
-        );
-        assert_eq!(
-            state(Some(2), Some(1), 3).canonical(),
-            state(Some(1), Some(2), 3)
-        );
-        assert_eq!(state(Some(1), Some(1), 3).canonical(), state(None, None, 3));
-        assert_eq!(state(Some(1), Some(1), 1).canonical(), state(None, None, 1));
-        assert_eq!(state(Some(1), None, 1).canonical(), state(Some(1), None, 1));
     }
 
     #[test]
@@ -1012,7 +884,30 @@ mod tests {
     }
 
     #[test]
-    fn graphlike_search_state_canonical_equality_matches_upstream() {
+    fn graphlike_search_state_canonical_equality_ordering_and_hash_match_upstream() {
+        // Construction keeps the given detector order; canonicalization sorts and cancels pairs.
+        let empty = SearchState::new(None, None, ObservableMask::new());
+        assert_eq!(empty.detector_active, None);
+        assert_eq!(empty.detector_held, None);
+        assert_eq!(empty.observables, obs_mask(0));
+
+        let full = state(Some(2), Some(1), 3);
+        assert_eq!(full.detector_active, Some(detector(2)));
+        assert_eq!(full.detector_held, Some(detector(1)));
+        assert_eq!(full.observables, obs_mask(3));
+
+        assert_eq!(
+            state(Some(1), Some(2), 3).canonical(),
+            state(Some(1), Some(2), 3)
+        );
+        assert_eq!(
+            state(Some(2), Some(1), 3).canonical(),
+            state(Some(1), Some(2), 3)
+        );
+        assert_eq!(state(Some(1), Some(1), 3).canonical(), state(None, None, 3));
+        assert_eq!(state(Some(1), Some(1), 1).canonical(), state(None, None, 1));
+        assert_eq!(state(Some(1), None, 1).canonical(), state(Some(1), None, 1));
+
         let v1 = state(Some(1), Some(2), 3);
         let v2 = state(Some(1), Some(4), 3);
 
@@ -1025,10 +920,7 @@ mod tests {
         assert_ne!(state(Some(3), Some(3), 1), state(Some(1), Some(1), 0));
         assert_eq!(state(Some(3), Some(3), 1), state(Some(1), Some(1), 1));
         assert_eq!(state(Some(2), None, 3), state(None, Some(2), 3));
-    }
 
-    #[test]
-    fn graphlike_search_state_canonical_ordering_matches_upstream() {
         assert!(state(Some(1), Some(999), 999) < state(Some(101), Some(102), 103));
         assert!(state(Some(999), Some(1), 999) < state(Some(101), Some(102), 103));
         assert!(state(Some(101), Some(1), 999) < state(Some(101), Some(102), 103));
@@ -1038,15 +930,7 @@ mod tests {
         assert!(!(state(Some(101), Some(102), 103) < state(Some(101), Some(102), 103)));
         assert!(!(state(Some(101), Some(104), 103) < state(Some(101), Some(102), 103)));
         assert!(!(state(Some(101), Some(102), 104) < state(Some(101), Some(102), 103)));
-    }
 
-    #[test]
-    fn graphlike_search_state_string_matches_upstream() {
-        assert_eq!(state(Some(1), Some(2), 3).to_string(), "D1 D2 L0 L1 ");
-    }
-
-    #[test]
-    fn graphlike_search_state_hash_matches_upstream() {
         assert_eq!(
             hash(state(Some(1), Some(2), 3)),
             hash(state(Some(2), Some(1), 3))

@@ -65,20 +65,9 @@ fn pf4_error_matcher_repeat_resource_policy_is_source_owned() {
 
 #[test]
 fn pf4_error_matcher_filter_rejects_shifted_repeat() {
-    let circuit = Circuit::from_stim_str(
-        "
-        M 0
-        DETECTOR rec[-1]
-        ",
-    )
-    .unwrap();
+    let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").unwrap();
     let filter = DetectorErrorModel::from_dem_str(
-        "
-        repeat 100001 {
-            error(0.1) D0
-            shift_detectors 1
-        }
-        ",
+        "repeat 100001 {\n    error(0.1) D0\n    shift_detectors 1\n}\n",
     )
     .unwrap();
     let error = explain_errors_from_circuit(&circuit, Some(&filter), false)
@@ -90,323 +79,92 @@ fn pf4_error_matcher_filter_rejects_shifted_repeat() {
     );
 }
 
+/// A filter DEM whose repeat bodies leave the detector frame unchanged must select exactly the
+/// errors its compact single-iteration form selects, without expanding the repeat counts.
 #[test]
-fn pf4_error_matcher_filter_folds_flat_detector_repeat() {
-    let circuit = Circuit::from_stim_str(
-        "
-        M(0.125) 0
-        DETECTOR rec[-1]
-        ",
-    )
-    .unwrap();
-    let compact_filter = DetectorErrorModel::from_dem_str("error(0.1) D0\n").unwrap();
-    let flat_repeat_filter =
-        DetectorErrorModel::from_dem_str("repeat 100001 {\n    error(0.1) D0\n}\n").unwrap();
-
-    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-    let actual = explain_errors_from_circuit(&circuit, Some(&flat_repeat_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn pf4_error_matcher_filter_folds_rich_flat_detector_repeat() {
-    let circuit = Circuit::from_stim_str(
-        "
-        MPAD 0
-        DETECTOR rec[-1]
-        M(0.125) 0
-        M(0.25) 1
-        DETECTOR rec[-2]
-        DETECTOR rec[-1]
-        OBSERVABLE_INCLUDE(0) rec[-1]
-        ",
-    )
-    .unwrap();
-    let compact_filter = DetectorErrorModel::from_dem_str(
-        "
-        shift_detectors 1
-        error(0.1) D0
-        error(0.1) D0 D0 D1 ^ L0
-        ",
-    )
-    .unwrap();
-    let flat_repeat_filter = DetectorErrorModel::from_dem_str(
-        "
-        shift_detectors 1
-        repeat 100001 {
-            error(0.1) D0
-            error(0.1) D0 D0 D1 ^ L0
-        }
-        ",
-    )
-    .unwrap();
-
-    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-    let actual = explain_errors_from_circuit(&circuit, Some(&flat_repeat_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn pf4_error_matcher_filter_folds_nested_detector_repeat() {
-    let circuit = Circuit::from_stim_str(
-        "
-        MPAD 0
-        DETECTOR rec[-1]
-        M(0.125) 0
-        M(0.25) 1
-        DETECTOR rec[-2]
-        DETECTOR rec[-1]
-        OBSERVABLE_INCLUDE(0) rec[-1]
-        ",
-    )
-    .unwrap();
-    let compact_filter = DetectorErrorModel::from_dem_str(
-        "
-        shift_detectors 1
-        error(0.1) D0
-        error(0.1) D0 D0 D1 ^ L0
-        ",
-    )
-    .unwrap();
-    let nested_repeat_filter = DetectorErrorModel::from_dem_str(
-        "
-        shift_detectors 1
-        repeat 100001 {
-            shift_detectors(4, 5) 0
-            repeat 17 {
-                error(0.1) D0
-            }
-            repeat 19 {
-                error(0.1) D0 D0 D1 ^ L0
-                shift_detectors 0
-            }
-        }
-        ",
-    )
-    .unwrap();
-
-    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-    let actual = explain_errors_from_circuit(&circuit, Some(&nested_repeat_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn pf4_error_matcher_filter_folds_logical_only_repeat() {
-    let circuit = Circuit::from_stim_str(
-        "
-        M(0.125) 0
-        OBSERVABLE_INCLUDE(0) rec[-1]
-        M(0.25) 1
-        OBSERVABLE_INCLUDE(1) rec[-1]
-        ",
-    )
-    .unwrap();
-    let compact_filter = DetectorErrorModel::from_dem_str(
-        "
-        error(0.1) L0
-        error(0.1) L1
-        ",
-    )
-    .unwrap();
-    let nested_repeat_filter = DetectorErrorModel::from_dem_str(
-        "
-        repeat 100001 {
-            error(0.1) L0
-            repeat 17 {
-                shift_detectors 0
-                error(0.1) L1
-            }
-        }
-        ",
-    )
-    .unwrap();
-
-    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-    assert!(
-        !expected.is_empty(),
-        "logical-only filter should select errors"
-    );
-    let actual = explain_errors_from_circuit(&circuit, Some(&nested_repeat_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn pf4_error_matcher_filter_folds_annotation_repeat() {
-    let circuit = Circuit::from_stim_str(
-        "
-        MPAD 0
-        DETECTOR rec[-1]
-        M(0.125) 0
-        M(0.25) 1
-        DETECTOR rec[-2]
-        DETECTOR rec[-1]
-        OBSERVABLE_INCLUDE(0) rec[-1]
-        ",
-    )
-    .unwrap();
-    let compact_filter = DetectorErrorModel::from_dem_str(
-        "
-        shift_detectors 1
-        detector(2, 3) D0
-        logical_observable L0
-        error(0.1) D0
-        error(0.1) D0 D0 D1 ^ L0
-        ",
-    )
-    .unwrap();
-    let annotation_repeat_filter = DetectorErrorModel::from_dem_str(
-        "
-        shift_detectors 1
-        repeat 100001 {
-            detector(2, 3) D0
-            logical_observable L0
-            error(0.1) D0
-            repeat 17 {
-                detector(7) D1
-                logical_observable L0
-                shift_detectors 0
-                error(0.1) D0 D0 D1 ^ L0
-            }
-        }
-        ",
-    )
-    .unwrap();
-
-    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-    assert!(
-        !expected.is_empty(),
-        "annotation-bearing filter should select errors"
-    );
-    let actual = explain_errors_from_circuit(&circuit, Some(&annotation_repeat_filter), false)
-        .unwrap()
-        .into_iter()
-        .map(|error| error.to_string())
-        .collect::<Vec<_>>();
-
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn pf4_error_matcher_filter_skips_annotation_only_repeat() {
-    let circuit = Circuit::from_stim_str(
-        "
-        M 0
-        DETECTOR rec[-1]
-        ",
-    )
-    .unwrap();
-    let annotation_only_filter = DetectorErrorModel::from_dem_str(
-        "
-        repeat 100001 {
-            detector(2) D0
-            logical_observable L0
-            shift_detectors 0
-        }
-        ",
-    )
-    .unwrap();
-
-    assert_eq!(
-        explain_errors_from_circuit(&circuit, Some(&annotation_only_filter), false).unwrap(),
-        Vec::new()
-    );
-}
-
-#[test]
-fn pfm_b3_folded_traversal_matcher_filter() {
-    let circuit = Circuit::from_stim_str(
-        "MPAD 0\n\
-         DETECTOR rec[-1]\n\
-         M(0.125) 0\n\
-         M(0.25) 1\n\
-         DETECTOR rec[-2]\n\
-         DETECTOR rec[-1]\n\
-         OBSERVABLE_INCLUDE(0) rec[-1]\n\
-         OBSERVABLE_INCLUDE(1) rec[-2]\n",
-    )
-    .expect("matcher circuit");
-    let compact = DetectorErrorModel::from_dem_str(
-        "shift_detectors 1\n\
-         error(0.1) D0\n\
-         error(0.1) D0 D0 D1 ^ L0\n\
-         error(0.1) L1\n",
-    )
-    .expect("compact filter");
-    let repeated = DetectorErrorModel::from_dem_str(
-        "shift_detectors 1\n\
-         repeat 100001 {\n\
-             detector(2, 3) D0\n\
-             logical_observable L0\n\
-             error(0.1) D0\n\
-             repeat 17 {\n\
-                 detector(7) D1\n\
-                 error(0.1) D0 D0 D1 ^ L0\n\
-                 error(0.1) L1\n\
-                 shift_detectors 0\n\
-             }\n\
-         }\n",
-    )
-    .expect("folded filter");
-    let normalize = |filter: &DetectorErrorModel| {
-        explain_errors_from_circuit(&circuit, Some(filter), false)
-            .expect("matcher filter traversal")
-            .into_iter()
-            .map(|error| error.to_string())
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(normalize(&repeated), normalize(&compact));
-
-    let neutral = DetectorErrorModel::from_dem_str("repeat 100001 {\n}\n").expect("neutral filter");
-    assert_eq!(normalize(&neutral), normalize(&DetectorErrorModel::new()));
-
-    let shifted = DetectorErrorModel::from_dem_str(
-        "repeat 100001 {\n    error(0.1) D0\n    shift_detectors 1\n}\n",
-    )
-    .expect("shifted filter");
-    let error = explain_errors_from_circuit(&circuit, Some(&shifted), false)
-        .expect_err("shifted filter repeat exceeds bounded traversal");
-    assert!(
-        error.to_string().contains("supports repeat counts"),
-        "{error}"
-    );
+fn error_matcher_filter_folds_zero_shift_repeats_like_compact_filters() {
+    const SINGLE_DETECTOR: &str = "M(0.125) 0\nDETECTOR rec[-1]\n";
+    const PADDED_DETECTORS: &str = "\
+MPAD 0
+DETECTOR rec[-1]
+M(0.125) 0
+M(0.25) 1
+DETECTOR rec[-2]
+DETECTOR rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-1]
+";
+    const PADDED_COMPACT: &str = "shift_detectors 1\nerror(0.1) D0\nerror(0.1) D0 D0 D1 ^ L0\n";
+    // (name, circuit, compact filter, repeated filter, compact filter selects some errors)
+    let cases: &[(&str, &str, &str, &str, bool)] = &[
+        (
+            "flat detector repeat",
+            SINGLE_DETECTOR,
+            "error(0.1) D0\n",
+            "repeat 100001 {\n    error(0.1) D0\n}\n",
+            true,
+        ),
+        (
+            "flat repeat with decomposed observable error",
+            PADDED_DETECTORS,
+            PADDED_COMPACT,
+            "shift_detectors 1\nrepeat 100001 {\n    error(0.1) D0\n    error(0.1) D0 D0 D1 ^ L0\n}\n",
+            true,
+        ),
+        (
+            "nested detector repeats",
+            PADDED_DETECTORS,
+            PADDED_COMPACT,
+            "shift_detectors 1\nrepeat 100001 {\n    shift_detectors(4, 5) 0\n    repeat 17 {\n        error(0.1) D0\n    }\n    repeat 19 {\n        error(0.1) D0 D0 D1 ^ L0\n        shift_detectors 0\n    }\n}\n",
+            true,
+        ),
+        (
+            "nested logical-only repeats",
+            "M(0.125) 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nM(0.25) 1\nOBSERVABLE_INCLUDE(1) rec[-1]\n",
+            "error(0.1) L0\nerror(0.1) L1\n",
+            "repeat 100001 {\n    error(0.1) L0\n    repeat 17 {\n        shift_detectors 0\n        error(0.1) L1\n    }\n}\n",
+            true,
+        ),
+        (
+            "annotated nested repeats",
+            PADDED_DETECTORS,
+            "shift_detectors 1\ndetector(2, 3) D0\nlogical_observable L0\nerror(0.1) D0\nerror(0.1) D0 D0 D1 ^ L0\n",
+            "shift_detectors 1\nrepeat 100001 {\n    detector(2, 3) D0\n    logical_observable L0\n    error(0.1) D0\n    repeat 17 {\n        detector(7) D1\n        logical_observable L0\n        shift_detectors 0\n        error(0.1) D0 D0 D1 ^ L0\n    }\n}\n",
+            true,
+        ),
+        (
+            "annotated nested repeats with a second observable",
+            "MPAD 0\nDETECTOR rec[-1]\nM(0.125) 0\nM(0.25) 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-2]\n",
+            "shift_detectors 1\nerror(0.1) D0\nerror(0.1) D0 D0 D1 ^ L0\nerror(0.1) L1\n",
+            "shift_detectors 1\nrepeat 100001 {\n    detector(2, 3) D0\n    logical_observable L0\n    error(0.1) D0\n    repeat 17 {\n        detector(7) D1\n        error(0.1) D0 D0 D1 ^ L0\n        error(0.1) L1\n        shift_detectors 0\n    }\n}\n",
+            true,
+        ),
+        (
+            "annotation-only repeat",
+            "M 0\nDETECTOR rec[-1]\n",
+            "",
+            "repeat 100001 {\n    detector(2) D0\n    logical_observable L0\n    shift_detectors 0\n}\n",
+            false,
+        ),
+        (
+            "empty repeat",
+            PADDED_DETECTORS,
+            "",
+            "repeat 100001 {\n}\n",
+            false,
+        ),
+    ];
+    for &(name, circuit, compact, repeated, selects_errors) in cases {
+        let circuit = Circuit::from_stim_str(circuit).unwrap();
+        let explain = |filter: &str| {
+            let filter = DetectorErrorModel::from_dem_str(filter).unwrap();
+            explain_errors_from_circuit(&circuit, Some(&filter), false)
+                .unwrap()
+                .into_iter()
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>()
+        };
+        let expected = explain(compact);
+        assert_eq!(!expected.is_empty(), selects_errors, "{name}: {expected:?}");
+        assert_eq!(explain(repeated), expected, "{name}");
+    }
 }

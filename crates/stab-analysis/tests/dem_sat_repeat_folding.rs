@@ -135,6 +135,9 @@ fn shortest_error_wcnf_common_matches_stim() -> AnalysisResult<()> {
         "error(0.1) D0 L0\nerror(0.1) D0\n",
         "error(1) D0 L0\nerror(0) D0\n",
         "error(0.001) D0 L0\nerror(0.999) D0\n",
+        "error(0.5) D0 L0\nerror(0.999) D0\n",
+        "error(0.5) D0 L0\nerror(0.5) D0\n",
+        "error(0) D0 L0\nerror(0) D0\n",
         "error(0.1) D1000001 L1000001\nerror(0.2) D1000001\n",
     ] {
         assert_eq!(
