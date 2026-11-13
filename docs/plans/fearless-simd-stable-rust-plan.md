@@ -1,6 +1,6 @@
 # Fearless SIMD And Stable Rust Plan
 
-Status: Approved on 2026-11-14 and active; S1 is in progress. This plan is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and changes no parity scope.
+Status: Approved on 2026-11-14 and active. S1 and S2 are complete; S3 is next. This plan is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and changes no parity scope.
 
 ## Summary
 
@@ -106,6 +106,49 @@ Recorded on 2026-11-13 on the AArch64 development host. None of this is performa
 - The ratios are recorded and the project owner confirms that performance is not affected.
 - If the x86-64 diagnostic shows a short-slice regression, S3 adds a fixed short-slice scalar path inside the kernel crate instead of keeping a feature flag.
 - If the AArch64 comparison fails, this plan stops before S3 and the cause is investigated; no gate is relaxed.
+
+### Checkpoint (2026-11-14)
+
+S1 landed with one deviation from the design: the main loops use fixed `u64x8` blocks for XOR and `u64x4` blocks for Clifford products on 128-bit levels, then finish with the native `S::u64s` vector and scalar words. Plain native-width loops were 8 to 11 percent slower at two sizes on NEON because each store landed before the next load.
+
+Measured on the AArch64 development host with the pinned Nightly, best of three alternating runs on one pinned core, in nanoseconds per call through the public `BitVec::xor_assign` and `CliffordString::right_multiply_in_place`:
+
+| Kernel and size | `std::simd` | `fearless_simd` | Scalar | Port / `std::simd` |
+| --- | ---: | ---: | ---: | ---: |
+| XOR, 64 bits | 4.29 | 4.29 | 4.29 | 1.000 |
+| XOR, 256 bits | 8.65 | 6.79 | 8.60 | 0.785 |
+| XOR, 1024 bits | 8.57 | 8.65 | 8.57 | 1.009 |
+| XOR, 4096 bits | 14.46 | 14.77 | 14.79 | 1.021 |
+| XOR, 65,536 bits | 199.91 | 197.12 | 199.88 | 0.986 |
+| XOR, 1,048,576 bits | 5219 | 5259 | 5219 | 1.008 |
+| XOR, 16,777,216 bits | 85,801 | 84,610 | 85,999 | 0.986 |
+| Clifford, 64 qubits | 32.69 | 24.47 | 26.14 | 0.749 |
+| Clifford, 1024 qubits | 99.28 | 95.42 | 114.83 | 0.961 |
+| Clifford, 65,536 qubits | 5119 | 5061 | 5093 | 0.989 |
+| Clifford, 1,048,576 qubits | 89,331 | 90,888 | 83,469 | 1.017 |
+
+End-to-end, best of five interleaved CLI runs on one pinned core, in milliseconds:
+
+| Workload | `std::simd` build | `fearless_simd` build | Scalar build | Port / `std::simd` |
+| --- | ---: | ---: | ---: | ---: |
+| `sample`, d=11, 300,000 shots | 236.0 | 236.8 | 240.2 | 1.00 |
+| `sample`, d=25, 25,000 shots | 1965.5 | 1961.4 | 1968.1 | 1.00 |
+| `sample`, d=7, 1000 rounds, 100,000 shots | 2620.7 | 2648.2 | 2651.9 | 1.01 |
+| `detect`, d=11, 350,000 shots, `b8` | 329.9 | 333.2 | 331.4 | 1.01 |
+| `detect`, d=11, 300,000 shots, `hits` | 1269.0 | 1272.8 | 1269.8 | 1.00 |
+| `m2d`, d=11, 200,000 records | 123.5 | 123.4 | 123.9 | 1.00 |
+| `analyze_errors --decompose_errors`, d=21 | 887.4 | 888.1 | 884.6 | 1.00 |
+| `analyze_errors --fold_loops`, d=21 | 192.2 | 193.6 | 192.9 | 1.01 |
+| `sample_dem`, d=11, 100,000 shots | 317.2 | 317.9 | 317.3 | 1.00 |
+| `gen`, d=51 | 16.2 | 16.4 | 16.5 | 1.02 |
+| `convert`, `b8` to `01`, 200,000 records | 94.9 | 95.3 | 94.8 | 1.00 |
+
+Conclusions:
+
+- The port does not change performance: every row is within two percent of the `std::simd` build, and the two small-size rows that moved are faster.
+- On this host the scalar build is also within two percent of both SIMD builds, because the compiler already vectorizes the scalar loops; the kernels are on no end-to-end hot path.
+- The x86-64 short-slice diagnostic was not run because no x86-64 host is available, so the cost of per-call level selection on x86-64 remains unmeasured.
+- Under the project owner's standing decision that an unaffected result means the legacy code is deleted, S3 proceeds.
 
 ## Milestone S3: Delete The Flag And The Scalar Production Paths
 
