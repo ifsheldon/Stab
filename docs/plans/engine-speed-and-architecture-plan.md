@@ -293,6 +293,27 @@ Open after this checkpoint:
 - Time reversal, missing detectors, flow generation, detecting regions, the ErrorMatcher filter, and sampled flows admit against the default budget and take no caller budget yet.
 - Until task 5 lands, a compact input that fits the budget runs until its work is done.
 
+### Checkpoint (2026-11-14): Cooperative Cancellation
+
+Task 5 landed in `8f5b743b`.
+
+One `stab_model::Cancellation` signal rides on the limits or options value that already carries the memory budget.
+Program cursors, the reference simulator, conversion programs, DEM sampling and replay, the reverse frame tracker, the error analyzer, flow solving, the ErrorMatcher scan, and flattening poll it every 1024 units of work and stop with a typed `Cancelled` outcome.
+The default signal can never be set, and the CLI passes it, so CLI behavior is unchanged.
+
+The same change charges parenthesized arguments and tags to the parse budget, closing the second open item of the previous checkpoint.
+
+Review checks: 48 seeded and hostile-input outputs are byte-identical to the previous binary, and paired timings on ten sampling, detection, analysis, and conversion cases are between 0.95x and 1.02x of the previous binary.
+
+Open after this checkpoint:
+
+- Circuit-sampling and detection-sampling sessions that observe cancellation inside a batch are poisoned, because the random stream has already advanced, while the same request observed between batches is resumable; conversion and DEM sessions are resumable in both cases.
+- Polls are spaced by work units, not time, so one very wide instruction can run long between polls, and a call shorter than 1024 units completes even when the signal is already set.
+- Circuit passes, logical-error search, SAT construction, and the flow checker do not poll; search and SAT keep their explicit budgets.
+- `stab_decoder::DecodeCancellation` is still a separate signal type.
+- The CLI budget is still per stage; a command-level budget needs retained-byte reports from parsing and compiled plans and a per-session budget override, which is new public API on four types and was not forced into this change.
+- A single-shot `sample` of 400 CZ+S layers on 400 qubits with its reference sample takes 37 ms against Stim's 29 ms, which is outside the suite and above the ceiling.
+
 ## Milestone E5: Faster Error Analysis
 
 ### Tasks
