@@ -8,14 +8,6 @@ repository.workspace = true
 homepage.workspace = true
 publish = false
 
-[features]
-default = []
-portable-simd = [
-    "stab-algebra/portable-simd",
-    "stab-bits/portable-simd",
-    "stab-engine/portable-simd",
-]
-
 [lints]
 workspace = true
 

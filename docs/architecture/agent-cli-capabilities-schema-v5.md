@@ -33,7 +33,7 @@ Each compiler entry contains:
 - `request_fingerprint_schema_version`, or `null` when no public request identity exists;
 - `configurable_limits`.
 
-There is no selectable-backend field. Sampling has one scalar executable implementation. Its actual identity appears in sampling plan fingerprints, while `portable-simd` remains a build-time leaf-kernel feature.
+There is no selectable-backend field. Sampling has one scalar executable implementation. Its actual identity appears in sampling plan fingerprints, while the unconditional SIMD leaf kernels are internal acceleration and not a backend.
 
 ## Change From Version 4
 

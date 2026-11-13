@@ -21,8 +21,6 @@ struct GraphFixture {
 struct FixturePackage {
     name: String,
     path: PathBuf,
-    #[serde(default)]
-    default_features: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,7 +77,6 @@ fn assert_fixture(source: &str) {
                 },
                 name: package.name,
                 relative_path: package.path,
-                default_features: package.default_features,
                 rust_version,
             }
         })
@@ -129,7 +126,6 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
         .map(|name| PackageSpec {
             name: (*name).to_owned(),
             relative_path: PathBuf::from("crates").join(name),
-            default_features: Vec::new(),
             rust_version: is_stable_component(name).then(stable_rust_version),
             version: Version::new(0, 2, 0),
             publish: None,
@@ -149,7 +145,7 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
                         from: (*from).to_owned(),
                         to: (*to).to_owned(),
                         kind: kind.into(),
-                        optional: *to == "stab-kernels-simd",
+                        optional: false,
                     }],
                     declared_path_dependencies: Vec::new(),
                     resolved_dependencies: Vec::new(),
@@ -159,11 +155,9 @@ fn every_product_edge_matches_the_target_graph_for_every_dependency_kind() {
                     .iter()
                     .find(|contract| contract.name == *from)
                     .is_some_and(|contract| contract.allowed_dependencies.contains(to));
-                let valid_kernel_edge =
-                    *to != "stab-kernels-simd" || matches!(kind, FixtureDependencyKind::Normal);
                 assert_eq!(
                     report.violations.is_empty(),
-                    is_permitted && valid_kernel_edge,
+                    is_permitted,
                     "{kind:?} product edge {from} -> {to}"
                 );
             }

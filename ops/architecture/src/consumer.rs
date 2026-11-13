@@ -7,75 +7,26 @@ use thiserror::Error;
 
 const PREFIX: &str = "stab-architecture";
 const STABLE_TOOLCHAIN: &str = "+1.97.1";
-const FEATURE_CONTRACTS: [FeatureContract; 7] = [
-    FeatureContract {
-        package: "stab-bits",
-        default: &[],
-        portable: &["dep:stab-kernels-simd"],
-    },
-    FeatureContract {
-        package: "stab-algebra",
-        default: &[],
-        portable: &["dep:stab-kernels-simd", "stab-bits/portable-simd"],
-    },
-    FeatureContract {
-        package: "stab-core",
-        default: &[],
-        portable: &["stab-algebra/portable-simd", "stab-engine/portable-simd"],
-    },
-    FeatureContract {
-        package: "stab-cli",
-        default: &[],
-        portable: &["stab-bits/portable-simd", "stab-engine/portable-simd"],
-    },
-    FeatureContract {
-        package: "stab-engine",
-        default: &[],
-        portable: &["stab-bits/portable-simd"],
-    },
-    FeatureContract {
-        package: "stab-oracle",
-        default: &[],
-        portable: &["stab-core/portable-simd"],
-    },
-    FeatureContract {
-        package: "stab-bench",
-        default: &[],
-        portable: &[
-            "stab-algebra/portable-simd",
-            "stab-bits/portable-simd",
-            "stab-engine/portable-simd",
-        ],
-    },
-];
+const KERNEL_PACKAGE: &str = "stab-kernels-simd";
+const FACADE_PACKAGE: &str = "stab-core";
 
-const FIXTURES: [ConsumerFixture; 4] = [
+const FIXTURES: [ConsumerFixture; 3] = [
     ConsumerFixture {
         id: "stable",
         relative_manifest: "test-support/consumers/stable/Cargo.toml",
         toolchain: Some(STABLE_TOOLCHAIN),
-        portable: false,
         requires_core: false,
     },
     ConsumerFixture {
-        id: "scalar-facade",
-        relative_manifest: "test-support/consumers/scalar-facade/Cargo.toml",
+        id: "facade",
+        relative_manifest: "test-support/consumers/facade/Cargo.toml",
         toolchain: None,
-        portable: false,
-        requires_core: true,
-    },
-    ConsumerFixture {
-        id: "nightly-facade",
-        relative_manifest: "test-support/consumers/nightly-facade/Cargo.toml",
-        toolchain: None,
-        portable: true,
         requires_core: true,
     },
     ConsumerFixture {
         id: "mixed",
         relative_manifest: "test-support/consumers/mixed/Cargo.toml",
         toolchain: None,
-        portable: true,
         requires_core: true,
     },
 ];
@@ -85,28 +36,19 @@ struct ConsumerFixture {
     id: &'static str,
     relative_manifest: &'static str,
     toolchain: Option<&'static str>,
-    portable: bool,
     requires_core: bool,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct FeatureContract {
-    package: &'static str,
-    default: &'static [&'static str],
-    portable: &'static [&'static str],
 }
 
 #[derive(Debug)]
 pub struct ConsumerCheckSummary {
     fixture_count: usize,
-    feature_contract_count: usize,
 }
 
 impl ConsumerCheckSummary {
     pub fn print(&self) {
         println!(
-            "[{PREFIX}] checked {} explicit feature contracts and {} external component and facade consumer fixtures",
-            self.feature_contract_count, self.fixture_count
+            "[{PREFIX}] checked {} external component and facade consumer fixtures, each resolving exactly one {KERNEL_PACKAGE} package",
+            self.fixture_count
         );
     }
 }
@@ -149,14 +91,10 @@ pub enum ConsumerCheckError {
         expected: usize,
     },
 
-    #[error(
-        "external consumer {fixture} resolved package {package} with portable-simd={actual}; expected {expected}"
-    )]
-    PortableFeature {
+    #[error("external consumer {fixture} did not resolve required package {package}")]
+    MissingPackage {
         fixture: &'static str,
         package: &'static str,
-        actual: bool,
-        expected: bool,
     },
 
     #[error("external consumer {fixture} unexpectedly resolved package {package}")]
@@ -164,17 +102,6 @@ pub enum ConsumerCheckError {
         fixture: &'static str,
         package: &'static str,
     },
-
-    #[error("workspace package {package} declares {feature}={actual:?}; expected {expected:?}")]
-    FeatureIntent {
-        package: &'static str,
-        feature: &'static str,
-        actual: Vec<String>,
-        expected: Vec<String>,
-    },
-
-    #[error("workspace metadata does not contain package {0}")]
-    MissingWorkspacePackage(&'static str),
 
     #[error(
         "external consumer {fixture} has publishable workspace packages {packages:?}; every test-support package must set publish = false"
@@ -190,72 +117,13 @@ pub fn check_external_consumers(root: &Path) -> Result<ConsumerCheckSummary, Con
         path: root.to_path_buf(),
         source,
     })?;
-    validate_workspace_feature_intent(&root)?;
     for fixture in FIXTURES {
         validate_fixture_execution(&root, fixture)?;
         validate_fixture_metadata(&root, fixture)?;
     }
     Ok(ConsumerCheckSummary {
         fixture_count: FIXTURES.len(),
-        feature_contract_count: FEATURE_CONTRACTS.len(),
     })
-}
-
-fn validate_workspace_feature_intent(root: &Path) -> Result<(), ConsumerCheckError> {
-    let metadata = MetadataCommand::new()
-        .current_dir(root)
-        .manifest_path(root.join("Cargo.toml"))
-        .other_options(vec!["--locked".to_string()])
-        .exec()
-        .map_err(|source| ConsumerCheckError::Metadata {
-            fixture: "workspace-feature-intent",
-            source,
-        })?;
-    for contract in FEATURE_CONTRACTS {
-        let package = metadata
-            .packages
-            .iter()
-            .find(|package| package.name.as_str() == contract.package)
-            .ok_or(ConsumerCheckError::MissingWorkspacePackage(
-                contract.package,
-            ))?;
-        require_feature_declaration(package, contract.package, "default", contract.default)?;
-        require_feature_declaration(
-            package,
-            contract.package,
-            "portable-simd",
-            contract.portable,
-        )?;
-    }
-    Ok(())
-}
-
-fn require_feature_declaration(
-    package: &cargo_metadata::Package,
-    package_name: &'static str,
-    feature: &'static str,
-    expected: &[&str],
-) -> Result<(), ConsumerCheckError> {
-    let actual = package
-        .features
-        .get(feature)
-        .into_iter()
-        .flatten()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
-    let expected = expected
-        .iter()
-        .map(|value| (*value).to_string())
-        .collect::<Vec<_>>();
-    if actual != expected {
-        return Err(ConsumerCheckError::FeatureIntent {
-            package: package_name,
-            feature,
-            actual,
-            expected,
-        });
-    }
-    Ok(())
 }
 
 fn validate_fixture_execution(
@@ -306,28 +174,33 @@ fn validate_fixture_metadata(
             source,
         })?;
     require_unpublished_fixture_packages(&metadata, fixture.id)?;
-    let features = resolved_features(&metadata, fixture.id)?;
-    let kernel_count = features.count("stab-kernels-simd");
-    let expected_kernel_count = usize::from(fixture.portable);
-    if kernel_count != expected_kernel_count {
+    let packages = resolved_packages(&metadata, fixture.id)?;
+    validate_resolved_packages(fixture, &packages)
+}
+
+fn validate_resolved_packages(
+    fixture: ConsumerFixture,
+    packages: &ResolvedPackages,
+) -> Result<(), ConsumerCheckError> {
+    let kernel_count = packages.count(KERNEL_PACKAGE);
+    if kernel_count != 1 {
         return Err(ConsumerCheckError::KernelCount {
             fixture: fixture.id,
             actual: kernel_count,
-            expected: expected_kernel_count,
+            expected: 1,
         });
     }
-    for package in ["stab-bits", "stab-algebra"] {
-        require_portable_feature(&features, fixture, package, fixture.portable)?;
-    }
-    if fixture.requires_core {
-        require_portable_feature(&features, fixture, "stab-core", fixture.portable)?;
-    } else if features.contains("stab-core") {
-        return Err(ConsumerCheckError::UnexpectedPackage {
+    match (fixture.requires_core, packages.contains(FACADE_PACKAGE)) {
+        (true, false) => Err(ConsumerCheckError::MissingPackage {
             fixture: fixture.id,
-            package: "stab-core",
-        });
+            package: FACADE_PACKAGE,
+        }),
+        (false, true) => Err(ConsumerCheckError::UnexpectedPackage {
+            fixture: fixture.id,
+            package: FACADE_PACKAGE,
+        }),
+        (true, true) | (false, false) => Ok(()),
     }
-    Ok(())
 }
 
 fn require_unpublished_fixture_packages(
@@ -355,7 +228,6 @@ fn require_unpublished_fixture_packages(
 #[derive(Debug)]
 struct ResolvedPackages {
     counts: BTreeMap<String, usize>,
-    features: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl ResolvedPackages {
@@ -366,15 +238,9 @@ impl ResolvedPackages {
     fn contains(&self, package: &str) -> bool {
         self.counts.contains_key(package)
     }
-
-    fn has_feature(&self, package: &str, feature: &str) -> bool {
-        self.features
-            .get(package)
-            .is_some_and(|features| features.contains(feature))
-    }
 }
 
-fn resolved_features(
+fn resolved_packages(
     metadata: &Metadata,
     fixture: &'static str,
 ) -> Result<ResolvedPackages, ConsumerCheckError> {
@@ -388,41 +254,82 @@ fn resolved_features(
         .map(|package| (package.id.clone(), package.name.to_string()))
         .collect::<BTreeMap<PackageId, String>>();
     let mut counts = BTreeMap::new();
-    let mut features = BTreeMap::<String, BTreeSet<String>>::new();
     for node in &resolve.nodes {
         let Some(name) = package_names.get(&node.id) else {
             continue;
         };
         *counts.entry(name.clone()).or_default() += 1;
-        features
-            .entry(name.clone())
-            .or_default()
-            .extend(node.features.iter().map(ToString::to_string));
     }
-    Ok(ResolvedPackages { counts, features })
-}
-
-fn require_portable_feature(
-    features: &ResolvedPackages,
-    fixture: ConsumerFixture,
-    package: &'static str,
-    expected: bool,
-) -> Result<(), ConsumerCheckError> {
-    let actual = features.has_feature(package, "portable-simd");
-    if actual != expected {
-        return Err(ConsumerCheckError::PortableFeature {
-            fixture: fixture.id,
-            package,
-            actual,
-            expected,
-        });
-    }
-    Ok(())
+    Ok(ResolvedPackages { counts })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn resolved(packages: &[(&str, usize)]) -> ResolvedPackages {
+        ResolvedPackages {
+            counts: packages
+                .iter()
+                .map(|(name, count)| ((*name).to_owned(), *count))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn every_consumer_graph_requires_exactly_one_kernel_package() {
+        for fixture in FIXTURES {
+            let mut valid = vec![("stab-bits", 1), (KERNEL_PACKAGE, 1)];
+            if fixture.requires_core {
+                valid.push((FACADE_PACKAGE, 1));
+            }
+            validate_resolved_packages(fixture, &resolved(&valid))
+                .unwrap_or_else(|error| panic!("{} should pass: {error}", fixture.id));
+
+            for kernel_count in [0, 2] {
+                let mut invalid = valid.clone();
+                invalid.retain(|(name, _)| *name != KERNEL_PACKAGE);
+                if kernel_count > 0 {
+                    invalid.push((KERNEL_PACKAGE, kernel_count));
+                }
+                match validate_resolved_packages(fixture, &resolved(&invalid)) {
+                    Err(ConsumerCheckError::KernelCount {
+                        fixture: id,
+                        actual,
+                        expected: 1,
+                    }) => {
+                        assert_eq!(id, fixture.id);
+                        assert_eq!(actual, kernel_count);
+                    }
+                    other => panic!(
+                        "{} with {kernel_count} kernel packages should fail: {other:?}",
+                        fixture.id
+                    ),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn consumer_graphs_must_match_their_facade_expectation() {
+        for fixture in FIXTURES {
+            let mut flipped = vec![(KERNEL_PACKAGE, 1)];
+            if !fixture.requires_core {
+                flipped.push((FACADE_PACKAGE, 1));
+            }
+            let error = validate_resolved_packages(fixture, &resolved(&flipped))
+                .expect_err("facade presence must match the fixture contract");
+            assert!(
+                matches!(
+                    (fixture.requires_core, &error),
+                    (true, ConsumerCheckError::MissingPackage { .. })
+                        | (false, ConsumerCheckError::UnexpectedPackage { .. })
+                ),
+                "{}: {error}",
+                fixture.id
+            );
+        }
+    }
 
     #[test]
     fn publishable_external_fixture_packages_are_rejected_from_metadata() {

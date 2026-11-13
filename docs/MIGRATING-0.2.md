@@ -7,13 +7,13 @@ Stab 0.2 is a coordinated breaking Rust API release. Stim v1.16.0 semantics rema
 | Crate | Primary use |
 | --- | --- |
 | `stab-model` | Circuits, detector error models, gates, targets, parsing, printing, validation, and model diagnostics |
-| `stab-bits` | Packed bit storage plus scalar bit operations |
+| `stab-bits` | Packed bit storage plus bit operations, with whole-slice XOR through `stab-kernels-simd` |
 | `stab-records` | Typed batches, layouts, strict Stim result codecs, readers, writers, and sinks |
 | `stab-algebra` | Pauli, Clifford, tableau, flow, and unitary mathematics |
 | `stab-analysis` | Pure transforms, generation, circuit-to-DEM analysis, flow analysis, search, SAT, and error matching |
 | `stab-engine` | Compilers, immutable plans, mutable sessions, sampling, conversion, and typed batch delivery |
 | `stab-decoder` | Decoder model views, truth-hidden inputs, caller-owned predictions, and reusable decoder sessions |
-| `stab-kernels-simd` | Slice-level SIMD leaf kernels built on `fearless_simd` with per-call instruction-set selection, not a simulation backend |
+| `stab-kernels-simd` | Slice-level SIMD leaf kernels built on `fearless_simd` with per-call instruction-set selection, always used by `stab-bits` and `stab-algebra`, not a simulation backend |
 | `stab-core` | A small facade over the product crates |
 | `stab-cli` | The `stab` command-line binary |
 
@@ -45,7 +45,7 @@ There are no `advanced` or `experimental` tiers. Low-level APIs and extension co
 | `stab_core::CircuitError` and `CircuitResult` | The owning `ModelError`, `AnalysisError`, `StabilizerError`, `FormatError`, engine error, or decoder error |
 | `SampleFormat` | `stab_records::RecordFormat` or the root `stab_core::RecordFormat` value reexport |
 | `CapabilitySet` and facade compiler descriptors | Model, record, and engine descriptors queried from their owners |
-| Caller-selectable sampling backend preferences | Removed; scalar is the sole execution plan and portable SIMD is internal leaf acceleration |
+| Caller-selectable sampling backend preferences | Removed; scalar is the sole execution plan and SIMD is internal leaf acceleration |
 
 The CLI composes owner errors into private human or JSON diagnostics. Library callers should preserve typed owner errors or define an application-specific aggregate only where a workflow genuinely crosses domains.
 
@@ -88,16 +88,11 @@ Decoder interoperability is canonical in `stab-decoder`. The separate `stab-refe
 
 Neither seam implies dynamic plugins, runtime gate registration, GPU placeholders, or a universal compiler registry.
 
-## Portable SIMD
+## SIMD Kernels
 
-Scalar behavior is the default. Portable SIMD is additive and opt-in:
+SIMD leaf kernels are always on, and there is no Cargo feature to select them. `stab-bits` and `stab-algebra` depend on `stab-kernels-simd` unconditionally, so every consumer, direct or through `stab-core`, resolves one `stab-kernels-simd` package plus `fearless_simd` and `fearless_simd_macros`.
 
-```toml
-[dependencies]
-stab-core = { version = "=0.2.0", features = ["portable-simd"] }
-```
-
-The facade feature forwards only the algebra kernel feature it exposes. Direct `stab-bits` users enable `stab-bits/portable-simd` themselves. Feature unification still resolves one `stab-kernels-simd` package when direct and facade dependencies are combined.
+Unreleased 0.2 development revisions had an opt-in `portable-simd` feature on `stab-bits`, `stab-algebra`, `stab-engine`, `stab-core`, and `stab-cli`; it is removed without an alias, so delete `features = ["portable-simd"]` from any dependency declaration that copied it. Results are unchanged, because the kernels compute the same words as the scalar formulas they replace. The kernels select the instruction set once per call: statically on AArch64 and with a runtime check on x86-64. See [ADR 0008](architecture/adr-0008-unconditional-fearless-simd-kernels.md).
 
 ## Error Migration Example
 

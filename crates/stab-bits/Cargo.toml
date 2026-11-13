@@ -13,12 +13,8 @@ keywords.workspace = true
 [lints]
 workspace = true
 
-[features]
-default = []
-portable-simd = ["dep:stab-kernels-simd"]
-
 [dependencies]
-stab-kernels-simd = { workspace = true, optional = true }
+stab-kernels-simd = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

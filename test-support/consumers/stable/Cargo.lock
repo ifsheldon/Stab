@@ -88,6 +88,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
+name = "fearless_simd"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "629c9d6b6f30b5604089e0980f4d924a013aacb1654a6cdf5d3d852224f68651"
+
+[[package]]
+name = "fearless_simd_macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e91d94c6885390b81782d7ee60fd6583b33907333a8b340de25ccf468353315"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -220,6 +237,7 @@ dependencies = [
  "num-complex",
  "rand",
  "stab-bits",
+ "stab-kernels-simd",
  "thiserror",
 ]
 
@@ -238,6 +256,7 @@ dependencies = [
 name = "stab-bits"
 version = "0.2.0"
 dependencies = [
+ "stab-kernels-simd",
  "thiserror",
 ]
 
@@ -265,6 +284,14 @@ dependencies = [
  "stab-model",
  "stab-records",
  "thiserror",
+]
+
+[[package]]
+name = "stab-kernels-simd"
+version = "0.2.0"
+dependencies = [
+ "fearless_simd",
+ "fearless_simd_macros",
 ]
 
 [[package]]

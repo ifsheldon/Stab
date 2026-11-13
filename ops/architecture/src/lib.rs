@@ -142,7 +142,7 @@ pub enum CheckError {
     },
 }
 
-/// Checks the Cargo dependency graph and direct portable-SIMD source boundary.
+/// Checks the Cargo dependency graph, the SIMD library boundary, and product source contracts.
 pub fn check_workspace(root: &Path) -> Result<CheckReport, CheckError> {
     let root = std::fs::canonicalize(root).map_err(|source| CheckError::ResolveRoot {
         path: root.to_path_buf(),

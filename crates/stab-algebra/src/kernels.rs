@@ -1,6 +1,4 @@
-#[cfg(feature = "portable-simd")]
-use crate::StabilizerError;
-use crate::StabilizerResult;
+use crate::{StabilizerError, StabilizerResult};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct CliffordNonIdentityCounts {
@@ -30,91 +28,10 @@ pub(crate) struct CliffordPlanesMut<'a> {
 ///
 /// # Errors
 ///
-/// With `portable-simd`, a plane-length disagreement is reported as
+/// A plane-length disagreement is reported as
 /// [`StabilizerError::InconsistentCliffordStringMetadata`]: callers build every plane from the same
 /// Clifford string word count, so a mismatch means the string's planes are out of sync.
 pub(crate) fn clifford_right_multiply_words(
-    left: CliffordPlanesMut<'_>,
-    right: CliffordPlanes<'_>,
-) -> StabilizerResult<CliffordNonIdentityCounts> {
-    #[cfg(feature = "portable-simd")]
-    {
-        portable_clifford_right_multiply_words(left, right)
-    }
-    #[cfg(not(feature = "portable-simd"))]
-    {
-        Ok(scalar_clifford_right_multiply_words(left, right))
-    }
-}
-
-#[cfg(any(test, not(feature = "portable-simd")))]
-fn scalar_clifford_right_multiply_words(
-    left: CliffordPlanesMut<'_>,
-    right: CliffordPlanes<'_>,
-) -> CliffordNonIdentityCounts {
-    debug_assert!(same_plane_lengths_mut(&left));
-    debug_assert!(same_plane_lengths(&right));
-    debug_assert_eq!(left.z_signs.len(), right.z_signs.len());
-
-    let left_words = left
-        .z_signs
-        .iter_mut()
-        .zip(left.x_signs)
-        .zip(left.inv_x2x)
-        .zip(left.x2z)
-        .zip(left.z2x)
-        .zip(left.inv_z2z);
-    let right_words = right
-        .z_signs
-        .iter()
-        .zip(right.x_signs)
-        .zip(right.inv_x2x)
-        .zip(right.x2z)
-        .zip(right.z2x)
-        .zip(right.inv_z2z);
-    let mut counts = CliffordNonIdentityCounts::default();
-    for (left, right) in left_words.zip(right_words) {
-        let (((((left_z_signs, left_x_signs), left_inv_x2x), left_x2z), left_z2x), left_inv_z2z) =
-            left;
-        let (
-            ((((right_z_signs, right_x_signs), right_inv_x2x), right_x2z), right_z2x),
-            right_inv_z2z,
-        ) = right;
-        let before = [
-            *left_z_signs,
-            *left_x_signs,
-            *left_inv_x2x,
-            *left_x2z,
-            *left_z2x,
-            *left_inv_z2z,
-        ];
-        let after = clifford_product(
-            before,
-            [
-                *right_z_signs,
-                *right_x_signs,
-                *right_inv_x2x,
-                *right_x2z,
-                *right_z2x,
-                *right_inv_z2z,
-            ],
-        );
-        [
-            *left_z_signs,
-            *left_x_signs,
-            *left_inv_x2x,
-            *left_x2z,
-            *left_z2x,
-            *left_inv_z2z,
-        ] = after;
-        counts.before += non_identity_count(before);
-        counts.after += non_identity_count(after);
-    }
-    counts
-}
-
-#[cfg(feature = "portable-simd")]
-fn portable_clifford_right_multiply_words(
     left: CliffordPlanesMut<'_>,
     right: CliffordPlanes<'_>,
 ) -> StabilizerResult<CliffordNonIdentityCounts> {
@@ -154,78 +71,6 @@ fn portable_clifford_right_multiply_words(
         stab_kernels_simd::clifford_right_multiply_words(left, right)
             .map_err(|_mismatch| StabilizerError::InconsistentCliffordStringMetadata)?;
     Ok(CliffordNonIdentityCounts { before, after })
-}
-
-#[cfg(any(test, not(feature = "portable-simd")))]
-fn clifford_product(left: [u64; 6], right: [u64; 6]) -> [u64; 6] {
-    let [
-        left_z_signs,
-        left_x_signs,
-        left_inv_x2x,
-        left_x2z,
-        left_z2x,
-        left_inv_z2z,
-    ] = left;
-    let [
-        right_z_signs,
-        right_x_signs,
-        right_inv_x2x,
-        right_x2z,
-        right_z2x,
-        right_inv_z2z,
-    ] = right;
-    let inv_x2x = (left_inv_x2x | right_inv_x2x) ^ (left_z2x & right_x2z);
-    let x2z = (!right_inv_x2x & left_x2z) ^ (!left_inv_z2z & right_x2z);
-    let z2x = (!left_inv_x2x & right_z2x) ^ (!right_inv_z2z & left_z2x);
-    let inv_z2z = (left_x2z & right_z2x) ^ (left_inv_z2z | right_inv_z2z);
-    let right_x2y = !right_inv_x2x & right_x2z;
-    let right_z2y = !right_inv_z2z & right_z2x;
-    let dy = (left_x2z & left_z2x) ^ left_inv_x2x ^ left_z2x ^ left_x2z ^ left_inv_z2z;
-    let x_signs = right_x_signs
-        ^ (!right_inv_x2x & left_x_signs)
-        ^ (right_x2y & dy)
-        ^ (right_x2z & left_z_signs);
-    let z_signs = right_z_signs
-        ^ (right_z2x & left_x_signs)
-        ^ (right_z2y & dy)
-        ^ (!right_inv_z2z & left_z_signs);
-    [z_signs, x_signs, inv_x2x, x2z, z2x, inv_z2z]
-}
-
-#[cfg(any(test, not(feature = "portable-simd")))]
-fn non_identity_count(words: [u64; 6]) -> usize {
-    words
-        .into_iter()
-        .fold(0, |combined, word| combined | word)
-        .count_ones() as usize
-}
-
-#[cfg(any(test, not(feature = "portable-simd")))]
-fn same_plane_lengths(planes: &CliffordPlanes<'_>) -> bool {
-    let len = planes.z_signs.len();
-    [
-        planes.x_signs,
-        planes.inv_x2x,
-        planes.x2z,
-        planes.z2x,
-        planes.inv_z2z,
-    ]
-    .into_iter()
-    .all(|plane| plane.len() == len)
-}
-
-#[cfg(any(test, not(feature = "portable-simd")))]
-fn same_plane_lengths_mut(planes: &CliffordPlanesMut<'_>) -> bool {
-    let len = planes.z_signs.len();
-    [
-        &*planes.x_signs,
-        &*planes.inv_x2x,
-        &*planes.x2z,
-        &*planes.z2x,
-        &*planes.inv_z2z,
-    ]
-    .into_iter()
-    .all(|plane| plane.len() == len)
 }
 
 pub(crate) struct PauliWordProduct {
@@ -268,8 +113,8 @@ pub(crate) fn pauli_right_multiply_words(
     }
 }
 
-#[cfg(all(test, feature = "portable-simd"))]
-mod portable_tests {
+#[cfg(test)]
+mod tests {
     #![allow(
         clippy::cast_possible_truncation,
         clippy::unwrap_used,
@@ -278,26 +123,160 @@ mod portable_tests {
 
     use super::*;
 
+    /// Independent scalar reference for the SIMD Clifford kernel.
+    fn scalar_clifford_right_multiply_words(
+        left: CliffordPlanesMut<'_>,
+        right: CliffordPlanes<'_>,
+    ) -> CliffordNonIdentityCounts {
+        debug_assert!(same_plane_lengths_mut(&left));
+        debug_assert!(same_plane_lengths(&right));
+        debug_assert_eq!(left.z_signs.len(), right.z_signs.len());
+
+        let left_words = left
+            .z_signs
+            .iter_mut()
+            .zip(left.x_signs)
+            .zip(left.inv_x2x)
+            .zip(left.x2z)
+            .zip(left.z2x)
+            .zip(left.inv_z2z);
+        let right_words = right
+            .z_signs
+            .iter()
+            .zip(right.x_signs)
+            .zip(right.inv_x2x)
+            .zip(right.x2z)
+            .zip(right.z2x)
+            .zip(right.inv_z2z);
+        let mut counts = CliffordNonIdentityCounts::default();
+        for (left, right) in left_words.zip(right_words) {
+            let (
+                ((((left_z_signs, left_x_signs), left_inv_x2x), left_x2z), left_z2x),
+                left_inv_z2z,
+            ) = left;
+            let (
+                ((((right_z_signs, right_x_signs), right_inv_x2x), right_x2z), right_z2x),
+                right_inv_z2z,
+            ) = right;
+            let before = [
+                *left_z_signs,
+                *left_x_signs,
+                *left_inv_x2x,
+                *left_x2z,
+                *left_z2x,
+                *left_inv_z2z,
+            ];
+            let after = clifford_product(
+                before,
+                [
+                    *right_z_signs,
+                    *right_x_signs,
+                    *right_inv_x2x,
+                    *right_x2z,
+                    *right_z2x,
+                    *right_inv_z2z,
+                ],
+            );
+            [
+                *left_z_signs,
+                *left_x_signs,
+                *left_inv_x2x,
+                *left_x2z,
+                *left_z2x,
+                *left_inv_z2z,
+            ] = after;
+            counts.before += non_identity_count(before);
+            counts.after += non_identity_count(after);
+        }
+        counts
+    }
+
+    fn clifford_product(left: [u64; 6], right: [u64; 6]) -> [u64; 6] {
+        let [
+            left_z_signs,
+            left_x_signs,
+            left_inv_x2x,
+            left_x2z,
+            left_z2x,
+            left_inv_z2z,
+        ] = left;
+        let [
+            right_z_signs,
+            right_x_signs,
+            right_inv_x2x,
+            right_x2z,
+            right_z2x,
+            right_inv_z2z,
+        ] = right;
+        let inv_x2x = (left_inv_x2x | right_inv_x2x) ^ (left_z2x & right_x2z);
+        let x2z = (!right_inv_x2x & left_x2z) ^ (!left_inv_z2z & right_x2z);
+        let z2x = (!left_inv_x2x & right_z2x) ^ (!right_inv_z2z & left_z2x);
+        let inv_z2z = (left_x2z & right_z2x) ^ (left_inv_z2z | right_inv_z2z);
+        let right_x2y = !right_inv_x2x & right_x2z;
+        let right_z2y = !right_inv_z2z & right_z2x;
+        let dy = (left_x2z & left_z2x) ^ left_inv_x2x ^ left_z2x ^ left_x2z ^ left_inv_z2z;
+        let x_signs = right_x_signs
+            ^ (!right_inv_x2x & left_x_signs)
+            ^ (right_x2y & dy)
+            ^ (right_x2z & left_z_signs);
+        let z_signs = right_z_signs
+            ^ (right_z2x & left_x_signs)
+            ^ (right_z2y & dy)
+            ^ (!right_inv_z2z & left_z_signs);
+        [z_signs, x_signs, inv_x2x, x2z, z2x, inv_z2z]
+    }
+
+    fn non_identity_count(words: [u64; 6]) -> usize {
+        words
+            .into_iter()
+            .fold(0, |combined, word| combined | word)
+            .count_ones() as usize
+    }
+
+    fn same_plane_lengths(planes: &CliffordPlanes<'_>) -> bool {
+        let len = planes.z_signs.len();
+        [
+            planes.x_signs,
+            planes.inv_x2x,
+            planes.x2z,
+            planes.z2x,
+            planes.inv_z2z,
+        ]
+        .into_iter()
+        .all(|plane| plane.len() == len)
+    }
+
+    fn same_plane_lengths_mut(planes: &CliffordPlanesMut<'_>) -> bool {
+        let len = planes.z_signs.len();
+        [
+            &*planes.x_signs,
+            &*planes.inv_x2x,
+            &*planes.x2z,
+            &*planes.z2x,
+            &*planes.inv_z2z,
+        ]
+        .into_iter()
+        .all(|plane| plane.len() == len)
+    }
+
     #[test]
-    fn portable_clifford_kernel_matches_scalar_across_blocks_and_tails() {
+    fn simd_clifford_kernel_matches_scalar_across_blocks_and_tails() {
         for word_count in [0_usize, 1, 3, 4, 5, 8, 9] {
             let left = raw_planes(word_count, 3);
             let right = raw_planes(word_count, 41);
             let mut scalar = left.clone();
-            let mut portable = left;
+            let mut simd = left;
 
             let scalar_counts = scalar_clifford_right_multiply_words(
                 mutable_planes(&mut scalar),
                 immutable_planes(&right),
             );
-            let portable_counts = portable_clifford_right_multiply_words(
-                mutable_planes(&mut portable),
-                immutable_planes(&right),
-            )
-            .unwrap();
+            let simd_counts =
+                clifford_right_multiply_words(mutable_planes(&mut simd), immutable_planes(&right))
+                    .unwrap();
 
-            assert_eq!(portable, scalar, "word_count={word_count}");
-            assert_eq!(portable_counts, scalar_counts, "word_count={word_count}");
+            assert_eq!(simd, scalar, "word_count={word_count}");
+            assert_eq!(simd_counts, scalar_counts, "word_count={word_count}");
         }
     }
 

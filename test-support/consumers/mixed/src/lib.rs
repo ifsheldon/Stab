@@ -1,11 +1,11 @@
-//! Mixed direct-component and facade consumer used to check feature unification.
+//! Mixed direct-component and facade consumer used to check that both paths share one kernel package.
 
 use std::error::Error;
 
 use stab_algebra::{CliffordString, SingleQubitClifford};
 use stab_bits::BitVec;
 
-pub fn exercise_unified_portable_dependencies() -> Result<(usize, usize), Box<dyn Error>> {
+pub fn exercise_unified_dependencies() -> Result<(usize, usize), Box<dyn Error>> {
     let mut direct_bits = BitVec::from_words_truncated(256, vec![1; 4]);
     let right = BitVec::from_words_truncated(256, vec![2; 4]);
     direct_bits.xor_assign(&right.as_bitslice())?;
@@ -24,7 +24,10 @@ pub fn exercise_unified_portable_dependencies() -> Result<(usize, usize), Box<dy
         return Err(std::io::Error::other("facade and owner transform outputs differ").into());
     }
 
-    Ok((direct_bits.len(), direct_clifford.len() + facade_clifford.len()))
+    Ok((
+        direct_bits.len(),
+        direct_clifford.len() + facade_clifford.len(),
+    ))
 }
 
 #[cfg(test)]
@@ -32,7 +35,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn direct_and_facade_dependencies_share_portable_features() {
-        assert_eq!(exercise_unified_portable_dependencies().unwrap(), (256, 512));
+    fn direct_and_facade_dependencies_resolve_together() {
+        assert_eq!(exercise_unified_dependencies().unwrap(), (256, 512));
     }
 }

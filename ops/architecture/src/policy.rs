@@ -49,12 +49,14 @@ pub(crate) const PRODUCT_PACKAGE_CONTRACTS: &[ProductPackageContract] = &[
             "stab-records",
         ],
     ),
-    ProductPackageContract::nightly("stab-kernels-simd", &[], &[]),
+    ProductPackageContract::stable("stab-kernels-simd", &[]),
     ProductPackageContract::stable("stab-model", &[]),
     ProductPackageContract::stable("stab-records", &["stab-bits"]),
 ];
 const STABLE_TEST_SUPPORT_PACKAGES: &[&str] =
     &["stab-reference-decoder", "stab-reference-noise-pass"];
+const SIMD_KERNEL_PACKAGE: &str = "stab-kernels-simd";
+const SIMD_LIBRARY_PACKAGES: &[&str] = &["fearless_simd", "fearless_simd_macros"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ProductPackageContract {
@@ -125,7 +127,6 @@ impl DependencyKind {
 pub struct PackageSpec {
     pub name: String,
     pub relative_path: PathBuf,
-    pub default_features: Vec<String>,
     pub rust_version: Option<Version>,
     pub version: Version,
     pub publish: Option<Vec<String>>,
@@ -212,7 +213,7 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
                 validate_product_identity(package, &mut violations);
                 validate_product_publication(package, &mut violations);
                 if is_stable_component(&package.name) {
-                    validate_stable_source_package(package, &mut violations);
+                    validate_stable_rust_version(package, &mut violations);
                 }
             }
             PackageClass::Ops if package_is_publishable(package) => {
@@ -237,7 +238,7 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
                     ));
                 }
                 if STABLE_TEST_SUPPORT_PACKAGES.contains(&package.name.as_str()) {
-                    validate_stable_source_package(package, &mut violations);
+                    validate_stable_rust_version(package, &mut violations);
                 }
             }
             PackageClass::Ops | PackageClass::Unclassified => {}
@@ -245,6 +246,23 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
     }
 
     for dependency in &graph.resolved_dependencies {
+        if SIMD_LIBRARY_PACKAGES.contains(&dependency.to_package.as_str())
+            && dependency.from_package != SIMD_KERNEL_PACKAGE
+        {
+            violations.push(Violation::new(
+                "simd-library-outside-kernel",
+                format!(
+                    "{} package {} ({}) depends on {} ({}) as {}; only {} may depend on the SIMD library",
+                    dependency.kind.as_str(),
+                    dependency.from_package,
+                    dependency.from_package_id,
+                    dependency.to_package,
+                    dependency.to_package_id,
+                    dependency.dependency_name,
+                    SIMD_KERNEL_PACKAGE,
+                ),
+            ));
+        }
         if product_contract(&dependency.to_package).is_some()
             && !resolves_to_local_product_package(dependency, &packages)
         {
@@ -380,23 +398,6 @@ pub(super) fn validate_graph(graph: &WorkspaceGraph) -> PolicyReport {
                     edge.from,
                     edge.kind.as_str(),
                     edge.to
-                ),
-            ));
-            continue;
-        }
-        if to_class == PackageClass::Product
-            && edge.to == "stab-kernels-simd"
-            && matches!(edge.from.as_str(), "stab-bits" | "stab-algebra")
-            && (edge.kind != DependencyKind::Normal || !edge.optional)
-        {
-            violations.push(Violation::new(
-                "nightly-kernel-edge-not-optional",
-                format!(
-                    "{} -> {} must be an optional normal dependency, found {} optional={}",
-                    edge.from,
-                    edge.to,
-                    edge.kind.as_str(),
-                    edge.optional
                 ),
             ));
             continue;
@@ -539,23 +540,6 @@ fn validate_stable_rust_version(package: &PackageSpec, violations: &mut Vec<Viol
     ));
 }
 
-fn validate_stable_source_package(package: &PackageSpec, violations: &mut Vec<Violation>) {
-    validate_stable_rust_version(package, violations);
-    if package
-        .default_features
-        .iter()
-        .any(|feature| feature.contains("portable-simd"))
-    {
-        violations.push(Violation::new(
-            "stable-default-reaches-nightly",
-            format!(
-                "Stable source package {} enables portable SIMD through default features {:?}",
-                package.name, package.default_features
-            ),
-        ));
-    }
-}
-
 fn package_is_publishable(package: &PackageSpec) -> bool {
     !matches!(&package.publish, Some(registries) if registries.is_empty())
 }
@@ -592,7 +576,6 @@ mod tests {
         PackageSpec {
             name: name.to_owned(),
             relative_path: PathBuf::from(prefix).join(name),
-            default_features: Vec::new(),
             rust_version: is_stable_source_package(name).then(stable_rust_version),
             version: Version::new(0, 2, 0),
             publish: if prefix == "crates" {
@@ -624,7 +607,6 @@ mod tests {
             PackageSpec {
                 name: "stab-compat-corpus".to_owned(),
                 relative_path: PathBuf::from("test-support/compat-corpus"),
-                default_features: Vec::new(),
                 rust_version: None,
                 version: Version::new(0, 2, 0),
                 publish: Some(Vec::new()),
@@ -857,23 +839,6 @@ mod tests {
     }
 
     #[test]
-    fn stable_component_defaults_cannot_reach_portable_simd() {
-        let mut bits = package("stab-bits", "crates");
-        bits.default_features = vec!["portable-simd".to_owned()];
-        let report = validate_graph(&graph(vec![bits]));
-
-        assert_eq!(report.violations.len(), 1);
-        assert_eq!(
-            report
-                .violations
-                .first()
-                .expect("portable default should produce one violation")
-                .code,
-            "stable-default-reaches-nightly"
-        );
-    }
-
-    #[test]
     fn stable_components_require_the_exact_rust_version() {
         for contract in PRODUCT_PACKAGE_CONTRACTS
             .iter()
@@ -906,7 +871,7 @@ mod tests {
     }
 
     #[test]
-    fn stable_reference_proofs_require_exact_msrv_and_scalar_defaults() {
+    fn stable_reference_proofs_require_exact_msrv() {
         for proof_package in STABLE_TEST_SUPPORT_PACKAGES {
             let valid = graph(vec![package(proof_package, "test-support")]);
             assert!(validate_graph(&valid).violations.is_empty());
@@ -923,19 +888,92 @@ mod tests {
                         && violation.message.contains(proof_package)
                 }));
             }
+        }
+    }
 
-            let mut nightly_default = valid;
-            nightly_default
-                .packages
-                .first_mut()
-                .expect("reference package")
-                .default_features = vec!["portable-simd".to_owned()];
-            assert!(
-                validate_graph(&nightly_default)
-                    .violations
-                    .iter()
-                    .any(|violation| violation.code == "stable-default-reaches-nightly")
-            );
+    fn simd_library_dependency(
+        from_package: &str,
+        dependency_name: &str,
+        to_package: &str,
+        kind: DependencyKind,
+    ) -> ResolvedDependencyIdentity {
+        ResolvedDependencyIdentity {
+            from_package: from_package.to_owned(),
+            from_package_id: format!("path+file:///workspace/crates/{from_package}#0.2.0"),
+            dependency_name: dependency_name.to_owned(),
+            to_package: to_package.to_owned(),
+            to_package_id: format!(
+                "registry+https://github.com/rust-lang/crates.io-index#{to_package}@1.2.0"
+            ),
+            to_workspace_package: None,
+            kind,
+        }
+    }
+
+    #[test]
+    fn only_the_kernel_crate_may_depend_on_the_simd_library() {
+        let packages = vec![
+            package("stab-kernels-simd", "crates"),
+            package("stab-bits", "crates"),
+            package("stab-architecture", "ops"),
+        ];
+        let mut valid = graph(packages.clone());
+        valid.resolved_dependencies = SIMD_LIBRARY_PACKAGES
+            .iter()
+            .map(|library| {
+                simd_library_dependency(
+                    "stab-kernels-simd",
+                    library,
+                    library,
+                    DependencyKind::Normal,
+                )
+            })
+            .collect();
+        assert!(validate_graph(&valid).violations.is_empty());
+
+        for (from_package, dependency_name, to_package, kind) in [
+            (
+                "stab-bits",
+                "fearless_simd",
+                "fearless_simd",
+                DependencyKind::Normal,
+            ),
+            (
+                "stab-bits",
+                "simd",
+                "fearless_simd",
+                DependencyKind::Development,
+            ),
+            (
+                "stab-bits",
+                "fearless_simd_macros",
+                "fearless_simd_macros",
+                DependencyKind::Build,
+            ),
+            (
+                "stab-architecture",
+                "fearless_simd",
+                "fearless_simd",
+                DependencyKind::Development,
+            ),
+        ] {
+            let mut invalid = graph(packages.clone());
+            invalid.resolved_dependencies.push(simd_library_dependency(
+                from_package,
+                dependency_name,
+                to_package,
+                kind,
+            ));
+            let report = validate_graph(&invalid);
+            let [violation] = report.violations.as_slice() else {
+                panic!(
+                    "expected one SIMD library violation: {:?}",
+                    report.violations
+                );
+            };
+            assert_eq!(violation.code, "simd-library-outside-kernel");
+            assert!(violation.message.contains(from_package));
+            assert!(violation.message.contains(to_package));
         }
     }
 

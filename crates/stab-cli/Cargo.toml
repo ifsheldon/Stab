@@ -12,10 +12,6 @@ keywords.workspace = true
 [lints]
 workspace = true
 
-[features]
-default = []
-portable-simd = ["stab-bits/portable-simd", "stab-engine/portable-simd"]
-
 [dependencies]
 clap = { workspace = true }
 same-file = { workspace = true }

@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 const PREFIX: &str = "stab-architecture";
 
 #[derive(Debug, Parser)]
-#[command(about = "Checks Stab's Cargo dependency and SIMD source boundaries.")]
+#[command(about = "Checks Stab's Cargo dependency, SIMD library, and source boundaries.")]
 struct Cli {
     #[arg(long, default_value = ".")]
     root: PathBuf,
@@ -21,7 +21,7 @@ struct Cli {
 enum Command {
     /// Validate the current workspace against the target product architecture.
     Check,
-    /// Validate external Stable, Nightly, and mixed feature consumers.
+    /// Validate external Stable component, facade, and mixed direct-component consumers.
     ConsumerCheck,
     /// Validate repository-owned Markdown links and heading anchors.
     DocsCheck,

@@ -11,10 +11,6 @@ publish = false
 [lints]
 workspace = true
 
-[features]
-default = []
-portable-simd = ["stab-core/portable-simd"]
-
 [dependencies]
 clap = { workspace = true }
 csv = { workspace = true }

@@ -75,11 +75,6 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
 }
 
 pub(crate) fn run(root: &RepoRoot, args: RunArgs) -> Result<(), BenchError> {
-    if !cfg!(feature = "portable-simd") {
-        return Err(BenchError::E2e(
-            "e2e-run requires stab-bench's portable-simd feature".to_string(),
-        ));
-    }
     if args.tier != Tier::Smoke && args.allow_dirty {
         return Err(BenchError::E2e(
             "--allow-dirty is available only for smoke diagnostics".to_string(),
@@ -288,14 +283,7 @@ fn build_binaries(root: &RepoRoot, loaded: &LoadedSuite) -> Result<Binaries, Ben
     ensure_stim_cli(root, &stim_source)?;
     run_checked_status(
         "cargo",
-        [
-            "build",
-            "--release",
-            "-p",
-            "stab-cli",
-            "--features",
-            "portable-simd",
-        ],
+        ["build", "--release", "-p", "stab-cli"],
         &root.path,
     )?;
     let stab = root

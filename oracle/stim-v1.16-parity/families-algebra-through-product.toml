@@ -1030,7 +1030,7 @@ area = "product-surface"
 contract = "Stab exposes a measured GPU execution backend for batch-parallel workloads."
 stim_refs = ["src/stim/simulators/frame_simulator.h"]
 status = "deferred"
-rationale = "GPU execution is explicitly deferred; CPU execution and portable SIMD leaf kernels remain the current target."
+rationale = "GPU execution is explicitly deferred; CPU execution and SIMD leaf kernels remain the current target."
 
 [[families]]
 id = "product-surface.javascript-wasm-bindings"

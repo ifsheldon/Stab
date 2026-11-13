@@ -1,7 +1,5 @@
 //! Stable packed bit storage, checked views, scalar kernels, and layout primitives.
 
-#[cfg(feature = "portable-simd")]
-mod portable;
 mod scalar;
 mod transpose;
 
@@ -831,16 +829,15 @@ fn checked_range(start: usize, bit_count: usize, len: usize) -> BitResult<()> {
     Ok(())
 }
 
+/// XORs equal-length word slices through the slice-level SIMD kernel.
+///
+/// Callers have already checked equal bit lengths, so a word-length disagreement here is an
+/// internal invariant violation; it is reported as the mismatched bit capacities.
 fn xor_assign_word_slices(lhs: &mut [u64], rhs: &[u64]) -> BitResult<()> {
-    #[cfg(feature = "portable-simd")]
-    {
-        portable::xor_assign_words(lhs, rhs)
-    }
-    #[cfg(not(feature = "portable-simd"))]
-    {
-        scalar::xor_assign_words(lhs, rhs);
-        Ok(())
-    }
+    stab_kernels_simd::xor_assign_words(lhs, rhs).map_err(|mismatch| BitError::LengthMismatch {
+        left: mismatch.expected.saturating_mul(WORD_BITS),
+        right: mismatch.actual.saturating_mul(WORD_BITS),
+    })
 }
 
 fn ensure_same_bit_len(left: usize, right: usize) -> BitResult<()> {
@@ -878,5 +875,34 @@ fn low_bits_mask(bit_count: usize) -> u64 {
 fn mask_unused_tail_bits(words: &mut [u64], bit_len: BitLen) {
     if let Some(last) = words.last_mut() {
         *last &= bit_len.last_word_mask();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::cast_possible_truncation,
+        clippy::unwrap_used,
+        reason = "bounded differential fixtures rotate by small word indexes"
+    )]
+
+    use super::*;
+
+    #[test]
+    fn simd_xor_matches_scalar_across_blocks_and_tails() {
+        for word_count in 0..=2 * BIT_BLOCK_WORDS + 1 {
+            let left = (0..word_count)
+                .map(|index| 0x5555_aaaa_1234_5678_u64.rotate_left(index as u32))
+                .collect::<Vec<_>>();
+            let right = (0..word_count)
+                .map(|index| 0xf0f0_0f0f_9876_5432_u64.rotate_right(index as u32))
+                .collect::<Vec<_>>();
+
+            let mut simd = left.clone();
+            let mut reference = left;
+            xor_assign_word_slices(&mut simd, &right).unwrap();
+            scalar::xor_assign_words(&mut reference, &right);
+            assert_eq!(simd, reference);
+        }
     }
 }

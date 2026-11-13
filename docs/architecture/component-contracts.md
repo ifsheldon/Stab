@@ -63,14 +63,14 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 
 - Purpose: own Stable packed bit storage, checked views, scalar kernels, and bit-matrix layouts.
 - Inputs and outputs: typed bit vectors, slices, blocks, matrices, and `BitError`.
-- Invariants: logical widths are explicit, unused tail bits are masked at owned boundaries, checked operations reject width and range mismatches before mutation, and optional acceleration cannot change scalar semantics.
-- Dependencies: standard-library support plus the optional dependency-free raw SIMD kernel crate behind `portable-simd`.
+- Invariants: logical widths are explicit, unused tail bits are masked at owned boundaries, checked operations reject width and range mismatches before mutation, and the SIMD kernel computes exactly the scalar XOR formula.
+- Dependencies: standard-library support plus the mandatory raw SIMD kernel crate `stab-kernels-simd`.
 - Forbidden: model, records, algebra, analysis, engine, facade, CLI, and ops.
 - Resource behavior: owned storage is proportional to declared logical width or matrix shape; in-place kernels allocate nothing after construction.
 - Extension points: checked packed storage and allocation-free in-place operations. New raw acceleration remains private to the selected implementation boundary until a measured caller proves it.
-- Conformance tests: scalar references, tails, dirty padding, empty and block boundaries, unequal-width rejection without mutation, transpose semantics, allocation counts, and default-versus-portable feature runs.
+- Conformance tests: scalar references, SIMD-versus-scalar XOR differentials, tails, dirty padding, empty and block boundaries, unequal-width rejection without mutation, transpose semantics, and allocation counts.
 - Benchmarks: dense XOR, not-zero, popcount, and transpose workloads with pinned Stim comparators where faithful; scalar-versus-SIMD diagnostics apply only to kernels whose executed path changes.
-- Files changed together: bit source and tests, optional feature maps, raw kernel sources, architecture checks, qualification ownership, runtime contracts, profiler notes, and Stable/Nightly matrix documentation.
+- Files changed together: bit source and tests, raw kernel sources, architecture checks, qualification ownership, runtime contracts, profiler notes, and toolchain documentation.
 
 ### Records
 
@@ -90,26 +90,26 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Purpose: own Pauli, Clifford, Tableau, and Flow mathematics.
 - Inputs and outputs: algebraic values and typed algebra errors.
 - Invariants: exact phase, sign, commutation, composition, and resource admission.
-- Dependencies: packed bit storage, plus an optional raw SIMD kernel edge selected only on Nightly.
+- Dependencies: packed bit storage plus the mandatory raw SIMD kernel crate `stab-kernels-simd`.
 - Forbidden: Stim parsing, CLI, ops.
-- Resource behavior: scalar stable defaults with bounded construction and optional Nightly acceleration above storage kernels.
+- Resource behavior: bounded construction, with Clifford right multiplication running through the allocation-free SIMD kernel.
 - Extension points: pure functions and owned values.
 - Conformance tests: exact Pauli phase and commutation laws, all valid Clifford products, tableau composition and inversion, flow semantics, width and resource rejection, scalar-versus-SIMD equivalence, allocation bounds, and external Stable consumers.
 - Benchmarks: Pauli, Clifford, tableau, and flow phases with exact semantic witnesses, including scalar-versus-SIMD diagnostics only for kernels whose executed path changes and pinned-Stim comparators where faithful.
-- Files changed together: algebra source and tests, bits and optional kernel feature maps, facade value reexports, analysis and engine callers, parity ownership, affected runtime contracts and profiler notes, and Stable/Nightly documentation.
+- Files changed together: algebra source and tests, bits and kernel sources, facade value reexports, analysis and engine callers, parity ownership, affected runtime contracts and profiler notes, and toolchain documentation.
 
 ### SIMD Kernels
 
-- Purpose: own the complete Nightly and direct portable-SIMD boundary.
-- Inputs and outputs: fixed four-word blocks and fixed arrays of raw Clifford bit planes.
-- Invariants: no Stab domain dependency, exact scalar-equivalent XOR and Clifford composition, no tail policy, no allocation, and no backend registration.
-- Dependencies: standard library only.
+- Purpose: own the only dependency on `fearless_simd` and every SIMD word kernel, as recorded in [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md).
+- Inputs and outputs: raw word slices and slices of raw Clifford bit planes, with typed length-mismatch errors.
+- Invariants: no Stab domain dependency, exact scalar-equivalent XOR and Clifford composition, instruction-set selection once per call and never inside a word loop, no logical tail policy, no allocation, and no backend registration.
+- Dependencies: `fearless_simd` and `fearless_simd_macros` only.
 - Forbidden: every Stab product crate, model value, record layout, execution plan, CLI type, and ops descriptor.
-- Resource behavior: constant stack scratch over fixed arrays; callers own block iteration, scalar tails, logical tail masking, width validation, and allocation policy.
+- Resource behavior: constant stack scratch; the kernel owns chunking, word tails, and non-identity counting, while callers own logical tail masking, width validation, and allocation policy.
 - Extension points: new kernels are added only after a production caller, independent scalar reference, focused semantic tests, and source-current performance evidence exist.
-- Conformance tests: raw fixed-block differential formulas, public boundary and tail tests in the owning Stable crate, all 24-by-24 valid Clifford products, exact metadata counts, and warmed zero-allocation mutation.
-- Benchmarks: scalar-versus-SIMD dense XOR and non-identity Clifford right multiplication, followed by the existing Stim-relative parity rows for the selected build.
-- Files changed together: kernel source and manifest, owning Stable feature maps, architecture checks, qualification ownership, affected profiler notes, feature-aware worker identity, and architecture documentation.
+- Conformance tests: differential tests against an independent scalar reference at every instruction-set level the host can construct plus the forced fallback, public boundary and tail tests in the owning Stable crates, all 24-by-24 valid Clifford products, exact metadata counts, and warmed zero-allocation mutation.
+- Benchmarks: SIMD-versus-scalar dense XOR and non-identity Clifford right multiplication as diagnostics, followed by the existing Stim-relative parity rows.
+- Files changed together: kernel source and manifest, the `stab-bits` and `stab-algebra` callers, architecture checks, qualification ownership, affected profiler notes, and architecture documentation.
 
 ### Engine
 
@@ -156,10 +156,10 @@ List source descriptors, generated files, docs, tests, and benchmark metadata th
 - Inputs and outputs: common owned model, algebra, decoder, and record values plus direct `analysis`, `decoder`, and `execution` component namespaces.
 - Invariants: every root value is inventory-owned, namespace aliases preserve component type identity, and the facade owns no algorithm, duplicate model, universal error, backend registry, codec, or low-level storage API.
 - Dependencies: records, algebra, model, analysis, engine, and decoder.
-- Forbidden: CLI, bits as a direct facade surface, ops, test-support runtime dependencies, direct portable-SIMD imports, forwarding modules, and compatibility adapters.
+- Forbidden: CLI, bits as a direct facade surface, ops, test-support runtime dependencies, direct SIMD library dependencies, forwarding modules, and compatibility adapters.
 - Resource behavior: the facade performs no runtime work and retains no operation output or execution scratch.
 - Extension points: none. Circuit passes and decoder sessions are exposed by their owner crates and their direct facade namespaces.
-- Conformance tests: exact root inventory, forbidden escape routes, executable scalar and portable external consumers, direct/facade type identity through real workflows, and feature isolation.
+- Conformance tests: exact root inventory, forbidden escape routes, executable facade and mixed external consumers, direct/facade type identity through real workflows, and exactly one resolved kernel package.
 - Benchmarks: none. Component and CLI workflows are measured at their actual public boundary.
 - Files changed together: `stab-core` exports, `ops/architecture/facade-root-reexports.txt`, architecture policy and tests, external consumers, README, and migration documentation.
 
@@ -194,11 +194,11 @@ Nested `tests.rs` and resource-test modules inherit the owner of their parent so
 | `crates/stab-engine/src/fingerprint.rs`, `probability.rs`, `bernoulli.rs`, `sampling/mod.rs`, `sampling/**`, `sampling_estimate.rs`, `detection/mod.rs`, `detection/**`, `dem_sampling/mod.rs`, `dem_sampling/**`, `reference_sample_tree.rs`, `sampled_flow.rs` | Engine | Backend-neutral request identity, execution-side biased randomization, sampling request estimates, sampling, detection, and DEM capability descriptors, compilation, immutable plans, owned mutable sessions, direct-Z, reusable bit-plane Pauli-frame, general-frame reference and fallback execution, deterministic reference samples, measurement-to-detection conversion, direct detector-frame sampling, lowered folded DEM execution, detector-only and sampled-error DEM sampling, owned reusable replay state, bounded reference-sample trees, sampled-flow execution, cancellation, progress, poisoning, and typed measurement, detection, or DEM-sample delivery are physically engine-owned. Sampling and detection share one generic bit-plane Pauli-frame execution owner: detection and sweep paths retain 64-bit lanes, while circuit sampling uses the wider packed block owned by `stab-bits`. DEM sampling similarly applies deterministic counter-keyed Bernoulli masks directly to bounded word-major output planes, while replay keeps the scalar error-record path because its records are caller-owned. Incremental conversion and replay use short-lived transactions that bind exactly one sink across writes and finalization; reusable plans and sessions retain no caller borrow. The engine imports bits, model, records, algebra, and analysis but no facade, codec, filesystem, CLI, or ops API. Its crate root is the sole canonical public execution namespace. |
 | `crates/stab-decoder/src/**` | Decoder | Stable truth-hidden detector input, model and layout views, caller-owned prediction prefixes, cancellation, preflight, progress, implementation failures, contract validation, and static `DecoderSession` dispatch are physically decoder-owned. Compilation and retained decoder representations remain implementation-specific. |
 | `test-support/reference-decoder/src/**` | External decoder proof | The unpublished exact-ML implementation consumes only public Stable model, records, and decoder APIs at runtime. Its fixed workspace, pair-update, and limb-weighted work limits, directed-interval probability program with exact-dyadic posterior certification, allocator-measured one-byte-per-syndrome retained table, and allocation-free reused decode prove the common seam without becoming product or CLI behavior; analysis and engine are test-only experiment dependencies. |
-| `test-support/reference-noise-pass/src/**` | External circuit-pass proof | The unpublished deterministic X-noise insertion pass consumes only public Stable analysis and model APIs. It projects inserted item, target, argument, and logical payload growth before allocation, recursively preserves the original closed-dialect structure and opaque metadata, inserts validated `X_ERROR` instructions after eligible represented single-target unitary instructions, returns a typed report, and proves the pass seam without depending on the facade, engine, CLI, ops, Nightly, portable SIMD, or a runtime registry. |
+| `test-support/reference-noise-pass/src/**` | External circuit-pass proof | The unpublished deterministic X-noise insertion pass consumes only public Stable analysis and model APIs. It projects inserted item, target, argument, and logical payload growth before allocation, recursively preserves the original closed-dialect structure and opaque metadata, inserts validated `X_ERROR` instructions after eligible represented single-target unitary instructions, returns a typed report, and proves the pass seam without depending on the facade, engine, CLI, ops, Nightly, or a runtime registry. |
 | `crates/stab-core/src/lib.rs` | Facade | Aliases `analysis`, `decoder`, and `execution` directly to their component crates and reexports the source-owned root inventory checked by `ops/architecture/facade-root-reexports.txt`. It contains no public modules, algorithms, universal errors, or low-level tiers. |
-| `crates/stab-bits/src/**` | Bits | Stable Rust 1.97.1 packed storage, checked views, scalar kernels, and transpose implementation are physically extracted. The optional `portable-simd` feature reaches only the dependency-free raw kernel crate and replaces complete four-word XOR blocks while retaining scalar tails and logical tail masking locally. |
-| `crates/stab-algebra/src/**` | Algebra | Stable Pauli, Clifford, tableau, flow, conversion, error, resource, and scalar quantum-word implementations are physically extracted. The crate depends on `stab-bits` and optionally on the raw kernel crate. Low-level unchecked construction used by admitted analysis and execution algorithms is isolated under `stab_algebra::advanced`; the optional feature replaces complete four-word Clifford composition blocks while retaining scalar tails, public metadata, and resource policy locally. |
-| `crates/stab-kernels-simd/src/**` | SIMD kernels | The dependency-free Nightly crate owns the only direct portable-SIMD feature gate and imports. Its first surface is fixed-block XOR plus Clifford right multiplication with before-and-after non-identity masks; it owns no Stab types, logical tails, allocation, or sampling backend policy. |
+| `crates/stab-bits/src/**` | Bits | Stable Rust 1.97.1 packed storage, checked views, scalar word operations, and transpose implementation are physically extracted. Whole-slice XOR always runs through the raw kernel crate, while the single-block XOR, masked XOR, and logical tail masking stay scalar and local. |
+| `crates/stab-algebra/src/**` | Algebra | Stable Pauli, Clifford, tableau, flow, conversion, error, resource, and scalar quantum-word implementations are physically extracted. The crate depends on `stab-bits` and the raw kernel crate. Low-level unchecked construction used by admitted analysis and execution algorithms is isolated under `stab_algebra::advanced`; Clifford right multiplication always runs through the raw kernel, while public metadata and resource policy stay local. |
+| `crates/stab-kernels-simd/src/**` | SIMD kernels | The Stable Rust 1.97.1 crate owns the only `fearless_simd` dependency. Its surface is slice-level XOR plus Clifford right multiplication with before-and-after non-identity counts; it owns no Stab types, logical tails, allocation, or sampling backend policy. |
 | `crates/stab-records/src/**` | Records | Stable Rust 1.97.1 strict codecs, typed semantic widths, shot-major and 64-shot bit-plane batches, correction-typed mutable prediction prefixes, typed DETS layouts, bounded visitors, and measurement, detection, and DEM-sample sinks are physically owned here. Shared text and packed decoders own grammar and length diagnostics so materialized and streaming consumers cannot drift. The CLI and facade consume these APIs directly rather than through adapters. |
 | `crates/stab-analysis/src/dem/search.rs`, `dem/search/**` | Analysis | These consume the model-owned folded traversal boundary and physically own compact detector indexing, bounded error-mechanism traversal, graphlike and hypergraph search, and operation-specific traversal, graph, hyperedge, and frontier resource policies. |
 | `crates/stab-analysis/src/error_matcher.rs`, `error_matcher/**`, `matched_error.rs` | Analysis | These physically own pure error matching, compact filter traversal, resource admission, canonical provenance values, ordering, and diagnostic formatting; simulator-backed sampled-flow checks remain execution-owned. |

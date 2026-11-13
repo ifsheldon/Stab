@@ -13,10 +13,6 @@ keywords.workspace = true
 [lints]
 workspace = true
 
-[features]
-default = []
-portable-simd = ["stab-bits/portable-simd"]
-
 [dependencies]
 arrayvec = { workspace = true }
 hex = { workspace = true }

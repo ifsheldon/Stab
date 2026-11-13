@@ -687,9 +687,8 @@ mod tests {
         assert_eq!(left, expected);
     }
 
-    #[cfg(feature = "portable-simd")]
     #[test]
-    fn portable_right_multiply_matches_every_single_qubit_product() {
+    fn right_multiply_matches_every_single_qubit_product_across_word_blocks() {
         let width = 257;
         for left_gate in SingleQubitClifford::all() {
             for right_gate in SingleQubitClifford::all() {
@@ -831,9 +830,8 @@ mod tests {
         assert_eq!(value.non_identity_count, observed_count);
     }
 
-    #[cfg(feature = "portable-simd")]
     #[test]
-    fn portable_right_multiply_reuses_packed_storage_without_allocating() {
+    fn right_multiply_reuses_packed_storage_without_allocating() {
         let width = 65_537;
         let mut left =
             CliffordString::from_gates(std::iter::repeat_n(SingleQubitClifford::H, width)).unwrap();

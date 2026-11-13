@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for Stab 0.2.
+Accepted for Stab 0.2. [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md) amends the kernel edges: `stab-bits` and `stab-algebra` now depend on `stab-kernels-simd` unconditionally, the `portable-simd` feature no longer exists, and the feature-reachability and portable-SIMD source rules below are replaced by the `fearless_simd` dependency rule recorded there.
 
 ## Context
 

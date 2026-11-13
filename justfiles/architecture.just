@@ -1,9 +1,9 @@
-# Check product dependency direction and the portable-SIMD source boundary.
+# Check product dependency direction and the SIMD library boundary.
 [working-directory: '..']
 check:
     cargo run -q -p stab-architecture -- check
 
-# Validate external Stable, scalar facade, portable facade, and mixed feature consumers.
+# Validate external Stable component, facade, and mixed direct-component consumers.
 [working-directory: '..']
 consumer-check:
     cargo run -q -p stab-architecture -- consumer-check

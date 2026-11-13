@@ -6,7 +6,6 @@ use syn::{Item, UseTree, Visibility};
 use crate::policy::is_stable_source_package;
 use crate::{CheckError, PackageSpec, Violation};
 
-const SIMD_PACKAGE: &str = "stab-kernels-simd";
 const FACADE_ROOT_REEXPORTS: &str = "ops/architecture/facade-root-reexports.txt";
 const FACADE_COMPONENT_CRATES: &[&str] = &[
     "stab_algebra",
@@ -84,21 +83,6 @@ pub(super) fn scan_workspace_sources(
                     source_path.display()
                 ),
             ));
-        }
-        if facts.contains_portable_simd {
-            match classify_simd_site(source_path, package) {
-                SimdSite::Kernel => {}
-                SimdSite::Forbidden => {
-                    violations.push(Violation::new(
-                        "portable-simd-outside-kernel",
-                        format!(
-                            "portable-SIMD source in {} must move to {}",
-                            source_path.display(),
-                            SIMD_PACKAGE
-                        ),
-                    ));
-                }
-            }
         }
     }
 
@@ -459,19 +443,6 @@ fn read_source(root: &Path, relative_path: &Path) -> Result<String, CheckError> 
     })
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SimdSite {
-    Kernel,
-    Forbidden,
-}
-
-fn classify_simd_site(_source_path: &Path, package: Option<&PackageSpec>) -> SimdSite {
-    if package.is_some_and(|package| package.name == SIMD_PACKAGE) {
-        return SimdSite::Kernel;
-    }
-    SimdSite::Forbidden
-}
-
 fn collect_rust_sources(
     root: &Path,
     directory: &Path,
@@ -546,50 +517,6 @@ mod tests {
         format!(
             "{prefix}stab_analysis as analysis\nstab_decoder as decoder\nstab_engine as execution\n"
         )
-    }
-
-    #[test]
-    fn kernel_package_owns_direct_simd() {
-        let package = PackageSpec {
-            name: SIMD_PACKAGE.to_owned(),
-            relative_path: PathBuf::from("crates/stab-kernels-simd"),
-            default_features: Vec::new(),
-            rust_version: None,
-            version: cargo_metadata::semver::Version::new(0, 2, 0),
-            publish: None,
-            binary_targets: Vec::new(),
-        };
-        let packages = [package.clone()];
-        let source = Path::new("crates/stab-kernels-simd/src/lib.rs");
-        assert_eq!(
-            package_for_source(source, &packages).map(|package| package.name.as_str()),
-            Some(SIMD_PACKAGE)
-        );
-        assert_eq!(classify_simd_site(source, Some(&package)), SimdSite::Kernel);
-    }
-
-    #[test]
-    fn former_legacy_simd_paths_are_forbidden() {
-        let core = PackageSpec {
-            name: "stab-core".to_owned(),
-            relative_path: PathBuf::from("crates/stab-core"),
-            default_features: Vec::new(),
-            rust_version: None,
-            version: cargo_metadata::semver::Version::new(0, 2, 0),
-            publish: None,
-            binary_targets: Vec::new(),
-        };
-        assert_eq!(
-            classify_simd_site(Path::new("crates/stab-core/src/bits/simd.rs"), Some(&core)),
-            SimdSite::Forbidden
-        );
-        assert_eq!(
-            classify_simd_site(
-                Path::new("crates/stab-core/src/bits/new_kernel.rs"),
-                Some(&core)
-            ),
-            SimdSite::Forbidden
-        );
     }
 
     #[test]

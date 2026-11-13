@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for Stab 0.2 architecture work.
+Superseded by [ADR 0008: Unconditional Leaf Kernels On Fearless SIMD](adr-0008-unconditional-fearless-simd-kernels.md) for leaf-kernel selection. The optional kernel crate, the `portable-simd` feature, and the scalar production kernels described below no longer exist; the rules against placeholder backends, hot-loop dynamic dispatch, and unproven sampling backends carry over into ADR 0008.
 
 ## Context
 

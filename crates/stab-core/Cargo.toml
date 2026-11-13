@@ -12,10 +12,6 @@ keywords.workspace = true
 [lints]
 workspace = true
 
-[features]
-default = []
-portable-simd = ["stab-algebra/portable-simd", "stab-engine/portable-simd"]
-
 [dependencies]
 stab-algebra = { workspace = true }
 stab-analysis = { workspace = true }
