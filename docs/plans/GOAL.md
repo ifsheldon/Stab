@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: September review repairs and code reduction have passing local verification, source CI, and fresh controlled AArch64 full and soak evidence. Release use requires the release checker and both mandated CI jobs to pass the exact proposed evidence descendant. P0 through P9 remain complete for their recorded revisions.
+Status: P10 evidence repair is active. A November audit found DEM printing, output-flush, standard-stream aliasing, argument-grammar, random-tableau, and benchmark peak-RSS defects plus weak fixture and statistical evidence; see the plan's P10 milestone. The `b4a758db` evidence below is historical until P10 publishes a fresh pair. P0 through P9 remain complete for their recorded revisions.
 
 ## Objective
 

@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: P0 through P9 completed for their recorded revisions. The September review repairs and code reduction have fresh passing controlled evidence; release validity remains conditional on the measured source, permitted evidence descendants, and required GitHub CI passing the exact proposed release revision.
+Status: P0 through P9 completed for their recorded revisions. P10 is active: a November audit found product defects and evidence gaps, so the `b4a758db` evidence pair no longer qualifies a release, and 0.2.0 waits for P10's fresh measured revision.
 
 ## Summary
 
@@ -592,6 +592,27 @@ Milestone audit and full code review found and repaired two false exact-RNG test
 - The final full code review covered product ownership, Stim parity, result formats, CLI and filesystem safety, bounded process supervision, SIMD isolation, the cross-architecture DEM comparator, CI ordering, E2E methodology, evidence publication, tests, operations, and documentation. It found no confirmed release blocker or follow-up defect.
 - The large-file review found no product Rust file at or above 1,200 lines. The largest repository-owned Rust files remain watch-list items below that limit, led by `ops/oracle/src/parity.rs` at 1,196 lines; this milestone adds no code to them.
 - No shell script exists outside vendored Stim, direct portable SIMD remains isolated in `stab-kernels-simd`, and the only production `unsafe` boundary is the documented bounded `wait4` supervisor path in benchmark operations.
+
+## Milestone P10: Repair Evidence And Rebalance Tests (Active)
+
+A November test and benchmark audit found real defects hidden by evidence that looked stronger than it was. DEM decimal printing selects its notation before rounding and diverges from pinned Stim just below powers of ten; `convert` can exit successfully after an unflushed stdout write fails; standard-stream redirection can alias and truncate a command input; repeated flags and arguments after `--` diverge from Stim without a ledger record; `Tableau::random` is a bounded random walk rather than Stim's uniform sampler; and the benchmark runner's spawn path folds the runner's own high-water RSS into every child's reported peak, so the memory ceilings never measured Stab. Separately, most fixture rows only re-run cargo tests, live-Stim fixtures never run in CI, several statistical tolerances cannot fail, CLI route owners use all-zero data, and most E2E cases are dominated by process startup.
+
+### Tasks
+
+1. Fix the product defects above, record the strict argument grammar and standard-stream policy as Stab divergences, and port uniform random tableau sampling.
+2. Retire `cargo-test`, placeholder, and red fixture rows together with their milestone, parity-mode, and status columns and the status-only `required_fixture_ids` list; run every remaining live-Stim fixture and the pinned-Stim probes on an AArch64 CI job.
+3. Remove duplicated, label, harness-only, and self-comparing tests, repointing ledger owners to the strongest surviving test.
+4. Add the missing high-value coverage: falsifiable statistical bounds, sparse-noise and Bernoulli statistics, independent conversion oracles, fold and decomposition properties, model and record properties, binary result-format differentials, non-zero CLI route data, and Stim-versus-Stab two-sample sampling differentials.
+5. Measure child peak RSS through a freshly executed launcher, bump the timing boundary, and replace startup-dominated E2E cases with user-scale QEC workflows within the existing case and family caps.
+6. Share one bounded process supervisor across operations crates and replace hand-rolled confined filesystem primitives with maintained crates where the reduction is real.
+7. Produce one fresh unseeded controlled AArch64 full-and-soak pair, seed baselines from it, and pass `e2e-release-check` with exact-revision CI.
+
+### Done Criteria
+
+- Every defect above has a falsifiable regression test, and every new divergence has a verified ledger family.
+- The fixture manifest contains only rows that execute pinned Stim or a stored pinned-Stim artifact, and CI runs all of them.
+- No gate, threshold, or semantic workload is relaxed to obtain a pass.
+- The P9 release-evidence procedure passes for the new measured revision.
 
 ## Test Suite Contract
 
