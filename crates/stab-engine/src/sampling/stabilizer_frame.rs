@@ -5,11 +5,13 @@ use smallvec::{SmallVec, smallvec};
 use stab_algebra::{PauliBasis, PauliSign, StabilizerError, Tableau};
 
 use super::SamplingCompileError;
+use super::reference_simulator::{LocalCliffordInverse, SignedLocalPauli};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct LocalTableauTransform {
     target_count: usize,
     outputs: Vec<LocalTableauOutput>,
+    inverse: LocalCliffordInverse,
 }
 
 impl LocalTableauTransform {
@@ -36,14 +38,21 @@ impl LocalTableauTransform {
                 bases: output_bases,
             });
         }
+        let inverse = inverse_images(target_count, &outputs)?;
         Ok(Self {
             target_count,
             outputs,
+            inverse,
         })
     }
 
     pub(super) fn target_count(&self) -> usize {
         self.target_count
+    }
+
+    /// The images `G^-1 P G` of each target's X and Z, as consumed by the reference simulator.
+    pub(super) fn inverse(&self) -> &LocalCliffordInverse {
+        &self.inverse
     }
 
     fn output(&self, index: usize) -> Option<&LocalTableauOutput> {
@@ -55,6 +64,41 @@ impl LocalTableauTransform {
 struct LocalTableauOutput {
     negative: bool,
     bases: Vec<PauliBasis>,
+}
+
+/// Inverts the forward conjugation table: if `G Q G^-1 = s P` then `G^-1 P G = s Q`.
+fn inverse_images(
+    target_count: usize,
+    outputs: &[LocalTableauOutput],
+) -> Result<LocalCliffordInverse, SamplingCompileError> {
+    let mut images = Vec::with_capacity(target_count.saturating_mul(2));
+    for target in 0..target_count {
+        for wanted in [PauliBasis::X, PauliBasis::Z] {
+            let (input_index, output) = outputs
+                .iter()
+                .enumerate()
+                .find(|(_, output)| {
+                    output.bases.iter().enumerate().all(|(index, basis)| {
+                        *basis
+                            == if index == target {
+                                wanted
+                            } else {
+                                PauliBasis::I
+                            }
+                    })
+                })
+                .ok_or_else(|| {
+                    SamplingCompileError::invalid_circuit(
+                        "local tableau transform is not invertible",
+                    )
+                })?;
+            images.push(SignedLocalPauli {
+                negative: output.negative,
+                bases: bases_from_index(input_index, target_count),
+            });
+        }
+    }
+    Ok(LocalCliffordInverse::new(images))
 }
 
 #[derive(Clone, Debug)]
@@ -98,11 +142,14 @@ impl PartialEq for StabilizerFrame {
 
 impl Eq for StabilizerFrame {}
 
+/// Generator-list snapshot used by the pre-E1 reference path that tests keep as a baseline.
+#[cfg(test)]
 #[derive(Debug)]
 pub(super) struct StabilizerStateSnapshot {
     generators: Vec<StabilizerGenerator>,
 }
 
+#[cfg(test)]
 impl StabilizerStateSnapshot {
     pub(super) fn try_new(qubit_count: usize) -> Result<Self, FrameStorageError> {
         let mut generators = Vec::new();
@@ -128,16 +175,21 @@ impl StabilizerStateSnapshot {
     pub(super) fn matches(&self, frame: &StabilizerFrame) -> bool {
         self.generators == frame.generators
     }
+}
 
-    pub(super) fn storage_bytes(qubit_count: usize) -> u128 {
-        (qubit_count as u128)
-            .saturating_mul(size_of::<StabilizerGenerator>() as u128)
-            .saturating_add(
-                (qubit_count as u128)
-                    .saturating_mul(qubit_count as u128)
-                    .saturating_mul(size_of::<PauliBasis>() as u128),
-            )
-    }
+/// Admission estimate for a reference repeat-fold snapshot.
+///
+/// This keeps the generator-list formula used before the inverse-tableau simulator so that
+/// admission decisions do not change; it over-estimates the simulator's actual snapshot, which
+/// holds `2n` rows of `2 * ceil(n / 64)` words and `2n` sign bytes.
+pub(super) fn reference_snapshot_admission_bytes(qubit_count: usize) -> u128 {
+    (qubit_count as u128)
+        .saturating_mul(size_of::<StabilizerGenerator>() as u128)
+        .saturating_add(
+            (qubit_count as u128)
+                .saturating_mul(qubit_count as u128)
+                .saturating_mul(size_of::<PauliBasis>() as u128),
+        )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -769,22 +821,6 @@ impl StabilizerGenerator {
         log_i ^= popcount_mod_4(count_bit_1);
         log_i ^= popcount_mod_4(count_bit_2) << 1;
         self.negative = (log_i & 2) != 0;
-    }
-
-    pub(super) fn is_negative(&self) -> bool {
-        self.negative
-    }
-
-    pub(super) fn set_negative(&mut self, negative: bool) {
-        self.negative = negative;
-    }
-
-    pub(super) fn flip_sign(&mut self) {
-        self.negative = !self.negative;
-    }
-
-    pub(super) fn has_x_terms(&self) -> bool {
-        self.xs.iter().any(|word| *word != 0)
     }
 
     fn local_input_index(&self, targets: &[usize]) -> usize {

@@ -3,11 +3,10 @@
     reason = "sampling unit tests use direct fixture parsing assertions for compact diagnostics"
 )]
 
-use super::execute::{
-    ReferenceExecutionStats, execute_reference_operations, reset_reference_execution_stats,
+use super::reference_run::{
+    ReferenceExecutionStats, ReferenceWorkspace, reset_reference_execution_stats,
     take_reference_execution_stats,
 };
-use super::stabilizer_frame::StabilizerStateSnapshot;
 use super::*;
 use stab_analysis::{
     CodeDistance, RoundCount, SurfaceCodeParams, SurfaceCodeTask, generate_surface_code_circuit,
@@ -95,7 +94,7 @@ impl MeasurementSink for RecordSink {
 }
 
 #[test]
-fn css_reference_tableau_matches_general_sampling_and_declines_other_cliffords() {
+fn reference_simulator_matches_generator_baseline_on_noisy_surface_and_feedback() {
     let probability = Probability::try_new(0.001).expect("valid generated-circuit noise");
     let params = SurfaceCodeParams::new(
         RoundCount::try_new(20).expect("valid round count"),
@@ -111,66 +110,25 @@ fn css_reference_tableau_matches_general_sampling_and_declines_other_cliffords()
     let plan = SamplingCompiler::new()
         .compile(generated.circuit())
         .expect("compile generated surface circuit");
-    let mut record = Vec::with_capacity(plan.inner.measurement_count);
-    let mut fast = Vec::with_capacity(plan.inner.measurement_count);
-    assert!(
-        super::reference_tableau::try_compute_reference_sample(
-            &plan.inner.operations,
-            plan.inner.qubit_count,
-            plan.inner.measurement_count,
-            plan.inner.expanded_operation_count,
-            &mut record,
-            &mut fast,
-        )
-        .expect("execute CSS reference tableau")
-    );
     assert_eq!(
-        fast,
-        super::api::compute_reference_sample_without_fast_path(&plan.inner)
-            .expect("execute general reference tableau")
+        plan.try_reference_sample()
+            .expect("inverse-tableau reference"),
+        super::api::compute_stabilizer_frame_reference_sample(&plan.inner)
+            .expect("generator-list reference")
     );
 
     let feedback = SamplingCompiler::new()
         .compile(
             &Circuit::from_stim_str("H 0\nCX 0 1\nM !0\nCX rec[-1] 1\nM 1\nMR !1\nM 1\n")
-                .expect("parse CSS feedback circuit"),
+                .expect("parse feedback circuit"),
         )
-        .expect("compile CSS feedback circuit");
-    record.clear();
-    fast.clear();
-    assert!(
-        super::reference_tableau::try_compute_reference_sample(
-            &feedback.inner.operations,
-            feedback.inner.qubit_count,
-            feedback.inner.measurement_count,
-            feedback.inner.expanded_operation_count,
-            &mut record,
-            &mut fast,
-        )
-        .expect("execute CSS feedback reference tableau")
-    );
-    assert_eq!(fast, vec![true, true, false, false]);
+        .expect("compile feedback circuit");
+    let reference = feedback.try_reference_sample().expect("feedback reference");
+    assert_eq!(reference, vec![true, true, false, false]);
     assert_eq!(
-        fast,
-        super::api::compute_reference_sample_without_fast_path(&feedback.inner)
-            .expect("execute general feedback reference tableau")
-    );
-
-    let non_css = SamplingCompiler::new()
-        .compile(&Circuit::from_stim_str("S 0\nM 0\n").expect("parse non-CSS circuit"))
-        .expect("compile non-CSS circuit");
-    record.clear();
-    fast.clear();
-    assert!(
-        !super::reference_tableau::try_compute_reference_sample(
-            &non_css.inner.operations,
-            non_css.inner.qubit_count,
-            non_css.inner.measurement_count,
-            non_css.inner.expanded_operation_count,
-            &mut record,
-            &mut fast,
-        )
-        .expect("decline non-CSS reference tableau")
+        reference,
+        super::api::compute_stabilizer_frame_reference_sample(&feedback.inner)
+            .expect("generator-list feedback reference")
     );
 }
 
@@ -187,29 +145,18 @@ fn count_determined(input: &str, unknown_input: bool) -> u64 {
 }
 
 fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionStats) {
-    let mut rng = SmallRng::seed_from_u64(0);
-    let mut frame = StabilizerFrame::try_new(plan.inner.qubit_count).expect("reference frame");
-    let mut snapshot =
-        StabilizerStateSnapshot::try_new(plan.inner.qubit_count).expect("reference state snapshot");
-    let mut record = Vec::with_capacity(plan.inner.measurement_count);
+    let mut workspace =
+        ReferenceWorkspace::try_new(plan.inner.qubit_count, true).expect("reference workspace");
     let mut output = Vec::with_capacity(plan.inner.measurement_count);
-    let mut correlated_error_occurred = false;
-    let mut buffers = ExecutionBuffers {
-        frame: &mut frame,
-        record: &mut record,
-        output: &mut output,
-        correlated_error_occurred: &mut correlated_error_occurred,
-    };
     reset_reference_execution_stats();
-    execute_reference_operations(
-        &plan.inner.operations,
-        &mut buffers,
-        &mut rng,
-        &[],
-        plan.reference_sample_loop_policy(),
-        Some(&mut snapshot),
-    )
-    .expect("execute reference program");
+    workspace
+        .run(
+            &plan.inner.operations,
+            plan.reference_sample_loop_policy(),
+            &[],
+            &mut output,
+        )
+        .expect("execute reference program");
     let stats = take_reference_execution_stats();
     (output, stats)
 }
@@ -305,7 +252,7 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
         folded
             .estimated_reference_work_storage_bytes()
             .saturating_sub(iterated.estimated_reference_work_storage_bytes()),
-        StabilizerStateSnapshot::storage_bytes(folded.inner.qubit_count)
+        stabilizer_frame::reference_snapshot_admission_bytes(folded.inner.qubit_count)
     );
 
     let base = general_frame_work_storage_bytes(

@@ -9,6 +9,7 @@ pub(super) fn sample(probability: f64, rng: &mut impl Rng, mode: ExecutionMode) 
         // result-flip probabilities before the reference run, so even a certain flip must not
         // invert the reference bit. The direct-Z fast path already encodes this by using only
         // the inversion flag as its reference bit.
+        #[cfg(test)]
         ExecutionMode::ReferenceSample => false,
     }
 }

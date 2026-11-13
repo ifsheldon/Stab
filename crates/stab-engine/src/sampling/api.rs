@@ -24,8 +24,10 @@ mod session_helpers;
 
 pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
 #[cfg(test)]
-pub(super) use session_helpers::compute_reference_sample_without_fast_path;
-pub(super) use session_helpers::{compute_reference_sample, try_bool_buffer};
+pub(super) use session_helpers::compute_stabilizer_frame_reference_sample;
+pub(super) use session_helpers::{
+    compute_reference_sample, try_bool_buffer, validate_reference_width,
+};
 use session_helpers::{fill_pauli_frame_batch, sample_general_into, validate_session_storage};
 
 const MAX_BATCH_SHOTS: usize = 64;
@@ -194,16 +196,33 @@ impl SamplingCompiler {
                 qubit_count,
                 measurement_count: counts.measurements,
                 sweep_bit_count: counts.sweep_bits,
-                expanded_operation_count: counts.expanded_operations,
                 operations,
                 kind,
                 reference_sample_loop_policy: self.reference_sample_loop_policy,
+                reference_sample: OnceLock::new(),
                 backend,
                 request_fingerprint,
                 fingerprint,
             }),
         })
     }
+}
+
+/// The plan-cached reference sample a session XORs into its output, if it uses one.
+fn session_reference(
+    plan: &SamplingPlan,
+    uses_reference_sample: bool,
+) -> Result<Option<&[bool]>, SamplingExecutionError> {
+    if !uses_reference_sample {
+        return Ok(None);
+    }
+    plan.inner
+        .reference_sample
+        .get()
+        .map(|sample| Some(sample.as_slice()))
+        .ok_or_else(|| SamplingExecutionError::InternalInvariant {
+            message: "sampling session lost its plan-cached reference sample".to_owned(),
+        })
 }
 
 fn select_plan_kind(
@@ -398,16 +417,28 @@ pub(super) struct SamplingPlanInner {
     pub(super) qubit_count: usize,
     pub(super) measurement_count: usize,
     pub(super) sweep_bit_count: usize,
-    pub(super) expanded_operation_count: u128,
     pub(super) operations: SampleProgram,
     pub(super) kind: SamplingPlanKind,
     pub(super) reference_sample_loop_policy: ReferenceSampleLoopPolicy,
+    /// The all-zero-sweep reference sample, computed at most once per successful plan.
+    reference_sample: OnceLock<Vec<bool>>,
     backend: SamplingBackend,
     request_fingerprint: CompilationRequestFingerprint,
     fingerprint: PlanFingerprint,
 }
 
 impl SamplingPlanInner {
+    /// Returns the plan's reference sample, computing it on first use.
+    ///
+    /// Failures are returned to the caller and not cached, so a later call retries.
+    pub(super) fn cached_reference_sample(&self) -> Result<&[bool], SamplingExecutionError> {
+        if let Some(sample) = self.reference_sample.get() {
+            return Ok(sample);
+        }
+        let sample = compute_reference_sample(self)?;
+        Ok(self.reference_sample.get_or_init(|| sample))
+    }
+
     pub(super) fn has_reference_state_snapshot_candidate(&self) -> bool {
         self.reference_sample_loop_policy == ReferenceSampleLoopPolicy::Fold
             && self
@@ -649,7 +680,7 @@ pub struct SamplingSession {
     plan: SamplingPlan,
     rng: SmallRng,
     frame: SessionFrame,
-    reference_sample: Option<Vec<bool>>,
+    uses_reference_sample: bool,
     record: Vec<bool>,
     output: Vec<bool>,
     batch: SessionBatch,
@@ -688,16 +719,21 @@ impl SamplingSession {
             RandomPolicy::Entropy => sampler_rng(None),
             RandomPolicy::Seeded(seed) => sampler_rng(Some(seed.get())),
         };
-        let reference_sample = match (&plan.inner.kind, reference_mode) {
-            (SamplingPlanKind::PauliFrame(_), ReferenceSampleMode::UseReferenceSample) => {
-                Some(compute_reference_sample(&plan.inner)?)
-            }
+        let uses_reference_sample = match (&plan.inner.kind, reference_mode) {
+            (SamplingPlanKind::PauliFrame(_), ReferenceSampleMode::UseReferenceSample)
+            | (
+                SamplingPlanKind::DirectZ(_) | SamplingPlanKind::GeneralFrame,
+                ReferenceSampleMode::SkipReferenceSample,
+            ) => true,
             (SamplingPlanKind::PauliFrame(_), ReferenceSampleMode::SkipReferenceSample)
-            | (_, ReferenceSampleMode::UseReferenceSample) => None,
-            (_, ReferenceSampleMode::SkipReferenceSample) => {
-                Some(compute_reference_sample(&plan.inner)?)
-            }
+            | (
+                SamplingPlanKind::DirectZ(_) | SamplingPlanKind::GeneralFrame,
+                ReferenceSampleMode::UseReferenceSample,
+            ) => false,
         };
+        if uses_reference_sample {
+            plan.inner.cached_reference_sample()?;
+        }
         let frame = if plan.inner.measurement_count == 0 {
             SessionFrame::Empty
         } else {
@@ -756,7 +792,7 @@ impl SamplingSession {
             plan,
             rng,
             frame,
-            reference_sample,
+            uses_reference_sample,
             batch,
             cancellation: OnceLock::new(),
             total_committed_shots: 0,
@@ -895,9 +931,7 @@ impl SamplingSession {
             return Ok(());
         }
         if let SamplingPlanKind::DirectZ(plan) = &self.plan.inner.kind {
-            let reference_bit = self
-                .reference_sample
-                .as_deref()
+            let reference_bit = session_reference(&self.plan, self.uses_reference_sample)?
                 .and_then(|sample| sample.first())
                 .copied()
                 .unwrap_or(false);
@@ -928,7 +962,7 @@ impl SamplingSession {
                 plan,
                 &mut self.frame,
                 &mut self.batch,
-                self.reference_sample.as_deref(),
+                session_reference(&self.plan, self.uses_reference_sample)?,
                 &mut self.rng,
                 shot_count,
             );
@@ -971,7 +1005,7 @@ impl SamplingSession {
 
     fn sample_shot(&mut self) -> Result<(), SamplingExecutionError> {
         let operations = &self.plan.inner.operations;
-        let reference = self.reference_sample.as_deref();
+        let reference = session_reference(&self.plan, self.uses_reference_sample)?;
         match (&self.plan.inner.kind, &mut self.frame) {
             (_, SessionFrame::Empty) if self.plan.inner.measurement_count == 0 => {
                 self.record.clear();

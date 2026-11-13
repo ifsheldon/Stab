@@ -1,5 +1,4 @@
-use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng as _};
+use rand::Rng;
 
 use super::{
     MAX_SAMPLING_SESSION_STORAGE_BYTES, ReferenceSampleMode, SamplingExecutionError,
@@ -7,11 +6,10 @@ use super::{
 };
 use crate::detection::frame::{PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingPlan};
 use crate::sampling::ExecutionMode;
-use crate::sampling::execute::{
-    ExecutionBuffers, execute_operations, execute_reference_operations,
-};
+use crate::sampling::execute::{ExecutionBuffers, execute_operations};
 use crate::sampling::operation::SampleProgram;
-use crate::sampling::stabilizer_frame::{StabilizerFrame, StabilizerStateSnapshot};
+use crate::sampling::reference_run::ReferenceWorkspace;
+use crate::sampling::stabilizer_frame::StabilizerFrame;
 
 pub(super) fn validate_session_storage(
     plan: &SamplingPlanInner,
@@ -95,31 +93,46 @@ pub(in crate::sampling) fn compute_reference_sample(
         plan.measurement_count,
         needs_snapshot,
     )?;
-    let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
     let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
-    if crate::sampling::reference_tableau::try_compute_reference_sample(
+    ReferenceWorkspace::try_new(plan.qubit_count, needs_snapshot)?.run(
         &plan.operations,
-        plan.qubit_count,
-        plan.measurement_count,
-        plan.expanded_operation_count,
-        &mut record,
+        plan.reference_sample_loop_policy,
+        &[],
         &mut output,
-    )? {
-        return Ok(output);
-    }
-
-    compute_general_reference_sample(plan, needs_snapshot, record, output)
+    )?;
+    validate_reference_width(&output, plan.measurement_count)?;
+    Ok(output)
 }
 
-fn compute_general_reference_sample(
-    plan: &SamplingPlanInner,
-    needs_snapshot: bool,
-    mut record: Vec<bool>,
-    mut output: Vec<bool>,
-) -> Result<Vec<bool>, SamplingExecutionError> {
-    record.clear();
-    output.clear();
+pub(in crate::sampling) fn validate_reference_width(
+    output: &[bool],
+    measurement_count: usize,
+) -> Result<(), SamplingExecutionError> {
+    if output.len() == measurement_count {
+        Ok(())
+    } else {
+        Err(SamplingExecutionError::InternalInvariant {
+            message: format!(
+                "reference simulation produced {} measurements but {measurement_count} were compiled",
+                output.len()
+            ),
+        })
+    }
+}
 
+/// The pre-E1 generator-list reference path, kept only as a differential-test baseline.
+#[cfg(test)]
+pub(in crate::sampling) fn compute_stabilizer_frame_reference_sample(
+    plan: &SamplingPlanInner,
+) -> Result<Vec<bool>, SamplingExecutionError> {
+    use crate::sampling::execute::execute_reference_operations;
+    use crate::sampling::stabilizer_frame::StabilizerStateSnapshot;
+    use rand::SeedableRng as _;
+    use rand::rngs::SmallRng;
+
+    let needs_snapshot = plan.uses_reference_state_snapshot();
+    let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
+    let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
     let mut rng = SmallRng::seed_from_u64(0);
     let mut frame = StabilizerFrame::try_new(plan.qubit_count).map_err(|error| {
         SamplingExecutionError::SessionStorageAllocation {
@@ -149,24 +162,6 @@ fn compute_general_reference_sample(
         snapshot.as_mut(),
     )?;
     Ok(output)
-}
-
-#[cfg(test)]
-pub(in crate::sampling) fn compute_reference_sample_without_fast_path(
-    plan: &SamplingPlanInner,
-) -> Result<Vec<bool>, SamplingExecutionError> {
-    let needs_snapshot = plan.uses_reference_state_snapshot();
-    crate::sampling::validate_general_frame_work_storage(
-        plan.qubit_count,
-        plan.measurement_count,
-        needs_snapshot,
-    )?;
-    compute_general_reference_sample(
-        plan,
-        needs_snapshot,
-        try_bool_buffer(plan.measurement_count, "reference measurement record")?,
-        try_bool_buffer(plan.measurement_count, "reference measurement output")?,
-    )
 }
 
 pub(super) fn fill_pauli_frame_batch(

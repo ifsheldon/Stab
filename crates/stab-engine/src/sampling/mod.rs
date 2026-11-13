@@ -26,7 +26,8 @@ mod noise;
 mod operation;
 pub(crate) mod pauli_product;
 mod reference;
-mod reference_tableau;
+mod reference_run;
+mod reference_simulator;
 mod stabilizer_frame;
 
 pub use api::{
@@ -79,8 +80,13 @@ impl SamplingPlan {
     }
 
     /// Computes the deterministic reference sample with bounded, fallible storage.
+    ///
+    /// The sample is computed once per plan and reused by later calls and sessions.
     pub fn try_reference_sample(&self) -> Result<Vec<bool>, SamplingExecutionError> {
-        api::compute_reference_sample(&self.inner)
+        let cached = self.inner.cached_reference_sample()?;
+        let mut sample = api::try_bool_buffer(cached.len(), "reference sample copy")?;
+        sample.extend_from_slice(cached);
+        Ok(sample)
     }
 
     pub(crate) fn sweep_bit_count(&self) -> usize {
@@ -166,7 +172,7 @@ fn general_frame_work_storage_bytes(
         .saturating_add(qubits.saturating_mul(256))
         .saturating_add(measurements);
     if include_reference_snapshot {
-        base.saturating_add(stabilizer_frame::StabilizerStateSnapshot::storage_bytes(
+        base.saturating_add(stabilizer_frame::reference_snapshot_admission_bytes(
             qubit_count,
         ))
     } else {
@@ -228,6 +234,8 @@ pub fn count_determined_measurements(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ExecutionMode {
     Sample,
+    /// Noiseless deterministic-false execution of the pre-E1 reference baseline in tests.
+    #[cfg(test)]
     ReferenceSample,
 }
 
@@ -235,6 +243,7 @@ impl ExecutionMode {
     fn measurement_randomness(self) -> MeasurementRandomness {
         match self {
             Self::Sample => MeasurementRandomness::Random,
+            #[cfg(test)]
             Self::ReferenceSample => MeasurementRandomness::DeterministicFalse,
         }
     }

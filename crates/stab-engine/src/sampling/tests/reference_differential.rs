@@ -1,19 +1,27 @@
-//! Reference-sample differentials across the three engine paths.
+//! Reference-sample differentials and properties for the inverse-tableau reference simulator.
 //!
-//! The iterated general tableau is the semantic baseline. The folded general path (which reuses
-//! one loop iteration when the state snapshot repeats) and the CSS fast path (which only accepts
-//! H/CX/R/M/MR-style programs) must reproduce it exactly, including on loops whose iterations
-//! change measurement signs, cycle with a period longer than one, or act on entangled state.
+//! The pre-E1 generator-list simulator, iterating every repeat, is the semantic baseline. The
+//! inverse-tableau simulator must reproduce it exactly with and without repeat folding,
+//! including on loops whose iterations change measurement signs, cycle with a period longer than
+//! one, act on entangled state, or use every Clifford gate, reset, measurement basis, pair
+//! measurement, and Pauli product in the catalog.
 
 use rand::RngExt as _;
+use stab_analysis::{
+    ColorCodeParams, ColorCodeTask, RepetitionCodeParams, RepetitionCodeTask,
+    generate_color_code_circuit, generate_repetition_code_circuit,
+};
+use stab_model::GateTargetGroupKind;
 
 use super::*;
 
 struct ReferencePaths {
+    baseline: Vec<bool>,
+    baseline_folded: Vec<bool>,
     iterated: Vec<bool>,
     folded: Vec<bool>,
     folded_stats: ReferenceExecutionStats,
-    css: Option<Vec<bool>>,
+    product: Vec<bool>,
 }
 
 impl ReferencePaths {
@@ -26,48 +34,41 @@ impl ReferencePaths {
             .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Fold)
             .compile(circuit)
             .expect("compile folded reference plan");
-        let iterated =
-            super::super::api::compute_reference_sample_without_fast_path(&iterated_plan.inner)
-                .expect("iterated general reference");
+        let baseline =
+            super::super::api::compute_stabilizer_frame_reference_sample(&iterated_plan.inner)
+                .expect("iterated generator-list reference");
+        let baseline_folded =
+            super::super::api::compute_stabilizer_frame_reference_sample(&folded_plan.inner)
+                .expect("folded generator-list reference");
+        let (iterated, _) = reference_with_stats(&iterated_plan);
         let (folded, folded_stats) = reference_with_stats(&folded_plan);
-        assert_eq!(
-            super::super::api::compute_reference_sample_without_fast_path(&folded_plan.inner)
-                .expect("product-policy general reference"),
-            folded,
-            "the product snapshot decision must not change the folded result"
-        );
-        let inner = &folded_plan.inner;
-        let mut record = Vec::with_capacity(inner.measurement_count);
-        let mut css = Vec::with_capacity(inner.measurement_count);
-        let css_accepted = super::super::reference_tableau::try_compute_reference_sample(
-            &inner.operations,
-            inner.qubit_count,
-            inner.measurement_count,
-            inner.expanded_operation_count,
-            &mut record,
-            &mut css,
-        )
-        .expect("execute CSS reference tableau");
-        assert_eq!(
-            folded_plan
-                .try_reference_sample()
-                .expect("product reference sample"),
-            iterated,
-            "product reference sample"
-        );
+        let product = folded_plan
+            .try_reference_sample()
+            .expect("product reference sample");
         Self {
+            baseline,
+            baseline_folded,
             iterated,
             folded,
             folded_stats,
-            css: css_accepted.then_some(css),
+            product,
         }
     }
 
     fn assert_agree(&self, label: &str) {
-        assert_eq!(self.folded, self.iterated, "folded vs iterated: {label}");
-        if let Some(css) = &self.css {
-            assert_eq!(css, &self.iterated, "CSS fast path vs iterated: {label}");
-        }
+        assert_eq!(
+            self.baseline_folded, self.baseline,
+            "generator-list folded vs iterated: {label}"
+        );
+        assert_eq!(
+            self.iterated, self.baseline,
+            "inverse tableau iterated: {label}"
+        );
+        assert_eq!(
+            self.folded, self.baseline,
+            "inverse tableau folded: {label}"
+        );
+        assert_eq!(self.product, self.baseline, "product reference: {label}");
     }
 }
 
@@ -85,7 +86,7 @@ fn cycle(pattern: &[bool], repetitions: usize) -> Vec<bool> {
 }
 
 #[test]
-fn folded_and_css_references_match_iteration_on_sign_changing_periodic_and_entangled_loops() {
+fn folded_references_match_iteration_on_sign_changing_periodic_and_entangled_loops() {
     // (label, circuit, hand-derived reference, whether the fold path must reuse iterations)
     let cases: [(&str, &str, Vec<bool>, bool); 9] = [
         (
@@ -145,17 +146,13 @@ fn folded_and_css_references_match_iteration_on_sign_changing_periodic_and_entan
     ];
     for (label, text, expected, must_fold) in cases {
         let paths = ReferencePaths::compute(&parse(text));
-        assert_eq!(paths.iterated, expected, "iterated baseline: {label}");
+        assert_eq!(paths.baseline, expected, "baseline: {label}");
         paths.assert_agree(label);
         if must_fold {
             assert_eq!(
                 paths.folded_stats.folded_repeats, 1,
                 "{label} must exercise the fold path"
             );
-        }
-        let uses_non_css_pauli = text.lines().any(|line| line.trim_start().starts_with("X "));
-        if !uses_non_css_pauli {
-            assert!(paths.css.is_some(), "{label} is a CSS program");
         }
     }
 }
@@ -172,10 +169,6 @@ fn folded_reference_matches_iteration_on_surface_code_with_inserted_paulis() {
     let text = generated.circuit().to_stim_string();
     let baseline = ReferencePaths::compute(generated.circuit());
     baseline.assert_agree("surface code");
-    assert!(
-        baseline.css.is_some(),
-        "the noiseless surface code is a CSS program"
-    );
 
     let final_data_qubit = text
         .lines()
@@ -198,47 +191,416 @@ fn folded_reference_matches_iteration_on_surface_code_with_inserted_paulis() {
         let label = format!("surface code with {}", inserted.trim());
         paths.assert_agree(&label);
         assert_ne!(
-            paths.iterated, baseline.iterated,
+            paths.baseline, baseline.baseline,
             "{label}: the inserted Pauli must change reference signs"
         );
     }
 }
 
-#[test]
-fn css_and_folded_references_match_iteration_on_seeded_random_css_circuits() {
-    let mut rng = SmallRng::seed_from_u64(0xC55_2EF);
-    for qubits in [1_usize, 2, 3, 5, 8, 17, 64, 65, 128, 300] {
-        for _ in 0..3 {
-            let mut text = String::new();
-            let emit = |text: &mut String, rng: &mut SmallRng, operations: usize| {
-                for _ in 0..operations {
-                    let qubit = rng.random_range(0..qubits);
-                    match rng.random_range(0..5) {
-                        0 => writeln!(text, "H {qubit}"),
-                        1 if qubits > 1 => {
-                            let target = (qubit + rng.random_range(1..qubits)) % qubits;
-                            writeln!(text, "CX {qubit} {target}")
-                        }
-                        1 | 2 => writeln!(text, "R {qubit}"),
-                        3 => writeln!(text, "M {qubit}"),
-                        _ => writeln!(text, "MR {qubit}"),
-                    }
-                    .expect("write generated instruction");
-                }
-            };
-            emit(&mut text, &mut rng, 2 * qubits.min(64));
-            let repetitions = if qubits <= 8 { 40 } else { 3 };
-            text.push_str(&format!("REPEAT {repetitions} {{\n"));
-            emit(&mut text, &mut rng, qubits.min(48));
-            text.push_str("}\nM");
-            for qubit in 0..qubits {
-                write!(text, " {qubit}").expect("write final measurement");
+/// Emits random qubit-targeted instructions covering the whole Clifford catalog, resets and
+/// measurements in every basis, pair measurements, Pauli products, feedback, and ignored noise.
+struct RandomCliffordEmitter {
+    single_qubit_gates: Vec<&'static str>,
+    two_qubit_gates: Vec<&'static str>,
+    product_gates: Vec<&'static str>,
+    measurements: usize,
+}
+
+impl RandomCliffordEmitter {
+    fn new() -> Self {
+        let mut single_qubit_gates = Vec::new();
+        let mut two_qubit_gates = Vec::new();
+        let mut product_gates = Vec::new();
+        for gate in Gate::all().filter(|gate| gate.is_unitary()) {
+            match gate.target_group_kind() {
+                GateTargetGroupKind::Singles => single_qubit_gates.push(gate.canonical_name()),
+                GateTargetGroupKind::Pairs => two_qubit_gates.push(gate.canonical_name()),
+                GateTargetGroupKind::PauliProducts => product_gates.push(gate.canonical_name()),
+                GateTargetGroupKind::None | GateTargetGroupKind::AllTargets => {}
             }
-            text.push('\n');
-            let paths = ReferencePaths::compute(&parse(&text));
-            let label = format!("{qubits}-qubit random CSS circuit:\n{text}");
-            assert!(paths.css.is_some(), "CSS fast path declined {label}");
-            paths.assert_agree(&label);
         }
+        assert!(single_qubit_gates.len() >= 20, "{single_qubit_gates:?}");
+        assert!(two_qubit_gates.len() >= 20, "{two_qubit_gates:?}");
+        assert!(!product_gates.is_empty());
+        Self {
+            single_qubit_gates,
+            two_qubit_gates,
+            product_gates,
+            measurements: 0,
+        }
+    }
+
+    fn emit(&mut self, text: &mut String, rng: &mut SmallRng, qubits: usize, operations: usize) {
+        for _ in 0..operations {
+            let qubit = rng.random_range(0..qubits);
+            let other = (qubit + rng.random_range(1..qubits.max(2))) % qubits;
+            let invert = if rng.random_bool(0.25) { "!" } else { "" };
+            let choice = rng.random_range(0..20);
+            let line = match choice {
+                0..=5 => {
+                    let gate = pick(rng, &self.single_qubit_gates);
+                    format!("{gate} {qubit}")
+                }
+                6..=10 if qubits > 1 => {
+                    let gate = pick(rng, &self.two_qubit_gates);
+                    format!("{gate} {qubit} {other}")
+                }
+                11 => format!("{} {qubit}", pick(rng, &["R", "RX", "RY"])),
+                12 | 13 => {
+                    self.measurements += 1;
+                    format!("{} {invert}{qubit}", pick(rng, &["M", "MX", "MY"]))
+                }
+                14 => {
+                    self.measurements += 1;
+                    format!("{} {invert}{qubit}", pick(rng, &["MR", "MRX", "MRY"]))
+                }
+                15 if qubits > 1 => {
+                    self.measurements += 1;
+                    let gate = pick(rng, &["MXX", "MYY", "MZZ"]);
+                    format!("{gate} {invert}{qubit} {other}")
+                }
+                16 | 17 => {
+                    let product = random_product(rng, qubits);
+                    if choice == 16 {
+                        self.measurements += 1;
+                        format!("MPP {invert}{product}")
+                    } else {
+                        format!("{} {product}", pick(rng, &self.product_gates))
+                    }
+                }
+                18 if self.measurements > 0 => {
+                    let lookback = rng.random_range(1..=self.measurements.min(4));
+                    let gate = pick(rng, &["CX", "CY", "CZ"]);
+                    format!("{gate} rec[-{lookback}] {qubit}")
+                }
+                _ => format!("X_ERROR(0.25) {qubit}"),
+            };
+            text.push_str(&line);
+            text.push('\n');
+        }
+    }
+}
+
+fn pick<'a>(rng: &mut SmallRng, values: &[&'a str]) -> &'a str {
+    values
+        .get(rng.random_range(0..values.len()))
+        .copied()
+        .expect("non-empty choice list")
+}
+
+fn random_product(rng: &mut SmallRng, qubits: usize) -> String {
+    let length = rng.random_range(1..=qubits.min(4));
+    let mut chosen: Vec<usize> = Vec::new();
+    while chosen.len() < length {
+        let qubit = rng.random_range(0..qubits);
+        if !chosen.contains(&qubit) {
+            chosen.push(qubit);
+        }
+    }
+    chosen
+        .iter()
+        .map(|qubit| format!("{}{qubit}", pick(rng, &["X", "Y", "Z"])))
+        .collect::<Vec<_>>()
+        .join("*")
+}
+
+fn random_clifford_circuit(rng: &mut SmallRng, qubits: usize) -> String {
+    let mut emitter = RandomCliffordEmitter::new();
+    let mut text = String::new();
+    emitter.emit(&mut text, rng, qubits, 2 * qubits.min(64) + 20);
+    let repetitions = if qubits <= 8 { 40 } else { 3 };
+    text.push_str(&format!("REPEAT {repetitions} {{\n"));
+    emitter.emit(&mut text, rng, qubits, qubits.min(48) + 10);
+    text.push_str("}\n");
+    // A product over a wide support exercises multi-word rows and collapses.
+    let wide = (0..qubits)
+        .step_by(qubits.div_ceil(6).max(1))
+        .map(|qubit| format!("X{qubit}"))
+        .collect::<Vec<_>>()
+        .join("*");
+    writeln!(text, "MPP {wide}").expect("write wide product");
+    for basis in ["MX", "MY", "M"] {
+        text.push_str(basis);
+        for qubit in 0..qubits {
+            write!(text, " {qubit}").expect("write final measurement");
+        }
+        text.push('\n');
+    }
+    text
+}
+
+#[test]
+fn inverse_tableau_matches_generator_baseline_on_random_clifford_circuits() {
+    let mut rng = SmallRng::seed_from_u64(0xC11F_F04D);
+    for qubits in [1_usize, 2, 3, 5, 8, 17, 63, 64, 65, 127, 128, 129, 300] {
+        for _ in 0..3 {
+            let text = random_clifford_circuit(&mut rng, qubits);
+            let paths = ReferencePaths::compute(&parse(&text));
+            paths.assert_agree(&format!("{qubits}-qubit random Clifford circuit:\n{text}"));
+        }
+    }
+}
+
+#[test]
+fn inverse_tableau_matches_generator_baseline_above_one_thousand_qubits() {
+    let mut rng = SmallRng::seed_from_u64(0x1100);
+    let qubits = 1100;
+    let mut emitter = RandomCliffordEmitter::new();
+    let mut text = String::new();
+    // Entangle all qubits first so later collapses touch many multi-word rows.
+    for qubit in (0..qubits).step_by(2) {
+        writeln!(text, "H {qubit}").expect("write layer");
+    }
+    for qubit in 0..qubits - 1 {
+        writeln!(text, "CX {qubit} {}", qubit + 1).expect("write chain");
+    }
+    emitter.emit(&mut text, &mut rng, qubits, 400);
+    text.push_str("MX");
+    for qubit in 0..qubits {
+        write!(text, " {qubit}").expect("write final measurement");
+    }
+    text.push('\n');
+    let circuit = parse(&text);
+    let plan = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile wide circuit");
+    assert_eq!(plan.qubit_count(), qubits);
+    assert_eq!(
+        plan.try_reference_sample()
+            .expect("inverse-tableau reference"),
+        super::super::api::compute_stabilizer_frame_reference_sample(&plan.inner)
+            .expect("generator-list reference"),
+    );
+}
+
+/// Rewrites the last top-level `REPEAT n` loop as `REPEAT outer { REPEAT n / outer { .. } }`
+/// followed by the remaining `n % outer` iterations, preserving the circuit's semantics.
+fn nest_round_loop(text: &str, outer: u64) -> String {
+    let start = text.rfind("\nREPEAT ").expect("generated round loop") + 1;
+    let header_end = start
+        + text
+            .get(start..)
+            .and_then(|rest| rest.find('\n'))
+            .expect("header");
+    let count: u64 = text
+        .get(start + "REPEAT ".len()..header_end)
+        .and_then(|header| header.trim_end_matches(" {").parse().ok())
+        .expect("repeat count");
+    let mut depth = 1_usize;
+    let mut close = header_end;
+    for (offset, line) in text
+        .get(header_end + 1..)
+        .expect("body")
+        .split_inclusive('\n')
+        .scan(header_end + 1, |position, line| {
+            let line_start = *position;
+            *position += line.len();
+            Some((line_start, line))
+        })
+    {
+        if line.trim_end().ends_with('{') {
+            depth += 1;
+        } else if line.trim() == "}" {
+            depth -= 1;
+            if depth == 0 {
+                close = offset;
+                break;
+            }
+        }
+    }
+    let body = text.get(header_end + 1..close).expect("round loop body");
+    let after = close
+        + text
+            .get(close..)
+            .and_then(|rest| rest.find('\n'))
+            .expect("close")
+        + 1;
+    let mut nested = format!(
+        "{}REPEAT {outer} {{\nREPEAT {} {{\n{body}}}\n}}\n",
+        text.get(..start).expect("prefix"),
+        count / outer,
+    );
+    if !count.is_multiple_of(outer) {
+        nested.push_str(&format!("REPEAT {} {{\n{body}}}\n", count % outer));
+    }
+    nested.push_str(text.get(after..).expect("suffix"));
+    nested
+}
+
+#[test]
+fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested_repeats() {
+    let rounds = RoundCount::try_new(13).expect("valid round count");
+    let distance = CodeDistance::try_new(5).expect("valid code distance");
+    let mut circuits = Vec::new();
+    for task in [
+        SurfaceCodeTask::RotatedMemoryX,
+        SurfaceCodeTask::RotatedMemoryZ,
+        SurfaceCodeTask::UnrotatedMemoryX,
+        SurfaceCodeTask::UnrotatedMemoryZ,
+    ] {
+        let params = SurfaceCodeParams::new(rounds, distance, task).expect("surface parameters");
+        circuits.push(
+            generate_surface_code_circuit(&params)
+                .expect("generate surface circuit")
+                .circuit()
+                .to_stim_string(),
+        );
+    }
+    let color =
+        ColorCodeParams::new(rounds, distance, ColorCodeTask::MemoryXyz).expect("color parameters");
+    circuits.push(
+        generate_color_code_circuit(&color)
+            .expect("generate color circuit")
+            .circuit()
+            .to_stim_string(),
+    );
+    let repetition = RepetitionCodeParams::new(rounds, distance, RepetitionCodeTask::Memory)
+        .expect("repetition parameters");
+    circuits.push(
+        generate_repetition_code_circuit(&repetition)
+            .expect("generate repetition circuit")
+            .circuit()
+            .to_stim_string(),
+    );
+
+    let mut rng = SmallRng::seed_from_u64(0xDE7E_C70D);
+    for text in circuits {
+        let nested = nest_round_loop(&text, 3);
+        assert!(nested.contains("REPEAT 3 {\nREPEAT "), "{nested}");
+        let mut flat_reference = None;
+        for variant in [text.clone(), nested] {
+            let circuit = parse(&variant);
+            let plan = SamplingCompiler::new()
+                .compile(&circuit)
+                .expect("compile detector circuit");
+            let reference = plan.try_reference_sample().expect("reference sample");
+            // Nesting the round loop must not change the measurement record.
+            assert_eq!(
+                flat_reference.get_or_insert_with(|| reference.clone()),
+                &reference,
+                "{variant}"
+            );
+            let expected = detector_parities(&circuit, &reference);
+            assert!(!expected.is_empty(), "{variant}");
+            let signs = crate::circuit_reference_signs(&circuit).expect("reference signs");
+            assert_eq!(signs.detector_signs(), expected.as_slice(), "{variant}");
+            // Independent noiseless executions draw every random outcome, so each deterministic
+            // detector must take the same value in them as in the reference sample.
+            let mut frame = StabilizerFrame::try_new(plan.qubit_count()).expect("sampling frame");
+            let (mut record, mut output) = (Vec::new(), Vec::new());
+            for _ in 0..3 {
+                plan.sample_shot_in_mode_into(
+                    &mut rng,
+                    ExecutionMode::Sample,
+                    &[],
+                    &mut frame,
+                    &mut record,
+                    &mut output,
+                )
+                .expect("sample noiseless shot");
+                assert_eq!(
+                    detector_parities(&circuit, &output),
+                    expected,
+                    "a deterministic detector disagrees with the reference sample:\n{variant}"
+                );
+            }
+            ReferencePaths::compute(&circuit).assert_agree(&variant);
+        }
+    }
+}
+
+/// Detector parities of one measurement record, by walking the flattened circuit.
+fn detector_parities(circuit: &Circuit, record: &[bool]) -> Vec<bool> {
+    let mut measured = 0_usize;
+    let mut parities = Vec::new();
+    for instruction in circuit.iter_flattened_instructions() {
+        let gate = instruction.gate();
+        if gate.canonical_name() == "DETECTOR" {
+            let parity = instruction
+                .targets()
+                .iter()
+                .filter_map(stab_model::Target::measurement_record_offset)
+                .fold(false, |parity, offset| {
+                    let index = i64::try_from(measured)
+                        .ok()
+                        .and_then(|measured| measured.checked_add(i64::from(offset.get())))
+                        .and_then(|index| usize::try_from(index).ok())
+                        .expect("detector lookback within record");
+                    parity ^ record.get(index).copied().expect("recorded measurement")
+                });
+            parities.push(parity);
+        } else if gate.produces_measurements() {
+            measured += instruction.target_groups().len();
+        }
+    }
+    assert_eq!(measured, record.len(), "measurement count");
+    parities
+}
+
+#[test]
+fn sessions_share_the_plan_reference_instead_of_recomputing_it() {
+    let params = SurfaceCodeParams::new(
+        RoundCount::try_new(5).expect("valid round count"),
+        CodeDistance::try_new(5).expect("valid code distance"),
+        SurfaceCodeTask::RotatedMemoryX,
+    )
+    .expect("valid surface-code parameters")
+    .with_before_measure_flip_probability(Probability::try_new(0.01).expect("probability"));
+    let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+    let plan = SamplingCompiler::new()
+        .compile(generated.circuit())
+        .expect("compile surface circuit");
+
+    let runs_before = super::super::reference_run::reference_run_count();
+    let sample = |plan: &SamplingPlan| {
+        let mut session = plan
+            .session(RandomPolicy::Seeded(Seed::new(7)))
+            .expect("session");
+        let mut sink = RecordSink::default();
+        session.run(ShotCount::new(70), &mut sink).expect("run");
+        sink.records
+    };
+    let first = sample(&plan);
+    assert_eq!(
+        super::super::reference_run::reference_run_count(),
+        runs_before + 1,
+        "the first session computes the reference"
+    );
+    let second = sample(&plan.clone());
+    let reference = plan.try_reference_sample().expect("reference");
+    assert_eq!(
+        super::super::reference_run::reference_run_count(),
+        runs_before + 1,
+        "later sessions and reference requests reuse the plan's reference"
+    );
+    assert_eq!(first, second, "equal seeds must give equal samples");
+    assert_eq!(
+        reference,
+        super::super::api::compute_stabilizer_frame_reference_sample(&plan.inner)
+            .expect("generator-list reference")
+    );
+}
+
+#[test]
+fn memory_experiment_rounds_fold_once_the_state_recurs() {
+    let probability = Probability::try_new(0.001).expect("valid generated-circuit noise");
+    for task in [
+        SurfaceCodeTask::RotatedMemoryX,
+        SurfaceCodeTask::RotatedMemoryZ,
+    ] {
+        let params = SurfaceCodeParams::new(
+            RoundCount::try_new(60).expect("valid round count"),
+            CodeDistance::try_new(5).expect("valid code distance"),
+            task,
+        )
+        .expect("valid surface-code parameters")
+        .with_after_clifford_depolarization(probability);
+        let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+        let paths = ReferencePaths::compute(generated.circuit());
+        paths.assert_agree(&format!("{task:?}"));
+        // The round's Clifford does not return the preparing tableau to itself, so this fold
+        // relies on comparing stabilizer states rather than tableaux.
+        assert_eq!(paths.folded_stats.folded_repeats, 1, "{task:?}");
+        assert_eq!(paths.folded_stats.reused_iterations, 58, "{task:?}");
     }
 }
