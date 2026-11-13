@@ -54,7 +54,7 @@ just oracle::run --all-rows
 cargo test -p stab-oracle -- --ignored pinned_stim
 ```
 
-The result-format corpus, fixture manifest, gate helper, and pinned-Stim probes run the actual pinned Stim source. Every manifest row compares Stab against live pinned Stim or a stored pinned-Stim artifact; rows own their commands, comparators, source attribution, and statistical plans, and they do not promote semantic family status. Pinned Stim prints DEM decimals at `long double` precision, so live DEM text parity is defined on 128-bit `long double` hosts such as the AArch64 baseline, and CI runs these checks on an AArch64 runner.
+The result-format corpus, fixture manifest, gate helper, and pinned-Stim probes run the actual pinned Stim source. Every manifest row compares Stab against live pinned Stim or a stored pinned-Stim artifact; rows own their commands, comparators, source attribution, and statistical plans, and they do not promote semantic family status. Comparators are `exact-output`, `help-health`, in-process `structural`, one-sample `statistical` (each side against hand-written analytic probabilities), and `two-sample` (Stim's and Stab's `01` outputs from the same seeded argv tested against each other per column and per declared joint statistic); `just oracle::run --all-rows --statistical` runs both statistical kinds. Pinned Stim prints DEM decimals at `long double` precision, so live DEM text parity is defined on 128-bit `long double` hosts such as the AArch64 baseline, and CI runs these checks on an AArch64 runner.
 
 ## Performance
 

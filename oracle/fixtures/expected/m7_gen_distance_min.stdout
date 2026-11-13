@@ -1,0 +1,25 @@
+# Generated repetition_code circuit.
+# task: memory
+# rounds: 1
+# distance: 2
+# before_round_data_depolarization: 0
+# before_measure_flip_probability: 0
+# after_reset_flip_probability: 0
+# after_clifford_depolarization: 0
+# layout:
+# L0 Z1 d2
+# Legend:
+#     d# = data qubit
+#     L# = data qubit with logical observable crossing
+#     Z# = measurement qubit
+R 0 1 2
+TICK
+CX 0 1
+TICK
+CX 2 1
+TICK
+MR 1
+DETECTOR(1, 0) rec[-1]
+M 0 2
+DETECTOR(1, 1) rec[-1] rec[-2] rec[-3]
+OBSERVABLE_INCLUDE(0) rec[-1]

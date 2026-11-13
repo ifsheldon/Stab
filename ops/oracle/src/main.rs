@@ -68,7 +68,9 @@ enum Command {
         #[arg(long)]
         exact: bool,
 
-        /// Run only statistical fixture comparisons within the selected fixture set.
+        /// Run only statistical fixture comparisons within the selected fixture set: one-sample
+        /// `statistical` rows checked against analytic probabilities and `two-sample` rows that
+        /// compare Stim's and Stab's sampled distributions with each other.
         #[arg(long)]
         statistical: bool,
 

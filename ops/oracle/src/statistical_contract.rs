@@ -92,9 +92,47 @@ pub(crate) fn rejection_boundaries(
     (lower_max, upper_min)
 }
 
+/// Outcome of a pooled two-proportion z-test between two equal-size samples.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum TwoProportionOutcome {
+    /// Both samples observed the same count, including the zero-variance case where both are
+    /// constant at 0 or at `shots`.
+    Identical,
+    /// One sample is constantly 0 and the other constantly 1, which no sigma tolerance excuses.
+    DeterministicDisagreement,
+    /// The counts differ and the pooled standard error is positive.
+    Scored { z: f64 },
+}
+
+/// Scores `first` and `second` hits, each out of `shots`, with the pooled two-proportion z-test.
+///
+/// Returns `None` when `shots` is zero or either count exceeds `shots`.
+pub(crate) fn two_proportion_outcome(
+    first: u64,
+    second: u64,
+    shots: u64,
+) -> Option<TwoProportionOutcome> {
+    if shots == 0 || first > shots || second > shots {
+        return None;
+    }
+    if first == second {
+        return Some(TwoProportionOutcome::Identical);
+    }
+    if first.min(second) == 0 && first.max(second) == shots {
+        return Some(TwoProportionOutcome::DeterministicDisagreement);
+    }
+    let shots = shots as f64;
+    let pooled = (first as f64 + second as f64) / (2.0 * shots);
+    let standard_error = (pooled * (1.0 - pooled) * 2.0 / shots).sqrt();
+    let z = (first as f64 - second as f64) / shots / standard_error;
+    Some(TwoProportionOutcome::Scored { z })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{AcceptedCountRange, rejection_boundaries};
+    use super::{
+        AcceptedCountRange, TwoProportionOutcome, rejection_boundaries, two_proportion_outcome,
+    };
 
     #[test]
     fn accepted_count_range_uses_exact_integer_boundaries() {
@@ -105,5 +143,32 @@ mod tests {
         assert_eq!(range.maximum(), 30);
         assert!(range.contains(range.minimum()));
         assert!(range.contains(range.maximum()));
+    }
+
+    #[test]
+    fn two_proportion_outcome_scores_pooled_difference_and_zero_variance_edges() {
+        // Pooled p = 0.525, standard error = sqrt(0.525 * 0.475 * 2 / 20000) ~= 0.0049937.
+        let outcome = two_proportion_outcome(11_000, 10_000, 20_000);
+        assert!(
+            matches!(
+                outcome,
+                Some(TwoProportionOutcome::Scored { z }) if (z - 0.05 / 0.004_993_746).abs() < 1e-3
+            ),
+            "{outcome:?}"
+        );
+        assert_eq!(
+            two_proportion_outcome(0, 0, 20),
+            Some(TwoProportionOutcome::Identical)
+        );
+        assert_eq!(
+            two_proportion_outcome(20, 20, 20),
+            Some(TwoProportionOutcome::Identical)
+        );
+        assert_eq!(
+            two_proportion_outcome(0, 20, 20),
+            Some(TwoProportionOutcome::DeterministicDisagreement)
+        );
+        assert_eq!(two_proportion_outcome(21, 0, 20), None);
+        assert_eq!(two_proportion_outcome(0, 0, 0), None);
     }
 }

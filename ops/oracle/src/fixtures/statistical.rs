@@ -63,6 +63,15 @@ pub(super) fn validate_statistical_plan(plan: &str, argv_tokens: &[String]) -> O
         Ok(plan) => plan,
         Err(reason) => return Some(reason),
     };
+    validate_shots_and_seed(plan.sample_count, plan.fixed_seed, argv_tokens)
+}
+
+/// Checks that a plan's declared sample count and seed are the ones the argv requests.
+pub(super) fn validate_shots_and_seed(
+    sample_count: usize,
+    fixed_seed: u64,
+    argv_tokens: &[String],
+) -> Option<String> {
     let shots = match option_value(argv_tokens, "--shots") {
         Some(value) => value,
         None => return Some("statistical fixture argv does not declare --shots".to_string()),
@@ -71,10 +80,9 @@ pub(super) fn validate_statistical_plan(plan: &str, argv_tokens: &[String]) -> O
         Ok(shots) => shots,
         Err(error) => return Some(format!("invalid --shots value {shots:?}: {error}")),
     };
-    if shots != plan.sample_count {
+    if shots != sample_count {
         return Some(format!(
-            "statistical plan sample_count={} does not match --shots {shots}",
-            plan.sample_count
+            "statistical plan sample_count={sample_count} does not match --shots {shots}"
         ));
     }
     let seed = match option_value(argv_tokens, "--seed") {
@@ -85,10 +93,9 @@ pub(super) fn validate_statistical_plan(plan: &str, argv_tokens: &[String]) -> O
         Ok(seed) => seed,
         Err(error) => return Some(format!("invalid --seed value {seed:?}: {error}")),
     };
-    if seed != plan.fixed_seed {
+    if seed != fixed_seed {
         return Some(format!(
-            "statistical plan fixed_seed={} does not match --seed {seed}",
-            plan.fixed_seed
+            "statistical plan fixed_seed={fixed_seed} does not match --seed {seed}"
         ));
     }
     None
@@ -239,43 +246,11 @@ enum StatisticalTolerance {
 }
 
 fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
-    let mut sample_count = None;
-    let mut fixed_seed = None;
-    let mut false_positive_rate = None;
     let mut source = None;
     let mut tolerance = None;
+    let mut common = CommonPlanFields::default();
     for token in plan.split(';').map(str::trim) {
-        if token.is_empty() {
-            continue;
-        }
-        if let Some(value) = token.strip_prefix("sample_count=") {
-            let parsed = value
-                .parse::<usize>()
-                .map_err(|error| format!("invalid sample_count {value:?}: {error}"))?;
-            if parsed == 0 {
-                return Err("sample_count must be positive".to_string());
-            }
-            sample_count = Some(parsed);
-            continue;
-        }
-        if let Some(value) = token.strip_prefix("fixed_seed=") {
-            fixed_seed = Some(
-                value
-                    .parse::<u64>()
-                    .map_err(|error| format!("invalid fixed_seed {value:?}: {error}"))?,
-            );
-            continue;
-        }
-        if let Some(value) = token.strip_prefix("false_positive_rate<=") {
-            let parsed = value
-                .parse::<f64>()
-                .map_err(|error| format!("invalid false_positive_rate {value:?}: {error}"))?;
-            if !parsed.is_finite() || !(0.0..=1.0).contains(&parsed) || parsed == 0.0 {
-                return Err(format!(
-                    "false_positive_rate {parsed} must be positive and at most 1"
-                ));
-            }
-            false_positive_rate = Some(parsed);
+        if token.is_empty() || common.parse_token(token)? {
             continue;
         }
         if let Some(value) = token.strip_prefix("source=") {
@@ -307,20 +282,76 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
         }
         return Err(format!("unknown statistical plan token {token:?}"));
     }
-    let false_positive_rate = false_positive_rate
-        .ok_or_else(|| "statistical plan does not contain false_positive_rate".to_string())?;
+    let (sample_count, fixed_seed, false_positive_rate) = common.finish()?;
     let tolerance = tolerance
         .ok_or_else(|| "statistical plan does not contain a statistical tolerance".to_string())?;
     validate_false_positive_budget(false_positive_rate, &tolerance)?;
     Ok(StatisticalPlan {
-        sample_count: sample_count
-            .ok_or_else(|| "statistical plan does not contain sample_count".to_string())?,
-        fixed_seed: fixed_seed
-            .ok_or_else(|| "statistical plan does not contain fixed_seed".to_string())?,
+        sample_count,
+        fixed_seed,
         false_positive_rate,
         source: source.unwrap_or(StatisticalSource::Stdout),
         tolerance,
     })
+}
+
+/// Plan tokens shared by the one-sample and two-sample statistical grammars.
+#[derive(Default)]
+pub(super) struct CommonPlanFields {
+    sample_count: Option<usize>,
+    fixed_seed: Option<u64>,
+    false_positive_rate: Option<f64>,
+}
+
+impl CommonPlanFields {
+    /// Consumes `token` when it is a shared plan token, returning whether it was consumed.
+    pub(super) fn parse_token(&mut self, token: &str) -> Result<bool, String> {
+        if let Some(value) = token.strip_prefix("sample_count=") {
+            let parsed = value
+                .parse::<usize>()
+                .map_err(|error| format!("invalid sample_count {value:?}: {error}"))?;
+            if parsed == 0 {
+                return Err("sample_count must be positive".to_string());
+            }
+            self.sample_count = Some(parsed);
+            return Ok(true);
+        }
+        if let Some(value) = token.strip_prefix("fixed_seed=") {
+            self.fixed_seed = Some(
+                value
+                    .parse::<u64>()
+                    .map_err(|error| format!("invalid fixed_seed {value:?}: {error}"))?,
+            );
+            return Ok(true);
+        }
+        if let Some(value) = token.strip_prefix("false_positive_rate<=") {
+            let parsed = value
+                .parse::<f64>()
+                .map_err(|error| format!("invalid false_positive_rate {value:?}: {error}"))?;
+            if !parsed.is_finite() || !(0.0..=1.0).contains(&parsed) || parsed == 0.0 {
+                return Err(format!(
+                    "false_positive_rate {parsed} must be positive and at most 1"
+                ));
+            }
+            self.false_positive_rate = Some(parsed);
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Returns `(sample_count, fixed_seed, false_positive_rate)` once all are declared.
+    pub(super) fn finish(self) -> Result<(usize, u64, f64), String> {
+        let false_positive_rate = self
+            .false_positive_rate
+            .ok_or_else(|| "statistical plan does not contain false_positive_rate".to_string())?;
+        let sample_count = self
+            .sample_count
+            .ok_or_else(|| "statistical plan does not contain sample_count".to_string())?;
+        let fixed_seed = self
+            .fixed_seed
+            .ok_or_else(|| "statistical plan does not contain fixed_seed".to_string())?;
+        Ok((sample_count, fixed_seed, false_positive_rate))
+    }
 }
 
 fn validate_false_positive_budget(
@@ -340,7 +371,7 @@ fn validate_false_positive_budget(
     Ok(())
 }
 
-fn two_sided_normal_tail_bound(sigma: f64) -> f64 {
+pub(super) fn two_sided_normal_tail_bound(sigma: f64) -> f64 {
     (std::f64::consts::FRAC_2_SQRT_PI / std::f64::consts::SQRT_2) * (-0.5 * sigma * sigma).exp()
         / sigma
 }
@@ -362,7 +393,7 @@ fn parse_bucket_text_and_sigma<'a>(token: &str, rest: &'a str) -> Result<(&'a st
     Ok((bucket_text, sigma))
 }
 
-fn parse_sigma(token: &str, sigma_text: &str, kind: &str) -> Result<f64, String> {
+pub(super) fn parse_sigma(token: &str, sigma_text: &str, kind: &str) -> Result<f64, String> {
     let Some(sigma_text) = sigma_text.strip_suffix(" sigma") else {
         return Err(format!("invalid {kind} statistical sigma token {token:?}"));
     };
@@ -430,7 +461,7 @@ fn parse_bucket_probabilities(text: &str) -> Result<Vec<(String, f64)>, String> 
     Ok(buckets)
 }
 
-fn option_value<'a>(tokens: &'a [String], option: &str) -> Option<&'a str> {
+pub(super) fn option_value<'a>(tokens: &'a [String], option: &str) -> Option<&'a str> {
     let with_equals = format!("{option}=");
     for (index, token) in tokens.iter().enumerate() {
         if token == option {

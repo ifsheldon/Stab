@@ -15,6 +15,7 @@ mod outputs;
 mod paths;
 mod reverse_flow;
 mod statistical;
+mod two_sample;
 
 pub(crate) use id::FixtureId;
 use paths::{fixture_file, validate_fixture_path};
@@ -44,13 +45,16 @@ impl RunFilter {
         }
     }
 
+    /// `Statistical` selects both one-sample analytic rows and Stim-versus-Stab two-sample rows.
     fn matches(self, row: &FixtureRow) -> bool {
-        row.comparator
-            == match self {
-                Self::Exact => FixtureComparator::ExactOutput,
-                Self::Statistical => FixtureComparator::Statistical,
-                Self::Structural => FixtureComparator::Structural,
-            }
+        match self {
+            Self::Exact => row.comparator == FixtureComparator::ExactOutput,
+            Self::Statistical => matches!(
+                row.comparator,
+                FixtureComparator::Statistical | FixtureComparator::TwoSample
+            ),
+            Self::Structural => row.comparator == FixtureComparator::Structural,
+        }
     }
 }
 
@@ -79,6 +83,8 @@ enum FixtureComparator {
     Statistical,
     #[serde(rename = "structural")]
     Structural,
+    #[serde(rename = "two-sample")]
+    TwoSample,
 }
 
 impl FixtureComparator {
@@ -88,6 +94,7 @@ impl FixtureComparator {
             Self::HelpHealth => "help-health",
             Self::Statistical => "statistical",
             Self::Structural => "structural",
+            Self::TwoSample => "two-sample",
         }
     }
 }
@@ -277,7 +284,9 @@ impl FixtureManifest {
             }
             if matches!(
                 row.comparator,
-                FixtureComparator::Statistical | FixtureComparator::Structural
+                FixtureComparator::Statistical
+                    | FixtureComparator::Structural
+                    | FixtureComparator::TwoSample
             ) && row.statistical_plan.is_empty()
             {
                 violations.push(format!(
@@ -291,6 +300,20 @@ impl FixtureManifest {
                     statistical::validate_statistical_plan(&row.statistical_plan, &argv_tokens)
                 {
                     violations.push(format!("{} invalid statistical plan: {reason}", row.id));
+                }
+            }
+            if row.comparator == FixtureComparator::TwoSample {
+                if is_core_fixture(row) {
+                    violations.push(format!(
+                        "{} two-sample rows must run the Stim and Stab binaries",
+                        row.id
+                    ));
+                }
+                let argv_tokens = row.argv_tokens();
+                if let Some(reason) =
+                    two_sample::validate_two_sample_plan(&row.statistical_plan, &argv_tokens)
+                {
+                    violations.push(format!("{} invalid two-sample plan: {reason}", row.id));
                 }
             }
             validate_vendor_source(root, row, &mut violations);
@@ -563,7 +586,9 @@ fn run_core_fixture(
         FixtureComparator::Structural => {
             compare_core_parse_print_structure(row, &stdin, &output.stdout.bytes)?;
         }
-        FixtureComparator::HelpHealth | FixtureComparator::Statistical => {
+        FixtureComparator::HelpHealth
+        | FixtureComparator::Statistical
+        | FixtureComparator::TwoSample => {
             return Err(FixtureError::ComparatorMismatch {
                 id: row.id.clone(),
                 comparator: row.comparator.as_str(),
@@ -768,6 +793,11 @@ fn compare_fixture(
             Ok(statistical::StatisticalSource::FixtureOutput) => compare_exact(stim, stab),
             Err(reason) => Some(reason),
         },
+        FixtureComparator::TwoSample => two_sample::compare_two_sample_plan(
+            &row.statistical_plan,
+            &stim.stdout.bytes,
+            &stab.stdout.bytes,
+        ),
         FixtureComparator::Structural => Some(format!(
             "{} comparator runs only for in-process core fixtures",
             row.comparator.as_str()
