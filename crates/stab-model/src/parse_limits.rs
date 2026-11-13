@@ -50,7 +50,7 @@ impl RepeatNestingLimitError {
 /// Configurable safety budgets for circuit and detector-error-model text parsing.
 ///
 /// The memory budget bounds the source bytes plus the conservative retained size of the parsed
-/// model, charged before each declaration and target is retained. Repeat nesting is the shared
+/// model, charged before each declaration, target, argument, and tag is retained. Repeat nesting is the shared
 /// recursion envelope. Numeric representability and identifier domains remain semantic parser
 /// contracts instead of configurable resource policy.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -112,6 +112,11 @@ const DECLARATION_HEAP_OVERHEAD_BYTES: u64 = 32;
 /// Target vectors grow by doubling, including when adjacent instructions fuse, so each retained
 /// target is charged for up to two slots.
 const TARGET_SLOTS_PER_TARGET: u64 = 2;
+
+/// Conservative retained bytes of one parsed argument, charged for two slots like a target.
+const ARGUMENT_BYTES: u64 = size_of::<f64>() as u64 * TARGET_SLOTS_PER_TARGET;
+/// Tag bytes are charged twice, covering the parsed text and its retained copy.
+const TAG_COPIES: u64 = 2;
 
 /// Conservative retained bytes of one parsed declaration, excluding its targets.
 const fn declaration_bytes(dialect: ModelDialect) -> u64 {
@@ -217,6 +222,23 @@ impl ParseAdmission {
         span: ByteSpan,
     ) -> ModelResult<()> {
         let bytes = (count as u128).saturating_mul(u128::from(target_bytes(self.dialect)));
+        self.charge(bytes, source_line, span)
+    }
+
+    /// Charges a declaration's parenthesized arguments and its tag.
+    pub(crate) fn admit_payload(
+        &mut self,
+        argument_count: usize,
+        tag_bytes: usize,
+        source_line: usize,
+        span: ByteSpan,
+    ) -> ModelResult<()> {
+        let bytes = (argument_count as u128)
+            .saturating_mul(u128::from(ARGUMENT_BYTES))
+            .saturating_add((tag_bytes as u128).saturating_mul(u128::from(TAG_COPIES)));
+        if bytes == 0 {
+            return Ok(());
+        }
         self.charge(bytes, source_line, span)
     }
 

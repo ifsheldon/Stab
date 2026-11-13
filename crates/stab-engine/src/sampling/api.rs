@@ -1,12 +1,11 @@
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
-use stab_model::{Circuit, MemoryBudget};
+use stab_model::{Cancellation, Circuit, MemoryBudget};
 use stab_records::{BitPlane64Batch, MeasurementBatchView, MeasurementSink, MeasurementWidth};
 use thiserror::Error;
 
@@ -150,10 +149,14 @@ impl ReferenceSampleLoopPolicy {
 ///
 /// The memory budget bounds the compiled program, every session's reusable storage, and the
 /// reference-simulator scratch, each admitted before it is allocated.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+///
+/// The cancellation signal is polled while the plan's reference sample is computed and by every
+/// session of the plan, which also returns it from [`SamplingSession::cancellation`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SamplingCompiler {
     reference_sample_loop_policy: ReferenceSampleLoopPolicy,
     memory_budget: MemoryBudget,
+    cancellation: Cancellation,
 }
 
 impl SamplingCompiler {
@@ -161,6 +164,7 @@ impl SamplingCompiler {
         Self {
             reference_sample_loop_policy: ReferenceSampleLoopPolicy::Fold,
             memory_budget: MemoryBudget::DEFAULT,
+            cancellation: Cancellation::never(),
         }
     }
 
@@ -170,12 +174,21 @@ impl SamplingCompiler {
         self
     }
 
+    #[must_use]
     pub const fn reference_sample_loop_policy(mut self, policy: ReferenceSampleLoopPolicy) -> Self {
         self.reference_sample_loop_policy = policy;
         self
     }
 
-    pub fn compile(self, circuit: &Circuit) -> Result<SamplingPlan, SamplingCompileError> {
+    /// Sets the cancellation signal polled by the plan and its sessions.
+    #[must_use]
+    pub fn cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = cancellation;
+        self
+    }
+
+    pub fn compile(&self, circuit: &Circuit) -> Result<SamplingPlan, SamplingCompileError> {
+        self.cancellation.check()?;
         let backend = SamplingBackend::Scalar;
         let request_fingerprint = CompilationRequestFingerprint::for_sampling(circuit);
         let program = compile_program(circuit, self.memory_budget)?;
@@ -195,6 +208,7 @@ impl SamplingCompiler {
                 sweep_bit_count: counts.sweep_bits,
                 program,
                 memory_budget: self.memory_budget,
+                cancellation: self.cancellation.clone(),
                 reference_sample_loop_policy: self.reference_sample_loop_policy,
                 reference_sample: OnceLock::new(),
                 backend,
@@ -398,6 +412,7 @@ pub(super) struct SamplingPlanInner {
     pub(super) sweep_bit_count: usize,
     pub(super) program: CircuitProgram,
     pub(super) memory_budget: MemoryBudget,
+    pub(super) cancellation: Cancellation,
     pub(super) reference_sample_loop_policy: ReferenceSampleLoopPolicy,
     /// The all-zero-sweep reference sample, computed at most once per successful plan.
     reference_sample: OnceLock<Vec<bool>>,
@@ -443,26 +458,21 @@ enum SessionFrame {
     },
 }
 
-/// Cooperative cancellation state checked between completed bounded sampling batches.
-///
-/// One expensive shot may delay the next check, so this does not promise a wall-clock deadline.
-#[derive(Clone, Debug, Default)]
-pub struct SamplingCancellation {
-    cancelled: Arc<AtomicBool>,
+/// Signal used by sessions whose plan has no cancellable signal and that never handed one out.
+static NEVER_CANCELLED: Cancellation = Cancellation::never();
+
+/// The cancellation a session polls: its plan's signal when that one is cancellable, otherwise
+/// the session-local signal created by its first `cancellation()` call, if any.
+pub(crate) fn session_cancellation(slot: &OnceLock<Cancellation>) -> &Cancellation {
+    slot.get().unwrap_or(&NEVER_CANCELLED)
 }
 
-impl SamplingCancellation {
-    pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Release);
-    }
-
-    pub fn reset(&self) {
-        self.cancelled.store(false, Ordering::Release);
-    }
-
-    #[inline(always)]
-    pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
+/// A session's cancellation slot, holding `plan_signal` when it is cancellable.
+pub(crate) fn session_cancellation_slot(plan_signal: &Cancellation) -> OnceLock<Cancellation> {
+    if plan_signal.is_cancellable() {
+        OnceLock::from(plan_signal.clone())
+    } else {
+        OnceLock::new()
     }
 }
 
@@ -494,6 +504,10 @@ pub enum SamplingExecutionError {
 
     #[error("sampling execution violated an internal batch invariant: {message}")]
     InternalInvariant { message: String },
+
+    /// Cancellation was observed inside a batch or while computing the reference sample.
+    #[error(transparent)]
+    Cancelled(#[from] stab_model::Cancelled),
 }
 
 /// Sink operation that failed.
@@ -634,7 +648,7 @@ pub struct SamplingSession {
     frame: SessionFrame,
     uses_reference_sample: bool,
     batch: BitPlane64Batch,
-    cancellation: OnceLock<Arc<AtomicBool>>,
+    cancellation: OnceLock<Cancellation>,
     total_committed_shots: u64,
     poisoned: bool,
     not_sync: PhantomData<Cell<()>>,
@@ -647,10 +661,7 @@ impl fmt::Debug for SamplingSession {
             .field("plan", &self.plan)
             .field(
                 "cancelled",
-                &self
-                    .cancellation
-                    .get()
-                    .is_some_and(|cancelled| cancelled.load(Ordering::Acquire)),
+                &session_cancellation(&self.cancellation).is_cancelled(),
             )
             .field("total_committed_shots", &self.total_committed_shots)
             .field("poisoned", &self.poisoned)
@@ -691,26 +702,26 @@ impl SamplingSession {
                 message: source.to_string(),
             },
         )?;
+        let cancellation = session_cancellation_slot(&plan.inner.cancellation);
         Ok(Self {
             plan,
             rng,
             frame,
             uses_reference_sample,
             batch,
-            cancellation: OnceLock::new(),
+            cancellation,
             total_committed_shots: 0,
             poisoned: false,
             not_sync: PhantomData,
         })
     }
 
-    pub fn cancellation(&self) -> SamplingCancellation {
-        SamplingCancellation {
-            cancelled: Arc::clone(
-                self.cancellation
-                    .get_or_init(|| Arc::new(AtomicBool::new(false))),
-            ),
-        }
+    /// The signal this session polls between and inside batches.
+    ///
+    /// It is the plan's signal when [`SamplingCompiler::cancellation`] supplied a cancellable one,
+    /// and otherwise a session-local signal created by the first call.
+    pub fn cancellation(&self) -> Cancellation {
+        self.cancellation.get_or_init(Cancellation::new).clone()
     }
 
     pub const fn is_poisoned(&self) -> bool {
@@ -731,6 +742,12 @@ impl SamplingSession {
     /// Successful and cooperatively cancelled nonempty requests finalize the sink. A sink-write or
     /// engine failure stops immediately without finalization because the sink may already contain
     /// an unknown partial prefix.
+    ///
+    /// Cancellation observed before a batch starts returns [`SamplingRunStatus::Cancelled`] and
+    /// leaves the session resumable with an unchanged seeded stream. Cancellation observed while a
+    /// batch is being sampled discards that batch, returns
+    /// [`SamplingExecutionError::Cancelled`] without finalizing the sink, and poisons the session,
+    /// because the random stream has already advanced into the discarded batch.
     ///
     /// A zero-shot request neither calls nor finalizes the sink.
     pub fn run<Sink>(
@@ -835,14 +852,13 @@ impl SamplingSession {
             session_reference(&self.plan, self.uses_reference_sample)?,
             &mut self.rng,
             shot_count,
+            session_cancellation(&self.cancellation),
         )
     }
 
     #[inline(always)]
     fn is_cancelled(&self) -> bool {
-        self.cancellation
-            .get()
-            .is_some_and(|cancelled| cancelled.load(Ordering::Acquire))
+        session_cancellation(&self.cancellation).is_cancelled()
     }
 
     const fn summary(

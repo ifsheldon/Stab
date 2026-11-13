@@ -191,7 +191,7 @@ pub(super) struct SessionCapacities {
 
 pub(super) fn initial_capacities(
     plan: &DemSamplingPlan,
-    limits: DemSamplerLimits,
+    limits: &DemSamplerLimits,
 ) -> Result<SessionCapacities, DemSamplingExecutionError> {
     // Batch shape follows the historical 64 MiB active-batch target, which keeps seeded streams
     // independent of the admission budget; only a smaller budget shrinks it further.
@@ -236,7 +236,7 @@ pub(super) fn validate_session_storage(
     output_shots: usize,
     sample_shots: usize,
     include_sampled_errors: bool,
-    limits: DemSamplerLimits,
+    limits: &DemSamplerLimits,
 ) -> Result<(), DemSamplingExecutionError> {
     let estimated_bytes =
         session_storage_bytes(plan, output_shots, sample_shots, include_sampled_errors);

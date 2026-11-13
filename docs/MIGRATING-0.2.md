@@ -77,18 +77,36 @@ Every admitted workload produces byte-identical output; only workloads that the 
 | `CircuitFlattenLimits` count fields, `DEFAULT_MAX_*` constants, and builders | `CircuitFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `DemFlattenLimits` repeat-unroll, expanded-instruction, repeat-iteration, target, argument, and byte fields, `DEFAULT_MAX_*` constants, and builders | `DemFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `CircuitPassLimits` item, target, argument, and payload fields, `DEFAULT_MAX_*` constants, and builders | `CircuitPassLimits::new(memory_budget, repeat_nesting)` with `memory_budget` and `with_memory_budget` |
-| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, ErrorMatcher, and coordinate-query work caps | Removed; retained storage is admitted against the default budget, and `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_memory_budget`, `DetectorErrorModel::detector_coordinates_with_memory_budget`, and the generator parameters' `with_memory_budget` accept a caller budget |
+| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, ErrorMatcher, and coordinate-query work caps | Removed; retained storage is admitted against the default budget, and `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_memory_budget`, and the generator parameters' `with_memory_budget` accept a caller budget |
 | The generator's 131,072-physical-qubit cap | A projected 2048 bytes per physical qubit admitted against the generator parameters' budget |
 
 `ErrorAnalyzerOptions` gained the public `memory_budget` field, so struct literals must add it or use `..ErrorAnalyzerOptions::default()`.
 The CLI's fixed 64 MiB input caps and 1 MiB or 64 MiB per-record caps are replaced by `--memory-budget`, which bounds whole inputs at the budget and streamed records at half of it.
+
+## Cooperative Cancellation
+
+E4 adds one cancellation signal, `stab_model::Cancellation`, with its error `stab_model::Cancelled`, both also exported from the `stab-core` root.
+`Cancellation::new()` creates a settable signal and `Cancellation::never()`, also the `Default`, one that cannot be set, so code that never cancels keeps its behavior.
+See the resource policy inventory's Cooperative Cancellation section for where each operation polls the signal and what it returns.
+
+| Changed item | Migration |
+| --- | --- |
+| `SamplingCancellation`, `DemSamplingCancellation` | Removed; every session's `cancellation()` now returns `stab_model::Cancellation`, which keeps `cancel`, `reset`, and `is_cancelled` |
+| `SamplingCompiler`, `MeasurementToDetectionCompiler`, `DetectionSamplingCompiler`, `DetectionConversionLimits`, `DemSamplerLimits`, `CircuitFlattenLimits`, `DemFlattenLimits` | No longer `Copy`; their `compile` methods take `&self`, limit accessors take `&self`, and `cancellation`/`with_cancellation` builders were added; clone a value that is used twice |
+| `ErrorAnalyzerOptions`, `MissingDetectorOptions`, `DetectingRegionOptions`, `DetectingRegionTargetOptions`, `TimeReversedForFlowsOptions`, `InverseQecOptions` | Gained a public `cancellation` field and are no longer `Copy`; struct literals add `cancellation: Cancellation::never()` or use `..Default::default()`, and `MissingDetectorOptions` now implements `Default` |
+| `circuit_with_inlined_feedback_with_memory_budget(circuit, budget)` | `circuit_with_inlined_feedback_with_limits(circuit, FeedbackInliningLimits::new(budget))` |
+| None | `circuit_flow_generators_with_options` with `FlowGeneratorOptions`, `explain_errors_from_circuit_with_options` with `ExplainErrorsOptions`, `DemFlattenedInstructionIter::with_cancellation`, the defaulted `FoldedDemVisitor::poll_cancellation` hook, and `stab_model::advanced::CancellationCountdown` |
+| Exhaustive matches on `ModelError`, `AnalysisError`, `SamplingCompileError`, `SamplingExecutionError`, `DetectionError`, `DetectionExecutionError`, and `DemError` | Add the new `Cancelled(Cancelled)` variant; `SamplingCompileErrorCode::Cancelled` reports `cancelled`, and `AnalysisError` converts a model `Cancelled` into its own variant |
+
+A frame-sampling session that observes cancellation inside a batch returns the `Cancelled` error and is poisoned, because its random stream already advanced; between batches it still returns the resumable `Cancelled` status.
+Measurement-to-detection conversion and DEM sampling and replay report an in-batch cancellation as the resumable `Cancelled` status.
 
 ## Parser Limits
 
 Circuit and DEM command boundaries accept Stim's ASCII whitespace, including vertical tabs and form feeds before commands and repeat terminators. Whitespace inside instruction arguments and targets keeps the stricter Stim grammar, and diagnostics retain exact source-byte spans.
 
 `ParseLimits::new` now takes a `MemoryBudget` and a `RepeatNestingLimit`.
-The budget bounds the source bytes plus the conservative retained size of the parsed model and defaults to one gibibyte; source lines, compact declarations, and retained targets are no longer capped.
+The budget bounds the source bytes plus the conservative retained size of the parsed model, including every declaration, target, argument, and tag, and defaults to one gibibyte; source lines, compact declarations, and retained targets are no longer capped.
 `SourceByteLimit`, `SourceLineLimit`, `RepresentedInstructionLimit`, and `RepresentedTargetLimit` and the `ParseLimits` accessors and builders for them are removed; use `with_memory_budget` and `memory_budget`.
 `ResourceKind::SourceLines`, `RepresentedInstructions`, and `RepresentedTargets` are replaced by `ResourceKind::RetainedBytes`.
 

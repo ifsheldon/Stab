@@ -20,6 +20,7 @@ use stab_model::{Circuit, Probability};
 
 const KNOWN_INPUT: MissingDetectorOptions = MissingDetectorOptions {
     ignore_non_deterministic_measurements: false,
+    cancellation: stab_model::Cancellation::never(),
 };
 
 fn matrix_circuits() -> Vec<(String, Circuit)> {

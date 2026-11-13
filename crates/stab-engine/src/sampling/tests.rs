@@ -158,6 +158,7 @@ fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionSt
             plan.reference_sample_loop_policy(),
             &[],
             &mut output,
+            &stab_model::Cancellation::never(),
         )
         .expect("execute reference program");
     let stats = take_reference_execution_stats();

@@ -68,6 +68,23 @@ target = "circuit_pass"
 name = "circuit_pass_validates_output_and_preserves_typed_diagnostics"
 
 [[families]]
+id = "stab-extensions.cooperative-cancellation"
+area = "stab-extensions"
+contract = "Library sampling, detection, measurement-to-detection, DEM sampling and replay, error analysis, flattening, feedback inlining, time reversal, flow generation, missing-detector, detecting-region, and ErrorMatcher operations poll a caller-supplied stab_model::Cancellation inside repeat interpretation and between batches, and stop with a typed Cancelled outcome without delivering a partially computed batch."
+stim_refs = ["doc/usage_command_line.md"]
+status = "divergence"
+owner = "stab-engine"
+divergence_kind = "stab-extension"
+rationale = "Stim has no cancellation signal and runs a compact astronomically repeated circuit until its work is done; Stab lets a library caller bound running time without fixed work caps."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-engine"
+kind = "test"
+target = "cancellation"
+name = "sampling_batch_stops_without_delivering_a_partial_batch"
+
+[[families]]
 id = "stab-extensions.decoder-session-layout-and-reuse"
 area = "stab-extensions"
 contract = "DecoderSession projects detector-model layouts and reuses state across whole and partitioned batches with equivalent predictions."

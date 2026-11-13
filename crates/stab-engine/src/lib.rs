@@ -15,9 +15,8 @@ mod sampling_estimate;
 pub use dem_sampling::{
     DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayBatchStatus, DemReplaySession,
     DemReplayTransaction, DemResourceKind, DemResourceLimitError, DemSamplerLimits,
-    DemSamplingCancellation, DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan,
-    DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,
-    DemSamplingSession,
+    DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError,
+    DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession,
 };
 pub use descriptor::CompilationDescriptor;
 pub(crate) use detection::DetectionRecordBuffer;
@@ -43,10 +42,9 @@ pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{
     CircuitReferenceSampleError, CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy,
     ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingBackend,
-    SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
-    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
-    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
-    circuit_reference_sample, count_determined_measurements,
+    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
+    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
+    Seed, ShotCount, SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
 };
 pub use sampling_estimate::estimate_sampling_request;
 

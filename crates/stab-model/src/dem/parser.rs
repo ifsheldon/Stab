@@ -87,11 +87,14 @@ impl<'a> DemParser<'a> {
                 self.admission
                     .admit_repeat_nesting(line_number, actual, semantic_line.span())?;
                 let body = self.parse_block(ParsedNestedDemItems::nested(), depth + 1)?;
-                items.push_item(super::DemItem::RepeatBlock(DemRepeatBlock::from_parts(
-                    repeat.count,
-                    body,
-                    repeat.tag,
-                )));
+                let repeat = DemRepeatBlock::from_parts(repeat.count, body, repeat.tag);
+                self.admission.admit_payload(
+                    0,
+                    repeat.tag_bytes().map_or(0, <[u8]>::len),
+                    line_number,
+                    semantic_line.span(),
+                )?;
+                items.push_item(super::DemItem::RepeatBlock(repeat));
             } else {
                 let instruction = if self
                     .admission
@@ -112,6 +115,12 @@ impl<'a> DemParser<'a> {
                         &mut self.admission,
                     )?
                 };
+                self.admission.admit_payload(
+                    instruction.args().len(),
+                    instruction.tag_bytes().map_or(0, <[u8]>::len),
+                    line_number,
+                    semantic_line.span(),
+                )?;
                 items.push_item(super::DemItem::Instruction(instruction));
             }
         }

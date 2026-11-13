@@ -153,7 +153,7 @@ fn circuit_to_dem_local_decomposition_symptom_boundary_matches_stim() {
         ..ErrorAnalyzerOptions::default()
     };
     assert_eq!(
-        circuit_to_detector_error_model(&local_sixteen, local_options)
+        circuit_to_detector_error_model(&local_sixteen, local_options.clone())
             .expect("sixteen-detector local decomposition succeeds")
             .to_dem_string(),
         LOCAL_DECOMPOSITION_16_EXPECTED

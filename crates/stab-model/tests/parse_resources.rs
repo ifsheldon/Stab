@@ -296,6 +296,63 @@ fn parser_admission_charges_fast_path_targets_and_prefusion_declarations() {
 }
 
 #[test]
+fn parser_admission_charges_arguments_and_tags_like_targets() {
+    // Each argument is charged for two f64 slots and each tag byte twice, so a line's retained
+    // charge grows by exactly those amounts beyond its extra source bytes.
+    let retained = |input: &str, parse: ParseStr| minimal_budget(input, parse) - input.len();
+    for (name, plain, decorated, extra, parse) in [
+        (
+            "circuit arguments",
+            "M 0\nDETECTOR rec[-1]\n",
+            "M 0\nDETECTOR(1,2,3,4,5,6,7,8) rec[-1]\n",
+            8 * 16,
+            parse_circuit_str as ParseStr,
+        ),
+        (
+            "circuit instruction tag",
+            "H 0\n",
+            "H[abcdefgh] 0\n",
+            8 * 2,
+            parse_circuit_str,
+        ),
+        (
+            "circuit repeat tag",
+            "REPEAT 2 {\nH 0\n}\n",
+            "REPEAT[abcd] 2 {\nH 0\n}\n",
+            4 * 2,
+            parse_circuit_str,
+        ),
+        (
+            "DEM arguments",
+            "detector D0\n",
+            "detector(1,2,3,4,5,6,7,8) D0\n",
+            8 * 16,
+            parse_dem_str,
+        ),
+        (
+            "DEM instruction tag",
+            "error(0.1) D0\n",
+            "error[abcdefgh](0.1) D0\n",
+            8 * 2,
+            parse_dem_str,
+        ),
+        (
+            "DEM repeat tag",
+            "repeat 2 {\nerror(0.1) D0\n}\n",
+            "repeat[abcd] 2 {\nerror(0.1) D0\n}\n",
+            4 * 2,
+            parse_dem_str,
+        ),
+    ] {
+        assert_eq!(
+            retained(decorated, parse) - retained(plain, parse),
+            extra,
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn parser_allocation_depends_only_on_admitted_model_storage() {
     fn allocations(
         input: &str,

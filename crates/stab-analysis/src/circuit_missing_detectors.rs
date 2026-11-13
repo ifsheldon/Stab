@@ -2,13 +2,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::Flow;
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, QubitId, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, QubitId,
+    Target,
 };
 
 use crate::{
-    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
+    AnalysisError, AnalysisResult, FlowGeneratorOptions, ResourceKind, ResourceLimitError,
+    ResourceOperation,
     circuit_flow::{FLOW_GENERATOR_MEMORY_BUDGET, flow_record_index},
-    circuit_flow_generators,
+    circuit_flow_generators_with_options,
 };
 
 mod final_repeat;
@@ -23,15 +25,25 @@ const DECLARED_ROW_TARGET_BYTES: u64 = 48;
 /// Declared rows are retained twice: once as declared and once reduced.
 const DECLARED_ROW_COPIES: u64 = 2;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MissingDetectorOptions {
     pub ignore_non_deterministic_measurements: bool,
+    /// Signal polled while flow generators are computed over the expanded circuit.
+    pub cancellation: Cancellation,
+}
+
+impl MissingDetectorOptions {
+    fn flow_generator_options(&self) -> FlowGeneratorOptions {
+        FlowGeneratorOptions {
+            cancellation: self.cancellation.clone(),
+        }
+    }
 }
 
 /// Finds deterministic measurement parities not covered by detectors or record-only observables.
 ///
 /// Detector rows and measurement invariants share one GF(2) elimination. The invariants come from
-/// [`circuit_flow_generators`], which is also the canonical owner for reset, measurement,
+/// [`crate::circuit_flow_generators`], which is also the canonical owner for reset, measurement,
 /// feedback, heralded-record, annotation, and compact-repeat semantics.
 pub fn missing_detectors(
     circuit: &Circuit,
@@ -40,14 +52,14 @@ pub fn missing_detectors(
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     if declaration_scan(circuit)?.instructions > FOLDED_FINAL_REPEAT_THRESHOLD
         && let Some(output) =
-            final_repeat::try_missing_detectors_folded_final_repeat(circuit, options, qubit_count)?
+            final_repeat::try_missing_detectors_folded_final_repeat(circuit, &options, qubit_count)?
     {
         return Ok(output);
     }
     if !contains_measurement_row_instruction(circuit) {
         return Ok(Circuit::new());
     }
-    missing_detectors_bounded(circuit, options, qubit_count)
+    missing_detectors_bounded(circuit, &options, qubit_count)
 }
 
 pub(super) fn contains_measurement_row_instruction(circuit: &Circuit) -> bool {
@@ -65,7 +77,7 @@ pub(super) fn contains_measurement_row_instruction(circuit: &Circuit) -> bool {
 
 pub(super) fn missing_detectors_bounded(
     circuit: &Circuit,
-    options: MissingDetectorOptions,
+    options: &MissingDetectorOptions,
     qubit_count: usize,
 ) -> AnalysisResult<Circuit> {
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
@@ -81,7 +93,10 @@ pub(super) fn missing_detectors_bounded(
     validate_missing_detector_flow_storage(qubit_count, measurement_count)?;
     let generator_circuit = circuit_with_known_input_resets(circuit, options, qubit_count)?;
     let invariants = collect_measurement_invariants(
-        circuit_flow_generators(&generator_circuit)?,
+        circuit_flow_generators_with_options(
+            &generator_circuit,
+            &options.flow_generator_options(),
+        )?,
         measurement_count,
     )?;
     let declarations = collect_declared_rows(circuit, measurement_count)?;
@@ -90,7 +105,7 @@ pub(super) fn missing_detectors_bounded(
 
 pub(super) fn terminal_state_signature(
     circuit: &Circuit,
-    options: MissingDetectorOptions,
+    options: &MissingDetectorOptions,
     qubit_count: usize,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
@@ -101,7 +116,9 @@ pub(super) fn terminal_state_signature(
     validate_missing_detector_flow_storage(qubit_count, measurement_count)?;
     let generator_circuit = circuit_with_known_input_resets(circuit, options, qubit_count)?;
     let mut signature = Vec::new();
-    for flow in circuit_flow_generators(&generator_circuit)? {
+    for flow in
+        circuit_flow_generators_with_options(&generator_circuit, &options.flow_generator_options())?
+    {
         if !flow.input().has_no_pauli_terms() || flow.output().has_no_pauli_terms() {
             continue;
         }
@@ -340,7 +357,7 @@ fn absolute_record_index(
 
 fn circuit_with_known_input_resets(
     circuit: &Circuit,
-    options: MissingDetectorOptions,
+    options: &MissingDetectorOptions,
     qubit_count: usize,
 ) -> AnalysisResult<Circuit> {
     if options.ignore_non_deterministic_measurements {

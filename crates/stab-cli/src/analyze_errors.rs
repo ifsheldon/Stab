@@ -99,6 +99,7 @@ where
                 .block_decompose_from_introducing_remnant_edges,
             approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
             memory_budget: args.memory.get(),
+            cancellation: stab_model::Cancellation::never(),
         },
     )?;
     let mut outputs = io.activate()?;

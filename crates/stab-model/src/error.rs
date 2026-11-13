@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{ParseError, ResourceLimitError, ValidationError};
+use crate::{Cancelled, ParseError, ResourceLimitError, ValidationError};
 
 /// Result type for stable model construction and validation.
 pub type ModelResult<T> = Result<T, ModelError>;
@@ -16,6 +16,10 @@ pub enum ModelError {
 
     #[error("{0}")]
     Validation(#[from] ValidationError),
+
+    /// A traversal given a cancellation signal observed it.
+    #[error(transparent)]
+    Cancelled(#[from] Cancelled),
 }
 
 impl ModelError {

@@ -1,6 +1,7 @@
 //! Stable typed Stim circuit and detector-error-model values.
 
 mod approximate;
+mod cancellation;
 mod circuit;
 mod controlled_pauli;
 mod dem;
@@ -21,6 +22,7 @@ mod source_text;
 mod target;
 mod validation;
 
+pub use cancellation::{Cancellation, Cancelled};
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
     CircuitInstruction, CircuitItem, RepeatBlock,
@@ -61,6 +63,7 @@ pub mod advanced {
         ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability, RepeatBlock,
         RepeatCount, Target,
     };
+    pub use crate::cancellation::CancellationCountdown;
     pub use crate::controlled_pauli::{
         ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
     };

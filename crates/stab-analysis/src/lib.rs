@@ -34,14 +34,15 @@ pub use circuit_detecting_regions::{
     circuit_detecting_regions, circuit_detecting_regions_for_targets,
 };
 pub use circuit_feedback::{
-    circuit_with_inlined_feedback, circuit_with_inlined_feedback_with_memory_budget,
+    FeedbackInliningLimits, circuit_with_inlined_feedback,
+    circuit_with_inlined_feedback_with_limits,
 };
 pub use circuit_flow::{
-    UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
+    FlowGeneratorOptions, UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
     check_if_circuit_has_unsigned_stabilizer_flows,
     check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
-    circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
-    solve_for_flow_measurements,
+    circuit_flow_generators_with_options, circuit_has_all_unsigned_stabilizer_flows,
+    circuit_has_unsigned_stabilizer_flow, solve_for_flow_measurements,
 };
 pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
@@ -82,7 +83,9 @@ pub use dem::{
     shortest_graphlike_undetectable_logical_error_with_limits,
 };
 pub use error::{AnalysisError, AnalysisResult};
-pub use error_matcher::explain_errors_from_circuit;
+pub use error_matcher::{
+    ExplainErrorsOptions, explain_errors_from_circuit, explain_errors_from_circuit_with_options,
+};
 pub use gate::{
     GateUnitaryMatrix, gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition,
     gate_has_flows, gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix,

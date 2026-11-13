@@ -74,7 +74,7 @@ fn reverse_family_error_classes_match_across_fold_modes() {
         let heralded =
             Circuit::from_stim_str("R 0\nHERALDED_ERASE(0.25) 0\nM 0\nDETECTOR rec[-1]\n")
                 .expect("heralded fixture");
-        let error = circuit_to_detector_error_model(&heralded, options)
+        let error = circuit_to_detector_error_model(&heralded, options.clone())
             .expect_err("heralded analysis requires the approximate option");
         assert!(
             error

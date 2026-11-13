@@ -3,9 +3,10 @@ use std::collections::BTreeMap;
 mod budget;
 mod filter;
 
+use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DetectorErrorModel, Gate, Pauli, Probability,
-    QubitId, RepeatBlock, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, DetectorErrorModel, Gate, Pauli,
+    Probability, QubitId, RepeatBlock, Target,
 };
 
 use crate::{
@@ -16,15 +17,43 @@ use crate::{
 use budget::validate_error_matcher_circuit;
 use filter::error_keys_from_dem;
 
+/// Options for [`explain_errors_from_circuit_with_options`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ExplainErrorsOptions {
+    /// Keep only the simplest circuit error location for each DEM error.
+    pub reduce_to_one_representative_error: bool,
+    /// Signal polled once per scanned instruction and repeat iteration, and by each candidate's
+    /// error analysis.
+    pub cancellation: Cancellation,
+}
+
 pub fn explain_errors_from_circuit(
     circuit: &Circuit,
     filter: Option<&DetectorErrorModel>,
     reduce_to_one_representative_error: bool,
 ) -> AnalysisResult<Vec<ExplainedError>> {
+    explain_errors_from_circuit_with_options(
+        circuit,
+        filter,
+        &ExplainErrorsOptions {
+            reduce_to_one_representative_error,
+            cancellation: Cancellation::never(),
+        },
+    )
+}
+
+/// Explains DEM errors by circuit error locations, polling the options' cancellation signal.
+pub fn explain_errors_from_circuit_with_options(
+    circuit: &Circuit,
+    filter: Option<&DetectorErrorModel>,
+    options: &ExplainErrorsOptions,
+) -> AnalysisResult<Vec<ExplainedError>> {
+    let reduce_to_one_representative_error = options.reduce_to_one_representative_error;
+    let cancellation = &options.cancellation;
     validate_error_matcher_circuit(circuit)?;
-    let detector_coords = detector_coordinates(circuit)?;
+    let detector_coords = detector_coordinates(circuit, cancellation)?;
     let filter_keys = filter
-        .map(error_keys_from_dem)
+        .map(|filter| error_keys_from_dem(filter, cancellation))
         .transpose()?
         .unwrap_or_default();
     let allow_new_entries = filter.is_none();
@@ -36,16 +65,18 @@ pub fn explain_errors_from_circuit(
         });
     }
 
-    for candidate in CandidateCollector::new(circuit)?.collect()? {
+    for candidate in CandidateCollector::new(circuit, cancellation)?.collect()? {
+        cancellation.check()?;
         let candidate_circuit = isolate_candidate(circuit, &candidate)?;
         let candidate_dem = circuit_to_detector_error_model(
             &candidate_circuit,
             ErrorAnalyzerOptions {
                 approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0)?),
+                cancellation: cancellation.clone(),
                 ..ErrorAnalyzerOptions::default()
             },
         )?;
-        for key in error_keys_from_dem(&candidate_dem)? {
+        for key in error_keys_from_dem(&candidate_dem, cancellation)? {
             if key.is_empty() {
                 continue;
             }
@@ -112,10 +143,10 @@ struct CandidateCollector<'a> {
 }
 
 impl<'a> CandidateCollector<'a> {
-    fn new(circuit: &'a Circuit) -> AnalysisResult<Self> {
+    fn new(circuit: &'a Circuit, cancellation: &Cancellation) -> AnalysisResult<Self> {
         Ok(Self {
             circuit,
-            state: ScanState::default(),
+            state: ScanState::new(cancellation),
         })
     }
 
@@ -680,11 +711,21 @@ struct ScanState {
     coord_offset: Vec<f64>,
     qubit_coords: BTreeMap<u64, Vec<f64>>,
     detector_coords: BTreeMap<u64, Vec<f64>>,
+    cancellation: Cancellation,
+    countdown: CancellationCountdown,
 }
 
 impl ScanState {
+    fn new(cancellation: &Cancellation) -> Self {
+        Self {
+            cancellation: cancellation.clone(),
+            ..Self::default()
+        }
+    }
+
     fn apply_repeat(&mut self, repeat: &RepeatBlock) -> AnalysisResult<()> {
         for _ in 0..repeat.repeat_count().get() {
+            self.countdown.tick(&self.cancellation)?;
             for item in repeat.body().items() {
                 match item {
                     CircuitItem::Instruction(instruction) => self.apply_instruction(instruction)?,
@@ -696,6 +737,7 @@ impl ScanState {
     }
 
     fn apply_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
+        self.countdown.tick(&self.cancellation)?;
         match instruction.gate().canonical_name() {
             "TICK" => {
                 self.tick_count = self.tick_count.checked_add(1).ok_or_else(|| {
@@ -773,8 +815,11 @@ impl ScanState {
     }
 }
 
-fn detector_coordinates(circuit: &Circuit) -> AnalysisResult<BTreeMap<u64, Vec<f64>>> {
-    let mut state = ScanState::default();
+fn detector_coordinates(
+    circuit: &Circuit,
+    cancellation: &Cancellation,
+) -> AnalysisResult<BTreeMap<u64, Vec<f64>>> {
+    let mut state = ScanState::new(cancellation);
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => state.apply_instruction(instruction)?,

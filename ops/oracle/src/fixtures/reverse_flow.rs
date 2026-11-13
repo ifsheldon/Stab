@@ -47,6 +47,7 @@ pub(super) fn core_time_reverse_flows_output(
         &flows,
         TimeReversedForFlowsOptions {
             dont_turn_measurements_into_resets: case.dont_turn_measurements_into_resets,
+            cancellation: stab_model::Cancellation::never(),
         },
     );
     let (inverse, inverse_flows) = match reversed {

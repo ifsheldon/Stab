@@ -153,7 +153,8 @@ The budget defaults to one gibibyte, is caller-selectable through each operation
 
 Format and representation invariants and the shared 256-level repeat-nesting envelope are not configurable resources.
 Explicit search budgets with budget-exhausted results remain separate caller policy.
-Count caps that only proxy memory and fixed work caps are not used; a compact input that fits the budget runs for as long as its work takes.
+Count caps that only proxy memory and fixed work caps are not used; a compact input that fits the budget runs for as long as its work takes unless the caller cancels it.
+Long-running library operations accept one `stab_model::Cancellation` signal on their limits or options value, poll it at bounded work intervals inside repeat interpretation and between batches, and stop with a typed `Cancelled` outcome.
 
 The [resource policy inventory](a2-resource-policy-inventory.md) classifies every remaining limit constant and records each removed one.
 

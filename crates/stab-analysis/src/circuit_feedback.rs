@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, GateCategory, MeasureRecordOffset,
-    MemoryBudget, Pauli, QubitId, RepeatBlock, RepeatCount, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, GateCategory,
+    MeasureRecordOffset, MemoryBudget, Pauli, QubitId, RepeatBlock, RepeatCount, Target,
     advanced::{
         CircuitBuilder, ClassicalControl, ControlledPauliTargetPair,
         classify_controlled_pauli_target_pair,
@@ -17,32 +17,74 @@ const MAX_FEEDBACK_REPEAT_NESTING: usize = 256;
 /// The unrolled reversed buffer and the rebuilt output circuit each retain the expansion.
 const FEEDBACK_RETAINED_COPIES: u64 = 2;
 
+/// Resource and cancellation policy for feedback inlining.
+///
+/// The memory budget bounds the conservative size of the unrolled intermediate and output
+/// circuits, projected before unrolling; expanded work itself is not capped. The cancellation
+/// signal is polled once per undone instruction and unrolled repeat iteration.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FeedbackInliningLimits {
+    memory_budget: MemoryBudget,
+    cancellation: Cancellation,
+}
+
+impl FeedbackInliningLimits {
+    pub const fn new(memory_budget: MemoryBudget) -> Self {
+        Self {
+            memory_budget,
+            cancellation: Cancellation::never(),
+        }
+    }
+
+    pub const fn memory_budget(&self) -> MemoryBudget {
+        self.memory_budget
+    }
+
+    pub const fn cancellation(&self) -> &Cancellation {
+        &self.cancellation
+    }
+
+    #[must_use]
+    pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.memory_budget = memory_budget;
+        self
+    }
+
+    #[must_use]
+    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = cancellation;
+        self
+    }
+}
+
 /// Inlines feedback within the default memory budget.
 pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    circuit_with_inlined_feedback_with_memory_budget(circuit, MemoryBudget::DEFAULT)
+    circuit_with_inlined_feedback_with_limits(circuit, FeedbackInliningLimits::default())
 }
 
 /// Inlines feedback after admitting the conservative size of its unrolled intermediate and
-/// output circuits against `budget`. Expanded work itself is not capped.
-pub fn circuit_with_inlined_feedback_with_memory_budget(
+/// output circuits against the limits' memory budget, polling the limits' cancellation signal.
+pub fn circuit_with_inlined_feedback_with_limits(
     circuit: &Circuit,
-    budget: MemoryBudget,
+    limits: FeedbackInliningLimits,
 ) -> AnalysisResult<Circuit> {
-    validate_feedback_repeat_budget(circuit, budget)?;
+    validate_feedback_repeat_budget(circuit, limits.memory_budget())?;
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         AnalysisError::invalid_detector_error_model(
             "measurement count does not fit usize while inlining feedback",
         )
     })?;
     let detector_count = detector_count(circuit)?;
+    let mut tracker = SparseReverseFrameTracker::new(
+        stab_model::advanced::circuit_simulated_qubit_count(circuit),
+        measurement_count,
+        detector_count,
+        false,
+    );
+    tracker.set_cancellation(limits.cancellation().clone());
     let mut helper = WithoutFeedbackHelper {
         reversed_output: Vec::new(),
-        tracker: SparseReverseFrameTracker::new(
-            stab_model::advanced::circuit_simulated_qubit_count(circuit),
-            measurement_count,
-            detector_count,
-            false,
-        ),
+        tracker,
         observable_changes: BTreeMap::new(),
         detector_changes: BTreeMap::new(),
     };
@@ -74,6 +116,7 @@ impl WithoutFeedbackHelper {
         let repeat_count = repeat.repeat_count().get();
         let mut outer_output = std::mem::take(&mut self.reversed_output);
         for _ in 0..repeat_count {
+            self.tracker.poll_cancellation()?;
             self.reversed_output.clear();
             self.undo_circuit(repeat.body())?;
             let body =
@@ -264,6 +307,7 @@ impl WithoutFeedbackHelper {
                 }
                 CircuitItem::RepeatBlock(repeat) => {
                     for _ in 0..repeat.repeat_count().get() {
+                        self.tracker.check_cancelled()?;
                         let body = self.build_output_from_items(
                             repeat.body().items(),
                             measurements_in_past,

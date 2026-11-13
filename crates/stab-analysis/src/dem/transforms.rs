@@ -45,13 +45,16 @@ pub fn flattened_detector_error_model_with_limits(
     model: &DetectorErrorModel,
     limits: DemFlattenLimits,
 ) -> AnalysisResult<DetectorErrorModel> {
-    let budget = validate_flattening_budget_with_limits(model, "flattened", limits)?;
+    let budget = validate_flattening_budget_with_limits(model, "flattened", &limits)?;
     let mut flattened = DetectorErrorModel::new();
     stab_model::advanced::dem_try_reserve_items_exact(
         &mut flattened,
         budget.materialized_capacity()?,
     )?;
-    for instruction in model.iter_flattened_instructions() {
+    for instruction in model
+        .iter_flattened_instructions()
+        .with_cancellation(limits.cancellation().clone())
+    {
         flattened.push_instruction(instruction?);
     }
     Ok(flattened)

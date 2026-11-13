@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use stab_model::Cancellation;
 use stab_records::BitPlane64Batch;
 
 use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner, SessionFrame};
@@ -67,6 +68,7 @@ pub(in crate::sampling) fn compute_reference_sample(
         plan.reference_sample_loop_policy,
         &[],
         &mut output,
+        &plan.cancellation,
     )?;
     validate_reference_width(&output, plan.measurement_count)?;
     Ok(output)
@@ -131,6 +133,7 @@ pub(super) fn fill_pauli_frame_batch(
     reference: Option<&[bool]>,
     rng: &mut impl Rng,
     shot_count: usize,
+    cancellation: &Cancellation,
 ) -> Result<(), SamplingExecutionError> {
     let SessionFrame::Pauli {
         state,
@@ -145,11 +148,16 @@ pub(super) fn fill_pauli_frame_batch(
     let mut output_start = 0_usize;
     while output_start < shot_count {
         if *pending_count == 0 {
-            state.sample_batch(program, rng).map_err(|error| {
-                SamplingExecutionError::InternalInvariant {
-                    message: error.to_string(),
-                }
-            })?;
+            state
+                .sample_batch(program, rng, cancellation)
+                .map_err(|error| match error {
+                    crate::detection::DetectionError::Cancelled(cancelled) => {
+                        SamplingExecutionError::Cancelled(cancelled)
+                    }
+                    error => SamplingExecutionError::InternalInvariant {
+                        message: error.to_string(),
+                    },
+                })?;
             *pending_start = 0;
             *pending_count = PAULI_FRAME_BATCH_SHOTS;
         }

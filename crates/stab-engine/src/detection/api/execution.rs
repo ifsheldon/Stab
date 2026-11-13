@@ -7,7 +7,8 @@ use super::{
     DetectionRunStatus, DetectionRunSummary, DirectDetectionState, DirectDetectorFramePlan,
     MAX_BATCH_SHOTS, MeasurementToDetectionPlan,
 };
-use crate::{RandomPolicy, SamplingCancellation, ShotCount, SinkFailurePhase};
+use crate::sampling::session_cancellation;
+use crate::{RandomPolicy, ShotCount, SinkFailurePhase};
 
 pub(super) fn run_direct<Sink>(
     direct: &DirectDetectorFramePlan,
@@ -27,20 +28,18 @@ where
         pending_count,
         cancellation,
     } = state;
+    let cancellation = session_cancellation(cancellation);
     let mut remaining = shots.get();
     let mut committed = 0_u64;
     while remaining > 0 {
-        if cancellation
-            .get()
-            .is_some_and(SamplingCancellation::is_cancelled)
-        {
+        if cancellation.is_cancelled() {
             break;
         }
         if *pending_count == 0 {
             direct
-                .sample_batch(frame, rng, MAX_BATCH_SHOTS)
+                .sample_batch(frame, rng, MAX_BATCH_SHOTS, cancellation)
                 .map_err(|source| DetectionRunError::Engine {
-                    source: DetectionExecutionError::Conversion(source),
+                    source: source.into(),
                     progress: DetectionRunProgress::new(committed, MAX_BATCH_SHOTS as u64),
                 })?;
             let (detector_planes, observable_planes) = direct.output_planes(frame);

@@ -91,6 +91,9 @@ pub enum DetectionError {
 
     #[error(transparent)]
     ResourceLimit(#[from] DetectionResourceLimitError),
+
+    #[error(transparent)]
+    Cancelled(#[from] stab_model::Cancelled),
 }
 
 impl DetectionError {
@@ -118,6 +121,7 @@ impl From<SamplingCompileError> for DetectionError {
             SamplingCompileError::CompiledBytesLimit { required, budget } => Self::ResourceLimit(
                 DetectionResourceLimitError::detection_compiled_bytes(required, budget),
             ),
+            SamplingCompileError::Cancelled(cancelled) => Self::Cancelled(cancelled),
         }
     }
 }
@@ -130,6 +134,7 @@ impl From<SamplingExecutionError> for DetectionError {
                     "sweep record expected {expected} bits, got {actual}"
                 ))
             }
+            SamplingExecutionError::Cancelled(cancelled) => Self::Cancelled(cancelled),
             other => Self::invalid_sampler_compilation(other.to_string()),
         }
     }

@@ -400,8 +400,13 @@ fn model_error_code(error: &ModelError) -> &'static str {
         ModelError::Parse(error) => error.code().as_str(),
         ModelError::ResourceLimit(error) => error.code(),
         ModelError::Validation(error) => error.code().as_str(),
+        ModelError::Cancelled(_) => CANCELLED_CODE,
     }
 }
+
+/// Stable diagnostic code of an operation stopped by its cancellation signal. The CLI passes
+/// a never-cancelled signal, so only a library caller embedding these diagnostics observes it.
+const CANCELLED_CODE: &str = "cancelled";
 
 fn analysis_error_code(error: &AnalysisError) -> &'static str {
     match error {
@@ -412,6 +417,7 @@ fn analysis_error_code(error: &AnalysisError) -> &'static str {
         AnalysisError::InvalidResultFormat { .. } => "invalid-result-format",
         AnalysisError::InvalidDetectorErrorModel { .. } => "invalid-detector-error-model",
         AnalysisError::ResourceLimit(_) => "resource-limit-exceeded",
+        AnalysisError::Cancelled(_) => CANCELLED_CODE,
     }
 }
 
@@ -421,12 +427,14 @@ fn sampling_compile_error_code(error: &SamplingCompileError) -> &'static str {
         SamplingCompileError::Analysis(error) => analysis_error_code(error),
         SamplingCompileError::InvalidCircuit { .. } => "invalid-sampler-compilation",
         SamplingCompileError::CompiledBytesLimit { .. } => "resource-limit-exceeded",
+        SamplingCompileError::Cancelled(_) => CANCELLED_CODE,
     }
 }
 
 fn sampling_execution_error_code(error: &SamplingExecutionError) -> &'static str {
     match error {
         SamplingExecutionError::InvalidSweepRecordWidth { .. } => "invalid-result-format",
+        SamplingExecutionError::Cancelled(_) => CANCELLED_CODE,
         _ => "sampling-execution-failed",
     }
 }
@@ -438,6 +446,7 @@ fn detection_error_code(error: &DetectionError) -> &'static str {
         DetectionError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
         DetectionError::InvalidResultFormat { .. } => "invalid-result-format",
         DetectionError::ResourceLimit(_) => "resource-limit-exceeded",
+        DetectionError::Cancelled(_) => CANCELLED_CODE,
     }
 }
 
@@ -451,6 +460,7 @@ fn detection_execution_error_code(error: &DetectionExecutionError) -> &'static s
     match error {
         DetectionExecutionError::Conversion(error) => detection_error_code(error),
         DetectionExecutionError::Sampling(error) => sampling_execution_error_code(error),
+        DetectionExecutionError::Cancelled(_) => CANCELLED_CODE,
         _ => "detection-execution-failed",
     }
 }
@@ -461,6 +471,7 @@ fn dem_error_code(error: &DemError) -> &'static str {
         DemError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
         DemError::InvalidResultFormat { .. } => "invalid-result-format",
         DemError::ResourceLimit(_) => "resource-limit-exceeded",
+        DemError::Cancelled(_) => CANCELLED_CODE,
     }
 }
 
@@ -618,7 +629,8 @@ fn model_error(error: &CliError) -> Option<&ModelError> {
             SamplingCompileError::Model(error) => Some(error),
             SamplingCompileError::Analysis(error) => model_error_from_analysis(error),
             SamplingCompileError::InvalidCircuit { .. }
-            | SamplingCompileError::CompiledBytesLimit { .. } => None,
+            | SamplingCompileError::CompiledBytesLimit { .. }
+            | SamplingCompileError::Cancelled(_) => None,
         },
         CliError::Detection(error) => model_error_from_detection(error),
         CliError::DetectionCompile(DetectionCompileError::InvalidCircuit(error)) => {
@@ -678,6 +690,7 @@ fn model_error_context(error: &ModelError) -> Value {
         ModelError::Parse(error) => parse_error_context(error),
         ModelError::ResourceLimit(error) => model_resource_context(error),
         ModelError::Validation(error) => validation_error_context(error),
+        ModelError::Cancelled(_) => json!({}),
     }
 }
 
@@ -738,7 +751,9 @@ fn sampling_compile_error_context(error: &SamplingCompileError) -> Value {
     match error {
         SamplingCompileError::Model(error) => model_error_context(error),
         SamplingCompileError::Analysis(error) => analysis_error_context(error),
-        SamplingCompileError::InvalidCircuit { .. } => json!({}),
+        SamplingCompileError::InvalidCircuit { .. } | SamplingCompileError::Cancelled(_) => {
+            json!({})
+        }
         SamplingCompileError::CompiledBytesLimit { required, budget } => json!({
             "resource": "materialized-bytes",
             "actual": required.to_string(),

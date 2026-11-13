@@ -98,7 +98,7 @@ impl DetectionSink for FailingSink {
 
 struct CancellingSink {
     inner: CollectSink,
-    cancellation: SamplingCancellation,
+    cancellation: stab_model::Cancellation,
 }
 
 impl DetectionSink for CancellingSink {
@@ -690,7 +690,7 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
     let circuit = circuit("M 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n");
     let limits = budget(0_u64);
     let conversion_error = MeasurementToDetectionCompiler::new()
-        .limits(limits)
+        .limits(limits.clone())
         .compile(&circuit)
         .expect_err("reject conversion plan beyond its record limit");
     assert!(matches!(
@@ -699,7 +699,7 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
     ));
     assert!(conversion_error.to_string().contains("memory budget"));
     let sampling_error = DetectionSamplingCompiler::new()
-        .limits(limits)
+        .limits(limits.clone())
         .compile(&circuit)
         .expect_err("reject detection sampling plan beyond its record limit");
     assert!(matches!(

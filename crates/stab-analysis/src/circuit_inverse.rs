@@ -1,5 +1,5 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, StabilizerResource, Tableau};
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, Target};
+use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, Target};
 
 use crate::{
     AnalysisError, AnalysisResult, circuit_flow::check_unsigned_flows_with_sparse_tracker,
@@ -9,19 +9,23 @@ mod reverse_flow;
 
 const MAX_TIME_REVERSE_TABLEAU_QUBITS: usize = StabilizerResource::TableauQubits.limit();
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InverseQecOptions {
     /// Preserve measurements instead of turning eligible measurements into resets.
     pub keep_measurements: bool,
+    /// Signal polled once per reversed instruction of the expanded measurement-rich reversal.
+    pub cancellation: Cancellation,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TimeReversedForFlowsOptions {
     /// Keep measurements as measurements instead of converting eligible ones to resets.
     ///
     /// This matches Stim v1.16.0's `dont_turn_measurements_into_resets` option
     /// across the supported tracker-driven measurement reversal surface.
     pub dont_turn_measurements_into_resets: bool,
+    /// Signal polled once per reversed instruction of the expanded measurement-rich reversal.
+    pub cancellation: Cancellation,
 }
 
 /// Returns the strict inverse of a unitary circuit and its invertible annotations.
@@ -102,6 +106,7 @@ pub fn circuit_inverse_qec_with_options(
 ) -> AnalysisResult<Circuit> {
     let reverse_options = TimeReversedForFlowsOptions {
         dont_turn_measurements_into_resets: options.keep_measurements,
+        cancellation: options.cancellation,
     };
     let (inverse, _) = circuit_time_reversed_for_flows_with_options(circuit, &[], reverse_options)?;
     Ok(inverse)

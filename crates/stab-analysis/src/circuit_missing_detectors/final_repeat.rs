@@ -8,7 +8,7 @@ use crate::AnalysisResult;
 
 pub(super) fn try_missing_detectors_folded_final_repeat(
     circuit: &Circuit,
-    options: MissingDetectorOptions,
+    options: &MissingDetectorOptions,
     qubit_count: usize,
 ) -> AnalysisResult<Option<Circuit>> {
     let Some((prefix, repeat)) = final_repeat_with_prefix(circuit) else {

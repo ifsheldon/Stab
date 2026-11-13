@@ -1,5 +1,7 @@
 use stab_model::advanced::MAX_DEM_REPEAT_NESTING;
-use stab_model::{DemInstruction, DemItem, DemTarget, DetectorErrorModel, MemoryBudget};
+use stab_model::{
+    Cancellation, DemInstruction, DemItem, DemTarget, DetectorErrorModel, MemoryBudget,
+};
 
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
 
@@ -11,20 +13,30 @@ const OPAQUE_TAG_STORAGE_MULTIPLIER: u64 = 4;
 /// before output is allocated. It does not constrain compact traversal or
 /// [`DetectorErrorModel::iter_flattened_instructions`], whose callers may stop before consuming
 /// the represented model. Repeat counts, expanded instructions, and payload counts are not
-/// separately capped; repeat nesting remains a fixed parser and model safety invariant.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// separately capped; repeat nesting remains a fixed parser and model safety invariant. The
+/// cancellation signal is polled once per visited item and repeat iteration while materializing.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DemFlattenLimits {
     memory_budget: MemoryBudget,
+    cancellation: Cancellation,
 }
 
 impl DemFlattenLimits {
     pub const fn new(memory_budget: MemoryBudget) -> Self {
-        Self { memory_budget }
+        Self {
+            memory_budget,
+            cancellation: Cancellation::never(),
+        }
     }
 
     /// Returns the budget for the materialized result.
-    pub const fn memory_budget(self) -> MemoryBudget {
+    pub const fn memory_budget(&self) -> MemoryBudget {
         self.memory_budget
+    }
+
+    /// Returns the cancellation signal polled while the result is materialized.
+    pub const fn cancellation(&self) -> &Cancellation {
+        &self.cancellation
     }
 
     /// Sets the budget for the materialized result.
@@ -33,14 +45,21 @@ impl DemFlattenLimits {
         self.memory_budget = memory_budget;
         self
     }
+
+    /// Sets the cancellation signal polled while the result is materialized.
+    #[must_use]
+    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = cancellation;
+        self
+    }
 }
 
 pub(crate) fn validate_flattening_budget_with_limits(
     model: &DetectorErrorModel,
     context: &'static str,
-    limits: DemFlattenLimits,
+    limits: &DemFlattenLimits,
 ) -> AnalysisResult<DemFlatteningBudget> {
-    let mut budget = DemFlatteningBudget::new(limits);
+    let mut budget = DemFlatteningBudget::new(limits.memory_budget());
     validate_flattening_budget_items(model, 1, 0, context, &mut budget)?;
     Ok(budget)
 }
@@ -88,15 +107,15 @@ fn validate_flattening_budget_items(
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct DemFlatteningBudget {
-    limits: DemFlattenLimits,
+    memory_budget: MemoryBudget,
     expanded_instructions: u64,
     materialized_bytes: u64,
 }
 
 impl DemFlatteningBudget {
-    const fn new(limits: DemFlattenLimits) -> Self {
+    const fn new(memory_budget: MemoryBudget) -> Self {
         Self {
-            limits,
+            memory_budget,
             expanded_instructions: 0,
             materialized_bytes: 0,
         }
@@ -152,7 +171,7 @@ impl DemFlatteningBudget {
             "materialized byte count",
             context,
         )?;
-        let budget = self.limits.memory_budget();
+        let budget = self.memory_budget;
         if !budget.admits(u128::from(self.materialized_bytes)) {
             return Err(ResourceLimitError::memory_budget(
                 ResourceOperation::DetectorErrorModelFlatten,

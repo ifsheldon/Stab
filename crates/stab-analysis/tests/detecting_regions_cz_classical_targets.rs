@@ -18,6 +18,7 @@ fn detector_zero_region_at_tick_zero(circuit_text: &str) -> Result<String, Strin
             detectors: vec![detector],
             ticks: vec![CircuitTick::new(0)],
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .map_err(|error| error.to_string())?;
@@ -38,6 +39,7 @@ fn detecting_region_error(circuit_text: &str) -> Result<String, String> {
             detectors: vec![detector(0)?],
             ticks: vec![CircuitTick::new(0)],
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .map_err(|error| error.to_string())
@@ -57,6 +59,7 @@ fn detecting_regions_treat_stim_negative_zero_detector_as_empty() -> Result<(), 
             detectors: vec![detector(0)?],
             ticks: vec![CircuitTick::new(0)],
             ignore_anticommutation_errors: true,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .map_err(|error| error.to_string())?;

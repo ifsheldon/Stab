@@ -41,6 +41,7 @@ fn repeat_skips_unrequested_compact_tick_spans() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0, 500_000_000_000, 999_999_999_999]),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap();
@@ -62,6 +63,7 @@ fn repeat_folds_nontrivial_zero_tick_body() {
                 targets: vec![],
                 ticks: vec![],
                 ignore_anticommutation_errors: false,
+                cancellation: stab_model::Cancellation::never(),
             },
         )
         .unwrap()
@@ -92,6 +94,7 @@ fn large_identity_snapshot_stays_sparse() {
             detectors: vec![detector(0)],
             ticks: ticks(&[1_000_000_000_000]),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap();
@@ -109,6 +112,7 @@ fn large_active_snapshot_fails_before_dense_allocation() {
             detectors: vec![detector(0)],
             ticks: ticks(&[999_999_999_999]),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap_err();
@@ -132,6 +136,7 @@ fn huge_repeat_reports_semantic_errors_promptly() {
             targets: vec![],
             ticks: vec![],
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap_err();
@@ -156,6 +161,7 @@ fn repeat_nesting_boundary_is_exact() {
         targets: vec![],
         ticks: vec![],
         ignore_anticommutation_errors: false,
+        cancellation: stab_model::Cancellation::never(),
     };
     circuit_detecting_regions_for_targets(&nested(MAX_DETECTING_REGION_REPEAT_NESTING), options())
         .unwrap();

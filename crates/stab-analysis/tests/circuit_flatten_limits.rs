@@ -154,7 +154,7 @@ fn caller_raised_limit_cannot_exceed_platform_materialization_capacity() {
     let limits = budget(u64::MAX);
 
     for result in [
-        flattened_circuit_with_limits(&enormous, limits).map(|_| ()),
+        flattened_circuit_with_limits(&enormous, limits.clone()).map(|_| ()),
         flattened_circuit_operations_with_limits(&enormous, limits).map(|_| ()),
     ] {
         let error = result.expect_err("platform vector capacity must reject before allocation");

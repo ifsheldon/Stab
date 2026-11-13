@@ -10,7 +10,7 @@ pub type AnalysisResult<T> = Result<T, AnalysisError>;
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum AnalysisError {
     #[error("{0}")]
-    Model(#[from] ModelError),
+    Model(ModelError),
 
     #[error("invalid {kind} value {value}")]
     InvalidDomainValue { kind: &'static str, value: String },
@@ -29,6 +29,21 @@ pub enum AnalysisError {
 
     #[error(transparent)]
     ResourceLimit(#[from] ResourceLimitError),
+
+    /// The operation's cancellation signal was observed.
+    #[error(transparent)]
+    Cancelled(#[from] stab_model::Cancelled),
+}
+
+impl From<ModelError> for AnalysisError {
+    /// Keeps one representation of cancellation: a model traversal stopped by the operation's
+    /// signal becomes [`AnalysisError::Cancelled`].
+    fn from(error: ModelError) -> Self {
+        match error {
+            ModelError::Cancelled(cancelled) => Self::Cancelled(cancelled),
+            error => Self::Model(error),
+        }
+    }
 }
 
 impl AnalysisError {

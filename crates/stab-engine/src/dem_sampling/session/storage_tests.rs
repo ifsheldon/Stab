@@ -101,14 +101,14 @@ fn batch_shape_follows_the_preferred_64_mib_target_whatever_the_budget() {
     assert_eq!(session_storage_bytes(&fits, 8, 8, true), preferred - 2);
     for limits in [DemSamplerLimits::default(), budget(u128::from(u64::MAX))] {
         assert_eq!(
-            initial_capacities(&fits, limits).expect("admit an eight-shot batch"),
+            initial_capacities(&fits, &limits).expect("admit an eight-shot batch"),
             SessionCapacities {
                 output: 8,
                 sample: 8
             }
         );
         assert_eq!(
-            initial_capacities(&plan(6_710_879, 0, 0), limits).expect("admit a smaller batch"),
+            initial_capacities(&plan(6_710_879, 0, 0), &limits).expect("admit a smaller batch"),
             SessionCapacities {
                 output: 7,
                 sample: 7
@@ -123,7 +123,7 @@ fn session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte_bef
     let model = plan(1000, 3, 7);
     let exact = session_storage_bytes(&model, 1, 1, false);
     assert_eq!(
-        initial_capacities(&model, budget(exact)).expect("admit the exact one-shot budget"),
+        initial_capacities(&model, &budget(exact)).expect("admit the exact one-shot budget"),
         SessionCapacities {
             output: 1,
             sample: 1
@@ -154,7 +154,7 @@ fn session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte_bef
     // A one-shot session above the preferred batch target is admitted within the budget.
     let above_target = plan(8_000_000, 0, 0);
     assert_eq!(
-        initial_capacities(&above_target, DemSamplerLimits::default())
+        initial_capacities(&above_target, &DemSamplerLimits::default())
             .expect("a one-shot batch above 64 MiB fits the default budget"),
         SessionCapacities {
             output: 1,

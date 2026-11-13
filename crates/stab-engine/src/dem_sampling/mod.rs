@@ -10,9 +10,9 @@ pub use error::{DemError, DemResourceKind, DemResourceLimitError};
 pub use limits::DemSamplerLimits;
 pub use plan::{DemSamplingCompiler, DemSamplingPlan};
 pub use session::{
-    DemReplayBatchStatus, DemReplaySession, DemReplayTransaction, DemSamplingCancellation,
-    DemSamplingExecutionError, DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus,
-    DemSamplingRunSummary, DemSamplingSession,
+    DemReplayBatchStatus, DemReplaySession, DemReplayTransaction, DemSamplingExecutionError,
+    DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,
+    DemSamplingSession,
 };
 
 pub(crate) use error::DemResult;

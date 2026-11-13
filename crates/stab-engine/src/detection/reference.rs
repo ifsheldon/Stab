@@ -1,4 +1,4 @@
-use stab_model::{Circuit, MemoryBudget};
+use stab_model::{Cancellation, Circuit, MemoryBudget};
 
 use super::buffers::try_false_vec;
 use super::error::{DetectionError, DetectionResourceLimitError, DetectionResult};
@@ -33,6 +33,7 @@ pub(super) fn static_reference_sample(
     program: &CircuitProgram,
     measurement_count: usize,
     budget: MemoryBudget,
+    cancellation: &Cancellation,
 ) -> DetectionResult<Vec<bool>> {
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     let loop_policy = ReferenceSampleLoopPolicy::Fold;
@@ -48,8 +49,14 @@ pub(super) fn static_reference_sample(
         program.counts().sweep_bits,
         "detection reference zero-sweep record",
     )?;
-    let reference_sample =
-        program_reference_sample(program, qubit_count, loop_policy, &zero_sweeps, budget)?;
+    let reference_sample = program_reference_sample(
+        program,
+        qubit_count,
+        loop_policy,
+        &zero_sweeps,
+        budget,
+        cancellation,
+    )?;
     validate_reference_sample_len(&reference_sample, measurement_count)?;
     Ok(reference_sample)
 }

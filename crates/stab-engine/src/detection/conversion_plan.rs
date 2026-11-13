@@ -1,5 +1,7 @@
 use arrayvec::ArrayVec;
-use stab_model::{Circuit, CircuitInstruction, MeasureRecordOffset, RepeatNestingLimit};
+use stab_model::{
+    Cancellation, Circuit, CircuitInstruction, MeasureRecordOffset, RepeatNestingLimit,
+};
 
 use super::buffers::{resource_amount, validate_vector_capacity};
 use super::error::{
@@ -112,7 +114,7 @@ impl ConversionPlan {
         admission: Self,
         mut visit: impl FnMut(&mut Self) -> DetectionResult<()>,
     ) -> DetectionResult<Self> {
-        let mut plan = Self::new(admission.limits, true);
+        let mut plan = Self::new(admission.limits.clone(), true);
         let operation_count = usize::try_from(admission.compact_operation_count)
             .map_err(|_| compilation_overflow())?;
         plan.program
@@ -798,6 +800,7 @@ impl ConversionPlan {
             &mut record.detectors,
             &mut record.observables,
             &mut cursor,
+            self.limits.cancellation(),
         )?;
         if cursor.measurement != self.measurement_count || cursor.detector != self.detector_count {
             return Err(DetectionError::invalid_sampler_compilation(format!(
@@ -813,6 +816,7 @@ impl ConversionPlan {
         measurement_planes: &[u64],
         detector_planes: &mut Vec<u64>,
         observable_planes: &mut Vec<u64>,
+        cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         if measurement_planes.len() != self.measurement_count {
             return Err(DetectionError::invalid_result_format(format!(
@@ -833,6 +837,7 @@ impl ConversionPlan {
             detector_planes,
             observable_planes,
             &mut cursor,
+            cancellation,
         )?;
         if cursor.measurement != self.measurement_count || cursor.detector != self.detector_count {
             return Err(DetectionError::invalid_sampler_compilation(format!(

@@ -583,6 +583,12 @@ pub trait FoldedDemVisitor {
         Ok(ControlFlow::Continue(()))
     }
 
+    /// Called once per expanded or selected repeat iteration, before the body is visited, so a
+    /// consumer can poll its cancellation signal even when a body visits no instruction.
+    fn poll_cancellation(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     /// Constructs the consumer-owned failure for cumulative repeat expansion.
     fn repeat_expansion_limit_error(
         &mut self,
@@ -648,6 +654,7 @@ where
                 ));
             }
             for iteration in 0..repeat_count {
+                visitor.poll_cancellation()?;
                 let mut iteration_state =
                     state.at_iteration(body, iteration, false, repeat_count)?;
                 if body
@@ -669,6 +676,7 @@ where
                     .into());
                 }
                 previous = Some(iteration);
+                visitor.poll_cancellation()?;
                 let mut iteration_state =
                     state.at_iteration(body, iteration, false, repeat_count)?;
                 if body

@@ -1,16 +1,17 @@
 use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
 use stab_bits::BitSlice;
+use stab_model::Cancellation;
 use stab_records::{DemSampleSink, FormatError as RecordsFormatError, PackedShotBatchView};
 use thiserror::Error;
 
 use super::buffers::try_zero_words;
 use super::plan::DemSamplingPlan;
 use super::{DemError, DemSamplerLimits};
+use crate::sampling::{session_cancellation, session_cancellation_slot};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount, SinkFailurePhase};
 
 const MAX_BATCH_SHOTS: usize = 64;
@@ -18,27 +19,6 @@ const MAX_BATCH_SHOTS: usize = 64;
 mod batch;
 
 use batch::{SessionBatch, initial_capacities, validate_session_storage};
-
-/// Cooperative cancellation state checked between bounded DEM sampling batches.
-#[derive(Clone, Debug, Default)]
-pub struct DemSamplingCancellation {
-    cancelled: Arc<AtomicBool>,
-}
-
-impl DemSamplingCancellation {
-    pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Release);
-    }
-
-    pub fn reset(&self) {
-        self.cancelled.store(false, Ordering::Release);
-    }
-
-    #[inline(always)]
-    pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
-    }
-}
 
 /// Engine-side DEM sampling execution failure.
 #[derive(Debug, Error)]
@@ -207,7 +187,7 @@ pub struct DemSamplingSession {
     error_planes: Option<Vec<u64>>,
     batch: SessionBatch,
     sample_capacity: usize,
-    cancellation: OnceLock<Arc<AtomicBool>>,
+    cancellation: OnceLock<Cancellation>,
     total_committed_shots: u64,
     poisoned: bool,
     not_sync: PhantomData<Cell<()>>,
@@ -220,10 +200,7 @@ impl fmt::Debug for DemSamplingSession {
             .field("plan", &self.plan)
             .field(
                 "cancelled",
-                &self
-                    .cancellation
-                    .get()
-                    .is_some_and(|cancelled| cancelled.load(Ordering::Acquire)),
+                &session_cancellation(&self.cancellation).is_cancelled(),
             )
             .field("total_committed_shots", &self.total_committed_shots)
             .field("poisoned", &self.poisoned)
@@ -237,7 +214,7 @@ impl DemSamplingSession {
         random_policy: RandomPolicy,
         limits: DemSamplerLimits,
     ) -> Result<Self, DemSamplingExecutionError> {
-        let capacities = initial_capacities(&plan, limits)?;
+        let capacities = initial_capacities(&plan, &limits)?;
         let record = plan.try_reusable_detection_record().map_err(|source| {
             DemSamplingExecutionError::SessionStorageAllocation {
                 message: source.to_string(),
@@ -257,6 +234,7 @@ impl DemSamplingSession {
         let sampling_seed = random_policy
             .seed()
             .map_or_else(rand::random, |seed| seed.get());
+        let cancellation = session_cancellation_slot(limits.cancellation());
         Ok(Self {
             plan,
             limits,
@@ -267,20 +245,21 @@ impl DemSamplingSession {
             error_planes: None,
             batch,
             sample_capacity: capacities.sample,
-            cancellation: OnceLock::new(),
+            cancellation,
             total_committed_shots: 0,
             poisoned: false,
             not_sync: PhantomData,
         })
     }
 
-    pub fn cancellation(&self) -> DemSamplingCancellation {
-        DemSamplingCancellation {
-            cancelled: Arc::clone(
-                self.cancellation
-                    .get_or_init(|| Arc::new(AtomicBool::new(false))),
-            ),
-        }
+    /// The signal this session polls between batches and while sampling a batch.
+    ///
+    /// It is the signal of [`DemSamplerLimits::with_cancellation`] when that one is cancellable,
+    /// and otherwise a session-local signal created by the first call. Shots are drawn from
+    /// counter-based streams, so cancellation observed inside a batch discards that batch and
+    /// the session resumes with the same seeded output.
+    pub fn cancellation(&self) -> Cancellation {
+        self.cancellation.get_or_init(Cancellation::new).clone()
     }
 
     pub const fn is_poisoned(&self) -> bool {
@@ -353,6 +332,12 @@ impl DemSamplingSession {
                     progress: DemSamplingRunProgress::new(committed, sample_shots_u64),
                 })?;
             if let Err(source) = self.fill_sample_planes(sample_shots, mode) {
+                if matches!(
+                    source,
+                    DemSamplingExecutionError::InvalidRequest(DemError::Cancelled(_))
+                ) {
+                    break;
+                }
                 self.poisoned = true;
                 return Err(DemSamplingRunError::Engine {
                     source,
@@ -424,6 +409,7 @@ impl DemSamplingSession {
                     shot_count,
                     &mut self.detector_planes,
                     &mut self.observable_planes,
+                    session_cancellation(&self.cancellation),
                 )
                 .map_err(DemSamplingExecutionError::InvalidRequest)?,
             RunMode::WithSampledErrors => {
@@ -440,6 +426,7 @@ impl DemSamplingSession {
                         &mut self.detector_planes,
                         &mut self.observable_planes,
                         error_planes,
+                        session_cancellation(&self.cancellation),
                     )
                     .map_err(DemSamplingExecutionError::InvalidRequest)?;
             }
@@ -474,13 +461,18 @@ impl DemSamplingSession {
             let error_record = error_records
                 .record(record_index)
                 .map_err(internal_format_error)?;
+            let cancellation = session_cancellation(&self.cancellation);
             match error_record {
-                ReplayRecord::Dense(bits) => self
-                    .plan
-                    .detection_record_from_error_record_into(bits, &mut self.record),
-                ReplayRecord::Packed(bits) => self
-                    .plan
-                    .detection_record_from_error_record_into(&bits, &mut self.record),
+                ReplayRecord::Dense(bits) => self.plan.detection_record_from_error_record_into(
+                    bits,
+                    &mut self.record,
+                    cancellation,
+                ),
+                ReplayRecord::Packed(bits) => self.plan.detection_record_from_error_record_into(
+                    &bits,
+                    &mut self.record,
+                    cancellation,
+                ),
             }
             .map_err(DemSamplingExecutionError::InvalidRequest)?;
             self.batch
@@ -555,7 +547,7 @@ impl DemSamplingSession {
             self.batch.capacity(),
             self.sample_capacity,
             true,
-            self.limits,
+            &self.limits,
         )?;
         let error_planes = try_zero_words(
             sample_plane_len(self.plan.error_count(), self.sample_capacity)?,
@@ -568,9 +560,7 @@ impl DemSamplingSession {
     }
 
     fn is_cancelled(&self) -> bool {
-        self.cancellation
-            .get()
-            .is_some_and(|cancelled| cancelled.load(Ordering::Acquire))
+        session_cancellation(&self.cancellation).is_cancelled()
     }
 
     fn summary(
@@ -707,7 +697,8 @@ impl DemReplaySession {
         })
     }
 
-    pub fn cancellation(&self) -> DemSamplingCancellation {
+    /// The signal this replay polls; see [`DemSamplingSession::cancellation`].
+    pub fn cancellation(&self) -> Cancellation {
         self.session.cancellation()
     }
 
@@ -901,6 +892,13 @@ impl DemReplaySession {
             }
             let batch_shots = records.len();
             if let Err(source) = self.session.fill_replay_batch(error_records, records) {
+                if matches!(
+                    source,
+                    DemSamplingExecutionError::InvalidRequest(DemError::Cancelled(_))
+                ) {
+                    self.cancelled = true;
+                    return Ok(DemReplayBatchStatus::Cancelled);
+                }
                 self.session.poisoned = true;
                 self.finished = true;
                 return Err(DemSamplingRunError::Engine {

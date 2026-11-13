@@ -1,5 +1,6 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, Target};
+use stab_model::advanced::CancellationCountdown;
+use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, Target};
 
 use crate::{AnalysisError, AnalysisResult, circuit_to_tableau, gate_tableau};
 
@@ -30,18 +31,35 @@ use resources::{
     validate_flow_generator_repeat_nesting, validate_ignored_only_flow_generator_resources,
 };
 
+/// Options for [`circuit_flow_generators_with_options`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct FlowGeneratorOptions {
+    /// Signal polled once per undone instruction of a measurement-rich circuit, whose compact
+    /// repeats are expanded one iteration at a time.
+    pub cancellation: Cancellation,
+}
+
 /// Returns signed stabilizer-flow generators for supported tableau and measurement-rich circuits.
 ///
 /// Measurement-rich output is admitted by projected owned bytes, and compact repeats are traversed
-/// directly under an aggregate expanded-work limit instead of first cloning an expanded circuit.
+/// directly instead of first cloning an expanded circuit; expanded work is not capped.
 pub fn circuit_flow_generators(circuit: &Circuit) -> AnalysisResult<Vec<Flow>> {
+    circuit_flow_generators_with_options(circuit, &FlowGeneratorOptions::default())
+}
+
+/// Returns signed stabilizer-flow generators, polling the options' cancellation signal.
+pub fn circuit_flow_generators_with_options(
+    circuit: &Circuit,
+    options: &FlowGeneratorOptions,
+) -> AnalysisResult<Vec<Flow>> {
+    options.cancellation.check()?;
     if circuit_is_ignored_only(circuit) {
         let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
         validate_ignored_only_flow_generator_resources(qubit_count)?;
         return Ok(reverse_ordered_identity_flow_rows(qubit_count));
     }
     if circuit_requires_reverse_flow_solver(circuit) {
-        return simple_measurement_rich_flow_generators(circuit)?
+        return simple_measurement_rich_flow_generators(circuit, &options.cancellation)?
             .ok_or_else(|| unsupported_flow_generator_error(circuit));
     }
     unitary_flow_generators(circuit)
@@ -69,7 +87,10 @@ fn unitary_flow_generators(circuit: &Circuit) -> AnalysisResult<Vec<Flow>> {
     Ok(flows)
 }
 
-fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> AnalysisResult<Option<Vec<Flow>>> {
+fn simple_measurement_rich_flow_generators(
+    circuit: &Circuit,
+    cancellation: &Cancellation,
+) -> AnalysisResult<Option<Vec<Flow>>> {
     if let [CircuitItem::Instruction(instruction)] = circuit.items() {
         let transition = reverse_flow_transition(instruction);
         let simple = match transition {
@@ -96,7 +117,7 @@ fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> AnalysisResult<
             return Ok(simple);
         }
     }
-    composed_measurement_flow_generators(circuit)
+    composed_measurement_flow_generators(circuit, cancellation)
 }
 
 fn simple_measurement_flows(
@@ -341,7 +362,10 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> AnalysisResult<Vec
     Ok(flows)
 }
 
-fn composed_measurement_flow_generators(circuit: &Circuit) -> AnalysisResult<Option<Vec<Flow>>> {
+fn composed_measurement_flow_generators(
+    circuit: &Circuit,
+    cancellation: &Cancellation,
+) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         AnalysisError::invalid_tableau_conversion(
@@ -354,31 +378,37 @@ fn composed_measurement_flow_generators(circuit: &Circuit) -> AnalysisResult<Opt
         return Ok(None);
     }
 
-    let mut solver = MeasurementFeedbackFlowSolver::new(qubit_count, measurement_count);
+    let mut solver =
+        MeasurementFeedbackFlowSolver::new(qubit_count, measurement_count, cancellation);
     if !solver.undo_circuit(circuit)? {
         return Ok(None);
     }
     solver.finalize().map(Some)
 }
 
-struct MeasurementFeedbackFlowSolver {
+struct MeasurementFeedbackFlowSolver<'a> {
     flows: Vec<Flow>,
     qubit_count: usize,
     measurement_count: usize,
     measurements_in_past: usize,
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
 }
 
-impl MeasurementFeedbackFlowSolver {
-    fn new(qubit_count: usize, measurement_count: usize) -> Self {
+impl<'a> MeasurementFeedbackFlowSolver<'a> {
+    fn new(qubit_count: usize, measurement_count: usize, cancellation: &'a Cancellation) -> Self {
         Self {
             flows: identity_flow_rows(qubit_count),
             qubit_count,
             measurement_count,
             measurements_in_past: measurement_count,
+            cancellation,
+            countdown: CancellationCountdown::new(),
         }
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<bool> {
+        self.countdown.tick(self.cancellation)?;
         match reverse_flow_transition(instruction) {
             ReverseFlowTransition::Measurement(basis) => self.undo_measurement(instruction, basis),
             ReverseFlowTransition::Reset(basis) => self.undo_reset(instruction, basis),

@@ -6,6 +6,7 @@ use thiserror::Error;
 pub enum SamplingCompileErrorCode {
     InvalidCircuit,
     ResourceLimit,
+    Cancelled,
 }
 
 impl SamplingCompileErrorCode {
@@ -13,6 +14,7 @@ impl SamplingCompileErrorCode {
         match self {
             Self::InvalidCircuit => "invalid-circuit",
             Self::ResourceLimit => "resource-limit",
+            Self::Cancelled => "cancelled",
         }
     }
 }
@@ -33,6 +35,9 @@ pub enum SamplingCompileError {
         "cannot compile circuit sampler: the compiled program needs at least {required} bytes, exceeding the {budget}-byte memory budget; raise the memory budget to admit it"
     )]
     CompiledBytesLimit { required: u64, budget: u64 },
+
+    #[error(transparent)]
+    Cancelled(#[from] stab_model::Cancelled),
 }
 
 impl SamplingCompileError {
@@ -45,6 +50,7 @@ impl SamplingCompileError {
     pub const fn code(&self) -> SamplingCompileErrorCode {
         match self {
             Self::CompiledBytesLimit { .. } => SamplingCompileErrorCode::ResourceLimit,
+            Self::Cancelled(_) => SamplingCompileErrorCode::Cancelled,
             Self::Model(_) | Self::Analysis(_) | Self::InvalidCircuit { .. } => {
                 SamplingCompileErrorCode::InvalidCircuit
             }

@@ -1,6 +1,6 @@
 use rand::Rng;
 use stab_bits::{BIT_BLOCK_WORDS, BitBlock};
-use stab_model::Circuit;
+use stab_model::{Cancellation, Circuit};
 
 use super::program::{CircuitProgram, ProgramOptions};
 use super::word::FrameWord;
@@ -23,6 +23,7 @@ impl DirectDetectorFramePlan {
         circuit: &Circuit,
         limits: DetectionConversionLimits,
     ) -> DetectionResult<Self> {
+        let memory_budget = limits.memory_budget();
         let conversion_admission =
             ConversionPlan::admission_from_circuit_with_limits(circuit, limits)?;
         let conversion_bytes = conversion_admission.compiled_storage_bytes()?;
@@ -30,12 +31,12 @@ impl DirectDetectorFramePlan {
             circuit,
             ProgramOptions::DETECTION,
             conversion_bytes,
-            limits.memory_budget().bytes(),
+            memory_budget.bytes(),
         )?;
         admit_combined_compiled_storage(
             conversion_bytes,
             execution_admission.retained_bytes(),
-            limits.memory_budget().bytes(),
+            memory_budget.bytes(),
         )?;
         let conversion =
             ConversionPlan::materialize_circuit_from_admission(circuit, conversion_admission)?;
@@ -44,11 +45,7 @@ impl DirectDetectorFramePlan {
             executable,
             conversion,
         };
-        admit_combined_compiled_storage(
-            result.compiled_bytes()?,
-            0,
-            limits.memory_budget().bytes(),
-        )?;
+        admit_combined_compiled_storage(result.compiled_bytes()?, 0, memory_budget.bytes())?;
         Ok(result)
     }
 
@@ -58,6 +55,10 @@ impl DirectDetectorFramePlan {
 
     pub(in crate::detection) fn memory_budget(&self) -> stab_model::MemoryBudget {
         self.conversion.limits.memory_budget()
+    }
+
+    pub(in crate::detection) fn cancellation(&self) -> &Cancellation {
+        self.conversion.limits.cancellation()
     }
 
     pub(in crate::detection) fn qubit_count(&self) -> usize {
@@ -102,13 +103,16 @@ impl DirectDetectorFramePlan {
         state: &mut DetectorFrameState,
         rng: &mut impl Rng,
         shot_count: usize,
+        cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         let mode = FrameExecutionMode::Sample {
             active_lanes: shot_count,
         };
         state.frame.reset(rng, mode);
-        state.frame.execute_program(&self.executable, rng, mode)?;
-        state.convert_batch(&self.conversion)?;
+        state
+            .frame
+            .execute_program(&self.executable, rng, mode, cancellation)?;
+        state.convert_batch(&self.conversion, cancellation)?;
         Ok(())
     }
 
@@ -152,12 +156,14 @@ impl PauliFrameSamplingState {
         &mut self,
         program: &CircuitProgram,
         rng: &mut impl Rng,
+        cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         let mode = FrameExecutionMode::Sample {
             active_lanes: PAULI_FRAME_BATCH_SHOTS,
         };
         self.frame.reset(rng, mode);
-        self.frame.execute_program(program, rng, mode)?;
+        self.frame
+            .execute_program(program, rng, mode, cancellation)?;
         if self.frame.measurements.len() != self.measurement_count {
             return Err(DetectionError::invalid_sampler_compilation(format!(
                 "Pauli-frame sampler produced {} measurement planes but {} were compiled",
@@ -243,6 +249,7 @@ impl SweepCorrectionPlan {
         shot_count: usize,
         state: &'a mut DetectorFrameState,
         rng: &mut impl Rng,
+        cancellation: &Cancellation,
     ) -> DetectionResult<(&'a [u64], &'a [u64])> {
         if sweep_planes.len() != self.sweep_bit_count {
             return Err(DetectionError::invalid_result_format(format!(
@@ -262,7 +269,9 @@ impl SweepCorrectionPlan {
             active_lanes: shot_count,
         };
         state.frame.reset(rng, mode);
-        state.frame.execute_program(&self.executable, rng, mode)?;
+        state
+            .frame
+            .execute_program(&self.executable, rng, mode, cancellation)?;
         if conversion.measurement_count != self.measurement_count
             || conversion.detector_count != self.detector_count
             || conversion.observable_count != self.observable_count
@@ -271,7 +280,7 @@ impl SweepCorrectionPlan {
                 "sweep correction conversion dimensions disagree with its admitted plan",
             ));
         }
-        state.convert_batch(conversion)?;
+        state.convert_batch(conversion, cancellation)?;
         Ok((&state.detector_planes, &state.observable_planes))
     }
 }
@@ -321,7 +330,11 @@ impl DetectorFrameState {
         })
     }
 
-    fn convert_batch(&mut self, plan: &ConversionPlan) -> DetectionResult<()> {
+    fn convert_batch(
+        &mut self,
+        plan: &ConversionPlan,
+        cancellation: &Cancellation,
+    ) -> DetectionResult<()> {
         if self.frame.measurements.len() != plan.measurement_count
             || self.frame.observables.len() != plan.observable_count
         {
@@ -333,6 +346,7 @@ impl DetectorFrameState {
             &self.frame.measurements,
             &mut self.detector_planes,
             &mut self.observable_planes,
+            cancellation,
         )?;
         for (plane, frame_observable) in self
             .observable_planes

@@ -110,7 +110,7 @@ fn assert_gate_matches_reference<W: FrameWord + std::fmt::Debug>(gate: Gate, see
         active_lanes: W::LANE_COUNT,
     };
     frame
-        .execute_program(&program, &mut rng, mode)
+        .execute_program(&program, &mut rng, mode, &stab_model::Cancellation::never())
         .expect("execute compiled gate");
     assert!(
         frame.xs == expected_xs && frame.zs == expected_zs,
@@ -224,13 +224,13 @@ fn assert_warmed_execution_does_not_allocate<W: FrameWord>(program: &CircuitProg
         .expect("frame fixture");
     frame.reset(&mut rng, mode);
     frame
-        .execute_program(program, &mut rng, mode)
+        .execute_program(program, &mut rng, mode, &stab_model::Cancellation::never())
         .expect("warm Pauli product execution");
     let measured = allocation_counter::measure(|| {
         for _ in 0..64 {
             frame.reset(&mut rng, mode);
             frame
-                .execute_program(program, &mut rng, mode)
+                .execute_program(program, &mut rng, mode, &stab_model::Cancellation::never())
                 .expect("execute warmed Pauli products");
         }
     });

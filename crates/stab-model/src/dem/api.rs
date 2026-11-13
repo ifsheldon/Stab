@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Bound, ControlFlow, Range, RangeBounds};
 
-use crate::{MemoryBudget, ModelError, ModelResult, Probability};
+use crate::advanced::CancellationCountdown;
+use crate::{Cancellation, MemoryBudget, ModelError, ModelResult, Probability};
 
 use super::coordinate_scan::{
     MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
@@ -32,6 +33,8 @@ pub struct DemFlattenedInstructionIter<'a> {
     detector_offset: u64,
     coordinate_shift: Vec<f64>,
     finished: bool,
+    cancellation: Cancellation,
+    countdown: CancellationCountdown,
 }
 
 impl<'a> DemFlattenedInstructionIter<'a> {
@@ -41,7 +44,20 @@ impl<'a> DemFlattenedInstructionIter<'a> {
             detector_offset: 0,
             coordinate_shift: Vec::new(),
             finished: false,
+            cancellation: Cancellation::never(),
+            countdown: CancellationCountdown::new(),
         }
+    }
+
+    /// Polls `cancellation` once per visited item and repeat iteration, yielding
+    /// [`ModelError::Cancelled`] once it is observed.
+    ///
+    /// A repeat whose body yields nothing, such as one holding only a zero-count repeat, is still
+    /// walked once per iteration, so a caller that must stay interruptible sets a signal.
+    #[must_use]
+    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = cancellation;
+        self
     }
 }
 
@@ -67,6 +83,7 @@ impl Iterator for DemFlattenedInstructionIter<'_> {
 impl DemFlattenedInstructionIter<'_> {
     fn next_result(&mut self) -> ModelResult<Option<DemInstruction>> {
         while let Some(frame) = self.stack.last_mut() {
+            self.countdown.tick(&self.cancellation)?;
             if frame.index == frame.items.len() {
                 if frame.start_next_repetition() {
                     continue;

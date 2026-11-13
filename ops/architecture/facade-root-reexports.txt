@@ -8,6 +8,8 @@ stab_model::AbsoluteTolerance
 stab_records::BitPlane64Batch
 stab_records::BitPlane64BatchView
 stab_model::ByteSpan
+stab_model::Cancellation
+stab_model::Cancelled
 stab_model::Circuit
 stab_model::CircuitDetectorId
 stab_model::CircuitInstruction

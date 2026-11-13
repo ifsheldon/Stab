@@ -1,6 +1,6 @@
-use stab_model::{MemoryBudget, Probability};
+use stab_model::{Cancellation, MemoryBudget, Probability};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ErrorAnalyzerOptions {
     pub fold_loops: bool,
     pub decompose_errors: bool,
@@ -11,4 +11,7 @@ pub struct ErrorAnalyzerOptions {
     /// Budget for the conservative retained size of the produced model, charged before each
     /// output item is retained. Expanded analysis work is not capped.
     pub memory_budget: MemoryBudget,
+    /// Signal polled once per analyzed instruction and repeat iteration; a set signal stops the
+    /// analysis with [`crate::AnalysisError::Cancelled`].
+    pub cancellation: Cancellation,
 }

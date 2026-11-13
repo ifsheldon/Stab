@@ -62,7 +62,8 @@ pub(super) fn execute_program(
     mode: ExecutionMode,
     sweep_record: &[bool],
 ) -> Result<(), SamplingExecutionError> {
-    let mut cursor = program.cursor();
+    let never = stab_model::Cancellation::never();
+    let mut cursor = program.cursor(&never);
     while let Some(instruction) = cursor.next_instruction().map_err(program_error)? {
         execute_instruction(program, instruction, buffers, rng, mode, sweep_record)?;
     }

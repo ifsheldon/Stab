@@ -1,7 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{FlexPauliString, PauliBasis, PauliPhase};
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, DemTarget, Pauli, QubitId, Target};
+use stab_model::advanced::CancellationCountdown;
+use stab_model::{
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, Pauli, QubitId, Target,
+};
 
 mod budget;
 mod clifford_action;
@@ -48,7 +51,24 @@ pub(crate) struct SparseReverseFrameTracker {
     gauge_errors: Vec<TargetXorSet>,
     anticommutations: BTreeSet<Anticommutation>,
     scratch: TrackerScratch,
+    cancellation: TrackerCancellation,
 }
+
+/// The owning operation's cancellation signal, polled once per undone instruction and repeat
+/// iteration. It is not tracker state, so every value compares equal.
+#[derive(Clone, Debug, Default)]
+struct TrackerCancellation {
+    signal: Cancellation,
+    countdown: CancellationCountdown,
+}
+
+impl PartialEq for TrackerCancellation {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for TrackerCancellation {}
 
 /// Reused merge buffers. They hold no tracker state, so clones start empty and every
 /// scratch value compares equal.
@@ -113,7 +133,25 @@ impl SparseReverseFrameTracker {
             gauge_errors: Vec::new(),
             anticommutations: BTreeSet::new(),
             scratch: TrackerScratch::default(),
+            cancellation: TrackerCancellation::default(),
         }
+    }
+
+    /// Polls `cancellation` while this tracker undoes instructions and repeat iterations.
+    pub(crate) fn set_cancellation(&mut self, cancellation: Cancellation) {
+        self.cancellation.signal = cancellation;
+    }
+
+    /// Fails when cancellation has been requested, for work that holds the tracker immutably.
+    pub(crate) fn check_cancelled(&self) -> AnalysisResult<()> {
+        Ok(self.cancellation.signal.check()?)
+    }
+
+    /// Counts one bounded unit of reverse work, failing once cancellation is observed.
+    #[inline]
+    pub(crate) fn poll_cancellation(&mut self) -> AnalysisResult<()> {
+        let TrackerCancellation { signal, countdown } = &mut self.cancellation;
+        Ok(countdown.tick(signal)?)
     }
 
     pub(crate) fn measurement_count(&self) -> usize {
@@ -283,6 +321,7 @@ impl SparseReverseFrameTracker {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<()> {
+        self.poll_cancellation()?;
         match reverse_flow_transition(instruction) {
             ReverseFlowTransition::Measurement(basis) => {
                 self.undo_measurements(instruction, tracker_basis(basis)?)

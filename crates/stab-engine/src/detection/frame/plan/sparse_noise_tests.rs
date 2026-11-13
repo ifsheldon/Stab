@@ -226,7 +226,7 @@ fn bit_block_sampling_frame_sparse_channels_match_category_target_and_lane_margi
         let mut tally = Tally::new(channel, 4);
         for _ in 0..BIT_BLOCK_BATCHES {
             state
-                .sample_batch(&program, &mut rng)
+                .sample_batch(&program, &mut rng, &stab_model::Cancellation::never())
                 .expect("sample BitBlock batch");
             for lane_word in 0..4 {
                 tally.add_lane_word(lane_word, u64::MAX, |measurement| {
@@ -251,8 +251,13 @@ fn u64_detection_frame_sparse_channels_match_marginals_and_never_touch_inactive_
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut tally = Tally::new(channel, 1);
         for lanes in std::iter::repeat_n(64, U64_FULL_BATCHES).chain([U64_FINAL_LANES]) {
-            plan.sample_batch(&mut state, &mut rng, lanes)
-                .expect("sample u64 batch");
+            plan.sample_batch(
+                &mut state,
+                &mut rng,
+                lanes,
+                &stab_model::Cancellation::never(),
+            )
+            .expect("sample u64 batch");
             let active = super::super::batch_active_mask(lanes);
             let measurements = &state.frame.measurements;
             assert_eq!(measurements.len(), 2 * DATA_QUBITS);

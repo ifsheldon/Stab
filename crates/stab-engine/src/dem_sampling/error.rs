@@ -72,6 +72,9 @@ pub enum DemError {
 
     #[error(transparent)]
     ResourceLimit(#[from] DemResourceLimitError),
+
+    #[error(transparent)]
+    Cancelled(#[from] stab_model::Cancelled),
 }
 
 impl DemError {

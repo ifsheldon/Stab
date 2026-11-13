@@ -1,4 +1,4 @@
-use super::program::{DemSampleBlock, DemSampleError, DemSampleOperation};
+use super::program::{DemPoll, DemSampleBlock, DemSampleError, DemSampleOperation};
 use super::{DemError, DemResult};
 use crate::bernoulli::{
     INDEXED_BLOCK_SHOTS, INDEXED_BLOCK_WORDS, IndexedRangeError, sample_indexed_range_into,
@@ -29,6 +29,7 @@ pub(super) fn sample_into_planes(
     detector_planes: &mut Vec<u64>,
     observable_planes: &mut Vec<u64>,
     mut error_output: SampledErrorPlanes<'_>,
+    poll: &mut DemPoll<'_>,
 ) -> DemResult<()> {
     if shot_count > INDEXED_BLOCK_SHOTS {
         return Err(DemError::invalid_sampler_compilation(format!(
@@ -66,6 +67,7 @@ pub(super) fn sample_into_planes(
         observable_planes,
         &mut error_output,
         &mut stream_cursor,
+        poll,
     )?;
     if stream_cursor != expected_streams {
         return Err(DemError::invalid_sampler_compilation(format!(
@@ -102,20 +104,24 @@ fn sample_block(
     observable_planes: &mut [u64],
     error_output: &mut SampledErrorPlanes<'_>,
     stream_cursor: &mut usize,
+    poll: &mut DemPoll<'_>,
 ) -> DemResult<()> {
     for operation in &block.operations {
         match operation {
-            DemSampleOperation::Error(error) => sample_error(
-                error,
-                detector_shift,
-                seed,
-                first_shot,
-                shot_count,
-                detector_planes,
-                observable_planes,
-                error_output,
-                stream_cursor,
-            )?,
+            DemSampleOperation::Error(error) => {
+                poll.tick()?;
+                sample_error(
+                    error,
+                    detector_shift,
+                    seed,
+                    first_shot,
+                    shot_count,
+                    detector_planes,
+                    observable_planes,
+                    error_output,
+                    stream_cursor,
+                )?;
+            }
             DemSampleOperation::Repeat(repeat) => {
                 if error_output.is_discard() {
                     if repeat.body.direct_sample_effect_count == 0 {
@@ -140,6 +146,7 @@ fn sample_block(
                             observable_planes,
                             error_output,
                             stream_cursor,
+                            poll,
                         )?;
                         continue;
                     }
@@ -148,6 +155,7 @@ fn sample_block(
                             .checked_add(repeat.start_detector_shift)
                             .ok_or_else(detector_shift_overflow_error)?;
                         for error in folded_errors {
+                            poll.tick()?;
                             sample_error(
                                 error,
                                 shift,
@@ -167,6 +175,7 @@ fn sample_block(
                     .checked_add(repeat.start_detector_shift)
                     .ok_or_else(detector_shift_overflow_error)?;
                 for _ in 0..repeat.repeat_count {
+                    poll.tick()?;
                     sample_block(
                         &repeat.body,
                         shift,
@@ -177,6 +186,7 @@ fn sample_block(
                         observable_planes,
                         error_output,
                         stream_cursor,
+                        poll,
                     )?;
                     shift = shift
                         .checked_add(repeat.body.detector_shift)

@@ -82,14 +82,16 @@ impl ReverseFoldAnalyzer {
             )
         })?;
         let detector_count = circuit.count_detectors()?;
+        let mut tracker = SparseReverseFrameTracker::new_for_error_analysis(
+            stab_model::advanced::circuit_simulated_qubit_count(circuit),
+            measurement_count,
+            detector_count,
+            options.allow_gauge_detectors,
+        );
+        tracker.set_cancellation(options.cancellation.clone());
         Ok(Self {
             options,
-            tracker: SparseReverseFrameTracker::new_for_error_analysis(
-                stab_model::advanced::circuit_simulated_qubit_count(circuit),
-                measurement_count,
-                detector_count,
-                options.allow_gauge_detectors,
-            ),
+            tracker,
             ticks_left: circuit.count_ticks()?,
             reversed_model: DetectorErrorModel::new(),
             errors: ErrorAccumulator::new(),
@@ -141,6 +143,7 @@ impl ReverseFoldAnalyzer {
     }
 
     fn undo_circuit(&mut self, circuit: &Circuit) -> AnalysisResult<()> {
+        self.tracker.poll_cancellation()?;
         for item in circuit.items().iter().rev() {
             match item {
                 CircuitItem::Instruction(instruction) => {
@@ -159,6 +162,7 @@ impl ReverseFoldAnalyzer {
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
+        self.tracker.poll_cancellation()?;
         let gate_name = instruction.gate().canonical_name();
         if !matches!(
             gate_name,

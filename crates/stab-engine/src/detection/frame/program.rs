@@ -9,8 +9,9 @@
 
 use arrayvec::ArrayVec;
 use stab_algebra::PauliBasis;
+use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, MeasureRecordOffset, RepeatNestingLimit,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, MeasureRecordOffset, RepeatNestingLimit,
 };
 
 use super::clifford::{SingleQubitFrameMap, TwoQubitFrameMap};
@@ -312,13 +313,19 @@ impl CircuitProgram {
         })
     }
 
-    pub(crate) fn cursor(&self) -> ProgramCursor<'_> {
-        ProgramCursor::new(&self.entries, 0, self.entries.len())
+    /// A cursor over the whole tape that polls `cancellation` while it expands repeats.
+    pub(crate) fn cursor<'a>(&'a self, cancellation: &'a Cancellation) -> ProgramCursor<'a> {
+        ProgramCursor::new(&self.entries, 0, self.entries.len(), cancellation)
     }
 
     /// A cursor over `entries[start..end]`, which must hold whole repeat blocks.
-    pub(crate) fn cursor_range(&self, start: usize, end: usize) -> ProgramCursor<'_> {
-        ProgramCursor::new(&self.entries, start, end)
+    pub(crate) fn cursor_range<'a>(
+        &'a self,
+        start: usize,
+        end: usize,
+        cancellation: &'a Cancellation,
+    ) -> ProgramCursor<'a> {
+        ProgramCursor::new(&self.entries, start, end, cancellation)
     }
 
     #[cfg(test)]
@@ -328,11 +335,17 @@ impl CircuitProgram {
 }
 
 /// Executes the flat tape, expanding every repeat iteration.
+///
+/// The cursor ticks a cancellation countdown once per returned instruction and once per repeat
+/// iteration, so a caller walking an astronomically repeated body observes cancellation within
+/// [`CancellationCountdown::INTERVAL`] bounded steps and receives [`DetectionError::Cancelled`].
 pub(crate) struct ProgramCursor<'a> {
     entries: &'a [ProgramEntry],
     index: usize,
     end: usize,
     repeats: ArrayVec<RepeatExecutionFrame, { RepeatNestingLimit::HARD_MAX }>,
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
 }
 
 #[derive(Clone, Copy)]
@@ -343,12 +356,19 @@ struct RepeatExecutionFrame {
 }
 
 impl<'a> ProgramCursor<'a> {
-    fn new(entries: &'a [ProgramEntry], start: usize, end: usize) -> Self {
+    fn new(
+        entries: &'a [ProgramEntry],
+        start: usize,
+        end: usize,
+        cancellation: &'a Cancellation,
+    ) -> Self {
         Self {
             entries,
             index: start,
             end: end.min(entries.len()),
             repeats: ArrayVec::new(),
+            cancellation,
+            countdown: CancellationCountdown::new(),
         }
     }
 
@@ -367,6 +387,7 @@ impl<'a> ProgramCursor<'a> {
                 .ok_or_else(program_shape_error)?;
             match entry {
                 ProgramEntry::Instruction(instruction) => {
+                    self.countdown.tick(self.cancellation)?;
                     self.index += 1;
                     return Ok(Some(instruction));
                 }
@@ -396,6 +417,7 @@ impl<'a> ProgramCursor<'a> {
                     if frame.remaining > 1 {
                         frame.remaining -= 1;
                         self.index = frame.body_start;
+                        self.countdown.tick(self.cancellation)?;
                     } else {
                         self.repeats.pop();
                         self.index += 1;

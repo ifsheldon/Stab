@@ -1,14 +1,14 @@
 use std::fmt;
 use std::sync::Arc;
 
-use stab_model::DetectorErrorModel;
 use stab_model::advanced::{FoldedDemTraversal, MAX_DEM_REPEAT_NESTING};
+use stab_model::{Cancellation, DetectorErrorModel};
 use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 
 use super::bit_plane::{SampledErrorPlanes, sample_into_planes};
 use super::buffers::try_false_vec;
 use super::program::{
-    DemSampleBlock, ErrorRecordBits, apply_error_record_block, compile_block,
+    DemPoll, DemSampleBlock, ErrorRecordBits, apply_error_record_block, compile_block,
     reset_detection_record, usize_from_u64,
 };
 use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
@@ -166,6 +166,7 @@ impl DemSamplingPlan {
         shot_count: usize,
         detector_planes: &mut Vec<u64>,
         observable_planes: &mut Vec<u64>,
+        cancellation: &Cancellation,
     ) -> DemResult<()> {
         sample_into_planes(
             &self.inner.operations,
@@ -177,6 +178,7 @@ impl DemSamplingPlan {
             detector_planes,
             observable_planes,
             SampledErrorPlanes::Discard,
+            &mut DemPoll::new(cancellation),
         )
     }
 
@@ -192,6 +194,7 @@ impl DemSamplingPlan {
         detector_planes: &mut Vec<u64>,
         observable_planes: &mut Vec<u64>,
         error_planes: &mut Vec<u64>,
+        cancellation: &Cancellation,
     ) -> DemResult<()> {
         sample_into_planes(
             &self.inner.operations,
@@ -203,6 +206,7 @@ impl DemSamplingPlan {
             detector_planes,
             observable_planes,
             SampledErrorPlanes::Record(error_planes),
+            &mut DemPoll::new(cancellation),
         )
     }
 
@@ -232,11 +236,19 @@ impl DemSamplingPlan {
         &self,
         error_record: &B,
         record: &mut DetectionRecordBuffer,
+        cancellation: &Cancellation,
     ) -> DemResult<()> {
         self.validate_error_record_width(error_record, None)?;
         reset_detection_record(record, self.detector_count(), self.observable_count());
         let mut cursor = 0;
-        apply_error_record_block(&self.inner.operations, 0, error_record, &mut cursor, record)?;
+        apply_error_record_block(
+            &self.inner.operations,
+            0,
+            error_record,
+            &mut cursor,
+            record,
+            &mut DemPoll::new(cancellation),
+        )?;
         if cursor != error_record.bit_len() {
             return Err(DemError::invalid_result_format(
                 "DEM error record had unused trailing bits",

@@ -117,6 +117,7 @@ fn inverse_qec_keep_measurements_uses_the_general_reverse_flow_contract() {
             &input,
             InverseQecOptions {
                 keep_measurements: true,
+                cancellation: stab_model::Cancellation::never(),
             },
         )
         .expect("inverse mixed QEC circuit while retaining measurements"),
@@ -828,6 +829,7 @@ fn time_reversed_for_flows_matches_stim_and_reversed_flows_hold() {
             .collect::<Vec<_>>();
         let options = TimeReversedForFlowsOptions {
             dont_turn_measurements_into_resets: keep_measurements,
+            cancellation: stab_model::Cancellation::never(),
         };
         let (actual, actual_flows) =
             circuit_time_reversed_for_flows_with_options(&circuit(input), &input_flows, options)

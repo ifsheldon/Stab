@@ -167,6 +167,7 @@ fn undo_probe_iteration(
     work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
     work_budget.admit_probe_iteration()?;
+    tracker.poll_cancellation()?;
     tracker.undo_circuit_with_gauge_output(body, gauge_output, work_budget)
 }
 

@@ -1,5 +1,6 @@
 use rand::{Rng, RngExt as _};
 use stab_algebra::PauliBasis;
+use stab_model::Cancellation;
 
 use super::error::{DetectionError, DetectionResult};
 use super::try_vec_with_capacity;
@@ -74,8 +75,9 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         program: &CircuitProgram,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_>,
+        cancellation: &Cancellation,
     ) -> DetectionResult<()> {
-        let mut cursor = program.cursor();
+        let mut cursor = program.cursor(cancellation);
         while let Some(instruction) = cursor.next_instruction()? {
             self.execute_instruction(instruction, rng, mode)?;
         }

@@ -26,7 +26,7 @@ fn compile_detection(
     limits: DetectionConversionLimits,
 ) -> Result<MeasurementToDetectionPlan, DetectionCompileError> {
     MeasurementToDetectionCompiler::new()
-        .limits(limits)
+        .limits(limits.clone())
         .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
         .compile(circuit)
 }
@@ -124,11 +124,11 @@ fn every_detection_entry_point_applies_the_caller_budget() {
     let limits = budget(0);
 
     for error in [
-        measurement_record_count_with_limits(&circuit, limits)
+        measurement_record_count_with_limits(&circuit, limits.clone())
             .expect_err("measurement counting must apply the caller budget"),
-        detection_record_width_with_limits(&circuit, limits)
+        detection_record_width_with_limits(&circuit, limits.clone())
             .expect_err("detection-width counting must apply the caller budget"),
-        validate_detection_sampling_circuit_with_limits(&circuit, limits)
+        validate_detection_sampling_circuit_with_limits(&circuit, limits.clone())
             .expect_err("frame validation must apply the caller budget"),
     ] {
         let resource = expect_detection_resource(error);
@@ -137,9 +137,9 @@ fn every_detection_entry_point_applies_the_caller_budget() {
     }
 
     for error in [
-        compile_detection(&circuit, limits).expect_err("conversion compilation"),
+        compile_detection(&circuit, limits.clone()).expect_err("conversion compilation"),
         DetectionSamplingCompiler::new()
-            .limits(limits)
+            .limits(limits.clone())
             .compile(&circuit)
             .expect_err("detection sampling compilation"),
     ] {

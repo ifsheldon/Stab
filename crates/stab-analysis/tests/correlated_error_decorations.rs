@@ -37,7 +37,7 @@ fn assert_analyzed_models_match(plain: &str, decorated: &str) {
         };
         let plain_model = circuit_to_detector_error_model(
             &Circuit::from_stim_str(plain).expect("plain fixture parses"),
-            options,
+            options.clone(),
         )
         .expect("plain fixture analyzes");
         let decorated_model = circuit_to_detector_error_model(

@@ -668,6 +668,7 @@ fn detecting_regions_text(circuit: &Circuit) -> Result<String, String> {
             targets,
             ticks,
             ignore_anticommutation_errors: true,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .map(|regions| {
@@ -800,6 +801,7 @@ fn missing_detector_text(
         &circuit,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .map(|missing| without_terminal_newlines(missing.to_stim_string()))

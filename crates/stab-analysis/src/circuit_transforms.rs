@@ -1,6 +1,7 @@
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, MemoryBudget, QubitId, RepeatNestingLimit,
-    Target, advanced::CircuitBuilder,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, Gate, MemoryBudget, QubitId,
+    RepeatNestingLimit, Target,
+    advanced::{CancellationCountdown, CircuitBuilder},
 };
 
 use crate::{
@@ -12,26 +13,43 @@ use crate::{
 ///
 /// The memory budget bounds the conservative retained size of the materialized circuit, admitted
 /// before the output is allocated. Expanded operation, target, and argument counts are not
-/// separately capped; repeat nesting stays the shared fixed recursion envelope.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// separately capped; repeat nesting stays the shared fixed recursion envelope. The cancellation
+/// signal is polled once per materialized instruction.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CircuitFlattenLimits {
     memory_budget: MemoryBudget,
+    cancellation: Cancellation,
 }
 
 impl CircuitFlattenLimits {
     pub const fn new(memory_budget: MemoryBudget) -> Self {
-        Self { memory_budget }
+        Self {
+            memory_budget,
+            cancellation: Cancellation::never(),
+        }
     }
 
     /// Returns the configured memory budget for the materialized result.
-    pub const fn memory_budget(self) -> MemoryBudget {
+    pub const fn memory_budget(&self) -> MemoryBudget {
         self.memory_budget
+    }
+
+    /// Returns the cancellation signal polled while the result is materialized.
+    pub const fn cancellation(&self) -> &Cancellation {
+        &self.cancellation
     }
 
     /// Returns this policy with a different memory budget.
     #[must_use]
     pub const fn with_memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
         self.memory_budget = memory_budget;
+        self
+    }
+
+    /// Returns this policy polling `cancellation`.
+    #[must_use]
+    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = cancellation;
         self
     }
 }
@@ -54,11 +72,13 @@ pub fn flattened_circuit_with_limits(
     circuit: &Circuit,
     limits: CircuitFlattenLimits,
 ) -> AnalysisResult<Circuit> {
-    let estimate = validate_flattening_budget(circuit, limits)?;
+    let estimate = validate_flattening_budget(circuit, &limits)?;
     let capacity = validate_materialized_instruction_capacity(estimate.operations)?;
     let mut result = CircuitBuilder::new();
     result.try_reserve_exact(capacity)?;
+    let mut countdown = CancellationCountdown::new();
     visit_flattened_operations(circuit, &mut Vec::new(), |instruction| {
+        countdown.tick(limits.cancellation())?;
         result
             .try_append_instruction(instruction)
             .map_err(Into::into)
@@ -82,7 +102,7 @@ pub fn flattened_circuit_operations_with_limits(
     circuit: &Circuit,
     limits: CircuitFlattenLimits,
 ) -> AnalysisResult<Vec<CircuitInstruction>> {
-    let estimate = validate_flattening_budget(circuit, limits)?;
+    let estimate = validate_flattening_budget(circuit, &limits)?;
     let capacity = validate_materialized_instruction_capacity(estimate.operations)?;
     let mut result = Vec::new();
     result.try_reserve_exact(capacity).map_err(|error| {
@@ -94,7 +114,9 @@ pub fn flattened_circuit_operations_with_limits(
             ),
         )
     })?;
+    let mut countdown = CancellationCountdown::new();
     visit_flattened_operations(circuit, &mut Vec::new(), |instruction| {
+        countdown.tick(limits.cancellation())?;
         result.push(instruction);
         Ok(())
     })?;
@@ -254,7 +276,7 @@ struct CircuitFlattenEstimate {
 
 fn validate_flattening_budget(
     circuit: &Circuit,
-    limits: CircuitFlattenLimits,
+    limits: &CircuitFlattenLimits,
 ) -> AnalysisResult<CircuitFlattenEstimate> {
     validate_flattened_repeat_nesting(circuit)?;
     let estimate = flattened_materialization_estimate(circuit, 1)?;

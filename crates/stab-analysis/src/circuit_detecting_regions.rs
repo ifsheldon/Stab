@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{FlexPauliString, PauliBasis, StabilizerResource};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget, GateCategory,
-    MemoryBudget, QubitId, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
+    GateCategory, MemoryBudget, QubitId, Target,
 };
 
 use crate::{
@@ -23,18 +23,22 @@ const DETECTING_REGION_LIVE_STATE_UNIT_BYTES: u64 = 64;
 const MAX_DETECTING_REGION_REPEAT_NESTING: usize = 128;
 const DETECTING_REGION_OUTPUT_ENTRY_OVERHEAD_BYTES: u64 = 64;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DetectingRegionOptions {
     pub detectors: Vec<DemDetectorId>,
     pub ticks: Vec<CircuitTick>,
     pub ignore_anticommutation_errors: bool,
+    /// Signal polled once per undone instruction and repeat iteration.
+    pub cancellation: Cancellation,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DetectingRegionTargetOptions {
     pub targets: Vec<DemTarget>,
     pub ticks: Vec<CircuitTick>,
     pub ignore_anticommutation_errors: bool,
+    /// Signal polled once per undone instruction and repeat iteration.
+    pub cancellation: Cancellation,
 }
 
 pub type DetectingRegionMap = BTreeMap<DemDetectorId, BTreeMap<CircuitTick, FlexPauliString>>;
@@ -54,6 +58,7 @@ pub fn circuit_detecting_regions(
                 .collect(),
             ticks: options.ticks,
             ignore_anticommutation_errors: options.ignore_anticommutation_errors,
+            cancellation: options.cancellation,
         },
     )?;
     Ok(target_regions
@@ -90,6 +95,7 @@ pub fn circuit_detecting_regions_for_targets(
         detector_count,
         fail_on_anticommute,
     );
+    tracker.set_cancellation(options.cancellation);
     let mut current_tick = tick_count;
     let snapshot_context = SnapshotContext {
         targets: &targets,
@@ -253,6 +259,7 @@ fn undo_repeat_with_snapshots(
 
     let mut remaining = repetitions;
     while remaining > 0 {
+        tracker.poll_cancellation()?;
         let iteration_start = current_tick
             .checked_sub(ticks_per_iteration)
             .ok_or_else(|| {

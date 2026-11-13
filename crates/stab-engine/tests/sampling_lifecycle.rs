@@ -5,8 +5,8 @@
 )]
 
 use stab_engine::{
-    RandomPolicy, RunError, SamplingCancellation, SamplingCompiler, SamplingExecutionError,
-    SamplingPlan, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
+    RandomPolicy, RunError, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
 };
 use stab_model::Circuit;
 use stab_records::{MeasurementBatchView, MeasurementSink};
@@ -22,7 +22,7 @@ struct ProbeSink {
     records: Vec<Vec<bool>>,
     write_calls: usize,
     finish_calls: usize,
-    cancel_after_write: Option<SamplingCancellation>,
+    cancel_after_write: Option<stab_model::Cancellation>,
     fail_write_call: Option<usize>,
     fail_finish: bool,
 }

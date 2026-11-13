@@ -1042,7 +1042,7 @@ fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &
         ..ErrorAnalyzerOptions::default()
     };
     assert_eq!(
-        circuit_to_detector_error_model(actual, analyzer_options).expect("actual analysis"),
+        circuit_to_detector_error_model(actual, analyzer_options.clone()).expect("actual analysis"),
         circuit_to_detector_error_model(expected, analyzer_options).expect("expected analysis"),
         "error analyzer: {label}"
     );

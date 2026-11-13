@@ -18,17 +18,17 @@ pub use stab_decoder::{
     DecoderLayout, DecoderModelView, DecoderModelViewError, DecoderSession, ValidatedDecodeBatch,
 };
 pub use stab_model::{
-    AbsoluteTolerance, ByteSpan, Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem,
-    CircuitTick, DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
-    DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
-    DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
-    DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, DiagnosticSeverity, Estimate,
-    EstimateClass, Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind,
-    GateTargetRule, MeasureRecordOffset, MemoryBudget, MemoryBudgetParseError, ModelDialect,
-    ModelError, ModelFingerprint, ModelResult, ObservableId, ParseError, ParseErrorCode,
-    ParseErrorContext, ParseLimits, Pauli, Probability, ProbabilityStimText, QubitId, RepeatBlock,
-    RepeatCount, RepeatNestingLimit, RepeatNestingLimitError, ResourceEstimate, Target,
-    ValidationError, ValidationErrorCode,
+    AbsoluteTolerance, ByteSpan, Cancellation, Cancelled, Circuit, CircuitDetectorId,
+    CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemErrorMechanismTraversalLimits,
+    DemErrorMechanismView, DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget,
+    DemErrorTargetIter, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
+    DemObservableId, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
+    DiagnosticSeverity, Estimate, EstimateClass, Gate, GateArgumentRule, GateCategory,
+    GateDecomposition, GateTargetGroupKind, GateTargetRule, MeasureRecordOffset, MemoryBudget,
+    MemoryBudgetParseError, ModelDialect, ModelError, ModelFingerprint, ModelResult, ObservableId,
+    ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
+    ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
+    RepeatNestingLimitError, ResourceEstimate, Target, ValidationError, ValidationErrorCode,
 };
 pub use stab_records::{
     BitPlane64Batch, BitPlane64BatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,

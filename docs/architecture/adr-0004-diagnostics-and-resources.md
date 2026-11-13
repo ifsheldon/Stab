@@ -28,7 +28,7 @@ The budget defaults to one gibibyte, is admitted from conservative checked arith
 
 Hostile-input protection means memory safety, no panics, checked arithmetic, bounded allocation, and bounded recursion.
 It does not mean bounded CPU time: count caps that only proxied memory and fixed work caps on expanded instructions, repeat iterations, sampled errors, replay work, or analysis work units are removed, and a compact input that fits the budget runs for as long as its work takes.
-Bounding running time belongs to the caller.
+Bounding running time belongs to the caller, through one cloneable `stab_model::Cancellation` signal that every long-running library operation accepts on its limits or options value and polls inside repeat interpretation and between batches; a set signal yields a typed `Cancelled` outcome and never a partially delivered batch.
 
 The per-operation limits types for parsing, circuit flattening, DEM flattening, detection conversion, DEM sampling, sampling, error analysis, and circuit generation each carry the one budget.
 Logical-error search and SAT materialization keep their explicit search budgets with budget-exhausted results.
@@ -48,5 +48,5 @@ Estimates label values as exact, upper-bound, or unknown and do not execute the 
 - Policy objects do not become a global configuration dependency.
 - Callers see only limits relevant to the operation they invoke.
 - New operation policies require a real byte-admission boundary, exact-budget and first-excess tests, and structured `ResourceLimitError` context naming the budget.
-- Long-running work on compact inputs is expected; callers bound time, and cooperative cancellation is the planned mechanism for interrupting it.
+- Long-running work on compact inputs is expected; callers bound time with cooperative cancellation, which the CLI does not expose because the process already stops on signals.
 - Admission precedes allocation proportional to rejected work, RNG advancement, output mutation, and expensive lowering; bounded capacity estimation from an admitted source prefix remains an implementation optimization.

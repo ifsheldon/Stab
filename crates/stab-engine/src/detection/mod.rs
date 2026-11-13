@@ -76,8 +76,9 @@ impl PreparedMeasurementToDetection {
         reference_mode: crate::ReferenceSampleMode,
         limits: DetectionConversionLimits,
     ) -> DetectionResult<Self> {
+        limits.cancellation().check()?;
         let conversion_admission =
-            ConversionPlan::admission_from_circuit_with_limits(circuit, limits)?;
+            ConversionPlan::admission_from_circuit_with_limits(circuit, limits.clone())?;
         let uses_reference = matches!(
             reference_mode,
             crate::ReferenceSampleMode::UseReferenceSample
@@ -142,6 +143,7 @@ impl PreparedMeasurementToDetection {
                     program,
                     plan.measurement_count,
                     limits.memory_budget(),
+                    limits.cancellation(),
                 )?)
             }
             _ => ReferenceSampleSource::Zero,
@@ -221,6 +223,7 @@ impl PreparedMeasurementToDetection {
         observable_planes: &mut Vec<u64>,
         correction_state: Option<&mut DetectorFrameState>,
         correction_rng: &mut impl rand::Rng,
+        cancellation: &stab_model::Cancellation,
     ) -> DetectionResult<()> {
         self.validate_word_plane_widths(measurement_planes, sweep_planes)?;
         reference::validate_reference_sample_len(reference_sample, self.measurement_count())?;
@@ -235,6 +238,7 @@ impl PreparedMeasurementToDetection {
             measurement_planes,
             detector_planes,
             observable_planes,
+            cancellation,
         )?;
         match (&self.sweep_correction, correction_state) {
             (Some(correction), Some(state)) => {
@@ -244,6 +248,7 @@ impl PreparedMeasurementToDetection {
                     shot_count,
                     state,
                     correction_rng,
+                    cancellation,
                 )?;
                 xor_words(detector_planes, detectors, "detector")?;
                 xor_words(observable_planes, observables, "observable")?;

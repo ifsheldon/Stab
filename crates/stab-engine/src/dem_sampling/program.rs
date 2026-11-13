@@ -1,5 +1,7 @@
-use stab_model::advanced::{FoldedDemBlock, FoldedDemItem, dem_instruction_detector_shift};
-use stab_model::{DemInstruction, DemInstructionKind, DemTarget};
+use stab_model::advanced::{
+    CancellationCountdown, FoldedDemBlock, FoldedDemItem, dem_instruction_detector_shift,
+};
+use stab_model::{Cancellation, DemInstruction, DemInstructionKind, DemTarget};
 
 use stab_bits::BitSlice;
 
@@ -209,16 +211,39 @@ fn compile_instruction(
     Ok(())
 }
 
+/// Cancellation polled by DEM sampling and replay once per bounded step of a batch.
+pub(super) struct DemPoll<'a> {
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
+}
+
+impl<'a> DemPoll<'a> {
+    pub(super) const fn new(cancellation: &'a Cancellation) -> Self {
+        Self {
+            cancellation,
+            countdown: CancellationCountdown::new(),
+        }
+    }
+
+    /// Counts one sampled error, replayed error, or repeat iteration.
+    #[inline]
+    pub(super) fn tick(&mut self) -> DemResult<()> {
+        Ok(self.countdown.tick(self.cancellation)?)
+    }
+}
+
 pub(super) fn apply_error_record_block<B: ErrorRecordBits + ?Sized>(
     block: &DemSampleBlock,
     detector_shift: u64,
     error_record: &B,
     cursor: &mut usize,
     record: &mut DetectionRecordBuffer,
+    poll: &mut DemPoll<'_>,
 ) -> DemResult<()> {
     for operation in &block.operations {
         match operation {
             DemSampleOperation::Error(error) => {
+                poll.tick()?;
                 let occurred = error_record.bit(*cursor).ok_or_else(|| {
                     DemError::invalid_result_format("DEM error record ended early")
                 })?;
@@ -234,12 +259,14 @@ pub(super) fn apply_error_record_block<B: ErrorRecordBits + ?Sized>(
                     .checked_add(repeat.start_detector_shift)
                     .ok_or_else(detector_shift_overflow_error)?;
                 for _ in 0..repeat.repeat_count {
+                    poll.tick()?;
                     apply_error_record_block(
                         &repeat.body,
                         iteration_shift,
                         error_record,
                         cursor,
                         record,
+                        poll,
                     )?;
                     iteration_shift = iteration_shift
                         .checked_add(repeat.body.detector_shift)

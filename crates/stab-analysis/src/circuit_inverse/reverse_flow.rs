@@ -35,13 +35,11 @@ pub(super) fn reverse_flows(
     let observable_count = circuit.count_observables()?;
     let qubit_count = flow_aware_qubit_count(circuit, flows)?;
     let flow_states = reverse_flow_states(observable_count, measurement_count, flows)?;
+    let mut tracker =
+        SparseReverseFrameTracker::new(qubit_count, measurement_count, detector_count, true);
+    tracker.set_cancellation(options.cancellation.clone());
     let mut engine = ReverseFlowEngine {
-        tracker: SparseReverseFrameTracker::new(
-            qubit_count,
-            measurement_count,
-            detector_count,
-            true,
-        ),
+        tracker,
         inverted: Circuit::new(),
         qubit_coordinates: Vec::new(),
         coordinate_shift: Vec::new(),
@@ -55,6 +53,7 @@ pub(super) fn reverse_flows(
 
     engine.seed_flow_outputs(&flow_states)?;
     for instruction in circuit.iter_flattened_instructions_reverse() {
+        engine.tracker.poll_cancellation()?;
         engine.reverse_instruction(instruction)?;
     }
     engine.seed_flow_inputs(&flow_states)?;

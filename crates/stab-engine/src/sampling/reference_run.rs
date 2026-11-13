@@ -1,6 +1,7 @@
 //! Drives the inverse-tableau reference simulator over the resolved circuit program.
 
-use stab_model::RepeatNestingLimit;
+use stab_model::advanced::CancellationCountdown;
+use stab_model::{Cancellation, RepeatNestingLimit};
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
 use super::reference_simulator::{
@@ -48,6 +49,7 @@ impl ReferenceWorkspace {
         loop_policy: ReferenceSampleLoopPolicy,
         sweep_record: &[bool],
         output: &mut Vec<bool>,
+        cancellation: &Cancellation,
     ) -> Result<(), SamplingExecutionError> {
         #[cfg(test)]
         REFERENCE_RUNS.with(|runs| runs.set(runs.get().saturating_add(1)));
@@ -57,7 +59,14 @@ impl ReferenceWorkspace {
             ReferenceSampleLoopPolicy::Fold => self.snapshot.as_mut(),
             ReferenceSampleLoopPolicy::Iterate => None,
         };
-        run_entries(program, &mut self.simulator, snapshot, sweep_record, output)
+        run_entries(
+            program,
+            &mut self.simulator,
+            snapshot,
+            sweep_record,
+            output,
+            cancellation,
+        )
     }
 }
 
@@ -178,9 +187,11 @@ fn run_entries(
     mut snapshot: Option<&mut ReferenceStateSnapshot>,
     sweep_record: &[bool],
     output: &mut Vec<bool>,
+    cancellation: &Cancellation,
 ) -> Result<(), SamplingExecutionError> {
     let entries = program.entries();
     let mut repeats = arrayvec::ArrayVec::<RepeatFrame, { RepeatNestingLimit::HARD_MAX }>::new();
+    let mut countdown = CancellationCountdown::new();
     let mut index = 0;
     while index < entries.len() {
         let entry = entries
@@ -188,6 +199,7 @@ fn run_entries(
             .ok_or_else(|| run_invariant("reference sampling moved beyond retained operations"))?;
         match entry {
             ProgramEntry::Instruction(instruction) => {
+                countdown.tick(cancellation)?;
                 apply_instruction(program, instruction, simulator, sweep_record, output)?;
                 index += 1;
             }
@@ -216,7 +228,7 @@ fn run_entries(
                     && simulator.capture(fold_snapshot)
                 {
                     let output_start = output.len();
-                    let mut cursor = program.cursor_range(body_start, *body_end);
+                    let mut cursor = program.cursor_range(body_start, *body_end, cancellation);
                     while let Some(instruction) =
                         cursor.next_instruction().map_err(program_error)?
                     {
@@ -272,6 +284,7 @@ fn run_entries(
                 if frame.remaining > 1 {
                     frame.remaining -= 1;
                     index = frame.body_start;
+                    countdown.tick(cancellation)?;
                 } else {
                     repeats.pop();
                     index += 1;
@@ -469,6 +482,7 @@ pub(super) fn count_determined_measurements(
     program: &CircuitProgram,
     qubit_count: usize,
     unknown_input: bool,
+    cancellation: &Cancellation,
 ) -> Result<u64, SamplingExecutionError> {
     let simulated = if unknown_input {
         qubit_count
@@ -488,7 +502,7 @@ pub(super) fn count_determined_measurements(
     }
     let mut record = Vec::new();
     let mut count = 0_u64;
-    let mut cursor = program.cursor();
+    let mut cursor = program.cursor(cancellation);
     while let Some(instruction) = cursor.next_instruction().map_err(program_error)? {
         match instruction {
             ProgramInstruction::Measure {
@@ -625,8 +639,13 @@ pub(super) fn simulator_error(error: ReferenceSimulatorError) -> SamplingExecuti
 }
 
 pub(super) fn program_error(error: crate::detection::DetectionError) -> SamplingExecutionError {
-    SamplingExecutionError::InternalInvariant {
-        message: error.to_string(),
+    match error {
+        crate::detection::DetectionError::Cancelled(cancelled) => {
+            SamplingExecutionError::Cancelled(cancelled)
+        }
+        error => SamplingExecutionError::InternalInvariant {
+            message: error.to_string(),
+        },
     }
 }
 

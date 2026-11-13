@@ -79,11 +79,11 @@ fn decomposed_matrix_errors_preserve_symptoms_and_are_graphlike() {
             let context = format!("{name} (fold_loops={fold_loops})");
             let base = base_options(name, fold_loops);
             let analyze = |options| circuit_to_detector_error_model(circuit, options);
-            let plain = analyze(base).unwrap_or_else(|error| panic!("{context}: {error}"));
+            let plain = analyze(base.clone()).unwrap_or_else(|error| panic!("{context}: {error}"));
             let lenient = analyze(ErrorAnalyzerOptions {
                 decompose_errors: true,
                 ignore_decomposition_failures: true,
-                ..base
+                ..base.clone()
             })
             .unwrap_or_else(|error| panic!("{context} lenient: {error}"));
 
@@ -114,7 +114,7 @@ fn decomposed_matrix_errors_preserve_symptoms_and_are_graphlike() {
 
             match analyze(ErrorAnalyzerOptions {
                 decompose_errors: true,
-                ..base
+                ..base.clone()
             }) {
                 Ok(strict) => {
                     assert!(

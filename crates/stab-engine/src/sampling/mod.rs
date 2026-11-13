@@ -27,10 +27,11 @@ mod stabilizer_frame;
 
 pub use api::{
     PlanFingerprint, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
-    SamplingBackend, SamplingCancellation, SamplingCompileError, SamplingCompileErrorCode,
-    SamplingCompiler, SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
+    SamplingBackend, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
+    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
     SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
 };
+pub(crate) use api::{session_cancellation, session_cancellation_slot};
 pub(crate) use local_tableau::LocalTableauTransform;
 pub(crate) use reference::{program_reference_sample, reference_work_storage_bytes};
 
@@ -62,6 +63,7 @@ impl SamplingPlan {
             &self.inner.program,
             self.inner.qubit_count,
             unknown_input,
+            &self.inner.cancellation,
         )
     }
 
@@ -195,6 +197,7 @@ fn sampling_compile_error(error: DetectionError) -> SamplingCompileError {
                 budget: limit.limit(),
             },
         },
+        DetectionError::Cancelled(cancelled) => SamplingCompileError::Cancelled(cancelled),
     }
 }
 

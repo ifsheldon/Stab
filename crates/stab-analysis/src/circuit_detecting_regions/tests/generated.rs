@@ -34,6 +34,7 @@ fn assert_generated_repetition_code_filters_and_regions() {
             targets: all_targets,
             ticks: ticks(&[0, 1, 2, 6, 7, 8]),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap();
@@ -82,6 +83,7 @@ fn assert_generated_rotated_surface_code_filters_and_regions() {
             targets: selected_targets.clone(),
             ticks: selected_ticks.clone(),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap();
@@ -179,6 +181,7 @@ fn assert_generated_unrotated_surface_code_filters_and_regions() {
             targets: selected_targets,
             ticks: selected_ticks,
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap();
@@ -360,6 +363,7 @@ fn assert_surface_code_regions(
             targets: selected_targets,
             ticks: all_ticks.iter().copied().take(6).collect(),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .unwrap();

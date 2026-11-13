@@ -40,6 +40,7 @@ fn time_reversal_preserves_generated_surface_code_regions() {
             targets: targets.clone(),
             ticks: ticks.clone(),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .expect("input detecting regions");
@@ -60,6 +61,7 @@ fn time_reversal_preserves_generated_surface_code_regions() {
             targets,
             ticks: all_detecting_region_ticks(&inverse).expect("inverse ticks"),
             ignore_anticommutation_errors: false,
+            cancellation: stab_model::Cancellation::never(),
         },
     )
     .expect("inverse detecting regions");
@@ -430,10 +432,11 @@ fn supported_time_reversal_is_semantically_involutive() {
             })?;
             let options = TimeReversedForFlowsOptions {
                 dont_turn_measurements_into_resets: true,
+                cancellation: stab_model::Cancellation::never(),
             };
 
             let (inverse, inverse_flows) =
-                circuit_time_reversed_for_flows_with_options(&input, &input_flows, options)
+                circuit_time_reversed_for_flows_with_options(&input, &input_flows, options.clone())
                     .map_err(|error| {
                         TestCaseError::fail(format!("first reversal failed: {error}\n{text}"))
                     })?;

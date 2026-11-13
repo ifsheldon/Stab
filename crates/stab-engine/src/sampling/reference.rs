@@ -1,4 +1,4 @@
-use stab_model::MemoryBudget;
+use stab_model::{Cancellation, MemoryBudget};
 
 use super::api::{ReferenceSampleLoopPolicy, try_bool_buffer, validate_reference_width};
 use super::reference_run::{ReferenceWorkspace, has_reference_fold_candidate};
@@ -58,6 +58,7 @@ impl SamplingPlan {
             self.inner.reference_sample_loop_policy,
             sweep_record,
             self.inner.memory_budget,
+            &self.inner.cancellation,
         )?;
         record.extend_from_slice(&output);
         Ok(())
@@ -103,6 +104,7 @@ pub(crate) fn program_reference_sample(
     loop_policy: ReferenceSampleLoopPolicy,
     sweep_record: &[bool],
     budget: MemoryBudget,
+    cancellation: &Cancellation,
 ) -> Result<Vec<bool>, SamplingExecutionError> {
     let measurement_count = program.counts().measurements;
     if measurement_count == 0 {
@@ -116,6 +118,7 @@ pub(crate) fn program_reference_sample(
         loop_policy,
         sweep_record,
         &mut output,
+        cancellation,
     )?;
     validate_reference_width(&output, measurement_count)?;
     Ok(output)

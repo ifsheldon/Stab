@@ -73,6 +73,12 @@ impl<'a> Parser<'a> {
                     command.end_error_span(),
                     depth,
                 )?;
+                self.admission.admit_payload(
+                    0,
+                    repeat.tag.as_ref().map_or(0, String::len),
+                    line_number,
+                    semantic_line.span(),
+                )?;
                 let body = self.parse_block(true, depth + 1)?;
                 circuit.push(CircuitItem::RepeatBlock(RepeatBlock::new(
                     repeat.count,
@@ -85,6 +91,12 @@ impl<'a> Parser<'a> {
                     line,
                     command.end_error_span(),
                     &mut self.admission,
+                )?;
+                self.admission.admit_payload(
+                    instruction.args().len(),
+                    instruction.tag_bytes().map_or(0, <[u8]>::len),
+                    line_number,
+                    semantic_line.span(),
                 )?;
                 if self.fuse_instructions {
                     circuit.push_instruction(instruction);

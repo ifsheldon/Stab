@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_analysis::circuit_with_inlined_feedback_with_memory_budget;
+use stab_analysis::{FeedbackInliningLimits, circuit_with_inlined_feedback_with_limits};
 use stab_engine::{
     DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler,
     MeasurementToDetectionCompiler, MeasurementToDetectionTransaction, RandomPolicy,
@@ -232,7 +232,10 @@ where
     )?;
     let circuit = parse_circuit_bytes(&circuit_bytes, args.memory)?;
     let circuit = if args.ran_without_feedback {
-        circuit_with_inlined_feedback_with_memory_budget(&circuit, args.memory.get())?
+        circuit_with_inlined_feedback_with_limits(
+            &circuit,
+            FeedbackInliningLimits::new(args.memory.get()),
+        )?
     } else {
         circuit
     };

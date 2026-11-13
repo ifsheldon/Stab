@@ -2,11 +2,12 @@ use std::collections::{BTreeSet, HashMap};
 use std::ops::ControlFlow;
 
 use stab_model::advanced::{
-    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
-    FoldedDemVisitor,
+    CancellationCountdown, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
+    FoldedDemTraversal, FoldedDemVisitor,
 };
 use stab_model::{
-    DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget, DetectorErrorModel, MemoryBudget,
+    Cancellation, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget,
+    DetectorErrorModel, MemoryBudget,
 };
 
 use crate::{AnalysisError, AnalysisResult};
@@ -16,6 +17,7 @@ const ERROR_MATCHER_FILTER_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
 
 pub(super) fn error_keys_from_dem(
     model: &DetectorErrorModel,
+    cancellation: &Cancellation,
 ) -> AnalysisResult<Vec<Vec<DemTarget>>> {
     let traversal = FoldedDemTraversal::new(model)?;
     traversal.validate_repeat_depth("ErrorMatcher filter")?;
@@ -25,6 +27,8 @@ pub(super) fn error_keys_from_dem(
         retained_key_bytes: 0,
         block_policies,
         keys: &mut keys,
+        cancellation,
+        countdown: CancellationCountdown::new(),
     };
     let _ = traversal.try_visit(&mut visitor)?;
     Ok(keys)
@@ -34,6 +38,8 @@ struct ErrorMatcherFilterVisitor<'a> {
     retained_key_bytes: u64,
     block_policies: FilterBlockPolicies,
     keys: &'a mut Vec<Vec<DemTarget>>,
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
 }
 
 impl ErrorMatcherFilterVisitor<'_> {
@@ -61,6 +67,7 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
         instruction: &DemInstruction,
         state: &DemTraversalState,
     ) -> AnalysisResult<ControlFlow<()>> {
+        self.countdown.tick(self.cancellation)?;
         if instruction.kind() == DemInstructionKind::Error {
             self.admit_key(instruction.targets().len())?;
             self.keys.push(canonical_error_key(
@@ -93,6 +100,10 @@ impl FoldedDemVisitor for ErrorMatcherFilterVisitor<'_> {
             max_total_iterations: u64::MAX,
             context: "ErrorMatcher filter",
         })
+    }
+
+    fn poll_cancellation(&mut self) -> AnalysisResult<()> {
+        Ok(self.countdown.tick(self.cancellation)?)
     }
 }
 
@@ -256,8 +267,8 @@ mod tests {
 
         assert_eq!(policies.by_block.len(), 3);
         assert_eq!(
-            error_keys_from_dem(&repeated).unwrap(),
-            error_keys_from_dem(&compact).unwrap()
+            error_keys_from_dem(&repeated, &Cancellation::never()).unwrap(),
+            error_keys_from_dem(&compact, &Cancellation::never()).unwrap()
         );
     }
 }

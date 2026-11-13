@@ -110,10 +110,10 @@ fn analyzer_rejections_match_stim_in_both_fold_modes() {
         for fold_loops in [false, true] {
             let options = ErrorAnalyzerOptions {
                 fold_loops,
-                ..row.options
+                ..row.options.clone()
             };
             let rejected = Circuit::from_stim_str(row.rejected).expect("rejected circuit parses");
-            match circuit_to_detector_error_model(&rejected, options) {
+            match circuit_to_detector_error_model(&rejected, options.clone()) {
                 Err(AnalysisError::InvalidDetectorErrorModel { .. }) => {}
                 other => panic!(
                     "{} (fold_loops={fold_loops}): expected an invalid-DEM rejection, got {other:?}",

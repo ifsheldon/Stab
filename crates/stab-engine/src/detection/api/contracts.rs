@@ -50,11 +50,18 @@ pub enum DetectionExecutionError {
 
     #[error("detection execution violated an internal batch invariant: {message}")]
     InternalInvariant { message: String },
+
+    /// Cancellation was observed while a detection-sampling batch was being sampled.
+    #[error(transparent)]
+    Cancelled(#[from] stab_model::Cancelled),
 }
 
 impl From<DetectionError> for DetectionExecutionError {
     fn from(error: DetectionError) -> Self {
-        Self::Conversion(error)
+        match error {
+            DetectionError::Cancelled(cancelled) => Self::Cancelled(cancelled),
+            error => Self::Conversion(error),
+        }
     }
 }
 

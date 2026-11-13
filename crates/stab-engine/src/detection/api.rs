@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 
-use stab_model::Circuit;
+use stab_model::{Cancellation, Circuit};
 use stab_records::{
     BitPlane64BatchView, DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView,
     MeasurementWidth, ObservableWidth, PackedShotBatch,
@@ -15,7 +15,8 @@ use stab_records::{
 use super::error::DetectionError;
 use super::frame::{DetectorFrameState, DirectDetectorFramePlan};
 use super::{DetectionConversionLimits, PreparedMeasurementToDetection};
-use crate::{RandomPolicy, ReferenceSampleMode, SamplingCancellation, ShotCount, SinkFailurePhase};
+use crate::sampling::{session_cancellation, session_cancellation_slot};
+use crate::{RandomPolicy, ReferenceSampleMode, ShotCount, SinkFailurePhase};
 
 mod contracts;
 mod delivery;
@@ -34,7 +35,7 @@ use execution::{
 const MAX_BATCH_SHOTS: usize = 64;
 
 /// Builder for immutable measurement-to-detection conversion plans.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MeasurementToDetectionCompiler {
     limits: DetectionConversionLimits,
     reference_mode: ReferenceSampleMode,
@@ -49,7 +50,7 @@ impl MeasurementToDetectionCompiler {
     }
 
     #[must_use]
-    pub const fn limits(mut self, limits: DetectionConversionLimits) -> Self {
+    pub fn limits(mut self, limits: DetectionConversionLimits) -> Self {
         self.limits = limits;
         self
     }
@@ -61,13 +62,13 @@ impl MeasurementToDetectionCompiler {
     }
 
     pub fn compile(
-        self,
+        &self,
         circuit: &Circuit,
     ) -> Result<MeasurementToDetectionPlan, DetectionCompileError> {
         let converter = PreparedMeasurementToDetection::compile_with_limits(
             circuit,
             self.reference_mode,
-            self.limits,
+            self.limits.clone(),
         )?;
         Ok(MeasurementToDetectionPlan::from_converter(converter))
     }
@@ -260,7 +261,7 @@ pub struct MeasurementToDetectionSession {
     detector_planes: Vec<u64>,
     observable_planes: Vec<u64>,
     batch: DetectionBatchBuffers,
-    cancellation: OnceLock<SamplingCancellation>,
+    cancellation: OnceLock<Cancellation>,
     total_committed_shots: u64,
     poisoned: bool,
     transaction_active: bool,
@@ -274,10 +275,7 @@ impl fmt::Debug for MeasurementToDetectionSession {
             .field("plan", &self.plan)
             .field(
                 "cancelled",
-                &self
-                    .cancellation
-                    .get()
-                    .is_some_and(SamplingCancellation::is_cancelled),
+                &session_cancellation(&self.cancellation).is_cancelled(),
             )
             .field("total_committed_shots", &self.total_committed_shots)
             .field("poisoned", &self.poisoned)
@@ -320,8 +318,8 @@ impl MeasurementToDetectionSession {
                 "measurement-to-detection observable planes",
             )?,
             batch: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
+            cancellation: session_cancellation_slot(converter.plan.limits.cancellation()),
             plan,
-            cancellation: OnceLock::new(),
             total_committed_shots: 0,
             poisoned: false,
             transaction_active: false,
@@ -329,10 +327,14 @@ impl MeasurementToDetectionSession {
         })
     }
 
-    pub fn cancellation(&self) -> SamplingCancellation {
-        self.cancellation
-            .get_or_init(SamplingCancellation::default)
-            .clone()
+    /// The signal this session polls before and while converting a batch.
+    ///
+    /// It is the signal of the compiler's [`DetectionConversionLimits`] when that one is
+    /// cancellable, and otherwise a session-local signal created by the first call. Conversion is
+    /// deterministic, so a batch cancelled before or during conversion is rejected whole and the
+    /// session stays resumable.
+    pub fn cancellation(&self) -> Cancellation {
+        self.cancellation.get_or_init(Cancellation::new).clone()
     }
 
     pub const fn is_poisoned(&self) -> bool {
@@ -385,11 +387,7 @@ impl MeasurementToDetectionSession {
         if shots.get() == 0 {
             return Ok(self.summary(DetectionRunStatus::Completed, shots, 0));
         }
-        if self
-            .cancellation
-            .get()
-            .is_some_and(SamplingCancellation::is_cancelled)
-        {
+        if session_cancellation(&self.cancellation).is_cancelled() {
             return Ok(self.summary(DetectionRunStatus::Cancelled, shots, 0));
         }
         let shot_count = usize::try_from(shots.get()).map_err(|_| DetectionRunError::Engine {
@@ -399,6 +397,9 @@ impl MeasurementToDetectionSession {
             progress: DetectionRunProgress::new(committed_shots, shots.get()),
         })?;
         if let Err(source) = self.fill_batch(measurements, sweeps, shot_count) {
+            if matches!(source, DetectionExecutionError::Cancelled(_)) {
+                return Ok(self.summary(DetectionRunStatus::Cancelled, shots, 0));
+            }
             self.poisoned = true;
             return Err(DetectionRunError::Engine {
                 source,
@@ -564,8 +565,9 @@ impl MeasurementToDetectionSession {
                 &mut self.observable_planes,
                 self.sweep_correction.as_mut(),
                 &mut self.correction_rng,
+                session_cancellation(&self.cancellation),
             )
-            .map_err(DetectionExecutionError::Conversion)?;
+            .map_err(DetectionExecutionError::from)?;
         self.batch
             .copy_from_planes(&self.detector_planes, &self.observable_planes)
     }
@@ -617,7 +619,7 @@ fn copy_batch_into_word_planes(
 }
 
 /// Builder for immutable circuit detection-sampling plans.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetectionSamplingCompiler {
     limits: DetectionConversionLimits,
 }
@@ -630,16 +632,20 @@ impl DetectionSamplingCompiler {
     }
 
     #[must_use]
-    pub const fn limits(mut self, limits: DetectionConversionLimits) -> Self {
+    pub fn limits(mut self, limits: DetectionConversionLimits) -> Self {
         self.limits = limits;
         self
     }
 
     pub fn compile(
-        self,
+        &self,
         circuit: &Circuit,
     ) -> Result<DetectionSamplingPlan, DetectionCompileError> {
-        let direct = DirectDetectorFramePlan::compile(circuit, self.limits)?;
+        self.limits
+            .cancellation()
+            .check()
+            .map_err(DetectionError::from)?;
+        let direct = DirectDetectorFramePlan::compile(circuit, self.limits.clone())?;
         Ok(DetectionSamplingPlan {
             inner: Arc::new(DetectionSamplingPlanInner { direct }),
         })
@@ -701,7 +707,7 @@ struct DirectDetectionState {
     delivery: DetectionBatchBuffers,
     pending_start: usize,
     pending_count: usize,
-    cancellation: OnceLock<SamplingCancellation>,
+    cancellation: OnceLock<Cancellation>,
 }
 
 /// Mutable reusable state for circuit detection sampling.
@@ -741,7 +747,7 @@ impl DetectionSamplingSession {
             delivery: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
             pending_start: 0,
             pending_count: 0,
-            cancellation: OnceLock::new(),
+            cancellation: session_cancellation_slot(plan.inner.direct.cancellation()),
         };
         Ok(Self {
             plan,
@@ -752,10 +758,18 @@ impl DetectionSamplingSession {
         })
     }
 
-    pub fn cancellation(&self) -> SamplingCancellation {
+    /// The signal this session polls between and inside batches.
+    ///
+    /// It is the signal of the compiler's [`DetectionConversionLimits`] when that one is
+    /// cancellable, and otherwise a session-local signal created by the first call.
+    /// Cancellation observed before a batch starts returns [`DetectionRunStatus::Cancelled`] and
+    /// leaves the session resumable; cancellation observed while a batch is sampled returns
+    /// [`DetectionExecutionError::Cancelled`], finalizes nothing, and poisons the session because
+    /// the random stream has advanced into the discarded batch.
+    pub fn cancellation(&self) -> Cancellation {
         self.state
             .cancellation
-            .get_or_init(SamplingCancellation::default)
+            .get_or_init(Cancellation::new)
             .clone()
     }
 

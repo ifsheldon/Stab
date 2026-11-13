@@ -1,4 +1,5 @@
-use stab_model::{MeasureRecordOffset, RepeatNestingLimit};
+use stab_model::advanced::CancellationCountdown;
+use stab_model::{Cancellation, MeasureRecordOffset, RepeatNestingLimit};
 use std::ops::{BitXor, BitXorAssign};
 
 use crate::detection::{DetectionError, DetectionResult};
@@ -42,10 +43,12 @@ pub(super) fn execute_program<Value>(
     detectors: &mut [Value],
     observables: &mut [Value],
     cursor: &mut ConversionCursor,
+    cancellation: &Cancellation,
 ) -> DetectionResult<()>
 where
     Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
 {
+    let mut countdown = CancellationCountdown::new();
     let mut repeat_stack = [RepeatExecutionFrame::EMPTY; RepeatNestingLimit::HARD_MAX];
     let mut repeat_depth = 0_usize;
     let mut program_counter = 0_usize;
@@ -59,6 +62,7 @@ where
                 program_counter = next_program_counter(program_counter)?;
             }
             ConversionOperation::Detector(terms) => {
+                countdown.tick(cancellation)?;
                 let value =
                     parity_of_terms(terms, cursor.measurement, measurements, reference_sample)?;
                 let detector = detectors.get_mut(cursor.detector).ok_or_else(|| {
@@ -75,6 +79,7 @@ where
                 program_counter = next_program_counter(program_counter)?;
             }
             ConversionOperation::Observable { id, terms } => {
+                countdown.tick(cancellation)?;
                 let value =
                     parity_of_terms(terms, cursor.measurement, measurements, reference_sample)?;
                 let observable = observables.get_mut(*id).ok_or_else(|| {
@@ -147,6 +152,7 @@ where
                     program_counter = next_program_counter(program_counter)?;
                 } else {
                     program_counter = frame.body_start;
+                    countdown.tick(cancellation)?;
                 }
             }
         }

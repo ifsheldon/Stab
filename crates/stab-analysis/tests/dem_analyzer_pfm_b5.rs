@@ -241,7 +241,7 @@ fn analyze_with_fold(
 }
 
 fn assert_folded_matches_unrolled(text: &str, options: ErrorAnalyzerOptions) {
-    let folded = semantic_dem(&analyze_with_fold(text, options, true));
+    let folded = semantic_dem(&analyze_with_fold(text, options.clone(), true));
     let unrolled = semantic_dem(&analyze_with_fold(text, options, false));
     assert_semantic_dems_match(&folded, &unrolled);
 }

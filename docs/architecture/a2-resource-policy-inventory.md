@@ -8,7 +8,7 @@ It classifies every limit-like constant in the product crates, as found by `rg -
 
 Hostile-input protection means memory safety, no panics, checked arithmetic, bounded allocation, and bounded recursion.
 
-It does not mean bounded CPU time, which belongs to the caller; a compact input that fits the memory budget runs for as long as its work takes until cooperative cancellation lands.
+It does not mean bounded CPU time, which belongs to the caller; a compact input that fits the memory budget runs for as long as its work takes unless the caller cancels it through the operation's `stab_model::Cancellation` signal, described under [Cooperative Cancellation](#cooperative-cancellation).
 
 Every materializing or executing operation has one admission dimension, a typed `stab_model::MemoryBudget` of conservatively counted retained bytes, admitted with checked arithmetic before allocation, RNG advancement, or output and followed by fallible reservation.
 
@@ -72,7 +72,7 @@ E4 also introduced unmatched cost-model and threshold constants: `REFERENCE_SNAP
 
 | Operation | Caller selection | What the budget bounds |
 | --- | --- | --- |
-| Circuit and DEM parsing | `ParseLimits::with_memory_budget` | Source bytes plus a conservative retained size per declaration and target, charged before retention. |
+| Circuit and DEM parsing | `ParseLimits::with_memory_budget` | Source bytes plus a conservative retained size per declaration, target, and parenthesized argument, each target and argument charged for two slots and each tag byte twice, charged before retention. |
 | Circuit sampling | `SamplingCompiler::memory_budget` | The resolved program, refused with `SamplingCompileError::CompiledBytesLimit` before materialization; each session's reusable storage; and the reference-simulator scratch. There is no general-frame fallback. |
 | Detection conversion and detection sampling | `DetectionConversionLimits::with_memory_budget` | The compact conversion plan plus one byte per measurement, sweep, detector, and observable record bit, the resolved program, the reference scratch, and each session's storage. |
 | DEM sampling and replay | `DemSamplerLimits::with_memory_budget` | Each session's reusable storage. Batch shape follows the historical 64 MiB target so seeded streams do not depend on a larger budget, and a one-shot batch is admitted whenever it fits the budget. |
@@ -80,12 +80,39 @@ E4 also introduced unmatched cost-model and threshold constants: `REFERENCE_SNAP
 | DEM flattening | `DemFlattenLimits::with_memory_budget` | The conservative materialized model. |
 | Circuit passes | `CircuitPassLimits::with_memory_budget` | Projected logical payload of the input, the declared output projection, and the returned circuit. |
 | Circuit-to-DEM analysis | `ErrorAnalyzerOptions::memory_budget` | Each retained output item, charged before it is retained. |
-| Feedback inlining | `circuit_with_inlined_feedback_with_memory_budget` | The unrolled intermediate and output circuits, projected before unrolling. |
+| Feedback inlining | `FeedbackInliningLimits::with_memory_budget` through `circuit_with_inlined_feedback_with_limits` | The unrolled intermediate and output circuits, projected before unrolling. |
 | Circuit generation | `*CodeParams::with_memory_budget` | 2048 conservative bytes per physical qubit, admitted before generation. |
 | DEM coordinate maps | `DetectorErrorModel::detector_coordinates_with_memory_budget` | The all-detector map. |
 | CLI inputs | `--memory-budget` | Whole inputs at the budget and each streamed text record at half of it, because a record's buffer doubles while it is framed. |
 
 Measurement-rich time reversal, missing-detector discovery, flow generation, detecting regions, and the ErrorMatcher filter admit their retained storage against the default budget and do not yet take a caller budget.
+
+## Cooperative Cancellation
+
+`stab_model::Cancellation` is one cloneable signal: `Cancellation::new` creates a settable signal, `cancel` and `reset` set and clear it from any thread, and `Cancellation::never`, also the default, cannot be set and costs no allocation.
+Operations given a set signal stop with a typed `Cancelled` outcome, either the error variant `Cancelled(stab_model::Cancelled)` of the operation's error type or a session's `Cancelled` run status, and the CLI reports the stable diagnostic code `cancelled`.
+The CLI passes never-cancelled signals, because the process already stops on `SIGINT` and `SIGTERM`.
+
+Loops poll through `stab_model::advanced::CancellationCountdown`, which loads the signal once every 1024 ticks; a tick is one interpreted instruction, repeat iteration, sampled or replayed error, or comparable bounded unit, never one gate target or one word-parallel step.
+One tick can still be a large instruction, such as a measurement with many targets in the reference simulator, so the poll interval is bounded in units of work rather than in time.
+
+| Operation | How the caller supplies the signal | Where it is polled | Outcome |
+| --- | --- | --- | --- |
+| Circuit sampling | `SamplingCompiler::cancellation`, or `SamplingSession::cancellation` for a session-local signal | Reference-sample repeat interpretation and every frame-program instruction and repeat iteration, plus between batches | Between batches, `SamplingRunStatus::Cancelled` with a finalized sink and a resumable seeded stream; inside a batch, `SamplingExecutionError::Cancelled` with no partial batch, no finalization, and a poisoned session; during reference computation, `SamplingExecutionError::Cancelled` |
+| Detection sampling | `DetectionConversionLimits::with_cancellation` on `DetectionSamplingCompiler::limits`, or `DetectionSamplingSession::cancellation` | Frame program and conversion program, plus between batches | As for circuit sampling, with `DetectionRunStatus::Cancelled` and `DetectionExecutionError::Cancelled` |
+| Measurement-to-detection conversion | `DetectionConversionLimits::with_cancellation` on `MeasurementToDetectionCompiler::limits`, or `MeasurementToDetectionSession::cancellation` | Reference-sample computation at compilation, sweep-correction frame program, and conversion program | `DetectionError::Cancelled` from compilation; a batch cancelled before or during conversion returns `DetectionRunStatus::Cancelled`, delivers nothing, and leaves the session resumable because conversion consumes no random stream |
+| DEM sampling and replay | `DemSamplerLimits::with_cancellation`, or the session's `cancellation` | Every sampled or replayed error and repeat iteration, plus between batches | `DemSamplingRunStatus::Cancelled` or `DemReplayBatchStatus::Cancelled`; counter-based streams make an in-batch cancellation resumable with the same seeded output |
+| Circuit-to-DEM analysis | `ErrorAnalyzerOptions::cancellation` | Every analyzed instruction and repeat iteration, folded or unrolled, including recurrence probes | `AnalysisError::Cancelled` |
+| Circuit and DEM flattening | `CircuitFlattenLimits::with_cancellation`, `DemFlattenLimits::with_cancellation` | Every materialized instruction; every visited DEM item and repeat iteration, also through `DemFlattenedInstructionIter::with_cancellation` | `AnalysisError::Cancelled`, or `ModelError::Cancelled` from the iterator |
+| Feedback inlining | `FeedbackInliningLimits::with_cancellation` | Every undone instruction and unrolled iteration | `AnalysisError::Cancelled` |
+| Time reversal and QEC inverse | `TimeReversedForFlowsOptions::cancellation`, `InverseQecOptions::cancellation` | Every reversed instruction of the expanded measurement-rich reversal | `AnalysisError::Cancelled` |
+| Flow generation and missing detectors | `FlowGeneratorOptions::cancellation` through `circuit_flow_generators_with_options`, `MissingDetectorOptions::cancellation` | Every undone instruction of the measurement-rich solver | `AnalysisError::Cancelled` |
+| Detecting regions | `DetectingRegionOptions::cancellation`, `DetectingRegionTargetOptions::cancellation` | Every undone instruction and repeat iteration of the reverse tracker | `AnalysisError::Cancelled` |
+| ErrorMatcher | `ExplainErrorsOptions::cancellation` through `explain_errors_from_circuit_with_options` | Every scanned instruction and repeat iteration, the filter traversal, and each candidate's analysis | `AnalysisError::Cancelled` |
+| Folded DEM traversal | `FoldedDemVisitor::poll_cancellation`, a defaulted visitor hook | Every expanded or selected repeat iteration | The visitor's error type |
+
+Parsing, circuit generation, circuit passes, logical-error search, and SAT materialization take no signal: parsing and generation are linear in their admitted bytes, the built-in passes are linear in the folded circuit, and search and SAT keep explicit search budgets.
+`stab_decoder::DecodeCancellation` remains the decoder session's own one-way signal.
 
 ## Removed Constants
 
