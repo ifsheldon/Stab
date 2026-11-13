@@ -8,7 +8,7 @@ use stab_model::Probability;
 use crate::{
     CliError,
     input::{read_limited_input_file, read_limited_stdin},
-    io_plan::{FileRole, PendingIo},
+    io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
     streaming::OutputSink,
 };
@@ -59,6 +59,7 @@ pub(crate) fn run_analyze_errors<R, W>(
     args: AnalyzeErrorsArgs,
     input: &mut R,
     stdout: &mut W,
+    streams: &StandardStreams,
 ) -> Result<(), CliError>
 where
     R: Read,
@@ -67,6 +68,13 @@ where
     let mut io = PendingIo::preflight(
         [(FileRole::Input, args.input.as_deref())],
         [(FileRole::Output, args.output.as_deref())],
+    )?;
+    io.reject_standard_stream_aliases(
+        streams,
+        StreamUse {
+            reads_stdin: args.input.is_none(),
+            writes_stdout: args.output.is_none(),
+        },
     )?;
     let mut input_file = io.take_input(FileRole::Input);
     let input_bytes = if let Some(input_file) = input_file.as_mut() {

@@ -17,7 +17,7 @@ use super::{
     CliError, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DemSampleBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
-    io_plan::{FileRole, InputFile, PendingIo},
+    io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     streaming::{FileOutputSink, OutputSink},
 };
 
@@ -95,6 +95,7 @@ pub(super) fn run_sample_dem<R, W>(
     args: SampleDemArgs,
     input: &mut R,
     stdout: &mut W,
+    streams: &StandardStreams,
 ) -> Result<(), CliError>
 where
     R: Read,
@@ -117,6 +118,13 @@ where
     let mut io = PendingIo::preflight_inputs(input_roles)?;
     if args.shots == 0 {
         let io = io.with_outputs(output_roles)?;
+        io.reject_standard_stream_aliases(
+            streams,
+            StreamUse {
+                reads_stdin: false,
+                writes_stdout: args.output.is_none(),
+            },
+        )?;
         let mut outputs = io.activate()?;
         let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
         primary_output.write_with(|writer| writer.write_all(&[]))?;
@@ -163,6 +171,13 @@ where
             .transpose()?,
     )?;
     let mut io = io.with_outputs(output_roles)?;
+    io.reject_standard_stream_aliases(
+        streams,
+        StreamUse {
+            reads_stdin: args.input.is_none(),
+            writes_stdout: args.output.is_none(),
+        },
+    )?;
     let mut execution = if let Some(input) = io.take_input(FileRole::ReplayErrorInput) {
         SampleDemExecution::Replay {
             input,

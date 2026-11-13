@@ -35,7 +35,7 @@ use detection::{DetectArgs, M2dArgs, run_detect, run_m2d};
 use diagnostics::{CliError, ErrorFormatArg, probe_error_format, write_cli_error};
 use help::{HelpArgs, run_help};
 use input::{read_limited_input_file, read_limited_stdin};
-use io_plan::{FileRole, PendingIo};
+use io_plan::{FileRole, PendingIo, StandardStreams, StreamUse};
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_analysis::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
@@ -322,8 +322,44 @@ fn parse_stim_i64_compatible_u64(value: &str) -> Result<u64, String> {
     Ok(parsed)
 }
 
-/// Runs the CLI and returns a process exit code.
-pub fn run_from<I, S, R, W, E>(args: I, mut input: R, mut stdout: W, mut stderr: E) -> i32
+/// Runs the CLI over caller-provided streams and returns a process exit code.
+///
+/// The streams are treated as detached from the filesystem, so file-role
+/// aliasing checks cover only paths named by flags. Use [`run_process`] for
+/// the real process standard streams.
+pub fn run_from<I, S, R, W, E>(args: I, input: R, stdout: W, stderr: E) -> i32
+where
+    I: IntoIterator<Item = S>,
+    S: Into<OsString>,
+    R: Read,
+    W: Write,
+    E: Write,
+{
+    run_with_streams(args, input, stdout, stderr, &StandardStreams::detached())
+}
+
+/// Runs the CLI over this process's arguments and standard streams.
+///
+/// When standard input or output is a regular file, commands also reject
+/// that file aliasing a named input or output before truncating anything.
+pub fn run_process() -> i32 {
+    let streams = StandardStreams::capture();
+    run_with_streams(
+        std::env::args_os(),
+        std::io::stdin().lock(),
+        std::io::stdout().lock(),
+        std::io::stderr().lock(),
+        &streams,
+    )
+}
+
+fn run_with_streams<I, S, R, W, E>(
+    args: I,
+    mut input: R,
+    mut stdout: W,
+    mut stderr: E,
+    streams: &StandardStreams,
+) -> i32
 where
     I: IntoIterator<Item = S>,
     S: Into<OsString>,
@@ -347,15 +383,17 @@ where
     let result = match command {
         Some(Command::Help(args)) => run_help(args, &mut stdout),
         Some(Command::Capabilities(args)) => run_capabilities(args, &mut stdout),
-        Some(Command::Inspect(args)) => run_inspect(args, &mut input, &mut stdout),
-        Some(Command::Plan(args)) => run_plan(args, &mut input, &mut stdout),
+        Some(Command::Inspect(args)) => run_inspect(args, &mut input, &mut stdout, streams),
+        Some(Command::Plan(args)) => run_plan(args, &mut input, &mut stdout, streams),
         Some(Command::Gen(args)) => run_gen(args, &mut stdout),
-        Some(Command::Convert(args)) => run_convert(args, &mut input, &mut stdout),
-        Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout),
-        Some(Command::Detect(args)) => run_detect(args, &mut input, &mut stdout),
-        Some(Command::M2d(args)) => run_m2d(args, &mut input, &mut stdout),
-        Some(Command::AnalyzeErrors(args)) => run_analyze_errors(args, &mut input, &mut stdout),
-        Some(Command::SampleDem(args)) => run_sample_dem(args, &mut input, &mut stdout),
+        Some(Command::Convert(args)) => run_convert(args, &mut input, &mut stdout, streams),
+        Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout, streams),
+        Some(Command::Detect(args)) => run_detect(args, &mut input, &mut stdout, streams),
+        Some(Command::M2d(args)) => run_m2d(args, &mut input, &mut stdout, streams),
+        Some(Command::AnalyzeErrors(args)) => {
+            run_analyze_errors(args, &mut input, &mut stdout, streams)
+        }
+        Some(Command::SampleDem(args)) => run_sample_dem(args, &mut input, &mut stdout, streams),
         None => {
             let error = Cli::command().error(
                 ErrorKind::MissingSubcommand,
@@ -365,6 +403,9 @@ where
         }
     };
 
+    // Buffered stdout can hold the final bytes until drop, where a write error
+    // would be lost, so a command succeeds only after its output is flushed.
+    let result = result.and_then(|()| stdout.flush().map_err(CliError::WriteOutput));
     match result {
         Ok(()) => 0,
         Err(error) => {
@@ -630,7 +671,12 @@ where
     }
 }
 
-fn run_sample<R, W>(args: SampleArgs, input: &mut R, stdout: &mut W) -> Result<(), CliError>
+fn run_sample<R, W>(
+    args: SampleArgs,
+    input: &mut R,
+    stdout: &mut W,
+    streams: &StandardStreams,
+) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
@@ -648,6 +694,13 @@ where
     let mut io = PendingIo::preflight(
         [(FileRole::Input, args.input.as_deref())],
         [(FileRole::Output, args.output.as_deref())],
+    )?;
+    io.reject_standard_stream_aliases(
+        streams,
+        StreamUse {
+            reads_stdin: args.input.is_none(),
+            writes_stdout: args.output.is_none(),
+        },
     )?;
     let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
         read_limited_input_file(

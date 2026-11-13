@@ -18,8 +18,8 @@ use stab_records::{
 
 use crate::{
     Cli, CliError, FileRole, MAX_CIRCUIT_INPUT_BYTES, PendingIo, SampleOutFormatArg,
-    one_shot_visible_measurement_count, parse_stim_u64, parse_stim_usize, read_limited_input_file,
-    read_limited_stdin,
+    StandardStreams, StreamUse, one_shot_visible_measurement_count, parse_stim_u64,
+    parse_stim_usize, read_limited_input_file, read_limited_stdin,
 };
 
 const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 5;
@@ -124,6 +124,7 @@ pub(crate) fn run_inspect<R, W>(
     args: InspectArgs,
     stdin: &mut R,
     stdout: &mut W,
+    streams: &StandardStreams,
 ) -> Result<(), CliError>
 where
     R: Read,
@@ -133,6 +134,7 @@ where
     let input = read_agent_input(
         args.input.as_deref(),
         stdin,
+        streams,
         "inspect model input",
         MAX_CIRCUIT_INPUT_BYTES,
     )?;
@@ -143,13 +145,18 @@ where
     write_agent_output(stdout, args.format, &report, &render_inspect_human(&report))
 }
 
-pub(crate) fn run_plan<R, W>(args: PlanArgs, stdin: &mut R, stdout: &mut W) -> Result<(), CliError>
+pub(crate) fn run_plan<R, W>(
+    args: PlanArgs,
+    stdin: &mut R,
+    stdout: &mut W,
+    streams: &StandardStreams,
+) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
 {
     match args.command {
-        PlanCommand::Sample(args) => run_plan_sample(args, stdin, stdout),
+        PlanCommand::Sample(args) => run_plan_sample(args, stdin, stdout, streams),
     }
 }
 
@@ -157,6 +164,7 @@ fn run_plan_sample<R, W>(
     args: PlanSampleArgs,
     stdin: &mut R,
     stdout: &mut W,
+    streams: &StandardStreams,
 ) -> Result<(), CliError>
 where
     R: Read,
@@ -170,6 +178,7 @@ where
     let input = read_agent_input(
         args.input.as_deref(),
         stdin,
+        streams,
         "plan sample circuit input",
         MAX_CIRCUIT_INPUT_BYTES,
     )?;
@@ -269,6 +278,7 @@ fn reference_loop_policy_report(
 fn read_agent_input<R>(
     path: Option<&Path>,
     stdin: &mut R,
+    streams: &StandardStreams,
     kind: &'static str,
     limit: u64,
 ) -> Result<Vec<u8>, CliError>
@@ -278,6 +288,13 @@ where
     let mut io = PendingIo::preflight(
         [(FileRole::Input, path)],
         std::iter::empty::<(FileRole, Option<&Path>)>(),
+    )?;
+    io.reject_standard_stream_aliases(
+        streams,
+        StreamUse {
+            reads_stdin: path.is_none(),
+            writes_stdout: true,
+        },
     )?;
     if path.is_some() {
         let mut input = io

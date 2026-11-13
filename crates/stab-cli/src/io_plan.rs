@@ -33,6 +33,47 @@ impl FileRole {
     }
 }
 
+/// Identity of a standard stream, retained only when it is a regular file.
+///
+/// Pipes, terminals, and character devices such as `/dev/null` cannot lose
+/// data through aliasing, so they are never compared.
+#[derive(Debug, Default)]
+pub(crate) struct StandardStreams {
+    stdin: Option<Handle>,
+    stdout: Option<Handle>,
+}
+
+impl StandardStreams {
+    /// Streams that are not process standard streams, such as in-memory buffers.
+    pub(crate) fn detached() -> Self {
+        Self::default()
+    }
+
+    /// Captures the identities of this process's standard input and output.
+    pub(crate) fn capture() -> Self {
+        Self {
+            stdin: regular_file_handle(Handle::stdin()),
+            stdout: regular_file_handle(Handle::stdout()),
+        }
+    }
+}
+
+fn regular_file_handle(handle: std::io::Result<Handle>) -> Option<Handle> {
+    let handle = handle.ok()?;
+    let is_file = handle.as_file().metadata().ok()?.file_type().is_file();
+    is_file.then_some(handle)
+}
+
+/// Which standard streams a command will actually read or write.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct StreamUse {
+    pub(crate) reads_stdin: bool,
+    pub(crate) writes_stdout: bool,
+}
+
+const STDIN_ROLE: &str = "stdin";
+const STDOUT_ROLE: &str = "stdout";
+
 #[derive(Debug)]
 pub(crate) struct InputFile {
     role: FileRole,
@@ -186,6 +227,54 @@ impl PendingIo {
         reject_output_aliases(&outputs)?;
         self.outputs = outputs;
         Ok(self)
+    }
+
+    /// Rejects a standard stream that refers to the same regular file as a
+    /// command input or output before any output is truncated.
+    pub(crate) fn reject_standard_stream_aliases(
+        &self,
+        streams: &StandardStreams,
+        used: StreamUse,
+    ) -> Result<(), CliError> {
+        let stdin = streams.stdin.as_ref().filter(|_| used.reads_stdin);
+        let stdout = streams.stdout.as_ref().filter(|_| used.writes_stdout);
+        if let Some(stdin) = stdin {
+            if let Some(output) = self
+                .outputs
+                .iter()
+                .find(|output| output.identity.as_ref() == Some(stdin))
+            {
+                return Err(CliError::ConflictingFileRoles {
+                    first: STDIN_ROLE,
+                    second: output.role.flag(),
+                });
+            }
+            if stdout == Some(stdin) {
+                return Err(CliError::ConflictingFileRoles {
+                    first: STDIN_ROLE,
+                    second: STDOUT_ROLE,
+                });
+            }
+        }
+        if let Some(stdout) = stdout {
+            if let Some(input) = self.inputs.iter().find(|input| input.identity == *stdout) {
+                return Err(CliError::ConflictingFileRoles {
+                    first: input.role.flag(),
+                    second: STDOUT_ROLE,
+                });
+            }
+            if let Some(output) = self
+                .outputs
+                .iter()
+                .find(|output| output.identity.as_ref() == Some(stdout))
+            {
+                return Err(CliError::ConflictingFileRoles {
+                    first: output.role.flag(),
+                    second: STDOUT_ROLE,
+                });
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn take_input(&mut self, role: FileRole) -> Option<InputFile> {

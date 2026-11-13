@@ -165,6 +165,23 @@ kind = "lib"
 name = "tests::path_alias::symlink_file_role_aliases_fail_without_truncation"
 
 [[families]]
+id = "resource-safety.cli-standard-stream-identities"
+area = "resource-safety"
+contract = "A redirected standard input or output that is the same regular file as a command input, output, or the other standard stream is rejected before truncation, while pipes, devices, and streams a command does not use are never compared."
+stim_refs = ["src/stim/cmd/command_sample.test.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stab extends same-file protection to shell redirections, which pinned Stim accepts and then truncates before reading."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "process_io"
+name = "standard_stream_aliases_fail_without_touching_files"
+
+[[families]]
 id = "resource-safety.dem-coordinate-map-limit"
 area = "resource-safety"
 contract = "Full DEM detector-coordinate maps reject above one million entries while selected coordinate queries remain available on compact large models."

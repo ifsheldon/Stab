@@ -17,7 +17,7 @@ use crate::{
     CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_line, read_limited_stdin, record_stream_error},
-    io_plan::{FileRole, InputFile, PendingIo},
+    io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink},
 };
@@ -115,6 +115,7 @@ pub(crate) fn run_detect<R, W>(
     args: DetectArgs,
     input: &mut R,
     stdout: &mut W,
+    streams: &StandardStreams,
 ) -> Result<(), CliError>
 where
     R: Read,
@@ -128,6 +129,13 @@ where
             (FileRole::Output, args.output.as_deref()),
             (FileRole::ObservableOutput, args.obs_output.as_deref()),
         ],
+    )?;
+    io.reject_standard_stream_aliases(
+        streams,
+        StreamUse {
+            reads_stdin: args.input.is_none() && args.shots != 0,
+            writes_stdout: args.output.is_none(),
+        },
     )?;
     if args.shots == 0 {
         let mut outputs = io.activate()?;
@@ -176,7 +184,12 @@ where
         .map_err(map_detection_run_error)
 }
 
-pub(crate) fn run_m2d<R, W>(args: M2dArgs, input: &mut R, stdout: &mut W) -> Result<(), CliError>
+pub(crate) fn run_m2d<R, W>(
+    args: M2dArgs,
+    input: &mut R,
+    stdout: &mut W,
+    streams: &StandardStreams,
+) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
@@ -192,6 +205,13 @@ where
             (FileRole::Output, args.output.as_deref()),
             (FileRole::ObservableOutput, args.obs_output.as_deref()),
         ],
+    )?;
+    io.reject_standard_stream_aliases(
+        streams,
+        StreamUse {
+            reads_stdin: args.input.is_none(),
+            writes_stdout: args.output.is_none(),
+        },
     )?;
     let mut circuit_file = io
         .take_input(FileRole::Circuit)

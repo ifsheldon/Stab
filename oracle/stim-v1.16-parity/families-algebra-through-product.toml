@@ -481,6 +481,38 @@ target = "parity_workflows"
 name = "analyze_errors_real_process_routes_all_nondeprecated_options"
 
 [[families]]
+id = "cli.argument-repetition"
+area = "cli"
+contract = "Every computational command rejects a repeated value or boolean flag with a usage error instead of choosing one occurrence."
+stim_refs = ["src/stim/util_bot/arg_parse.cc", "src/stim/util_bot/arg_parse.test.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim's find_argument silently uses the first occurrence, so a later override such as a second --shots is dropped without notice; Stab treats the ambiguity as a usage error."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::args::repeated_flags_and_arguments_after_terminator_are_rejected"
+
+[[families]]
+id = "cli.argument-terminator"
+area = "cli"
+contract = "Every computational command rejects arguments after a -- terminator because it accepts no positional arguments, while a bare trailing -- is accepted."
+stim_refs = ["src/stim/util_bot/arg_parse.cc", "src/stim/util_bot/arg_parse.test.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Stim ignores every argument after --, including recognized flags such as --shots and --in, so the command silently runs with defaults; Stab follows the POSIX meaning and reports the unexpected positional arguments."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "lib"
+name = "tests::args::repeated_flags_and_arguments_after_terminator_are_rejected"
+
+[[families]]
 id = "cli.convert"
 area = "cli"
 contract = "convert accepts every nondeprecated Stim option and routes typed circuit, DEM, explicit-layout, primary-output, and observable-output arguments."
@@ -594,6 +626,23 @@ package = "stab-cli"
 kind = "test"
 target = "parity_workflows"
 name = "m2d_real_process_covers_measurement_sweep_and_output_routes"
+
+[[families]]
+id = "cli.output-write-failures"
+area = "cli"
+contract = "Every command that writes output exits 141 with empty stderr on a closed stdout pipe and exits 1 with a diagnostic on any other primary or side-output write failure, including bytes still buffered at completion."
+stim_refs = ["src/stim/main_namespaced.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim matches the closed-pipe status through SIGPIPE but ignores other write errors and exits 0 on a full device, silently losing output; Stab reports them."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "process_io"
+name = "full_device_write_failures_exit_with_a_diagnostic"
 
 [[families]]
 id = "cli.repl"

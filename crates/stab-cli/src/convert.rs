@@ -12,7 +12,7 @@ use stab_records::{
 use crate::{
     CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg,
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
-    io_plan::{FileRole, PendingIo},
+    io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink, write_ptb64_group},
 };
@@ -216,17 +216,23 @@ pub(crate) fn run_convert<R, W>(
     args: ConvertArgs,
     stdin: &mut R,
     stdout: &mut W,
+    streams: &StandardStreams,
 ) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
 {
+    let stream_use = StreamUse {
+        reads_stdin: args.input.is_none(),
+        writes_stdout: args.output.is_none(),
+    };
     if args.in_format == RecordFormatArg::Stim || args.out_format == RecordFormatArg::Stim {
         validate_stim_conversion_options(&args)?;
         let io = PendingIo::preflight(
             [(FileRole::Input, args.input.as_deref())],
             [(FileRole::Output, args.output.as_deref())],
         )?;
+        io.reject_standard_stream_aliases(streams, stream_use)?;
         return run_convert_stim(io, stdin, stdout);
     }
     if args.obs_out_format == RecordFormatArg::Stim {
@@ -244,6 +250,7 @@ where
             (FileRole::ObservableOutput, args.obs_output.as_deref()),
         ],
     )?;
+    io.reject_standard_stream_aliases(streams, stream_use)?;
 
     let layout = resolve_convert_layout(&args, &mut io)?;
     let input_file = io.take_input(FileRole::Input);
