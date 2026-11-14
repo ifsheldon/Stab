@@ -3,7 +3,7 @@ use std::assert_matches;
 use super::*;
 use std::io::BufRead as _;
 
-const HELPER_TEST: &str = "process::tests::process_helper";
+const HELPER_TEST: &str = "tests::process_helper";
 const HELPER_ENV: &str = "STAB_BENCH_PROCESS_HELPER";
 const EXPECTED_CPU_ENV: &str = "STAB_BENCH_EXPECTED_CPU";
 const OUTPUT_PATH_ENV: &str = "STAB_BENCH_OUTPUT_PATH";
@@ -19,6 +19,7 @@ fn request(mode: &str) -> ProcessRequest {
             OsString::from("--nocapture"),
         ],
         stdin: Vec::new(),
+        unread_stdin: UnreadStdin::Reject,
         working_directory: std::env::current_dir().expect("working directory"),
         environment: vec![(OsString::from(HELPER_ENV), OsString::from(mode))].into(),
         affinity_cpu: None,
@@ -103,11 +104,54 @@ fn rejects_missing_binary_and_all_stream_limits() {
 }
 
 #[test]
-fn propagates_writer_failure() {
+fn unread_stdin_policy_decides_whether_a_broken_pipe_fails() {
     let mut request = request("close-stdin");
     request.stdin = vec![0_u8; 8 << 20];
-    let result = run_bounded_process(&request);
-    assert_matches!(result, Err(ProcessError::WriteStdin { .. }));
+    assert_matches!(
+        run_bounded_process(&request),
+        Err(ProcessError::WriteStdin { .. })
+    );
+
+    request.unread_stdin = UnreadStdin::Allow;
+    let output = run_bounded_process(&request).expect("an early exit stays observable");
+    assert_eq!(output.status, Some(3));
+    assert_eq!(output.stderr, b"rejected");
+}
+
+#[test]
+fn timeout_includes_blocked_stdin_writes() {
+    let mut request = request("sleep");
+    request.stdin = vec![0_u8; 8 << 20];
+    request.limits.timeout = Duration::from_millis(200);
+    let started = Instant::now();
+
+    assert_matches!(
+        run_bounded_process(&request),
+        Err(ProcessError::TimedOut(_))
+    );
+    assert!(started.elapsed() < Duration::from_secs(2));
+}
+
+#[test]
+fn sticky_cancellation_prevents_a_later_process_from_starting() {
+    let directory = tempfile::tempdir().expect("temporary marker directory");
+    let marker = directory.path().join("must-not-start");
+    let mut request = request("success");
+    request.program = PathBuf::from("/bin/sh");
+    request.args = vec![
+        OsString::from("-c"),
+        OsString::from("printf started > \"$1\""),
+        OsString::from("sticky-cancellation"),
+        marker.as_os_str().to_owned(),
+    ];
+    let cancellation = ProcessCancellation::for_test();
+    cancellation.cancel();
+
+    assert_matches!(
+        run_bounded_process_with_cancellation(&request, &cancellation),
+        Err(ProcessError::Interrupted(_))
+    );
+    assert!(!marker.exists());
 }
 
 #[test]
@@ -399,7 +443,7 @@ fn managed_child_drop_kills_and_reaps_after_io_start() {
     );
 }
 
-const LAUNCHER_TEST: &str = "process::tests::launcher_entry";
+const LAUNCHER_TEST: &str = "tests::launcher_entry";
 
 /// Runs `mode` through the measurement launcher, played by this test binary.
 fn measured(mode: &str) -> ProcessRequest {
@@ -543,7 +587,10 @@ fn process_helper() {
                 .write_all(b"stdin-drained\n")
                 .expect("write completion marker");
         }
-        "close-stdin" => std::process::exit(0),
+        "close-stdin" => {
+            eprint!("rejected");
+            std::process::exit(3);
+        }
         "file-overflow" => {
             let mut barrier = [0_u8; 1];
             std::io::stdin()

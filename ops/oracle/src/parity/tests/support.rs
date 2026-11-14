@@ -43,7 +43,7 @@ impl PinnedStimProgram {
             OsString::from("-o"),
             binary.clone().into_os_string(),
         ];
-        let compile = run_process(Path::new("c++"), &args, source, Some(&root.path))
+        let compile = run_process(Path::new("c++"), &args, source, &root.path)
             .expect("compile pinned Stim probe");
         assert!(
             compile.success(),
@@ -62,6 +62,6 @@ impl PinnedStimProgram {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        run_process(&self.binary, args, stdin, Some(&self.root)).expect("execute pinned Stim probe")
+        run_process(&self.binary, args, stdin, &self.root).expect("execute pinned Stim probe")
     }
 }

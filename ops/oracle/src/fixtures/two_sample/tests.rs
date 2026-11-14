@@ -242,11 +242,7 @@ fn process_output(stdout: &[u8]) -> crate::ProcessOutput {
         status: Some(0),
         stdout: crate::CapturedOutput {
             bytes: stdout.to_vec(),
-            truncated: false,
         },
-        stderr: crate::CapturedOutput {
-            bytes: Vec::new(),
-            truncated: false,
-        },
+        stderr: crate::CapturedOutput { bytes: Vec::new() },
     }
 }

@@ -38,10 +38,6 @@ impl FixtureOutput {
         self.actual.display_path()
     }
 
-    pub(super) fn monitored_file(&self) -> crate::safe_file::SafeFileLocation {
-        self.actual.clone()
-    }
-
     #[cfg(test)]
     pub(super) fn from_path(
         expected_relative: impl Into<String>,

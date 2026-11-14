@@ -15,6 +15,7 @@ members = [
     "ops/bench",
     "ops/oracle",
     "ops/pre-commit",
+    "ops/process",
     "ops/release",
     "test-support/compat-corpus",
     "test-support/reference-decoder",

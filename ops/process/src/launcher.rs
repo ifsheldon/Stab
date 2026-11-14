@@ -6,8 +6,8 @@
 //! Spawning a measured program directly from the runner therefore reports at
 //! least the runner's own peak, which hid every benchmark's real memory use.
 //!
-//! The supervisor instead executes a fresh, small launcher (this module, run as
-//! `stab-bench e2e-launch`). The launcher pins itself to the requested CPU so the
+//! The supervisor instead executes a fresh, small launcher: a binary whose
+//! entry point calls [`run_launcher`], such as `stab-bench e2e-launch`. The launcher pins itself to the requested CPU so the
 //! program inherits the mask before it starts, spawns the program with inherited
 //! standard streams, bounds the program's regular-file writes, reaps it with
 //! `wait4`, and writes
@@ -30,21 +30,12 @@ const MAX_REPORT_BYTES: u64 = 4 << 10;
 /// Exit status of a launcher that could not measure its program.
 const LAUNCH_FAILURE_EXIT: u8 = 125;
 
-/// The launcher executable and the arguments that select its launch entry point.
+/// The launcher executable and the arguments that select its entry point, which
+/// must call [`run_launcher`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Launcher {
-    pub(crate) program: PathBuf,
-    pub(crate) args: Vec<OsString>,
-}
-
-impl Launcher {
-    /// The running `stab-bench` binary's hidden `e2e-launch` command.
-    pub(crate) fn current_bench() -> Result<Self, std::io::Error> {
-        Ok(Self {
-            program: std::env::current_exe()?,
-            args: vec![OsString::from("e2e-launch")],
-        })
-    }
+pub struct Launcher {
+    pub program: PathBuf,
+    pub args: Vec<OsString>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -179,7 +170,7 @@ fn read_report(path: &Path) -> Result<LaunchReport, String> {
 
 /// Entry point of the launcher process. Reads its spec from the environment,
 /// measures the program, and reports through the spec's report file only.
-pub(crate) fn run_launcher() -> ExitCode {
+pub fn run_launcher() -> ExitCode {
     ExitCode::from(launcher_exit_code())
 }
 

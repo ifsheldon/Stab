@@ -518,17 +518,11 @@ fn run_prepared_fixture_process(
     command: &outputs::PreparedFixtureCommand,
     stdin: &[u8],
 ) -> Result<crate::ProcessOutput, OracleError> {
-    let monitored_files = command
-        .outputs
-        .iter()
-        .map(outputs::FixtureOutput::monitored_file)
-        .collect::<Vec<_>>();
-    crate::process::run_process_monitoring_files(
+    crate::process::run_process_with_file_limit(
         program,
         &command.argv,
         stdin,
-        Some(&root.path),
-        &monitored_files,
+        &root.path,
         outputs::AUXILIARY_OUTPUT_LIMIT_BYTES,
     )
 }
@@ -623,12 +617,8 @@ fn core_parse_print_output(
             status: Some(0),
             stdout: crate::CapturedOutput {
                 bytes: dem.to_dem_string().into_bytes(),
-                truncated: false,
             },
-            stderr: crate::CapturedOutput {
-                bytes: Vec::new(),
-                truncated: false,
-            },
+            stderr: crate::CapturedOutput { bytes: Vec::new() },
         });
     }
     let circuit = parse_core_circuit(row, "stdin", input)?;
@@ -636,12 +626,8 @@ fn core_parse_print_output(
         status: Some(0),
         stdout: crate::CapturedOutput {
             bytes: circuit.to_stim_string().into_bytes(),
-            truncated: false,
         },
-        stderr: crate::CapturedOutput {
-            bytes: Vec::new(),
-            truncated: false,
-        },
+        stderr: crate::CapturedOutput { bytes: Vec::new() },
     })
 }
 

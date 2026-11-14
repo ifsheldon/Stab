@@ -35,11 +35,9 @@ fn process_output(status: Option<i32>, stdout: &[u8], stderr: &[u8]) -> crate::P
         status,
         stdout: crate::CapturedOutput {
             bytes: stdout.to_vec(),
-            truncated: false,
         },
         stderr: crate::CapturedOutput {
             bytes: stderr.to_vec(),
-            truncated: false,
         },
     }
 }

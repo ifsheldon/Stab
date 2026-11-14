@@ -38,7 +38,7 @@ pub(crate) enum GateCatalogError {
 
 pub(crate) fn run(root: &RepoRoot, rebuild_stim: bool) -> Result<(), OracleError> {
     let helper = ensure_stim_helper(root, rebuild_stim, HELPER_TARGET)?;
-    let output = run_checked_path(&helper, std::iter::empty::<&str>(), b"", Some(&root.path))?;
+    let output = run_checked_path(&helper, std::iter::empty::<&str>(), b"", &root.path)?;
     let stim = std::str::from_utf8(&output.stdout.bytes).map_err(GateCatalogError::from)?;
     let stab = model_catalog()?;
     if stim != stab {

@@ -318,6 +318,7 @@ mod tests {
             .map(OsString::from)
             .into(),
             stdin: vec![b'\n'],
+            unread_stdin: crate::process::UnreadStdin::Reject,
             working_directory: std::env::current_dir().expect("working directory"),
             environment: vec![
                 (OsString::from("STAB_HOST_TEST_CPU"), cpu.to_string().into()),

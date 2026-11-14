@@ -26,7 +26,7 @@ fn pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug() {
     .into_iter()
     .map(OsString::from)
     .collect::<Vec<_>>();
-    let primary = run_process(&stim, &primary_args, &input, Some(&root.path))
+    let primary = run_process(&stim, &primary_args, &input, &root.path)
         .expect("execute primary-output reproduction");
     assert!(!primary.success());
     assert!(
@@ -45,7 +45,7 @@ fn pinned_stim_convert_ptb64_routes_reproduce_single_record_writer_bug() {
         OsString::from("--obs_out"),
         observable_path.into_os_string(),
     ];
-    let observable = run_process(&stim, &observable_args, &input, Some(&root.path))
+    let observable = run_process(&stim, &observable_args, &input, &root.path)
         .expect("execute observable-output reproduction");
     assert!(!observable.success());
     assert!(
@@ -296,7 +296,7 @@ fn pinned_stim_sweep_controls_cross_folded_conversion_boundaries() {
         &stim,
         &args,
         b"000000000000000000\n000000000000000000\n",
-        Some(&root.path),
+        &root.path,
     )
     .expect("execute pinned folded sweep conversion");
     assert!(
@@ -346,7 +346,7 @@ fn pinned_stim_sweep_corrections_include_pauli_observables_in_both_reference_mod
         if skip_reference {
             args.push(OsString::from("--skip_reference_sample"));
         }
-        let output = run_process(&stim, &args, b"\n\n", Some(&root.path))
+        let output = run_process(&stim, &args, b"\n\n", &root.path)
             .expect("execute pinned Pauli-observable conversion");
         assert!(
             output.success(),
@@ -379,7 +379,7 @@ fn pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit() {
         "CZ sweep[0] rec[-1]\nM 0\n",
         "CZ sweep[0] sweep[1]\nM 0\n",
     ] {
-        let output = run_process(&stim, &sample_args, source.as_bytes(), Some(&root.path))
+        let output = run_process(&stim, &sample_args, source.as_bytes(), &root.path)
             .expect("execute pinned Stim no-op sample");
         assert!(
             output.success(),
@@ -393,7 +393,7 @@ fn pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit() {
         &stim,
         &sample_args,
         b"X 0\nM 0\nREPEAT 2 {\n    REPEAT 2 {\n        R 1\n        CX rec[-1] 1\n        M 1\n    }\n}\n",
-        Some(&root.path),
+        &root.path,
     )
     .expect("execute pinned Stim nested record feedback");
     assert!(nested_record.success());
@@ -413,14 +413,14 @@ fn pinned_stim_feedback_transform_mistakes_a_sweep_target_for_a_qubit() {
         OsString::from("--circuit"),
         circuit.into_os_string(),
     ];
-    let ordinary = run_process(&stim, &common, b"10\n", Some(&root.path))
+    let ordinary = run_process(&stim, &common, b"10\n", &root.path)
         .expect("execute ordinary pinned conversion");
     assert!(ordinary.success());
     assert_eq!(ordinary.stdout.bytes, b"shot\n");
 
     let mut transformed = common.to_vec();
     transformed.push(OsString::from("--ran_without_feedback"));
-    let transformed = run_process(&stim, &transformed, b"10\n", Some(&root.path))
+    let transformed = run_process(&stim, &transformed, b"10\n", &root.path)
         .expect("execute transformed pinned conversion");
     assert!(transformed.success());
     assert_eq!(transformed.stdout.bytes, b"shot D0\n");

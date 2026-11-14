@@ -23,7 +23,7 @@ pub(super) fn run_owner_tests(root: &RepoRoot, ledger: &Ledger) -> Result<(), Or
             display,
             family_ids.join(", ")
         );
-        run_checked("cargo", test.run_args(), b"", Some(&root.path))?;
+        run_checked("cargo", test.run_args(), b"", &root.path)?;
     }
     println!(
         "[stab-oracle] parity passed {} unique canonical owner tests",
@@ -67,12 +67,7 @@ fn check_test_listings(
                 format!("selector listing group lost {first_display}").into_boxed_str(),
             )
         })?;
-        let listing = run_checked(
-            "cargo",
-            representative.listing_all_args(),
-            b"",
-            Some(&root.path),
-        )?;
+        let listing = run_checked("cargo", representative.listing_all_args(), b"", &root.path)?;
         let listing_stdout = String::from_utf8_lossy(&listing.stdout.bytes);
         for display in displays {
             let (test, family_ids) = tests.get(*display).ok_or_else(|| {

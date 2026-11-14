@@ -13,19 +13,18 @@ workspace = true
 [dependencies]
 clap = { workspace = true }
 hex = { workspace = true }
-libc = { workspace = true }
 rand = { workspace = true }
-rustix = { workspace = true, features = ["event", "time"] }
+rustix = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
-signal-hook = { workspace = true }
 stab-algebra = { workspace = true }
 stab-analysis = { workspace = true }
 stab-bits = { workspace = true }
 stab-decoder = { workspace = true }
 stab-engine = { workspace = true }
 stab-model = { workspace = true }
+stab-process = { path = "../process" }
 stab-records = { workspace = true }
 stab-reference-decoder = { path = "../../test-support/reference-decoder" }
 tempfile = { workspace = true }

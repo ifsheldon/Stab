@@ -190,78 +190,8 @@ enum OracleError {
     #[error("pinned Stim helper build requires missing artifact {0}")]
     MissingStimArtifact(PathBuf),
 
-    #[error("failed to start {program}: {source}")]
-    Spawn {
-        program: String,
-        source: std::io::Error,
-    },
-
-    #[error("failed to write stdin for {program}: {source}")]
-    WriteStdin {
-        program: String,
-        source: std::io::Error,
-    },
-
-    #[error("failed to wait for {program}: {source}")]
-    Wait {
-        program: String,
-        source: std::io::Error,
-    },
-
-    #[error("failed to capture output from {program}: {source}")]
-    CaptureOutput {
-        program: String,
-        source: std::io::Error,
-    },
-
-    #[error(
-        "{program} {stream} exceeded the {limit}-byte capture limit\nstdout:\n{stdout}\nstderr:\n{stderr}"
-    )]
-    OutputLimitExceeded {
-        program: String,
-        stream: &'static str,
-        limit: usize,
-        stdout: CapturedOutput,
-        stderr: CapturedOutput,
-    },
-
-    #[error("{program} auxiliary output {path} exceeded the {limit}-byte limit")]
-    AuxiliaryOutputLimitExceeded {
-        program: String,
-        path: PathBuf,
-        limit: u64,
-    },
-
-    #[error("{program} auxiliary output {path} is unsafe: {reason}")]
-    UnsafeAuxiliaryOutput {
-        program: String,
-        path: PathBuf,
-        reason: String,
-    },
-
-    #[error("{program} timed out after {milliseconds}ms\nstdout:\n{stdout}\nstderr:\n{stderr}")]
-    TimedOut {
-        program: String,
-        milliseconds: u128,
-        stdout: CapturedOutput,
-        stderr: CapturedOutput,
-    },
-
-    #[error("{program} was interrupted\nstdout:\n{stdout}\nstderr:\n{stderr}")]
-    Interrupted {
-        program: String,
-        stdout: CapturedOutput,
-        stderr: CapturedOutput,
-    },
-
-    #[error("failed to install a process-cancellation handler: {0}")]
-    InstallCancellationHandler(std::io::Error),
-
-    #[error("failed to terminate process group for {program}: {source}")]
-    TerminateProcessGroup {
-        program: String,
-        source: std::io::Error,
-    },
+    #[error(transparent)]
+    Process(#[from] stab_process::ProcessError),
 
     #[error("{program} failed with status {status}\nstdout:\n{stdout}\nstderr:\n{stderr}")]
     CommandFailed {
@@ -363,7 +293,6 @@ struct StimSourceVersion {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct CapturedOutput {
     bytes: Vec<u8>,
-    truncated: bool,
 }
 
 impl CapturedOutput {
@@ -376,7 +305,7 @@ impl CapturedOutput {
     }
 
     fn render_for_diagnostics(&self) -> String {
-        render_bytes_for_diagnostics(&self.bytes, self.truncated)
+        render_bytes_for_diagnostics(&self.bytes)
     }
 }
 
@@ -533,7 +462,7 @@ fn fetch_stim(root: &RepoRoot) -> Result<(), OracleError> {
         "git",
         ["submodule", "update", "--init", "--", VENDOR_STIM_PATH],
         b"",
-        Some(&root.path),
+        &root.path,
     )?;
     validate_stim_source(root)?;
     Ok(())
@@ -593,7 +522,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_checked("git", args, b"", Some(working_dir))?;
+    let output = run_checked("git", args, b"", working_dir)?;
     Ok(String::from_utf8_lossy(&output.stdout.bytes)
         .trim()
         .to_string())
@@ -622,7 +551,7 @@ fn ensure_stim_binary(root: &RepoRoot, rebuild: bool) -> Result<PathBuf, OracleE
             OsString::from("-DCMAKE_BUILD_TYPE=Release"),
         ],
         b"",
-        Some(&root.path),
+        &root.path,
     )?;
     run_checked(
         "cmake",
@@ -634,7 +563,7 @@ fn ensure_stim_binary(root: &RepoRoot, rebuild: bool) -> Result<PathBuf, OracleE
             OsString::from("--parallel"),
         ],
         b"",
-        Some(&root.path),
+        &root.path,
     )?;
     if !binary.is_file() {
         return Err(OracleError::MissingStimBinary(binary));
@@ -673,7 +602,7 @@ fn ensure_stim_helper(
                 OsString::from("--parallel"),
             ],
             b"",
-            Some(&root.path),
+            &root.path,
         )?;
     }
     if !library.is_file() {
@@ -701,7 +630,7 @@ fn ensure_stim_helper(
             cmake_path_definition("STIM_LIBRARY", &library),
         ],
         b"",
-        Some(&root.path),
+        &root.path,
     )?;
     run_checked(
         "cmake",
@@ -713,7 +642,7 @@ fn ensure_stim_helper(
             OsString::from("--parallel"),
         ],
         b"",
-        Some(&root.path),
+        &root.path,
     )?;
     let binary = root.stim_helper_binary(target);
     if !binary.is_file() {
@@ -745,7 +674,7 @@ fn ensure_stab_cli_binary(root: &RepoRoot) -> Result<PathBuf, OracleError> {
         "cargo",
         ["build", "-q", "-p", "stab-cli", "--bin", "stab"],
         b"",
-        Some(&root.path),
+        &root.path,
     )?;
     Ok(root.stab_cli_binary())
 }
@@ -759,18 +688,8 @@ fn run_smoke_case(
     let stim_binary = ensure_stim_binary(root, rebuild_stim)?;
     let stab_binary = ensure_stab_cli_binary(root)?;
 
-    let stim = run_process(
-        &stim_binary,
-        &smoke_case.args,
-        smoke_case.stdin,
-        Some(&root.path),
-    )?;
-    let stab = run_process(
-        &stab_binary,
-        &smoke_case.args,
-        smoke_case.stdin,
-        Some(&root.path),
-    )?;
+    let stim = run_process(&stim_binary, &smoke_case.args, smoke_case.stdin, &root.path)?;
+    let stab = run_process(&stab_binary, &smoke_case.args, smoke_case.stdin, &root.path)?;
     compare_outputs(&smoke_case, &stim, &stab)?;
     println!(
         "[{PREFIX}] PASS {} status={:?} stderr_class={:?}",
@@ -941,11 +860,9 @@ mod tests {
             status,
             stdout: super::CapturedOutput {
                 bytes: stdout.to_vec(),
-                truncated: false,
             },
             stderr: super::CapturedOutput {
                 bytes: stderr.to_vec(),
-                truncated: false,
             },
         }
     }

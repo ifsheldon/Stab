@@ -9,8 +9,8 @@ use super::data::PinnedInputs;
 use super::model::Policy;
 use crate::error::BenchError;
 use crate::process::{
-    Launcher, OutputPolicy, ProcessEnvironment, ProcessLaunch, ProcessLimits, ProcessRequest,
-    ProcessResult, run_bounded_process,
+    OutputPolicy, ProcessEnvironment, ProcessLaunch, ProcessLimits, ProcessRequest, ProcessResult,
+    UnreadStdin, bench_launcher, run_bounded_process,
 };
 
 const STDERR_LIMIT_BYTES: usize = 64 << 10;
@@ -101,13 +101,14 @@ pub(super) fn run_command(
     } else {
         OutputPolicy::Discard
     };
-    let launcher = Launcher::current_bench()
+    let launcher = bench_launcher()
         .map_err(|source| BenchError::E2e(format!("locate measurement launcher: {source}")))?;
     run_bounded_process(&ProcessRequest {
         launch: ProcessLaunch::Measured(launcher),
         program: binary.to_path_buf(),
         args: args.to_vec(),
         stdin: stdin.to_vec(),
+        unread_stdin: UnreadStdin::Reject,
         working_directory: working_directory.to_path_buf(),
         environment: ProcessEnvironment::Inherit,
         affinity_cpu: cpu,
@@ -151,6 +152,7 @@ pub(super) fn command_output(
         program: binary.to_path_buf(),
         args,
         stdin: stdin.to_vec(),
+        unread_stdin: UnreadStdin::Reject,
         working_directory: working_directory.to_path_buf(),
         environment: ProcessEnvironment::Inherit,
         affinity_cpu: cpu,

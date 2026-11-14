@@ -2549,19 +2549,18 @@ version = "0.2.0"
 dependencies = [
  "clap",
  "hex",
- "libc",
  "rand 0.10.1",
  "rustix",
  "serde",
  "serde_json",
  "sha2",
- "signal-hook",
  "stab-algebra",
  "stab-analysis",
  "stab-bits",
  "stab-decoder",
  "stab-engine",
  "stab-model",
+ "stab-process",
  "stab-records",
  "stab-reference-decoder",
  "tempfile",
@@ -2678,12 +2677,12 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "signal-hook",
  "stab-analysis",
  "stab-cli",
  "stab-compat-corpus",
  "stab-core",
  "stab-model",
+ "stab-process",
  "stab-records",
  "tempfile",
  "thiserror",
@@ -2700,6 +2699,19 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "stab-process"
+version = "0.2.0"
+dependencies = [
+ "libc",
+ "rustix",
+ "serde",
+ "serde_json",
+ "signal-hook",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

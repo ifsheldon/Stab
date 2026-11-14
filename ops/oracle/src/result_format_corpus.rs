@@ -53,7 +53,7 @@ pub(super) fn run(
             .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
         for checked_case in checked.cases() {
             let args = convert_args(checked_case);
-            let stim = run_process(&stim_binary, &args, checked_case.input(), Some(&root.path))
+            let stim = run_process(&stim_binary, &args, checked_case.input(), &root.path)
                 .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
             check_process(
                 "pinned Stim",
@@ -63,7 +63,7 @@ pub(super) fn run(
                 &stim,
             )?;
 
-            let stab = run_process(&stab_binary, &args, checked_case.input(), Some(&root.path))
+            let stab = run_process(&stab_binary, &args, checked_case.input(), &root.path)
                 .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
             check_process(
                 "Stab",
@@ -78,7 +78,7 @@ pub(super) fn run(
                 && let Some(width) = checked_case.measurement_only_width()
             {
                 let args = measurement_only_convert_args(checked_case, width);
-                let stim = run_process(&stim_binary, &args, checked_case.input(), Some(&root.path))
+                let stim = run_process(&stim_binary, &args, checked_case.input(), &root.path)
                     .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
                 check_process(
                     "pinned Stim",
@@ -88,7 +88,7 @@ pub(super) fn run(
                     &stim,
                 )?;
 
-                let stab = run_process(&stab_binary, &args, checked_case.input(), Some(&root.path))
+                let stab = run_process(&stab_binary, &args, checked_case.input(), &root.path)
                     .map_err(|error| ResultFormatCorpusError::Process(Box::new(error)))?;
                 check_process(
                     "Stab",

@@ -55,13 +55,9 @@ pub(super) fn core_time_reverse_flows_output(
         Err(source) => {
             return Ok(crate::ProcessOutput {
                 status: Some(1),
-                stdout: crate::CapturedOutput {
-                    bytes: Vec::new(),
-                    truncated: false,
-                },
+                stdout: crate::CapturedOutput { bytes: Vec::new() },
                 stderr: crate::CapturedOutput {
                     bytes: format!("{source}\n").into_bytes(),
-                    truncated: false,
                 },
             });
         }
@@ -79,12 +75,8 @@ pub(super) fn core_time_reverse_flows_output(
         status: Some(0),
         stdout: crate::CapturedOutput {
             bytes: stdout.into_bytes(),
-            truncated: false,
         },
-        stderr: crate::CapturedOutput {
-            bytes: Vec::new(),
-            truncated: false,
-        },
+        stderr: crate::CapturedOutput { bytes: Vec::new() },
     })
 }
 
@@ -124,12 +116,7 @@ pub(super) fn run_pinned_stim_reverse_flow(
         }
         .into());
     }
-    crate::run_process(
-        helper,
-        std::iter::empty::<&str>(),
-        &protocol,
-        Some(&root.path),
-    )
+    crate::run_process(helper, std::iter::empty::<&str>(), &protocol, &root.path)
 }
 
 fn reverse_flow_case(
