@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: P10 evidence repair is active. A November audit found DEM printing, output-flush, standard-stream aliasing, argument-grammar, random-tableau, and benchmark peak-RSS defects plus weak fixture and statistical evidence; see the plan's P10 milestone. The `b4a758db` evidence below is historical until P10 publishes a fresh pair. P0 through P9 remain complete for their recorded revisions.
+Status: P10 evidence repair is active. A November audit found DEM printing, output-flush, standard-stream aliasing, argument-grammar, random-tableau, and benchmark peak-RSS defects plus weak fixture and statistical evidence; see the plan's P10 milestone. P10's fresh controlled pair is published for measured source `2c229ccd` after the fearless SIMD and engine plans closed the performance gaps that blocked it; exact-revision CI for that source is still outstanding. P0 through P9 remain complete for their recorded revisions.
 
 ## Objective
 
@@ -27,11 +27,11 @@ Superseded plans, progress reports, qualification inventories, and benchmark man
 
 ## Current Evidence
 
-1. Measured source `b4a758db169fd343c93f2b84a5b1d68558c9e6c3` passed both mandated GitHub CI jobs in [run 33954379257](https://github.com/ifsheldon/Stab/actions/runs/33954379257). Local verification also passed 1,831 workspace tests, all 138 canonical owners, 459 implemented fixtures, and the 62-case live result-format differential.
-2. The controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/b4a758db169fd343c93f2b84a5b1d68558c9e6c3/` each cover all 29 release cases and pass correctness, memory, `1.25x` Stim parity, and seeded `1.15x` Stab self-regression.
-3. Full worst median and confidence upper ratios are `1.179210x` and `1.190196x`; soak values are `1.163228x` and `1.199477x`. Maximum Stab peak RSS is `51,896,320` bytes for full and `52,101,120` bytes for soak.
-4. Both bundles replay offline. They used CPU 0, recorded temperatures at or below `39 C`, ran with no configured swap and unchanged swap counters, and `/swap.img` was restored afterward at its prior priority `-2`. No benchmark process remained.
-5. P10 replaced the timing boundary (`e2e-user-workflow-v3`), the workload matrix, and the self-regression baselines, so items 1-4 describe the retired suite; superseded bundles remain in Git history.
+1. Measured source `2c229ccd59b51657e0f68e349f4de98e157672ef` is clean and local. Local verification of its product ancestor `61cede6b` passed 1,567 workspace tests, all 141 canonical owners, all 199 fixture manifest rows, and the 83-case live result-format differential; the commits between them change plan documents only. No GitHub CI run exists for the measured source or its evidence descendant, because these commits have not been pushed.
+2. The controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/2c229ccd59b51657e0f68e349f4de98e157672ef/` each cover all 25 release cases under the `e2e-user-workflow-v3` boundary and pass correctness, memory, and `1.25x` Stim parity on all 24 cases that have a Stim counterpart.
+3. Full worst median and confidence upper ratios are `0.970867x` (`sample-dem.medium`) and `0.991665x` (`sample-surface.d25-b8`); soak values are `0.961373x` and `0.970937x` (both `sample-dem.medium`). Maximum Stab peak RSS is `111,095,808` bytes for full and `111,108,096` bytes for soak, both on `analyze-decompose.d25`.
+4. Both bundles replay offline. They used CPU 4, recorded temperatures at or below `66 C`, ran with no configured swap and unchanged swap counters, and `/swap.img` was restored afterward at its prior priority `-1`. No benchmark process remained.
+5. This is the first formal pair for the current suite, so both bundles report self-regression as `unseeded`, and `benchmarks/suite.toml` holds exactly the 25 baselines derived from the pair. The retired `b4a758db` pair and its 29-case matrix remain in Git history.
 6. Controlled x86-64 timing remains unqualified. Cross-architecture CI proves correctness and contracts, not x86-64 performance.
 
 ## Release Use

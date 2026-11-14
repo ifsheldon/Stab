@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: P0 through P9 completed for their recorded revisions. P10 is active: a November audit found product defects and evidence gaps, so the `b4a758db` evidence pair no longer qualifies a release, and 0.2.0 waits for P10's fresh measured revision.
+Status: P0 through P9 completed for their recorded revisions. P10 is active: a November audit found product defects and evidence gaps, so the `b4a758db` evidence pair no longer qualifies a release. P10's fresh controlled pair is published for measured source `2c229ccd` and passes `e2e-release-check` on its evidence descendant; 0.2.0 still waits for exact-revision CI on that descendant.
 
 ## Summary
 
