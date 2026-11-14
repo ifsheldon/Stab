@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_algebra::{FlexPauliString, PauliBasis, PauliPhase};
+use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase};
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, Pauli, QubitId, Target,
@@ -412,8 +412,13 @@ impl SparseReverseFrameTracker {
         self.record_index_from_offset(offset)
     }
 
-    pub(crate) fn region_for_target(&self, target: DemTarget) -> AnalysisResult<FlexPauliString> {
-        self.region_for_target_with_len(target, self.qubit_count)
+    /// Returns the full-width region of `target`, admitted against `budget`.
+    pub(crate) fn region_for_target(
+        &self,
+        target: DemTarget,
+        budget: AlgebraMemoryBudget,
+    ) -> AnalysisResult<FlexPauliString> {
+        self.region_for_target_with_len(target, self.qubit_count, budget)
     }
 
     pub(crate) fn compact_region_for_target(
@@ -429,13 +434,14 @@ impl SparseReverseFrameTracker {
             .map(|max_qubit| qubit_index(QubitId::new(max_qubit)?).map(|index| index + 1))
             .transpose()?
             .unwrap_or(0);
-        self.region_for_target_with_len(target, len)
+        self.region_for_target_with_len(target, len, AlgebraMemoryBudget::DEFAULT)
     }
 
     fn region_for_target_with_len(
         &self,
         target: DemTarget,
         len: usize,
+        budget: AlgebraMemoryBudget,
     ) -> AnalysisResult<FlexPauliString> {
         let mut bases = vec![PauliBasis::I; len];
         for (qubit, xs) in &self.xs {
@@ -471,11 +477,13 @@ impl SparseReverseFrameTracker {
                 };
             }
         }
-        FlexPauliString::from_phase_and_bases(PauliPhase::Plus, bases).map_err(|error| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "failed to build detecting region for {target}: {error}"
-            ))
-        })
+        FlexPauliString::from_phase_and_bases_with_budget(PauliPhase::Plus, bases, budget).map_err(
+            |error| {
+                AnalysisError::invalid_detector_error_model(format!(
+                    "failed to build detecting region for {target}: {error}"
+                ))
+            },
+        )
     }
 
     pub(crate) fn undo_implicit_rz_at_start_of_circuit(&mut self) -> AnalysisResult<()> {

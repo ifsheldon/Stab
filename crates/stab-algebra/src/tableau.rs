@@ -202,11 +202,21 @@ impl Tableau {
     }
 
     /// Returns the Tableau of conjugation by `pauli`, admitted against
-    /// [`AlgebraMemoryBudget::DEFAULT`] because its size is quadratic in the string's width.
+    /// [`AlgebraMemoryBudget::DEFAULT`].
+    ///
+    /// See [`Self::from_pauli_string_with_budget`].
     pub fn from_pauli_string(pauli: &PauliString) -> StabilizerResult<Self> {
+        Self::from_pauli_string_with_budget(pauli, AlgebraMemoryBudget::DEFAULT)
+    }
+
+    /// Returns the Tableau of conjugation by `pauli`, admitted against `budget` because its size
+    /// is quadratic in the string's width.
+    pub fn from_pauli_string_with_budget(
+        pauli: &PauliString,
+        budget: AlgebraMemoryBudget,
+    ) -> StabilizerResult<Self> {
         let num_qubits = pauli.len();
-        AlgebraMemoryBudget::DEFAULT
-            .admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+        budget.admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
         let mut result = Self::identity_unadmitted(num_qubits)?;
         for (index, basis) in pauli.active_terms() {
             if basis.z_bit() {
@@ -410,12 +420,24 @@ impl Tableau {
 
     /// Embeds this Tableau into `num_qubits`, acting on `targets` in the supplied order.
     ///
-    /// The result is admitted against [`AlgebraMemoryBudget::DEFAULT`] because `num_qubits` is
-    /// independent of this Tableau's size.
+    /// The result is admitted against [`AlgebraMemoryBudget::DEFAULT`]; see
+    /// [`Self::embedded_with_budget`].
     pub fn embedded(&self, num_qubits: usize, targets: &[usize]) -> StabilizerResult<Self> {
+        self.embedded_with_budget(num_qubits, targets, AlgebraMemoryBudget::DEFAULT)
+    }
+
+    /// Embeds this Tableau into `num_qubits`, acting on `targets` in the supplied order.
+    ///
+    /// The result is admitted against `budget` because `num_qubits` is independent of this
+    /// Tableau's size.
+    pub fn embedded_with_budget(
+        &self,
+        num_qubits: usize,
+        targets: &[usize],
+        budget: AlgebraMemoryBudget,
+    ) -> StabilizerResult<Self> {
         validate_tableau_targets(self.len(), num_qubits, targets)?;
-        AlgebraMemoryBudget::DEFAULT
-            .admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+        budget.admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
         let mut result = Self::identity_unadmitted(num_qubits)?;
         let width = self.len();
         for (local_index, global_index) in targets.iter().copied().enumerate() {

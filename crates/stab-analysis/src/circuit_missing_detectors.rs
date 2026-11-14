@@ -4,15 +4,13 @@ use stab_algebra::Flow;
 use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, MeasureRecordOffset,
-    ParseLimits, QubitId, Target,
+    MemoryBudget, ParseLimits, QubitId, Target,
 };
 
 use crate::folded_walk::walk_folded;
 use crate::{
     AnalysisError, AnalysisResult, FlowGeneratorOptions, ResourceKind, ResourceLimitError,
-    ResourceOperation,
-    circuit_flow::{FLOW_GENERATOR_MEMORY_BUDGET, flow_record_index},
-    circuit_flow_generators_with_options,
+    ResourceOperation, circuit_flow::flow_record_index, circuit_flow_generators_with_options,
 };
 
 mod final_repeat;
@@ -29,6 +27,9 @@ const DECLARED_ROW_COPIES: u64 = 2;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MissingDetectorOptions {
     pub ignore_non_deterministic_measurements: bool,
+    /// Budget for the retained declared rows and the projected flow rows, also passed to the
+    /// flow generators.
+    pub memory_budget: MemoryBudget,
     /// Signal polled while flow generators are computed over the expanded circuit.
     pub cancellation: Cancellation,
 }
@@ -36,6 +37,7 @@ pub struct MissingDetectorOptions {
 impl MissingDetectorOptions {
     fn flow_generator_options(&self) -> FlowGeneratorOptions {
         FlowGeneratorOptions {
+            memory_budget: self.memory_budget,
             cancellation: self.cancellation.clone(),
         }
     }
@@ -86,12 +88,12 @@ pub(super) fn missing_detectors_bounded(
             "measurement count does not fit usize during missing-detector analysis",
         )
     })?;
-    validate_declaration_scan(circuit)?;
+    validate_declaration_scan(circuit, options.memory_budget)?;
     if measurement_count == 0 {
         collect_declared_rows(circuit, measurement_count)?;
         return Ok(Circuit::new());
     }
-    validate_missing_detector_flow_storage(qubit_count, measurement_count)?;
+    validate_missing_detector_flow_storage(qubit_count, measurement_count, options.memory_budget)?;
     let generator_circuit = circuit_with_known_input_resets(circuit, options, qubit_count)?;
     let invariants = collect_measurement_invariants(
         circuit_flow_generators_with_options(
@@ -114,7 +116,7 @@ pub(super) fn terminal_state_signature(
             "measurement count does not fit usize during missing-detector state proof",
         )
     })?;
-    validate_missing_detector_flow_storage(qubit_count, measurement_count)?;
+    validate_missing_detector_flow_storage(qubit_count, measurement_count, options.memory_budget)?;
     let generator_circuit = circuit_with_known_input_resets(circuit, options, qubit_count)?;
     let mut signature = Vec::new();
     for flow in
@@ -289,16 +291,20 @@ fn collect_declared_rows(
 fn validate_missing_detector_flow_storage(
     qubit_count: usize,
     measurement_count: usize,
+    budget: MemoryBudget,
 ) -> AnalysisResult<()> {
     let projected = crate::circuit_flow::measurement_rich_flow_generator_projected_bytes(
         qubit_count,
         measurement_count,
     );
-    admit_missing_detector_bytes(ResourceKind::ProjectedPayloadBytes, projected)
+    admit_missing_detector_bytes(budget, ResourceKind::ProjectedPayloadBytes, projected)
 }
 
-fn admit_missing_detector_bytes(resource: ResourceKind, projected: u64) -> AnalysisResult<()> {
-    let budget = FLOW_GENERATOR_MEMORY_BUDGET;
+fn admit_missing_detector_bytes(
+    budget: MemoryBudget,
+    resource: ResourceKind,
+    projected: u64,
+) -> AnalysisResult<()> {
     if !budget.admits(u128::from(projected)) {
         return Err(ResourceLimitError::memory_budget(
             ResourceOperation::MissingDetectorDiscovery,
@@ -360,8 +366,9 @@ fn declaration_scan(circuit: &Circuit) -> AnalysisResult<DeclarationScan> {
     Ok(totals)
 }
 
-fn validate_declaration_scan(circuit: &Circuit) -> AnalysisResult<()> {
+fn validate_declaration_scan(circuit: &Circuit, budget: MemoryBudget) -> AnalysisResult<()> {
     admit_missing_detector_bytes(
+        budget,
         ResourceKind::MaterializedBytes,
         declaration_scan(circuit)?.row_bytes,
     )

@@ -15,6 +15,7 @@ pub enum ResourceOperation {
     PauliConjugation,
     SatMaterialization,
     TableauConversion,
+    TimeReversal,
 }
 
 impl ResourceOperation {
@@ -32,6 +33,7 @@ impl ResourceOperation {
             Self::PauliConjugation => "pauli-conjugation",
             Self::SatMaterialization => "sat-materialization",
             Self::TableauConversion => "tableau-conversion",
+            Self::TimeReversal => "time-reversal",
         }
     }
 }

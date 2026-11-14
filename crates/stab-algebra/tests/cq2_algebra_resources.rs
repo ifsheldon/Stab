@@ -9,7 +9,8 @@ use std::str::FromStr as _;
 use rand::rngs::StdRng;
 use rand::{Rng as _, SeedableRng as _};
 use stab_algebra::{
-    AlgebraMemoryBudget, CommutingPauliStringIterator, FlexPauliString, Flow, PauliString,
+    AlgebraMemoryBudget, CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow,
+    PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,
     StabilizerError, StabilizerResource, StabilizerResult, Tableau, TableauIterator,
     stabilizers_to_tableau_with_budget,
 };
@@ -22,6 +23,7 @@ fn algebra_byte_admission_refuses_before_allocation_or_rng_use() {
     random_tableau_admission_is_exact_and_precedes_rng_use();
     stabilizer_solver_admission_is_exact_and_precedes_allocation();
     iterator_widths_keep_their_representation_invariants();
+    caller_budgets_govern_requested_string_widths();
 }
 
 /// Returns the bytes a refused request reported, after checking the refusal's shape.
@@ -222,5 +224,127 @@ fn iterator_widths_keep_their_representation_invariants() {
     assert_eq!(
         TableauIterator::new(64, false).err(),
         Some(StabilizerError::InvalidTableauIteratorQubitCount { num_qubits: 64 })
+    );
+}
+
+/// Bytes of `planes` packed planes of `bits` bits, the documented algebra storage formula.
+fn packed_plane_bytes(planes: u64, bits: u64) -> u64 {
+    planes * bits.div_ceil(64) * 8
+}
+
+/// Checks that an item-collecting constructor admitting `required` bytes for its whole input is
+/// refused one byte short, naming that budget, and is admitted at exactly `required`.
+fn assert_collected_boundary<T: std::fmt::Debug>(
+    resource: StabilizerResource,
+    required: u64,
+    mut request: impl FnMut(AlgebraMemoryBudget) -> StabilizerResult<T>,
+) {
+    let short = AlgebraMemoryBudget::from_bytes(required - 1);
+    assert_eq!(
+        refused_bytes(request(short), resource, short),
+        u128::from(required)
+    );
+    request(AlgebraMemoryBudget::from_bytes(required)).expect("the exact budget is admitted");
+}
+
+fn caller_budgets_govern_requested_string_widths() {
+    let width = 1_000_u64;
+    let n = 1_000_usize;
+    let pauli = packed_plane_bytes(2, width);
+    let clifford = packed_plane_bytes(6, width) + width;
+
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::PauliString, |budget| {
+            PauliString::identity_with_budget(n, budget)
+        }),
+        pauli
+    );
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::PauliString, |budget| {
+            PauliString::random_with_budget(n, budget, &mut StdRng::seed_from_u64(1))
+        }),
+        pauli
+    );
+    let dense = format!("-{}", "X".repeat(n));
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::PauliString, |budget| {
+            PauliString::from_str_with_budget(&dense, budget)
+        }),
+        pauli
+    );
+    // A short sparse literal requests its largest index plus one qubits.
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::PauliString, |budget| {
+            FlexPauliString::from_str_with_budget("iX999", budget)
+        }),
+        pauli
+    );
+    // Collected bases are charged one byte each beside the packed planes.
+    assert_collected_boundary(StabilizerResource::PauliString, pauli + width, |budget| {
+        PauliString::from_bases_with_budget(PauliSign::Plus, vec![PauliBasis::Y; n], budget)
+    });
+    assert_collected_boundary(StabilizerResource::PauliString, pauli + width, |budget| {
+        FlexPauliString::from_phase_and_bases_with_budget(
+            PauliPhase::MinusI,
+            vec![PauliBasis::Z; n],
+            budget,
+        )
+    });
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::PauliString, |budget| {
+            PauliStringIterator::new_with_budget(n, 1, 1, true, true, true, budget)
+        }),
+        pauli + width * (size_of::<usize>() + size_of::<PauliBasis>()) as u64
+    );
+
+    // Six packed planes plus one table-index byte per gate.
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::CliffordString, |budget| {
+            CliffordString::identity_with_budget(n, budget)
+        }),
+        clifford
+    );
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::CliffordString, |budget| {
+            CliffordString::random_with_budget(n, budget, &mut StdRng::seed_from_u64(2))
+        }),
+        clifford
+    );
+    let half = CliffordString::identity(n / 2).expect("half-width string");
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::CliffordString, |budget| {
+            half.concat_with_budget(&half, budget)
+        }),
+        clifford
+    );
+    let one = CliffordString::from_gates([SingleQubitClifford::H]).expect("one gate");
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::CliffordString, |budget| {
+            one.repeat_with_budget(n, budget)
+        }),
+        clifford
+    );
+    // Collected gates are charged their own size beside the planes and table indices.
+    assert_collected_boundary(
+        StabilizerResource::CliffordString,
+        clifford + width * size_of::<SingleQubitClifford>() as u64,
+        |budget| CliffordString::from_gates_with_budget(vec![SingleQubitClifford::S; n], budget),
+    );
+
+    // 2n packed rows of two planes plus one packed sign plane.
+    let tableau = 2 * width * packed_plane_bytes(2, width) + packed_plane_bytes(1, 2 * width);
+    let source = PauliString::identity(n).expect("conjugating Pauli");
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::Tableau, |budget| {
+            Tableau::from_pauli_string_with_budget(&source, budget)
+        }),
+        tableau
+    );
+    let phase = Tableau::gate1("+Y", "+Z").expect("phase gate");
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::Tableau, |budget| {
+            phase.embedded_with_budget(n, &[n - 1], budget)
+        }),
+        tableau
     );
 }

@@ -30,8 +30,10 @@ mod target_xor_set;
 pub use circuit::circuit_without_tags;
 pub use circuit_detecting_regions::{
     DetectingRegionMap, DetectingRegionOptions, DetectingRegionTargetMap,
-    DetectingRegionTargetOptions, all_detecting_region_targets, all_detecting_region_ticks,
-    circuit_detecting_regions, circuit_detecting_regions_for_targets,
+    DetectingRegionTargetOptions, all_detecting_region_targets,
+    all_detecting_region_targets_with_budget, all_detecting_region_ticks,
+    all_detecting_region_ticks_with_budget, circuit_detecting_regions,
+    circuit_detecting_regions_for_targets,
 };
 pub use circuit_feedback::{
     FeedbackInliningLimits, circuit_with_inlined_feedback,

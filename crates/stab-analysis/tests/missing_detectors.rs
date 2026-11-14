@@ -25,6 +25,7 @@ fn missing_circuit_with_options(
         circuit,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )?;
@@ -171,6 +172,7 @@ fn require_missing_circuit_error_contains(
         circuit,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) else {
@@ -307,6 +309,7 @@ fn pf5_missing_detectors_spp_rejects_anti_hermitian_unitary_products()
             &circuit,
             MissingDetectorOptions {
                 ignore_non_deterministic_measurements: true,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         ) else {
@@ -553,6 +556,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
         &cross_iteration,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) else {
@@ -576,6 +580,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
         &observable_merging,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) else {
@@ -597,6 +602,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
         &nested,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) {
@@ -627,6 +633,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
             &empty_overflow,
             MissingDetectorOptions {
                 ignore_non_deterministic_measurements: true,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )?
@@ -642,6 +649,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
             &nonempty_overflow,
             MissingDetectorOptions {
                 ignore_non_deterministic_measurements: true,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )?
@@ -653,6 +661,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
         &measurement_pads,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) else {
@@ -668,6 +677,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
         &tracker_changing,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) else {
@@ -702,6 +712,7 @@ fn assert_missing_detector_projected_storage_and_allocation_bounds()
                 circuit,
                 MissingDetectorOptions {
                     ignore_non_deterministic_measurements: true,
+                    memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),
                 },
             ));
@@ -733,6 +744,7 @@ fn assert_missing_detector_projected_storage_and_allocation_bounds()
                 circuit,
                 MissingDetectorOptions {
                     ignore_non_deterministic_measurements: false,
+                    memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),
                 },
             ));
@@ -786,6 +798,7 @@ fn pf5_missing_detectors_repeat_refuses_expansion_beyond_the_budget()
         &circuit,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) else {
@@ -800,6 +813,7 @@ fn pf5_missing_detectors_repeat_refuses_expansion_beyond_the_budget()
         &circuit,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     ) else {
@@ -845,6 +859,7 @@ fn assert_missing_detector_folded_final_repeat_is_count_independent()
                 &circuit,
                 MissingDetectorOptions {
                     ignore_non_deterministic_measurements,
+                    memory_budget: stab_model::MemoryBudget::DEFAULT,
                     cancellation: stab_model::Cancellation::never(),
                 },
             )?)

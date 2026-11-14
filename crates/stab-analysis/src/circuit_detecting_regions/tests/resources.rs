@@ -13,6 +13,7 @@ pub(super) fn assert_resource_contract() {
     huge_repeat_reports_semantic_errors_promptly();
     repeat_nesting_boundary_is_exact();
     budget_boundaries_are_typed_and_fail_closed();
+    caller_budget_governs_region_requests();
 }
 
 fn assert_resource_error(
@@ -41,6 +42,7 @@ fn repeat_skips_unrequested_compact_tick_spans() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0, 500_000_000_000, 999_999_999_999]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -63,6 +65,7 @@ fn repeat_folds_nontrivial_zero_tick_body() {
                 targets: vec![],
                 ticks: vec![],
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -94,6 +97,7 @@ fn large_identity_snapshot_stays_sparse() {
             detectors: vec![detector(0)],
             ticks: ticks(&[1_000_000_000_000]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -114,6 +118,7 @@ fn large_active_snapshot_is_admitted_in_bytes() {
             detectors: vec![detector(0)],
             ticks: ticks(&[999_999_999_999]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -137,6 +142,7 @@ fn huge_repeat_reports_semantic_errors_promptly() {
             targets: vec![],
             ticks: vec![],
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -162,6 +168,7 @@ fn repeat_nesting_boundary_is_exact() {
         targets: vec![],
         ticks: vec![],
         ignore_anticommutation_errors: false,
+        memory_budget: stab_model::MemoryBudget::DEFAULT,
         cancellation: stab_model::Cancellation::never(),
     };
     circuit_detecting_regions_for_targets(&nested(MAX_DETECTING_REGION_REPEAT_NESTING), options())
@@ -179,9 +186,9 @@ fn repeat_nesting_boundary_is_exact() {
 }
 
 fn budget_boundaries_are_typed_and_fail_closed() {
-    let budget_bytes = DETECTING_REGION_MEMORY_BUDGET.bytes();
+    let budget_bytes = MemoryBudget::DEFAULT.bytes();
     let max_units = budget_bytes / DETECTING_REGION_LIVE_STATE_UNIT_BYTES;
-    let mut live = DetectingRegionBudget::for_request(0, 0).unwrap();
+    let mut live = DetectingRegionBudget::for_request(MemoryBudget::DEFAULT, 0, 0).unwrap();
     live.reserve_live_state(max_units).unwrap();
     assert_resource_error(
         live.reserve_live_state(1).unwrap_err(),
@@ -190,10 +197,11 @@ fn budget_boundaries_are_typed_and_fail_closed() {
         budget_bytes,
     );
 
-    let mut clone_boundary = DetectingRegionBudget::for_request(0, 0).unwrap();
+    let mut clone_boundary =
+        DetectingRegionBudget::for_request(MemoryBudget::DEFAULT, 0, 0).unwrap();
     clone_boundary.reserve_tracker_state(max_units / 3).unwrap();
     clone_boundary.admit_recurrence_probe().unwrap();
-    let mut clone_excess = DetectingRegionBudget::for_request(0, 0).unwrap();
+    let mut clone_excess = DetectingRegionBudget::for_request(MemoryBudget::DEFAULT, 0, 0).unwrap();
     clone_excess
         .reserve_tracker_state(max_units / 3 + 1)
         .unwrap();
@@ -205,7 +213,7 @@ fn budget_boundaries_are_typed_and_fail_closed() {
     assert_eq!(resource.resource(), ResourceKind::LiveStateUnits);
     assert!(resource.actual() > resource.limit());
 
-    let mut bytes = DetectingRegionBudget::for_request(0, 0).unwrap();
+    let mut bytes = DetectingRegionBudget::for_request(MemoryBudget::DEFAULT, 0, 0).unwrap();
     bytes.commit_output_region(budget_bytes).unwrap();
     assert_resource_error(
         bytes.commit_output_region(1).unwrap_err(),
@@ -213,4 +221,31 @@ fn budget_boundaries_are_typed_and_fail_closed() {
         budget_bytes + 1,
         budget_bytes,
     );
+}
+
+fn caller_budget_governs_region_requests() {
+    let circuit = Circuit::from_stim_str("R 0\nTICK\nM 0\nDETECTOR rec[-1]\n").unwrap();
+    let request = |memory_budget| {
+        circuit_detecting_regions(
+            &circuit,
+            DetectingRegionOptions {
+                detectors: vec![detector(0)],
+                ticks: ticks(&[0]),
+                ignore_anticommutation_errors: false,
+                memory_budget,
+                cancellation: stab_model::Cancellation::never(),
+            },
+        )
+    };
+    // The requested detector and tick are each one live-state unit before traversal.
+    let required = 2 * DETECTING_REGION_LIVE_STATE_UNIT_BYTES;
+    let short = MemoryBudget::from_bytes(required - 1);
+    assert_resource_error(
+        request(short).unwrap_err(),
+        ResourceKind::LiveStateUnits,
+        required,
+        short.bytes(),
+    );
+    let regions = request(MemoryBudget::DEFAULT).unwrap();
+    assert_eq!(regions[&detector(0)][&tick(0)].to_string(), "+Z");
 }

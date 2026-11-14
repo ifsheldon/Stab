@@ -60,6 +60,7 @@ fn flow_generation_and_missing_detectors_over_an_astronomical_repeat_are_cancell
     assert_cancelled(circuit_flow_generators_with_options(
         &fixture,
         &FlowGeneratorOptions {
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: cancelled(),
         },
     ));
@@ -67,6 +68,7 @@ fn flow_generation_and_missing_detectors_over_an_astronomical_repeat_are_cancell
         &fixture,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: cancelled(),
         },
     ));
@@ -109,6 +111,7 @@ fn output_bounded_expansions_honor_a_set_signal() {
         &[],
         TimeReversedForFlowsOptions {
             dont_turn_measurements_into_resets: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: cancelled(),
         },
     ));
@@ -118,6 +121,7 @@ fn output_bounded_expansions_honor_a_set_signal() {
             detectors: vec![DemDetectorId::try_new(0).expect("detector id")],
             ticks: vec![CircuitTick::new(0)],
             ignore_anticommutation_errors: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: cancelled(),
         },
     ));

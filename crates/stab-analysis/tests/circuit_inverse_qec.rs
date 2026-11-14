@@ -117,6 +117,7 @@ fn inverse_qec_keep_measurements_uses_the_general_reverse_flow_contract() {
             &input,
             InverseQecOptions {
                 keep_measurements: true,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -829,6 +830,7 @@ fn time_reversed_for_flows_matches_stim_and_reversed_flows_hold() {
             .collect::<Vec<_>>();
         let options = TimeReversedForFlowsOptions {
             dont_turn_measurements_into_resets: keep_measurements,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         };
         let (actual, actual_flows) =

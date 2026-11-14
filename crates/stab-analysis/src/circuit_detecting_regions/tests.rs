@@ -35,6 +35,7 @@ fn regions(text: &str, detectors: Vec<DemDetectorId>, ticks: Vec<u64>) -> Detect
             detectors,
             ticks: ticks.into_iter().map(tick).collect(),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -116,6 +117,7 @@ fn detecting_regions_target_api_matches_mx_python_example() {
             targets: all_detecting_region_targets(&circuit).unwrap(),
             ticks: all_detecting_region_ticks(&circuit).unwrap(),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -142,6 +144,7 @@ fn detecting_regions_target_api_supports_mzz_example() {
             targets: vec![DemTarget::relative_detector(0).unwrap()],
             ticks: all_detecting_region_ticks(&circuit).unwrap(),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -167,6 +170,7 @@ fn detecting_regions_target_api_ignores_tags_and_ordinary_noise_like_upstream() 
             targets: all_detecting_region_targets(&circuit).unwrap(),
             ticks: all_detecting_region_ticks(&circuit).unwrap(),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -254,6 +258,7 @@ fn detecting_regions_target_shape_supports_pauli_product_measurements() {
             targets: vec![detector_0, detector_1, observable],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -281,6 +286,7 @@ fn detecting_regions_target_shape_supports_spp_unitary_products() {
             targets: vec![observable],
             ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         };
         let actual = circuit_detecting_regions_for_targets(&circuit, options.clone()).unwrap();
@@ -313,6 +319,7 @@ fn detecting_regions_target_shape_rejects_anti_hermitian_pauli_products() {
                 targets: all_detecting_region_targets(&circuit).unwrap(),
                 ticks: all_detecting_region_ticks(&circuit).unwrap(),
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -338,6 +345,7 @@ fn detecting_regions_target_shape_keeps_reset_and_unitaries_plain() {
                         detectors: vec![detector(0)],
                         ticks: ticks(&[0]),
                         ignore_anticommutation_errors: false,
+                        memory_budget: stab_model::MemoryBudget::DEFAULT,
                         cancellation: stab_model::Cancellation::never(),
                     },
                 )
@@ -378,6 +386,7 @@ fn detecting_regions_target_api_supports_logical_observable_targets() {
             ],
             ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -414,6 +423,7 @@ fn detecting_regions_target_api_rejects_invalid_targets() {
                 targets: vec![target],
                 ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -445,6 +455,7 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
             targets: vec![detector_target, observable],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -462,6 +473,7 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
             detectors: vec![detector(0), detector(1)],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -499,6 +511,7 @@ fn detecting_regions_target_shape_supports_heralded_record_noise() {
                 targets: vec![DemTarget::relative_detector(0).unwrap()],
                 ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -521,6 +534,7 @@ fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
                         targets: vec![DemTarget::relative_detector(0).unwrap()],
                         ticks: ticks(&[0]),
                         ignore_anticommutation_errors: false,
+                        memory_budget: stab_model::MemoryBudget::DEFAULT,
                         cancellation: stab_model::Cancellation::never(),
                     },
                 )
@@ -551,7 +565,7 @@ fn detecting_regions_target_api_admits_dense_helpers_against_the_memory_budget()
     assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert!(resource.actual() > resource.limit());
-    assert_eq!(resource.limit(), DETECTING_REGION_MEMORY_BUDGET.bytes());
+    assert_eq!(resource.limit(), MemoryBudget::DEFAULT.bytes());
 
     let above_retired_cap =
         Circuit::from_stim_str("M 0\nREPEAT 1000001 {\n    DETECTOR rec[-1]\n}\n").unwrap();
@@ -654,6 +668,7 @@ fn detecting_regions_rejects_unknown_detector() {
             detectors: vec![detector(1)],
             ticks: ticks(&[]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -670,6 +685,7 @@ fn detecting_regions_rejects_out_of_range_tick() {
             detectors: vec![detector(0)],
             ticks: ticks(&[1]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -686,6 +702,7 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -700,6 +717,7 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -712,6 +730,7 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
             detectors: vec![detector(0)],
             ticks: ticks(&[]),
             ignore_anticommutation_errors: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -724,6 +743,7 @@ fn detecting_regions_anticommutation_supports_ignored_mode() {
             detectors: vec![],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -748,6 +768,7 @@ fn detecting_regions_anticommutation_rejects_false_mode() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -770,6 +791,7 @@ fn detecting_regions_anticommutation_rejects_implicit_start_state() {
                 targets: all_detecting_region_targets(&circuit).unwrap(),
                 ticks: all_detecting_region_ticks(&circuit).unwrap(),
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -788,6 +810,7 @@ fn detecting_regions_anticommutation_rejects_product_measurement_start_state() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -806,6 +829,7 @@ fn detecting_regions_anticommutation_rejects_false_mode_with_empty_filters() {
                 detectors,
                 ticks,
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -825,6 +849,7 @@ fn detecting_regions_gauge_ignores_measurement_collapse_when_requested() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: true,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -838,6 +863,7 @@ fn detecting_regions_gauge_ignores_measurement_collapse_when_requested() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0, 1]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -905,6 +931,7 @@ fn detecting_regions_clifford_supports_swap_gate() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -922,6 +949,7 @@ fn detecting_regions_clifford_supports_promoted_controlled_pauli_gate() {
             detectors: vec![detector(0)],
             ticks: ticks(&[0]),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -1070,6 +1098,7 @@ fn detecting_regions_target_shape_rejects_unsupported_feedback_shapes() {
                 detectors: vec![detector(0)],
                 ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )
@@ -1119,6 +1148,7 @@ fn detecting_regions_target_shape_rejects_unpromoted_sweep_shapes() {
                 detectors: vec![detector(0)],
                 ticks: ticks(&[0]),
                 ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             },
         )

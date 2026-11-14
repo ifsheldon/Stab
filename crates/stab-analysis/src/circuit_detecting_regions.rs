@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_algebra::{FlexPauliString, PauliBasis};
+use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
     GateKind, MemoryBudget, QubitId, Target,
@@ -12,9 +12,6 @@ use crate::{
     sparse_rev_frame_tracker::{ReverseTrackerWorkBudget, SparseReverseFrameTracker},
 };
 
-/// Region extraction admits its retained tracker state, recurrence-probe clones, output map, and
-/// convenience helper vectors against the default memory budget.
-const DETECTING_REGION_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
 /// Conservative retained bytes of one live tracker-state unit (one sparse map entry).
 const DETECTING_REGION_LIVE_STATE_UNIT_BYTES: u64 = 64;
 /// Region extraction recurses through the snapshot walk and the sparse tracker's recurrence
@@ -29,6 +26,8 @@ pub struct DetectingRegionOptions {
     pub detectors: Vec<DemDetectorId>,
     pub ticks: Vec<CircuitTick>,
     pub ignore_anticommutation_errors: bool,
+    /// Budget for the retained tracker state, recurrence-probe clones, and output regions.
+    pub memory_budget: MemoryBudget,
     /// Signal polled once per undone instruction and repeat iteration.
     pub cancellation: Cancellation,
 }
@@ -38,6 +37,8 @@ pub struct DetectingRegionTargetOptions {
     pub targets: Vec<DemTarget>,
     pub ticks: Vec<CircuitTick>,
     pub ignore_anticommutation_errors: bool,
+    /// Budget for the retained tracker state, recurrence-probe clones, and output regions.
+    pub memory_budget: MemoryBudget,
     /// Signal polled once per undone instruction and repeat iteration.
     pub cancellation: Cancellation,
 }
@@ -59,6 +60,7 @@ pub fn circuit_detecting_regions(
                 .collect(),
             ticks: options.ticks,
             ignore_anticommutation_errors: options.ignore_anticommutation_errors,
+            memory_budget: options.memory_budget,
             cancellation: options.cancellation,
         },
     )?;
@@ -75,8 +77,11 @@ pub fn circuit_detecting_regions_for_targets(
     circuit: &Circuit,
     options: DetectingRegionTargetOptions,
 ) -> AnalysisResult<DetectingRegionTargetMap> {
-    let mut budget =
-        DetectingRegionBudget::for_request(options.targets.len(), options.ticks.len())?;
+    let mut budget = DetectingRegionBudget::for_request(
+        options.memory_budget,
+        options.targets.len(),
+        options.ticks.len(),
+    )?;
     validate_supported_subset(circuit)?;
     let fail_on_anticommute = !options.ignore_anticommutation_errors;
     let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
@@ -116,10 +121,21 @@ pub fn circuit_detecting_regions_for_targets(
     Ok(regions)
 }
 
+/// Lists every detector and observable target, admitted against [`MemoryBudget::DEFAULT`].
+///
+/// See [`all_detecting_region_targets_with_budget`].
 pub fn all_detecting_region_targets(circuit: &Circuit) -> AnalysisResult<Vec<DemTarget>> {
+    all_detecting_region_targets_with_budget(circuit, MemoryBudget::DEFAULT)
+}
+
+/// Lists every detector and observable target after admitting the dense vector against `budget`.
+pub fn all_detecting_region_targets_with_budget(
+    circuit: &Circuit,
+    budget: MemoryBudget,
+) -> AnalysisResult<Vec<DemTarget>> {
     let detector_count = circuit.count_detectors()?;
     let observable_count = circuit.count_observables()?;
-    let target_capacity = dense_target_helper_capacity(detector_count, observable_count)?;
+    let target_capacity = dense_target_helper_capacity(detector_count, observable_count, budget)?;
     let mut targets = Vec::new();
     targets.try_reserve_exact(target_capacity).map_err(|_| {
         detecting_region_resource_error(ResourceKind::MaterializedUnits, target_capacity as u64, 0)
@@ -136,9 +152,10 @@ pub fn all_detecting_region_targets(circuit: &Circuit) -> AnalysisResult<Vec<Dem
 fn dense_target_helper_capacity(
     detector_count: u64,
     observable_count: u64,
+    budget: MemoryBudget,
 ) -> AnalysisResult<usize> {
     let target_count = detector_count.saturating_add(observable_count);
-    admit_helper_bytes(target_count, size_of::<DemTarget>())?;
+    admit_helper_bytes(budget, target_count, size_of::<DemTarget>())?;
     usize::try_from(target_count).map_err(|_| {
         detecting_region_resource_error(
             ResourceKind::MaterializedUnits,
@@ -148,9 +165,20 @@ fn dense_target_helper_capacity(
     })
 }
 
+/// Lists every tick of `circuit`, admitted against [`MemoryBudget::DEFAULT`].
+///
+/// See [`all_detecting_region_ticks_with_budget`].
 pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<CircuitTick>> {
+    all_detecting_region_ticks_with_budget(circuit, MemoryBudget::DEFAULT)
+}
+
+/// Lists every tick of `circuit` after admitting the dense vector against `budget`.
+pub fn all_detecting_region_ticks_with_budget(
+    circuit: &Circuit,
+    budget: MemoryBudget,
+) -> AnalysisResult<Vec<CircuitTick>> {
     let tick_count = circuit.count_ticks()?;
-    let capacity = admit_helper_bytes(tick_count, size_of::<CircuitTick>())?;
+    let capacity = admit_helper_bytes(budget, tick_count, size_of::<CircuitTick>())?;
     let mut ticks = Vec::new();
     ticks.try_reserve_exact(capacity).map_err(|_| {
         detecting_region_resource_error(ResourceKind::MaterializedUnits, tick_count, 0)
@@ -160,17 +188,13 @@ pub fn all_detecting_region_ticks(circuit: &Circuit) -> AnalysisResult<Vec<Circu
 }
 
 /// Admits a dense helper vector of `count` elements against the budget before allocating it.
-fn admit_helper_bytes(count: u64, element_bytes: usize) -> AnalysisResult<usize> {
+fn admit_helper_bytes(
+    budget: MemoryBudget,
+    count: u64,
+    element_bytes: usize,
+) -> AnalysisResult<usize> {
     let required = count.saturating_mul(element_bytes as u64);
-    if !DETECTING_REGION_MEMORY_BUDGET.admits(u128::from(required)) {
-        return Err(ResourceLimitError::memory_budget(
-            ResourceOperation::DetectingRegions,
-            ResourceKind::MaterializedBytes,
-            required,
-            DETECTING_REGION_MEMORY_BUDGET.bytes(),
-        )
-        .into());
-    }
+    admit_region_bytes(budget, ResourceKind::MaterializedBytes, required)?;
     usize::try_from(count).map_err(|_| {
         detecting_region_resource_error(ResourceKind::MaterializedUnits, count, usize::MAX as u64)
     })
@@ -375,7 +399,7 @@ fn snapshot_regions(
     }
     for target in active_targets {
         let output_bytes = budget.admit_output_candidate(context.qubit_count)?;
-        let region = tracker.region_for_target(target)?;
+        let region = tracker.region_for_target(target, budget.algebra_budget())?;
         budget.commit_output_region(output_bytes)?;
         regions.entry(target).or_default().insert(tick, region);
     }
@@ -815,6 +839,7 @@ fn validate_ticks(ticks: &BTreeSet<CircuitTick>, tick_count: u64) -> AnalysisRes
 }
 
 struct DetectingRegionBudget {
+    memory: MemoryBudget,
     live_state_units: u64,
     tracker_state_units: u64,
     tracked_target_upper_bound: u64,
@@ -822,10 +847,15 @@ struct DetectingRegionBudget {
 }
 
 impl DetectingRegionBudget {
-    fn for_request(target_count: usize, tick_count: usize) -> AnalysisResult<Self> {
+    fn for_request(
+        memory: MemoryBudget,
+        target_count: usize,
+        tick_count: usize,
+    ) -> AnalysisResult<Self> {
         let request_units = usize_to_u64(target_count, "requested target count")?
             .saturating_add(usize_to_u64(tick_count, "requested tick count")?);
         let mut result = Self {
+            memory,
             live_state_units: 0,
             tracker_state_units: 0,
             tracked_target_upper_bound: 0,
@@ -837,13 +867,13 @@ impl DetectingRegionBudget {
 
     fn reserve_live_state(&mut self, count: u64) -> AnalysisResult<()> {
         let next = self.live_state_units.saturating_add(count);
-        admit_live_state_units(next)?;
+        admit_live_state_units(self.memory, next)?;
         self.live_state_units = next;
         Ok(())
     }
 
     fn admit_transient_live_state(&self, count: u64) -> AnalysisResult<()> {
-        admit_live_state_units(self.live_state_units.saturating_add(count))
+        admit_live_state_units(self.memory, self.live_state_units.saturating_add(count))
     }
 
     fn reserve_tracker_state(&mut self, count: u64) -> AnalysisResult<()> {
@@ -967,29 +997,40 @@ impl DetectingRegionBudget {
             .live_state_units
             .saturating_mul(DETECTING_REGION_LIVE_STATE_UNIT_BYTES);
         admit_region_bytes(
+            self.memory,
             ResourceKind::OutputBytes,
             next_output_bytes.saturating_add(live_bytes),
         )?;
         Ok(next_output_bytes)
     }
+
+    /// The caller's budget for the algebra values built from admitted output regions.
+    fn algebra_budget(&self) -> AlgebraMemoryBudget {
+        AlgebraMemoryBudget::from_bytes(self.memory.bytes())
+    }
 }
 
-fn admit_live_state_units(units: u64) -> AnalysisResult<()> {
+fn admit_live_state_units(budget: MemoryBudget, units: u64) -> AnalysisResult<()> {
     admit_region_bytes(
+        budget,
         ResourceKind::LiveStateUnits,
         units.saturating_mul(DETECTING_REGION_LIVE_STATE_UNIT_BYTES),
     )
 }
 
-fn admit_region_bytes(resource: ResourceKind, required: u64) -> AnalysisResult<()> {
-    if DETECTING_REGION_MEMORY_BUDGET.admits(u128::from(required)) {
+fn admit_region_bytes(
+    budget: MemoryBudget,
+    resource: ResourceKind,
+    required: u64,
+) -> AnalysisResult<()> {
+    if budget.admits(u128::from(required)) {
         return Ok(());
     }
     Err(ResourceLimitError::memory_budget(
         ResourceOperation::DetectingRegions,
         resource,
         required,
-        DETECTING_REGION_MEMORY_BUDGET.bytes(),
+        budget.bytes(),
     )
     .into())
 }

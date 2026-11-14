@@ -20,7 +20,7 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 - The CLI applies `--memory-budget` per stage, not per command, so one command can retain a small multiple of the budget; a 147 MB flattened circuit peaks at 1.35 GB under the 1 GiB default.
 - Peak memory at large record widths is far above Stim's for shapes that Stim streams, such as 415 MB against 6 MB for a 5,000,000-round repetition-code `sample`.
-- Time reversal, missing-detector discovery, flow generation, detecting regions, sampled flows, and Pauli and Clifford strings admit against the default budget and take no caller budget.
+- Sampled flows (`sample_if_circuit_has_stabilizer_flows` in `stab-engine`), flow checking, Pauli conjugation (`pauli_after_circuit`, `pauli_before_circuit`), and `Flow` text parsing admit against the default budget and take no caller budget; the engine function needs an options value, and the analysis ones a budgeted sibling.
 
 ## Cancellation
 

@@ -1,5 +1,7 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, Tableau};
-use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, Target};
+use stab_model::{
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, MemoryBudget, Target,
+};
 
 use crate::{
     AnalysisError, AnalysisResult,
@@ -13,6 +15,9 @@ mod reverse_flow;
 pub struct InverseQecOptions {
     /// Preserve measurements instead of turning eligible measurements into resets.
     pub keep_measurements: bool,
+    /// Budget for the expanded measurement-rich reversal, as
+    /// [`TimeReversedForFlowsOptions::memory_budget`].
+    pub memory_budget: MemoryBudget,
     /// Signal polled once per reversed instruction of the expanded measurement-rich reversal.
     pub cancellation: Cancellation,
 }
@@ -24,6 +29,9 @@ pub struct TimeReversedForFlowsOptions {
     /// This matches Stim v1.16.0's `dont_turn_measurements_into_resets` option
     /// across the supported tracker-driven measurement reversal surface.
     pub dont_turn_measurements_into_resets: bool,
+    /// Budget for the retained copies of the expanded measurement-rich reversal, and for the
+    /// dense Tableau that validates the input flows of a unitary circuit.
+    pub memory_budget: MemoryBudget,
     /// Signal polled once per reversed instruction of the expanded measurement-rich reversal.
     pub cancellation: Cancellation,
 }
@@ -135,6 +143,7 @@ pub fn circuit_inverse_qec_with_options(
 ) -> AnalysisResult<Circuit> {
     let reverse_options = TimeReversedForFlowsOptions {
         dont_turn_measurements_into_resets: options.keep_measurements,
+        memory_budget: options.memory_budget,
         cancellation: options.cancellation,
     };
     let (inverse, _) = circuit_time_reversed_for_flows_with_options(circuit, &[], reverse_options)?;
@@ -193,7 +202,7 @@ pub(crate) fn time_reversed_for_flows_using(
     if flows.is_empty() {
         return Ok((inverse, Vec::new()));
     }
-    let validation = FlowValidation::build(select(circuit, flows), circuit, &options.cancellation)?;
+    let validation = FlowValidation::build(select(circuit, flows), circuit, &options)?;
     for (index, (flow, satisfied)) in flows
         .iter()
         .zip(validation.check_all(circuit, flows, &options.cancellation)?)
@@ -420,13 +429,14 @@ impl FlowValidation {
     fn build(
         algorithm: FlowCheckAlgorithm,
         circuit: &Circuit,
-        cancellation: &Cancellation,
+        reversal: &TimeReversedForFlowsOptions,
     ) -> AnalysisResult<Self> {
         if algorithm == FlowCheckAlgorithm::SparseTracker {
             return Ok(Self::SparseFolded);
         }
         let options = crate::CircuitToTableauOptions {
-            cancellation: cancellation.clone(),
+            memory_budget: reversal.memory_budget,
+            cancellation: reversal.cancellation.clone(),
             ..crate::CircuitToTableauOptions::default()
         };
         Ok(Self::Tableau(crate::circuit_to_tableau_with_options(

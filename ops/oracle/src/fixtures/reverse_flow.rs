@@ -47,6 +47,7 @@ pub(super) fn core_time_reverse_flows_output(
         &flows,
         TimeReversedForFlowsOptions {
             dont_turn_measurements_into_resets: case.dont_turn_measurements_into_resets,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     );

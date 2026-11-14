@@ -1,6 +1,6 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_model::advanced::CancellationCountdown;
-use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, Target};
+use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, MemoryBudget, Target};
 
 use crate::{AnalysisError, AnalysisResult, gate_tableau};
 
@@ -23,17 +23,15 @@ use helpers::{
 };
 
 use super::transitions::{ReverseFlowTransition, reverse_flow_transition};
-pub(crate) use resources::{
-    FLOW_GENERATOR_MEMORY_BUDGET, measurement_rich_flow_generator_projected_bytes,
-    validate_measurement_rich_flow_generator_resources,
-};
-use resources::{
-    validate_flow_generator_repeat_nesting, validate_measurement_free_flow_generator_resources,
-};
+pub(crate) use resources::measurement_rich_flow_generator_projected_bytes;
+use resources::{admit_flow_generator_rows, validate_flow_generator_repeat_nesting};
 
 /// Options for [`circuit_flow_generators_with_options`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FlowGeneratorOptions {
+    /// Budget for the owned flow rows, projected before they are built, and for the Tableau of a
+    /// unitary circuit.
+    pub memory_budget: MemoryBudget,
     /// Signal polled once per undone instruction of a measurement-rich circuit, whose compact
     /// repeats are expanded one iteration at a time.
     pub cancellation: Cancellation,
@@ -53,30 +51,31 @@ pub fn circuit_flow_generators_with_options(
     options: &FlowGeneratorOptions,
 ) -> AnalysisResult<Vec<Flow>> {
     options.cancellation.check()?;
+    let budget = options.memory_budget;
     if circuit_is_ignored_only(circuit) {
         let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
-        validate_measurement_free_flow_generator_resources(qubit_count)?;
+        admit_flow_generator_rows(qubit_count, 0, budget)?;
         return Ok(reverse_ordered_identity_flow_rows(qubit_count));
     }
     if circuit_requires_reverse_flow_solver(circuit) {
-        return simple_measurement_rich_flow_generators(circuit, &options.cancellation)?
+        return simple_measurement_rich_flow_generators(circuit, budget, &options.cancellation)?
             .ok_or_else(|| unsupported_flow_generator_error(circuit));
     }
-    unitary_flow_generators(circuit, &options.cancellation)
+    unitary_flow_generators(circuit, options)
 }
 
 fn unitary_flow_generators(
     circuit: &Circuit,
-    cancellation: &Cancellation,
+    options: &FlowGeneratorOptions,
 ) -> AnalysisResult<Vec<Flow>> {
-    validate_measurement_free_flow_generator_resources(
-        stab_model::advanced::circuit_simulated_qubit_count(circuit),
-    )?;
+    let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    admit_flow_generator_rows(qubit_count, 0, options.memory_budget)?;
     let tableau = crate::circuit_to_tableau_with_options(
         circuit,
         &crate::CircuitToTableauOptions {
             ignore_noise: true,
-            cancellation: cancellation.clone(),
+            memory_budget: options.memory_budget,
+            cancellation: options.cancellation.clone(),
             ..crate::CircuitToTableauOptions::default()
         },
     )?;
@@ -100,43 +99,49 @@ fn unitary_flow_generators(
 
 fn simple_measurement_rich_flow_generators(
     circuit: &Circuit,
+    budget: MemoryBudget,
     cancellation: &Cancellation,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     if let [CircuitItem::Instruction(instruction)] = circuit.items() {
         let transition = reverse_flow_transition(instruction);
         let simple = match transition {
             ReverseFlowTransition::Measurement(basis) => {
-                simple_measurement_flows(instruction, basis)?
+                simple_measurement_flows(instruction, basis, budget)?
             }
-            ReverseFlowTransition::Reset(basis) => simple_reset_flows(instruction, basis)?,
+            ReverseFlowTransition::Reset(basis) => simple_reset_flows(instruction, basis, budget)?,
             ReverseFlowTransition::MeasureReset(basis) => {
-                simple_measure_reset_flows(instruction, basis)?
+                simple_measure_reset_flows(instruction, basis, budget)?
             }
             ReverseFlowTransition::PairMeasurement(basis) => {
-                simple_pair_measurement_flows(instruction, basis)?
+                simple_pair_measurement_flows(instruction, basis, budget)?
             }
             ReverseFlowTransition::PauliProductMeasurement => {
-                simple_pauli_product_measurement_flows(instruction)?
+                simple_pauli_product_measurement_flows(instruction, budget)?
             }
-            ReverseFlowTransition::MeasurementPad => Some(measurement_pad_flows(instruction)?),
-            ReverseFlowTransition::SweepControlledPauliNoop => Some(
-                reverse_ordered_identity_flow_rows(instruction_qubit_count(instruction)),
-            ),
+            ReverseFlowTransition::MeasurementPad => {
+                Some(measurement_pad_flows(instruction, budget)?)
+            }
+            ReverseFlowTransition::SweepControlledPauliNoop => {
+                let qubit_count = instruction_qubit_count(instruction);
+                admit_flow_generator_rows(qubit_count, 0, budget)?;
+                Some(reverse_ordered_identity_flow_rows(qubit_count))
+            }
             _ => None,
         };
         if simple.is_some() {
             return Ok(simple);
         }
     }
-    composed_measurement_flow_generators(circuit, cancellation)
+    composed_measurement_flow_generators(circuit, budget, cancellation)
 }
 
 fn simple_measurement_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
+    budget: MemoryBudget,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
-    validate_measurement_rich_flow_generator_resources(qubit_count, instruction.targets().len())?;
+    admit_flow_generator_rows(qubit_count, instruction.targets().len(), budget)?;
     let mut measured_targets = Vec::with_capacity(instruction.targets().len());
     for (record_index, target) in instruction.targets().iter().enumerate() {
         measured_targets.push((
@@ -174,9 +179,10 @@ fn simple_measurement_flows(
 fn simple_reset_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
+    budget: MemoryBudget,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
-    validate_measurement_rich_flow_generator_resources(qubit_count, 0)?;
+    admit_flow_generator_rows(qubit_count, 0, budget)?;
     let qubits = match unique_plain_target_indices(instruction) {
         Some(qubits) => qubits,
         None => return Ok(None),
@@ -193,13 +199,14 @@ fn simple_reset_flows(
 fn simple_measure_reset_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
+    budget: MemoryBudget,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     let targets = measure_reset_targets(instruction)?;
     if has_duplicate_measure_reset_targets(&targets) {
-        return duplicate_measure_reset_flows(instruction, basis, &targets).map(Some);
+        return duplicate_measure_reset_flows(instruction, basis, &targets, budget).map(Some);
     }
-    validate_measurement_rich_flow_generator_resources(qubit_count, targets.len())?;
+    admit_flow_generator_rows(qubit_count, targets.len(), budget)?;
     let mut flows = identity_flow_rows(qubit_count);
     for (record_index, (qubit, inverted)) in targets.into_iter().enumerate() {
         remove_single_anticommutations(&mut flows, qubit, basis)?;
@@ -228,9 +235,10 @@ fn duplicate_measure_reset_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
     targets: &[(usize, bool)],
+    budget: MemoryBudget,
 ) -> AnalysisResult<Vec<Flow>> {
     let qubit_count = instruction_qubit_count(instruction);
-    validate_measurement_rich_flow_generator_resources(qubit_count, targets.len())?;
+    admit_flow_generator_rows(qubit_count, targets.len(), budget)?;
     let mut flows = identity_flow_rows(qubit_count);
     for qubit in unique_measure_reset_qubits(targets) {
         remove_single_anticommutations(&mut flows, qubit, basis)?;
@@ -282,10 +290,11 @@ fn duplicate_measure_reset_flows(
 fn simple_pair_measurement_flows(
     instruction: &CircuitInstruction,
     basis: PauliBasis,
+    budget: MemoryBudget,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     let groups = instruction.target_groups();
-    validate_measurement_rich_flow_generator_resources(qubit_count, groups.len())?;
+    admit_flow_generator_rows(qubit_count, groups.len(), budget)?;
     let mut measured_pairs = Vec::with_capacity(groups.len());
     for (record_index, group) in groups.iter().enumerate() {
         let [left, right] = *group else {
@@ -329,10 +338,11 @@ fn simple_pair_measurement_flows(
 
 fn simple_pauli_product_measurement_flows(
     instruction: &CircuitInstruction,
+    budget: MemoryBudget,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     let groups = instruction.target_groups();
-    validate_measurement_rich_flow_generator_resources(qubit_count, groups.len())?;
+    admit_flow_generator_rows(qubit_count, groups.len(), budget)?;
     let mut measured_products = Vec::with_capacity(groups.len());
     for (record_index, group) in groups.into_iter().enumerate() {
         let product =
@@ -348,8 +358,11 @@ fn simple_pauli_product_measurement_flows(
     Ok(Some(flows))
 }
 
-fn measurement_pad_flows(instruction: &CircuitInstruction) -> AnalysisResult<Vec<Flow>> {
-    validate_measurement_rich_flow_generator_resources(0, instruction.targets().len())?;
+fn measurement_pad_flows(
+    instruction: &CircuitInstruction,
+    budget: MemoryBudget,
+) -> AnalysisResult<Vec<Flow>> {
+    admit_flow_generator_rows(0, instruction.targets().len(), budget)?;
     let mut positive_records = Vec::new();
     let mut negative_records = Vec::new();
     for (record_index, target) in instruction.targets().iter().rev().enumerate() {
@@ -375,6 +388,7 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> AnalysisResult<Vec
 
 fn composed_measurement_flow_generators(
     circuit: &Circuit,
+    budget: MemoryBudget,
     cancellation: &Cancellation,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
@@ -383,7 +397,7 @@ fn composed_measurement_flow_generators(
             "circuit measurement count does not fit usize during flow generation",
         )
     })?;
-    validate_measurement_rich_flow_generator_resources(qubit_count, measurement_count)?;
+    admit_flow_generator_rows(qubit_count, measurement_count, budget)?;
     validate_flow_generator_repeat_nesting(circuit)?;
     if !circuit_requires_reverse_flow_solver(circuit) {
         return Ok(None);

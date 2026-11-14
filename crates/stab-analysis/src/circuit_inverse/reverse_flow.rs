@@ -7,7 +7,7 @@ use stab_model::{
 };
 
 use crate::{
-    AnalysisError, AnalysisResult,
+    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
     circuit_flow::{check_unsigned_flows_with_sparse_tracker, transitions::ReverseFlowTransition},
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
@@ -29,7 +29,7 @@ pub(super) fn reverse_flows(
     options: TimeReversedForFlowsOptions,
 ) -> AnalysisResult<(Circuit, Vec<Flow>)> {
     reject_flow_observable_terms(flows)?;
-    validate_general_reversal(circuit)?;
+    validate_general_reversal(circuit, options.memory_budget)?;
     let measurement_count = usize::try_from(circuit.count_measurements()?)
         .map_err(|_| reverse_error("measurement count does not fit the platform index width"))?;
     let detector_count = circuit.count_detectors()?;
@@ -708,16 +708,18 @@ fn item_requires_general_reversal(item: &CircuitItem) -> bool {
 /// coordinate maps, and the finished copy.
 const MEASUREMENT_RICH_RETAINED_COPIES: u64 = 3;
 
-fn validate_general_reversal(circuit: &Circuit) -> AnalysisResult<()> {
+fn validate_general_reversal(circuit: &Circuit, budget: MemoryBudget) -> AnalysisResult<()> {
     let projected = projected_reversal_bytes(circuit)?
         .checked_mul(MEASUREMENT_RICH_RETAINED_COPIES)
         .ok_or_else(|| reverse_error("measurement-rich repeat expansion size overflowed"))?;
-    let budget = MemoryBudget::DEFAULT;
     if !budget.admits(u128::from(projected)) {
-        return Err(reverse_error(format!(
-            "measurement-rich repeat expansion needs at least {projected} bytes, exceeding the {}-byte memory budget",
-            budget.bytes()
-        )));
+        return Err(ResourceLimitError::memory_budget(
+            ResourceOperation::TimeReversal,
+            ResourceKind::MaterializedBytes,
+            projected,
+            budget.bytes(),
+        )
+        .into());
     }
     validate_items(circuit.items())
 }

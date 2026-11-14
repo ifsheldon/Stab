@@ -13,9 +13,7 @@ pub use checker::{
     check_unsigned_stabilizer_flows_with_diagnostics, circuit_has_all_unsigned_stabilizer_flows,
     circuit_has_unsigned_stabilizer_flow,
 };
-pub(crate) use generators::{
-    FLOW_GENERATOR_MEMORY_BUDGET, measurement_rich_flow_generator_projected_bytes,
-};
+pub(crate) use generators::measurement_rich_flow_generator_projected_bytes;
 pub use generators::{
     FlowGeneratorOptions, circuit_flow_generators, circuit_flow_generators_with_options,
 };

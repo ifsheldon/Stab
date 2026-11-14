@@ -20,6 +20,7 @@ use stab_model::{Circuit, Probability};
 
 const KNOWN_INPUT: MissingDetectorOptions = MissingDetectorOptions {
     ignore_non_deterministic_measurements: false,
+    memory_budget: stab_model::MemoryBudget::DEFAULT,
     cancellation: stab_model::Cancellation::never(),
 };
 

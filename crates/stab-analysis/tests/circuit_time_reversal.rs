@@ -40,6 +40,7 @@ fn time_reversal_preserves_generated_surface_code_regions() {
             targets: targets.clone(),
             ticks: ticks.clone(),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -61,6 +62,7 @@ fn time_reversal_preserves_generated_surface_code_regions() {
             targets,
             ticks: all_detecting_region_ticks(&inverse).expect("inverse ticks"),
             ignore_anticommutation_errors: false,
+            memory_budget: stab_model::MemoryBudget::DEFAULT,
             cancellation: stab_model::Cancellation::never(),
         },
     )
@@ -188,10 +190,16 @@ fn time_reversal_admits_measurement_rich_repeat_expansion_against_the_memory_bud
 
     let oversized = circuit("REPEAT 1000000000000 {\n    M 0\n}\n");
     let error = circuit_time_reversed_for_flows(&oversized, &[])
-        .expect_err("measurement-rich expansion beyond the memory budget is refused")
-        .to_string();
-    assert!(error.contains("memory budget"), "{error}");
-    assert!(error.contains("repeat"), "{error}");
+        .expect_err("measurement-rich expansion beyond the memory budget is refused");
+    let resource = error
+        .resource_limit_error()
+        .expect("typed time-reversal budget refusal");
+    assert_eq!(
+        resource.operation(),
+        stab_analysis::ResourceOperation::TimeReversal
+    );
+    assert_eq!(resource.limit(), stab_model::MemoryBudget::DEFAULT.bytes());
+    assert!(error.to_string().contains("memory budget"), "{error}");
 }
 
 #[test]
@@ -432,6 +440,7 @@ fn supported_time_reversal_is_semantically_involutive() {
             })?;
             let options = TimeReversedForFlowsOptions {
                 dont_turn_measurements_into_resets: true,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
                 cancellation: stab_model::Cancellation::never(),
             };
 

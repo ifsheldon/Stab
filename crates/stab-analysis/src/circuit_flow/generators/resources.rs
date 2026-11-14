@@ -3,30 +3,23 @@ use stab_model::{Circuit, MemoryBudget, ParseLimits};
 
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
 
-/// Owned flow-generator rows are admitted against the default memory budget.
-pub(crate) const FLOW_GENERATOR_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
-
-/// Admits the `2n` measurement-free flow rows that the ignored-only and unitary generators return,
-/// two `n`-qubit Pauli strings each, against the default flow-generator budget. Building them is
-/// linear in those bytes.
-pub(super) fn validate_measurement_free_flow_generator_resources(
-    qubit_count: usize,
-) -> AnalysisResult<()> {
-    validate_measurement_rich_flow_generator_resources(qubit_count, 0)
-}
-
-pub(crate) fn validate_measurement_rich_flow_generator_resources(
+/// Admits owned flow rows against the caller's flow-generator budget: `2n + m` rows for `n`
+/// qubits and `m` measurements. The ignored-only and unitary generators return the `2n`
+/// measurement-free rows, two `n`-qubit Pauli strings each, and building them is linear in those
+/// bytes.
+pub(super) fn admit_flow_generator_rows(
     qubit_count: usize,
     measurement_count: usize,
+    budget: MemoryBudget,
 ) -> AnalysisResult<()> {
     let projected_bytes =
         measurement_rich_flow_generator_projected_bytes(qubit_count, measurement_count);
-    if !FLOW_GENERATOR_MEMORY_BUDGET.admits(u128::from(projected_bytes)) {
+    if !budget.admits(u128::from(projected_bytes)) {
         return Err(ResourceLimitError::memory_budget(
             ResourceOperation::FlowGeneration,
             ResourceKind::ProjectedPayloadBytes,
             projected_bytes,
-            FLOW_GENERATOR_MEMORY_BUDGET.bytes(),
+            budget.bytes(),
         )
         .into());
     }
