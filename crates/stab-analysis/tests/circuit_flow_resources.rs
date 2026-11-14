@@ -57,19 +57,27 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
     assert_eq!(resource.actual(), 257);
     assert_eq!(resource.limit(), 256);
 
-    let admitted = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 4095\n"))
-        .expect("exact ignored-only projected-storage maximum");
-    assert_eq!(admitted.len(), 8192);
+    // Ignored-only and unitary flow rows are admitted in bytes like measurement-rich rows, so the
+    // former 4096-qubit dense bound is gone and a projection above the budget is refused.
+    let admitted = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 4096\n"))
+        .expect("ignored-only flows beyond the former dense bound");
+    assert_eq!(admitted.len(), 8194);
+    let unitary = circuit_flow_generators(&circuit("H 4096\n")).expect("wide unitary flows");
+    assert_eq!(unitary.len(), 8194);
 
-    let error = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 4096\n"))
-        .expect_err("first ignored-only projected-storage excess");
-    let resource = error
-        .resource_limit_error()
-        .expect("typed ignored-only projected-storage error");
-    assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
-    assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
-    assert_eq!(resource.actual(), 4097 * 4097);
-    assert_eq!(resource.limit(), 4096 * 4096);
+    for text in ["QUBIT_COORDS(0) 100000\n", "H 100000\n"] {
+        let error = circuit_flow_generators(&circuit(text))
+            .expect_err("measurement-free flow storage above the budget");
+        let resource = error
+            .resource_limit_error()
+            .expect("typed measurement-free projected-storage error");
+        assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
+        assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
+        let qubits = 100_001_u64;
+        let row_bytes = std::mem::size_of::<Flow>() as u64 + 2 * qubits;
+        assert_eq!(resource.actual(), 2 * qubits * row_bytes);
+        assert_eq!(resource.limit(), 1 << 30);
+    }
 }
 
 #[test]

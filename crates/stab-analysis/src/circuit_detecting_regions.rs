@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_algebra::{FlexPauliString, PauliBasis, StabilizerResource};
+use stab_algebra::{FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
     GateCategory, MemoryBudget, QubitId, Target,
@@ -844,14 +844,6 @@ impl DetectingRegionBudget {
     }
 
     fn admit_output_candidate(&self, qubit_count: usize) -> AnalysisResult<u64> {
-        let pauli_limit = StabilizerResource::PauliQubits.limit();
-        if qubit_count > pauli_limit {
-            return Err(detecting_region_resource_error(
-                ResourceKind::MaterializedUnits,
-                qubit_count as u64,
-                pauli_limit as u64,
-            ));
-        }
         let candidate_bytes = output_region_bytes(qubit_count)?;
         self.next_output_bytes(candidate_bytes)?;
         Ok(candidate_bytes)

@@ -14,6 +14,7 @@ pub enum ResourceOperation {
     MissingDetectorDiscovery,
     PauliConjugation,
     SatMaterialization,
+    TableauConversion,
 }
 
 impl ResourceOperation {
@@ -30,6 +31,7 @@ impl ResourceOperation {
             Self::MissingDetectorDiscovery => "missing-detector-discovery",
             Self::PauliConjugation => "pauli-conjugation",
             Self::SatMaterialization => "sat-materialization",
+            Self::TableauConversion => "tableau-conversion",
         }
     }
 }

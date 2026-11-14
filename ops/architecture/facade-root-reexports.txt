@@ -5,6 +5,7 @@
 # their directly coupled errors, and sink/session contracts. Algorithms and lower-level
 # implementation types belong in their owning component namespaces or crates.
 stab_model::AbsoluteTolerance
+stab_algebra::AlgebraMemoryBudget
 stab_records::BitPlane64Batch
 stab_records::BitPlane64BatchView
 stab_model::ByteSpan

@@ -6,22 +6,14 @@ use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, Res
 /// Owned flow-generator rows are admitted against the default memory budget.
 pub(crate) const FLOW_GENERATOR_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
 const MAX_FLOW_GENERATOR_REPEAT_NESTING: usize = 256;
-// Two rows per qubit, two Pauli strings per row, and two bit planes per string.
-const MAX_IGNORED_ONLY_FLOW_GENERATOR_PROJECTED_BYTES: u64 = 4096 * 4096;
 
-pub(super) fn validate_ignored_only_flow_generator_resources(
+/// Admits the `2n` measurement-free flow rows that the ignored-only and unitary generators return,
+/// two `n`-qubit Pauli strings each, against the default flow-generator budget. Building them is
+/// linear in those bytes.
+pub(super) fn validate_measurement_free_flow_generator_resources(
     qubit_count: usize,
 ) -> AnalysisResult<()> {
-    let qubits = qubit_count as u128;
-    let projected_bytes = u64::try_from(qubits.saturating_mul(qubits)).unwrap_or(u64::MAX);
-    if projected_bytes > MAX_IGNORED_ONLY_FLOW_GENERATOR_PROJECTED_BYTES {
-        return Err(flow_resource_error(
-            ResourceKind::ProjectedPayloadBytes,
-            projected_bytes,
-            MAX_IGNORED_ONLY_FLOW_GENERATOR_PROJECTED_BYTES,
-        ));
-    }
-    Ok(())
+    validate_measurement_rich_flow_generator_resources(qubit_count, 0)
 }
 
 pub(crate) fn validate_measurement_rich_flow_generator_resources(

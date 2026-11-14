@@ -136,7 +136,7 @@ fn derive_single_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<2>> {
 fn derive_two_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<4>> {
     let name = gate.canonical_name();
     let inverse_tableau = two_qubit_inverse_tableau(gate)?;
-    let bits = |output: Result<&stab_algebra::PauliString, _>| {
+    let bits = |output: Result<stab_algebra::PauliString, _>| {
         let output = output.map_err(|error: stab_algebra::StabilizerError| {
             AnalysisError::invalid_detector_error_model(format!(
                 "failed to apply inverse tableau for {name} during sparse reverse tracking: {error}"

@@ -58,8 +58,8 @@ impl Flow {
     ///
     /// # Errors
     ///
-    /// Returns [`StabilizerError::ResourceLimitExceeded`] when the combined number of measurement
-    /// and observable terms exceeds [`super::StabilizerResource::FlowClassicalTerms`].
+    /// Returns [`StabilizerError::AllocationFailed`] when term storage cannot be reserved. Each
+    /// stored term is one item the caller supplied, so storage is bounded by the input.
     pub fn new(
         input: PauliString,
         output: PauliString,
@@ -67,27 +67,16 @@ impl Flow {
         observables: impl IntoIterator<Item = u32>,
     ) -> StabilizerResult<Self> {
         let measurements = measurements.into_iter();
-        let mut stored_measurements = Vec::with_capacity(
-            measurements
-                .size_hint()
-                .0
-                .min(super::StabilizerResource::FlowClassicalTerms.limit()),
-        );
+        let mut stored_measurements = Vec::new();
         for measurement in measurements {
-            ensure_additional_classical_term(stored_measurements.len(), 0)?;
-            stored_measurements.push(FlowMeasurementIndex::new(measurement));
+            push_term(
+                &mut stored_measurements,
+                FlowMeasurementIndex::new(measurement),
+            )?;
         }
-        let observables = observables.into_iter();
-        let mut stored_observables = Vec::with_capacity(
-            observables.size_hint().0.min(
-                super::StabilizerResource::FlowClassicalTerms
-                    .limit()
-                    .saturating_sub(stored_measurements.len()),
-            ),
-        );
+        let mut stored_observables = Vec::new();
         for observable in observables {
-            ensure_additional_classical_term(stored_measurements.len(), stored_observables.len())?;
-            stored_observables.push(FlowObservableIndex(observable));
+            push_term(&mut stored_observables, FlowObservableIndex(observable))?;
         }
         let mut result = Self {
             input,
@@ -129,8 +118,8 @@ impl Flow {
     /// # Errors
     ///
     /// Returns [`StabilizerError::InvalidFlowProduct`] when the input and output products have an
-    /// imaginary relative phase, or [`StabilizerError::ResourceLimitExceeded`] when the resulting
-    /// classical terms exceed [`super::StabilizerResource::FlowClassicalTerms`].
+    /// imaginary relative phase, or [`StabilizerError::AllocationFailed`] when the merged terms,
+    /// at most the operands' combined terms, cannot be reserved.
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<Self> {
         let input_product = self.input.multiply(&rhs.input)?;
         let output_product = self.output.multiply(&rhs.output)?;
@@ -157,8 +146,8 @@ impl Flow {
             self.output.sign()
         };
         let output = unsigned_pauli_from_flex(&output_product).with_sign(output_sign);
-        let measurements = xor_merge(&self.measurements, &rhs.measurements, 0)?;
-        let observables = xor_merge(&self.observables, &rhs.observables, measurements.len())?;
+        let measurements = xor_merge(&self.measurements, &rhs.measurements)?;
+        let observables = xor_merge(&self.observables, &rhs.observables)?;
         Ok(Self {
             input,
             output,
@@ -310,62 +299,46 @@ fn parse_classical_output_term(
     observables: &mut Vec<u32>,
 ) -> StabilizerResult<()> {
     if token.starts_with('r') {
-        ensure_additional_classical_term(measurements.len(), observables.len())?;
-        measurements.push(parse_rec_index(token, original_text)?);
-        Ok(())
+        push_term(measurements, parse_rec_index(token, original_text)?)
     } else if token.starts_with('o') {
-        ensure_additional_classical_term(measurements.len(), observables.len())?;
-        observables.push(parse_obs_index(token, original_text)?);
-        Ok(())
+        push_term(observables, parse_obs_index(token, original_text)?)
     } else {
         Err(invalid_flow_text(original_text))
     }
 }
 
-fn ensure_additional_classical_term(
-    measurement_count: usize,
-    observable_count: usize,
-) -> StabilizerResult<()> {
-    let requested = measurement_count
-        .checked_add(observable_count)
-        .and_then(|count| count.checked_add(1))
-        .unwrap_or(usize::MAX);
-    super::StabilizerResource::FlowClassicalTerms.ensure(requested)
+/// Pushes one classical term after reserving its slot fallibly.
+fn push_term<T>(values: &mut Vec<T>, value: T) -> StabilizerResult<()> {
+    crate::budget::try_reserve_one(super::StabilizerResource::FlowTerms, values)?;
+    values.push(value);
+    Ok(())
 }
 
-fn xor_merge<T: Copy + Ord>(
-    left: &[T],
-    right: &[T],
-    stored_before: usize,
-) -> StabilizerResult<Vec<T>> {
-    let remaining_capacity = super::StabilizerResource::FlowClassicalTerms
-        .limit()
-        .saturating_sub(stored_before);
-    let mut result = Vec::with_capacity(
-        left.len()
-            .saturating_add(right.len())
-            .min(remaining_capacity),
-    );
+fn xor_merge<T: Copy + Ord>(left: &[T], right: &[T]) -> StabilizerResult<Vec<T>> {
+    let mut result = crate::budget::try_with_capacity(
+        super::StabilizerResource::FlowTerms,
+        left.len().saturating_add(right.len()),
+    )?;
     let mut left = left.iter().copied().peekable();
     let mut right = right.iter().copied().peekable();
     loop {
         match (left.peek().copied(), right.peek().copied()) {
             (None, None) => break,
             (Some(value), None) => {
-                push_xor_term(&mut result, value, stored_before)?;
+                result.push(value);
                 left.next();
             }
             (None, Some(value)) => {
-                push_xor_term(&mut result, value, stored_before)?;
+                result.push(value);
                 right.next();
             }
             (Some(left_value), Some(right_value)) => match left_value.cmp(&right_value) {
                 Ordering::Less => {
-                    push_xor_term(&mut result, left_value, stored_before)?;
+                    result.push(left_value);
                     left.next();
                 }
                 Ordering::Greater => {
-                    push_xor_term(&mut result, right_value, stored_before)?;
+                    result.push(right_value);
                     right.next();
                 }
                 Ordering::Equal => {
@@ -376,12 +349,6 @@ fn xor_merge<T: Copy + Ord>(
         }
     }
     Ok(result)
-}
-
-fn push_xor_term<T>(values: &mut Vec<T>, value: T, stored_before: usize) -> StabilizerResult<()> {
-    ensure_additional_classical_term(stored_before, values.len())?;
-    values.push(value);
-    Ok(())
 }
 
 fn parse_flow_pauli(text: &str, original_text: &str) -> StabilizerResult<(PauliString, bool)> {

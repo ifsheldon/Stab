@@ -202,7 +202,7 @@ fn assert_gate_matches_declared_tableau(gate: Gate) {
                 tableau.z_output(input).expect("tableau Z output"),
             ),
         ] {
-            let measurement = mpp_target(output);
+            let measurement = mpp_target(&output);
             let text = format!(
                 "{preparation}{} {targets}\nMPP {measurement}\n",
                 gate.canonical_name()

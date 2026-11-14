@@ -4,14 +4,13 @@
     reason = "Clifford qualification uses a reviewed 24-element compatibility table and exact failures keep diagnostics readable"
 )]
 
-use std::cell::Cell;
 use std::collections::BTreeSet;
 
 use rand::Rng as _;
 use rand::SeedableRng as _;
 use rand::rngs::{SmallRng, StdRng};
 use stab_algebra::{
-    CliffordString, SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult,
+    AlgebraMemoryBudget, CliffordString, SingleQubitClifford, StabilizerError, StabilizerResource,
     Tableau,
 };
 
@@ -53,21 +52,6 @@ const CLIFFORD_CONTRACT: [(SingleQubitClifford, &str, &str, &str, &str); 24] = [
     (SingleQubitClifford::Cnzyx, "C_NZYX", "dY", "-Z", "-Y"),
     (SingleQubitClifford::Czynx, "C_ZYNX", "dZ", "-Z", "+Y"),
 ];
-
-fn assert_resource_limit<T>(
-    result: StabilizerResult<T>,
-    resource: StabilizerResource,
-    requested: usize,
-) {
-    assert_eq!(
-        result.err(),
-        Some(StabilizerError::ResourceLimitExceeded {
-            resource,
-            requested,
-            limit: resource.limit(),
-        })
-    );
-}
 
 fn contract_gates() -> impl ExactSizeIterator<Item = SingleQubitClifford> {
     CLIFFORD_CONTRACT.map(|(gate, _, _, _, _)| gate).into_iter()
@@ -202,58 +186,46 @@ fn cq2_algebra_clifford_string_contract_covers_growth_and_composition() {
 }
 
 #[test]
-fn cq2_algebra_clifford_growth_rejects_limits_and_overflow() {
-    let resource = StabilizerResource::CliffordQubits;
+fn cq2_algebra_clifford_growth_admits_bytes_and_rejects_overflow() {
+    // One past the former 1,048,576-entry count cap, which byte admission replaced.
+    let width = 1_048_577;
+    let mut wide_left = CliffordString::identity(width).expect("wide left");
+    let mut wide_right = CliffordString::identity(width).expect("wide right");
+    wide_right
+        .set_gate_at(width - 1, SingleQubitClifford::X)
+        .expect("set wide right tail");
+    let wide_right_before = wide_right.clone();
+    wide_left
+        .right_multiply_in_place(&wide_right)
+        .expect("wide equal-width multiplication");
+    assert_eq!(wide_left.len(), width);
+    assert_eq!(wide_left.gate_at(0), Some(SingleQubitClifford::I));
+    assert_eq!(wide_left.gate_at(width - 1), Some(SingleQubitClifford::X));
+    assert_eq!(wide_right, wide_right_before);
 
-    let mut maximum_left = CliffordString::identity(resource.limit()).expect("maximum left");
-    let mut maximum_right = CliffordString::identity(resource.limit()).expect("maximum right");
-    maximum_right
-        .set_gate_at(resource.limit() - 1, SingleQubitClifford::X)
-        .expect("set maximum right tail");
-    let maximum_right_before = maximum_right.clone();
-    maximum_left
-        .right_multiply_in_place(&maximum_right)
-        .expect("maximum equal-width multiplication");
-    assert_eq!(maximum_left.len(), resource.limit());
-    assert_eq!(maximum_left.gate_at(0), Some(SingleQubitClifford::I));
-    assert_eq!(
-        maximum_left.gate_at(resource.limit() - 1),
-        Some(SingleQubitClifford::X)
-    );
-    assert_eq!(maximum_right, maximum_right_before);
-
-    assert_resource_limit(
-        CliffordString::identity(resource.limit() + 1),
-        resource,
-        resource.limit() + 1,
-    );
-    let consumed = Cell::new(0_usize);
-    let gates = std::iter::from_fn(|| {
-        consumed.set(consumed.get() + 1);
-        Some(SingleQubitClifford::I)
-    });
-    assert_resource_limit(
-        CliffordString::from_gates(gates),
-        resource,
-        resource.limit() + 1,
-    );
-    assert_eq!(consumed.get(), resource.limit() + 1);
-
-    let left_len = resource.limit() / 2 + 1;
-    let right_len = resource.limit() - left_len + 1;
-    let concat = CliffordString::identity(left_len)
-        .and_then(|left| CliffordString::identity(right_len).and_then(|right| left.concat(&right)));
-    assert_resource_limit(concat, resource, resource.limit() + 1);
-
-    let repeated = CliffordString::identity(left_len).and_then(|value| value.repeat(2));
-    assert_resource_limit(repeated, resource, left_len * 2);
+    let budget = AlgebraMemoryBudget::DEFAULT.bytes();
+    let refused = |result: Result<CliffordString, StabilizerError>| {
+        assert!(
+            matches!(
+                result,
+                Err(StabilizerError::MemoryBudgetExceeded {
+                    resource: StabilizerResource::CliffordString,
+                    budget_bytes,
+                    ..
+                }) if budget_bytes == budget
+            ),
+            "{result:?}"
+        );
+    };
+    refused(CliffordString::identity(usize::MAX / 2));
+    refused(CliffordString::identity(1).and_then(|value| value.repeat(usize::MAX / 2)));
 
     assert_eq!(
         CliffordString::identity(2)
             .and_then(|value| value.repeat(usize::MAX))
             .err(),
         Some(StabilizerError::ResourceSizeOverflow {
-            resource,
+            resource: StabilizerResource::CliffordString,
             item_count: 2,
             repetitions: usize::MAX,
         })
@@ -268,11 +240,7 @@ fn cq2_algebra_clifford_growth_rejects_limits_and_overflow() {
 
     let mut actual_rng = StdRng::seed_from_u64(0x5eed_0002);
     let mut expected_rng = StdRng::seed_from_u64(0x5eed_0002);
-    assert_resource_limit(
-        CliffordString::random(resource.limit() + 1, &mut actual_rng),
-        resource,
-        resource.limit() + 1,
-    );
+    refused(CliffordString::random(usize::MAX / 2, &mut actual_rng));
     assert_eq!(actual_rng.next_u64(), expected_rng.next_u64());
 }
 

@@ -2,7 +2,7 @@ use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, Target};
 
-use crate::{AnalysisError, AnalysisResult, circuit_to_tableau, gate_tableau};
+use crate::{AnalysisError, AnalysisResult, gate_tableau};
 
 mod canonicalize;
 mod classification;
@@ -28,7 +28,7 @@ pub(crate) use resources::{
     validate_measurement_rich_flow_generator_resources,
 };
 use resources::{
-    validate_flow_generator_repeat_nesting, validate_ignored_only_flow_generator_resources,
+    validate_flow_generator_repeat_nesting, validate_measurement_free_flow_generator_resources,
 };
 
 /// Options for [`circuit_flow_generators_with_options`].
@@ -55,33 +55,44 @@ pub fn circuit_flow_generators_with_options(
     options.cancellation.check()?;
     if circuit_is_ignored_only(circuit) {
         let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
-        validate_ignored_only_flow_generator_resources(qubit_count)?;
+        validate_measurement_free_flow_generator_resources(qubit_count)?;
         return Ok(reverse_ordered_identity_flow_rows(qubit_count));
     }
     if circuit_requires_reverse_flow_solver(circuit) {
         return simple_measurement_rich_flow_generators(circuit, &options.cancellation)?
             .ok_or_else(|| unsupported_flow_generator_error(circuit));
     }
-    unitary_flow_generators(circuit)
+    unitary_flow_generators(circuit, &options.cancellation)
 }
 
-fn unitary_flow_generators(circuit: &Circuit) -> AnalysisResult<Vec<Flow>> {
-    let tableau = circuit_to_tableau(circuit, true, false, false)?;
+fn unitary_flow_generators(
+    circuit: &Circuit,
+    cancellation: &Cancellation,
+) -> AnalysisResult<Vec<Flow>> {
+    validate_measurement_free_flow_generator_resources(
+        stab_model::advanced::circuit_simulated_qubit_count(circuit),
+    )?;
+    let tableau = crate::circuit_to_tableau_with_options(
+        circuit,
+        &crate::CircuitToTableauOptions {
+            ignore_noise: true,
+            cancellation: cancellation.clone(),
+            ..crate::CircuitToTableauOptions::default()
+        },
+    )?;
     let mut flows = Vec::with_capacity(tableau.len() * 2);
     for index in (0..tableau.len()).rev() {
         flows.push(Flow::from_paulis(
             single_pauli(tableau.len(), index, PauliBasis::X),
             tableau
                 .x_output(index)
-                .map_err(stabilizer_to_circuit_error)?
-                .clone(),
+                .map_err(stabilizer_to_circuit_error)?,
         ));
         flows.push(Flow::from_paulis(
             single_pauli(tableau.len(), index, PauliBasis::Z),
             tableau
                 .z_output(index)
-                .map_err(stabilizer_to_circuit_error)?
-                .clone(),
+                .map_err(stabilizer_to_circuit_error)?,
         ));
     }
     Ok(flows)

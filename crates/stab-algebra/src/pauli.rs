@@ -4,6 +4,7 @@ use std::str::FromStr;
 use rand::{Rng, RngExt as _};
 
 use super::{StabilizerError, StabilizerResource, StabilizerResult};
+use crate::budget::{AlgebraMemoryBudget, pauli_bytes, try_reserve_one, try_zeroed_words};
 use crate::kernels::pauli_right_multiply_words;
 use stab_bits::{BitError, BitVec};
 
@@ -212,14 +213,27 @@ pub struct PauliString {
 }
 
 impl PauliString {
-    /// Creates an all-identity string within the [`StabilizerResource::PauliQubits`] limit.
+    /// Creates an all-identity string after admitting its two packed planes against
+    /// [`AlgebraMemoryBudget::DEFAULT`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
-        StabilizerResource::PauliQubits.ensure(num_qubits)?;
-        Ok(Self::identity_unchecked(num_qubits))
+        AlgebraMemoryBudget::DEFAULT
+            .admit(StabilizerResource::PauliString, pauli_bytes(num_qubits))?;
+        let words = num_qubits.div_ceil(WORD_BITS);
+        Ok(Self {
+            sign: PauliSign::Plus,
+            xs: BitVec::from_words_truncated(
+                num_qubits,
+                try_zeroed_words(StabilizerResource::PauliString, words)?,
+            ),
+            zs: BitVec::from_words_truncated(
+                num_qubits,
+                try_zeroed_words(StabilizerResource::PauliString, words)?,
+            ),
+            has_terms: false,
+        })
     }
 
     pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
-        debug_assert!(num_qubits <= StabilizerResource::PauliQubits.limit());
         Self {
             sign: PauliSign::Plus,
             xs: BitVec::zeros(num_qubits),
@@ -242,21 +256,20 @@ impl PauliString {
         Ok(result)
     }
 
-    /// Collects Pauli bases, rejecting the first item beyond the Pauli-qubit limit.
+    /// Collects Pauli bases, refusing the first item whose collected bases and packed planes
+    /// would exceed [`AlgebraMemoryBudget::DEFAULT`].
     pub fn from_bases(
         sign: PauliSign,
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> StabilizerResult<Self> {
-        let limit = StabilizerResource::PauliQubits.limit();
         let mut collected = Vec::new();
         for basis in bases {
-            if collected.len() == limit {
-                return Err(StabilizerError::ResourceLimitExceeded {
-                    resource: StabilizerResource::PauliQubits,
-                    requested: limit.saturating_add(1),
-                    limit,
-                });
-            }
+            let count = collected.len().saturating_add(1);
+            AlgebraMemoryBudget::DEFAULT.admit(
+                StabilizerResource::PauliString,
+                collected_bases_bytes(count),
+            )?;
+            try_reserve_one(StabilizerResource::PauliString, &mut collected)?;
             collected.push(basis);
         }
         Ok(Self::from_bases_unchecked(sign, collected))
@@ -267,7 +280,6 @@ impl PauliString {
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> Self {
         let bases = bases.into_iter().collect::<Vec<_>>();
-        debug_assert!(bases.len() <= StabilizerResource::PauliQubits.limit());
         let mut x_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
         let mut z_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
         let mut has_terms = false;
@@ -381,24 +393,6 @@ impl PauliString {
         } else {
             self.has_terms = true;
         }
-    }
-
-    pub(crate) fn replace_bases_preserving_terms(
-        &mut self,
-        targets: &[usize],
-        bases: &[PauliBasis],
-    ) {
-        debug_assert_eq!(targets.len(), bases.len());
-        debug_assert!(self.has_terms);
-        for (&target, &basis) in targets.iter().zip(bases) {
-            self.write_basis_in_bounds(target, basis);
-        }
-        // A valid Clifford maps every non-identity generator to another non-identity generator.
-        self.has_terms = true;
-    }
-
-    pub(crate) fn flip_sign_in_place(&mut self) {
-        self.sign = self.sign.flipped();
     }
 
     pub(crate) fn clear_known_terms(&mut self, positions: &[usize]) {
@@ -581,7 +575,6 @@ impl PauliString {
                 right: zs.len(),
             });
         }
-        StabilizerResource::PauliQubits.ensure(xs.len())?;
         let has_terms = bits_have_terms(&xs, &zs);
         Ok(Self {
             sign,
@@ -650,7 +643,7 @@ pub struct FlexPauliString {
 }
 
 impl FlexPauliString {
-    /// Creates an all-identity value within the [`StabilizerResource::PauliQubits`] limit.
+    /// Creates an all-identity value admitted like [`PauliString::identity`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
         Ok(Self {
             value: PauliString::identity(num_qubits)?,
@@ -746,8 +739,12 @@ impl FlexPauliString {
         num_qubits: usize,
         original_text: &str,
     ) -> StabilizerResult<Self> {
-        StabilizerResource::PauliQubits.ensure(num_qubits)?;
-        let mut result = Self::from_phase_and_bases(phase, vec![PauliBasis::I; num_qubits])?;
+        let mut value = PauliString::identity(num_qubits)?;
+        value.sign = phase.sign();
+        let mut result = Self {
+            value,
+            imaginary: phase.is_imaginary(),
+        };
         let mut current_basis = None;
         let mut current_index = None;
 
@@ -901,6 +898,11 @@ fn flush_sparse_term(
         });
     }
     result.right_mul_basis(index, basis)
+}
+
+/// Bytes held while collecting `count` bases: one byte per collected basis plus the packed planes.
+fn collected_bases_bytes(count: usize) -> u128 {
+    count as u128 * size_of::<PauliBasis>() as u128 + pauli_bytes(count)
 }
 
 fn bits_have_terms(xs: &BitVec, zs: &BitVec) -> bool {

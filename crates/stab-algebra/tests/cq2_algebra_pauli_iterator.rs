@@ -4,8 +4,8 @@
 )]
 
 use stab_algebra::{
-    PauliBasis, PauliSign, PauliStringIterator, StabilizerError, StabilizerResource,
-    StabilizerResult,
+    AlgebraMemoryBudget, PauliBasis, PauliSign, PauliStringIterator, StabilizerError,
+    StabilizerResource, StabilizerResult,
 };
 use thiserror::Error;
 
@@ -53,16 +53,18 @@ fn cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference() -
     assert_eq!(restarted, first);
     assert_eq!(restarted, summarize_reference(restart_spec)?);
 
-    let resource = StabilizerResource::PauliQubits;
-    let accepted = PauliStringIterator::new(resource.limit(), 1, 1, true, true, true)?;
-    assert_eq!(accepted.result().len(), resource.limit());
+    // The former 1,048,576-qubit count cap is gone; width is admitted in bytes instead, and a
+    // width whose state cannot fit the default budget is refused before allocation.
+    let wide = 1_048_577;
+    let accepted = PauliStringIterator::new(wide, 1, 1, true, true, true)?;
+    assert_eq!(accepted.result().len(), wide);
     assert!(matches!(
-        PauliStringIterator::new(resource.limit() + 1, 1, 1, true, true, true),
-        Err(StabilizerError::ResourceLimitExceeded {
-            resource: StabilizerResource::PauliQubits,
-            requested,
-            limit,
-        }) if requested == resource.limit() + 1 && limit == resource.limit()
+        PauliStringIterator::new(usize::MAX / 2, 1, 1, true, true, true),
+        Err(StabilizerError::MemoryBudgetExceeded {
+            resource: StabilizerResource::PauliString,
+            budget_bytes,
+            ..
+        }) if budget_bytes == AlgebraMemoryBudget::DEFAULT.bytes()
     ));
     Ok(())
 }

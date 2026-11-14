@@ -1,46 +1,66 @@
 use std::fmt::{Display, Formatter};
 
-use rand::{Rng, RngExt as _};
+use rand::Rng;
 
+mod action;
+mod local;
 mod random;
+pub(crate) mod rows;
 
-use super::{
-    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
-    StabilizerResult,
-};
+pub(crate) use rows::PauliRows;
 
+use super::budget::{AlgebraMemoryBudget, StabilizerResource, tableau_bytes};
+use super::{PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, StabilizerResult};
+
+/// A Clifford operation stored as the signed images of its `2n` canonical generators.
+///
+/// Row `k` holds the image of `X_k` and row `n + k` the image of `Z_k`, each as packed X and Z
+/// words with one packed sign plane, so composition, inversion, and Pauli actions run over whole
+/// words. Every constructor validates or synthesizes a Clifford, so a value always satisfies the
+/// symplectic commutation relations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Tableau {
-    xs: Vec<PauliString>,
-    zs: Vec<PauliString>,
+    rows: PauliRows,
 }
 
 impl Tableau {
-    /// Creates an identity Tableau within the [`crate::StabilizerResource::TableauQubits`] limit.
+    /// Creates an identity Tableau admitted against [`AlgebraMemoryBudget::DEFAULT`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
-        super::StabilizerResource::TableauQubits.ensure(num_qubits)?;
-        Ok(Self::identity_unchecked(num_qubits))
+        Self::identity_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT)
     }
 
-    pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
-        debug_assert!(num_qubits <= super::StabilizerResource::TableauQubits.limit());
-        let mut xs = Vec::with_capacity(num_qubits);
-        let mut zs = Vec::with_capacity(num_qubits);
-        for index in 0..num_qubits {
-            xs.push(single_pauli(
-                num_qubits,
-                index,
-                PauliBasis::X,
-                PauliSign::Plus,
-            ));
-            zs.push(single_pauli(
-                num_qubits,
-                index,
-                PauliBasis::Z,
-                PauliSign::Plus,
-            ));
+    /// Creates an identity Tableau after admitting its packed rows against `budget`.
+    pub fn identity_with_budget(
+        num_qubits: usize,
+        budget: AlgebraMemoryBudget,
+    ) -> StabilizerResult<Self> {
+        budget.admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+        Self::identity_unadmitted(num_qubits)
+    }
+
+    /// Creates an identity Tableau whose size the caller has already bounded.
+    pub(crate) fn identity_unadmitted(num_qubits: usize) -> StabilizerResult<Self> {
+        let mut rows =
+            PauliRows::try_zeroed(2 * num_qubits, num_qubits, StabilizerResource::Tableau)?;
+        for qubit in 0..num_qubits {
+            rows.set_bits(qubit, qubit, true, false)?;
+            rows.set_bits(num_qubits + qubit, qubit, false, true)?;
         }
-        Self { xs, zs }
+        Ok(Self { rows })
+    }
+
+    fn zeroed(num_qubits: usize) -> StabilizerResult<Self> {
+        Ok(Self {
+            rows: PauliRows::try_zeroed(2 * num_qubits, num_qubits, StabilizerResource::Tableau)?,
+        })
+    }
+
+    pub(crate) const fn from_rows(rows: PauliRows) -> Self {
+        Self { rows }
+    }
+
+    pub(crate) const fn rows(&self) -> &PauliRows {
+        &self.rows
     }
 
     /// Creates a Tableau from the images of its canonical X and Z generators.
@@ -48,76 +68,105 @@ impl Tableau {
     /// [`PauliString`] makes Hermiticity explicit by construction: each generator has a real
     /// positive or negative sign. This constructor additionally checks the generator counts and
     /// widths, then requires the complete canonical symplectic commutation relation. That relation
-    /// proves the output map is invertible, so a second rank calculation would be redundant.
+    /// proves the output map is invertible, so a second rank calculation would be redundant. The
+    /// packed rows are the same size as the supplied generators, so they are reserved fallibly
+    /// without a separate budget.
     pub fn from_conjugated_generators(
         xs: Vec<PauliString>,
         zs: Vec<PauliString>,
     ) -> StabilizerResult<Self> {
-        let result = Self { xs, zs };
-        result.validate_shape()?;
+        let result = Self::from_generators_unvalidated(&xs, &zs)?;
         if let Some(error) = result.first_symplectic_error()? {
             return Err(error);
         }
         Ok(result)
     }
 
-    /// Samples a uniformly random Clifford tableau using the caller-owned RNG.
+    /// Packs generator images after checking only their counts and widths.
+    pub(crate) fn from_generators_unvalidated(
+        xs: &[PauliString],
+        zs: &[PauliString],
+    ) -> StabilizerResult<Self> {
+        if xs.len() != zs.len() {
+            return Err(StabilizerError::TableauGeneratorCountMismatch {
+                x_generators: xs.len(),
+                z_generators: zs.len(),
+            });
+        }
+        let expected = xs.len();
+        for (basis, generators) in [(PauliBasis::X, xs), (PauliBasis::Z, zs)] {
+            for (index, generator) in generators.iter().enumerate() {
+                if generator.len() != expected {
+                    return Err(StabilizerError::TableauGeneratorWidthMismatch {
+                        basis,
+                        index,
+                        width: generator.len(),
+                        expected,
+                    });
+                }
+            }
+        }
+        let mut result = Self::zeroed(expected)?;
+        for (index, (x, z)) in xs.iter().zip(zs).enumerate() {
+            result.rows.set_from_pauli(index, x)?;
+            result.rows.set_from_pauli(expected + index, z)?;
+        }
+        Ok(result)
+    }
+
+    /// Samples a uniformly random Clifford tableau admitted against
+    /// [`AlgebraMemoryBudget::DEFAULT`].
     ///
-    /// Every Clifford operation, including its Pauli signs, is equally likely, as in Stim's
-    /// `Tableau::random`; the Bravyi–Maslov construction is ported from Stim. Passing a seeded
-    /// `rand` RNG gives deterministic Stab output, but the stream differs from Stim's C++ RNG.
-    /// The qubit count is bounded by [`crate::StabilizerResource::RandomTableauQubits`].
+    /// See [`Self::random_with_budget`].
     pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        super::StabilizerResource::RandomTableauQubits.ensure(num_qubits)?;
-        let rows = random::random_symplectic(num_qubits, rng);
-        let output = |row: u128, sign: bool| {
-            let bases = (0..num_qubits).map(|qubit| {
-                PauliBasis::from_xz(
-                    (row >> qubit) & 1 == 1,
-                    (row >> (num_qubits + qubit)) & 1 == 1,
-                )
-            });
-            PauliString::from_bases_unchecked(sign_from_bit(sign), bases)
-        };
-        let (x_rows, z_rows) = rows.split_at(num_qubits);
-        let xs = x_rows
-            .iter()
-            .map(|&row| output(row, rng.random_bool(0.5)))
-            .collect();
-        let zs = z_rows
-            .iter()
-            .map(|&row| output(row, rng.random_bool(0.5)))
-            .collect();
-        Self::from_conjugated_generators(xs, zs)
+        Self::random_with_budget(num_qubits, AlgebraMemoryBudget::DEFAULT, rng)
     }
 
-    pub(crate) fn from_output_columns_unchecked(
-        xs: Vec<PauliString>,
-        zs: Vec<PauliString>,
-    ) -> Self {
-        Self { xs, zs }
+    /// Samples a uniformly random Clifford tableau using the caller-owned RNG.
+    ///
+    /// Every Clifford operation, including its Pauli signs, is equally likely, as in Stim's
+    /// `Tableau::random`: the symplectic part is Bravyi and Maslov's uniform sampler and every
+    /// generator sign is an independent fair bit. Passing a seeded `rand` RNG gives deterministic
+    /// Stab output, but the stream differs from Stim's C++ RNG. The output and the sampling
+    /// matrices are admitted against `budget` before any randomness is consumed. Sampling costs
+    /// `O(n^3 / 64)` word operations.
+    pub fn random_with_budget<R>(
+        num_qubits: usize,
+        budget: AlgebraMemoryBudget,
+        rng: &mut R,
+    ) -> StabilizerResult<Self>
+    where
+        R: Rng + ?Sized,
+    {
+        budget.admit(
+            StabilizerResource::RandomTableau,
+            random::random_tableau_bytes(num_qubits),
+        )?;
+        random::random_tableau(num_qubits, rng)
     }
 
-    pub(crate) fn with_output_sign_mask(&self, mask: u128) -> Self {
-        let len = self.len();
-        let xs = self
-            .xs
-            .iter()
-            .enumerate()
-            .map(|(index, output)| output.with_sign(sign_from_bit(((mask >> index) & 1) != 0)))
-            .collect();
-        let zs = self
-            .zs
-            .iter()
-            .enumerate()
-            .map(|(index, output)| {
-                output.with_sign(sign_from_bit(((mask >> (len + index)) & 1) != 0))
-            })
-            .collect();
-        Self { xs, zs }
+    /// Builds a one-qubit Tableau from small fixed generator images.
+    pub(crate) fn from_small_generators(
+        xs: &[PauliString],
+        zs: &[PauliString],
+    ) -> StabilizerResult<Self> {
+        Self::from_generators_unvalidated(xs, zs)
+    }
+
+    pub(crate) fn with_output_sign_mask(&self, mask: u128) -> StabilizerResult<Self> {
+        let mut result = self.clone();
+        for row in 0..result.rows.row_count() {
+            let bit = u32::try_from(row)
+                .ok()
+                .and_then(|shift| mask.checked_shr(shift));
+            result
+                .rows
+                .set_sign(row, bit.is_some_and(|bits| bits & 1 != 0))?;
+        }
+        Ok(result)
     }
 
     pub fn gate1(x_output: &str, z_output: &str) -> StabilizerResult<Self> {
@@ -144,60 +193,91 @@ impl Tableau {
         Self::from_conjugated_generators(vec![x1, x2], vec![z1, z2])
     }
 
+    /// Returns the Tableau of conjugation by `pauli`, admitted against
+    /// [`AlgebraMemoryBudget::DEFAULT`] because its size is quadratic in the string's width.
     pub fn from_pauli_string(pauli: &PauliString) -> StabilizerResult<Self> {
-        super::StabilizerResource::TableauQubits.ensure(pauli.len())?;
-        let mut result = Self::identity_unchecked(pauli.len());
-        for index in 0..pauli.len() {
-            let basis = pauli
-                .get(index)
-                .ok_or(StabilizerError::TableauIndexOutOfRange {
-                    index,
-                    len: pauli.len(),
-                })?;
-            let x_sign = sign_from_bit(basis.z_bit());
-            let z_sign = sign_from_bit(basis.x_bit());
-            let x_basis = single_basis_row(pauli.len(), index, PauliBasis::X);
-            let z_basis = single_basis_row(pauli.len(), index, PauliBasis::Z);
-            let x_output = PauliString::from_bases_unchecked(x_sign, x_basis);
-            let z_output = PauliString::from_bases_unchecked(z_sign, z_basis);
-            result.set_outputs(index, x_output, z_output)?;
+        let num_qubits = pauli.len();
+        AlgebraMemoryBudget::DEFAULT
+            .admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+        let mut result = Self::identity_unadmitted(num_qubits)?;
+        for (index, basis) in pauli.active_terms() {
+            if basis.z_bit() {
+                result.rows.flip_sign(index)?;
+            }
+            if basis.x_bit() {
+                result.rows.flip_sign(num_qubits + index)?;
+            }
         }
         Ok(result)
     }
 
     pub fn len(&self) -> usize {
-        self.xs.len()
+        self.rows.num_qubits()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.xs.is_empty()
+        self.len() == 0
     }
 
-    pub fn x_output(&self, index: usize) -> StabilizerResult<&PauliString> {
-        self.xs
-            .get(index)
-            .ok_or(StabilizerError::TableauIndexOutOfRange {
-                index,
-                len: self.len(),
+    /// Reports whether this Tableau is the identity operation, signs included.
+    pub fn is_identity(&self) -> bool {
+        let num_qubits = self.len();
+        if self.rows.sign_words().iter().any(|word| *word != 0) {
+            return false;
+        }
+        (0..2 * num_qubits).all(|row| {
+            let qubit = row % num_qubits.max(1);
+            let x_half = row < num_qubits;
+            self.rows.row(row).is_ok_and(|words| {
+                let (xs, zs) = words.split_at(self.rows.half_words());
+                let (diagonal, other) = if x_half { (xs, zs) } else { (zs, xs) };
+                other.iter().all(|word| *word == 0)
+                    && diagonal.iter().enumerate().all(|(index, word)| {
+                        let expected = if index == qubit / 64 {
+                            1_u64 << (qubit % 64)
+                        } else {
+                            0
+                        };
+                        *word == expected
+                    })
             })
+        })
     }
 
-    pub fn z_output(&self, index: usize) -> StabilizerResult<&PauliString> {
-        self.zs
-            .get(index)
-            .ok_or(StabilizerError::TableauIndexOutOfRange {
-                index,
-                len: self.len(),
-            })
+    /// Returns the signed image of `X_index`.
+    pub fn x_output(&self, index: usize) -> StabilizerResult<PauliString> {
+        self.rows.to_pauli(self.x_row(index)?)
+    }
+
+    /// Returns the signed image of `Z_index`.
+    pub fn z_output(&self, index: usize) -> StabilizerResult<PauliString> {
+        self.rows.to_pauli(self.z_row(index)?)
     }
 
     pub fn y_output(&self, index: usize) -> StabilizerResult<PauliString> {
         self.x_output(index)?
-            .multiply(self.z_output(index)?)?
+            .multiply(&self.z_output(index)?)?
             .multiply_phase(PauliPhase::PlusI)?
             .try_into_real()
     }
 
+    fn x_row(&self, index: usize) -> StabilizerResult<usize> {
+        if index < self.len() {
+            Ok(index)
+        } else {
+            Err(StabilizerError::TableauIndexOutOfRange {
+                index,
+                len: self.len(),
+            })
+        }
+    }
+
+    fn z_row(&self, index: usize) -> StabilizerResult<usize> {
+        Ok(self.len() + self.x_row(index)?)
+    }
+
+    /// Conjugates `input` by this Tableau in `O(w n / 64)` word operations for an input of weight
+    /// `w`.
     pub fn apply(&self, input: &PauliString) -> StabilizerResult<PauliString> {
         if input.len() != self.len() {
             return Err(StabilizerError::LengthMismatch {
@@ -205,26 +285,21 @@ impl Tableau {
                 right: self.len(),
             });
         }
-        let identity = vec![PauliBasis::I; self.len()];
-        let mut result = FlexPauliString::from_phase_and_bases(input.phase(), identity)?;
-        for index in 0..input.len() {
-            let basis = input
-                .get(index)
-                .ok_or(StabilizerError::TableauIndexOutOfRange {
-                    index,
-                    len: input.len(),
-                })?;
-            let factor = match basis {
-                PauliBasis::I => continue,
-                PauliBasis::X => flex_from_pauli(self.x_output(index)?)?,
-                PauliBasis::Y => flex_from_pauli(&self.y_output(index)?)?,
-                PauliBasis::Z => flex_from_pauli(self.z_output(index)?)?,
-            };
-            result = result.multiply(&factor)?;
-        }
-        result.try_into_real()
+        let mut output = PauliRows::try_zeroed(1, self.len(), StabilizerResource::PauliString)?;
+        let negative = action::apply_words(
+            &self.rows,
+            None,
+            input.x_bits(),
+            input.z_bits(),
+            input.sign().is_negative(),
+            output.row_mut(0)?,
+        )?;
+        output.set_sign(0, negative)?;
+        output.to_pauli(0)
     }
 
+    /// Returns the operation that applies `self` and then `second`, in `O(n^3 / 64)` word
+    /// operations.
     pub fn then(&self, second: &Self) -> StabilizerResult<Self> {
         if self.len() != second.len() {
             return Err(StabilizerError::LengthMismatch {
@@ -232,170 +307,156 @@ impl Tableau {
                 right: second.len(),
             });
         }
-        let mut xs = Vec::with_capacity(self.len());
-        let mut zs = Vec::with_capacity(self.len());
-        for index in 0..self.len() {
-            xs.push(second.apply(self.x_output(index)?)?);
-            zs.push(second.apply(self.z_output(index)?)?);
-        }
-        Ok(Self { xs, zs })
+        let mut result = Self::zeroed(self.len())?;
+        action::apply_rows(&second.rows, &self.rows, &mut result.rows)?;
+        Ok(result)
     }
 
     /// Appends a local Clifford action to the selected output qubits in place.
     ///
-    /// This is semantically equivalent to composing with `gate.embedded(self.len(), targets)`,
-    /// while one- and two-qubit gates update the existing symplectic rows without constructing a
-    /// full-width temporary Tableau.
+    /// This is semantically equivalent to composing with `gate.embedded(self.len(), targets)`.
+    /// One- and two-qubit gates rewrite the target bits of every row from a precomputed local
+    /// image table without allocating; wider gates conjugate each row's gathered local Pauli.
     pub fn append(&mut self, gate: &Self, targets: &[usize]) -> StabilizerResult<()> {
-        self.validate_shape()?;
-        gate.validate_shape()?;
         validate_tableau_targets(gate.len(), self.len(), targets)?;
-
-        if gate.len() > 2 {
-            let expanded = gate.embedded(self.len(), targets)?;
-            *self = self.then(&expanded)?;
-            return Ok(());
-        }
-
-        let images = local_pauli_images(gate)?;
-        for output in self.xs.iter_mut().chain(&mut self.zs) {
-            let code =
-                targets
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .fold(0_usize, |code, (local_index, target)| {
-                        let basis = output.get(target).unwrap_or(PauliBasis::I);
-                        code | (usize::from(pauli_xyz(basis)) << (2 * local_index))
-                    });
-            let image = images
-                .get(code)
-                .ok_or(StabilizerError::TableauIndexOutOfRange {
-                    index: code,
-                    len: images.len(),
-                })?;
-            if image.phase.sign().is_negative() {
-                output.flip_sign_in_place();
-            }
-            let bases =
-                image
-                    .bases
-                    .get(..gate.len())
-                    .ok_or(StabilizerError::TableauIndexOutOfRange {
-                        index: gate.len(),
-                        len: image.bases.len(),
-                    })?;
-            output.replace_bases_preserving_terms(targets, bases);
-        }
-        Ok(())
+        local::append(&mut self.rows, gate, targets)
     }
 
-    /// Raises this Tableau to a signed integer power by repeated squaring.
+    /// Raises this Tableau to a signed integer power by repeated squaring, in `O(log |exponent|)`
+    /// compositions.
     pub fn pow(&self, exponent: i64) -> StabilizerResult<Self> {
-        self.validate_shape()?;
         let mut power = exponent.unsigned_abs();
         let mut base = if exponent < 0 {
             self.inverse()?
         } else {
             self.clone()
         };
-        let mut result = Self::identity_unchecked(self.len());
+        let mut result: Option<Self> = None;
         while power != 0 {
             if power & 1 != 0 {
-                result = result.then(&base)?;
+                result = Some(match result {
+                    None => base.clone(),
+                    Some(accumulated) => accumulated.then(&base)?,
+                });
             }
             power >>= 1;
             if power != 0 {
+                if base.is_identity() {
+                    break;
+                }
                 base = base.then(&base)?;
+            }
+        }
+        match result {
+            Some(result) => Ok(result),
+            None => Self::identity_unadmitted(self.len()),
+        }
+    }
+
+    /// Returns the tensor-product action of `self` and `other` on disjoint qubits.
+    ///
+    /// The result is at most twice the operands' combined size, so it is reserved fallibly
+    /// without a separate budget.
+    pub fn direct_sum(&self, other: &Self) -> StabilizerResult<Self> {
+        let left = self.len();
+        let num_qubits =
+            left.checked_add(other.len())
+                .ok_or(StabilizerError::ResourceSizeOverflow {
+                    resource: StabilizerResource::Tableau,
+                    item_count: left,
+                    repetitions: 2,
+                })?;
+        let mut result = Self::zeroed(num_qubits)?;
+        for (source, offset) in [(self, 0), (other, left)] {
+            let width = source.len();
+            for index in 0..width {
+                for (source_row, target_row) in [
+                    (index, offset + index),
+                    (width + index, num_qubits + offset + index),
+                ] {
+                    copy_shifted_row(
+                        &source.rows,
+                        source_row,
+                        &mut result.rows,
+                        target_row,
+                        offset,
+                    )?;
+                }
             }
         }
         Ok(result)
     }
 
-    /// Returns the tensor-product action of `self` and `other` on disjoint qubits.
-    pub fn direct_sum(&self, other: &Self) -> StabilizerResult<Self> {
-        self.validate_shape()?;
-        other.validate_shape()?;
-        let num_qubits = self.len().saturating_add(other.len());
-        super::StabilizerResource::TableauQubits.ensure(num_qubits)?;
-        let left_targets = (0..self.len()).collect::<Vec<_>>();
-        let right_targets = (self.len()..num_qubits).collect::<Vec<_>>();
-        let mut xs = Vec::with_capacity(num_qubits);
-        let mut zs = Vec::with_capacity(num_qubits);
-        for index in 0..self.len() {
-            xs.push(expand_pauli(
-                self.x_output(index)?,
-                &left_targets,
-                num_qubits,
-            )?);
-            zs.push(expand_pauli(
-                self.z_output(index)?,
-                &left_targets,
-                num_qubits,
-            )?);
-        }
-        for index in 0..other.len() {
-            xs.push(expand_pauli(
-                other.x_output(index)?,
-                &right_targets,
-                num_qubits,
-            )?);
-            zs.push(expand_pauli(
-                other.z_output(index)?,
-                &right_targets,
-                num_qubits,
-            )?);
-        }
-        Ok(Self::from_output_columns_unchecked(xs, zs))
-    }
-
     /// Embeds this Tableau into `num_qubits`, acting on `targets` in the supplied order.
+    ///
+    /// The result is admitted against [`AlgebraMemoryBudget::DEFAULT`] because `num_qubits` is
+    /// independent of this Tableau's size.
     pub fn embedded(&self, num_qubits: usize, targets: &[usize]) -> StabilizerResult<Self> {
-        self.validate_shape()?;
-        super::StabilizerResource::TableauQubits.ensure(num_qubits)?;
         validate_tableau_targets(self.len(), num_qubits, targets)?;
-        let mut result = Self::identity_unchecked(num_qubits);
+        AlgebraMemoryBudget::DEFAULT
+            .admit(StabilizerResource::Tableau, tableau_bytes(num_qubits))?;
+        let mut result = Self::identity_unadmitted(num_qubits)?;
+        let width = self.len();
         for (local_index, global_index) in targets.iter().copied().enumerate() {
-            result.set_outputs(
-                global_index,
-                expand_pauli(self.x_output(local_index)?, targets, num_qubits)?,
-                expand_pauli(self.z_output(local_index)?, targets, num_qubits)?,
-            )?;
+            for (source_row, target_row) in [
+                (local_index, global_index),
+                (width + local_index, num_qubits + global_index),
+            ] {
+                result
+                    .rows
+                    .set_bits(target_row, global_index, false, false)?;
+                for (local_qubit, target) in targets.iter().copied().enumerate() {
+                    let (x, z) = self.rows.bits(source_row, local_qubit)?;
+                    result.rows.set_bits(target_row, target, x, z)?;
+                }
+                result
+                    .rows
+                    .set_sign(target_row, self.rows.sign(source_row)?)?;
+            }
         }
         Ok(result)
     }
 
+    /// Returns the inverse operation, signs included, in `O(n^3 / 64)` word operations.
     pub fn inverse(&self) -> StabilizerResult<Self> {
         self.inverse_with_signs(true)
     }
 
+    /// Returns the inverse's unsigned generator images by transposition in `O(n^2 / 64)` word
+    /// operations, with every sign positive.
     pub fn inverse_skipping_signs(&self) -> StabilizerResult<Self> {
         self.inverse_with_signs(false)
     }
 
+    fn inverse_with_signs(&self, include_signs: bool) -> StabilizerResult<Self> {
+        let mut result = Self::zeroed(self.len())?;
+        action::transpose_inverse_into(&self.rows, &mut result.rows)?;
+        if include_signs {
+            action::fix_inverse_signs(&self.rows, &mut result.rows)?;
+        }
+        Ok(result)
+    }
+
     /// Returns the unique row-reduced generators stabilizing this Tableau's output state.
     pub fn canonical_stabilizers(&self) -> StabilizerResult<Vec<PauliString>> {
-        self.validate_shape()?;
-        let stabilizers = self.zs.clone();
+        let stabilizers = (0..self.len())
+            .map(|index| self.z_output(index))
+            .collect::<StabilizerResult<Vec<_>>>()?;
         crate::conversions::canonicalize_stabilizers(&stabilizers)
     }
 
     pub fn to_pauli_string(&self) -> StabilizerResult<PauliString> {
-        if !self.is_pauli_product() {
+        if !self.is_pauli_product()? {
             return Err(StabilizerError::NotPauliProduct);
         }
-        let bases = (0..self.len()).map(|index| {
-            let x = self
-                .z_output(index)
-                .map(|output| output.sign().is_negative())
-                .unwrap_or(false);
-            let z = self
-                .x_output(index)
-                .map(|output| output.sign().is_negative())
-                .unwrap_or(false);
-            PauliBasis::from_xz(x, z)
-        });
-        Ok(PauliString::from_bases_unchecked(PauliSign::Plus, bases))
+        let num_qubits = self.len();
+        let mut result = PauliRows::try_zeroed(1, num_qubits, StabilizerResource::PauliString)?;
+        for qubit in 0..num_qubits {
+            let x = self.rows.sign(num_qubits + qubit)?;
+            let z = self.rows.sign(qubit)?;
+            result.set_bits(0, qubit, x, z)?;
+        }
+        result.to_pauli(0)
     }
 
     pub fn x_output_pauli_xyz(
@@ -403,7 +464,7 @@ impl Tableau {
         input_index: usize,
         output_index: usize,
     ) -> StabilizerResult<u8> {
-        self.output_pauli_xyz(self.x_output(input_index)?, output_index)
+        self.output_pauli_xyz(self.x_row(input_index)?, output_index)
     }
 
     pub fn y_output_pauli_xyz(
@@ -411,8 +472,9 @@ impl Tableau {
         input_index: usize,
         output_index: usize,
     ) -> StabilizerResult<u8> {
-        let y_output = self.y_output(input_index)?;
-        self.output_pauli_xyz(&y_output, output_index)
+        let x = self.output_bits(self.x_row(input_index)?, output_index)?;
+        let z = self.output_bits(self.z_row(input_index)?, output_index)?;
+        Ok(pauli_xyz(PauliBasis::from_xz(x.0 ^ z.0, x.1 ^ z.1)))
     }
 
     pub fn z_output_pauli_xyz(
@@ -420,73 +482,35 @@ impl Tableau {
         input_index: usize,
         output_index: usize,
     ) -> StabilizerResult<u8> {
-        self.output_pauli_xyz(self.z_output(input_index)?, output_index)
+        self.output_pauli_xyz(self.z_row(input_index)?, output_index)
     }
 
+    /// Checks the canonical symplectic commutation relations in `O(n^3 / 64)` word operations.
     pub fn satisfies_invariants(&self) -> StabilizerResult<bool> {
-        self.validate_shape()?;
         Ok(self.first_symplectic_error()?.is_none())
     }
 
-    fn validate_shape(&self) -> StabilizerResult<()> {
-        if self.xs.len() != self.zs.len() {
-            return Err(StabilizerError::TableauGeneratorCountMismatch {
-                x_generators: self.xs.len(),
-                z_generators: self.zs.len(),
-            });
-        }
-        let expected = self.len();
-        super::StabilizerResource::TableauQubits.ensure(expected)?;
-        for (basis, generators) in [(PauliBasis::X, &self.xs), (PauliBasis::Z, &self.zs)] {
-            for (index, generator) in generators.iter().enumerate() {
-                if generator.len() != expected {
-                    return Err(StabilizerError::TableauGeneratorWidthMismatch {
-                        basis,
-                        index,
-                        width: generator.len(),
-                        expected,
-                    });
-                }
-            }
-        }
-        Ok(())
-    }
-
     fn first_symplectic_error(&self) -> StabilizerResult<Option<StabilizerError>> {
-        for left in 0..self.len() {
-            if self.x_output(left)?.commutes(self.z_output(left)?)? {
+        let num_qubits = self.len();
+        let half_words = self.rows.half_words();
+        for left in 0..num_qubits {
+            let left_x = self.rows.row(left)?;
+            let left_z = self.rows.row(num_qubits + left)?;
+            if !rows::rows_anticommute(left_x, left_z, half_words) {
                 return Ok(Some(StabilizerError::ConjugatedGeneratorPairCommutes {
                     index: left,
                 }));
             }
-            for right in left + 1..self.len() {
-                for (left_basis, left_output, right_basis, right_output) in [
-                    (
-                        PauliBasis::X,
-                        self.x_output(left)?,
-                        PauliBasis::X,
-                        self.x_output(right)?,
-                    ),
-                    (
-                        PauliBasis::X,
-                        self.x_output(left)?,
-                        PauliBasis::Z,
-                        self.z_output(right)?,
-                    ),
-                    (
-                        PauliBasis::Z,
-                        self.z_output(left)?,
-                        PauliBasis::X,
-                        self.x_output(right)?,
-                    ),
-                    (
-                        PauliBasis::Z,
-                        self.z_output(left)?,
-                        PauliBasis::Z,
-                        self.z_output(right)?,
-                    ),
+            for right in left + 1..num_qubits {
+                let right_x = self.rows.row(right)?;
+                let right_z = self.rows.row(num_qubits + right)?;
+                for (left_basis, left_row, right_basis, right_row) in [
+                    (PauliBasis::X, left_x, PauliBasis::X, right_x),
+                    (PauliBasis::X, left_x, PauliBasis::Z, right_z),
+                    (PauliBasis::Z, left_z, PauliBasis::X, right_x),
+                    (PauliBasis::Z, left_z, PauliBasis::Z, right_z),
                 ] {
-                    if !left_output.commutes(right_output)? {
+                    if rows::rows_anticommute(left_row, right_row, half_words) {
                         return Ok(Some(StabilizerError::ConjugatedGeneratorsAnticommute {
                             left_basis,
                             left_index: left,
@@ -500,100 +524,63 @@ impl Tableau {
         Ok(None)
     }
 
-    fn inverse_with_signs(&self, include_signs: bool) -> StabilizerResult<Self> {
-        let mut xs = Vec::with_capacity(self.len());
-        let mut zs = Vec::with_capacity(self.len());
-        for index in 0..self.len() {
-            let target_x = single_pauli(self.len(), index, PauliBasis::X, PauliSign::Plus);
-            let target_z = single_pauli(self.len(), index, PauliBasis::Z, PauliSign::Plus);
-            xs.push(self.preimage(&target_x, include_signs)?);
-            zs.push(self.preimage(&target_z, include_signs)?);
+    fn is_pauli_product(&self) -> StabilizerResult<bool> {
+        let num_qubits = self.len();
+        for qubit in 0..num_qubits {
+            for (row, expected) in [(qubit, (true, false)), (num_qubits + qubit, (false, true))] {
+                let words = self.rows.row(row)?;
+                let weight = words.iter().map(|word| word.count_ones()).sum::<u32>();
+                if weight != 1 || self.rows.bits(row, qubit)? != expected {
+                    return Ok(false);
+                }
+            }
         }
-        Ok(Self { xs, zs })
+        Ok(true)
     }
 
-    fn preimage(&self, target: &PauliString, include_sign: bool) -> StabilizerResult<PauliString> {
-        ensure_pauli_len(target, self.len())?;
-        let mut bases = Vec::with_capacity(self.len());
-        for index in 0..self.len() {
-            let has_x = !target.commutes(self.z_output(index)?)?;
-            let has_z = !target.commutes(self.x_output(index)?)?;
-            bases.push(PauliBasis::from_xz(has_x, has_z));
-        }
-        let unsigned = PauliString::from_bases_unchecked(PauliSign::Plus, bases.clone());
-        if !include_sign || self.apply(&unsigned)? == *target {
-            return Ok(unsigned);
-        }
-        let signed = PauliString::from_bases_unchecked(PauliSign::Minus, bases);
-        if self.apply(&signed)? == *target {
-            Ok(signed)
-        } else {
-            Err(StabilizerError::InvalidTableauInverse)
-        }
-    }
-
-    fn set_outputs(
-        &mut self,
-        index: usize,
-        x_output: PauliString,
-        z_output: PauliString,
-    ) -> StabilizerResult<()> {
-        ensure_pauli_len(&x_output, self.len())?;
-        ensure_pauli_len(&z_output, self.len())?;
-        let len = self.len();
-        let x_target = self
-            .xs
-            .get_mut(index)
-            .ok_or(StabilizerError::TableauIndexOutOfRange { index, len })?;
-        *x_target = x_output;
-        let z_target = self
-            .zs
-            .get_mut(index)
-            .ok_or(StabilizerError::TableauIndexOutOfRange { index, len })?;
-        *z_target = z_output;
-        Ok(())
-    }
-
-    fn is_pauli_product(&self) -> bool {
-        (0..self.len()).all(|index| {
-            self.x_output(index)
-                .is_ok_and(|output| row_matches_single_pauli(output, index, PauliBasis::X))
-                && self
-                    .z_output(index)
-                    .is_ok_and(|output| row_matches_single_pauli(output, index, PauliBasis::Z))
-        })
-    }
-
-    fn output_pauli_xyz(&self, output: &PauliString, index: usize) -> StabilizerResult<u8> {
-        let basis = output
-            .get(index)
-            .ok_or(StabilizerError::TableauIndexOutOfRange {
-                index,
+    fn output_bits(&self, row: usize, output_index: usize) -> StabilizerResult<(bool, bool)> {
+        if output_index >= self.len() {
+            return Err(StabilizerError::TableauIndexOutOfRange {
+                index: output_index,
                 len: self.len(),
-            })?;
-        Ok(pauli_xyz(basis))
+            });
+        }
+        self.rows.bits(row, output_index)
+    }
+
+    fn output_pauli_xyz(&self, row: usize, output_index: usize) -> StabilizerResult<u8> {
+        let (x, z) = self.output_bits(row, output_index)?;
+        Ok(pauli_xyz(PauliBasis::from_xz(x, z)))
     }
 }
 
 impl Display for Tableau {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let num_qubits = self.len();
         f.write_str("+-")?;
-        for _ in 0..self.len() {
+        for _ in 0..num_qubits {
             f.write_str("xz-")?;
         }
         f.write_str("\n|")?;
-        for index in 0..self.len() {
-            let x = self.xs.get(index).ok_or(std::fmt::Error)?;
-            let z = self.zs.get(index).ok_or(std::fmt::Error)?;
-            write!(f, " {}{}", x.sign(), z.sign())?;
+        for index in 0..num_qubits {
+            let x = self.rows.sign(index).map_err(|_| std::fmt::Error)?;
+            let z = self
+                .rows
+                .sign(num_qubits + index)
+                .map_err(|_| std::fmt::Error)?;
+            write!(f, " {}{}", sign_from_bit(x), sign_from_bit(z))?;
         }
-        for output_index in 0..self.len() {
+        for output_index in 0..num_qubits {
             f.write_str("\n|")?;
-            for input_index in 0..self.len() {
-                let x = self.xs.get(input_index).ok_or(std::fmt::Error)?;
-                let z = self.zs.get(input_index).ok_or(std::fmt::Error)?;
-                let x_basis = x.get(output_index).unwrap_or(PauliBasis::I);
-                let z_basis = z.get(output_index).unwrap_or(PauliBasis::I);
+            for input_index in 0..num_qubits {
+                let basis = |row| {
+                    self.rows
+                        .bits(row, output_index)
+                        .map(|(x, z)| PauliBasis::from_xz(x, z))
+                        .map_err(|_| std::fmt::Error)
+                };
+                let x_basis = basis(input_index)?;
+                let z_basis = basis(num_qubits + input_index)?;
                 write!(f, " {x_basis}{z_basis}")?;
             }
         }
@@ -612,127 +599,39 @@ fn ensure_pauli_len(pauli: &PauliString, expected: usize) -> StabilizerResult<()
     }
 }
 
-fn single_pauli(len: usize, index: usize, basis: PauliBasis, sign: PauliSign) -> PauliString {
-    let bases = single_basis_row(len, index, basis);
-    PauliString::from_bases_unchecked(sign, bases)
+/// Copies `source_row` into `target_row`, shifting its qubits up by `offset`.
+fn copy_shifted_row(
+    source: &PauliRows,
+    source_row: usize,
+    target: &mut PauliRows,
+    target_row: usize,
+    offset: usize,
+) -> StabilizerResult<()> {
+    let source_half = source.half_words();
+    let target_half = target.half_words();
+    let words = source.row(source_row)?;
+    let (source_x, source_z) = words.split_at(source_half);
+    let target_words = target.row_mut(target_row)?;
+    let (target_x, target_z) = target_words.split_at_mut(target_half);
+    or_shifted(target_x, source_x, offset);
+    or_shifted(target_z, source_z, offset);
+    let sign = source.sign(source_row)?;
+    target.set_sign(target_row, sign)
 }
 
-fn single_basis_row(len: usize, index: usize, basis: PauliBasis) -> Vec<PauliBasis> {
-    (0..len)
-        .map(|candidate| {
-            if candidate == index {
-                basis
-            } else {
-                PauliBasis::I
-            }
-        })
-        .collect()
-}
-
-fn expand_pauli(
-    local: &PauliString,
-    targets: &[usize],
-    num_qubits: usize,
-) -> StabilizerResult<PauliString> {
-    let mut bases = vec![PauliBasis::I; num_qubits];
-    for (local_index, global_index) in targets.iter().copied().enumerate() {
-        let basis = local
-            .get(local_index)
-            .ok_or(StabilizerError::TableauIndexOutOfRange {
-                index: local_index,
-                len: local.len(),
-            })?;
-        let target =
-            bases
-                .get_mut(global_index)
-                .ok_or(StabilizerError::TableauIndexOutOfRange {
-                    index: global_index,
-                    len: num_qubits,
-                })?;
-        *target = basis;
-    }
-    Ok(PauliString::from_bases_unchecked(local.sign(), bases))
-}
-
-#[derive(Clone, Copy)]
-struct LocalPauliImage {
-    phase: PauliPhase,
-    bases: [PauliBasis; 2],
-}
-
-impl LocalPauliImage {
-    const IDENTITY: Self = Self {
-        phase: PauliPhase::Plus,
-        bases: [PauliBasis::I; 2],
-    };
-}
-
-fn local_pauli_images(gate: &Tableau) -> StabilizerResult<[LocalPauliImage; 16]> {
-    debug_assert!(gate.len() <= 2);
-    let image_count = 1_usize << (2 * gate.len());
-    let mut images = [LocalPauliImage::IDENTITY; 16];
-    for (code, image) in images.iter_mut().enumerate().take(image_count) {
-        for index in 0..gate.len() {
-            let basis = basis_from_xyz((code >> (2 * index)) & 3);
-            let factor = local_generator_image(gate, index, basis)?;
-            multiply_local_images(image, factor);
+/// ORs `source` into `target` shifted up by `offset` bits, dropping bits past `target`.
+fn or_shifted(target: &mut [u64], source: &[u64], offset: usize) {
+    let word_offset = offset / 64;
+    let bit_offset = offset % 64;
+    for (index, word) in source.iter().copied().enumerate() {
+        if let Some(slot) = target.get_mut(word_offset + index) {
+            *slot |= word << bit_offset;
         }
-        if image.phase.is_imaginary() {
-            return Err(StabilizerError::ImaginaryProduct { phase: image.phase });
+        if bit_offset != 0
+            && let Some(slot) = target.get_mut(word_offset + index + 1)
+        {
+            *slot |= word >> (64 - bit_offset);
         }
-    }
-    Ok(images)
-}
-
-fn local_generator_image(
-    gate: &Tableau,
-    index: usize,
-    basis: PauliBasis,
-) -> StabilizerResult<LocalPauliImage> {
-    match basis {
-        PauliBasis::I => Ok(LocalPauliImage::IDENTITY),
-        PauliBasis::X => local_image_from_pauli(gate.x_output(index)?),
-        PauliBasis::Z => local_image_from_pauli(gate.z_output(index)?),
-        PauliBasis::Y => {
-            let mut image = local_image_from_pauli(gate.x_output(index)?)?;
-            multiply_local_images(&mut image, local_image_from_pauli(gate.z_output(index)?)?);
-            image.phase = image.phase.multiply(PauliPhase::PlusI);
-            Ok(image)
-        }
-    }
-}
-
-fn local_image_from_pauli(pauli: &PauliString) -> StabilizerResult<LocalPauliImage> {
-    let mut image = LocalPauliImage {
-        phase: pauli.phase(),
-        ..LocalPauliImage::IDENTITY
-    };
-    for (index, basis) in image.bases.iter_mut().enumerate().take(pauli.len()) {
-        *basis = pauli
-            .get(index)
-            .ok_or(StabilizerError::TableauIndexOutOfRange {
-                index,
-                len: pauli.len(),
-            })?;
-    }
-    Ok(image)
-}
-
-fn multiply_local_images(left: &mut LocalPauliImage, right: LocalPauliImage) {
-    left.phase = left.phase.multiply(right.phase);
-    for (left_basis, right_basis) in left.bases.iter_mut().zip(right.bases) {
-        let (basis, phase) = left_basis.multiply(right_basis);
-        *left_basis = basis;
-        left.phase = left.phase.multiply(phase);
-    }
-}
-
-fn basis_from_xyz(code: usize) -> PauliBasis {
-    match code {
-        0 => PauliBasis::I,
-        1 => PauliBasis::X,
-        2 => PauliBasis::Y,
-        _ => PauliBasis::Z,
     }
 }
 
@@ -765,23 +664,7 @@ fn validate_tableau_targets(
     Ok(())
 }
 
-fn flex_from_pauli(pauli: &PauliString) -> StabilizerResult<FlexPauliString> {
-    let bases = (0..pauli.len()).map(|index| pauli.get(index).unwrap_or(PauliBasis::I));
-    FlexPauliString::from_phase_and_bases(pauli.phase(), bases)
-}
-
-fn row_matches_single_pauli(row: &PauliString, index: usize, basis: PauliBasis) -> bool {
-    (0..row.len()).all(|candidate| {
-        row.get(candidate).unwrap_or(PauliBasis::I)
-            == if candidate == index {
-                basis
-            } else {
-                PauliBasis::I
-            }
-    })
-}
-
-fn pauli_xyz(basis: PauliBasis) -> u8 {
+pub(crate) fn pauli_xyz(basis: PauliBasis) -> u8 {
     match basis {
         PauliBasis::I => 0,
         PauliBasis::X => 1,

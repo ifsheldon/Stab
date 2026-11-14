@@ -521,7 +521,7 @@ fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> Analysi
             .tableau(),
     );
     let mut queue = VecDeque::from([(
-        stab_algebra::advanced::tableau_identity_unchecked(1),
+        stab_algebra::Tableau::identity(1).map_err(stabilizer_to_simplify_error)?,
         Vec::<Gate>::new(),
     )]);
     let mut seen = BTreeSet::new();

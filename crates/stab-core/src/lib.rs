@@ -8,9 +8,9 @@ pub use stab_decoder as decoder;
 pub use stab_engine as execution;
 
 pub use stab_algebra::{
-    CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, PauliBasis, PauliPhase, PauliSign,
-    PauliString, SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult,
-    Tableau,
+    AlgebraMemoryBudget, CliffordString, FlexPauliString, Flow, FlowMeasurementIndex, PauliBasis,
+    PauliPhase, PauliSign, PauliString, SingleQubitClifford, StabilizerError, StabilizerResource,
+    StabilizerResult, Tableau,
 };
 pub use stab_decoder::{
     DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeCancellation,

@@ -55,7 +55,7 @@ fn tableau_inverse_matches_all_known_gate_data_and_word_boundary() {
         for index in 0..tableau.len() {
             assert_eq!(
                 inverse
-                    .apply(tableau.x_output(index).expect("gate X output"))
+                    .apply(&tableau.x_output(index).expect("gate X output"))
                     .expect("inverse X action"),
                 identity.x_output(index).expect("identity X output").clone(),
                 "{} inverse X{index}",
@@ -63,7 +63,7 @@ fn tableau_inverse_matches_all_known_gate_data_and_word_boundary() {
             );
             assert_eq!(
                 inverse
-                    .apply(tableau.z_output(index).expect("gate Z output"))
+                    .apply(&tableau.z_output(index).expect("gate Z output"))
                     .expect("inverse Z action"),
                 identity.z_output(index).expect("identity Z output").clone(),
                 "{} inverse Z{index}",

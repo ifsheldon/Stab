@@ -9,7 +9,7 @@ pub(super) fn assert_resource_contract() {
     repeat_skips_unrequested_compact_tick_spans();
     repeat_folds_nontrivial_zero_tick_body();
     large_identity_snapshot_stays_sparse();
-    large_active_snapshot_fails_before_dense_allocation();
+    large_active_snapshot_is_admitted_in_bytes();
     huge_repeat_reports_semantic_errors_promptly();
     repeat_nesting_boundary_is_exact();
     budget_boundaries_are_typed_and_fail_closed();
@@ -101,12 +101,14 @@ fn large_identity_snapshot_stays_sparse() {
     assert!(!actual.contains_key(&detector(0)));
 }
 
-fn large_active_snapshot_fails_before_dense_allocation() {
+fn large_active_snapshot_is_admitted_in_bytes() {
+    // One past the former 1,048,576-qubit count cap: the dense output region is charged to the
+    // memory budget instead, which a 16,000,001-qubit region fits.
     let circuit = Circuit::from_stim_str(
         "QUBIT_COORDS 16000000\nREPEAT 1000000000000 {\n    TICK\n}\nM 16000000\nDETECTOR rec[-1]\n",
     )
     .unwrap();
-    let error = circuit_detecting_regions(
+    let actual = circuit_detecting_regions(
         &circuit,
         DetectingRegionOptions {
             detectors: vec![detector(0)],
@@ -115,17 +117,16 @@ fn large_active_snapshot_fails_before_dense_allocation() {
             cancellation: stab_model::Cancellation::never(),
         },
     )
-    .unwrap_err();
-    let AnalysisError::ResourceLimit(resource) = error else {
-        panic!("expected typed output materialization rejection, got {error}");
+    .unwrap();
+    let Some(region) = actual
+        .get(&detector(0))
+        .and_then(|regions| regions.get(&tick(999_999_999_999)))
+    else {
+        panic!("expected the active region at the requested tick");
     };
-    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
-    assert_eq!(resource.resource(), ResourceKind::MaterializedUnits);
-    assert!(resource.actual() > resource.limit());
-    assert_eq!(
-        resource.limit(),
-        stab_algebra::StabilizerResource::PauliQubits.limit() as u64
-    );
+    assert_eq!(region.len(), 16_000_001);
+    assert_eq!(region.value().weight(), 1);
+    assert_eq!(region.get(16_000_000), Some(PauliBasis::Z));
 }
 
 fn huge_repeat_reports_semantic_errors_promptly() {

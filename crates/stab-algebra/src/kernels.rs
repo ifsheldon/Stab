@@ -113,6 +113,27 @@ pub(crate) fn pauli_right_multiply_words(
     }
 }
 
+/// XORs one generator row `(x, z)` into the accumulated product `(acc_x, acc_z)` and returns the
+/// word-wise `acc_z & x` taken before the update, whose total parity over every accumulated row is
+/// the commutation sign `sum_{j<l} z_j . x_l` of the ordered product.
+pub(crate) fn pauli_accumulate_words(
+    acc_x: &mut [u64],
+    acc_z: &mut [u64],
+    x: &[u64],
+    z: &[u64],
+) -> u64 {
+    debug_assert_eq!(acc_x.len(), acc_z.len());
+    debug_assert_eq!(acc_x.len(), x.len());
+    debug_assert_eq!(acc_x.len(), z.len());
+    let mut parity = 0_u64;
+    for (((acc_x, acc_z), x), z) in acc_x.iter_mut().zip(acc_z.iter_mut()).zip(x).zip(z) {
+        parity ^= *acc_z & *x;
+        *acc_x ^= *x;
+        *acc_z ^= *z;
+    }
+    parity
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(

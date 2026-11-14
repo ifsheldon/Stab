@@ -3,19 +3,19 @@
 [[families]]
 id = "resource-safety.algebra-size-limits"
 area = "resource-safety"
-contract = "Algebra constructors and operations enforce typed Pauli, flow, tableau, iterator, stabilizer-solver, and unitary limits before materialization or RNG consumption."
-stim_refs = ["src/stim/stabilizers/pauli_string.test.cc", "src/stim/stabilizers/tableau.test.cc"]
+contract = "Algebra values built from a requested size, including Pauli strings and iterators, Tableaux, random Tableaux, and the stabilizer solver's working rows, are admitted in bytes against a typed algebra memory budget, admitting the exact requirement and refusing the first excess byte before allocation or RNG consumption, while flow terms and unitary conversion are bounded by their input and no width is capped."
+stim_refs = ["src/stim/stabilizers/pauli_string.test.cc", "src/stim/stabilizers/tableau.test.cc", "src/stim/util_top/stabilizers_to_tableau.test.cc"]
 status = "divergence"
 owner = "stab-algebra"
 divergence_kind = "resource-limit"
-rationale = "Stab uses explicit fallible size admission, including a 512-qubit dense tableau boundary, instead of relying on host allocation failure."
+rationale = "Stim allocates algebra values of any width and relies on host allocation failure; Stab refuses a projected value above its one-gibibyte default algebra memory budget with a typed error before allocating, and otherwise accepts every width Stim accepts."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
 package = "stab-algebra"
 kind = "test"
 target = "cq2_algebra_resources"
-name = "algebra_size_limits_reject_before_materialization_or_rng_use"
+name = "algebra_byte_admission_refuses_before_allocation_or_rng_use"
 
 [[families]]
 id = "resource-safety.circuit-count-overflow"
@@ -251,12 +251,12 @@ name = "circuit_feedback::tests::feedback_unrolling_is_admitted_against_the_memo
 [[families]]
 id = "resource-safety.flow-generation-fixed-limits"
 area = "resource-safety"
-contract = "Measurement-rich flow generation admits its projected owned rows against the one-gibibyte default memory budget and reports typed projected-payload and 256-level repeat-nesting excesses, while ignored-only and compact unitary paths retain their specialized behavior; expanded solver work is not capped."
+contract = "Flow generation admits its projected owned rows, measurement-rich, ignored-only, and unitary alike, against the one-gibibyte default memory budget and reports typed projected-payload and 256-level repeat-nesting excesses; expanded solver work is not capped."
 stim_refs = ["src/stim/util_top/circuit_flow_generators.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Stab admits owned flow rows before allocation; the ignored-only path keeps its dense quadratic-qubit bound until that algorithm is replaced."
+rationale = "Stab admits owned flow rows against the memory budget before allocation instead of relying on host allocation failure."
 [families.evidence]
 status = "verified"
 [families.evidence.test]

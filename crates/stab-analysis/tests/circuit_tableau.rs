@@ -4,8 +4,11 @@
 )]
 
 use stab_algebra::Tableau;
-use stab_analysis::{AnalysisResult, circuit_to_tableau};
-use stab_model::Circuit;
+use stab_analysis::{
+    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceOperation,
+    circuit_to_tableau, circuit_to_tableau_with_options,
+};
+use stab_model::{Cancellation, Circuit, MemoryBudget};
 
 trait CircuitTableauTestExt {
     fn to_tableau(
@@ -402,6 +405,73 @@ fn assert_circuit_to_tableau_repeat_folding() {
         .expect("huge ignored repeat"),
         Tableau::identity(1).expect("Tableau identity")
     );
+}
+
+#[test]
+fn circuit_to_tableau_admits_bytes_and_squares_repeats_cancellably() {
+    // A 70-qubit body crosses a word boundary and has a large multiplicative order, so a repeat
+    // count of 2^62 must be raised by squaring rather than by composing iterations.
+    let body = "H 0\nS 69\nCX 0 69 3 64\nSQRT_X 65\nCZ 1 66\n";
+    let body_tableau = circuit(body)
+        .to_tableau(false, false, false)
+        .expect("body Tableau");
+    let count = 1_u64 << 62;
+    let repeated = circuit(&format!("REPEAT {count} {{\n{body}}}\n"))
+        .to_tableau(false, false, false)
+        .expect("2^62 repeat");
+    assert_eq!(repeated, body_tableau.pow(1_i64 << 62).expect("2^62 power"));
+
+    // The Tableau of 1000 qubits needs 2n rows of two 16-word planes plus a 32-word sign plane.
+    let wide = circuit("H 999\n");
+    let required = 2_000 * 2 * 16 * 8 + 32 * 8;
+    let options = |bytes| CircuitToTableauOptions {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..CircuitToTableauOptions::default()
+    };
+    assert_eq!(
+        circuit_to_tableau_with_options(&wide, &options(required))
+            .expect("exact budget")
+            .len(),
+        1_000
+    );
+    let error = circuit_to_tableau_with_options(&wide, &options(required - 1))
+        .expect_err("first excess byte");
+    let resource = error.resource_limit_error().expect("typed budget refusal");
+    assert_eq!(resource.operation(), ResourceOperation::TableauConversion);
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+    assert_eq!(
+        (resource.actual(), resource.limit()),
+        (required, required - 1)
+    );
+
+    let cancellation = Cancellation::new();
+    cancellation.cancel();
+    let cancelled = circuit_to_tableau_with_options(
+        &circuit(&format!("REPEAT {count} {{\n{body}}}\n")),
+        &CircuitToTableauOptions {
+            cancellation,
+            ..CircuitToTableauOptions::default()
+        },
+    );
+    assert!(matches!(cancelled, Err(AnalysisError::Cancelled(_))));
+
+    // A signal set while a wide power is being squared stops it between compositions; without
+    // polling, the 124 compositions of 1100-qubit Tableaux would run for minutes in a debug build.
+    let cancellation = Cancellation::new();
+    let signal = cancellation.clone();
+    let canceller = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        signal.cancel();
+    });
+    let cancelled = circuit_to_tableau_with_options(
+        &circuit(&format!("REPEAT {count} {{\n{body}CX 2 1099\n}}\n")),
+        &CircuitToTableauOptions {
+            cancellation,
+            ..CircuitToTableauOptions::default()
+        },
+    );
+    canceller.join().expect("canceller thread");
+    assert!(matches!(cancelled, Err(AnalysisError::Cancelled(_))));
 }
 
 fn circuit(text: &str) -> Circuit {

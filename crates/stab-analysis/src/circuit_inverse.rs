@@ -1,4 +1,4 @@
-use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, StabilizerResource, Tableau};
+use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, Tableau};
 use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, Target};
 
 use crate::{
@@ -7,7 +7,11 @@ use crate::{
 
 mod reverse_flow;
 
-const MAX_TIME_REVERSE_TABLEAU_QUBITS: usize = StabilizerResource::TableauQubits.limit();
+/// Widest repeat-free circuit validated against its dense Tableau even when the sparse tracker
+/// could validate it. Wider sparse-supported circuits keep the sparse tracker, whose cost follows
+/// the flows' support, and wider unsupported circuits use the dense Tableau admitted in bytes. This
+/// selects an algorithm and never refuses work.
+const DENSE_TIME_REVERSE_VALIDATION_QUBIT_THRESHOLD: usize = 512;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InverseQecOptions {
@@ -153,10 +157,10 @@ pub fn circuit_time_reversed_for_flows_with_options(
     if flows.is_empty() {
         return Ok((inverse, Vec::new()));
     }
-    let validation = FlowValidation::for_circuit(circuit)?;
+    let validation = FlowValidation::for_circuit(circuit, &options.cancellation)?;
     for (index, (flow, satisfied)) in flows
         .iter()
-        .zip(validation.check_all(circuit, flows)?)
+        .zip(validation.check_all(circuit, flows, &options.cancellation)?)
         .enumerate()
     {
         if !satisfied {
@@ -279,34 +283,39 @@ enum FlowValidation {
 }
 
 impl FlowValidation {
-    fn for_circuit(circuit: &Circuit) -> AnalysisResult<Self> {
-        let within_tableau_budget = stab_model::advanced::circuit_simulated_qubit_count(circuit)
-            <= MAX_TIME_REVERSE_TABLEAU_QUBITS;
+    fn for_circuit(circuit: &Circuit, cancellation: &Cancellation) -> AnalysisResult<Self> {
+        let narrow = stab_model::advanced::circuit_simulated_qubit_count(circuit)
+            <= DENSE_TIME_REVERSE_VALIDATION_QUBIT_THRESHOLD;
         let has_repeat = circuit
             .items()
             .iter()
             .any(|item| matches!(item, CircuitItem::RepeatBlock(_)));
-        if has_repeat && sparse_tracker_can_validate_without_unbounded_unroll(circuit) {
+        let sparse = sparse_tracker_can_validate_without_unbounded_unroll(circuit);
+        if sparse && (has_repeat || !narrow) {
             return Ok(Self::SparseFolded);
         }
-        if within_tableau_budget {
-            return Ok(Self::Tableau(crate::circuit_to_tableau(
-                circuit, false, false, false,
-            )?));
-        }
-        if sparse_tracker_can_validate_without_unbounded_unroll(circuit) {
-            return Ok(Self::SparseFolded);
-        }
-        Err(AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows unitary fast path requires at most {MAX_TIME_REVERSE_TABLEAU_QUBITS} tableau qubits unless the circuit is supported by folded sparse validation"
-        )))
+        let options = crate::CircuitToTableauOptions {
+            cancellation: cancellation.clone(),
+            ..crate::CircuitToTableauOptions::default()
+        };
+        Ok(Self::Tableau(crate::circuit_to_tableau_with_options(
+            circuit, &options,
+        )?))
     }
 
-    fn check_all(&self, circuit: &Circuit, flows: &[Flow]) -> AnalysisResult<Vec<bool>> {
+    fn check_all(
+        &self,
+        circuit: &Circuit,
+        flows: &[Flow],
+        cancellation: &Cancellation,
+    ) -> AnalysisResult<Vec<bool>> {
         match self {
             Self::Tableau(tableau) => flows
                 .iter()
-                .map(|flow| unitary_flow_is_satisfied_by_tableau(tableau, flow))
+                .map(|flow| {
+                    cancellation.check()?;
+                    unitary_flow_is_satisfied_by_tableau(tableau, flow)
+                })
                 .collect(),
             Self::SparseFolded => check_unsigned_flows_with_sparse_tracker(circuit, flows)
                 .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string())),

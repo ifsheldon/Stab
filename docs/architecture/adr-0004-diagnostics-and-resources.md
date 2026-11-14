@@ -34,8 +34,11 @@ The per-operation limits types for parsing, circuit flattening, DEM flattening, 
 Logical-error search and SAT materialization keep their explicit search budgets with budget-exhausted results.
 These policies are not aliases of one global limits structure, although the CLI feeds all of them from one `--memory-budget` option.
 
+`stab-algebra` depends on no model crate, so it owns a typed `AlgebraMemoryBudget` with the same one-gibibyte default for values built from a requested size, such as a Tableau, a random Tableau, or the stabilizer solver's working rows; `stab-analysis` maps its `MemoryBudget` onto it, and its callers poll cancellation between algebra calls, each of which is polynomial in bytes already admitted.
+Algebra operations whose storage is a bounded multiple of operands the caller already holds reserve it fallibly without a separate admission.
+
 A constant is not automatically a public policy field.
-Representation bounds, the parser-recursion envelope, platform limits, implementation thresholds that select an algorithm without rejecting work, and the dense `stab-algebra` bounds that remain until their algorithms are replaced stay private.
+Representation bounds, the parser-recursion envelope, platform limits, and implementation thresholds that select an algorithm without rejecting work stay private.
 
 Semantic hard limits are not configurable.
 

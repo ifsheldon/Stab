@@ -194,15 +194,6 @@ fn tableaux_preserve_generators_composition_inversion_and_actions() {
     assert!(cnot.y_output(2).is_err());
     assert!(cnot.z_output_pauli_xyz(0, 2).is_err());
 
-    let malformed = stab_algebra::advanced::tableau_from_output_columns_unchecked(
-        vec![PauliString::from_str("+X").expect("malformed X output")],
-        vec![PauliString::from_str("+X").expect("malformed Z output")],
-    );
-    assert!(
-        !malformed
-            .satisfies_invariants()
-            .expect("check malformed advanced Tableau")
-    );
     assert!(Tableau::gate1("+X", "+X").is_err());
     assert_eq!(
         Tableau::gate1("XX", "Z"),
@@ -356,11 +347,16 @@ fn tableaux_preserve_generators_composition_inversion_and_actions() {
     assert_random_tableaux_are_uniform_over_the_clifford_group();
 }
 
-/// `Tableau::random` must be uniform over the Clifford group, signs included,
-/// like Stim's Bravyi-Maslov sampler. A Pearson chi-square over the complete
-/// one- and two-qubit groups rejects a biased sampler; the fixed seed keeps the
-/// six-sigma bound deterministic.
+/// `Tableau::random` must be uniform over the Clifford group, signs included, like Stim's
+/// Bravyi-Maslov sampler. Every one- and two-qubit Clifford (24 and 11,520 of them) must appear,
+/// and a Pearson chi-square over the complete group must stay below `d + 2 sqrt(d t) + 2 t` for
+/// `d` degrees of freedom and `t = 16`. By the Laurent-Massart chi-square tail bound a uniform
+/// sampler exceeds that threshold with probability at most `e^-16 < 1.2e-7` per group under the
+/// chi-square approximation, which holds here with at least 20 expected samples per element, so
+/// the two checks together have a false-positive bound below `2.3e-7`; the fixed seed makes the
+/// outcome deterministic.
 fn assert_random_tableaux_are_uniform_over_the_clifford_group() {
+    const TAIL_EXPONENT: f64 = 16.0;
     let mut rng = SmallRng::seed_from_u64(0x554e_4946_4f52_4d31);
     for (num_qubits, group_order, samples_per_element) in
         [(1_usize, 24_usize, 500_u32), (2, 11_520, 20)]
@@ -382,9 +378,10 @@ fn assert_random_tableaux_are_uniform_over_the_clifford_group() {
             .map(|&count| (f64::from(count) - expected).powi(2) / expected)
             .sum::<f64>();
         let degrees = f64::from(u32::try_from(group_order - 1).expect("small group"));
+        let threshold = degrees + 2.0 * (degrees * TAIL_EXPONENT).sqrt() + 2.0 * TAIL_EXPONENT;
         assert!(
-            chi_square < degrees + 6.0 * (2.0 * degrees).sqrt(),
-            "{num_qubits}-qubit chi-square {chi_square} over {degrees} degrees of freedom"
+            chi_square < threshold,
+            "{num_qubits}-qubit chi-square {chi_square} over {degrees} degrees of freedom exceeds {threshold}"
         );
     }
 }
@@ -493,7 +490,7 @@ fn algebra_owned_representation_conversions_preserve_values() {
         for _ in 0..4 {
             let source = Tableau::random(width, &mut rng).expect("source tableau");
             let stabilizers = (0..width)
-                .map(|index| source.z_output(index).expect("Z generator").clone())
+                .map(|index| source.z_output(index).expect("Z generator"))
                 .collect::<Vec<_>>();
             let recovered = stabilizers_to_tableau(&stabilizers, false, false, false)
                 .expect("stabilizers to tableau");

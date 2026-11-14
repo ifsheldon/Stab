@@ -1,6 +1,4 @@
-use stab_algebra::{
-    Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString, StabilizerResource, Tableau,
-};
+use stab_algebra::{Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString, Tableau};
 use stab_model::{Circuit, CircuitItem, DemTarget, QubitId};
 
 use crate::{
@@ -8,7 +6,12 @@ use crate::{
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
-const MAX_BATCH_FLOW_TABLEAU_QUBITS: usize = StabilizerResource::TableauQubits.limit();
+/// Widest repeat-free circuit whose full-width flows are checked against one dense Tableau; wider
+/// circuits use the sparse reverse tracker. This selects an algorithm and never refuses work: the
+/// two paths report different mismatch diagnostics, and the sparse tracker's cost follows the
+/// flows' support instead of the quadratic Tableau, so the boundary keeps outputs and wide-circuit
+/// cost unchanged.
+const BATCH_FLOW_TABLEAU_QUBIT_THRESHOLD: usize = 512;
 
 /// Checks unsigned stabilizer flows against the supported unitary and sparse-tracker subsets.
 pub fn check_if_circuit_has_unsigned_stabilizer_flows(
@@ -62,7 +65,7 @@ fn should_use_batch_flow_tableau(circuit: &Circuit, flows: &[Flow]) -> bool {
             && flow.output().len() == circuit_qubits
             && flow.measurements().next().is_none()
             && flow.observables().next().is_none()
-    }) && circuit_qubits <= MAX_BATCH_FLOW_TABLEAU_QUBITS
+    }) && circuit_qubits <= BATCH_FLOW_TABLEAU_QUBIT_THRESHOLD
         && circuit
             .items()
             .iter()

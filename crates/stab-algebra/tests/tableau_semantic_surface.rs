@@ -6,8 +6,8 @@
 use std::str::FromStr as _;
 
 use stab_algebra::{
-    PauliBasis, PauliString, SingleQubitClifford, StabilizerError, StabilizerResource, Tableau,
-    TableauIterator, stabilizers_to_tableau,
+    PauliBasis, PauliString, SingleQubitClifford, StabilizerError, Tableau, TableauIterator,
+    stabilizers_to_tableau,
 };
 
 #[test]
@@ -97,16 +97,6 @@ fn checked_generators_reject_invalid_shape_and_symplectic_relations() {
     let signed = Tableau::from_conjugated_generators(vec![pauli("-Z")], vec![pauli("+X")])
         .expect("real negative generator signs are Hermitian and valid");
     assert_eq!(signed, Tableau::gate1("-Z", "+X").expect("signed Hadamard"));
-
-    let too_wide = pauli(&format!("+{}", "_".repeat(513)));
-    assert_eq!(
-        Tableau::from_conjugated_generators(vec![too_wide.clone(); 513], vec![too_wide; 513],),
-        Err(StabilizerError::ResourceLimitExceeded {
-            resource: StabilizerResource::TableauQubits,
-            requested: 513,
-            limit: 512,
-        })
-    );
 }
 
 fn assert_powers_direct_sums_and_embedding() {
@@ -182,22 +172,17 @@ fn assert_powers_direct_sums_and_embedding() {
         })
     );
 
-    let wide = Tableau::identity(300).expect("admitted wide Tableau");
+    // Word-unaligned widths exercise the shifted copy of the right operand's rows.
+    let wide = product
+        .direct_sum(&Tableau::identity(298).expect("wide identity"))
+        .expect("wide direct sum")
+        .direct_sum(&cnot)
+        .expect("wide direct sum with a trailing gate");
+    let gap = "_".repeat(298);
     assert_eq!(
-        wide.direct_sum(&wide),
-        Err(StabilizerError::ResourceLimitExceeded {
-            resource: StabilizerResource::TableauQubits,
-            requested: 600,
-            limit: 512,
-        })
-    );
-    assert_eq!(
-        phase.embedded(513, &[0]),
-        Err(StabilizerError::ResourceLimitExceeded {
-            resource: StabilizerResource::TableauQubits,
-            requested: 513,
-            limit: 512,
-        })
+        wide.apply(&pauli(&format!("+XZ{gap}X_")))
+            .expect("wide direct-sum action"),
+        pauli(&format!("+YX{gap}XX"))
     );
 }
 
@@ -308,10 +293,10 @@ fn assert_canonical_stabilizers() {
 
 fn assert_stable_surface(tableau: &Tableau) {
     let xs = (0..tableau.len())
-        .map(|index| tableau.x_output(index).expect("X output").clone())
+        .map(|index| tableau.x_output(index).expect("X output"))
         .collect::<Vec<_>>();
     let zs = (0..tableau.len())
-        .map(|index| tableau.z_output(index).expect("Z output").clone())
+        .map(|index| tableau.z_output(index).expect("Z output"))
         .collect::<Vec<_>>();
     assert_eq!(
         Tableau::from_conjugated_generators(xs, zs).expect("checked reconstruction"),
@@ -331,11 +316,11 @@ fn assert_stable_surface(tableau: &Tableau) {
         .expect("canonical stabilizers");
     let alternative_generators = if tableau.len() == 2 {
         vec![
-            tableau.z_output(1).expect("Z1 output").clone(),
+            tableau.z_output(1).expect("Z1 output"),
             tableau
                 .z_output(0)
                 .expect("Z0 output")
-                .multiply_real(tableau.z_output(1).expect("Z1 output"))
+                .multiply_real(&tableau.z_output(1).expect("Z1 output"))
                 .expect("commuting generator product"),
         ]
     } else {

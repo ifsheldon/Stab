@@ -195,7 +195,7 @@ impl TableauIterator {
                 return None;
             }
             self.yielded_empty = true;
-            return Some(Tableau::identity_unchecked(0));
+            return Tableau::identity_unadmitted(0).ok();
         }
 
         while let Some(level) = self.cur_level {
@@ -230,7 +230,7 @@ impl TableauIterator {
     fn next_signed_variant(&mut self) -> Option<Tableau> {
         let source = self.pending_unsigned.as_ref()?;
         let mask = self.next_sign_mask?;
-        let signed = source.with_output_sign_mask(mask);
+        let signed = source.with_output_sign_mask(mask).ok()?;
         if mask == 0 {
             self.pending_unsigned = None;
             self.next_sign_mask = None;
@@ -257,7 +257,7 @@ impl TableauIterator {
             xs.push(columns.next()?.clone());
             zs.push(columns.next()?.clone());
         }
-        Some(Tableau::from_output_columns_unchecked(xs, zs))
+        Tableau::from_small_generators(&xs, &zs).ok()
     }
 }
 
@@ -294,7 +294,8 @@ pub struct PauliStringIterator {
 }
 
 impl PauliStringIterator {
-    /// Creates reusable iterator state within the Pauli-qubit materialization limit.
+    /// Creates reusable iterator state after admitting its result string and position buffers
+    /// against [`crate::AlgebraMemoryBudget::DEFAULT`].
     pub fn new(
         num_qubits: usize,
         min_weight: usize,
@@ -303,7 +304,12 @@ impl PauliStringIterator {
         allow_y: bool,
         allow_z: bool,
     ) -> StabilizerResult<Self> {
-        super::StabilizerResource::PauliQubits.ensure(num_qubits)?;
+        let buffers =
+            num_qubits as u128 * (size_of::<usize>() as u128 + size_of::<PauliBasis>() as u128);
+        crate::AlgebraMemoryBudget::DEFAULT.admit(
+            super::StabilizerResource::PauliString,
+            crate::budget::pauli_bytes(num_qubits) + buffers,
+        )?;
         let mut result = Self {
             num_qubits,
             min_weight,

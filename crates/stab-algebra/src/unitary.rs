@@ -1,5 +1,7 @@
 use num_complex::Complex32;
 
+use crate::budget::try_with_capacity;
+
 use super::{
     PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResource, StabilizerResult,
     Tableau,
@@ -14,8 +16,9 @@ const STIM_SNAP_DISTANCE_SQUARED: f32 = 0.125;
 /// true, qubit 0 corresponds to the least significant amplitude bit. When it is false, qubit 0
 /// corresponds to the most significant amplitude bit, matching Stim's `unitary_to_tableau`
 /// convention. Matrix entries that should be Pauli phases are snapped using Stim's v1.16.0
-/// stabilizer-state smoothing threshold. The matrix dimension is checked against
-/// [`StabilizerResource::UnitaryMatrixDimension`] before row-shape or numerical work.
+/// stabilizer-state smoothing threshold. Like Stim, any power-of-two dimension is accepted: the
+/// per-generator scratch matrix has the input's size and is reserved fallibly, and the
+/// `O(d^3)` unitarity check and conjugations are the caller's CPU time.
 pub fn unitary_to_tableau(
     matrix: &[Vec<Complex32>],
     little_endian: bool,
@@ -42,12 +45,13 @@ pub fn unitary_to_tableau(
         )?);
     }
 
-    let tableau = Tableau::from_output_columns_unchecked(xs, zs);
-    if tableau.satisfies_invariants()? {
-        Ok(tableau)
-    } else {
-        Err(StabilizerError::UnitaryMatrixNotClifford)
-    }
+    Tableau::from_conjugated_generators(xs, zs).map_err(|error| match error {
+        StabilizerError::ConjugatedGeneratorPairCommutes { .. }
+        | StabilizerError::ConjugatedGeneratorsAnticommute { .. } => {
+            StabilizerError::UnitaryMatrixNotClifford
+        }
+        other => other,
+    })
 }
 
 fn validate_matrix_shape(matrix: &[Vec<Complex32>]) -> StabilizerResult<usize> {
@@ -55,7 +59,6 @@ fn validate_matrix_shape(matrix: &[Vec<Complex32>]) -> StabilizerResult<usize> {
     if height == 0 || !height.is_power_of_two() {
         return Err(StabilizerError::UnitaryMatrixHeightNotPowerOfTwo { height });
     }
-    StabilizerResource::UnitaryMatrixDimension.ensure(height)?;
     for (row, values) in matrix.iter().enumerate() {
         if values.len() != height {
             return Err(StabilizerError::UnitaryMatrixRowWidthMismatch {
@@ -107,10 +110,10 @@ fn conjugated_generator_to_pauli(
     let bit = amplitude_bit(input_index, num_qubits, little_endian);
     let generator_x_mask = if basis.x_bit() { 1_usize << bit } else { 0 };
     let generator_z_mask = if basis.z_bit() { 1_usize << bit } else { 0 };
-    let mut conjugated = Vec::with_capacity(dimension);
+    let mut conjugated = try_with_capacity(StabilizerResource::Tableau, dimension)?;
 
     for output_row in 0..dimension {
-        let mut row = Vec::with_capacity(dimension);
+        let mut row = try_with_capacity(StabilizerResource::Tableau, dimension)?;
         for output_column in 0..dimension {
             let mut value = zero();
             for input_column in 0..dimension {

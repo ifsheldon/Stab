@@ -48,6 +48,24 @@ fn stabilizers_to_tableau_bell_pair_matches_stim() {
 
     input[2] = pauli("+Z_");
     assert!(stabilizers_to_tableau(&input, true, true, false).is_err());
+
+    // Adapted from the `stim.Tableau.from_stabilizers` examples in Stim v1.16.0 doc/stim.pyi:
+    // the destabilizers and the completion of an underconstrained input match Stim exactly.
+    let completed = stabilizers_to_tableau(
+        &[pauli("XX_"), pauli("ZZ_"), pauli("-YY_"), pauli("")],
+        true,
+        true,
+        false,
+    )
+    .expect("complete redundant underconstrained input");
+    assert_eq!(
+        completed,
+        Tableau::from_conjugated_generators(
+            vec![pauli("+Z__"), pauli("+_X_"), pauli("+__X")],
+            vec![pauli("+XX_"), pauli("+ZZ_"), pauli("+__Z")],
+        )
+        .expect("Stim's completed tableau")
+    );
 }
 
 fn stabilizers_to_tableau_detects_anticommutation() {
@@ -122,14 +140,14 @@ fn stabilizers_to_tableau_preserves_overconstrained_generator_order() {
         let dependent = source
             .z_output(1)
             .expect("Z1")
-            .multiply_real(source.z_output(3).expect("Z3"))
+            .multiply_real(&source.z_output(3).expect("Z3"))
             .expect("dependent stabilizer");
         let mut stabilizers = vec![
             PauliString::identity(num_qubits).expect("identity stabilizer"),
             dependent,
         ];
         for index in 0..num_qubits {
-            stabilizers.push(source.z_output(index).expect("source stabilizer").clone());
+            stabilizers.push(source.z_output(index).expect("source stabilizer"));
         }
 
         assert!(matches!(
@@ -142,7 +160,7 @@ fn stabilizers_to_tableau_preserves_overconstrained_generator_order() {
             let expected_index = index + 1 + usize::from(index > 3);
             assert_eq!(
                 actual.z_output(index).expect("actual stabilizer"),
-                &stabilizers[expected_index]
+                stabilizers[expected_index]
             );
         }
         assert!(actual.satisfies_invariants().expect("solver invariants"));
@@ -158,8 +176,8 @@ fn stabilizers_to_tableau_handles_size_affecting_redundancy() {
     let tableau =
         stabilizers_to_tableau(&input, true, true, false).expect("convert redundant input");
     assert_eq!(tableau.len(), 2);
-    assert_eq!(tableau.z_output(0).expect("z0"), &pauli("X_"));
-    assert_eq!(tableau.z_output(1).expect("z1"), &pauli("_X"));
+    assert_eq!(tableau.z_output(0).expect("z0"), pauli("X_"));
+    assert_eq!(tableau.z_output(1).expect("z1"), pauli("_X"));
     assert!(tableau.satisfies_invariants().expect("invariants"));
 }
 
@@ -168,7 +186,7 @@ fn stabilizers_to_tableau_underconstrained_requires_opt_in_and_can_invert() {
     assert!(stabilizers_to_tableau(&input, false, false, false).is_err());
 
     let actual = stabilizers_to_tableau(&input, false, true, false).expect("underconstrained");
-    assert_eq!(actual.z_output(0).expect("z0"), &pauli("Z_"));
+    assert_eq!(actual.z_output(0).expect("z0"), pauli("Z_"));
     assert!(actual.satisfies_invariants().expect("invariants"));
 
     let inverted = stabilizers_to_tableau(&input, false, true, true).expect("inverse");
@@ -182,7 +200,7 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_valid_tableaus() {
         .take(50)
     {
         let stabilizers = (0..source.len())
-            .map(|index| source.z_output(index).expect("source z").clone())
+            .map(|index| source.z_output(index).expect("source z"))
             .collect::<Vec<_>>();
         let actual =
             stabilizers_to_tableau(&stabilizers, false, false, false).expect("convert stabilizers");
@@ -203,7 +221,7 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
     for num_qubits in 0..10 {
         let source = Tableau::random(num_qubits, &mut rng).expect("random tableau");
         let stabilizers = (0..source.len())
-            .map(|index| source.z_output(index).expect("source z").clone())
+            .map(|index| source.z_output(index).expect("source z"))
             .collect::<Vec<_>>();
         let actual =
             stabilizers_to_tableau(&stabilizers, false, false, false).expect("convert stabilizers");
@@ -222,7 +240,7 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
             let completed = stabilizers_to_tableau(kept, false, true, false)
                 .expect("complete partial stabilizers");
             for (index, expected) in kept.iter().enumerate() {
-                assert_eq!(completed.z_output(index).expect("completed z"), expected);
+                assert_eq!(completed.z_output(index).expect("completed z"), *expected);
             }
             assert!(
                 completed
@@ -252,11 +270,11 @@ fn stabilizers_to_tableau_accepts_inputs_past_iterator_limit() {
     assert_eq!(actual.len(), 70);
     assert_eq!(
         actual.x_output(69).expect("x69"),
-        &single_pauli(70, 69, PauliBasis::X)
+        single_pauli(70, 69, PauliBasis::X)
     );
     assert_eq!(
         actual.z_output(69).expect("z69"),
-        &single_pauli(70, 69, PauliBasis::Z)
+        single_pauli(70, 69, PauliBasis::Z)
     );
     assert!(actual.satisfies_invariants().expect("invariants"));
 }

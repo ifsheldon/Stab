@@ -13,11 +13,19 @@ pub enum StabilizerError {
     #[error("Pauli string length mismatch: left={left} right={right}")]
     LengthMismatch { left: usize, right: usize },
 
-    #[error("{resource} request {requested} exceeds limit {limit}")]
-    ResourceLimitExceeded {
+    #[error(
+        "{resource} needs {requested_bytes} bytes, exceeding the {budget_bytes}-byte memory budget"
+    )]
+    MemoryBudgetExceeded {
         resource: StabilizerResource,
-        requested: usize,
-        limit: usize,
+        requested_bytes: u128,
+        budget_bytes: u64,
+    },
+
+    #[error("allocating {bytes} bytes for {resource} failed")]
+    AllocationFailed {
+        resource: StabilizerResource,
+        bytes: usize,
     },
 
     #[error(
@@ -130,12 +138,6 @@ pub enum StabilizerError {
 
     #[error("stabilizer {stabilizer} has an inconsistent sign")]
     InconsistentStabilizer { stabilizer: String },
-
-    #[error("stabilizer set has {independent} independent generators but {num_qubits} qubits")]
-    OverconstrainedStabilizers {
-        independent: usize,
-        num_qubits: usize,
-    },
 
     #[error(
         "stabilizer set has {independent} independent generators but {num_qubits} qubits and underconstrained conversion is disabled"

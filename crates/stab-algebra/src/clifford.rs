@@ -3,8 +3,10 @@ use std::fmt::{Display, Formatter};
 use rand::{Rng, RngExt as _};
 
 use super::{
-    PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau,
+    PauliBasis, PauliPhase, PauliSign, StabilizerError, StabilizerResource, StabilizerResult,
+    Tableau,
 };
+use crate::budget::{clifford_bytes, try_reserve_one, try_zeroed_words};
 use crate::kernels::{
     CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words,
 };
@@ -192,10 +194,17 @@ impl SingleQubitClifford {
 
     /// Returns the one-qubit tableau represented by this Clifford.
     pub fn tableau(self) -> Tableau {
-        Tableau::from_output_columns_unchecked(
-            vec![signed_pauli_string(self.x_output())],
-            vec![signed_pauli_string(self.z_output())],
-        )
+        let image = |pauli: SignedPauli| {
+            (
+                pauli.sign.is_negative(),
+                pauli.basis.x_bit(),
+                pauli.basis.z_bit(),
+            )
+        };
+        Tableau::from_rows(crate::tableau::PauliRows::one_qubit(
+            image(self.x_output()),
+            image(self.z_output()),
+        ))
     }
 
     /// Applies this Clifford to one Pauli basis.
@@ -330,14 +339,28 @@ pub struct CliffordString {
 }
 
 impl CliffordString {
-    /// Creates an identity string within the [`crate::StabilizerResource::CliffordQubits`] limit.
+    /// Creates an identity string after admitting its six packed planes against
+    /// [`crate::AlgebraMemoryBudget::DEFAULT`].
     pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
-        super::StabilizerResource::CliffordQubits.ensure(num_qubits)?;
-        Ok(Self::identity_unchecked(num_qubits))
+        admit_clifford_planes(num_qubits, 0)?;
+        let plane = || -> StabilizerResult<BitVec> {
+            Ok(BitVec::from_words_truncated(
+                num_qubits,
+                try_zeroed_words(StabilizerResource::CliffordString, num_qubits.div_ceil(64))?,
+            ))
+        };
+        Ok(Self {
+            z_signs: plane()?,
+            x_signs: plane()?,
+            inv_x2x: plane()?,
+            x2z: plane()?,
+            z2x: plane()?,
+            inv_z2z: plane()?,
+            non_identity_count: 0,
+        })
     }
 
     pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
-        debug_assert!(num_qubits <= super::StabilizerResource::CliffordQubits.limit());
         Self {
             z_signs: BitVec::zeros(num_qubits),
             x_signs: BitVec::zeros(num_qubits),
@@ -349,27 +372,25 @@ impl CliffordString {
         }
     }
 
-    /// Collects Clifford gates, rejecting the first item beyond the Clifford-qubit limit.
+    /// Collects Clifford gates, refusing the first item whose collected gates, table indices, and
+    /// packed planes would exceed [`crate::AlgebraMemoryBudget::DEFAULT`].
     pub fn from_gates(
         gates: impl IntoIterator<Item = SingleQubitClifford>,
     ) -> StabilizerResult<Self> {
-        let limit = super::StabilizerResource::CliffordQubits.limit();
         let mut collected = Vec::new();
         for gate in gates {
-            if collected.len() == limit {
-                return Err(StabilizerError::ResourceLimitExceeded {
-                    resource: super::StabilizerResource::CliffordQubits,
-                    requested: limit.saturating_add(1),
-                    limit,
-                });
-            }
+            let count = collected.len().saturating_add(1);
+            admit_clifford_planes(
+                count,
+                count as u128 * size_of::<SingleQubitClifford>() as u128,
+            )?;
+            try_reserve_one(StabilizerResource::CliffordString, &mut collected)?;
             collected.push(gate);
         }
-        Ok(Self::from_gates_within_limit(collected))
+        Ok(Self::from_collected_gates(collected))
     }
 
-    fn from_gates_within_limit(gates: Vec<SingleQubitClifford>) -> Self {
-        debug_assert!(gates.len() <= super::StabilizerResource::CliffordQubits.limit());
+    fn from_collected_gates(gates: Vec<SingleQubitClifford>) -> Self {
         let table_indices = gates
             .into_iter()
             .map(SingleQubitClifford::table_index)
@@ -494,7 +515,7 @@ impl CliffordString {
                 left: self.len(),
                 right: rhs.len(),
             })?;
-        super::StabilizerResource::CliffordQubits.ensure(new_len)?;
+        admit_clifford_planes(new_len, 0)?;
         let mut table_indices = self.table_indices()?;
         table_indices.reserve(rhs.len());
         table_indices.extend(rhs.table_indices()?);
@@ -510,11 +531,11 @@ impl CliffordString {
             self.len()
                 .checked_mul(repetitions)
                 .ok_or(StabilizerError::ResourceSizeOverflow {
-                    resource: super::StabilizerResource::CliffordQubits,
+                    resource: StabilizerResource::CliffordString,
                     item_count: self.len(),
                     repetitions,
                 })?;
-        super::StabilizerResource::CliffordQubits.ensure(new_len)?;
+        admit_clifford_planes(new_len, 0)?;
         let source = self.table_indices()?;
         let table_indices = source
             .iter()
@@ -576,7 +597,6 @@ impl CliffordString {
 
     fn ensure_len(&mut self, len: usize) -> StabilizerResult<()> {
         if len > self.len() {
-            super::StabilizerResource::CliffordQubits.ensure(len)?;
             self.z_signs.resize_zeros(len);
             self.x_signs.resize_zeros(len);
             self.inv_x2x.resize_zeros(len);
@@ -609,6 +629,15 @@ impl CliffordString {
     }
 }
 
+/// Admits the six planes of a `num_qubits`-gate string, its one-byte table indices, and `extra`
+/// bytes against the default algebra budget.
+fn admit_clifford_planes(num_qubits: usize, extra: u128) -> StabilizerResult<()> {
+    crate::AlgebraMemoryBudget::DEFAULT.admit(
+        StabilizerResource::CliffordString,
+        clifford_bytes(num_qubits) + num_qubits as u128 + extra,
+    )
+}
+
 fn prefix_mut(words: &mut [u64], len: usize) -> StabilizerResult<&mut [u64]> {
     let word_len = words.len();
     words.get_mut(..len).ok_or_else(|| {
@@ -638,10 +667,6 @@ fn sign_from_bit(negative: bool) -> PauliSign {
     } else {
         PauliSign::Plus
     }
-}
-
-fn signed_pauli_string(pauli: SignedPauli) -> PauliString {
-    PauliString::from_bases_unchecked(pauli.sign, [pauli.basis])
 }
 
 #[cfg(test)]

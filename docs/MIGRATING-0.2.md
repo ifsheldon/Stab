@@ -56,7 +56,7 @@ The partial `stab_analysis::mbqc_decomposition` helper, also exposed through `st
 `DemSamplerLimits` per-shot and total work limits were removed in E4; see Memory Budget below.
 Sessions stream any number of shots whose reusable storage fits the budget.
 
-`Tableau::random` now samples uniformly over the Clifford group, signs included, using the Bravyi–Maslov construction ported from Stim. Earlier builds applied a bounded random gate walk whose distribution was not uniform, so seeded callers receive different tableaux for the same seed; the signature, error behavior, and `RandomTableauQubits` limit are unchanged.
+`Tableau::random` now samples uniformly over the Clifford group, signs included, using the Bravyi–Maslov construction ported from Stim. Earlier builds applied a bounded random gate walk whose distribution was not uniform, so seeded callers receive different tableaux for the same seed; the signature is unchanged. Since E4 the sampler runs on packed rows at any width the memory budget admits, and it consumes the random stream exactly as the earlier 64-qubit sampler did, so seeded tableaux of at most 64 qubits are unchanged.
 
 Circuit sampling compiles one resolved program shared with detection, and no public item was removed or renamed. Four observable behaviors changed. `SamplingCompiler::compile` then counted its fixed one-million boundary, removed in E4, in expanded circuit instructions, as `DetectionSamplingCompiler` does, so `SamplingCompileError::ExpandedOperationLimit` reports instruction counts and wide circuits that detection already accepted now compile; the sampling compiler schema is `6` and the executable-contract schema is `6`, so every sampling request and plan fingerprint changed. A circuit whose only work is one Z measurement, optionally after one single-qubit Pauli channel on the measured qubit, no longer uses a dedicated direct-Z plan, so its seeded output stream differs while its distribution does not. Without that plan, a single measurement of a very large qubit index is refused by the same frame and reference storage limits as any other circuit, including the `MeasurementToDetectionCompiler` reference sample. `count_determined_measurements` with `unknown_input` now matches pinned Stim on circuits that reset every qubit before measuring them, where it previously undercounted. The measurement-to-detection compiler schema reported by `capabilities` is `4`, because its reference sample and sweep correction now share one program admitted within the conversion's configured compiled-byte limit instead of a separate sampling plan.
 
@@ -100,6 +100,29 @@ See the resource policy inventory's Cooperative Cancellation section for where e
 
 A frame-sampling session that observes cancellation inside a batch returns the `Cancelled` error and is poisoned, because its random stream already advanced; between batches it still returns the resumable `Cancelled` status.
 Measurement-to-detection conversion and DEM sampling and replay report an in-batch cancellation as the resumable `Cancelled` status.
+
+## Algebra Byte Admission
+
+E4 removes every count and work cap in `stab-algebra` by replacing the dense algorithms with word-parallel ones over packed rows, and admits the storage those caps bounded in bytes.
+`stab_algebra::AlgebraMemoryBudget`, also exported from the `stab-core` root, is the algebra's own typed byte bound with the same one-gibibyte default as `MemoryBudget`, because `stab-algebra` does not depend on `stab-model`.
+Constructors that turn a requested size into storage admit its bytes before allocating or drawing randomness; operations on values the caller already holds reserve a bounded multiple of them fallibly.
+
+| Removed or changed item | Replacement |
+| --- | --- |
+| `StabilizerResource::{PauliQubits, CliffordQubits, TableauQubits, RandomTableauQubits, StabilizerSolveQubits, UnitaryMatrixDimension, FlowClassicalTerms, CircuitTableauRepeatWork}` and the `limit` and `ensure` methods | `StabilizerResource::{PauliString, CliffordString, Tableau, RandomTableau, StabilizerSolve, FlowTerms}`, which name the refused or failed storage and carry no limit |
+| `StabilizerError::ResourceLimitExceeded { resource, requested, limit }` | `StabilizerError::MemoryBudgetExceeded { resource, requested_bytes, budget_bytes }` for a refused request and `StabilizerError::AllocationFailed { resource, bytes }` for a failed fallible reservation |
+| `StabilizerError::OverconstrainedStabilizers` | Removed; as in Stim, a generator beyond the independent ones is reported as redundant or contradictory |
+| `Tableau::x_output` and `Tableau::z_output` returning `&PauliString` | Both return an owned `PauliString`, because generator images are packed rows rather than stored strings |
+| `stab_algebra::advanced::{tableau_identity_unchecked, tableau_from_output_columns_unchecked}` | `Tableau::identity_with_budget` and `Tableau::from_conjugated_generators`; a Tableau with mismatched generator shapes can no longer be constructed |
+| None | `Tableau::identity_with_budget`, `Tableau::random_with_budget`, `stabilizers_to_tableau_with_budget`, `Tableau::is_identity`, `stab_analysis::circuit_to_tableau_with_options` with `CircuitToTableauOptions`, and `stab_analysis::ResourceOperation::TableauConversion`, which exhaustive matches on `ResourceOperation` must add |
+
+Behavior changes for workloads the removed caps admitted:
+
+- `stabilizers_to_tableau` now runs Stim's elimination, so its X outputs and the stabilizers it adds to an underconstrained input match Stim exactly; earlier builds returned valid but different destabilizers and completions for most inputs. Its Z outputs are unchanged. An anticommuting input reports the first anticommuting pair in input order, the later generator as `stabilizer` and the earlier as `conflict`, and every error prints the generator as given rather than padded to the widest one.
+- `circuit_to_tableau` refuses a Tableau above the memory budget with `AnalysisError::ResourceLimit` for the `tableau-conversion` operation instead of an invalid-conversion message, and no longer caps repeat work.
+- Unitary `circuit_time_reversed_for_flows` validates a wide circuit that the sparse tracker cannot fold against the dense Tableau instead of refusing it.
+- Ignored-only and unitary `circuit_flow_generators` admit their flow rows in bytes instead of a 4096-qubit bound, and detecting regions no longer refuse an output region wider than 1,048,576 qubits by count.
+- `unitary_to_tableau` accepts any power-of-two dimension, as Stim does; a matrix that is not Clifford still reports `UnitaryMatrixNotClifford`.
 
 ## Parser Limits
 
