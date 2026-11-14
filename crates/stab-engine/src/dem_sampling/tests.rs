@@ -1,16 +1,23 @@
 #![allow(
     clippy::expect_used,
+    clippy::indexing_slicing,
     reason = "DEM sampling tests use compact fixture assertions"
 )]
 
 use std::convert::Infallible;
 use std::sync::Arc;
 
+use rand::rngs::SmallRng;
+use rand::{RngExt as _, SeedableRng as _};
+use stab_bits::BitSlice;
+
 use stab_model::DetectorErrorModel;
 use stab_records::{DemSampleBatchView, DemSampleSink};
 
 use super::plan::DemSamplingPlanInner;
-use super::program::{DemSampleBlock, DemSampleError, DemSampleOperation, odd_parity_probability};
+use super::program::{
+    self, DemSampleBlock, DemSampleError, DemSampleOperation, odd_parity_probability,
+};
 use super::*;
 use crate::{DetectionRecordBuffer, RandomPolicy, Seed, ShotCount};
 
@@ -160,11 +167,11 @@ fn execution_failure_preserves_first_error_progress_and_poisons_session() {
             detector_count: 1,
             observable_count: 0,
             operations: DemSampleBlock {
-                operations: vec![DemSampleOperation::Error(DemSampleError {
-                    probability: 1.0,
-                    detectors: vec![1],
-                    observables: Vec::new(),
-                })],
+                operations: vec![DemSampleOperation::Error(DemSampleError::new(
+                    1.0,
+                    vec![1],
+                    Vec::new(),
+                ))],
                 error_count: 1,
                 direct_sample_effect_count: 1,
                 direct_sample_work_count: 1,
@@ -190,4 +197,119 @@ fn execution_failure_preserves_first_error_progress_and_poisons_session() {
     assert_eq!(sink.writes, 0);
     assert_eq!(sink.finishes, 0);
     assert!(session.is_poisoned());
+}
+
+/// Writes a random DEM block with nested repeats, zero repeat counts, error-free bodies, and
+/// detector shifts.
+fn write_random_dem_block(rng: &mut SmallRng, depth: usize, text: &mut String) {
+    use std::fmt::Write as _;
+
+    for _ in 0..rng.random_range(0..5_u32) {
+        match rng.random_range(0..10_u32) {
+            0..=4 => {
+                text.push_str("error(0.125)");
+                for _ in 0..rng.random_range(1..4_u32) {
+                    if rng.random_bool(0.2) {
+                        write!(text, " L{}", rng.random_range(0..2_u32)).expect("write");
+                    } else {
+                        write!(text, " D{}", rng.random_range(0..6_u32)).expect("write");
+                    }
+                }
+                text.push('\n');
+            }
+            5 | 6 => {
+                writeln!(text, "shift_detectors {}", rng.random_range(0..4_u32)).expect("write");
+            }
+            _ if depth < 3 => {
+                let repeat_count = [0, 1, 2, 3, 7][rng.random_range(0..5_usize)];
+                writeln!(text, "repeat {repeat_count} {{").expect("write");
+                write_random_dem_block(rng, depth + 1, text);
+                text.push_str("}\n");
+            }
+            _ => text.push_str("detector D0\n"),
+        }
+    }
+}
+
+type ReplayOutcome = Result<(usize, DetectionRecordBuffer), String>;
+
+fn replay_with<B: replay::ErrorRecordBits + ?Sized>(
+    plan: &DemSamplingPlan,
+    bits: &B,
+    detector_width: usize,
+    use_locator: bool,
+) -> ReplayOutcome {
+    let cancellation = stab_model::Cancellation::new();
+    let mut poll = program::DemPoll::new(&cancellation);
+    let mut record = DetectionRecordBuffer {
+        detectors: Vec::new(),
+        observables: Vec::new(),
+    };
+    replay::reset_detection_record(&mut record, detector_width, plan.observable_count());
+    let block = &plan.inner.operations;
+    let consumed = if use_locator {
+        replay::apply_error_record(block, bits, &mut record, &mut poll)
+    } else {
+        let mut cursor = 0;
+        replay::apply_error_record_block(block, 0, bits, &mut cursor, &mut record, &mut poll)
+            .map(|()| cursor)
+    };
+    consumed
+        .map(|consumed| (consumed, record))
+        .map_err(|error| error.to_string())
+}
+
+#[test]
+fn error_locator_replay_matches_the_sequential_walk() {
+    let mut rng = SmallRng::seed_from_u64(0x5EED_D3A1);
+    let mut replayed_errors = 0_usize;
+    let mut failures = 0_usize;
+    for _ in 0..300 {
+        let mut text = String::new();
+        write_random_dem_block(&mut rng, 0, &mut text);
+        let model = DetectorErrorModel::from_dem_str(&text).expect("parse random DEM");
+        let plan = DemSamplingCompiler::new()
+            .compile(&model)
+            .expect("compile random DEM");
+        let error_count = plan.error_count();
+        let lengths = [
+            Some(error_count),
+            error_count.checked_sub(1),
+            Some(error_count + 1),
+            Some(error_count + 70),
+        ];
+        for length in lengths.into_iter().flatten() {
+            for density in [0.0, 0.02, 0.4, 1.0] {
+                let bools: Vec<bool> = (0..length).map(|_| rng.random_bool(density)).collect();
+                // Packed storage carries garbage beyond the logical length, which must not replay.
+                let mut words = vec![0_u64; length.div_ceil(64)];
+                for (index, bit) in bools.iter().enumerate() {
+                    words[index / 64] |= u64::from(*bit) << (index % 64);
+                }
+                if length % 64 != 0
+                    && let Some(last) = words.last_mut()
+                {
+                    *last |= u64::MAX << (length % 64);
+                }
+                let packed = BitSlice::new(&words, length).expect("packed record");
+                // A narrow detector buffer makes target range failures comparable too.
+                for detector_width in [plan.detector_count(), plan.detector_count() / 2] {
+                    let expected = replay_with(&plan, bools.as_slice(), detector_width, false);
+                    let dense = replay_with(&plan, bools.as_slice(), detector_width, true);
+                    let packed = replay_with(&plan, &packed, detector_width, true);
+                    assert_eq!(dense, expected, "dense record of {length} bits for\n{text}");
+                    assert_eq!(
+                        packed, expected,
+                        "packed record of {length} bits for\n{text}"
+                    );
+                    match expected {
+                        Ok(_) => replayed_errors += bools.iter().filter(|bit| **bit).count(),
+                        Err(_) => failures += 1,
+                    }
+                }
+            }
+        }
+    }
+    assert!(replayed_errors > 10_000, "fixture must replay many errors");
+    assert!(failures > 100, "fixture must compare failure diagnostics");
 }

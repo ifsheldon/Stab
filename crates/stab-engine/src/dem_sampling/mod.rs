@@ -4,6 +4,7 @@ mod error;
 mod limits;
 mod plan;
 mod program;
+mod replay;
 mod session;
 
 pub use error::{DemError, DemResourceKind, DemResourceLimitError};

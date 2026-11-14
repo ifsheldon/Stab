@@ -319,25 +319,36 @@ fn dem_sampling_batch_stops_and_stays_resumable() {
 
 #[test]
 fn dem_replay_batch_stops_without_delivering_a_partial_batch() {
-    // The repeated body holds no error, so replay walks every iteration of a one-bit record.
-    let model = dem("error(0.5) D0\nrepeat 1000000000000 {\n    detector D0\n}\n");
+    // Replay work scales with the set bits of the supplied records, so the batch carries 16
+    // records of 2^22 set errors each: far more work than the cancellation delay allows.
+    const ERRORS: usize = 1 << 22;
+    const SHOTS: usize = 16;
+    let model = dem(&format!("repeat {ERRORS} {{\n    error(0.5) D0\n}}\n"));
     let cancellation = Cancellation::new();
     let signal = cancellation.clone();
     let (status, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
         let plan = DemSamplingCompiler::new()
             .compile(&model)
-            .expect("compile endless replay");
+            .expect("compile large replay");
+        let mut records = PackedShotBatch::zeros(SHOTS, ERRORS).expect("allocate records");
+        let all_set = vec![u8::MAX; ERRORS / 8];
+        for shot in 0..SHOTS {
+            records
+                .copy_shot_from_b8(shot, &all_set)
+                .expect("fill replay record");
+        }
         let mut replay = plan
             .replay_session_with_limits(
-                ShotCount::new(1),
+                ShotCount::new(SHOTS as u64),
                 DemSamplerLimits::default().with_cancellation(signal),
             )
             .expect("create replay session");
         let mut sink = CountingSink::default();
         let mut transaction = replay.start_transaction(&mut sink).expect("start replay");
+        let view = records.view_prefix(SHOTS).expect("view replay records");
         started();
         let status = transaction
-            .write_batch(&[vec![true]])
+            .write_packed_batch(view)
             .expect("an in-batch replay cancellation is not a failure");
         let summary = transaction.finish().expect("finish cancelled replay");
         assert!(summary.status().is_cancelled());

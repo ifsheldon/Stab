@@ -3,40 +3,22 @@ use stab_model::advanced::{
 };
 use stab_model::{Cancellation, DemInstruction, DemInstructionKind, DemTarget};
 
-use stab_bits::BitSlice;
-
 use super::{DemError, DemResult};
-use crate::DetectionRecordBuffer;
+use crate::bernoulli::SparseBernoulli;
 
-/// One replayed sampled-error record, read one error bit at a time in DEM order.
-pub(super) trait ErrorRecordBits {
-    fn bit_len(&self) -> usize;
-    fn bit(&self, index: usize) -> Option<bool>;
-}
-
-impl ErrorRecordBits for [bool] {
-    fn bit_len(&self) -> usize {
-        self.len()
-    }
-
-    fn bit(&self, index: usize) -> Option<bool> {
-        self.get(index).copied()
-    }
-}
-
-impl ErrorRecordBits for BitSlice<'_> {
-    fn bit_len(&self) -> usize {
-        self.len()
-    }
-
-    fn bit(&self, index: usize) -> Option<bool> {
-        self.get(index)
-    }
+/// The compiled operation holding error ordinals `first_error..` of its block.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ErrorSpan {
+    pub(super) first_error: usize,
+    pub(super) operation: usize,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct DemSampleBlock {
     pub(super) operations: Vec<DemSampleOperation>,
+    /// Error-carrying operations in order, keyed by their first unrolled error ordinal, so a
+    /// replayed error is located by binary search instead of a walk over the whole program.
+    pub(super) error_spans: Vec<ErrorSpan>,
     pub(super) detector_shift: u64,
     pub(super) error_count: usize,
     pub(super) direct_sample_effect_count: usize,
@@ -52,9 +34,35 @@ pub(super) enum DemSampleOperation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct DemSampleError {
-    pub(super) probability: f64,
+    probability: f64,
+    /// Geometric-skip constants, present exactly when `probability` is on the sparse branch.
+    sparse: Option<SparseBernoulli>,
     pub(super) detectors: Vec<u64>,
     pub(super) observables: Vec<usize>,
+}
+
+impl DemSampleError {
+    pub(super) fn new(probability: f64, detectors: Vec<u64>, observables: Vec<usize>) -> Self {
+        Self {
+            probability,
+            sparse: SparseBernoulli::new(probability),
+            detectors,
+            observables,
+        }
+    }
+
+    pub(super) const fn probability(&self) -> f64 {
+        self.probability
+    }
+
+    pub(super) const fn sparse(&self) -> Option<&SparseBernoulli> {
+        self.sparse.as_ref()
+    }
+
+    fn set_probability(&mut self, probability: f64) {
+        self.probability = probability;
+        self.sparse = SparseBernoulli::new(probability);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -100,6 +108,7 @@ pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleB
                 current_shift = current_shift.checked_add(repeated_shift).ok_or_else(|| {
                     DemError::invalid_sampler_compilation("DEM sampler detector shift overflowed")
                 })?;
+                let first_error = block.error_count;
                 block.error_count = checked_repeated_count(
                     block.error_count,
                     body.error_count,
@@ -128,6 +137,12 @@ pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleB
                             "DEM sampler direct sample work count overflowed",
                         )
                     })?;
+                if body.error_count > 0 {
+                    block.error_spans.push(ErrorSpan {
+                        first_error,
+                        operation: block.operations.len(),
+                    });
+                }
                 block
                     .operations
                     .push(DemSampleOperation::Repeat(DemSampleRepeat {
@@ -156,11 +171,7 @@ fn compile_instruction(
         .first()
         .copied()
         .ok_or_else(|| DemError::invalid_sampler_compilation("error is missing probability"))?;
-    let mut operation = DemSampleError {
-        probability,
-        detectors: Vec::new(),
-        observables: Vec::new(),
-    };
+    let mut operation = DemSampleError::new(probability, Vec::new(), Vec::new());
     for target in instruction.targets() {
         match target {
             DemTarget::RelativeDetector(detector) => {
@@ -182,6 +193,10 @@ fn compile_instruction(
             }
         }
     }
+    block.error_spans.push(ErrorSpan {
+        first_error: block.error_count,
+        operation: block.operations.len(),
+    });
     block.error_count = block.error_count.checked_add(1).ok_or_else(|| {
         DemError::invalid_sampler_compilation("DEM sampler error count overflowed")
     })?;
@@ -230,73 +245,6 @@ impl<'a> DemPoll<'a> {
     pub(super) fn tick(&mut self) -> DemResult<()> {
         Ok(self.countdown.tick(self.cancellation)?)
     }
-}
-
-pub(super) fn apply_error_record_block<B: ErrorRecordBits + ?Sized>(
-    block: &DemSampleBlock,
-    detector_shift: u64,
-    error_record: &B,
-    cursor: &mut usize,
-    record: &mut DetectionRecordBuffer,
-    poll: &mut DemPoll<'_>,
-) -> DemResult<()> {
-    for operation in &block.operations {
-        match operation {
-            DemSampleOperation::Error(error) => {
-                poll.tick()?;
-                let occurred = error_record.bit(*cursor).ok_or_else(|| {
-                    DemError::invalid_result_format("DEM error record ended early")
-                })?;
-                *cursor = cursor.checked_add(1).ok_or_else(|| {
-                    DemError::invalid_result_format("DEM error record cursor overflowed")
-                })?;
-                if occurred {
-                    apply_error_to_record(error, detector_shift, record)?;
-                }
-            }
-            DemSampleOperation::Repeat(repeat) => {
-                let mut iteration_shift = detector_shift
-                    .checked_add(repeat.start_detector_shift)
-                    .ok_or_else(detector_shift_overflow_error)?;
-                for _ in 0..repeat.repeat_count {
-                    poll.tick()?;
-                    apply_error_record_block(
-                        &repeat.body,
-                        iteration_shift,
-                        error_record,
-                        cursor,
-                        record,
-                        poll,
-                    )?;
-                    iteration_shift = iteration_shift
-                        .checked_add(repeat.body.detector_shift)
-                        .ok_or_else(detector_shift_overflow_error)?;
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn apply_error_to_record(
-    error: &DemSampleError,
-    detector_shift: u64,
-    record: &mut DetectionRecordBuffer,
-) -> DemResult<()> {
-    for detector in &error.detectors {
-        let shifted = detector_shift
-            .checked_add(*detector)
-            .ok_or_else(|| detector_index_overflow_error("detector"))?;
-        toggle_bit(
-            &mut record.detectors,
-            usize_from_u64(shifted, "detector index")?,
-            "detector",
-        )?;
-    }
-    for observable in &error.observables {
-        toggle_bit(&mut record.observables, *observable, "observable")?;
-    }
-    Ok(())
 }
 
 fn checked_repeated_count(
@@ -364,7 +312,10 @@ fn folded_zero_shift_repeat_errors(
     }
     let mut folded_errors = Vec::with_capacity(one_pass_errors.len());
     for mut folded_error in one_pass_errors {
-        folded_error.probability = odd_parity_probability(folded_error.probability, repeat_count);
+        folded_error.set_probability(odd_parity_probability(
+            folded_error.probability,
+            repeat_count,
+        ));
         if folded_error.probability > 0.0 {
             folded_errors.push(folded_error);
         }
@@ -426,9 +377,9 @@ fn shifted_sample_error(error: &DemSampleError, detector_offset: u64) -> DemResu
         })
         .collect::<DemResult<Vec<_>>>()?;
     Ok(DemSampleError {
-        probability: error.probability,
         detectors,
         observables: error.observables.clone(),
+        ..*error
     })
 }
 
@@ -461,35 +412,16 @@ pub(super) fn odd_parity_probability(probability: f64, repeat_count: u64) -> f64
     }
 }
 
-pub(super) fn reset_detection_record(
-    record: &mut DetectionRecordBuffer,
-    detector_count: usize,
-    observable_count: usize,
-) {
-    record.detectors.clear();
-    record.detectors.resize(detector_count, false);
-    record.observables.clear();
-    record.observables.resize(observable_count, false);
-}
-
-fn toggle_bit(bits: &mut [bool], index: usize, kind: &'static str) -> DemResult<()> {
-    let bit = bits.get_mut(index).ok_or_else(|| {
-        DemError::invalid_sampler_compilation(format!("{kind} index {index} is out of range"))
-    })?;
-    *bit = !*bit;
-    Ok(())
-}
-
 pub(super) fn usize_from_u64(value: u64, kind: &'static str) -> DemResult<usize> {
     usize::try_from(value).map_err(|_| {
         DemError::invalid_sampler_compilation(format!("{kind} {value} does not fit in usize"))
     })
 }
 
-fn detector_index_overflow_error(kind: &'static str) -> DemError {
+pub(super) fn detector_index_overflow_error(kind: &'static str) -> DemError {
     DemError::invalid_sampler_compilation(format!("{kind} index overflowed"))
 }
 
-fn detector_shift_overflow_error() -> DemError {
+pub(super) fn detector_shift_overflow_error() -> DemError {
     DemError::invalid_sampler_compilation("DEM sampler detector shift overflowed")
 }

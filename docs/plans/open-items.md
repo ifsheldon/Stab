@@ -7,8 +7,6 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 ## Speed
 
-- Sampling a detector error model by replaying sparse HITS input is several times slower than Stim, because the engine walks every error for every shot.
-- `sample_dem` on a distance-7 model with 1000 rounds takes about 22 s for 100,000 shots and has not been compared with Stim.
 - A single-shot `sample` with a reference sample on 400 layers of `CZ` and `S` over 400 qubits takes 37 ms against Stim's 29 ms, which is above the `1.25x` ceiling and outside the suite.
 - The reference sample is about 58 percent of a 64-shot `sample` at distance 35 with 1000 rounds, and reference loops with a period above one are not folded.
 - Reading HITS and DETS input is slower than reading `b8` input, although still faster than Stim.

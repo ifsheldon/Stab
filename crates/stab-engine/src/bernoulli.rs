@@ -1,7 +1,14 @@
 use rand::{Rng, RngExt as _};
 
+mod sparse;
+
+pub(crate) use sparse::{IndexedShotRange, SparseBernoulli};
+
 pub(crate) const INDEXED_BLOCK_SHOTS: usize = 1024;
 pub(crate) const INDEXED_BLOCK_WORDS: usize = INDEXED_BLOCK_SHOTS / u64::BITS as usize;
+
+/// Probabilities strictly below this bound are sampled by geometric gap skipping.
+const SPARSE_PROBABILITY_BOUND: f64 = 0.02;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum IndexedRangeError {
@@ -121,7 +128,7 @@ fn sample_words(probability: f64, output: &mut [u64], rng: &mut impl RandomSourc
         }
         return;
     }
-    if probability < 0.02 {
+    if probability < SPARSE_PROBABILITY_BOUND {
         output.fill(0);
         or_sparse_hits(probability, output, rng);
     } else {
@@ -141,7 +148,7 @@ fn or_sparse_hits(probability: f64, output: &mut [u64], rng: &mut impl RandomSou
     let mut position = 0_usize;
     while position < bit_count {
         let uniform = 1.0 - rng.next_unit_f64();
-        let gap = (uniform.ln() / log_failure).floor();
+        let gap = geometric_gap(uniform, log_failure);
         if !gap.is_finite() || gap >= bit_count.saturating_sub(position) as f64 {
             break;
         }
@@ -149,6 +156,15 @@ fn or_sparse_hits(probability: f64, output: &mut [u64], rng: &mut impl RandomSou
         output[position / u64::BITS as usize] |= 1_u64 << (position % u64::BITS as usize);
         position += 1;
     }
+}
+
+/// Number of failures before the next success for one uniform draw in `(0, 1]`.
+///
+/// This expression defines the seeded sparse stream; every sparse sampler shares it so their
+/// hit positions agree bit for bit.
+#[inline(always)]
+fn geometric_gap(uniform: f64, log_failure: f64) -> f64 {
+    (uniform.ln() / log_failure).floor()
 }
 
 #[allow(
@@ -213,10 +229,27 @@ fn copy_bit_range(
 }
 
 fn indexed_seed(seed: u64, stream_index: u64, block: u64) -> u64 {
-    splitmix64(
-        seed ^ splitmix64(stream_index.wrapping_add(0xA076_1D64_78BD_642F))
-            ^ splitmix64(block.wrapping_add(0xE703_7ED1_A0B4_28DB)),
+    indexed_seed_from_keys(
+        seed,
+        indexed_stream_key(stream_index),
+        indexed_block_key(block),
     )
+}
+
+/// Seed of one indexed block substream from its precomputed stream and block keys.
+#[inline(always)]
+fn indexed_seed_from_keys(seed: u64, stream_key: u64, block_key: u64) -> u64 {
+    splitmix64(seed ^ stream_key ^ block_key)
+}
+
+#[inline(always)]
+fn indexed_stream_key(stream_index: u64) -> u64 {
+    splitmix64(stream_index.wrapping_add(0xA076_1D64_78BD_642F))
+}
+
+#[inline(always)]
+fn indexed_block_key(block: u64) -> u64 {
+    splitmix64(block.wrapping_add(0xE703_7ED1_A0B4_28DB))
 }
 
 fn splitmix64(mut value: u64) -> u64 {

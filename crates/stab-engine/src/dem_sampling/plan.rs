@@ -7,10 +7,8 @@ use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 
 use super::bit_plane::{SampledErrorPlanes, sample_into_planes};
 use super::buffers::try_false_vec;
-use super::program::{
-    DemPoll, DemSampleBlock, ErrorRecordBits, apply_error_record_block, compile_block,
-    reset_detection_record, usize_from_u64,
-};
+use super::program::{DemPoll, DemSampleBlock, compile_block, usize_from_u64};
+use super::replay::{ErrorRecordBits, apply_error_record, reset_detection_record};
 use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
 use super::{DemError, DemResult, DemSamplerLimits};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount};
@@ -240,16 +238,13 @@ impl DemSamplingPlan {
     ) -> DemResult<()> {
         self.validate_error_record_width(error_record, None)?;
         reset_detection_record(record, self.detector_count(), self.observable_count());
-        let mut cursor = 0;
-        apply_error_record_block(
+        let consumed = apply_error_record(
             &self.inner.operations,
-            0,
             error_record,
-            &mut cursor,
             record,
             &mut DemPoll::new(cancellation),
         )?;
-        if cursor != error_record.bit_len() {
+        if consumed != error_record.bit_len() {
             return Err(DemError::invalid_result_format(
                 "DEM error record had unused trailing bits",
             ));
