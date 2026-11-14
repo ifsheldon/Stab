@@ -1,580 +1,625 @@
-//! The static Stim v1.16.0 gate table: one row per gate carrying category,
-//! argument and target rules, inverse identity, classification flags, and
-//! the accepted alias list. Classification accessors in the parent module
-//! derive every view from these rows.
+//! The static Stim v1.16.0 gate table: one row per [`GateKind`], in declaration order, carrying
+//! the canonical name, category, argument and target rules, inverse, classification flags, and
+//! accepted alias list. Classification accessors in the parent module derive every other view
+//! from these rows, so per-gate facts have this one owner.
 
-use super::{ArgRule, GateCategory, GateFlags, GateInfo, TargetRule};
+use super::{ArgRule, GateCategory, GateFlags, GateInfo, GateKind, TargetRule};
+use crate::Pauli;
+
+/// Spells a row's identity once: the kind variant and its canonical name are the same token.
+macro_rules! id {
+    ($kind:ident) => {
+        (GateKind::$kind, stringify!($kind))
+    };
+}
 
 const fn gate(
-    name: &'static str,
+    id: (GateKind, &'static str),
     category: GateCategory,
     arg_rule: ArgRule,
     target_rule: TargetRule,
 ) -> GateInfo {
-    gate_with_inverse(name, name, category, arg_rule, target_rule)
+    gate_with_inverse(id, id.0, category, arg_rule, target_rule)
 }
 
 const fn gate_with_inverse(
-    name: &'static str,
-    inverse_name: &'static str,
+    (kind, name): (GateKind, &'static str),
+    inverse: GateKind,
     category: GateCategory,
     arg_rule: ArgRule,
     target_rule: TargetRule,
 ) -> GateInfo {
     GateInfo {
+        kind,
         name,
-        inverse_name,
+        inverse,
         category,
         arg_rule,
         target_rule,
         can_fuse: true,
         flags: GateFlags::NONE,
         aliases: &[],
+        controlled_pauli: None,
+        collapse_basis: None,
     }
 }
 
 const fn not_fusable_gate(
-    name: &'static str,
+    id: (GateKind, &'static str),
     category: GateCategory,
     arg_rule: ArgRule,
     target_rule: TargetRule,
 ) -> GateInfo {
-    GateInfo {
-        name,
-        inverse_name: name,
-        category,
-        arg_rule,
-        target_rule,
-        can_fuse: false,
-        flags: GateFlags::NONE,
-        aliases: &[],
-    }
+    let mut info = gate(id, category, arg_rule, target_rule);
+    info.can_fuse = false;
+    info
 }
 
-pub(super) const GATES: &[GateInfo] = &[
+/// Proves at compile time that row `i` describes `GateKind::ALL[i]`, which makes the
+/// discriminant-indexed lookup in [`GateKind::gate`] total.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "indexes are bounded by the equal table and kind-list lengths during const evaluation"
+)]
+const _: () = {
+    let mut index = 0;
+    while index < GATES.len() {
+        assert!(
+            GATES[index].kind as usize == index && GateKind::ALL[index] as usize == index,
+            "gate table rows must follow GateKind declaration order"
+        );
+        assert!(
+            GATES[index].controlled_pauli.is_some()
+                == matches!(GATES[index].target_rule, TargetRule::ClassicalControlPairs),
+            "exactly the classically controllable gates name a controlled Pauli"
+        );
+        assert!(
+            GATES[index].collapse_basis.is_some()
+                == matches!(GATES[index].category, GateCategory::Collapsing),
+            "exactly the single-qubit collapsing gates name a collapse basis"
+        );
+        index += 1;
+    }
+};
+
+pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     not_fusable_gate(
-        "DETECTOR",
+        id!(DETECTOR),
         GateCategory::Annotation,
         ArgRule::Any,
         TargetRule::RecOnly,
     ),
     not_fusable_gate(
-        "OBSERVABLE_INCLUDE",
+        id!(OBSERVABLE_INCLUDE),
         GateCategory::Annotation,
         ArgRule::UnsignedInteger,
         TargetRule::RecOrPauli,
     ),
     not_fusable_gate(
-        "TICK",
+        id!(TICK),
         GateCategory::Annotation,
         ArgRule::Exact(0),
         TargetRule::None,
     ),
     not_fusable_gate(
-        "QUBIT_COORDS",
+        id!(QUBIT_COORDS),
         GateCategory::Annotation,
         ArgRule::Any,
         TargetRule::QubitCoords,
     ),
     not_fusable_gate(
-        "SHIFT_COORDS",
+        id!(SHIFT_COORDS),
         GateCategory::Annotation,
         ArgRule::Any,
         TargetRule::None,
     ),
     not_fusable_gate(
-        "REPEAT",
+        id!(REPEAT),
         GateCategory::ControlFlow,
         ArgRule::Exact(0),
         TargetRule::None,
     ),
     gate(
-        "MPAD",
+        id!(MPAD),
         GateCategory::Annotation,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementPads,
     )
     .with_flags(GateFlags::PRODUCES_RESULTS),
     gate(
-        "MX",
+        id!(MX),
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
     )
+    .with_collapse_basis(Pauli::X)
     .with_flags(GateFlags::PRODUCES_RESULTS),
     gate(
-        "MY",
+        id!(MY),
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
     )
+    .with_collapse_basis(Pauli::Y)
     .with_flags(GateFlags::PRODUCES_RESULTS),
     gate(
-        "M",
+        id!(M),
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
     )
+    .with_collapse_basis(Pauli::Z)
     .with_flags(GateFlags::PRODUCES_RESULTS)
     .with_aliases(&["M", "MZ"]),
     gate(
-        "MRX",
+        id!(MRX),
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
     )
+    .with_collapse_basis(Pauli::X)
     .with_flags(GateFlags::PRODUCES_RESULTS.union(GateFlags::IS_RESET)),
     gate(
-        "MRY",
+        id!(MRY),
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
     )
+    .with_collapse_basis(Pauli::Y)
     .with_flags(GateFlags::PRODUCES_RESULTS.union(GateFlags::IS_RESET)),
     gate(
-        "MR",
+        id!(MR),
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
     )
+    .with_collapse_basis(Pauli::Z)
     .with_flags(GateFlags::PRODUCES_RESULTS.union(GateFlags::IS_RESET))
     .with_aliases(&["MR", "MRZ"]),
     gate_with_inverse(
-        "RX",
-        "MX",
+        id!(RX),
+        GateKind::MX,
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     )
+    .with_collapse_basis(Pauli::X)
     .with_flags(GateFlags::IS_RESET),
     gate_with_inverse(
-        "RY",
-        "MY",
+        id!(RY),
+        GateKind::MY,
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     )
+    .with_collapse_basis(Pauli::Y)
     .with_flags(GateFlags::IS_RESET),
     gate_with_inverse(
-        "R",
-        "M",
+        id!(R),
+        GateKind::M,
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     )
+    .with_collapse_basis(Pauli::Z)
     .with_flags(GateFlags::IS_RESET)
     .with_aliases(&["R", "RZ"]),
     gate(
-        "XCX",
+        id!(XCX),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
-        "XCY",
+        id!(XCY),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     ),
     gate(
-        "XCZ",
+        id!(XCZ),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
-    ),
+    )
+    .with_controlled_pauli(Pauli::X),
     gate(
-        "YCX",
+        id!(YCX),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     ),
     gate(
-        "YCY",
+        id!(YCY),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
-        "YCZ",
-        GateCategory::Controlled,
-        ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
-    ),
-    gate(
-        "CX",
+        id!(YCZ),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
     )
+    .with_controlled_pauli(Pauli::Y),
+    gate(
+        id!(CX),
+        GateCategory::Controlled,
+        ArgRule::Exact(0),
+        TargetRule::ClassicalControlPairs,
+    )
+    .with_controlled_pauli(Pauli::X)
     .with_aliases(&["CNOT", "CX", "ZCX"]),
     gate(
-        "CY",
+        id!(CY),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
     )
+    .with_controlled_pauli(Pauli::Y)
     .with_aliases(&["CY", "ZCY"]),
     gate(
-        "CZ",
+        id!(CZ),
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
     )
+    .with_controlled_pauli(Pauli::Z)
     .with_flags(GateFlags::SYMMETRIC_PAIR)
     .with_aliases(&["CZ", "ZCZ"]),
     gate(
-        "H",
+        id!(H),
         GateCategory::HadamardLike,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     )
     .with_aliases(&["H", "H_XZ"]),
     gate(
-        "H_XY",
+        id!(H_XY),
         GateCategory::HadamardLike,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "H_YZ",
+        id!(H_YZ),
         GateCategory::HadamardLike,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "H_NXY",
+        id!(H_NXY),
         GateCategory::HadamardLike,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "H_NXZ",
+        id!(H_NXZ),
         GateCategory::HadamardLike,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "H_NYZ",
+        id!(H_NYZ),
         GateCategory::HadamardLike,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "DEPOLARIZE1",
+        id!(DEPOLARIZE1),
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "DEPOLARIZE2",
+        id!(DEPOLARIZE2),
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
-        "X_ERROR",
+        id!(X_ERROR),
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "Y_ERROR",
+        id!(Y_ERROR),
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "Z_ERROR",
+        id!(Z_ERROR),
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "I_ERROR",
+        id!(I_ERROR),
         GateCategory::Noise,
         ArgRule::AnyProbabilityList,
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "II_ERROR",
+        id!(II_ERROR),
         GateCategory::Noise,
         ArgRule::AnyProbabilityList,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
-        "PAULI_CHANNEL_1",
+        id!(PAULI_CHANNEL_1),
         GateCategory::Noise,
         ArgRule::ProbabilityList(3),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "PAULI_CHANNEL_2",
+        id!(PAULI_CHANNEL_2),
         GateCategory::Noise,
         ArgRule::ProbabilityList(15),
         TargetRule::PlainPairs,
     ),
     not_fusable_gate(
-        "E",
+        id!(E),
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::PauliList,
     )
     .with_aliases(&["CORRELATED_ERROR", "E"]),
     not_fusable_gate(
-        "ELSE_CORRELATED_ERROR",
+        id!(ELSE_CORRELATED_ERROR),
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::PauliList,
     ),
     gate(
-        "HERALDED_ERASE",
+        id!(HERALDED_ERASE),
         GateCategory::HeraldedNoise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
     )
     .with_flags(GateFlags::PRODUCES_RESULTS),
     gate(
-        "HERALDED_PAULI_CHANNEL_1",
+        id!(HERALDED_PAULI_CHANNEL_1),
         GateCategory::HeraldedNoise,
         ArgRule::ProbabilityList(4),
         TargetRule::AnySingleQubit,
     )
     .with_flags(GateFlags::PRODUCES_RESULTS),
     gate(
-        "I",
+        id!(I),
         GateCategory::Pauli,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "X",
+        id!(X),
         GateCategory::Pauli,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "Y",
+        id!(Y),
         GateCategory::Pauli,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate(
-        "Z",
+        id!(Z),
         GateCategory::Pauli,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_XYZ",
-        "C_ZYX",
+        id!(C_XYZ),
+        GateKind::C_ZYX,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_ZYX",
-        "C_XYZ",
+        id!(C_ZYX),
+        GateKind::C_XYZ,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_NXYZ",
-        "C_ZYNX",
+        id!(C_NXYZ),
+        GateKind::C_ZYNX,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_XNYZ",
-        "C_ZNYX",
+        id!(C_XNYZ),
+        GateKind::C_ZNYX,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_XYNZ",
-        "C_NZYX",
+        id!(C_XYNZ),
+        GateKind::C_NZYX,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_NZYX",
-        "C_XYNZ",
+        id!(C_NZYX),
+        GateKind::C_XYNZ,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_ZNYX",
-        "C_XNYZ",
+        id!(C_ZNYX),
+        GateKind::C_XNYZ,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "C_ZYNX",
-        "C_NXYZ",
+        id!(C_ZYNX),
+        GateKind::C_NXYZ,
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "SQRT_X",
-        "SQRT_X_DAG",
+        id!(SQRT_X),
+        GateKind::SQRT_X_DAG,
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "SQRT_X_DAG",
-        "SQRT_X",
+        id!(SQRT_X_DAG),
+        GateKind::SQRT_X,
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "SQRT_Y",
-        "SQRT_Y_DAG",
+        id!(SQRT_Y),
+        GateKind::SQRT_Y_DAG,
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "SQRT_Y_DAG",
-        "SQRT_Y",
+        id!(SQRT_Y_DAG),
+        GateKind::SQRT_Y,
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
-        "S",
-        "S_DAG",
+        id!(S),
+        GateKind::S_DAG,
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     )
     .with_aliases(&["S", "SQRT_Z"]),
     gate_with_inverse(
-        "S_DAG",
-        "S",
+        id!(S_DAG),
+        GateKind::S,
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     )
     .with_aliases(&["S_DAG", "SQRT_Z_DAG"]),
     gate(
-        "II",
+        id!(II),
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "SQRT_XX",
-        "SQRT_XX_DAG",
+        id!(SQRT_XX),
+        GateKind::SQRT_XX_DAG,
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "SQRT_XX_DAG",
-        "SQRT_XX",
+        id!(SQRT_XX_DAG),
+        GateKind::SQRT_XX,
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "SQRT_YY",
-        "SQRT_YY_DAG",
+        id!(SQRT_YY),
+        GateKind::SQRT_YY_DAG,
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "SQRT_YY_DAG",
-        "SQRT_YY",
+        id!(SQRT_YY_DAG),
+        GateKind::SQRT_YY,
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "SQRT_ZZ",
-        "SQRT_ZZ_DAG",
+        id!(SQRT_ZZ),
+        GateKind::SQRT_ZZ_DAG,
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "SQRT_ZZ_DAG",
-        "SQRT_ZZ",
+        id!(SQRT_ZZ_DAG),
+        GateKind::SQRT_ZZ,
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
-        "MPP",
+        id!(MPP),
         GateCategory::PauliProduct,
         ArgRule::ZeroOrOneProbability,
         TargetRule::PauliProducts,
     )
     .with_flags(GateFlags::PRODUCES_RESULTS),
     gate_with_inverse(
-        "SPP",
-        "SPP_DAG",
+        id!(SPP),
+        GateKind::SPP_DAG,
         GateCategory::PauliProduct,
         ArgRule::Exact(0),
         TargetRule::PauliProducts,
     ),
     gate_with_inverse(
-        "SPP_DAG",
-        "SPP",
+        id!(SPP_DAG),
+        GateKind::SPP,
         GateCategory::PauliProduct,
         ArgRule::Exact(0),
         TargetRule::PauliProducts,
     ),
     gate(
-        "SWAP",
+        id!(SWAP),
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "ISWAP",
-        "ISWAP_DAG",
+        id!(ISWAP),
+        GateKind::ISWAP_DAG,
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate_with_inverse(
-        "CXSWAP",
-        "SWAPCX",
+        id!(CXSWAP),
+        GateKind::SWAPCX,
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     ),
     gate_with_inverse(
-        "SWAPCX",
-        "CXSWAP",
+        id!(SWAPCX),
+        GateKind::CXSWAP,
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     ),
     gate(
-        "CZSWAP",
+        id!(CZSWAP),
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
@@ -582,29 +627,29 @@ pub(super) const GATES: &[GateInfo] = &[
     .with_flags(GateFlags::SYMMETRIC_PAIR)
     .with_aliases(&["CZSWAP", "SWAPCZ"]),
     gate_with_inverse(
-        "ISWAP_DAG",
-        "ISWAP",
+        id!(ISWAP_DAG),
+        GateKind::ISWAP,
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
-        "MXX",
+        id!(MXX),
         GateCategory::PairMeasurement,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementPairs,
     )
     .with_flags(GateFlags::PRODUCES_RESULTS.union(GateFlags::SYMMETRIC_PAIR)),
     gate(
-        "MYY",
+        id!(MYY),
         GateCategory::PairMeasurement,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementPairs,
     )
     .with_flags(GateFlags::PRODUCES_RESULTS.union(GateFlags::SYMMETRIC_PAIR)),
     gate(
-        "MZZ",
+        id!(MZZ),
         GateCategory::PairMeasurement,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementPairs,

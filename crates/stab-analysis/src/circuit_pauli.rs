@@ -1,6 +1,6 @@
 use stab_algebra::{PauliBasis, PauliString, Tableau};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, GateCategory, Pauli, QubitId, Target,
+    Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, Pauli, QubitId, Target,
     advanced::{ControlledPauliTargetPair, classify_controlled_pauli_target_pair},
 };
 
@@ -82,18 +82,89 @@ fn apply_instruction_after(
     pauli: &mut PauliString,
     instruction: &CircuitInstruction,
 ) -> AnalysisResult<()> {
-    let name = instruction.gate().canonical_name();
     if no_effect_on_pauli(instruction) {
         return Ok(());
     }
-    match name {
-        "R" | "RX" | "RY" | "MR" | "MRX" | "MRY" => check_reset_avoided(pauli, instruction),
-        "M" | "MX" | "MY" => check_measurement_commutes(pauli, instruction),
-        "MPP" => check_mpp_commutes(pauli, instruction),
-        _ if instruction.gate().is_unitary() => {
-            apply_unitary_instruction(pauli, instruction, false)
-        }
-        _ => Err(unsupported_instruction(instruction, "after")),
+    match instruction.gate().kind() {
+        GateKind::R
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::MR
+        | GateKind::MRX
+        | GateKind::MRY => check_reset_avoided(pauli, instruction),
+        GateKind::M | GateKind::MX | GateKind::MY => check_measurement_commutes(pauli, instruction),
+        GateKind::MPP => check_mpp_commutes(pauli, instruction),
+        GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG => apply_unitary_instruction(pauli, instruction, false),
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => Err(unsupported_instruction(instruction, "after")),
     }
 }
 
@@ -101,33 +172,176 @@ fn apply_instruction_before(
     pauli: &mut PauliString,
     instruction: &CircuitInstruction,
 ) -> AnalysisResult<()> {
-    let name = instruction.gate().canonical_name();
     if no_effect_on_pauli(instruction) {
         return Ok(());
     }
-    match name {
-        "R" | "RX" | "RY" | "MR" | "MRX" | "MRY" => undo_reset(pauli, instruction),
-        "M" | "MX" | "MY" => check_measurement_commutes(pauli, instruction),
-        "MPP" => check_mpp_commutes(pauli, instruction),
-        _ if instruction.gate().is_unitary() => apply_unitary_instruction(pauli, instruction, true),
-        _ => Err(unsupported_instruction(instruction, "before")),
+    match instruction.gate().kind() {
+        GateKind::R
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::MR
+        | GateKind::MRX
+        | GateKind::MRY => undo_reset(pauli, instruction),
+        GateKind::M | GateKind::MX | GateKind::MY => check_measurement_commutes(pauli, instruction),
+        GateKind::MPP => check_mpp_commutes(pauli, instruction),
+        GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG => apply_unitary_instruction(pauli, instruction, true),
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => Err(unsupported_instruction(instruction, "before")),
     }
 }
 
 fn no_effect_on_pauli(instruction: &CircuitInstruction) -> bool {
-    matches!(
-        instruction.gate().canonical_name(),
-        "DETECTOR"
-            | "OBSERVABLE_INCLUDE"
-            | "TICK"
-            | "QUBIT_COORDS"
-            | "SHIFT_COORDS"
-            | "MPAD"
-            | "I"
-            | "II"
-            | "I_ERROR"
-            | "II_ERROR"
-    ) || instruction.gate().category() == GateCategory::Annotation
+    match instruction.gate().kind() {
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::MPAD
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::I
+        | GateKind::II => true,
+        GateKind::REPEAT
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => false,
+    }
 }
 
 fn apply_unitary_instruction(
@@ -159,21 +373,16 @@ fn apply_unitary_instruction(
     };
     let mut output_sign = pauli.sign();
     for group in instruction.target_groups() {
-        if matches!(gate_name, "CX" | "CY" | "CZ" | "XCZ" | "YCZ") {
+        if let Some(conditional_pauli) = instruction.gate().controlled_pauli() {
             match classify_controlled_pauli_target_pair(instruction.gate(), group) {
                 ControlledPauliTargetPair::Quantum { first, second } => {
                     apply_local_tableau_group(pauli, &local, &[first, second], &mut output_sign)?;
                 }
                 ControlledPauliTargetPair::Classical { target, .. } => {
-                    let conditional_basis = match gate_name {
-                        "CX" | "XCZ" => PauliBasis::X,
-                        "CY" | "YCZ" => PauliBasis::Y,
-                        "CZ" => PauliBasis::Z,
-                        _ => {
-                            return Err(AnalysisError::invalid_tableau_conversion(
-                                "controlled-Pauli classifier received a different gate",
-                            ));
-                        }
+                    let conditional_basis = match conditional_pauli {
+                        Pauli::X => PauliBasis::X,
+                        Pauli::Y => PauliBasis::Y,
+                        Pauli::Z => PauliBasis::Z,
                     };
                     let target = target.get() as usize;
                     if anticommutes(pauli_basis(pauli, target)?, conditional_basis) {
@@ -387,12 +596,13 @@ fn check_mpp_commutes(pauli: &PauliString, instruction: &CircuitInstruction) -> 
 }
 
 fn single_result_basis(instruction: &CircuitInstruction) -> AnalysisResult<PauliBasis> {
-    match instruction.gate().canonical_name() {
-        "M" | "R" | "MR" => Ok(PauliBasis::Z),
-        "MX" | "RX" | "MRX" => Ok(PauliBasis::X),
-        "MY" | "RY" | "MRY" => Ok(PauliBasis::Y),
-        name => Err(AnalysisError::invalid_tableau_conversion(format!(
-            "{name} does not have a single-result Pauli basis"
+    match instruction.gate().collapse_basis() {
+        Some(Pauli::Z) => Ok(PauliBasis::Z),
+        Some(Pauli::X) => Ok(PauliBasis::X),
+        Some(Pauli::Y) => Ok(PauliBasis::Y),
+        None => Err(AnalysisError::invalid_tableau_conversion(format!(
+            "{} does not have a single-result Pauli basis",
+            instruction.gate().canonical_name()
         ))),
     }
 }

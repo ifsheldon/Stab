@@ -1,8 +1,10 @@
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, Gate, MemoryBudget, QubitId,
-    RepeatNestingLimit, Target,
-    advanced::{CancellationCountdown, CircuitBuilder},
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, FoldedCircuitSummary, FoldedWalkError,
+    Gate, GateKind, MemoryBudget, ParseLimits, QubitId, Target,
+    advanced::{CancellationCountdown, CircuitBuilder, FoldedCircuitEvent},
 };
+
+use crate::folded_walk::{check_repeat_nesting, walk_folded};
 
 use crate::{
     AnalysisError, AnalysisResult, CircuitPass, CircuitPassInput, CircuitPassOutput,
@@ -279,7 +281,7 @@ fn validate_flattening_budget(
     limits: &CircuitFlattenLimits,
 ) -> AnalysisResult<CircuitFlattenEstimate> {
     validate_flattened_repeat_nesting(circuit)?;
-    let estimate = flattened_materialization_estimate(circuit, 1)?;
+    let estimate = flattened_materialization_estimate(circuit)?;
     validate_materialized_instruction_capacity(estimate.operations)?;
     let materialized_bytes = estimate.materialized_bytes()?;
     let budget = limits.memory_budget();
@@ -324,45 +326,65 @@ impl CircuitFlattenEstimate {
     }
 }
 
-fn flattened_materialization_estimate(
-    circuit: &Circuit,
-    multiplier: u64,
-) -> AnalysisResult<CircuitFlattenEstimate> {
+fn flattened_materialization_estimate(circuit: &Circuit) -> AnalysisResult<CircuitFlattenEstimate> {
     let mut estimate = CircuitFlattenEstimate::default();
-    for item in circuit.items() {
-        let addition = match item {
-            CircuitItem::Instruction(instruction)
-                if instruction.gate().canonical_name() == "SHIFT_COORDS" =>
-            {
-                CircuitFlattenEstimate::default()
-            }
-            CircuitItem::Instruction(instruction) => CircuitFlattenEstimate {
-                operations: multiplier,
-                targets: checked_flatten_product(
-                    usize_to_u64(instruction.targets().len())?,
-                    multiplier,
-                    "target count",
-                )?,
-                arguments: checked_flatten_product(
-                    usize_to_u64(instruction.args().len())?,
-                    multiplier,
-                    "argument count",
-                )?,
-                tag_bytes: checked_flatten_product(
-                    usize_to_u64(instruction.tag_bytes().map_or(0, <[u8]>::len))?,
-                    multiplier,
-                    "tag byte count",
-                )?,
-            },
-            CircuitItem::RepeatBlock(repeat) => {
-                let repeated_multiplier = multiplier
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or_else(flattened_operation_count_error)?;
-                flattened_materialization_estimate(repeat.body(), repeated_multiplier)?
-            }
-        };
-        estimate = estimate.checked_add(addition)?;
-    }
+    walk_folded(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+        |depth, limit| {
+            ResourceLimitError::circuit_flatten_repeat_nesting(
+                usize::try_from(depth).unwrap_or(usize::MAX),
+                usize::try_from(limit).unwrap_or(usize::MAX),
+            )
+            .into()
+        },
+        |event| {
+            let addition = match event {
+                FoldedCircuitEvent::Instruction { instruction, .. }
+                    if instruction.gate().kind() == GateKind::SHIFT_COORDS =>
+                {
+                    return Ok(());
+                }
+                FoldedCircuitEvent::Instruction {
+                    instruction,
+                    executions,
+                } => {
+                    let multiplier = executions
+                        .exact()
+                        .ok_or_else(flattened_operation_count_error)?;
+                    CircuitFlattenEstimate {
+                        operations: multiplier,
+                        targets: checked_flatten_product(
+                            usize_to_u64(instruction.targets().len())?,
+                            multiplier,
+                            "target count",
+                        )?,
+                        arguments: checked_flatten_product(
+                            usize_to_u64(instruction.args().len())?,
+                            multiplier,
+                            "argument count",
+                        )?,
+                        tag_bytes: checked_flatten_product(
+                            usize_to_u64(instruction.tag_bytes().map_or(0, <[u8]>::len))?,
+                            multiplier,
+                            "tag byte count",
+                        )?,
+                    }
+                }
+                // Flattening multiplies through every block, so an iteration count beyond `u64`
+                // is refused even when the block's body is empty.
+                FoldedCircuitEvent::Repeat { iterations, .. } => {
+                    iterations
+                        .exact()
+                        .ok_or_else(flattened_operation_count_error)?;
+                    return Ok(());
+                }
+            };
+            estimate = estimate.checked_add(addition)?;
+            Ok(())
+        },
+    )?;
     Ok(estimate)
 }
 
@@ -390,50 +412,42 @@ fn usize_to_u64(value: usize) -> AnalysisResult<u64> {
 }
 
 fn validate_flattened_repeat_nesting(circuit: &Circuit) -> AnalysisResult<()> {
-    let limit = RepeatNestingLimit::HARD_MAX;
-    let mut pending = vec![(circuit, 0usize)];
-    while let Some((current, depth)) = pending.pop() {
-        for item in current.items() {
-            let CircuitItem::RepeatBlock(repeat) = item else {
-                continue;
-            };
-            let next_depth = depth.checked_add(1).ok_or_else(|| {
-                AnalysisError::invalid_domain_value("circuit repeat nesting", "depth overflow")
-            })?;
-            if next_depth > limit {
-                return Err(
-                    ResourceLimitError::circuit_flatten_repeat_nesting(next_depth, limit).into(),
-                );
-            }
-            pending.push((repeat.body(), next_depth));
-        }
-    }
-    Ok(())
+    check_repeat_nesting(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        |depth, limit| {
+            ResourceLimitError::circuit_flatten_repeat_nesting(
+                usize::try_from(depth).unwrap_or(usize::MAX),
+                usize::try_from(limit).unwrap_or(usize::MAX),
+            )
+            .into()
+        },
+    )
 }
 
+/// Counts the instructions flattening emits, which excludes `SHIFT_COORDS`.
 fn flattened_operation_count(circuit: &Circuit) -> AnalysisResult<u64> {
-    let mut count = 0_u64;
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                if instruction.gate().canonical_name() != "SHIFT_COORDS" {
-                    count = count
-                        .checked_add(1)
-                        .ok_or_else(flattened_operation_count_error)?;
-                }
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let body_count = flattened_operation_count(repeat.body())?;
-                let repeated_count = body_count
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or_else(flattened_operation_count_error)?;
-                count = count
-                    .checked_add(repeated_count)
-                    .ok_or_else(flattened_operation_count_error)?;
-            }
+    let summary = FoldedCircuitSummary::of(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+    )
+    .map_err(|error| match error {
+        FoldedWalkError::RepeatNesting { depth, limit } => {
+            ResourceLimitError::circuit_flatten_repeat_nesting(depth, limit).into()
         }
-    }
-    Ok(count)
+        FoldedWalkError::Cancelled(cancelled) => AnalysisError::from(cancelled),
+    })?;
+    GateKind::ALL
+        .into_iter()
+        .filter(|kind| *kind != GateKind::SHIFT_COORDS)
+        .try_fold(0_u64, |count, kind| {
+            summary
+                .instructions_of(kind)
+                .exact()
+                .and_then(|instructions| count.checked_add(instructions))
+                .ok_or_else(flattened_operation_count_error)
+        })
 }
 
 fn visit_flattened_operations(
@@ -479,17 +493,94 @@ fn visit_flattened_instruction(
     shift: &mut Vec<f64>,
     visitor: &mut impl FnMut(CircuitInstruction) -> AnalysisResult<()>,
 ) -> AnalysisResult<()> {
-    match instruction.gate().canonical_name() {
-        "SHIFT_COORDS" => {
+    match instruction.gate().kind() {
+        GateKind::SHIFT_COORDS => {
             add_coordinate_shift_mul(shift, instruction.args(), 1.0)?;
         }
-        "QUBIT_COORDS" | "DETECTOR" => {
+        GateKind::QUBIT_COORDS | GateKind::DETECTOR => {
             visitor(clone_instruction_with_args(
                 instruction,
                 shifted_flattened_coordinates(instruction.args(), shift)?,
             )?)?;
         }
-        _ => visitor(clone_instruction_with_args(
+        GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => visitor(clone_instruction_with_args(
             instruction,
             try_clone_slice(instruction.args(), "flattened circuit argument allocation")?,
         )?)?,
@@ -507,7 +598,7 @@ fn append_noiseless_instruction<R: WithoutNoiseRecorder>(
         let noiseless = if is_heralded_noise(gate) {
             recorder.record(WithoutNoiseChange::ReplacedHeraldedNoise)?;
             stab_model::advanced::circuit_instruction_with_tag_bytes(
-                Gate::from_name("MPAD")?,
+                GateKind::MPAD.gate(),
                 Vec::new(),
                 vec![Target::qubit(QubitId::new(0)?, false); instruction.targets().len()],
                 instruction.tag_bytes(),
@@ -542,7 +633,7 @@ fn coordinate_shift_of(circuit: &Circuit) -> AnalysisResult<Vec<f64>> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                if instruction.gate().canonical_name() == "SHIFT_COORDS" {
+                if instruction.gate().kind() == GateKind::SHIFT_COORDS {
                     add_coordinate_shift_mul(&mut shift, instruction.args(), 1.0)?;
                 }
             }
@@ -628,10 +719,7 @@ fn try_clone_slice<T: Clone>(values: &[T], context: &'static str) -> AnalysisRes
 }
 
 fn is_heralded_noise(gate: Gate) -> bool {
-    matches!(
-        gate.canonical_name(),
-        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-    )
+    gate.produces_heralded_results()
 }
 
 fn flattened_operation_count_error() -> AnalysisError {

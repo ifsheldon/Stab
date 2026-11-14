@@ -12,11 +12,10 @@
 
 use stab_analysis::{
     AnalysisError, CircuitFlattenLimits, DemFlattenLimits, DetectingRegionOptions,
-    ErrorAnalyzerOptions, ExplainErrorsOptions, FeedbackInliningLimits, FlowGeneratorOptions,
-    MissingDetectorOptions, TimeReversedForFlowsOptions, circuit_detecting_regions,
-    circuit_flow_generators_with_options, circuit_time_reversed_for_flows_with_options,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback_with_limits,
-    explain_errors_from_circuit_with_options, flattened_circuit_operations_with_limits,
+    ErrorAnalyzerOptions, FeedbackInliningLimits, FlowGeneratorOptions, MissingDetectorOptions,
+    TimeReversedForFlowsOptions, circuit_detecting_regions, circuit_flow_generators_with_options,
+    circuit_time_reversed_for_flows_with_options, circuit_to_detector_error_model,
+    circuit_with_inlined_feedback_with_limits, flattened_circuit_operations_with_limits,
     flattened_circuit_with_limits, flattened_detector_error_model_with_limits, missing_detectors,
 };
 use stab_model::{
@@ -68,20 +67,6 @@ fn flow_generation_and_missing_detectors_over_an_astronomical_repeat_are_cancell
         &fixture,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements: false,
-            cancellation: cancelled(),
-        },
-    ));
-}
-
-#[test]
-fn error_matcher_scan_of_an_astronomical_repeat_is_cancellable() {
-    let fixture =
-        circuit("X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\nREPEAT 1000000000000 {\n    TICK\n}\n");
-    assert_cancelled(explain_errors_from_circuit_with_options(
-        &fixture,
-        None,
-        &ExplainErrorsOptions {
-            reduce_to_one_representative_error: true,
             cancellation: cancelled(),
         },
     ));

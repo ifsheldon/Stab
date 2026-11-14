@@ -1,4 +1,4 @@
-use crate::{Gate, MeasureRecordOffset, QubitId, Target};
+use crate::{Gate, GateKind, MeasureRecordOffset, QubitId, Target};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClassicalControl {
@@ -49,18 +49,94 @@ pub fn classify_controlled_pauli_target_pair(
 
     let first_control = ClassicalControl::from_target(first);
     let second_control = ClassicalControl::from_target(second);
-    if gate.canonical_name() == "CZ"
+    if gate.kind() == GateKind::CZ
         && let (Some(first), Some(second)) = (first_control, second_control)
     {
         return ControlledPauliTargetPair::ClassicalNoop { first, second };
     }
 
-    let classical = match gate.canonical_name() {
-        "CX" | "CY" if second.qubit_id().is_some() => first_control.zip(second.qubit_id()),
-        "CZ" if second.qubit_id().is_some() => first_control.zip(second.qubit_id()),
-        "CZ" if first.qubit_id().is_some() => second_control.zip(first.qubit_id()),
-        "XCZ" | "YCZ" if first.qubit_id().is_some() => second_control.zip(first.qubit_id()),
-        _ => None,
+    let classical = match gate.kind() {
+        GateKind::CX | GateKind::CY => first_control.zip(second.qubit_id()),
+        GateKind::CZ => first_control
+            .zip(second.qubit_id())
+            .or_else(|| second_control.zip(first.qubit_id())),
+        GateKind::XCZ | GateKind::YCZ => second_control.zip(first.qubit_id()),
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => None,
     };
     classical.map_or(
         ControlledPauliTargetPair::Unsupported,

@@ -1,6 +1,7 @@
 use stab_algebra::PauliBasis;
 use stab_model::{
-    CircuitInstruction, GateCategory, MeasureRecordOffset, Pauli, Probability, QubitId, Target,
+    CircuitInstruction, Gate, GateCategory, MeasureRecordOffset, Pauli, Probability, QubitId,
+    Target,
 };
 
 use super::super::{
@@ -174,8 +175,9 @@ pub(super) fn unsupported_frame_instruction(instruction: &CircuitInstruction) ->
     ))
 }
 
-pub(super) fn unsupported_frame_target(gate_name: &str, target: &Target) -> DetectionError {
+pub(super) fn unsupported_frame_target(gate: Gate, target: &Target) -> DetectionError {
     DetectionError::invalid_sampler_compilation(format!(
-        "gate {gate_name} has non-qubit frame target {target}"
+        "gate {} has non-qubit frame target {target}",
+        gate.canonical_name()
     ))
 }

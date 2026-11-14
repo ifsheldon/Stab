@@ -1,8 +1,8 @@
 use stab_algebra::{AlgebraMemoryBudget, StabilizerError, Tableau};
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, MemoryBudget,
-    QubitId, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, MemoryBudget, QubitId,
+    Target,
 };
 
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
@@ -172,7 +172,7 @@ impl Conversion<'_> {
             | GateCategory::Period4
             | GateCategory::ParityPhasing
             | GateCategory::Swap => {
-                let local = gate_tableau_for_name(gate.canonical_name())?;
+                let local = crate::gate_tableau(gate)?;
                 for group in instruction.target_groups() {
                     apply_unitary_group_to_tableau(gate.canonical_name(), &local, group, result)?;
                 }
@@ -229,11 +229,6 @@ fn target_qubit_ids(gate_name: &str, targets: &[Target]) -> AnalysisResult<Vec<Q
             })
         })
         .collect()
-}
-
-fn gate_tableau_for_name(gate_name: &str) -> AnalysisResult<Tableau> {
-    let gate = Gate::from_name(gate_name).map_err(AnalysisError::from)?;
-    crate::gate_tableau(gate)
 }
 
 /// Maps algebra failures, reporting a refused Tableau as a memory-budget refusal.

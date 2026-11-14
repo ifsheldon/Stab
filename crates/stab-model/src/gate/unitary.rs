@@ -1,143 +1,201 @@
+use super::GateKind;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GateUnitaryRows {
     One([[(f32, f32); 2]; 2]),
     Two([[(f32, f32); 4]; 4]),
 }
 
-pub(crate) fn gate_unitary_rows(gate_name: &str) -> Option<GateUnitaryRows> {
+pub(crate) fn gate_unitary_rows(kind: GateKind) -> Option<GateUnitaryRows> {
     let h = f32::sqrt(0.5);
-    Some(match gate_name {
-        "I" => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (1.0, 0.0)]]),
-        "X" => GateUnitaryRows::One([[(0.0, 0.0), (1.0, 0.0)], [(1.0, 0.0), (0.0, 0.0)]]),
-        "Y" => GateUnitaryRows::One([[(0.0, 0.0), (0.0, -1.0)], [(0.0, 1.0), (0.0, 0.0)]]),
-        "Z" => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (-1.0, 0.0)]]),
-        "H" => GateUnitaryRows::One([[(h, 0.0), (h, 0.0)], [(h, 0.0), (-h, 0.0)]]),
-        "H_XY" => GateUnitaryRows::One([[(0.0, 0.0), (h, -h)], [(h, h), (0.0, 0.0)]]),
-        "H_YZ" => GateUnitaryRows::One([[(h, 0.0), (0.0, -h)], [(0.0, h), (-h, 0.0)]]),
-        "H_NXY" => GateUnitaryRows::One([[(0.0, 0.0), (h, h)], [(h, -h), (0.0, 0.0)]]),
-        "H_NXZ" => GateUnitaryRows::One([[(-h, 0.0), (h, 0.0)], [(h, 0.0), (h, 0.0)]]),
-        "H_NYZ" => GateUnitaryRows::One([[(-h, 0.0), (0.0, -h)], [(0.0, h), (h, 0.0)]]),
-        "SQRT_X" => GateUnitaryRows::One([[(0.5, 0.5), (0.5, -0.5)], [(0.5, -0.5), (0.5, 0.5)]]),
-        "SQRT_X_DAG" => {
+    Some(match kind {
+        GateKind::I => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (1.0, 0.0)]]),
+        GateKind::X => GateUnitaryRows::One([[(0.0, 0.0), (1.0, 0.0)], [(1.0, 0.0), (0.0, 0.0)]]),
+        GateKind::Y => GateUnitaryRows::One([[(0.0, 0.0), (0.0, -1.0)], [(0.0, 1.0), (0.0, 0.0)]]),
+        GateKind::Z => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (-1.0, 0.0)]]),
+        GateKind::H => GateUnitaryRows::One([[(h, 0.0), (h, 0.0)], [(h, 0.0), (-h, 0.0)]]),
+        GateKind::H_XY => GateUnitaryRows::One([[(0.0, 0.0), (h, -h)], [(h, h), (0.0, 0.0)]]),
+        GateKind::H_YZ => GateUnitaryRows::One([[(h, 0.0), (0.0, -h)], [(0.0, h), (-h, 0.0)]]),
+        GateKind::H_NXY => GateUnitaryRows::One([[(0.0, 0.0), (h, h)], [(h, -h), (0.0, 0.0)]]),
+        GateKind::H_NXZ => GateUnitaryRows::One([[(-h, 0.0), (h, 0.0)], [(h, 0.0), (h, 0.0)]]),
+        GateKind::H_NYZ => GateUnitaryRows::One([[(-h, 0.0), (0.0, -h)], [(0.0, h), (h, 0.0)]]),
+        GateKind::SQRT_X => {
+            GateUnitaryRows::One([[(0.5, 0.5), (0.5, -0.5)], [(0.5, -0.5), (0.5, 0.5)]])
+        }
+        GateKind::SQRT_X_DAG => {
             GateUnitaryRows::One([[(0.5, -0.5), (0.5, 0.5)], [(0.5, 0.5), (0.5, -0.5)]])
         }
-        "SQRT_Y" => GateUnitaryRows::One([[(0.5, 0.5), (-0.5, -0.5)], [(0.5, 0.5), (0.5, 0.5)]]),
-        "SQRT_Y_DAG" => {
+        GateKind::SQRT_Y => {
+            GateUnitaryRows::One([[(0.5, 0.5), (-0.5, -0.5)], [(0.5, 0.5), (0.5, 0.5)]])
+        }
+        GateKind::SQRT_Y_DAG => {
             GateUnitaryRows::One([[(0.5, -0.5), (0.5, -0.5)], [(-0.5, 0.5), (0.5, -0.5)]])
         }
-        "S" => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (0.0, 1.0)]]),
-        "S_DAG" => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (0.0, -1.0)]]),
-        "C_XYZ" => GateUnitaryRows::One([[(0.5, -0.5), (-0.5, -0.5)], [(0.5, -0.5), (0.5, 0.5)]]),
-        "C_NXYZ" => GateUnitaryRows::One([[(0.5, 0.5), (0.5, -0.5)], [(-0.5, -0.5), (0.5, -0.5)]]),
-        "C_XNYZ" => GateUnitaryRows::One([[(0.5, 0.5), (-0.5, 0.5)], [(0.5, 0.5), (0.5, -0.5)]]),
-        "C_XYNZ" => GateUnitaryRows::One([[(0.5, -0.5), (0.5, 0.5)], [(-0.5, 0.5), (0.5, 0.5)]]),
-        "C_ZYX" => GateUnitaryRows::One([[(0.5, 0.5), (0.5, 0.5)], [(-0.5, 0.5), (0.5, -0.5)]]),
-        "C_ZYNX" => GateUnitaryRows::One([[(0.5, -0.5), (-0.5, 0.5)], [(0.5, 0.5), (0.5, 0.5)]]),
-        "C_ZNYX" => GateUnitaryRows::One([[(0.5, -0.5), (0.5, -0.5)], [(-0.5, -0.5), (0.5, 0.5)]]),
-        "C_NZYX" => GateUnitaryRows::One([[(0.5, 0.5), (-0.5, -0.5)], [(0.5, -0.5), (0.5, -0.5)]]),
-        "II" => GateUnitaryRows::Two([
+        GateKind::S => GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (0.0, 1.0)]]),
+        GateKind::S_DAG => {
+            GateUnitaryRows::One([[(1.0, 0.0), (0.0, 0.0)], [(0.0, 0.0), (0.0, -1.0)]])
+        }
+        GateKind::C_XYZ => {
+            GateUnitaryRows::One([[(0.5, -0.5), (-0.5, -0.5)], [(0.5, -0.5), (0.5, 0.5)]])
+        }
+        GateKind::C_NXYZ => {
+            GateUnitaryRows::One([[(0.5, 0.5), (0.5, -0.5)], [(-0.5, -0.5), (0.5, -0.5)]])
+        }
+        GateKind::C_XNYZ => {
+            GateUnitaryRows::One([[(0.5, 0.5), (-0.5, 0.5)], [(0.5, 0.5), (0.5, -0.5)]])
+        }
+        GateKind::C_XYNZ => {
+            GateUnitaryRows::One([[(0.5, -0.5), (0.5, 0.5)], [(-0.5, 0.5), (0.5, 0.5)]])
+        }
+        GateKind::C_ZYX => {
+            GateUnitaryRows::One([[(0.5, 0.5), (0.5, 0.5)], [(-0.5, 0.5), (0.5, -0.5)]])
+        }
+        GateKind::C_ZYNX => {
+            GateUnitaryRows::One([[(0.5, -0.5), (-0.5, 0.5)], [(0.5, 0.5), (0.5, 0.5)]])
+        }
+        GateKind::C_ZNYX => {
+            GateUnitaryRows::One([[(0.5, -0.5), (0.5, -0.5)], [(-0.5, -0.5), (0.5, 0.5)]])
+        }
+        GateKind::C_NZYX => {
+            GateUnitaryRows::One([[(0.5, 0.5), (-0.5, -0.5)], [(0.5, -0.5), (0.5, -0.5)]])
+        }
+        GateKind::II => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (1.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (1.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
         ]),
-        "SQRT_XX" => GateUnitaryRows::Two([
+        GateKind::SQRT_XX => GateUnitaryRows::Two([
             [(0.5, 0.5), (0.0, 0.0), (0.0, 0.0), (0.5, -0.5)],
             [(0.0, 0.0), (0.5, 0.5), (0.5, -0.5), (0.0, 0.0)],
             [(0.0, 0.0), (0.5, -0.5), (0.5, 0.5), (0.0, 0.0)],
             [(0.5, -0.5), (0.0, 0.0), (0.0, 0.0), (0.5, 0.5)],
         ]),
-        "SQRT_XX_DAG" => GateUnitaryRows::Two([
+        GateKind::SQRT_XX_DAG => GateUnitaryRows::Two([
             [(0.5, -0.5), (0.0, 0.0), (0.0, 0.0), (0.5, 0.5)],
             [(0.0, 0.0), (0.5, -0.5), (0.5, 0.5), (0.0, 0.0)],
             [(0.0, 0.0), (0.5, 0.5), (0.5, -0.5), (0.0, 0.0)],
             [(0.5, 0.5), (0.0, 0.0), (0.0, 0.0), (0.5, -0.5)],
         ]),
-        "SQRT_YY" => GateUnitaryRows::Two([
+        GateKind::SQRT_YY => GateUnitaryRows::Two([
             [(0.5, 0.5), (0.0, 0.0), (0.0, 0.0), (-0.5, 0.5)],
             [(0.0, 0.0), (0.5, 0.5), (0.5, -0.5), (0.0, 0.0)],
             [(0.0, 0.0), (0.5, -0.5), (0.5, 0.5), (0.0, 0.0)],
             [(-0.5, 0.5), (0.0, 0.0), (0.0, 0.0), (0.5, 0.5)],
         ]),
-        "SQRT_YY_DAG" => GateUnitaryRows::Two([
+        GateKind::SQRT_YY_DAG => GateUnitaryRows::Two([
             [(0.5, -0.5), (0.0, 0.0), (0.0, 0.0), (-0.5, -0.5)],
             [(0.0, 0.0), (0.5, -0.5), (0.5, 0.5), (0.0, 0.0)],
             [(0.0, 0.0), (0.5, 0.5), (0.5, -0.5), (0.0, 0.0)],
             [(-0.5, -0.5), (0.0, 0.0), (0.0, 0.0), (0.5, -0.5)],
         ]),
-        "SQRT_ZZ" => GateUnitaryRows::Two([
+        GateKind::SQRT_ZZ => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 1.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 1.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
         ]),
-        "SQRT_ZZ_DAG" => GateUnitaryRows::Two([
+        GateKind::SQRT_ZZ_DAG => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, -1.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, -1.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
         ]),
-        "SWAP" => GateUnitaryRows::Two(swap_unitary()),
-        "ISWAP" => GateUnitaryRows::Two([
+        GateKind::SWAP => GateUnitaryRows::Two(swap_unitary()),
+        GateKind::ISWAP => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 1.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 1.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
         ]),
-        "ISWAP_DAG" => GateUnitaryRows::Two([
+        GateKind::ISWAP_DAG => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, -1.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, -1.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
         ]),
-        "CXSWAP" => GateUnitaryRows::Two([
+        GateKind::CXSWAP => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (1.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
             [(0.0, 0.0), (1.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
         ]),
-        "SWAPCX" => GateUnitaryRows::Two([
+        GateKind::SWAPCX => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
             [(0.0, 0.0), (1.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (1.0, 0.0), (0.0, 0.0)],
         ]),
-        "CZSWAP" => GateUnitaryRows::Two(czswap_unitary()),
-        "XCX" => GateUnitaryRows::Two([
+        GateKind::CZSWAP => GateUnitaryRows::Two(czswap_unitary()),
+        GateKind::XCX => GateUnitaryRows::Two([
             [(0.5, 0.0), (0.5, 0.0), (0.5, 0.0), (-0.5, 0.0)],
             [(0.5, 0.0), (0.5, 0.0), (-0.5, 0.0), (0.5, 0.0)],
             [(0.5, 0.0), (-0.5, 0.0), (0.5, 0.0), (0.5, 0.0)],
             [(-0.5, 0.0), (0.5, 0.0), (0.5, 0.0), (0.5, 0.0)],
         ]),
-        "XCY" => GateUnitaryRows::Two(xcy_unitary()),
-        "XCZ" => GateUnitaryRows::Two(xcz_unitary()),
-        "YCX" => GateUnitaryRows::Two(ycx_unitary()),
-        "YCY" => GateUnitaryRows::Two([
+        GateKind::XCY => GateUnitaryRows::Two(xcy_unitary()),
+        GateKind::XCZ => GateUnitaryRows::Two(xcz_unitary()),
+        GateKind::YCX => GateUnitaryRows::Two(ycx_unitary()),
+        GateKind::YCY => GateUnitaryRows::Two([
             [(0.5, 0.0), (0.0, -0.5), (0.0, -0.5), (0.5, 0.0)],
             [(0.0, 0.5), (0.5, 0.0), (-0.5, 0.0), (0.0, -0.5)],
             [(0.0, 0.5), (-0.5, 0.0), (0.5, 0.0), (0.0, -0.5)],
             [(0.5, 0.0), (0.0, 0.5), (0.0, 0.5), (0.5, 0.0)],
         ]),
-        "YCZ" => GateUnitaryRows::Two([
+        GateKind::YCZ => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (1.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, -1.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 1.0), (0.0, 0.0)],
         ]),
-        "CX" => GateUnitaryRows::Two(zcx_unitary()),
-        "CY" => GateUnitaryRows::Two([
+        GateKind::CX => GateUnitaryRows::Two(zcx_unitary()),
+        GateKind::CY => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, -1.0)],
             [(0.0, 0.0), (0.0, 0.0), (1.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 1.0), (0.0, 0.0), (0.0, 0.0)],
         ]),
-        "CZ" => GateUnitaryRows::Two([
+        GateKind::CZ => GateUnitaryRows::Two([
             [(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (1.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (1.0, 0.0), (0.0, 0.0)],
             [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (-1.0, 0.0)],
         ]),
-        _ => return None,
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => return None,
     })
 }
 

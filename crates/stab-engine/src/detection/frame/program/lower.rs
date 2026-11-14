@@ -5,7 +5,7 @@ use std::ops::ControlFlow;
 use arrayvec::ArrayVec;
 use stab_algebra::PauliBasis;
 use stab_model::{
-    Circuit, CircuitInstruction, Gate, RepeatNestingLimit, Target,
+    Circuit, CircuitInstruction, Gate, GateKind, RepeatNestingLimit, Target,
     advanced::{
         ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
     },
@@ -89,8 +89,8 @@ enum EntryKind {
         terms: usize,
         products: usize,
     },
-    SinglePauliNoise,
-    TwoQubitPauliNoise,
+    SinglePauliNoise(SingleQubitNoise),
+    TwoQubitPauliNoise(TwoQubitNoise),
     CorrelatedError {
         else_branch: bool,
     },
@@ -101,6 +101,23 @@ enum EntryKind {
         map: TwoQubitFrameMap,
     },
     Observable,
+}
+
+/// The single-qubit Pauli channel a noise gate lowers to.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SingleQubitNoise {
+    X,
+    Y,
+    Z,
+    Depolarize,
+    PauliChannel,
+}
+
+/// The two-qubit Pauli channel a noise gate lowers to.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TwoQubitNoise {
+    Depolarize,
+    PauliChannel,
 }
 
 /// Running counts of the admission walk, with folded repeat totals.
@@ -358,12 +375,12 @@ fn visit_lowered_instructions(
     instruction: &CircuitInstruction,
     mut visitor: impl FnMut(&CircuitInstruction) -> DetectionResult<()>,
 ) -> DetectionResult<()> {
-    if !matches!(instruction.gate().canonical_name(), "SPP" | "SPP_DAG") {
+    if !is_pauli_product_phase(instruction.gate()) {
         return visitor(instruction);
     }
     let completion =
         stab_analysis::advanced::visit_decomposed_spp_instructions(instruction, |lowered| {
-            if matches!(lowered.gate().canonical_name(), "SPP" | "SPP_DAG") {
+            if is_pauli_product_phase(lowered.gate()) {
                 return ControlFlow::Break(DetectionError::invalid_sampler_compilation(
                     "single-instruction frame lowering retained its source instruction",
                 ));
@@ -385,16 +402,25 @@ fn visit_lowered_instructions(
     Ok(())
 }
 
+fn is_pauli_product_phase(gate: Gate) -> bool {
+    matches!(gate.kind(), GateKind::SPP | GateKind::SPP_DAG)
+}
+
 fn lower(
     instruction: &CircuitInstruction,
     options: ProgramOptions,
     actions: &mut FrameCliffordActionCache,
 ) -> DetectionResult<Lowering> {
-    let kind = match instruction.gate().canonical_name() {
-        "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "I_ERROR" | "II_ERROR" => {
+    let kind = match instruction.gate().kind() {
+        GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::DETECTOR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR => {
             return Ok(Lowering::Noop);
         }
-        "OBSERVABLE_INCLUDE" => {
+        GateKind::OBSERVABLE_INCLUDE => {
             if !options.include_pauli_observables
                 || !instruction.targets().iter().any(Target::is_pauli_target)
             {
@@ -402,81 +428,149 @@ fn lower(
             }
             EntryKind::Observable
         }
-        "R" => EntryKind::Reset(PauliBasis::Z),
-        "RX" => EntryKind::Reset(PauliBasis::X),
-        "RY" => EntryKind::Reset(PauliBasis::Y),
-        "M" => measure(PauliBasis::Z, false),
-        "MX" => measure(PauliBasis::X, false),
-        "MY" => measure(PauliBasis::Y, false),
-        "MR" => measure(PauliBasis::Z, true),
-        "MRX" => measure(PauliBasis::X, true),
-        "MRY" => measure(PauliBasis::Y, true),
-        "MXX" => EntryKind::MeasurePairs(PauliBasis::X),
-        "MYY" => EntryKind::MeasurePairs(PauliBasis::Y),
-        "MZZ" => EntryKind::MeasurePairs(PauliBasis::Z),
-        "MPP" => pauli_product_shape(instruction)?,
-        "MPAD" => EntryKind::MeasurePads,
-        name @ ("X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "PAULI_CHANNEL_1"
-        | "DEPOLARIZE2" | "PAULI_CHANNEL_2") => {
-            let pairs = matches!(name, "DEPOLARIZE2" | "PAULI_CHANNEL_2");
-            if zero_probability_noise(instruction)? {
-                return Ok(Lowering::Noop);
-            } else if pairs {
-                EntryKind::TwoQubitPauliNoise
-            } else {
-                EntryKind::SinglePauliNoise
-            }
+        GateKind::R => EntryKind::Reset(PauliBasis::Z),
+        GateKind::RX => EntryKind::Reset(PauliBasis::X),
+        GateKind::RY => EntryKind::Reset(PauliBasis::Y),
+        GateKind::M => measure(PauliBasis::Z, false),
+        GateKind::MX => measure(PauliBasis::X, false),
+        GateKind::MY => measure(PauliBasis::Y, false),
+        GateKind::MR => measure(PauliBasis::Z, true),
+        GateKind::MRX => measure(PauliBasis::X, true),
+        GateKind::MRY => measure(PauliBasis::Y, true),
+        GateKind::MXX => EntryKind::MeasurePairs(PauliBasis::X),
+        GateKind::MYY => EntryKind::MeasurePairs(PauliBasis::Y),
+        GateKind::MZZ => EntryKind::MeasurePairs(PauliBasis::Z),
+        GateKind::MPP => pauli_product_shape(instruction)?,
+        GateKind::MPAD => EntryKind::MeasurePads,
+        GateKind::X_ERROR => return single_noise(instruction, SingleQubitNoise::X),
+        GateKind::Y_ERROR => return single_noise(instruction, SingleQubitNoise::Y),
+        GateKind::Z_ERROR => return single_noise(instruction, SingleQubitNoise::Z),
+        GateKind::DEPOLARIZE1 => return single_noise(instruction, SingleQubitNoise::Depolarize),
+        GateKind::PAULI_CHANNEL_1 => {
+            return single_noise(instruction, SingleQubitNoise::PauliChannel);
         }
-        "E" => EntryKind::CorrelatedError { else_branch: false },
-        "ELSE_CORRELATED_ERROR" => EntryKind::CorrelatedError { else_branch: true },
-        "HERALDED_ERASE" => EntryKind::HeraldedErase,
-        "HERALDED_PAULI_CHANNEL_1" => EntryKind::HeraldedPauliChannel,
-        name => {
-            let Some(action) = actions.action(instruction.gate())? else {
-                if zero_probability_noise(instruction)? {
-                    return Ok(Lowering::FrameIdentity);
-                }
-                return Err(DetectionError::invalid_sampler_compilation(format!(
-                    "detector frame execution does not support {name}"
-                )));
-            };
-            let controlled = controlled_pauli_basis(name);
-            if controlled.is_some() {
-                validate_controlled_pauli_targets(instruction)?;
-            }
-            if let Some(target) = instruction
-                .targets()
-                .iter()
-                .find(|target| target.qubit_id().is_none())
-            {
-                return match (action, controlled) {
-                    (FrameCliffordAction::Two(map), Some(basis)) => {
-                        Ok(Lowering::Entry(EntryKind::ControlledPauli { basis, map }))
-                    }
-                    _ => Err(unsupported_frame_target(name, target)),
-                };
-            }
-            EntryKind::Clifford(match action {
-                FrameCliffordAction::Identity => FrameGate::Identity,
-                FrameCliffordAction::Single(map) => FrameGate::Single(map),
-                FrameCliffordAction::Two(map) => FrameGate::Two(map),
-            })
-        }
+        GateKind::DEPOLARIZE2 => return pair_noise(instruction, TwoQubitNoise::Depolarize),
+        GateKind::PAULI_CHANNEL_2 => return pair_noise(instruction, TwoQubitNoise::PauliChannel),
+        GateKind::E => EntryKind::CorrelatedError { else_branch: false },
+        GateKind::ELSE_CORRELATED_ERROR => EntryKind::CorrelatedError { else_branch: true },
+        GateKind::HERALDED_ERASE => EntryKind::HeraldedErase,
+        GateKind::HERALDED_PAULI_CHANNEL_1 => EntryKind::HeraldedPauliChannel,
+        // `SPP` and `SPP_DAG` arrive here only if their decomposition retained them, and
+        // `REPEAT` never forms an instruction; both fail as unsupported frame actions.
+        GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::REPEAT => return lower_clifford(instruction, actions),
     };
     Ok(Lowering::Entry(kind))
 }
 
-const fn measure(basis: PauliBasis, reset: bool) -> EntryKind {
-    EntryKind::Measure { basis, reset }
+/// Lowers a Pauli channel, or a channel whose probabilities are all zero to nothing.
+fn single_noise(
+    instruction: &CircuitInstruction,
+    noise: SingleQubitNoise,
+) -> DetectionResult<Lowering> {
+    Ok(if zero_probability_noise(instruction)? {
+        Lowering::Noop
+    } else {
+        Lowering::Entry(EntryKind::SinglePauliNoise(noise))
+    })
 }
 
-fn controlled_pauli_basis(name: &str) -> Option<PauliBasis> {
-    match name {
-        "CX" | "XCZ" => Some(PauliBasis::X),
-        "CY" | "YCZ" => Some(PauliBasis::Y),
-        "CZ" => Some(PauliBasis::Z),
-        _ => None,
+fn pair_noise(instruction: &CircuitInstruction, noise: TwoQubitNoise) -> DetectionResult<Lowering> {
+    Ok(if zero_probability_noise(instruction)? {
+        Lowering::Noop
+    } else {
+        Lowering::Entry(EntryKind::TwoQubitPauliNoise(noise))
+    })
+}
+
+/// Lowers a unitary gate through its cached frame action, or a zero-probability instruction
+/// without one to a frame identity.
+fn lower_clifford(
+    instruction: &CircuitInstruction,
+    actions: &mut FrameCliffordActionCache,
+) -> DetectionResult<Lowering> {
+    let gate = instruction.gate();
+    let Some(action) = actions.action(gate)? else {
+        if zero_probability_noise(instruction)? {
+            return Ok(Lowering::FrameIdentity);
+        }
+        return Err(DetectionError::invalid_sampler_compilation(format!(
+            "detector frame execution does not support {}",
+            gate.canonical_name()
+        )));
+    };
+    let controlled = gate.controlled_pauli().map(pauli_basis);
+    if controlled.is_some() {
+        validate_controlled_pauli_targets(instruction)?;
     }
+    if let Some(target) = instruction
+        .targets()
+        .iter()
+        .find(|target| target.qubit_id().is_none())
+    {
+        return match (action, controlled) {
+            (FrameCliffordAction::Two(map), Some(basis)) => {
+                Ok(Lowering::Entry(EntryKind::ControlledPauli { basis, map }))
+            }
+            _ => Err(unsupported_frame_target(gate, target)),
+        };
+    }
+    Ok(Lowering::Entry(EntryKind::Clifford(match action {
+        FrameCliffordAction::Identity => FrameGate::Identity,
+        FrameCliffordAction::Single(map) => FrameGate::Single(map),
+        FrameCliffordAction::Two(map) => FrameGate::Two(map),
+    })))
+}
+
+const fn measure(basis: PauliBasis, reset: bool) -> EntryKind {
+    EntryKind::Measure { basis, reset }
 }
 
 fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> DetectionResult<()> {
@@ -535,14 +629,14 @@ fn record_effects(
             }
             EntryKind::Clifford(_)
             | EntryKind::Reset(_)
-            | EntryKind::SinglePauliNoise
-            | EntryKind::TwoQubitPauliNoise
+            | EntryKind::SinglePauliNoise(_)
+            | EntryKind::TwoQubitPauliNoise(_)
             | EntryKind::CorrelatedError { .. }
             | EntryKind::Observable => 0,
         },
     };
     if let Lowering::Entry(EntryKind::Clifford(_)) = lowering
-        && controlled_pauli_basis(instruction.gate().canonical_name()).is_some()
+        && instruction.gate().controlled_pauli().is_some()
     {
         record_controls(instruction, counts)?;
     }
@@ -663,7 +757,7 @@ fn payload_bytes(instruction: &CircuitInstruction, kind: EntryKind) -> Detection
     match kind {
         EntryKind::Clifford(_)
         | EntryKind::Reset(_)
-        | EntryKind::SinglePauliNoise
+        | EntryKind::SinglePauliNoise(_)
         | EntryKind::HeraldedErase
         | EntryKind::HeraldedPauliChannel => Ok(words),
         EntryKind::Measure { .. } | EntryKind::MeasurePairs(_) => checked_add_bytes(words, flags),
@@ -675,7 +769,7 @@ fn payload_bytes(instruction: &CircuitInstruction, kind: EntryKind) -> Detection
             )?,
             byte_product(products, 1)?,
         ),
-        EntryKind::TwoQubitPauliNoise => {
+        EntryKind::TwoQubitPauliNoise(_) => {
             checked_add_bytes(words, byte_product(15, size_of::<f64>())?)
         }
         EntryKind::CorrelatedError { .. } | EntryKind::Observable => term_bytes(
@@ -793,25 +887,27 @@ fn build(
         EntryKind::PauliProducts { terms, products } => {
             ProgramInstruction::PauliProducts(build_pauli_products(instruction, terms, products)?)
         }
-        EntryKind::SinglePauliNoise => {
-            let probabilities = match instruction.gate().canonical_name() {
-                "X_ERROR" => [single_probability_argument(instruction)?.get(), 0.0, 0.0],
-                "Y_ERROR" => [0.0, single_probability_argument(instruction)?.get(), 0.0],
-                "Z_ERROR" => [0.0, 0.0, single_probability_argument(instruction)?.get()],
-                "DEPOLARIZE1" => [single_probability_argument(instruction)?.get() / 3.0; 3],
-                "PAULI_CHANNEL_1" => probability_list::<3>(instruction)?,
-                _ => return Err(program_shape_error()),
+        EntryKind::SinglePauliNoise(noise) => {
+            let probabilities = match noise {
+                SingleQubitNoise::X => [single_probability_argument(instruction)?.get(), 0.0, 0.0],
+                SingleQubitNoise::Y => [0.0, single_probability_argument(instruction)?.get(), 0.0],
+                SingleQubitNoise::Z => [0.0, 0.0, single_probability_argument(instruction)?.get()],
+                SingleQubitNoise::Depolarize => {
+                    [single_probability_argument(instruction)?.get() / 3.0; 3]
+                }
+                SingleQubitNoise::PauliChannel => probability_list::<3>(instruction)?,
             };
             ProgramInstruction::SinglePauliNoise {
                 probabilities,
                 targets: qubit_targets(instruction)?,
             }
         }
-        EntryKind::TwoQubitPauliNoise => {
-            let probabilities = match instruction.gate().canonical_name() {
-                "DEPOLARIZE2" => [single_probability_argument(instruction)?.get() / 15.0; 15],
-                "PAULI_CHANNEL_2" => probability_list::<15>(instruction)?,
-                _ => return Err(program_shape_error()),
+        EntryKind::TwoQubitPauliNoise(noise) => {
+            let probabilities = match noise {
+                TwoQubitNoise::Depolarize => {
+                    [single_probability_argument(instruction)?.get() / 15.0; 15]
+                }
+                TwoQubitNoise::PauliChannel => probability_list::<15>(instruction)?,
             };
             ProgramInstruction::TwoQubitPauliNoise {
                 probabilities: Box::new(probabilities),
@@ -957,9 +1053,11 @@ impl ReferenceCliffordTable {
 }
 
 fn reference_clifford(gate: Gate) -> DetectionResult<ReferenceClifford> {
-    Ok(match gate.canonical_name() {
-        "H" => ReferenceClifford::Hadamard,
-        "CX" => ReferenceClifford::ControlledX,
+    // `H` and `CX` have dedicated reference kernels; every other gate takes the general tableau
+    // path, which rejects gates without a Clifford action.
+    Ok(match gate.kind() {
+        GateKind::H => ReferenceClifford::Hadamard,
+        GateKind::CX => ReferenceClifford::ControlledX,
         _ => {
             let tableau = match stab_analysis::single_qubit_clifford_for_gate(gate) {
                 Ok(clifford) => clifford.tableau(),

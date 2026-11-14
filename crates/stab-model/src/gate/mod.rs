@@ -1,5 +1,6 @@
 mod decomposition;
 mod flows;
+mod kind;
 mod metadata;
 mod table;
 mod unitary;
@@ -7,12 +8,13 @@ mod unitary;
 pub use decomposition::GateDecomposition;
 pub(crate) use decomposition::gate_decomposition_text;
 pub(crate) use flows::gate_flow_descriptors;
+pub use kind::GateKind;
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
 use table::GATES;
 pub use unitary::GateUnitaryRows;
 pub(crate) use unitary::gate_unitary_rows;
 
-use crate::{ModelResult, Probability, Target, ValidationError};
+use crate::{ModelResult, Pauli, Probability, Target, ValidationError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GateCategory {
@@ -32,16 +34,24 @@ pub enum GateCategory {
     PairMeasurement,
 }
 
+/// A parsed Stim gate: a handle to its row in the one Stim v1.16.0 gate table.
+///
+/// [`Gate::kind`] returns the closed [`GateKind`] identity for exhaustive per-gate matches, and
+/// the classification accessors read the same table row.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Gate {
     info: &'static GateInfo,
 }
 
 impl Gate {
-    /// Iterates over the canonical gates defined by Stim v1.16.0.
+    const fn from_info(info: &'static GateInfo) -> Self {
+        Self { info }
+    }
+
+    /// Iterates over the canonical gates defined by Stim v1.16.0, in [`GateKind`] order.
     #[inline]
     pub fn all() -> impl ExactSizeIterator<Item = Self> {
-        GATES.iter().map(|info| Self { info })
+        GateKind::ALL.into_iter().map(GateKind::gate)
     }
 
     #[inline]
@@ -51,53 +61,28 @@ impl Gate {
 
     #[inline]
     pub(crate) fn lookup_name(name: &str) -> Option<Self> {
-        gate_info_from_name(name).map(|info| Self { info })
+        gate_kind_from_name(name).map(GateKind::gate)
     }
 
     #[inline]
     pub(crate) fn from_simple_plain_name(name: &str) -> Option<Self> {
-        gate_info_from_simple_plain_name(name).map(|info| Self { info })
+        gate_kind_from_simple_plain_name(name).map(GateKind::gate)
     }
 
-    /// Canonical `DETECTOR` gate, resolved from the gate table at compile time.
-    pub(crate) const DETECTOR: Self = Self::table_constant("DETECTOR");
-    /// Canonical `OBSERVABLE_INCLUDE` gate, resolved from the gate table at compile time.
-    pub(crate) const OBSERVABLE_INCLUDE: Self = Self::table_constant("OBSERVABLE_INCLUDE");
-    /// Canonical `TICK` gate, resolved from the gate table at compile time.
-    pub(crate) const TICK: Self = Self::table_constant("TICK");
-    /// Canonical `QUBIT_COORDS` gate, resolved from the gate table at compile time.
-    pub(crate) const QUBIT_COORDS: Self = Self::table_constant("QUBIT_COORDS");
-    /// Canonical `SHIFT_COORDS` gate, resolved from the gate table at compile time.
-    pub(crate) const SHIFT_COORDS: Self = Self::table_constant("SHIFT_COORDS");
-    /// Canonical `H` gate, resolved from the gate table at compile time.
-    pub(crate) const H: Self = Self::table_constant("H");
-    /// Canonical `S` gate, resolved from the gate table at compile time.
-    pub(crate) const S: Self = Self::table_constant("S");
-    /// Canonical `M` gate, resolved from the gate table at compile time.
-    pub(crate) const M: Self = Self::table_constant("M");
-    /// Canonical `CX` gate, resolved from the gate table at compile time.
-    pub(crate) const CX: Self = Self::table_constant("CX");
+    pub(crate) const DETECTOR: Self = GateKind::DETECTOR.gate();
+    pub(crate) const OBSERVABLE_INCLUDE: Self = GateKind::OBSERVABLE_INCLUDE.gate();
+    pub(crate) const TICK: Self = GateKind::TICK.gate();
+    pub(crate) const QUBIT_COORDS: Self = GateKind::QUBIT_COORDS.gate();
+    pub(crate) const SHIFT_COORDS: Self = GateKind::SHIFT_COORDS.gate();
+    pub(crate) const H: Self = GateKind::H.gate();
+    pub(crate) const S: Self = GateKind::S.gate();
+    pub(crate) const M: Self = GateKind::M.gate();
+    pub(crate) const CX: Self = GateKind::CX.gate();
 
-    /// Looks a canonical gate up by name at compile time.
-    ///
-    /// The scan runs during constant evaluation, so a name that is not in the canonical
-    /// gate table fails the build instead of producing a runtime error.
-    #[allow(
-        clippy::indexing_slicing,
-        clippy::panic,
-        reason = "compile-time table scan: a missing name or out-of-range index fails the build during const evaluation and cannot panic at runtime"
-    )]
-    const fn table_constant(name: &str) -> Self {
-        let mut index = 0;
-        while index < GATES.len() {
-            if const_name_eq(GATES[index].name, name) {
-                return Self {
-                    info: &GATES[index],
-                };
-            }
-            index += 1;
-        }
-        panic!("gate constant does not name a canonical gate-table entry");
+    /// Returns this gate's closed identity.
+    #[inline]
+    pub fn kind(self) -> GateKind {
+        self.info.kind
     }
 
     #[inline]
@@ -108,11 +93,6 @@ impl Gate {
     #[inline]
     pub fn category(self) -> GateCategory {
         self.info.category
-    }
-
-    #[inline]
-    pub fn best_candidate_inverse(self) -> ModelResult<Self> {
-        Self::from_name(self.info.inverse_name)
     }
 
     pub(crate) fn validate(self, args: &[f64], targets: &[Target]) -> ModelResult<()> {
@@ -134,30 +114,12 @@ impl Gate {
     }
 }
 
-/// Compares two gate names byte for byte during constant evaluation.
-#[allow(
-    clippy::indexing_slicing,
-    reason = "indexes are bounded by the compared lengths and run during const evaluation"
-)]
-const fn const_name_eq(left: &str, right: &str) -> bool {
-    let (left, right) = (left.as_bytes(), right.as_bytes());
-    if left.len() != right.len() {
-        return false;
-    }
-    let mut index = 0;
-    while index < left.len() {
-        if left[index] != right[index] {
-            return false;
-        }
-        index += 1;
-    }
-    true
-}
-
 #[derive(Debug, Eq, PartialEq)]
 struct GateInfo {
+    kind: GateKind,
     name: &'static str,
-    inverse_name: &'static str,
+    /// Stim's best candidate inverse, which for non-unitary gates is a generalized inverse.
+    inverse: GateKind,
     category: GateCategory,
     arg_rule: ArgRule,
     target_rule: TargetRule,
@@ -165,6 +127,11 @@ struct GateInfo {
     flags: GateFlags,
     /// All accepted names in Stim v1.16.0 alias order; empty means the canonical name only.
     aliases: &'static [&'static str],
+    /// The Pauli a controlled-Pauli gate applies to its target when the control is set, for
+    /// the gates that accept measurement-record and sweep-bit controls.
+    controlled_pauli: Option<Pauli>,
+    /// The basis of a single-qubit measurement, reset, or measure-reset gate.
+    collapse_basis: Option<Pauli>,
 }
 
 impl GateInfo {
@@ -175,6 +142,16 @@ impl GateInfo {
 
     const fn with_aliases(mut self, aliases: &'static [&'static str]) -> Self {
         self.aliases = aliases;
+        self
+    }
+
+    const fn with_collapse_basis(mut self, basis: Pauli) -> Self {
+        self.collapse_basis = Some(basis);
+        self
+    }
+
+    const fn with_controlled_pauli(mut self, pauli: Pauli) -> Self {
+        self.controlled_pauli = Some(pauli);
         self
     }
 }
@@ -494,124 +471,116 @@ fn validate_finite_arg(gate: &'static str, arg: f64) -> ModelResult<()> {
 }
 
 #[inline]
-fn gate_info_from_name(name: &str) -> Option<&'static GateInfo> {
-    if let Some(info) = gate_info_from_uppercase_name(name) {
-        return Some(info);
+fn gate_kind_from_name(name: &str) -> Option<GateKind> {
+    if let Some(kind) = gate_kind_from_uppercase_name(name) {
+        return Some(kind);
     }
     if !name.bytes().any(|byte| byte.is_ascii_lowercase()) {
         return None;
     }
     let uppercase = name.to_ascii_uppercase();
-    gate_info_from_uppercase_name(&uppercase)
+    gate_kind_from_uppercase_name(&uppercase)
 }
 
 #[inline]
-#[allow(
-    clippy::indexing_slicing,
-    reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
-)]
-fn gate_info_from_simple_plain_name(name: &str) -> Option<&'static GateInfo> {
+fn gate_kind_from_simple_plain_name(name: &str) -> Option<GateKind> {
     Some(match name {
-        "M" | "MZ" => &GATES[9],
-        "CX" | "CNOT" => &GATES[22],
-        "H" => &GATES[25],
-        "S" | "SQRT_Z" => &GATES[60],
-        _ if name.eq_ignore_ascii_case("M") || name.eq_ignore_ascii_case("MZ") => &GATES[9],
-        _ if name.eq_ignore_ascii_case("CX") || name.eq_ignore_ascii_case("CNOT") => &GATES[22],
-        _ if name.eq_ignore_ascii_case("H") => &GATES[25],
-        _ if name.eq_ignore_ascii_case("S") || name.eq_ignore_ascii_case("SQRT_Z") => &GATES[60],
+        "M" | "MZ" => GateKind::M,
+        "CX" | "CNOT" => GateKind::CX,
+        "H" => GateKind::H,
+        "S" | "SQRT_Z" => GateKind::S,
+        _ if name.eq_ignore_ascii_case("M") || name.eq_ignore_ascii_case("MZ") => GateKind::M,
+        _ if name.eq_ignore_ascii_case("CX") || name.eq_ignore_ascii_case("CNOT") => GateKind::CX,
+        _ if name.eq_ignore_ascii_case("H") => GateKind::H,
+        _ if name.eq_ignore_ascii_case("S") || name.eq_ignore_ascii_case("SQRT_Z") => GateKind::S,
         _ => return None,
     })
 }
 
 #[inline]
-#[allow(
-    clippy::indexing_slicing,
-    reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
-)]
-fn gate_info_from_uppercase_name(name: &str) -> Option<&'static GateInfo> {
+fn gate_kind_from_uppercase_name(name: &str) -> Option<GateKind> {
     Some(match name {
-        "DETECTOR" => &GATES[0],
-        "OBSERVABLE_INCLUDE" => &GATES[1],
-        "TICK" => &GATES[2],
-        "QUBIT_COORDS" => &GATES[3],
-        "SHIFT_COORDS" => &GATES[4],
-        "REPEAT" => &GATES[5],
-        "MPAD" => &GATES[6],
-        "MX" => &GATES[7],
-        "MY" => &GATES[8],
-        "M" | "MZ" => &GATES[9],
-        "MRX" => &GATES[10],
-        "MRY" => &GATES[11],
-        "MR" | "MRZ" => &GATES[12],
-        "RX" => &GATES[13],
-        "RY" => &GATES[14],
-        "R" | "RZ" => &GATES[15],
-        "XCX" => &GATES[16],
-        "XCY" => &GATES[17],
-        "XCZ" => &GATES[18],
-        "YCX" => &GATES[19],
-        "YCY" => &GATES[20],
-        "YCZ" => &GATES[21],
-        "CX" | "CNOT" | "ZCX" => &GATES[22],
-        "CY" | "ZCY" => &GATES[23],
-        "CZ" | "ZCZ" => &GATES[24],
-        "H" | "H_XZ" => &GATES[25],
-        "H_XY" => &GATES[26],
-        "H_YZ" => &GATES[27],
-        "H_NXY" => &GATES[28],
-        "H_NXZ" => &GATES[29],
-        "H_NYZ" => &GATES[30],
-        "DEPOLARIZE1" => &GATES[31],
-        "DEPOLARIZE2" => &GATES[32],
-        "X_ERROR" => &GATES[33],
-        "Y_ERROR" => &GATES[34],
-        "Z_ERROR" => &GATES[35],
-        "I_ERROR" => &GATES[36],
-        "II_ERROR" => &GATES[37],
-        "PAULI_CHANNEL_1" => &GATES[38],
-        "PAULI_CHANNEL_2" => &GATES[39],
-        "E" | "CORRELATED_ERROR" => &GATES[40],
-        "ELSE_CORRELATED_ERROR" => &GATES[41],
-        "HERALDED_ERASE" => &GATES[42],
-        "HERALDED_PAULI_CHANNEL_1" => &GATES[43],
-        "I" => &GATES[44],
-        "X" => &GATES[45],
-        "Y" => &GATES[46],
-        "Z" => &GATES[47],
-        "C_XYZ" => &GATES[48],
-        "C_ZYX" => &GATES[49],
-        "C_NXYZ" => &GATES[50],
-        "C_XNYZ" => &GATES[51],
-        "C_XYNZ" => &GATES[52],
-        "C_NZYX" => &GATES[53],
-        "C_ZNYX" => &GATES[54],
-        "C_ZYNX" => &GATES[55],
-        "SQRT_X" => &GATES[56],
-        "SQRT_X_DAG" => &GATES[57],
-        "SQRT_Y" => &GATES[58],
-        "SQRT_Y_DAG" => &GATES[59],
-        "S" | "SQRT_Z" => &GATES[60],
-        "S_DAG" | "SQRT_Z_DAG" => &GATES[61],
-        "II" => &GATES[62],
-        "SQRT_XX" => &GATES[63],
-        "SQRT_XX_DAG" => &GATES[64],
-        "SQRT_YY" => &GATES[65],
-        "SQRT_YY_DAG" => &GATES[66],
-        "SQRT_ZZ" => &GATES[67],
-        "SQRT_ZZ_DAG" => &GATES[68],
-        "MPP" => &GATES[69],
-        "SPP" => &GATES[70],
-        "SPP_DAG" => &GATES[71],
-        "SWAP" => &GATES[72],
-        "ISWAP" => &GATES[73],
-        "CXSWAP" => &GATES[74],
-        "SWAPCX" => &GATES[75],
-        "CZSWAP" | "SWAPCZ" => &GATES[76],
-        "ISWAP_DAG" => &GATES[77],
-        "MXX" => &GATES[78],
-        "MYY" => &GATES[79],
-        "MZZ" => &GATES[80],
+        "DETECTOR" => GateKind::DETECTOR,
+        "OBSERVABLE_INCLUDE" => GateKind::OBSERVABLE_INCLUDE,
+        "TICK" => GateKind::TICK,
+        "QUBIT_COORDS" => GateKind::QUBIT_COORDS,
+        "SHIFT_COORDS" => GateKind::SHIFT_COORDS,
+        "REPEAT" => GateKind::REPEAT,
+        "MPAD" => GateKind::MPAD,
+        "MX" => GateKind::MX,
+        "MY" => GateKind::MY,
+        "M" | "MZ" => GateKind::M,
+        "MRX" => GateKind::MRX,
+        "MRY" => GateKind::MRY,
+        "MR" | "MRZ" => GateKind::MR,
+        "RX" => GateKind::RX,
+        "RY" => GateKind::RY,
+        "R" | "RZ" => GateKind::R,
+        "XCX" => GateKind::XCX,
+        "XCY" => GateKind::XCY,
+        "XCZ" => GateKind::XCZ,
+        "YCX" => GateKind::YCX,
+        "YCY" => GateKind::YCY,
+        "YCZ" => GateKind::YCZ,
+        "CX" | "CNOT" | "ZCX" => GateKind::CX,
+        "CY" | "ZCY" => GateKind::CY,
+        "CZ" | "ZCZ" => GateKind::CZ,
+        "H" | "H_XZ" => GateKind::H,
+        "H_XY" => GateKind::H_XY,
+        "H_YZ" => GateKind::H_YZ,
+        "H_NXY" => GateKind::H_NXY,
+        "H_NXZ" => GateKind::H_NXZ,
+        "H_NYZ" => GateKind::H_NYZ,
+        "DEPOLARIZE1" => GateKind::DEPOLARIZE1,
+        "DEPOLARIZE2" => GateKind::DEPOLARIZE2,
+        "X_ERROR" => GateKind::X_ERROR,
+        "Y_ERROR" => GateKind::Y_ERROR,
+        "Z_ERROR" => GateKind::Z_ERROR,
+        "I_ERROR" => GateKind::I_ERROR,
+        "II_ERROR" => GateKind::II_ERROR,
+        "PAULI_CHANNEL_1" => GateKind::PAULI_CHANNEL_1,
+        "PAULI_CHANNEL_2" => GateKind::PAULI_CHANNEL_2,
+        "E" | "CORRELATED_ERROR" => GateKind::E,
+        "ELSE_CORRELATED_ERROR" => GateKind::ELSE_CORRELATED_ERROR,
+        "HERALDED_ERASE" => GateKind::HERALDED_ERASE,
+        "HERALDED_PAULI_CHANNEL_1" => GateKind::HERALDED_PAULI_CHANNEL_1,
+        "I" => GateKind::I,
+        "X" => GateKind::X,
+        "Y" => GateKind::Y,
+        "Z" => GateKind::Z,
+        "C_XYZ" => GateKind::C_XYZ,
+        "C_ZYX" => GateKind::C_ZYX,
+        "C_NXYZ" => GateKind::C_NXYZ,
+        "C_XNYZ" => GateKind::C_XNYZ,
+        "C_XYNZ" => GateKind::C_XYNZ,
+        "C_NZYX" => GateKind::C_NZYX,
+        "C_ZNYX" => GateKind::C_ZNYX,
+        "C_ZYNX" => GateKind::C_ZYNX,
+        "SQRT_X" => GateKind::SQRT_X,
+        "SQRT_X_DAG" => GateKind::SQRT_X_DAG,
+        "SQRT_Y" => GateKind::SQRT_Y,
+        "SQRT_Y_DAG" => GateKind::SQRT_Y_DAG,
+        "S" | "SQRT_Z" => GateKind::S,
+        "S_DAG" | "SQRT_Z_DAG" => GateKind::S_DAG,
+        "II" => GateKind::II,
+        "SQRT_XX" => GateKind::SQRT_XX,
+        "SQRT_XX_DAG" => GateKind::SQRT_XX_DAG,
+        "SQRT_YY" => GateKind::SQRT_YY,
+        "SQRT_YY_DAG" => GateKind::SQRT_YY_DAG,
+        "SQRT_ZZ" => GateKind::SQRT_ZZ,
+        "SQRT_ZZ_DAG" => GateKind::SQRT_ZZ_DAG,
+        "MPP" => GateKind::MPP,
+        "SPP" => GateKind::SPP,
+        "SPP_DAG" => GateKind::SPP_DAG,
+        "SWAP" => GateKind::SWAP,
+        "ISWAP" => GateKind::ISWAP,
+        "CXSWAP" => GateKind::CXSWAP,
+        "SWAPCX" => GateKind::SWAPCX,
+        "CZSWAP" | "SWAPCZ" => GateKind::CZSWAP,
+        "ISWAP_DAG" => GateKind::ISWAP_DAG,
+        "MXX" => GateKind::MXX,
+        "MYY" => GateKind::MYY,
+        "MZZ" => GateKind::MZZ,
         _ => return None,
     })
 }

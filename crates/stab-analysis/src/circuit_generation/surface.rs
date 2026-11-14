@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{AnalysisError, AnalysisResult};
-use stab_model::Circuit;
+use stab_model::{Circuit, GateKind};
 
 use super::{
     CircuitGenParams, GeneratedCircuit, SurfaceCodeParams, SurfaceCodeTask,
@@ -283,21 +283,31 @@ fn finish_surface_code_circuit(
 
     let mut cycle_actions = Circuit::new();
     append_begin_round_tick(params, &mut cycle_actions, &data_qubits)?;
-    append_unitary_1(params, &mut cycle_actions, "H", &x_measurement_qubits)?;
+    append_unitary_1(
+        params,
+        &mut cycle_actions,
+        GateKind::H,
+        &x_measurement_qubits,
+    )?;
     for targets in &cnot_targets {
-        append_instruction(&mut cycle_actions, "TICK", Vec::new(), Vec::new())?;
-        append_unitary_2(params, &mut cycle_actions, "CX", targets)?;
+        append_instruction(&mut cycle_actions, GateKind::TICK, Vec::new(), Vec::new())?;
+        append_unitary_2(params, &mut cycle_actions, GateKind::CX, targets)?;
     }
-    append_instruction(&mut cycle_actions, "TICK", Vec::new(), Vec::new())?;
-    append_unitary_1(params, &mut cycle_actions, "H", &x_measurement_qubits)?;
-    append_instruction(&mut cycle_actions, "TICK", Vec::new(), Vec::new())?;
+    append_instruction(&mut cycle_actions, GateKind::TICK, Vec::new(), Vec::new())?;
+    append_unitary_1(
+        params,
+        &mut cycle_actions,
+        GateKind::H,
+        &x_measurement_qubits,
+    )?;
+    append_instruction(&mut cycle_actions, GateKind::TICK, Vec::new(), Vec::new())?;
     append_measure_reset(params, &mut cycle_actions, &measurement_qubits, 'Z')?;
 
     let mut head = Circuit::new();
     for (qubit, coord) in &q2p {
         append_instruction(
             &mut head,
-            "QUBIT_COORDS",
+            GateKind::QUBIT_COORDS,
             coord.args(),
             qubit_targets(&[*qubit])?,
         )?;
@@ -308,7 +318,7 @@ fn finish_surface_code_circuit(
     for measure in chosen_basis_measure_coords {
         append_instruction(
             &mut head,
-            "DETECTOR",
+            GateKind::DETECTOR,
             vec![f64::from(measure.x), f64::from(measure.y), 0.0],
             vec![rec_target(
                 u32::try_from(measurement_qubits.len()).map_err(|_| {
@@ -325,13 +335,18 @@ fn finish_surface_code_circuit(
     let measurement_count = u32::try_from(measurement_qubits.len()).map_err(|_| {
         AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
     })?;
-    append_instruction(&mut body, "SHIFT_COORDS", vec![0.0, 0.0, 1.0], Vec::new())?;
+    append_instruction(
+        &mut body,
+        GateKind::SHIFT_COORDS,
+        vec![0.0, 0.0, 1.0],
+        Vec::new(),
+    )?;
     for qubit in &measurement_qubits {
         let coord = q2p[qubit];
         let k = measurement_count - measure_coord_to_order[&coord] - 1;
         append_instruction(
             &mut body,
-            "DETECTOR",
+            GateKind::DETECTOR,
             vec![f64::from(coord.x), f64::from(coord.y), 0.0],
             rec_targets(&[k + 1, k + 1 + measurement_count])?,
         )?;
@@ -353,7 +368,7 @@ fn finish_surface_code_circuit(
         detectors.sort_unstable();
         append_instruction(
             &mut tail,
-            "DETECTOR",
+            GateKind::DETECTOR,
             vec![f64::from(measure.x), f64::from(measure.y), 1.0],
             rec_targets(&detectors)?,
         )?;
@@ -365,7 +380,7 @@ fn finish_surface_code_circuit(
     obs_inc.sort_unstable();
     append_instruction(
         &mut tail,
-        "OBSERVABLE_INCLUDE",
+        GateKind::OBSERVABLE_INCLUDE,
         vec![0.0],
         rec_targets(&obs_inc)?,
     )?;

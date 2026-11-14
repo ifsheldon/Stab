@@ -66,6 +66,7 @@ stab_model::Gate
 stab_model::GateArgumentRule
 stab_model::GateCategory
 stab_model::GateDecomposition
+stab_model::GateKind
 stab_model::GateTargetGroupKind
 stab_model::GateTargetRule
 stab_model::MeasureRecordOffset

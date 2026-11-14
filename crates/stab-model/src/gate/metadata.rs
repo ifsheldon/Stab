@@ -180,15 +180,28 @@ impl Gate {
     /// Returns the true unitary inverse, or `None` for non-unitary gates.
     #[inline]
     pub fn inverse(self) -> Option<Self> {
-        self.is_unitary()
-            .then(|| Self::from_name(self.info.inverse_name).ok())
-            .flatten()
+        self.is_unitary().then(|| self.info.inverse.gate())
     }
 
     /// Returns Stim's best candidate inverse, including non-unitary generalized inverses.
     #[inline]
-    pub fn generalized_inverse(self) -> crate::ModelResult<Self> {
-        self.best_candidate_inverse()
+    pub fn generalized_inverse(self) -> Self {
+        self.info.inverse.gate()
+    }
+
+    /// Returns the Pauli applied to the target of a controlled-Pauli gate that also accepts
+    /// measurement-record and sweep-bit controls (`CX`, `CY`, `CZ`, `XCZ`, and `YCZ`), and
+    /// `None` for every other gate.
+    #[inline]
+    pub fn controlled_pauli(self) -> Option<crate::Pauli> {
+        self.info.controlled_pauli
+    }
+
+    /// Returns the basis of a single-qubit measurement, reset, or measure-reset gate (`MX`,
+    /// `MY`, `M`, `MRX`, `MRY`, `MR`, `RX`, `RY`, and `R`), and `None` for every other gate.
+    #[inline]
+    pub fn collapse_basis(self) -> Option<crate::Pauli> {
+        self.info.collapse_basis
     }
 
     #[inline]

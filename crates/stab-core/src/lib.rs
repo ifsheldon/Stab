@@ -24,9 +24,9 @@ pub use stab_model::{
     DemErrorTargetIter, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
     DemObservableId, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
     DiagnosticSeverity, Estimate, EstimateClass, Gate, GateArgumentRule, GateCategory,
-    GateDecomposition, GateTargetGroupKind, GateTargetRule, MeasureRecordOffset, MemoryBudget,
-    MemoryBudgetParseError, ModelDialect, ModelError, ModelFingerprint, ModelResult, ObservableId,
-    ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
+    GateDecomposition, GateKind, GateTargetGroupKind, GateTargetRule, MeasureRecordOffset,
+    MemoryBudget, MemoryBudgetParseError, ModelDialect, ModelError, ModelFingerprint, ModelResult,
+    ObservableId, ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
     ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
     RepeatNestingLimitError, ResourceEstimate, Target, ValidationError, ValidationErrorCode,
 };

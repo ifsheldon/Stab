@@ -71,15 +71,7 @@ fn model_catalog() -> Result<String, GateCatalogError> {
 fn model_row(gate: Gate) -> Result<String, GateCatalogError> {
     let mut aliases = gate.aliases().to_vec();
     aliases.sort_unstable();
-    let inverse = gate.generalized_inverse().map_err(|error| {
-        GateCatalogError::Mismatch(
-            format!(
-                "{} has an invalid generalized inverse: {error}",
-                gate.canonical_name()
-            )
-            .into_boxed_str(),
-        )
-    })?;
+    let inverse = gate.generalized_inverse();
     let mut row = String::new();
     writeln!(
         row,

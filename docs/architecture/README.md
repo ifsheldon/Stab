@@ -48,13 +48,13 @@ Stab does not extend the Stim gate table through a runtime registry.
 
 | Component | Owns | Must not own |
 | --- | --- | --- |
-| Model | Circuit and DEM values, gate syntax, targets, IDs, parsing, printing, structural validation | Simulation, analysis algorithms, CLI, files |
+| Model | Circuit and DEM values, the closed `GateKind` identity and its one gate semantics table, targets, IDs, parsing, printing, structural validation, folded circuit summaries | Simulation, analysis algorithms, CLI, files |
 | Bits | Packed storage, checked views, scalar kernels | Quantum semantics, formats, execution |
 | Records | Measurement and detection layouts, packed batches, codecs, sources, sinks | Circuit execution, filesystem paths |
 | Algebra | Pauli, Clifford, Tableau, Flow semantics | Stim parsing, CLI, operational plans |
 | SIMD kernels | Slice-level `fearless_simd` word kernels and the only dependency on the SIMD library | Models, codecs, policy, filesystem access, Stab types |
-| Engine | Compilation, private IR, plans, sessions, sampling, detection conversion, DEM sampling over shared analysis lowering | Text codecs, paths, CLI, ops |
-| Analysis | Pure circuit and DEM transforms, search, generation, error matching | CLI, operational plans, mutable execution sessions |
+| Engine | Compilation, private IR, plans, sessions, sampling, detection conversion, DEM sampling | Text codecs, paths, CLI, ops |
+| Analysis | Pure circuit and DEM transforms, search, generation | CLI, operational plans, mutable execution sessions |
 | Decoder API | Detection input and prediction output contracts | Decoder implementations, simulation internals |
 | Facade | Finite canonical root contracts and direct component namespaces | Algorithms, duplicate models, universal errors, qualification plans |
 | CLI | Argument parsing, file-role preflight, sink construction, rendering | Quantum algorithms |
@@ -100,6 +100,8 @@ stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
 ops -> product crates
 product crates -X-> ops
 ```
+
+The `stab-engine -> stab-analysis` edge carries three analysis algorithms and their error type, not gate vocabulary, which `stab-model` owns: detector-frame lowering decomposes `SPP` and `SPP_DAG` through `visit_decomposed_spp_instructions`, reference-sample Clifford kernels take each gate's local tableau from `single_qubit_clifford_for_gate` and `gate_tableau` because tableaus are `stab-algebra` values that the model cannot name, and sampled-flow checking removes noise with `circuit_without_noise` and resolves record indices with `flow_record_index`. Engine errors wrap `AnalysisError` from those calls.
 
 The unpublished `stab-reference-decoder` proves decoder composition using only `stab-decoder`, `stab-model`, and `stab-records` at runtime; its analysis and engine dependencies are test-only experiment fixtures. The unpublished `stab-reference-noise-pass` proves circuit-pass composition using only `stab-analysis` and `stab-model`. Neither proof crate can depend on `stab-core`, CLI, ops, private modules, or unstable Rust features.
 

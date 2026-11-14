@@ -14,8 +14,13 @@ use crate::{
 mod api;
 mod counts;
 mod equality;
+mod folded;
 mod iter;
 
+pub use folded::{
+    FoldedCircuitEvent, FoldedCircuitSummary, FoldedCount, FoldedVisitError, FoldedWalkError,
+    visit_folded_circuit,
+};
 pub use iter::{CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter};
 
 use self::iter::{checked_item_range, circuit_item_range_error};

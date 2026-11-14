@@ -3,9 +3,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
-    GateCategory, MemoryBudget, QubitId, Target,
+    GateKind, MemoryBudget, QubitId, Target,
 };
 
+use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
 use crate::{
     AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
     sparse_rev_frame_tracker::{ReverseTrackerWorkBudget, SparseReverseFrameTracker},
@@ -346,7 +347,7 @@ fn undo_instruction_with_snapshots(
     budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
     budget.admit_tracker_instruction(instruction)?;
-    if instruction.gate().canonical_name() == "TICK" {
+    if instruction.gate().kind() == GateKind::TICK {
         *current_tick = current_tick.checked_sub(1).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "tick count underflowed while extracting detecting regions",
@@ -440,50 +441,90 @@ fn validate_supported_subset_inner(circuit: &Circuit, depth: usize) -> AnalysisR
 }
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    if crate::single_qubit_clifford_for_gate(instruction.gate()).is_ok() {
-        return validate_single_plain_qubit_targets(instruction);
-    }
-    if is_feedback_capable_controlled_pauli(instruction.gate().canonical_name()) {
-        return validate_controlled_pauli_targets(instruction);
-    }
-    if instruction.gate().is_two_qubit_gate() && crate::gate_has_tableau(instruction.gate()) {
-        return validate_plain_qubit_pair_targets(instruction);
-    }
-    if instruction.gate().category() == GateCategory::Noise
-        && !is_heralded_record_noise(instruction)
-    {
-        return Ok(());
-    }
-    match instruction.gate().canonical_name() {
-        "R" | "RX" | "RY" => validate_single_plain_qubit_targets(instruction),
-        "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
-            validate_single_measurement_qubit_targets(instruction)
+    match instruction.gate().kind() {
+        GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG => validate_single_plain_qubit_targets(instruction),
+        GateKind::CX | GateKind::CY | GateKind::CZ | GateKind::XCZ | GateKind::YCZ => {
+            validate_controlled_pauli_targets(instruction)
         }
-        "MXX" | "MYY" | "MZZ" => validate_measurement_qubit_pair_targets(instruction),
-        "MPP" | "SPP" | "SPP_DAG" => validate_pauli_product_targets(instruction),
-        "MPAD" => validate_measurement_pad_targets(instruction),
-        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+        GateKind::XCX
+        | GateKind::XCY
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG => validate_plain_qubit_pair_targets(instruction),
+        GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR => Ok(()),
+        GateKind::R | GateKind::RX | GateKind::RY => {
             validate_single_plain_qubit_targets(instruction)
         }
-        "TICK" => validate_target_count(instruction, 0),
-        "DETECTOR" => validate_detector_targets(instruction),
-        "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
-        "QUBIT_COORDS" | "SHIFT_COORDS" => Ok(()),
-        name => Err(AnalysisError::invalid_detector_error_model(format!(
-            "simple detecting-region extraction does not support gate {name}"
+        GateKind::M
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::MR
+        | GateKind::MRX
+        | GateKind::MRY => validate_single_measurement_qubit_targets(instruction),
+        GateKind::MXX | GateKind::MYY | GateKind::MZZ => {
+            validate_measurement_qubit_pair_targets(instruction)
+        }
+        GateKind::MPP | GateKind::SPP | GateKind::SPP_DAG => {
+            validate_pauli_product_targets(instruction)
+        }
+        GateKind::MPAD => validate_measurement_pad_targets(instruction),
+        GateKind::HERALDED_ERASE | GateKind::HERALDED_PAULI_CHANNEL_1 => {
+            validate_single_plain_qubit_targets(instruction)
+        }
+        GateKind::TICK => validate_target_count(instruction, 0),
+        GateKind::DETECTOR => validate_detector_targets(instruction),
+        GateKind::OBSERVABLE_INCLUDE => validate_observable_include_targets(instruction),
+        GateKind::QUBIT_COORDS | GateKind::SHIFT_COORDS => Ok(()),
+        GateKind::REPEAT => Err(AnalysisError::invalid_detector_error_model(format!(
+            "simple detecting-region extraction does not support gate {}",
+            instruction.gate().canonical_name()
         ))),
     }
-}
-
-fn is_heralded_record_noise(instruction: &CircuitInstruction) -> bool {
-    matches!(
-        instruction.gate().canonical_name(),
-        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-    )
-}
-
-fn is_feedback_capable_controlled_pauli(gate_name: &str) -> bool {
-    matches!(gate_name, "CX" | "CY" | "CZ" | "XCZ" | "YCZ")
 }
 
 fn validate_single_plain_qubit_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
@@ -525,17 +566,26 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Analys
             )));
         };
         let gate_name = instruction.gate().canonical_name();
-        if is_cz_classical_bit_noop(gate_name, left, right) {
+        let slot = controlled_pauli_form(instruction.gate()).map(|form| form.slot);
+        if slot == Some(ControlSlot::Either)
+            && left.is_classical_bit_target()
+            && right.is_classical_bit_target()
+        {
             continue;
         }
         let left_is_sweep = left.is_sweep_bit_target();
         let right_is_sweep = right.is_sweep_bit_target();
         if left_is_sweep || right_is_sweep {
-            if left_is_sweep && right_is_sweep && gate_name == "CZ" {
+            if left_is_sweep && right_is_sweep && slot == Some(ControlSlot::Either) {
                 continue;
             }
             if left_is_sweep ^ right_is_sweep {
-                validate_sweep_position(gate_name, left_is_sweep)?;
+                validate_control_position(
+                    instruction,
+                    slot,
+                    left_is_sweep,
+                    "sweep-controlled targets",
+                )?;
                 let qubit_target = if left_is_sweep { right } else { left };
                 validate_qubit_target(instruction, qubit_target, false)?;
                 continue;
@@ -553,7 +603,12 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Analys
                 validate_qubit_target(instruction, right, false)?;
             }
             (true, false) | (false, true) => {
-                validate_feedback_position(gate_name, left_is_record)?;
+                validate_control_position(
+                    instruction,
+                    slot,
+                    left_is_record,
+                    "measurement-record feedback",
+                )?;
                 let feedback_target = if left_is_record { right } else { left };
                 validate_qubit_target(instruction, feedback_target, false)?;
             }
@@ -568,38 +623,20 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Analys
     Ok(())
 }
 
-fn is_cz_classical_bit_noop(gate_name: &str, left: &Target, right: &Target) -> bool {
-    gate_name == "CZ" && left.is_classical_bit_target() && right.is_classical_bit_target()
-}
-
-fn validate_feedback_position(gate_name: &str, record_is_first: bool) -> AnalysisResult<()> {
-    let valid = match gate_name {
-        "CX" | "CY" => record_is_first,
-        "XCZ" | "YCZ" => !record_is_first,
-        "CZ" => true,
-        _ => false,
-    };
-    if valid {
+/// Rejects a classical control outside the gate's control slot; `slot` is `None` for a gate
+/// that accepts no classical control.
+fn validate_control_position(
+    instruction: &CircuitInstruction,
+    slot: Option<ControlSlot>,
+    control_is_first: bool,
+    control_kind: &str,
+) -> AnalysisResult<()> {
+    if slot.is_some_and(|slot| slot.accepts(control_is_first)) {
         Ok(())
     } else {
         Err(AnalysisError::invalid_detector_error_model(format!(
-            "simple detecting-region extraction does not support {gate_name} measurement-record feedback in this target position"
-        )))
-    }
-}
-
-fn validate_sweep_position(gate_name: &str, sweep_is_first: bool) -> AnalysisResult<()> {
-    let valid = match gate_name {
-        "CX" | "CY" => sweep_is_first,
-        "XCZ" | "YCZ" => !sweep_is_first,
-        "CZ" => true,
-        _ => false,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(AnalysisError::invalid_detector_error_model(format!(
-            "simple detecting-region extraction does not support {gate_name} sweep-controlled targets in this target position"
+            "simple detecting-region extraction does not support {} {control_kind} in this target position",
+            instruction.gate().canonical_name()
         )))
     }
 }
@@ -820,20 +857,89 @@ impl DetectingRegionBudget {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<()> {
-        let gate_name = instruction.gate().canonical_name();
         let target_slots = usize_to_u64(instruction.targets().len(), "traversed target count")?;
-        let state_growth = match gate_name {
-            "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => 0,
-            "DETECTOR" | "OBSERVABLE_INCLUDE" => {
+        let state_growth = match instruction.gate().kind() {
+            GateKind::TICK | GateKind::QUBIT_COORDS | GateKind::SHIFT_COORDS => 0,
+            GateKind::DETECTOR | GateKind::OBSERVABLE_INCLUDE => {
                 self.tracked_target_upper_bound = self.tracked_target_upper_bound.saturating_add(1);
                 target_slots.max(1)
             }
-            _ if instruction.gate().category() == GateCategory::Noise
-                && !is_heralded_record_noise(instruction) =>
-            {
-                0
-            }
-            _ => self.tracked_target_upper_bound.saturating_mul(target_slots),
+            GateKind::DEPOLARIZE1
+            | GateKind::DEPOLARIZE2
+            | GateKind::X_ERROR
+            | GateKind::Y_ERROR
+            | GateKind::Z_ERROR
+            | GateKind::I_ERROR
+            | GateKind::II_ERROR
+            | GateKind::PAULI_CHANNEL_1
+            | GateKind::PAULI_CHANNEL_2
+            | GateKind::E
+            | GateKind::ELSE_CORRELATED_ERROR => 0,
+            GateKind::REPEAT
+            | GateKind::MPAD
+            | GateKind::MX
+            | GateKind::MY
+            | GateKind::M
+            | GateKind::MRX
+            | GateKind::MRY
+            | GateKind::MR
+            | GateKind::RX
+            | GateKind::RY
+            | GateKind::R
+            | GateKind::XCX
+            | GateKind::XCY
+            | GateKind::XCZ
+            | GateKind::YCX
+            | GateKind::YCY
+            | GateKind::YCZ
+            | GateKind::CX
+            | GateKind::CY
+            | GateKind::CZ
+            | GateKind::H
+            | GateKind::H_XY
+            | GateKind::H_YZ
+            | GateKind::H_NXY
+            | GateKind::H_NXZ
+            | GateKind::H_NYZ
+            | GateKind::HERALDED_ERASE
+            | GateKind::HERALDED_PAULI_CHANNEL_1
+            | GateKind::I
+            | GateKind::X
+            | GateKind::Y
+            | GateKind::Z
+            | GateKind::C_XYZ
+            | GateKind::C_ZYX
+            | GateKind::C_NXYZ
+            | GateKind::C_XNYZ
+            | GateKind::C_XYNZ
+            | GateKind::C_NZYX
+            | GateKind::C_ZNYX
+            | GateKind::C_ZYNX
+            | GateKind::SQRT_X
+            | GateKind::SQRT_X_DAG
+            | GateKind::SQRT_Y
+            | GateKind::SQRT_Y_DAG
+            | GateKind::S
+            | GateKind::S_DAG
+            | GateKind::II
+            | GateKind::SQRT_XX
+            | GateKind::SQRT_XX_DAG
+            | GateKind::SQRT_YY
+            | GateKind::SQRT_YY_DAG
+            | GateKind::SQRT_ZZ
+            | GateKind::SQRT_ZZ_DAG
+            | GateKind::MPP
+            | GateKind::SPP
+            | GateKind::SPP_DAG
+            | GateKind::SWAP
+            | GateKind::ISWAP
+            | GateKind::CXSWAP
+            | GateKind::SWAPCX
+            | GateKind::CZSWAP
+            | GateKind::ISWAP_DAG
+            | GateKind::MXX
+            | GateKind::MYY
+            | GateKind::MZZ => self.tracked_target_upper_bound.saturating_mul(target_slots),
         };
         self.reserve_tracker_state(state_growth)
     }

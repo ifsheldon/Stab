@@ -5,11 +5,10 @@
 //! set) is the XOR of a fixed subset of the input slots. The subsets depend only on the gate,
 //! so they are derived once from the gate tableau for every catalog gate.
 
-use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use stab_algebra::{PauliBasis, Tableau};
-use stab_model::{DemTarget, Gate, QubitId};
+use stab_model::{DemTarget, Gate, GateKind, QubitId};
 
 use super::{
     SparseReverseFrameTracker, TargetXorSet, TrackerScratch, replace_qubit_set, sorted_slice,
@@ -72,26 +71,34 @@ enum TrackerClifford {
     Two(CliffordAction<4>),
 }
 
-/// Reverse actions of every catalog Clifford, keyed by canonical gate name.
-static TRACKER_CLIFFORDS: LazyLock<HashMap<&'static str, TrackerClifford>> = LazyLock::new(|| {
-    Gate::all()
-        .filter_map(|gate| {
-            let action = if single_qubit_clifford_for_gate(gate).is_ok() {
-                TrackerClifford::One(derive_single_qubit_action(gate).ok()?)
+/// Reverse actions of every catalog Clifford, indexed by gate kind.
+static TRACKER_CLIFFORDS: LazyLock<[Option<TrackerClifford>; GateKind::COUNT]> =
+    LazyLock::new(|| {
+        GateKind::ALL.map(|kind| {
+            let gate = kind.gate();
+            if single_qubit_clifford_for_gate(gate).is_ok() {
+                derive_single_qubit_action(gate)
+                    .ok()
+                    .map(TrackerClifford::One)
             } else if gate.is_two_qubit_gate() {
-                TrackerClifford::Two(derive_two_qubit_action(gate).ok()?)
+                derive_two_qubit_action(gate).ok().map(TrackerClifford::Two)
             } else {
-                return None;
-            };
-            Some((gate.canonical_name(), action))
+                None
+            }
         })
-        .collect()
-});
+    });
+
+fn cached_action(gate: Gate) -> Option<TrackerClifford> {
+    TRACKER_CLIFFORDS
+        .get(gate.kind() as usize)
+        .copied()
+        .flatten()
+}
 
 /// Returns the reverse action of a single-qubit Clifford gate.
 pub(super) fn single_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<2>> {
-    match TRACKER_CLIFFORDS.get(gate.canonical_name()) {
-        Some(TrackerClifford::One(action)) => Ok(*action),
+    match cached_action(gate) {
+        Some(TrackerClifford::One(action)) => Ok(action),
         // Gates without a cached action re-derive it to report the original failure.
         _ => derive_single_qubit_action(gate),
     }
@@ -99,8 +106,8 @@ pub(super) fn single_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<2
 
 /// Returns the reverse action of a two-qubit Clifford gate.
 pub(super) fn two_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<4>> {
-    match TRACKER_CLIFFORDS.get(gate.canonical_name()) {
-        Some(TrackerClifford::Two(action)) => Ok(*action),
+    match cached_action(gate) {
+        Some(TrackerClifford::Two(action)) => Ok(action),
         _ => derive_two_qubit_action(gate),
     }
 }

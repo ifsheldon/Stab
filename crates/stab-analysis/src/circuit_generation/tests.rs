@@ -1,5 +1,5 @@
 use crate::{AnalysisResult, CodeDistance, RoundCount};
-use stab_model::{Circuit, Probability};
+use stab_model::{Circuit, GateKind, Probability};
 
 use super::{
     CircuitGenParams, append_begin_round_tick, append_measure, append_measure_reset, append_reset,
@@ -36,12 +36,12 @@ fn append_unitary_1_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
-    append_unitary_1(&params, &mut circuit, "H", &[2, 3, 5])?;
+    append_unitary_1(&params, &mut circuit, GateKind::H, &[2, 3, 5])?;
     assert_circuit_text(&circuit, "H 2 3 5\n");
 
     let mut circuit = Circuit::new();
     let params = params.with_after_clifford_depolarization(Probability::try_new(0.125)?);
-    append_unitary_1(&params, &mut circuit, "H", &[2, 3, 5])?;
+    append_unitary_1(&params, &mut circuit, GateKind::H, &[2, 3, 5])?;
     assert_circuit_text(&circuit, "H 2 3 5\nDEPOLARIZE1(0.125) 2 3 5\n");
 
     Ok(())
@@ -52,12 +52,12 @@ fn append_unitary_2_matches_stim() -> AnalysisResult<()> {
     // Adapted from Stim v1.16.0 src/stim/gen/circuit_gen_params.test.cc.
     let mut circuit = Circuit::new();
     let params = base_params()?;
-    append_unitary_2(&params, &mut circuit, "CNOT", &[2, 3, 5, 7])?;
+    append_unitary_2(&params, &mut circuit, GateKind::CX, &[2, 3, 5, 7])?;
     assert_circuit_text(&circuit, "CX 2 3 5 7\n");
 
     let mut circuit = Circuit::new();
     let params = params.with_after_clifford_depolarization(Probability::try_new(0.125)?);
-    append_unitary_2(&params, &mut circuit, "CNOT", &[2, 3, 5, 7])?;
+    append_unitary_2(&params, &mut circuit, GateKind::CX, &[2, 3, 5, 7])?;
     assert_circuit_text(&circuit, "CX 2 3 5 7\nDEPOLARIZE2(0.125) 2 3 5 7\n");
 
     Ok(())

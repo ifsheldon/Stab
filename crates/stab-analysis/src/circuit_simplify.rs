@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::ops::ControlFlow;
 
 use stab_algebra::{SingleQubitClifford, StabilizerError};
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, Gate, Pauli, QubitId, Target};
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, Gate, GateKind, Pauli, QubitId, Target,
+};
 
 use crate::{AnalysisError, AnalysisResult};
 
@@ -30,12 +32,91 @@ pub fn visit_decomposed_spp_instructions<Break>(
     instruction: &CircuitInstruction,
     mut visitor: impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
 ) -> AnalysisResult<ControlFlow<Break>> {
-    let dagger = match instruction.gate().canonical_name() {
-        "SPP" => false,
-        "SPP_DAG" => true,
-        name => {
+    let dagger = match instruction.gate().kind() {
+        GateKind::SPP => false,
+        GateKind::SPP_DAG => true,
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::MPP
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => {
             return Err(invalid_simplification(format!(
-                "SPP decomposition expected SPP or SPP_DAG, got {name}"
+                "SPP decomposition expected SPP or SPP_DAG, got {}",
+                instruction.gate().canonical_name()
             )));
         }
     };
@@ -64,24 +145,97 @@ fn append_decomposed_instruction(
     instruction: &CircuitInstruction,
     result: &mut Circuit,
 ) -> AnalysisResult<()> {
-    match instruction.gate().canonical_name() {
-        "I" | "II" => return Ok(()),
-        "MPP" => return append_decomposed_mpp(instruction, result),
-        "SPP" => return append_decomposed_spp(instruction, result, false),
-        "SPP_DAG" => return append_decomposed_spp(instruction, result, true),
-        "MPAD" | "DETECTOR" | "OBSERVABLE_INCLUDE" | "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => {
+    match instruction.gate().kind() {
+        GateKind::I | GateKind::II => return Ok(()),
+        GateKind::MPP => return append_decomposed_mpp(instruction, result),
+        GateKind::SPP => return append_decomposed_spp(instruction, result, false),
+        GateKind::SPP_DAG => return append_decomposed_spp(instruction, result, true),
+        GateKind::MPAD
+        | GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS => {
             result.append_instruction(instruction.clone());
             return Ok(());
         }
-        _ if instruction.gate().is_noisy() && !instruction.gate().produces_measurements() => {
-            result.append_instruction(instruction.clone());
-            return Ok(());
-        }
-        _ if !crate::gate_has_h_s_cx_m_r_decomposition(instruction.gate()) => {
-            result.append_instruction(instruction.clone());
-            return Ok(());
-        }
-        _ => {}
+        // Every other gate is kept or decomposed by its table classification below.
+        GateKind::REPEAT
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => {}
+    }
+    if (instruction.gate().is_noisy() && !instruction.gate().produces_measurements())
+        || !crate::gate_has_h_s_cx_m_r_decomposition(instruction.gate())
+    {
+        result.append_instruction(instruction.clone());
+        return Ok(());
     }
 
     if instruction.gate().is_single_qubit_gate() || instruction.gate().is_two_qubit_gate() {
@@ -205,7 +359,7 @@ fn append_decomposed_mpp(
         if product.terms.is_empty() {
             append_gate_targets(
                 result,
-                Gate::from_name("MPAD")?,
+                GateKind::MPAD.gate(),
                 vec![Target::qubit(
                     QubitId::new(u32::from(product.negative))?,
                     false,
@@ -223,7 +377,7 @@ fn append_decomposed_mpp(
             .qubit;
         append_gate_targets(
             result,
-            Gate::from_name("M")?,
+            GateKind::M.gate(),
             vec![Target::qubit(accumulator, product.negative)],
             instruction.tag_bytes(),
         )?;
@@ -270,9 +424,9 @@ fn visit_decomposed_spp<Break>(
             return Ok(completion);
         }
         let phase_gate = if product.negative ^ dagger {
-            Gate::from_name("S_DAG")?
+            GateKind::S_DAG.gate()
         } else {
-            Gate::from_name("S")?
+            GateKind::S.gate()
         };
         let completion = visit_single_target_sequence(
             visitor,
@@ -342,14 +496,14 @@ fn visit_basis_change<Break>(
     match term.pauli {
         Pauli::X => visit_gate_targets(
             visitor,
-            Gate::from_name("H")?,
+            GateKind::H.gate(),
             vec![Target::qubit(term.qubit, false)],
             tag,
         ),
         Pauli::Y => visit_single_target_sequence(
             visitor,
             &shortest_single_qubit_base_sequence(
-                crate::single_qubit_clifford_for_gate(Gate::from_name("H_YZ")?)
+                crate::single_qubit_clifford_for_gate(GateKind::H_YZ.gate())
                     .map_err(stabilizer_to_simplify_error)?,
             )?,
             Target::qubit(term.qubit, false),
@@ -367,7 +521,7 @@ fn visit_product_cx_fanout<Break>(
     let Some(accumulator) = terms.first().map(|term| term.qubit) else {
         return Ok(ControlFlow::Continue(()));
     };
-    let cx = Gate::from_name("CX")?;
+    let cx = GateKind::CX.gate();
     for term in terms.iter().skip(1) {
         let completion = visit_gate_targets(
             visitor,
@@ -442,11 +596,11 @@ fn append_basis_change(
     tag: Option<&[u8]>,
 ) -> AnalysisResult<()> {
     match term.pauli {
-        Pauli::X => append_gate_on_qubit(result, Gate::from_name("H")?, term.qubit, tag),
+        Pauli::X => append_gate_on_qubit(result, GateKind::H.gate(), term.qubit, tag),
         Pauli::Y => append_single_target_sequence(
             result,
             &shortest_single_qubit_base_sequence(
-                crate::single_qubit_clifford_for_gate(Gate::from_name("H_YZ")?)
+                crate::single_qubit_clifford_for_gate(GateKind::H_YZ.gate())
                     .map_err(stabilizer_to_simplify_error)?,
             )?,
             Target::qubit(term.qubit, false),
@@ -464,7 +618,7 @@ fn append_product_cx_fanout(
     let Some(accumulator) = terms.first().map(|term| term.qubit) else {
         return Ok(());
     };
-    let cx = Gate::from_name("CX")?;
+    let cx = GateKind::CX.gate();
     for term in terms.iter().skip(1) {
         append_gate_targets(
             result,
@@ -509,14 +663,14 @@ fn append_gate_targets(
 fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> AnalysisResult<Vec<Gate>> {
     let target = clifford.tableau();
     let h = (
-        Gate::from_name("H")?,
-        crate::single_qubit_clifford_for_gate(Gate::from_name("H")?)
+        GateKind::H.gate(),
+        crate::single_qubit_clifford_for_gate(GateKind::H.gate())
             .map_err(stabilizer_to_simplify_error)?
             .tableau(),
     );
     let s = (
-        Gate::from_name("S")?,
-        crate::single_qubit_clifford_for_gate(Gate::from_name("S")?)
+        GateKind::S.gate(),
+        crate::single_qubit_clifford_for_gate(GateKind::S.gate())
             .map_err(stabilizer_to_simplify_error)?
             .tableau(),
     );

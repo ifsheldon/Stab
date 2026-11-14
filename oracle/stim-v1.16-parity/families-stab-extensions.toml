@@ -70,7 +70,7 @@ name = "circuit_pass_validates_output_and_preserves_typed_diagnostics"
 [[families]]
 id = "stab-extensions.cooperative-cancellation"
 area = "stab-extensions"
-contract = "Library sampling, detection, measurement-to-detection, DEM sampling and replay, error analysis, flattening, feedback inlining, time reversal, flow generation, missing-detector, detecting-region, and ErrorMatcher operations poll a caller-supplied stab_model::Cancellation inside repeat interpretation and between batches, and stop with a typed Cancelled outcome without delivering a partially computed batch."
+contract = "Library sampling, detection, measurement-to-detection, DEM sampling and replay, error analysis, flattening, feedback inlining, time reversal, flow generation, missing-detector, and detecting-region operations poll a caller-supplied stab_model::Cancellation inside repeat interpretation and between batches, and stop with a typed Cancelled outcome without delivering a partially computed batch."
 stim_refs = ["doc/usage_command_line.md"]
 status = "divergence"
 owner = "stab-engine"

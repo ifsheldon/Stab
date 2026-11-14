@@ -1,8 +1,8 @@
-use arrayvec::ArrayVec;
-use stab_model::{Circuit, CircuitItem, Estimate, RepeatNestingLimit, ResourceEstimate};
-use stab_records::{EncodedSizeEstimate, RecordFormat};
+use std::convert::Infallible;
 
-const INLINE_TRAVERSAL_FRAMES: usize = RepeatNestingLimit::HARD_MAX + 1;
+use stab_model::advanced::{FoldedCircuitEvent, visit_folded_circuit};
+use stab_model::{Cancellation, Circuit, Estimate, ParseLimits, ResourceEstimate};
+use stab_records::{EncodedSizeEstimate, RecordFormat};
 
 /// Estimates cheaply knowable resource properties of a sampling request without compiling or
 /// executing it.
@@ -40,92 +40,35 @@ fn estimate_from_encoded<T>(estimate: EncodedSizeEstimate<T>) -> Estimate<T> {
     }
 }
 
+/// Counts folded items and expanded instructions in one folded walk.
+///
+/// The expanded count is unknown once any repeat block's expanded iterations exceed `u64`, even
+/// when that block's body is empty, and both counts are unknown for nesting beyond the shared
+/// repeat envelope.
 fn operation_counts(circuit: &Circuit) -> (Option<usize>, Option<usize>) {
     let mut structural_items = Some(0usize);
-    let mut expanded_operations = Some(0usize);
-    let mut stack = TraversalStack::new(circuit.items().iter(), 1);
-
-    while let Some((item, multiplier)) = stack.next() {
-        structural_items = structural_items.and_then(|count| count.checked_add(1));
-        match item {
-            CircuitItem::Instruction(_) => {
-                expanded_operations =
-                    expanded_operations.and_then(|count| count.checked_add(multiplier));
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let body_multiplier = usize::try_from(repeat.repeat_count().get())
-                    .ok()
-                    .and_then(|repeat_count| multiplier.checked_mul(repeat_count));
-                match body_multiplier {
-                    Some(body_multiplier) => {
-                        stack.push(repeat.body().items().iter(), body_multiplier);
-                    }
-                    None => {
-                        expanded_operations = None;
-                        stack.push(repeat.body().items().iter(), 0);
-                    }
-                }
-            }
-        }
+    let mut expanded_operations = Some(0u64);
+    let walked = visit_folded_circuit(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+        |event| {
+            structural_items = structural_items.and_then(|count| count.checked_add(1));
+            let added = match event {
+                FoldedCircuitEvent::Instruction { executions, .. } => executions.exact(),
+                FoldedCircuitEvent::Repeat { iterations, .. } => iterations.exact().map(|_| 0),
+            };
+            expanded_operations = expanded_operations
+                .zip(added)
+                .and_then(|(count, added)| count.checked_add(added));
+            Ok::<(), Infallible>(())
+        },
+    );
+    if walked.is_err() {
+        return (None, None);
     }
-
-    (structural_items, expanded_operations)
-}
-
-struct TraversalFrame<T> {
-    iterator: T,
-    multiplier: usize,
-}
-
-struct TraversalStack<T> {
-    inline: ArrayVec<TraversalFrame<T>, INLINE_TRAVERSAL_FRAMES>,
-    overflow: Vec<TraversalFrame<T>>,
-}
-
-impl<T> TraversalStack<T> {
-    fn new(iterator: T, multiplier: usize) -> Self {
-        let mut inline = ArrayVec::new();
-        inline.push(TraversalFrame {
-            iterator,
-            multiplier,
-        });
-        Self {
-            inline,
-            overflow: Vec::new(),
-        }
-    }
-
-    fn push(&mut self, iterator: T, multiplier: usize) {
-        let frame = TraversalFrame {
-            iterator,
-            multiplier,
-        };
-        if self.overflow.is_empty() && self.inline.len() < self.inline.capacity() {
-            self.inline.push(frame);
-        } else {
-            self.overflow.push(frame);
-        }
-    }
-
-    fn last_mut(&mut self) -> Option<&mut TraversalFrame<T>> {
-        self.overflow.last_mut().or_else(|| self.inline.last_mut())
-    }
-
-    fn pop(&mut self) {
-        if self.overflow.pop().is_none() {
-            self.inline.pop();
-        }
-    }
-}
-
-impl<'a> TraversalStack<std::slice::Iter<'a, CircuitItem>> {
-    fn next(&mut self) -> Option<(&'a CircuitItem, usize)> {
-        loop {
-            let frame = self.last_mut()?;
-            if let Some(item) = frame.iterator.next() {
-                return Some((item, frame.multiplier));
-            }
-            self.pop();
-        }
-    }
+    (
+        structural_items,
+        expanded_operations.and_then(|count| usize::try_from(count).ok()),
+    )
 }

@@ -25,7 +25,8 @@ mod validation;
 pub use cancellation::{Cancellation, Cancelled};
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
-    CircuitInstruction, CircuitItem, RepeatBlock,
+    CircuitInstruction, CircuitItem, FoldedCircuitSummary, FoldedCount, FoldedWalkError,
+    RepeatBlock,
 };
 pub use dem::{
     DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
@@ -40,7 +41,8 @@ pub use dialect::ModelDialect;
 pub use error::{ModelError, ModelResult};
 pub use fingerprint::ModelFingerprint;
 pub use gate::{
-    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateTargetGroupKind, GateTargetRule,
+    Gate, GateArgumentRule, GateCategory, GateDecomposition, GateKind, GateTargetGroupKind,
+    GateTargetRule,
 };
 pub use ids::{
     AbsoluteTolerance, CircuitDetectorId, CircuitTick, DemRepeatCount, MeasureRecordOffset,
@@ -64,6 +66,7 @@ pub mod advanced {
         RepeatCount, Target,
     };
     pub use crate::cancellation::CancellationCountdown;
+    pub use crate::circuit::{FoldedCircuitEvent, FoldedVisitError, visit_folded_circuit};
     pub use crate::controlled_pauli::{
         ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
     };
@@ -358,18 +361,18 @@ pub mod advanced {
     /// Returns the raw pinned flow descriptors for a gate.
     #[inline]
     pub fn gate_flow_descriptors(gate: Gate) -> Option<&'static [&'static str]> {
-        crate::gate::gate_flow_descriptors(gate.canonical_name())
+        crate::gate::gate_flow_descriptors(gate.kind())
     }
 
     /// Returns the raw pinned scalar unitary rows for a gate.
     #[inline]
     pub fn gate_unitary_rows(gate: Gate) -> Option<GateUnitaryRows> {
-        crate::gate::gate_unitary_rows(gate.canonical_name())
+        crate::gate::gate_unitary_rows(gate.kind())
     }
 
     /// Returns the raw pinned H/S/CX/M/R decomposition descriptor for a gate.
     #[inline]
     pub fn gate_decomposition(gate: Gate) -> Option<GateDecomposition> {
-        crate::gate::gate_decomposition_text(gate.canonical_name()).map(GateDecomposition::new)
+        crate::gate::gate_decomposition_text(gate.kind()).map(GateDecomposition::new)
     }
 }

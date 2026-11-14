@@ -1,7 +1,8 @@
 use stab_algebra::PauliBasis;
-use stab_model::{CircuitInstruction, GateCategory};
-
-use crate::gate_has_tableau;
+use stab_model::advanced::{
+    ClassicalControl, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
+};
+use stab_model::{CircuitInstruction, GateKind, Pauli};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReverseFlowTransition {
@@ -41,77 +42,119 @@ impl ReverseFlowTransition {
 pub(crate) fn reverse_flow_transition(instruction: &CircuitInstruction) -> ReverseFlowTransition {
     use ReverseFlowTransition as Transition;
 
-    match instruction.gate().canonical_name() {
-        "M" => Transition::Measurement(PauliBasis::Z),
-        "MX" => Transition::Measurement(PauliBasis::X),
-        "MY" => Transition::Measurement(PauliBasis::Y),
-        "R" => Transition::Reset(PauliBasis::Z),
-        "RX" => Transition::Reset(PauliBasis::X),
-        "RY" => Transition::Reset(PauliBasis::Y),
-        "MR" => Transition::MeasureReset(PauliBasis::Z),
-        "MRX" => Transition::MeasureReset(PauliBasis::X),
-        "MRY" => Transition::MeasureReset(PauliBasis::Y),
-        "MXX" => Transition::PairMeasurement(PauliBasis::X),
-        "MYY" => Transition::PairMeasurement(PauliBasis::Y),
-        "MZZ" => Transition::PairMeasurement(PauliBasis::Z),
-        "MPP" => Transition::PauliProductMeasurement,
-        "MPAD" => Transition::MeasurementPad,
-        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => Transition::HeraldedMeasurement,
-        "SPP" | "SPP_DAG" => Transition::PauliProductUnitary,
-        "DETECTOR" => Transition::Detector,
-        "OBSERVABLE_INCLUDE" => Transition::Observable,
-        "CX" | "XCZ" if sweep_controlled_pauli_is_sign_only_noop(instruction) => {
-            Transition::SweepControlledPauliNoop
+    match instruction.gate().kind() {
+        GateKind::M => Transition::Measurement(PauliBasis::Z),
+        GateKind::MX => Transition::Measurement(PauliBasis::X),
+        GateKind::MY => Transition::Measurement(PauliBasis::Y),
+        GateKind::R => Transition::Reset(PauliBasis::Z),
+        GateKind::RX => Transition::Reset(PauliBasis::X),
+        GateKind::RY => Transition::Reset(PauliBasis::Y),
+        GateKind::MR => Transition::MeasureReset(PauliBasis::Z),
+        GateKind::MRX => Transition::MeasureReset(PauliBasis::X),
+        GateKind::MRY => Transition::MeasureReset(PauliBasis::Y),
+        GateKind::MXX => Transition::PairMeasurement(PauliBasis::X),
+        GateKind::MYY => Transition::PairMeasurement(PauliBasis::Y),
+        GateKind::MZZ => Transition::PairMeasurement(PauliBasis::Z),
+        GateKind::MPP => Transition::PauliProductMeasurement,
+        GateKind::MPAD => Transition::MeasurementPad,
+        GateKind::HERALDED_ERASE | GateKind::HERALDED_PAULI_CHANNEL_1 => {
+            Transition::HeraldedMeasurement
         }
-        "CY" | "YCZ" if sweep_controlled_pauli_is_sign_only_noop(instruction) => {
-            Transition::SweepControlledPauliNoop
+        GateKind::SPP | GateKind::SPP_DAG => Transition::PauliProductUnitary,
+        GateKind::DETECTOR => Transition::Detector,
+        GateKind::OBSERVABLE_INCLUDE => Transition::Observable,
+        GateKind::CX | GateKind::XCZ | GateKind::CY | GateKind::YCZ | GateKind::CZ => {
+            if sweep_controlled_pauli_is_sign_only_noop(instruction) {
+                Transition::SweepControlledPauliNoop
+            } else {
+                match instruction.gate().controlled_pauli() {
+                    Some(Pauli::X) => Transition::ControlledPauli(PauliBasis::X),
+                    Some(Pauli::Y) => Transition::ControlledPauli(PauliBasis::Y),
+                    Some(Pauli::Z) => Transition::ControlledPauli(PauliBasis::Z),
+                    None => Transition::Unsupported,
+                }
+            }
         }
-        "CZ" if sweep_controlled_pauli_is_sign_only_noop(instruction) => {
-            Transition::SweepControlledPauliNoop
-        }
-        "CX" | "XCZ" => Transition::ControlledPauli(PauliBasis::X),
-        "CY" | "YCZ" => Transition::ControlledPauli(PauliBasis::Y),
-        "CZ" => Transition::ControlledPauli(PauliBasis::Z),
-        _ if gate_has_tableau(instruction.gate()) => Transition::Tableau,
-        _ if matches!(
-            instruction.gate().category(),
-            GateCategory::Annotation | GateCategory::Noise
-        ) =>
-        {
-            Transition::Ignored
-        }
-        _ => Transition::Unsupported,
+        GateKind::XCX
+        | GateKind::XCY
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG => Transition::Tableau,
+        GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR => Transition::Ignored,
+        GateKind::REPEAT => Transition::Unsupported,
     }
 }
 
+/// Reports whether every target pair of a controlled-Pauli instruction is a sweep bit in the
+/// gate's classical-control slot paired with a qubit, which only flips a sign.
+///
+/// A sweep bit is a sign-only no-op only in the classical-control slot (vendor
+/// sparse_rev_frame_tracker.cc undo_ZC{X,Y,Z}_single): CX/CY take the control first, XCZ/YCZ
+/// take the Pauli side first, and CZ accepts a classical bit in either slot. The model's
+/// controlled-Pauli classifier owns that orientation, so a sweep bit in the Pauli slot falls
+/// through to the tracker's not-a-qubit rejection instead of classifying as a no-op.
 pub(crate) fn sweep_controlled_pauli_is_sign_only_noop(instruction: &CircuitInstruction) -> bool {
-    let gate_name = instruction.gate().canonical_name();
-    if !matches!(gate_name, "CX" | "CY" | "CZ" | "XCZ" | "YCZ") {
+    if instruction.gate().controlled_pauli().is_none() {
         return false;
     }
     let groups = instruction.target_groups();
     !groups.is_empty()
         && groups.iter().all(|group| {
-            let [left, right] = *group else {
-                return false;
-            };
-            let left_is_sweep = left.is_sweep_bit_target();
-            let right_is_sweep = right.is_sweep_bit_target();
-            if !(left_is_sweep ^ right_is_sweep)
-                || left.qubit_id().is_some() == right.qubit_id().is_some()
-            {
-                return false;
-            }
-            // A sweep bit is a sign-only no-op only in the classical-control
-            // slot (vendor sparse_rev_frame_tracker.cc undo_ZC{X,Y,Z}_single):
-            // CX/CY take the control first, XCZ/YCZ take the Pauli side
-            // first, and CZ accepts a classical bit in either slot. A sweep
-            // bit in the Pauli slot must fall through to the tracker's
-            // not-a-qubit rejection instead of classifying as a no-op.
-            match gate_name {
-                "CX" | "CY" => left_is_sweep,
-                "XCZ" | "YCZ" => right_is_sweep,
-                _ => true,
-            }
+            matches!(
+                classify_controlled_pauli_target_pair(instruction.gate(), group),
+                ControlledPauliTargetPair::Classical {
+                    control: ClassicalControl::Sweep(_),
+                    ..
+                }
+            )
         })
 }

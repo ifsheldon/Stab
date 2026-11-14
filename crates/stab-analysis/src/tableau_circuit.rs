@@ -1,5 +1,5 @@
 use stab_algebra::{PauliBasis, PauliSign, Tableau};
-use stab_model::{Circuit, Gate, QubitId, Target};
+use stab_model::{Circuit, GateKind, QubitId, Target};
 
 use crate::{AnalysisError, AnalysisResult, gate_tableau};
 
@@ -32,50 +32,50 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
             })?;
 
         if pivot != column {
-            apply_gate(&mut remaining, &mut circuit, "CX", &[pivot, column])?;
-            apply_gate(&mut remaining, &mut circuit, "CX", &[column, pivot])?;
-            apply_gate(&mut remaining, &mut circuit, "CX", &[pivot, column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[pivot, column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[column, pivot])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[pivot, column])?;
         }
 
         if output_code(&remaining, PauliBasis::Z, column, column)? == 3 {
-            apply_gate(&mut remaining, &mut circuit, "S", &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
         }
         if output_code(&remaining, PauliBasis::Z, column, column)? != 2 {
-            apply_gate(&mut remaining, &mut circuit, "H", &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::H, &[column])?;
         }
         if output_code(&remaining, PauliBasis::X, column, column)? != 1 {
-            apply_gate(&mut remaining, &mut circuit, "S", &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
         }
 
         for row in column + 1..num_qubits {
             if output_code(&remaining, PauliBasis::X, column, row)? == 3 {
-                apply_gate(&mut remaining, &mut circuit, "S", &[row])?;
+                apply_gate(&mut remaining, &mut circuit, GateKind::S, &[row])?;
             }
         }
         for row in column + 1..num_qubits {
             if output_code(&remaining, PauliBasis::X, column, row)? == 2 {
-                apply_gate(&mut remaining, &mut circuit, "H", &[row])?;
+                apply_gate(&mut remaining, &mut circuit, GateKind::H, &[row])?;
             }
         }
         for row in column + 1..num_qubits {
             if output_code(&remaining, PauliBasis::X, column, row)? != 0 {
-                apply_gate(&mut remaining, &mut circuit, "CX", &[column, row])?;
+                apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[column, row])?;
             }
         }
 
         for row in column + 1..num_qubits {
             if output_code(&remaining, PauliBasis::Z, column, row)? == 3 {
-                apply_gate(&mut remaining, &mut circuit, "S", &[row])?;
+                apply_gate(&mut remaining, &mut circuit, GateKind::S, &[row])?;
             }
         }
         for row in column + 1..num_qubits {
             if output_code(&remaining, PauliBasis::Z, column, row)? == 1 {
-                apply_gate(&mut remaining, &mut circuit, "H", &[row])?;
+                apply_gate(&mut remaining, &mut circuit, GateKind::H, &[row])?;
             }
         }
         for row in column + 1..num_qubits {
             if output_code(&remaining, PauliBasis::Z, column, row)? != 0 {
-                apply_gate(&mut remaining, &mut circuit, "CX", &[row, column])?;
+                apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[row, column])?;
             }
         }
     }
@@ -90,18 +90,18 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
         .collect::<AnalysisResult<Vec<_>>>()?;
     for (column, negative) in negative_zs.iter().copied().enumerate() {
         if negative {
-            apply_gate(&mut remaining, &mut circuit, "H", &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::H, &[column])?;
         }
     }
     for (column, negative) in negative_zs.iter().copied().enumerate() {
         if negative {
-            apply_gate(&mut remaining, &mut circuit, "S", &[column])?;
-            apply_gate(&mut remaining, &mut circuit, "S", &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
         }
     }
     for (column, negative) in negative_zs.into_iter().enumerate() {
         if negative {
-            apply_gate(&mut remaining, &mut circuit, "H", &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::H, &[column])?;
         }
     }
     for column in 0..num_qubits {
@@ -111,14 +111,14 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
             .sign()
             == PauliSign::Minus
         {
-            apply_gate(&mut remaining, &mut circuit, "S", &[column])?;
-            apply_gate(&mut remaining, &mut circuit, "S", &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
+            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
         }
     }
 
     if circuit.count_qubits() < num_qubits && num_qubits != 0 {
-        apply_gate(&mut remaining, &mut circuit, "H", &[num_qubits - 1])?;
-        apply_gate(&mut remaining, &mut circuit, "H", &[num_qubits - 1])?;
+        apply_gate(&mut remaining, &mut circuit, GateKind::H, &[num_qubits - 1])?;
+        apply_gate(&mut remaining, &mut circuit, GateKind::H, &[num_qubits - 1])?;
     }
 
     let identity = Tableau::identity(num_qubits).map_err(map_tableau_error)?;
@@ -157,10 +157,10 @@ fn output_code(
 fn apply_gate(
     remaining: &mut Tableau,
     circuit: &mut Circuit,
-    gate_name: &'static str,
+    gate: GateKind,
     targets: &[usize],
 ) -> AnalysisResult<()> {
-    let gate = Gate::from_name(gate_name)?;
+    let gate = gate.gate();
     let local = gate_tableau(gate)?;
     remaining
         .append(&local, targets)

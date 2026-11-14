@@ -720,8 +720,7 @@ fn gate_inverse_metadata_matches_stim_v116() {
         assert_eq!(
             Gate::from_name(gate)
                 .unwrap()
-                .best_candidate_inverse()
-                .unwrap()
+                .generalized_inverse()
                 .canonical_name(),
             inverse,
             "{gate}"
@@ -731,8 +730,7 @@ fn gate_inverse_metadata_matches_stim_v116() {
     assert_eq!(
         Gate::from_name("H_XZ")
             .unwrap()
-            .best_candidate_inverse()
-            .unwrap()
+            .generalized_inverse()
             .canonical_name(),
         "H"
     );

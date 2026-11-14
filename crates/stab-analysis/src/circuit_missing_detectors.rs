@@ -1,11 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::Flow;
+use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, QubitId,
-    Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, MeasureRecordOffset,
+    ParseLimits, QubitId, Target,
 };
 
+use crate::folded_walk::walk_folded;
 use crate::{
     AnalysisError, AnalysisResult, FlowGeneratorOptions, ResourceKind, ResourceLimitError,
     ResourceOperation,
@@ -18,7 +20,6 @@ mod final_repeat;
 /// Above this many expanded instructions the count-independent folded final-repeat proof is
 /// tried first. It selects an algorithm; it does not reject work.
 const FOLDED_FINAL_REPEAT_THRESHOLD: u64 = 1_000_000;
-const MAX_MISSING_DETECTOR_REPEAT_NESTING: usize = 256;
 /// Conservative retained bytes of one declared row before its targets, and per row target.
 const DECLARED_ROW_BYTES: u64 = 64;
 const DECLARED_ROW_TARGET_BYTES: u64 = 48;
@@ -67,8 +68,8 @@ pub(super) fn contains_measurement_row_instruction(circuit: &Circuit) -> bool {
         CircuitItem::Instruction(instruction) => {
             instruction.gate().produces_measurements()
                 || matches!(
-                    instruction.gate().canonical_name(),
-                    "DETECTOR" | "OBSERVABLE_INCLUDE"
+                    instruction.gate().kind(),
+                    GateKind::DETECTOR | GateKind::OBSERVABLE_INCLUDE
                 )
         }
         CircuitItem::RepeatBlock(repeat) => contains_measurement_row_instruction(repeat.body()),
@@ -156,14 +157,14 @@ fn collect_declared_rows(
                 })?;
         }
 
-        match instruction.gate().canonical_name() {
-            "DETECTOR" => detector_rows.push(row_from_record_targets(
+        match instruction.gate().kind() {
+            GateKind::DETECTOR => detector_rows.push(row_from_record_targets(
                 instruction,
                 measurement_offset,
                 false,
                 &mut ignored_logical_rows,
             )?),
-            "OBSERVABLE_INCLUDE" => {
+            GateKind::OBSERVABLE_INCLUDE => {
                 let observable = instruction
                     .observable_id_argument()?
                     .ok_or_else(|| {
@@ -186,7 +187,85 @@ fn collect_declared_rows(
                     ignored_logical_rows.insert(observable);
                 }
             }
-            _ => {}
+            GateKind::TICK
+            | GateKind::QUBIT_COORDS
+            | GateKind::SHIFT_COORDS
+            | GateKind::REPEAT
+            | GateKind::MPAD
+            | GateKind::MX
+            | GateKind::MY
+            | GateKind::M
+            | GateKind::MRX
+            | GateKind::MRY
+            | GateKind::MR
+            | GateKind::RX
+            | GateKind::RY
+            | GateKind::R
+            | GateKind::XCX
+            | GateKind::XCY
+            | GateKind::XCZ
+            | GateKind::YCX
+            | GateKind::YCY
+            | GateKind::YCZ
+            | GateKind::CX
+            | GateKind::CY
+            | GateKind::CZ
+            | GateKind::H
+            | GateKind::H_XY
+            | GateKind::H_YZ
+            | GateKind::H_NXY
+            | GateKind::H_NXZ
+            | GateKind::H_NYZ
+            | GateKind::DEPOLARIZE1
+            | GateKind::DEPOLARIZE2
+            | GateKind::X_ERROR
+            | GateKind::Y_ERROR
+            | GateKind::Z_ERROR
+            | GateKind::I_ERROR
+            | GateKind::II_ERROR
+            | GateKind::PAULI_CHANNEL_1
+            | GateKind::PAULI_CHANNEL_2
+            | GateKind::E
+            | GateKind::ELSE_CORRELATED_ERROR
+            | GateKind::HERALDED_ERASE
+            | GateKind::HERALDED_PAULI_CHANNEL_1
+            | GateKind::I
+            | GateKind::X
+            | GateKind::Y
+            | GateKind::Z
+            | GateKind::C_XYZ
+            | GateKind::C_ZYX
+            | GateKind::C_NXYZ
+            | GateKind::C_XNYZ
+            | GateKind::C_XYNZ
+            | GateKind::C_NZYX
+            | GateKind::C_ZNYX
+            | GateKind::C_ZYNX
+            | GateKind::SQRT_X
+            | GateKind::SQRT_X_DAG
+            | GateKind::SQRT_Y
+            | GateKind::SQRT_Y_DAG
+            | GateKind::S
+            | GateKind::S_DAG
+            | GateKind::II
+            | GateKind::SQRT_XX
+            | GateKind::SQRT_XX_DAG
+            | GateKind::SQRT_YY
+            | GateKind::SQRT_YY_DAG
+            | GateKind::SQRT_ZZ
+            | GateKind::SQRT_ZZ_DAG
+            | GateKind::MPP
+            | GateKind::SPP
+            | GateKind::SPP_DAG
+            | GateKind::SWAP
+            | GateKind::ISWAP
+            | GateKind::CXSWAP
+            | GateKind::SWAPCX
+            | GateKind::CZSWAP
+            | GateKind::ISWAP_DAG
+            | GateKind::MXX
+            | GateKind::MYY
+            | GateKind::MZZ => {}
         }
     }
     if measurement_offset != measurement_count {
@@ -240,55 +319,44 @@ struct DeclarationScan {
 }
 
 fn declaration_scan(circuit: &Circuit) -> AnalysisResult<DeclarationScan> {
-    fn count(
-        circuit: &Circuit,
-        multiplier: u64,
-        depth: usize,
-        totals: &mut DeclarationScan,
-    ) -> AnalysisResult<()> {
-        if depth > MAX_MISSING_DETECTOR_REPEAT_NESTING {
-            return Err(ResourceLimitError::missing_detector_discovery(
-                ResourceKind::RepeatNesting,
-                depth as u64,
-                MAX_MISSING_DETECTOR_REPEAT_NESTING as u64,
-            )
-            .into());
-        }
-        for item in circuit.items() {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    totals.instructions = totals.instructions.saturating_add(multiplier);
-                    if matches!(
-                        instruction.gate().canonical_name(),
-                        "DETECTOR" | "OBSERVABLE_INCLUDE"
-                    ) {
-                        let row = DECLARED_ROW_BYTES.saturating_add(
-                            (instruction.targets().len() as u64)
-                                .saturating_mul(DECLARED_ROW_TARGET_BYTES),
-                        );
-                        totals.row_bytes = totals.row_bytes.saturating_add(
-                            row.saturating_mul(DECLARED_ROW_COPIES)
-                                .saturating_mul(multiplier),
-                        );
-                    }
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    let repeated_multiplier =
-                        multiplier.saturating_mul(repeat.repeat_count().get());
-                    count(
-                        repeat.body(),
-                        repeated_multiplier,
-                        depth.saturating_add(1),
-                        totals,
-                    )?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     let mut totals = DeclarationScan::default();
-    count(circuit, 1, 0, &mut totals)?;
+    walk_folded(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+        |depth, limit| {
+            ResourceLimitError::missing_detector_discovery(
+                ResourceKind::RepeatNesting,
+                depth,
+                limit,
+            )
+            .into()
+        },
+        |event| {
+            let FoldedCircuitEvent::Instruction {
+                instruction,
+                executions,
+            } = event
+            else {
+                return Ok(());
+            };
+            let multiplier = executions.saturating();
+            totals.instructions = totals.instructions.saturating_add(multiplier);
+            if matches!(
+                instruction.gate().kind(),
+                GateKind::DETECTOR | GateKind::OBSERVABLE_INCLUDE
+            ) {
+                let row = DECLARED_ROW_BYTES.saturating_add(
+                    (instruction.targets().len() as u64).saturating_mul(DECLARED_ROW_TARGET_BYTES),
+                );
+                totals.row_bytes = totals.row_bytes.saturating_add(
+                    row.saturating_mul(DECLARED_ROW_COPIES)
+                        .saturating_mul(multiplier),
+                );
+            }
+            Ok(())
+        },
+    )?;
     Ok(totals)
 }
 
@@ -380,7 +448,7 @@ fn circuit_with_known_input_resets(
     }
     let mut with_resets = Circuit::new();
     with_resets.append_instruction(CircuitInstruction::new(
-        Gate::from_name("R")?,
+        GateKind::R.gate(),
         Vec::new(),
         targets,
         None,
@@ -434,7 +502,7 @@ fn build_missing_detector_output(
         .collect::<Vec<_>>();
     eliminate_rows(&mut rows, measurement_count);
 
-    let detector = Gate::from_name("DETECTOR")?;
+    let detector = GateKind::DETECTOR.gate();
     let mut result = Circuit::new();
     for row in &mut rows {
         if !row.invariant || row.row.is_empty() {

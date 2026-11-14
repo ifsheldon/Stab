@@ -201,7 +201,7 @@ area = "analysis"
 contract = "DEM errors map back to full physical circuit provenance and repeat-stack locations."
 stim_refs = ["src/stim/simulators/error_matcher.test.cc"]
 status = "deferred"
-rationale = "The explain_errors product and full ErrorMatcher provenance are explicitly deferred."
+rationale = "The explain_errors product and full ErrorMatcher provenance are explicitly deferred, so Stab exports no ErrorMatcher or matched-error API."
 
 [[families]]
 id = "analysis.flow-checking-common"

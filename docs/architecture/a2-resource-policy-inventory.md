@@ -43,14 +43,11 @@ Budgets are per operation: parsing, plan compilation, reference-simulator scratc
 | `RepeatNestingLimit::HARD_MAX` | `stab-model/src/parse_limits.rs` | Nesting | The shared 256-level envelope that callers may tighten but not raise. |
 | `MAX_DEM_REPEAT_NESTING` | `stab-model/src/dem.rs` | Nesting | Re-export of the shared envelope for DEM consumers. |
 | `ReferenceSampleTree::MAX_NESTING` | `stab-engine/src/reference_sample_tree.rs` | Nesting | The shared envelope. |
-| `MAX_FEEDBACK_REPEAT_NESTING` | `stab-analysis/src/circuit_feedback.rs` | Nesting | 256, the shared envelope. |
-| `MAX_MISSING_DETECTOR_REPEAT_NESTING` | `stab-analysis/src/circuit_missing_detectors.rs` | Nesting | 256, the shared envelope. |
-| `MAX_FLOW_GENERATOR_REPEAT_NESTING` | `stab-analysis/src/circuit_flow/generators/resources.rs` | Nesting | 256, the shared envelope. |
+| `ParseLimits::DEFAULT_REPEAT_NESTING` | `stab-model/src/parse_limits.rs` | Nesting | The shared envelope as a `RepeatNestingLimit`. The model's folded circuit walk (`stab_model::advanced::visit_folded_circuit` and `FoldedCircuitSummary`) enforces it for the analyzer, flattening, feedback inlining, flow generation, missing-detector discovery, measurement-rich time reversal, the CLI herald count, and the sampling request estimate, each reporting its own nesting error. |
 | `MAX_DETECTING_REGION_REPEAT_NESTING` | `stab-analysis/src/circuit_detecting_regions.rs` | Nesting | 128. Raising it to 256 overflowed a 2 MiB test-thread stack in a debug build, because the snapshot walk and the tracker's recurrence probes recurse several frames per level, so it stays until that traversal is iterative. |
 | `ParseLimits::DEFAULT_MEMORY_BUDGET` | `stab-model/src/parse_limits.rs` | Byte budget | The parse budget for source bytes plus the conservative retained model. |
 | `DETECTING_REGION_MEMORY_BUDGET` | `stab-analysis/src/circuit_detecting_regions.rs` | Byte budget | Live tracker state, output regions, and helper vectors; the default budget because the API takes no budget yet. |
 | `FLOW_GENERATOR_MEMORY_BUDGET` | `stab-analysis/src/circuit_flow/generators/resources.rs` | Byte budget | Owned measurement-rich flow rows, also used by missing-detector discovery; the default budget. |
-| `ERROR_MATCHER_FILTER_MEMORY_BUDGET` | `stab-analysis/src/error_matcher/filter.rs` | Byte budget | Retained filter keys; the default budget. |
 | `MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES` | `stab-model/src/dem/api.rs` | Byte budget | The default budget divided by 48 conservative bytes per retained candidate; truncation beyond it reports a typed error naming the budget. |
 | `AlgebraMemoryBudget::DEFAULT` | `stab-algebra/src/budget.rs` | Byte budget | One gibibyte, the same default as `MemoryBudget`, for algebra values built from a requested size; `stab-analysis` maps its `MemoryBudget` onto it. |
 | `SatMaterializationLimits::DEFAULT_MAX_*` (eight constants) | `stab-analysis/src/dem/sat/limits.rs` | Search budget | Explicit SAT construction policy, values unchanged. |
@@ -118,7 +115,6 @@ One tick can still be a large instruction, such as a measurement with many targe
 | Flow generation and missing detectors | `FlowGeneratorOptions::cancellation` through `circuit_flow_generators_with_options`, `MissingDetectorOptions::cancellation` | Every undone instruction of the measurement-rich solver, and the unitary path's Tableau conversion | `AnalysisError::Cancelled` |
 | Circuit-to-Tableau conversion | `CircuitToTableauOptions::cancellation` through `circuit_to_tableau_with_options`, also reached from `TimeReversedForFlowsOptions::cancellation` for the dense validation of unitary time reversal | Every instruction, and before every Tableau composition of a repeat power, so a repeat count near `2^63` is cancellable between its at most 126 compositions | `AnalysisError::Cancelled` |
 | Detecting regions | `DetectingRegionOptions::cancellation`, `DetectingRegionTargetOptions::cancellation` | Every undone instruction and repeat iteration of the reverse tracker | `AnalysisError::Cancelled` |
-| ErrorMatcher | `ExplainErrorsOptions::cancellation` through `explain_errors_from_circuit_with_options` | Every scanned instruction and repeat iteration, the filter traversal, and each candidate's analysis | `AnalysisError::Cancelled` |
 | Folded DEM traversal | `FoldedDemVisitor::poll_cancellation`, a defaulted visitor hook | Every expanded or selected repeat iteration | The visitor's error type |
 
 `stab-algebra` operations take no signal: each call is polynomial in bytes already admitted, at most `O(n^3 / 64)` word operations for an `n`-qubit Tableau, or `O(log |k|)` such compositions for `Tableau::pow(k)`, and callers that loop over them poll between calls.
@@ -160,7 +156,9 @@ Parsing, circuit generation, circuit passes, logical-error search, and SAT mater
 | `MAX_DETECTING_REGION_LIVE_STATE_UNITS`, `_OUTPUT_BYTES` | Byte proxies | Converted to `DETECTING_REGION_MEMORY_BUDGET` at 64 bytes per live-state unit. |
 | `MAX_DETECTING_REGION_OUTPUT_REGIONS`, `_HELPER_TARGETS`, `_HELPER_TICKS` | Count caps | Removed; regions and helper vectors are charged in bytes. |
 | `MAX_ERROR_MATCHER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work caps | Removed. |
-| `MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work and count caps | Removed; retained keys are charged to `ERROR_MATCHER_FILTER_MEMORY_BUDGET`. |
+| `MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work and count caps | Removed; E4 charged retained keys to a filter byte budget, and E8 deleted that budget with the deferred `explain_errors` surface. |
+| `ERROR_MATCHER_FILTER_MEMORY_BUDGET` | Byte budget | Removed in E8 with `ErrorMatcher`, because `explain_errors` is a deferred product surface. |
+| `MAX_FEEDBACK_REPEAT_NESTING`, `MAX_MISSING_DETECTOR_REPEAT_NESTING`, `MAX_FLOW_GENERATOR_REPEAT_NESTING` | Nesting | Removed in E8; each was 256, and the shared folded walk now applies `ParseLimits::DEFAULT_REPEAT_NESTING` with the same value and the same reported depth. |
 | `MAX_DEM_COORDINATE_SCALAR_WORK` | Work cap | Removed; coordinate vectors are bounded by the represented model. |
 | `MAX_DEM_COORDINATE_MAP_DETECTORS` | Count cap | Converted to byte admission of the all-detector map. |
 | `MAX_GENERATED_PHYSICAL_QUBITS` | Generator cap | Converted to 2048 bytes per physical qubit against the parameters' budget, because generation is linear in its output. |

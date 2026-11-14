@@ -1,5 +1,5 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, Tableau};
-use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, Target};
+use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, Target};
 
 use crate::{
     AnalysisError, AnalysisResult, circuit_flow::check_unsigned_flows_with_sparse_tracker,
@@ -46,7 +46,7 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> AnalysisResult<Circuit> {
             matches!(
                 item,
                 CircuitItem::Instruction(instruction)
-                    if instruction.gate().canonical_name() == "QUBIT_COORDS"
+                    if instruction.gate().kind() == GateKind::QUBIT_COORDS
             )
         })
         .count();
@@ -192,19 +192,93 @@ pub fn circuit_time_reversed_for_flows_with_options(
 fn inverse_public_instruction(
     instruction: &CircuitInstruction,
 ) -> AnalysisResult<CircuitInstruction> {
-    if instruction.gate().is_unitary() {
-        return inverse_unitary_instruction(instruction);
-    }
     let gate = instruction.gate();
-    let args = match gate.canonical_name() {
-        "TICK" => instruction.args().to_vec(),
-        "SHIFT_COORDS" => instruction.args().iter().map(|arg| -*arg).collect(),
-        "QUBIT_COORDS" => {
+    let args = match gate.kind() {
+        GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG => return inverse_unitary_instruction(instruction),
+        GateKind::TICK => instruction.args().to_vec(),
+        GateKind::SHIFT_COORDS => instruction.args().iter().map(|arg| -*arg).collect(),
+        GateKind::QUBIT_COORDS => {
             return Err(AnalysisError::invalid_tableau_conversion(
                 "inverting QUBIT_COORDS is supported only at the start of a circuit or repeat block",
             ));
         }
-        _ => {
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::MPP
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => {
             return Err(AnalysisError::invalid_tableau_conversion(format!(
                 "operation {} has no strict circuit inverse",
                 gate.canonical_name()
@@ -240,7 +314,7 @@ fn inverse_unitary_instruction(
             gate.canonical_name()
         )));
     }
-    let inverse_gate = gate.best_candidate_inverse()?;
+    let inverse_gate = gate.generalized_inverse();
     let targets = reversed_target_groups(instruction);
     Ok(stab_model::advanced::circuit_instruction_with_tag_bytes(
         inverse_gate,
@@ -346,8 +420,89 @@ fn sparse_tracker_supports_folded_unitary_repeat(circuit: &Circuit) -> bool {
 }
 
 fn sparse_tracker_supports_folded_instruction(instruction: &CircuitInstruction) -> bool {
-    crate::single_qubit_clifford_for_gate(instruction.gate()).is_ok()
-        || matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ")
+    match instruction.gate().kind() {
+        GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG => true,
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => false,
+    }
 }
 
 fn unitary_flow_is_satisfied_by_tableau(tableau: &Tableau, flow: &Flow) -> AnalysisResult<bool> {

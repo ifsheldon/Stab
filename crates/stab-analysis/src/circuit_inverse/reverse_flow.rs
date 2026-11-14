@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{Flow, PauliSign, PauliString};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, MeasureRecordOffset, MemoryBudget,
-    QubitId, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, FoldedCount, Gate, GateKind,
+    MeasureRecordOffset, MemoryBudget, ParseLimits, QubitId, Target, advanced::FoldedCircuitEvent,
 };
 
 use crate::{
@@ -14,6 +14,7 @@ use crate::{
 
 use super::{TimeReversedForFlowsOptions, reversed_target_groups};
 use crate::circuit_flow::transitions::reverse_flow_transition;
+use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
 
 pub(super) fn requires_general_reversal(circuit: &Circuit, flows: &[Flow]) -> bool {
     flows
@@ -154,7 +155,7 @@ impl ReverseFlowEngine {
     }
 
     fn reverse_measurement(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        let reset_gate = measurement_reset_gate(instruction.gate().canonical_name())?;
+        let reset_gate = measurement_reset_gate(instruction.gate())?;
         for group in instruction.target_groups().into_iter().rev() {
             let [target] = group else {
                 return Err(reverse_error(format!(
@@ -179,7 +180,7 @@ impl ReverseFlowEngine {
 
             if turn_into_reset {
                 self.append_instruction(
-                    Gate::from_name(reset_gate)?,
+                    reset_gate,
                     Vec::new(),
                     vec![target.clone()],
                     instruction.tag_bytes(),
@@ -187,7 +188,7 @@ impl ReverseFlowEngine {
             } else {
                 self.record_new_measurement(&record_targets);
                 self.append_instruction(
-                    instruction.gate().best_candidate_inverse()?,
+                    instruction.gate().generalized_inverse(),
                     instruction.args().to_vec(),
                     vec![target.clone()],
                     instruction.tag_bytes(),
@@ -266,23 +267,101 @@ impl ReverseFlowEngine {
 
         let reversed_targets = segment_targets.into_iter().rev().collect::<Vec<_>>();
         self.append_instruction(
-            instruction.gate().best_candidate_inverse()?,
+            instruction.gate().generalized_inverse(),
             Vec::new(),
             reversed_targets.clone(),
             instruction.tag_bytes(),
         )?;
         if is_measure_reset && !instruction.args().is_empty() {
-            let error_gate = match instruction.gate().canonical_name() {
-                "MR" => "X_ERROR",
-                "MRX" | "MRY" => "Z_ERROR",
-                name => {
+            let error_gate = match instruction.gate().kind() {
+                GateKind::MR => GateKind::X_ERROR,
+                GateKind::MRX | GateKind::MRY => GateKind::Z_ERROR,
+                GateKind::DETECTOR
+                | GateKind::OBSERVABLE_INCLUDE
+                | GateKind::TICK
+                | GateKind::QUBIT_COORDS
+                | GateKind::SHIFT_COORDS
+                | GateKind::REPEAT
+                | GateKind::MPAD
+                | GateKind::MX
+                | GateKind::MY
+                | GateKind::M
+                | GateKind::RX
+                | GateKind::RY
+                | GateKind::R
+                | GateKind::XCX
+                | GateKind::XCY
+                | GateKind::XCZ
+                | GateKind::YCX
+                | GateKind::YCY
+                | GateKind::YCZ
+                | GateKind::CX
+                | GateKind::CY
+                | GateKind::CZ
+                | GateKind::H
+                | GateKind::H_XY
+                | GateKind::H_YZ
+                | GateKind::H_NXY
+                | GateKind::H_NXZ
+                | GateKind::H_NYZ
+                | GateKind::DEPOLARIZE1
+                | GateKind::DEPOLARIZE2
+                | GateKind::X_ERROR
+                | GateKind::Y_ERROR
+                | GateKind::Z_ERROR
+                | GateKind::I_ERROR
+                | GateKind::II_ERROR
+                | GateKind::PAULI_CHANNEL_1
+                | GateKind::PAULI_CHANNEL_2
+                | GateKind::E
+                | GateKind::ELSE_CORRELATED_ERROR
+                | GateKind::HERALDED_ERASE
+                | GateKind::HERALDED_PAULI_CHANNEL_1
+                | GateKind::I
+                | GateKind::X
+                | GateKind::Y
+                | GateKind::Z
+                | GateKind::C_XYZ
+                | GateKind::C_ZYX
+                | GateKind::C_NXYZ
+                | GateKind::C_XNYZ
+                | GateKind::C_XYNZ
+                | GateKind::C_NZYX
+                | GateKind::C_ZNYX
+                | GateKind::C_ZYNX
+                | GateKind::SQRT_X
+                | GateKind::SQRT_X_DAG
+                | GateKind::SQRT_Y
+                | GateKind::SQRT_Y_DAG
+                | GateKind::S
+                | GateKind::S_DAG
+                | GateKind::II
+                | GateKind::SQRT_XX
+                | GateKind::SQRT_XX_DAG
+                | GateKind::SQRT_YY
+                | GateKind::SQRT_YY_DAG
+                | GateKind::SQRT_ZZ
+                | GateKind::SQRT_ZZ_DAG
+                | GateKind::MPP
+                | GateKind::SPP
+                | GateKind::SPP_DAG
+                | GateKind::SWAP
+                | GateKind::ISWAP
+                | GateKind::CXSWAP
+                | GateKind::SWAPCX
+                | GateKind::CZSWAP
+                | GateKind::ISWAP_DAG
+                | GateKind::MXX
+                | GateKind::MYY
+                | GateKind::MZZ => {
                     return Err(reverse_error(format!(
-                        "don't know how to eject measurement noise from {name}"
+                        "don't know how to eject measurement noise from {}",
+                        instruction.gate().canonical_name()
                     )));
                 }
             };
             self.append_instruction(
-                Gate::from_name(error_gate)?,
+                error_gate.gate(),
                 instruction.args().to_vec(),
                 reversed_targets,
                 instruction.tag_bytes(),
@@ -310,7 +389,7 @@ impl ReverseFlowEngine {
         }
         self.tracker.undo_instruction(instruction)?;
         self.append_instruction(
-            instruction.gate().best_candidate_inverse()?,
+            instruction.gate().generalized_inverse(),
             instruction.args().to_vec(),
             reversed_target_groups(instruction),
             instruction.tag_bytes(),
@@ -359,7 +438,7 @@ impl ReverseFlowEngine {
     fn reverse_simple(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         self.tracker.undo_instruction(instruction)?;
         self.append_instruction(
-            instruction.gate().best_candidate_inverse()?,
+            instruction.gate().generalized_inverse(),
             instruction.args().to_vec(),
             reversed_target_groups(instruction),
             instruction.tag_bytes(),
@@ -367,8 +446,8 @@ impl ReverseFlowEngine {
     }
 
     fn reverse_ignored(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        match instruction.gate().canonical_name() {
-            "QUBIT_COORDS" => {
+        match instruction.gate().kind() {
+            GateKind::QUBIT_COORDS => {
                 let shifted = shifted_coordinates(instruction.args(), &self.coordinate_shift);
                 self.qubit_coordinates.push(
                     stab_model::advanced::circuit_instruction_with_tag_bytes(
@@ -380,11 +459,89 @@ impl ReverseFlowEngine {
                 );
                 Ok(())
             }
-            "SHIFT_COORDS" => {
+            GateKind::SHIFT_COORDS => {
                 add_coordinate_shift(&mut self.coordinate_shift, instruction.args());
                 Ok(())
             }
-            _ => self.reverse_simple(instruction),
+            GateKind::DETECTOR
+            | GateKind::OBSERVABLE_INCLUDE
+            | GateKind::TICK
+            | GateKind::REPEAT
+            | GateKind::MPAD
+            | GateKind::MX
+            | GateKind::MY
+            | GateKind::M
+            | GateKind::MRX
+            | GateKind::MRY
+            | GateKind::MR
+            | GateKind::RX
+            | GateKind::RY
+            | GateKind::R
+            | GateKind::XCX
+            | GateKind::XCY
+            | GateKind::XCZ
+            | GateKind::YCX
+            | GateKind::YCY
+            | GateKind::YCZ
+            | GateKind::CX
+            | GateKind::CY
+            | GateKind::CZ
+            | GateKind::H
+            | GateKind::H_XY
+            | GateKind::H_YZ
+            | GateKind::H_NXY
+            | GateKind::H_NXZ
+            | GateKind::H_NYZ
+            | GateKind::DEPOLARIZE1
+            | GateKind::DEPOLARIZE2
+            | GateKind::X_ERROR
+            | GateKind::Y_ERROR
+            | GateKind::Z_ERROR
+            | GateKind::I_ERROR
+            | GateKind::II_ERROR
+            | GateKind::PAULI_CHANNEL_1
+            | GateKind::PAULI_CHANNEL_2
+            | GateKind::E
+            | GateKind::ELSE_CORRELATED_ERROR
+            | GateKind::HERALDED_ERASE
+            | GateKind::HERALDED_PAULI_CHANNEL_1
+            | GateKind::I
+            | GateKind::X
+            | GateKind::Y
+            | GateKind::Z
+            | GateKind::C_XYZ
+            | GateKind::C_ZYX
+            | GateKind::C_NXYZ
+            | GateKind::C_XNYZ
+            | GateKind::C_XYNZ
+            | GateKind::C_NZYX
+            | GateKind::C_ZNYX
+            | GateKind::C_ZYNX
+            | GateKind::SQRT_X
+            | GateKind::SQRT_X_DAG
+            | GateKind::SQRT_Y
+            | GateKind::SQRT_Y_DAG
+            | GateKind::S
+            | GateKind::S_DAG
+            | GateKind::II
+            | GateKind::SQRT_XX
+            | GateKind::SQRT_XX_DAG
+            | GateKind::SQRT_YY
+            | GateKind::SQRT_YY_DAG
+            | GateKind::SQRT_ZZ
+            | GateKind::SQRT_ZZ_DAG
+            | GateKind::MPP
+            | GateKind::SPP
+            | GateKind::SPP_DAG
+            | GateKind::SWAP
+            | GateKind::ISWAP
+            | GateKind::CXSWAP
+            | GateKind::SWAPCX
+            | GateKind::CZSWAP
+            | GateKind::ISWAP_DAG
+            | GateKind::MXX
+            | GateKind::MYY
+            | GateKind::MZZ => self.reverse_simple(instruction),
         }
     }
 
@@ -433,7 +590,7 @@ impl ReverseFlowEngine {
                         ))
                     })?;
                     self.append_instruction(
-                        Gate::from_name("DETECTOR")?,
+                        GateKind::DETECTOR.gate(),
                         coordinates,
                         record_targets,
                         tag.as_deref(),
@@ -441,7 +598,7 @@ impl ReverseFlowEngine {
                 }
                 DemTarget::LogicalObservable(observable) => {
                     self.append_instruction(
-                        Gate::from_name("OBSERVABLE_INCLUDE")?,
+                        GateKind::OBSERVABLE_INCLUDE.gate(),
                         vec![observable.get() as f64],
                         record_targets,
                         tag.as_deref(),
@@ -569,22 +726,39 @@ fn validate_general_reversal(circuit: &Circuit) -> AnalysisResult<()> {
 fn projected_reversal_bytes(circuit: &Circuit) -> AnalysisResult<u64> {
     let overflow = || reverse_error("measurement-rich repeat expansion size overflowed");
     let mut total = 0_u64;
-    for item in circuit.items() {
-        let bytes = match item {
-            CircuitItem::Instruction(instruction) => (size_of::<CircuitItem>() as u64)
+    crate::folded_walk::walk_folded(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+        |depth, limit| {
+            reverse_error(format!(
+                "measurement-rich repeat expansion nests repeat blocks {depth} deep, beyond the {limit}-level envelope"
+            ))
+        },
+        |event| {
+            let FoldedCircuitEvent::Instruction {
+                instruction,
+                executions,
+            } = event
+            else {
+                return Ok(());
+            };
+            let bytes = (size_of::<CircuitItem>() as u64)
                 .checked_add(
                     (instruction.targets().len() as u64)
                         .checked_mul(size_of::<Target>() as u64)
                         .ok_or_else(overflow)?,
                 )
                 .and_then(|bytes| bytes.checked_add(instruction.args().len() as u64 * 8))
-                .ok_or_else(overflow)?,
-            CircuitItem::RepeatBlock(repeat) => projected_reversal_bytes(repeat.body())?
-                .checked_mul(repeat.repeat_count().get())
-                .ok_or_else(overflow)?,
-        };
-        total = total.checked_add(bytes).ok_or_else(overflow)?;
-    }
+                .ok_or_else(overflow)?;
+            let expanded = FoldedCount::new(bytes)
+                .times(executions)
+                .exact()
+                .ok_or_else(overflow)?;
+            total = total.checked_add(expanded).ok_or_else(overflow)?;
+            Ok(())
+        },
+    )?;
     Ok(total)
 }
 
@@ -619,7 +793,7 @@ fn validate_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> 
         )));
     }
     validate_sweep_target_order(instruction)?;
-    if instruction.gate().canonical_name() == "ELSE_CORRELATED_ERROR"
+    if instruction.gate().kind() == GateKind::ELSE_CORRELATED_ERROR
         || matches!(
             reverse_flow_transition(instruction),
             ReverseFlowTransition::Unsupported
@@ -634,10 +808,11 @@ fn validate_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> 
 }
 
 fn validate_sweep_target_order(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    let invalid_side = match instruction.gate().canonical_name() {
-        "CX" | "CY" => SweepInvalidSide::Right,
-        "XCZ" | "YCZ" => SweepInvalidSide::Left,
-        _ => return Ok(()),
+    // A sweep bit is valid only in the gate's classical-control slot.
+    let invalid_side = match controlled_pauli_form(instruction.gate()).map(|form| form.slot) {
+        Some(ControlSlot::First) => SweepInvalidSide::Right,
+        Some(ControlSlot::Second) => SweepInvalidSide::Left,
+        Some(ControlSlot::Either) | None => return Ok(()),
     };
     for group in instruction.target_groups() {
         let [left, right] = group else {
@@ -769,13 +944,91 @@ fn output_measurement_index(index: usize, count: usize) -> AnalysisResult<i32> {
         .map_err(|_| reverse_error("output measurement record offset does not fit i32"))
 }
 
-fn measurement_reset_gate(measurement: &str) -> AnalysisResult<&'static str> {
-    match measurement {
-        "M" => Ok("R"),
-        "MX" => Ok("RX"),
-        "MY" => Ok("RY"),
-        name => Err(reverse_error(format!(
-            "don't know how to turn measurement {name} into a reset"
+fn measurement_reset_gate(measurement: Gate) -> AnalysisResult<Gate> {
+    match measurement.kind() {
+        GateKind::M => Ok(GateKind::R.gate()),
+        GateKind::MX => Ok(GateKind::RX.gate()),
+        GateKind::MY => Ok(GateKind::RY.gate()),
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => Err(reverse_error(format!(
+            "don't know how to turn measurement {} into a reset",
+            measurement.canonical_name()
         ))),
     }
 }

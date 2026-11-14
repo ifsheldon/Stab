@@ -77,7 +77,7 @@ Every admitted workload produces byte-identical output; only workloads that the 
 | `CircuitFlattenLimits` count fields, `DEFAULT_MAX_*` constants, and builders | `CircuitFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `DemFlattenLimits` repeat-unroll, expanded-instruction, repeat-iteration, target, argument, and byte fields, `DEFAULT_MAX_*` constants, and builders | `DemFlattenLimits::{new, memory_budget, with_memory_budget}` |
 | `CircuitPassLimits` item, target, argument, and payload fields, `DEFAULT_MAX_*` constants, and builders | `CircuitPassLimits::new(memory_budget, repeat_nesting)` with `memory_budget` and `with_memory_budget` |
-| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, ErrorMatcher, and coordinate-query work caps | Removed; retained storage is admitted against the default budget, and `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_memory_budget`, and the generator parameters' `with_memory_budget` accept a caller budget |
+| Fixed analyzer, feedback-inlining, Pauli-conjugation, time-reversal, flow-generator, missing-detector, detecting-region, and coordinate-query work caps | Removed; retained storage is admitted against the default budget, and `ErrorAnalyzerOptions::memory_budget`, `circuit_with_inlined_feedback_with_limits`, `DetectorErrorModel::detector_coordinates_with_memory_budget`, and the generator parameters' `with_memory_budget` accept a caller budget |
 | The generator's 131,072-physical-qubit cap | A projected 2048 bytes per physical qubit admitted against the generator parameters' budget |
 
 `ErrorAnalyzerOptions` gained the public `memory_budget` field, so struct literals must add it or use `..ErrorAnalyzerOptions::default()`.
@@ -95,7 +95,7 @@ See the resource policy inventory's Cooperative Cancellation section for where e
 | `SamplingCompiler`, `MeasurementToDetectionCompiler`, `DetectionSamplingCompiler`, `DetectionConversionLimits`, `DemSamplerLimits`, `CircuitFlattenLimits`, `DemFlattenLimits` | No longer `Copy`; their `compile` methods take `&self`, limit accessors take `&self`, and `cancellation`/`with_cancellation` builders were added; clone a value that is used twice |
 | `ErrorAnalyzerOptions`, `MissingDetectorOptions`, `DetectingRegionOptions`, `DetectingRegionTargetOptions`, `TimeReversedForFlowsOptions`, `InverseQecOptions` | Gained a public `cancellation` field and are no longer `Copy`; struct literals add `cancellation: Cancellation::never()` or use `..Default::default()`, and `MissingDetectorOptions` now implements `Default` |
 | `circuit_with_inlined_feedback_with_memory_budget(circuit, budget)` | `circuit_with_inlined_feedback_with_limits(circuit, FeedbackInliningLimits::new(budget))` |
-| None | `circuit_flow_generators_with_options` with `FlowGeneratorOptions`, `explain_errors_from_circuit_with_options` with `ExplainErrorsOptions`, `DemFlattenedInstructionIter::with_cancellation`, the defaulted `FoldedDemVisitor::poll_cancellation` hook, and `stab_model::advanced::CancellationCountdown` |
+| None | `circuit_flow_generators_with_options` with `FlowGeneratorOptions`, `DemFlattenedInstructionIter::with_cancellation`, the defaulted `FoldedDemVisitor::poll_cancellation` hook, and `stab_model::advanced::CancellationCountdown` |
 | Exhaustive matches on `ModelError`, `AnalysisError`, `SamplingCompileError`, `SamplingExecutionError`, `DetectionError`, `DetectionExecutionError`, and `DemError` | Add the new `Cancelled(Cancelled)` variant; `SamplingCompileErrorCode::Cancelled` reports `cancelled`, and `AnalysisError` converts a model `Cancelled` into its own variant |
 
 A frame-sampling session that observes cancellation inside a batch returns the `Cancelled` error and is poisoned, because its random stream already advanced; between batches it still returns the resumable `Cancelled` status.
@@ -202,6 +202,24 @@ Neither seam implies dynamic plugins, runtime gate registration, GPU placeholder
 SIMD leaf kernels are always on, and there is no Cargo feature to select them. `stab-bits` and `stab-algebra` depend on `stab-kernels-simd` unconditionally, so every consumer, direct or through `stab-core`, resolves one `stab-kernels-simd` package plus `fearless_simd` and `fearless_simd_macros`.
 
 Unreleased 0.2 development revisions had an opt-in `portable-simd` feature on `stab-bits`, `stab-algebra`, `stab-engine`, `stab-core`, and `stab-cli`; it is removed without an alias, so delete `features = ["portable-simd"]` from any dependency declaration that copied it. Results are unchanged, because the kernels compute the same words as the scalar formulas they replace. The kernels select the instruction set once per call: statically on AArch64 and with a runtime check on x86-64. See [ADR 0008](architecture/adr-0008-unconditional-fearless-simd-kernels.md).
+
+## Deferred Surfaces, Gate Vocabulary, And Folded Summaries
+
+E8 removes the exported `explain_errors` machinery, because `explain_errors` is a deferred product surface, and gives gates and folded-circuit counts one model-owned vocabulary.
+
+| Removed or changed item | Replacement |
+| --- | --- |
+| `stab_analysis::explain_errors_from_circuit`, `explain_errors_from_circuit_with_options`, `ExplainErrorsOptions`, `ExplainedError`, `CircuitErrorLocation`, `CircuitErrorLocationStackFrame`, `CircuitTargetsInsideInstruction`, `DemTargetWithCoords`, `FlippedMeasurement`, `GateTargetWithCoords`, `canonicalize_circuit_error_location_parts`, `canonicalize_dem_error_terms`, and `stab_analysis::advanced::{CircuitErrorLocationView, CircuitTargetsInsideInstructionView, write_explained_error}`, also reachable as `stab_core::analysis::*` | Removed without a replacement; Stim's `ErrorMatcher` provenance stays deferred with `explain_errors` |
+| `Gate::best_candidate_inverse()` returning `ModelResult<Gate>` | Removed; `Gate::generalized_inverse()` returns `Gate` directly, because every table row names its inverse |
+| None | `stab_model::GateKind`, also exported from the `stab-core` root, a closed enum with one variant per canonical Stim v1.16.0 gate spelled like the gate (`GateKind::CX`, `GateKind::SQRT_X_DAG`), with `GateKind::ALL`, `GateKind::COUNT`, `GateKind::gate`, `GateKind::canonical_name`, and `From<GateKind> for Gate`; `Gate::kind` returns it, and aliases such as `CNOT` parse to their canonical kind |
+| None | `Gate::controlled_pauli()`, the Pauli applied by `CX`, `CY`, `CZ`, `XCZ`, and `YCZ`, and `Gate::collapse_basis()`, the basis of `MX`, `MY`, `M`, `MRX`, `MRY`, `MR`, `RX`, `RY`, and `R` |
+| None | `stab_model::FoldedCircuitSummary`, `FoldedCount`, and `FoldedWalkError`, plus `stab_model::advanced::{visit_folded_circuit, FoldedCircuitEvent, FoldedVisitError}` |
+
+`GateKind` is deliberately not `#[non_exhaustive]`: the dialect is closed (ADR 0001), and code that selects behavior per gate should match it without a wildcard so that a new gate fails to compile. `Gate` keeps its size and its accessors; per-gate facts still come from the one gate table through `Gate`.
+
+`FoldedCircuitSummary::of(circuit, nesting, cancellation)` visits each folded item once and reports expanded instruction, target, argument, tag-byte, and measurement counts per gate kind, expanded repeat iterations, folded item count, and maximum nesting. Each expanded count is a `FoldedCount` that is either exact or overflowed, so a consumer reports overflow of the count it reads with its own error through `FoldedCount::get`, `exact`, or `saturating`. `visit_folded_circuit` is the same walk for consumers that accumulate their own byte formulas incrementally. The walk refuses nesting beyond its `RepeatNestingLimit` with `FoldedWalkError::RepeatNesting`, polls its `Cancellation` every 1024 items, and never allocates in proportion to a repeat count.
+
+Measurement-rich `circuit_time_reversed_for_flows` and `circuit_inverse_qec` now refuse a programmatically built circuit nested deeper than 256 repeat levels before projecting its expansion, instead of recursing without a bound; parsed circuits cannot exceed that envelope. `estimate_sampling_request` reports unknown item and operation counts for such a circuit.
 
 ## Error Migration Example
 

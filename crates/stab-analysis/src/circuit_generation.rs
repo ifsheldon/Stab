@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::{AnalysisError, AnalysisResult};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, MeasureRecordOffset, MemoryBudget, Probability,
-    QubitId, RepeatBlock, RepeatCount, Target,
+    Circuit, CircuitInstruction, CircuitItem, GateKind, MeasureRecordOffset, MemoryBudget,
+    Probability, QubitId, RepeatBlock, RepeatCount, Target,
 };
 
 mod color;
@@ -436,7 +436,12 @@ pub fn generate_repetition_code_circuit(
     append_first_round_detectors(&mut full, measurement_count)?;
 
     let mut body = cycle_actions;
-    append_instruction(&mut body, "SHIFT_COORDS", vec![0.0, 1.0], Vec::new())?;
+    append_instruction(
+        &mut body,
+        GateKind::SHIFT_COORDS,
+        vec![0.0, 1.0],
+        Vec::new(),
+    )?;
     append_repeat_detectors(&mut body, measurement_count)?;
     append_repeated_body(&mut full, body, common.rounds.get().saturating_sub(1))?;
 
@@ -444,7 +449,7 @@ pub fn generate_repetition_code_circuit(
     append_tail_detectors(&mut full, measurement_count)?;
     append_instruction(
         &mut full,
-        "OBSERVABLE_INCLUDE",
+        GateKind::OBSERVABLE_INCLUDE,
         vec![0.0],
         vec![rec_target(1)?],
     )?;
@@ -551,10 +556,10 @@ fn repetition_cycle(
 ) -> AnalysisResult<Circuit> {
     let mut circuit = Circuit::new();
     append_begin_round_tick(params, &mut circuit, data_qubits)?;
-    append_unitary_2(params, &mut circuit, "CX", cnot_targets_1)?;
-    append_instruction(&mut circuit, "TICK", Vec::new(), Vec::new())?;
-    append_unitary_2(params, &mut circuit, "CX", cnot_targets_2)?;
-    append_instruction(&mut circuit, "TICK", Vec::new(), Vec::new())?;
+    append_unitary_2(params, &mut circuit, GateKind::CX, cnot_targets_1)?;
+    append_instruction(&mut circuit, GateKind::TICK, Vec::new(), Vec::new())?;
+    append_unitary_2(params, &mut circuit, GateKind::CX, cnot_targets_2)?;
+    append_instruction(&mut circuit, GateKind::TICK, Vec::new(), Vec::new())?;
     append_measure_reset(params, &mut circuit, measurement_qubits, 'Z')?;
     Ok(circuit)
 }
@@ -564,10 +569,10 @@ fn append_begin_round_tick(
     circuit: &mut Circuit,
     data_qubits: &[u32],
 ) -> AnalysisResult<()> {
-    append_instruction(circuit, "TICK", Vec::new(), Vec::new())?;
+    append_instruction(circuit, GateKind::TICK, Vec::new(), Vec::new())?;
     append_probability_instruction(
         circuit,
-        "DEPOLARIZE1",
+        GateKind::DEPOLARIZE1,
         data_qubits,
         params.before_round_data_depolarization,
     )
@@ -576,13 +581,13 @@ fn append_begin_round_tick(
 fn append_unitary_1(
     params: &CircuitGenParams,
     circuit: &mut Circuit,
-    gate: &'static str,
+    gate: GateKind,
     targets: &[u32],
 ) -> AnalysisResult<()> {
     append_instruction(circuit, gate, Vec::new(), qubit_targets(targets)?)?;
     append_probability_instruction(
         circuit,
-        "DEPOLARIZE1",
+        GateKind::DEPOLARIZE1,
         targets,
         params.after_clifford_depolarization,
     )
@@ -591,13 +596,13 @@ fn append_unitary_1(
 fn append_unitary_2(
     params: &CircuitGenParams,
     circuit: &mut Circuit,
-    gate: &'static str,
+    gate: GateKind,
     targets: &[u32],
 ) -> AnalysisResult<()> {
     append_instruction(circuit, gate, Vec::new(), qubit_targets(targets)?)?;
     append_probability_instruction(
         circuit,
-        "DEPOLARIZE2",
+        GateKind::DEPOLARIZE2,
         targets,
         params.after_clifford_depolarization,
     )
@@ -669,29 +674,29 @@ fn append_measure_reset(
     )
 }
 
-fn reset_gate(basis: char) -> AnalysisResult<&'static str> {
+fn reset_gate(basis: char) -> AnalysisResult<GateKind> {
     match basis {
-        'X' => Ok("RX"),
-        'Y' => Ok("RY"),
-        'Z' => Ok("R"),
+        'X' => Ok(GateKind::RX),
+        'Y' => Ok(GateKind::RY),
+        'Z' => Ok(GateKind::R),
         _ => Err(AnalysisError::invalid_domain_value("reset basis", basis)),
     }
 }
 
-fn measure_gate(basis: char) -> AnalysisResult<&'static str> {
+fn measure_gate(basis: char) -> AnalysisResult<GateKind> {
     match basis {
-        'X' => Ok("MX"),
-        'Y' => Ok("MY"),
-        'Z' => Ok("M"),
+        'X' => Ok(GateKind::MX),
+        'Y' => Ok(GateKind::MY),
+        'Z' => Ok(GateKind::M),
         _ => Err(AnalysisError::invalid_domain_value("measure basis", basis)),
     }
 }
 
-fn measure_reset_gate(basis: char) -> AnalysisResult<&'static str> {
+fn measure_reset_gate(basis: char) -> AnalysisResult<GateKind> {
     match basis {
-        'X' => Ok("MRX"),
-        'Y' => Ok("MRY"),
-        'Z' => Ok("MR"),
+        'X' => Ok(GateKind::MRX),
+        'Y' => Ok(GateKind::MRY),
+        'Z' => Ok(GateKind::MR),
         _ => Err(AnalysisError::invalid_domain_value(
             "measure-reset basis",
             basis,
@@ -699,13 +704,17 @@ fn measure_reset_gate(basis: char) -> AnalysisResult<&'static str> {
     }
 }
 
-fn anti_basis_error_gate(basis: char) -> &'static str {
-    if basis == 'X' { "Z_ERROR" } else { "X_ERROR" }
+fn anti_basis_error_gate(basis: char) -> GateKind {
+    if basis == 'X' {
+        GateKind::Z_ERROR
+    } else {
+        GateKind::X_ERROR
+    }
 }
 
 fn append_probability_instruction(
     circuit: &mut Circuit,
-    gate: &'static str,
+    gate: GateKind,
     targets: &[u32],
     probability: Probability,
 ) -> AnalysisResult<()> {
@@ -728,7 +737,7 @@ fn append_first_round_detectors(
         let rec = measurement_count - detector;
         append_instruction(
             circuit,
-            "DETECTOR",
+            GateKind::DETECTOR,
             vec![f64::from(2 * detector + 1), 0.0],
             vec![rec_target(rec)?],
         )?;
@@ -741,7 +750,7 @@ fn append_repeat_detectors(circuit: &mut Circuit, measurement_count: u32) -> Ana
         let rec = measurement_count - detector;
         append_instruction(
             circuit,
-            "DETECTOR",
+            GateKind::DETECTOR,
             vec![f64::from(2 * detector + 1), 0.0],
             vec![
                 rec_target(rec)?,
@@ -757,7 +766,7 @@ fn append_tail_detectors(circuit: &mut Circuit, measurement_count: u32) -> Analy
         let rec = measurement_count - detector;
         append_instruction(
             circuit,
-            "DETECTOR",
+            GateKind::DETECTOR,
             vec![f64::from(2 * detector + 1), 1.0],
             vec![
                 rec_target(rec)?,
@@ -846,11 +855,11 @@ fn append_circuit(target: &mut Circuit, source: &Circuit) {
 
 fn append_instruction(
     circuit: &mut Circuit,
-    gate: &'static str,
+    gate: GateKind,
     args: Vec<f64>,
     targets: Vec<Target>,
 ) -> AnalysisResult<()> {
-    let gate = Gate::from_name(gate)?;
+    let gate = gate.gate();
     circuit.append_instruction(CircuitInstruction::new(gate, args, targets, None)?);
     Ok(())
 }

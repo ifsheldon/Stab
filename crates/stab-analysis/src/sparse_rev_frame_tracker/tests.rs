@@ -139,7 +139,7 @@ fn sparse_rev_frame_tracker_undo_single_qubit_cliffords_match_tableau() {
     ];
     for gate in SingleQubitClifford::all() {
         let parsed_gate = Gate::from_name(gate.canonical_name()).unwrap();
-        let inverse_gate = parsed_gate.best_candidate_inverse().unwrap();
+        let inverse_gate = parsed_gate.generalized_inverse();
         let expected_circuit = circuit(&format!("{} 0\n", inverse_gate.canonical_name()));
         let expected_tableau = circuit_to_tableau(&expected_circuit, false, false, false).unwrap();
         let instruction = instruction(&format!("{} 0\n", gate.canonical_name()));

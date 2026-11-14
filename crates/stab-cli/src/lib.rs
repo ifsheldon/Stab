@@ -47,8 +47,8 @@ use stab_engine::{
     SamplingCompiler, SamplingSession, Seed, ShotCount,
 };
 use stab_model::{
-    Circuit, CircuitItem, MemoryBudget, MemoryBudgetParseError, ModelResult, ParseLimits,
-    Probability,
+    Cancellation, Circuit, FoldedCircuitSummary, FoldedCount, GateKind, MemoryBudget,
+    MemoryBudgetParseError, ModelResult, ParseLimits, Probability,
 };
 use stab_records::{
     DetsResultType, MeasurementBatchView, MeasurementSink, RecordBatchPart, RecordEncoder,
@@ -982,10 +982,7 @@ fn one_shot_visible_measurements(
         let next_index = measurement_index
             .checked_add(produced)
             .ok_or(CliError::MeasurementCountOverflow)?;
-        if !matches!(
-            instruction.gate().canonical_name(),
-            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-        ) {
+        if !instruction.gate().produces_heralded_results() {
             visible.extend(measurement_index..next_index);
         }
         measurement_index = next_index;
@@ -1008,28 +1005,20 @@ fn one_shot_visible_measurement_count(circuit: &Circuit) -> Result<Option<usize>
 }
 
 fn hidden_herald_measurement_count(circuit: &Circuit) -> Result<u64, CliError> {
-    let mut hidden = 0u64;
-    for item in circuit.items() {
-        let contribution = match item {
-            CircuitItem::Instruction(instruction)
-                if matches!(
-                    instruction.gate().canonical_name(),
-                    "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
-                ) =>
-            {
-                u64::try_from(instruction.target_groups().len())
-                    .map_err(|_| CliError::MeasurementCountOverflow)?
-            }
-            CircuitItem::Instruction(_) => 0,
-            CircuitItem::RepeatBlock(repeat) => hidden_herald_measurement_count(repeat.body())?
-                .checked_mul(repeat.repeat_count().get())
-                .ok_or(CliError::MeasurementCountOverflow)?,
-        };
-        hidden = hidden
-            .checked_add(contribution)
-            .ok_or(CliError::MeasurementCountOverflow)?;
-    }
-    Ok(hidden)
+    let summary = FoldedCircuitSummary::of(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+    )
+    .map_err(stab_model::ModelError::from)?;
+    GateKind::ALL
+        .into_iter()
+        .filter(|kind| kind.gate().produces_heralded_results())
+        .fold(FoldedCount::ZERO, |hidden, kind| {
+            hidden.plus(summary.measurements_of(kind))
+        })
+        .exact()
+        .ok_or(CliError::MeasurementCountOverflow)
 }
 
 #[cfg(test)]

@@ -6,8 +6,38 @@
 )]
 
 use stab_model::{
-    Circuit, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
+    Circuit, CircuitItem, Gate, GateArgumentRule, GateKind, GateTargetGroupKind, GateTargetRule,
+    Probability,
 };
+
+#[test]
+fn every_accepted_gate_name_parses_to_its_one_canonical_kind() {
+    // The variant spelling is the canonical name, and every alias in any letter case resolves to
+    // the same kind, so per-gate matches on `GateKind` see aliases as their canonical gate.
+    assert_eq!(Gate::all().len(), GateKind::COUNT);
+    for (gate, kind) in Gate::all().zip(GateKind::ALL) {
+        assert_eq!(gate.kind(), kind);
+        assert_eq!(kind.gate(), gate);
+        assert_eq!(format!("{kind:?}"), gate.canonical_name());
+        for alias in gate.aliases() {
+            for spelling in [alias.to_string(), alias.to_ascii_lowercase()] {
+                assert_eq!(
+                    Gate::from_name(&spelling).unwrap().kind(),
+                    kind,
+                    "{spelling}"
+                );
+            }
+            if kind != GateKind::REPEAT {
+                let circuit = Circuit::from_stim_str(&format!("{}\n", alias.to_ascii_lowercase()));
+                if let Ok(circuit) = circuit
+                    && let Some(CircuitItem::Instruction(instruction)) = circuit.items().first()
+                {
+                    assert_eq!(instruction.gate().kind(), kind, "{alias}");
+                }
+            }
+        }
+    }
+}
 
 #[test]
 fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
@@ -166,7 +196,6 @@ fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
         Gate::from_name("M")
             .unwrap()
             .generalized_inverse()
-            .unwrap()
             .canonical_name(),
         "M"
     );
@@ -174,7 +203,6 @@ fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
         Gate::from_name("R")
             .unwrap()
             .generalized_inverse()
-            .unwrap()
             .canonical_name(),
         "M"
     );
@@ -182,7 +210,6 @@ fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
         Gate::from_name("SPP")
             .unwrap()
             .generalized_inverse()
-            .unwrap()
             .canonical_name(),
         "SPP_DAG"
     );

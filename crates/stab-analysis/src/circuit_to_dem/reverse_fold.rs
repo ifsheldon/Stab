@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, DemInstruction, DemInstructionKind, DemItem,
-    DemRepeatCount, DemTarget, DetectorErrorModel, Pauli, Probability, QubitId, RepeatCount,
-    Target,
+    DemRepeatCount, DemTarget, DetectorErrorModel, GateKind, Pauli, Probability, QubitId,
+    RepeatCount, Target,
 };
 
 use super::{
@@ -163,41 +163,45 @@ impl ReverseFoldAnalyzer {
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         self.tracker.poll_cancellation()?;
-        let gate_name = instruction.gate().canonical_name();
-        if !matches!(
-            gate_name,
-            "ELSE_CORRELATED_ERROR" | "E" | "CORRELATED_ERROR"
-        ) {
+        let kind = instruction.gate().kind();
+        if !matches!(kind, GateKind::ELSE_CORRELATED_ERROR | GateKind::E) {
             self.require_no_pending_else_chain()?;
         }
-        match gate_name {
-            "X_ERROR" => self.record_single_pauli_errors(instruction, Pauli::X)?,
-            "Y_ERROR" => self.record_single_pauli_errors(instruction, Pauli::Y)?,
-            "Z_ERROR" => self.record_single_pauli_errors(instruction, Pauli::Z)?,
-            "DEPOLARIZE1" => self.record_depolarize1(instruction)?,
-            "DEPOLARIZE2" => self.record_depolarize2(instruction)?,
-            "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction)?,
-            "PAULI_CHANNEL_2" => self.record_pauli_channel2(instruction)?,
-            "E" | "CORRELATED_ERROR" => self.record_correlated_error_block(instruction)?,
-            "ELSE_CORRELATED_ERROR" => {
+        match kind {
+            GateKind::X_ERROR => self.record_single_pauli_errors(instruction, Pauli::X)?,
+            GateKind::Y_ERROR => self.record_single_pauli_errors(instruction, Pauli::Y)?,
+            GateKind::Z_ERROR => self.record_single_pauli_errors(instruction, Pauli::Z)?,
+            GateKind::DEPOLARIZE1 => self.record_depolarize1(instruction)?,
+            GateKind::DEPOLARIZE2 => self.record_depolarize2(instruction)?,
+            GateKind::PAULI_CHANNEL_1 => self.record_pauli_channel1(instruction)?,
+            GateKind::PAULI_CHANNEL_2 => self.record_pauli_channel2(instruction)?,
+            GateKind::E => self.record_correlated_error_block(instruction)?,
+            GateKind::ELSE_CORRELATED_ERROR => {
                 self.stacked_else_correlated.push(instruction.clone());
             }
-            "HERALDED_ERASE" => self.record_heralded_erase(instruction)?,
-            "HERALDED_PAULI_CHANNEL_1" => self.record_heralded_pauli_channel1(instruction)?,
-            "I_ERROR" | "II_ERROR" => {}
-            "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
+            GateKind::HERALDED_ERASE => self.record_heralded_erase(instruction)?,
+            GateKind::HERALDED_PAULI_CHANNEL_1 => {
+                self.record_heralded_pauli_channel1(instruction)?
+            }
+            GateKind::I_ERROR | GateKind::II_ERROR => {}
+            GateKind::M
+            | GateKind::MX
+            | GateKind::MY
+            | GateKind::MR
+            | GateKind::MRX
+            | GateKind::MRY => {
                 self.record_measurement_errors(instruction, instruction.targets().len())?;
                 self.tracker.undo_instruction(instruction)?;
             }
-            "MXX" | "MYY" | "MZZ" | "MPP" => {
+            GateKind::MXX | GateKind::MYY | GateKind::MZZ | GateKind::MPP => {
                 self.record_measurement_errors(instruction, instruction.target_groups().len())?;
                 self.tracker.undo_instruction(instruction)?;
             }
-            "MPAD" => {
+            GateKind::MPAD => {
                 self.record_measurement_errors(instruction, instruction.targets().len())?;
                 self.tracker.undo_instruction(instruction)?;
             }
-            "DETECTOR" => {
+            GateKind::DETECTOR => {
                 self.tracker.undo_instruction(instruction)?;
                 self.push_output_instruction(
                     stab_model::advanced::dem_instruction_with_tag_bytes(
@@ -208,7 +212,7 @@ impl ReverseFoldAnalyzer {
                     )?,
                 )?;
             }
-            "OBSERVABLE_INCLUDE" => {
+            GateKind::OBSERVABLE_INCLUDE => {
                 self.tracker.undo_instruction(instruction)?;
                 let observable = instruction.observable_id_argument()?.ok_or_else(|| {
                     AnalysisError::invalid_detector_error_model(
@@ -224,7 +228,7 @@ impl ReverseFoldAnalyzer {
                     )?,
                 )?;
             }
-            "SHIFT_COORDS" => {
+            GateKind::SHIFT_COORDS => {
                 self.push_output_instruction(
                     stab_model::advanced::dem_instruction_with_tag_bytes(
                         DemInstructionKind::ShiftDetectors,
@@ -234,14 +238,66 @@ impl ReverseFoldAnalyzer {
                     )?,
                 )?;
             }
-            "TICK" => {
+            GateKind::TICK => {
                 self.ticks_left = self.ticks_left.checked_sub(1).ok_or_else(|| {
                     AnalysisError::invalid_detector_error_model(
                         "tick count underflowed during folded error analysis",
                     )
                 })?;
             }
-            _ => self.tracker.undo_instruction(instruction)?,
+            GateKind::QUBIT_COORDS
+            | GateKind::REPEAT
+            | GateKind::RX
+            | GateKind::RY
+            | GateKind::R
+            | GateKind::XCX
+            | GateKind::XCY
+            | GateKind::XCZ
+            | GateKind::YCX
+            | GateKind::YCY
+            | GateKind::YCZ
+            | GateKind::CX
+            | GateKind::CY
+            | GateKind::CZ
+            | GateKind::H
+            | GateKind::H_XY
+            | GateKind::H_YZ
+            | GateKind::H_NXY
+            | GateKind::H_NXZ
+            | GateKind::H_NYZ
+            | GateKind::I
+            | GateKind::X
+            | GateKind::Y
+            | GateKind::Z
+            | GateKind::C_XYZ
+            | GateKind::C_ZYX
+            | GateKind::C_NXYZ
+            | GateKind::C_XNYZ
+            | GateKind::C_XYNZ
+            | GateKind::C_NZYX
+            | GateKind::C_ZNYX
+            | GateKind::C_ZYNX
+            | GateKind::SQRT_X
+            | GateKind::SQRT_X_DAG
+            | GateKind::SQRT_Y
+            | GateKind::SQRT_Y_DAG
+            | GateKind::S
+            | GateKind::S_DAG
+            | GateKind::II
+            | GateKind::SQRT_XX
+            | GateKind::SQRT_XX_DAG
+            | GateKind::SQRT_YY
+            | GateKind::SQRT_YY_DAG
+            | GateKind::SQRT_ZZ
+            | GateKind::SQRT_ZZ_DAG
+            | GateKind::SPP
+            | GateKind::SPP_DAG
+            | GateKind::SWAP
+            | GateKind::ISWAP
+            | GateKind::CXSWAP
+            | GateKind::SWAPCX
+            | GateKind::CZSWAP
+            | GateKind::ISWAP_DAG => self.tracker.undo_instruction(instruction)?,
         }
         self.collect_gauge_errors()
     }

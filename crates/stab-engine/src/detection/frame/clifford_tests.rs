@@ -16,7 +16,7 @@ use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use stab_algebra::{PauliBasis, PauliString};
 use stab_bits::BitBlock;
-use stab_model::{Circuit, Gate, GateTargetGroupKind};
+use stab_model::{Circuit, Gate, GateKind, GateTargetGroupKind};
 
 use super::BitPlaneDetectionFrame;
 use super::noise::FrameExecutionMode;
@@ -171,7 +171,10 @@ fn every_unitary_gate_compiles_to_one_program_operation() {
             "{} compiled to the wrong number of program operations",
             gate.canonical_name()
         );
-        let frame_identity = matches!(gate.canonical_name(), "I" | "X" | "Y" | "Z" | "II");
+        let frame_identity = matches!(
+            gate.kind(),
+            GateKind::I | GateKind::X | GateKind::Y | GateKind::Z | GateKind::II
+        );
         assert!(
             matches!(
                 program.entries().first(),

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_analysis::{advanced::flow_record_index, circuit_without_noise};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, MeasureRecordOffset, QubitId,
+    Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, MeasureRecordOffset, QubitId,
     Target,
 };
 use stab_records::{MeasurementBatchView, MeasurementSink};
@@ -174,7 +174,7 @@ fn augmented_flow_test_circuit(
     for qubit in 0..qubit_count {
         append_one_target_instruction(
             &mut augmented,
-            "X_ERROR",
+            GateKind::X_ERROR,
             vec![0.5],
             Target::qubit(
                 qubit_id_from_index(qubit, "sampled flow X_ERROR qubit")?,
@@ -186,7 +186,7 @@ fn augmented_flow_test_circuit(
     for qubit in 0..qubit_count {
         append_one_target_instruction(
             &mut augmented,
-            "Z_ERROR",
+            GateKind::Z_ERROR,
             vec![0.5],
             Target::qubit(
                 qubit_id_from_index(qubit, "sampled flow Z_ERROR qubit")?,
@@ -202,7 +202,7 @@ fn augmented_flow_test_circuit(
         let record = sampled_flow_measurement_target(measurement, measurement_count)?;
         append_two_target_instruction(
             &mut augmented,
-            "CX",
+            GateKind::CX,
             record,
             Target::qubit(ancilla, false),
             None,
@@ -211,7 +211,7 @@ fn augmented_flow_test_circuit(
     append_pauli_controlled_not(&mut augmented, flow.output(), ancilla, &qubits, None)?;
     append_one_target_instruction(
         &mut augmented,
-        "M",
+        GateKind::M,
         Vec::new(),
         Target::qubit(ancilla, false),
         None,
@@ -293,8 +293,7 @@ fn collect_circuit_qubits(
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                let selected_observable = instruction.gate().canonical_name()
-                    == "OBSERVABLE_INCLUDE"
+                let selected_observable = instruction.gate().kind() == GateKind::OBSERVABLE_INCLUDE
                     && observable_is_selected(instruction, observables)?;
                 if instruction.gate().category() == GateCategory::Annotation && !selected_observable
                 {
@@ -329,7 +328,7 @@ fn append_flow_test_block_for_circuit(
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction)
-                if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE"
+                if instruction.gate().kind() == GateKind::OBSERVABLE_INCLUDE
                     && observable_is_selected(instruction, observables)? =>
             {
                 append_selected_observable_feedback(output, instruction, ancilla, qubits)?;
@@ -402,7 +401,7 @@ fn append_selected_observable_feedback(
         if target.is_inverted_result_target() {
             append_one_target_instruction(
                 output,
-                "X",
+                GateKind::X,
                 Vec::new(),
                 Target::qubit(ancilla, false),
                 instruction.tag_bytes(),
@@ -411,17 +410,38 @@ fn append_selected_observable_feedback(
         if target.is_measurement_record_target() {
             append_two_target_instruction(
                 output,
-                "CX",
+                GateKind::CX,
                 target.clone(),
                 Target::qubit(ancilla, false),
                 instruction.tag_bytes(),
             )?;
         } else if target.is_x_target() {
-            append_pauli_observable_feedback(output, "XCX", target, ancilla, instruction, qubits)?;
+            append_pauli_observable_feedback(
+                output,
+                GateKind::XCX,
+                target,
+                ancilla,
+                instruction,
+                qubits,
+            )?;
         } else if target.is_y_target() {
-            append_pauli_observable_feedback(output, "YCX", target, ancilla, instruction, qubits)?;
+            append_pauli_observable_feedback(
+                output,
+                GateKind::YCX,
+                target,
+                ancilla,
+                instruction,
+                qubits,
+            )?;
         } else if target.is_z_target() {
-            append_pauli_observable_feedback(output, "CX", target, ancilla, instruction, qubits)?;
+            append_pauli_observable_feedback(
+                output,
+                GateKind::CX,
+                target,
+                ancilla,
+                instruction,
+                qubits,
+            )?;
         } else {
             return Err(SampledFlowError::invalid_flow(format!(
                 "sampled flow checking does not support OBSERVABLE_INCLUDE target {target}"
@@ -433,7 +453,7 @@ fn append_selected_observable_feedback(
 
 fn append_pauli_observable_feedback(
     output: &mut Circuit,
-    gate_name: &'static str,
+    gate: GateKind,
     target: &Target,
     ancilla: QubitId,
     source: &CircuitInstruction,
@@ -446,7 +466,7 @@ fn append_pauli_observable_feedback(
     })?;
     append_two_target_instruction(
         output,
-        gate_name,
+        gate,
         Target::qubit(qubits.get(qubit)?, false),
         Target::qubit(ancilla, false),
         source.tag_bytes(),
@@ -461,15 +481,15 @@ fn append_pauli_controlled_not(
     tag: Option<&[u8]>,
 ) -> SampledFlowResult<()> {
     for (index, basis) in pauli.active_terms() {
-        let gate_name = match basis {
-            PauliBasis::X => "XCX",
-            PauliBasis::Y => "YCX",
-            PauliBasis::Z => "ZCX",
+        let gate = match basis {
+            PauliBasis::X => GateKind::XCX,
+            PauliBasis::Y => GateKind::YCX,
+            PauliBasis::Z => GateKind::CX,
             PauliBasis::I => continue,
         };
         append_two_target_instruction(
             circuit,
-            gate_name,
+            gate,
             Target::qubit(qubits.get_index(index)?, false),
             Target::qubit(ancilla, false),
             tag,
@@ -478,7 +498,7 @@ fn append_pauli_controlled_not(
     if pauli.sign() == PauliSign::Minus {
         append_one_target_instruction(
             circuit,
-            "X",
+            GateKind::X,
             Vec::new(),
             Target::qubit(ancilla, false),
             tag,
@@ -555,13 +575,13 @@ fn sampled_flow_measurement_target(
 
 fn append_one_target_instruction(
     circuit: &mut Circuit,
-    gate_name: &'static str,
+    gate: GateKind,
     args: Vec<f64>,
     target: Target,
     tag: Option<&[u8]>,
 ) -> SampledFlowResult<()> {
     circuit.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
-        Gate::from_name(gate_name)?,
+        gate.gate(),
         args,
         vec![target],
         tag,
@@ -571,13 +591,13 @@ fn append_one_target_instruction(
 
 fn append_two_target_instruction(
     circuit: &mut Circuit,
-    gate_name: &'static str,
+    gate: GateKind,
     first: Target,
     second: Target,
     tag: Option<&[u8]>,
 ) -> SampledFlowResult<()> {
     circuit.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
-        Gate::from_name(gate_name)?,
+        gate.gate(),
         Vec::new(),
         vec![first, second],
         tag,

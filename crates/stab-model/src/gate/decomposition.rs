@@ -1,3 +1,5 @@
+use super::GateKind;
+
 /// Stim v1.16.0 gate decomposition metadata into the H/S/CX/M/R basis.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GateDecomposition {
@@ -21,16 +23,16 @@ impl AsRef<str> for GateDecomposition {
     }
 }
 
-pub(crate) fn gate_decomposition_text(gate_name: &str) -> Option<&'static str> {
-    match gate_name {
-        "MX" => Some(
+pub(crate) fn gate_decomposition_text(kind: GateKind) -> Option<&'static str> {
+    match kind {
+        GateKind::MX => Some(
             r#"
 H 0
 M 0
 H 0
 "#,
         ),
-        "MY" => Some(
+        GateKind::MY => Some(
             r#"
 S 0
 S 0
@@ -41,12 +43,12 @@ H 0
 S 0
 "#,
         ),
-        "M" => Some(
+        GateKind::M => Some(
             r#"
 M 0
 "#,
         ),
-        "MRX" => Some(
+        GateKind::MRX => Some(
             r#"
 H 0
 M 0
@@ -54,7 +56,7 @@ R 0
 H 0
 "#,
         ),
-        "MRY" => Some(
+        GateKind::MRY => Some(
             r#"
 S 0
 S 0
@@ -66,38 +68,38 @@ H 0
 S 0
 "#,
         ),
-        "MR" => Some(
+        GateKind::MR => Some(
             r#"
 M 0
 R 0
 "#,
         ),
-        "RX" => Some(
+        GateKind::RX => Some(
             r#"
 R 0
 H 0
 "#,
         ),
-        "RY" => Some(
+        GateKind::RY => Some(
             r#"
 R 0
 H 0
 S 0
 "#,
         ),
-        "R" => Some(
+        GateKind::R => Some(
             r#"
 R 0
 "#,
         ),
-        "XCX" => Some(
+        GateKind::XCX => Some(
             r#"
 H 0
 CNOT 0 1
 H 0
 "#,
         ),
-        "XCY" => Some(
+        GateKind::XCY => Some(
             r#"
 H 0
 S 1
@@ -108,12 +110,12 @@ H 0
 S 1
 "#,
         ),
-        "XCZ" => Some(
+        GateKind::XCZ => Some(
             r#"
 CNOT 1 0
 "#,
         ),
-        "YCX" => Some(
+        GateKind::YCX => Some(
             r#"
 S 0
 S 0
@@ -124,7 +126,7 @@ S 0
 H 1
 "#,
         ),
-        "YCY" => Some(
+        GateKind::YCY => Some(
             r#"
 S 0
 S 0
@@ -139,7 +141,7 @@ S 0
 S 1
 "#,
         ),
-        "YCZ" => Some(
+        GateKind::YCZ => Some(
             r#"
 S 0
 S 0
@@ -148,12 +150,12 @@ CNOT 1 0
 S 0
 "#,
         ),
-        "CX" => Some(
+        GateKind::CX => Some(
             r#"
 CNOT 0 1
 "#,
         ),
-        "CY" => Some(
+        GateKind::CY => Some(
             r#"
 S 1
 S 1
@@ -162,19 +164,19 @@ CNOT 0 1
 S 1
 "#,
         ),
-        "CZ" => Some(
+        GateKind::CZ => Some(
             r#"
 H 1
 CNOT 0 1
 H 1
 "#,
         ),
-        "H" => Some(
+        GateKind::H => Some(
             r#"
 H 0
 "#,
         ),
-        "H_XY" => Some(
+        GateKind::H_XY => Some(
             r#"
 H 0
 S 0
@@ -183,34 +185,34 @@ H 0
 S 0
 "#,
         ),
-        "H_YZ" => Some(
+        GateKind::H_YZ => Some(
             r#"
 H 0
-S 0
-H 0
-S 0
-S 0
-"#,
-        ),
-        "H_NXY" => Some(
-            r#"
-S 0
-H 0
-S 0
-S 0
-H 0
-"#,
-        ),
-        "H_NXZ" => Some(
-            r#"
-S 0
 S 0
 H 0
 S 0
 S 0
 "#,
         ),
-        "H_NYZ" => Some(
+        GateKind::H_NXY => Some(
+            r#"
+S 0
+H 0
+S 0
+S 0
+H 0
+"#,
+        ),
+        GateKind::H_NXZ => Some(
+            r#"
+S 0
+S 0
+H 0
+S 0
+S 0
+"#,
+        ),
+        GateKind::H_NYZ => Some(
             r#"
 S 0
 S 0
@@ -219,7 +221,7 @@ S 0
 H 0
 "#,
         ),
-        "MXX" => Some(
+        GateKind::MXX => Some(
             r#"
 CX 0 1
 H 0
@@ -228,7 +230,7 @@ H 0
 CX 0 1
 "#,
         ),
-        "MYY" => Some(
+        GateKind::MYY => Some(
             r#"
 S 0 1
 CX 0 1
@@ -240,19 +242,19 @@ CX 0 1
 S 0 1
 "#,
         ),
-        "MZZ" => Some(
+        GateKind::MZZ => Some(
             r#"
 CX 0 1
 M 1
 CX 0 1
 "#,
         ),
-        "I" => Some(
+        GateKind::I => Some(
             r#"
 # (no operations)
 "#,
         ),
-        "X" => Some(
+        GateKind::X => Some(
             r#"
 H 0
 S 0
@@ -260,7 +262,7 @@ S 0
 H 0
 "#,
         ),
-        "Y" => Some(
+        GateKind::Y => Some(
             r#"
 S 0
 S 0
@@ -270,13 +272,13 @@ S 0
 H 0
 "#,
         ),
-        "Z" => Some(
+        GateKind::Z => Some(
             r#"
 S 0
 S 0
 "#,
         ),
-        "MPP" => Some(
+        GateKind::MPP => Some(
             r#"
 S 1 1 1
 H 0 1 3 4
@@ -287,7 +289,7 @@ H 0 1 3 4
 S 1
 "#,
         ),
-        "SPP" => Some(
+        GateKind::SPP => Some(
             r#"
 CX 2 1
 CX 1 0
@@ -298,7 +300,7 @@ CX 1 0
 CX 2 1
 "#,
         ),
-        "SPP_DAG" => Some(
+        GateKind::SPP_DAG => Some(
             r#"
 CX 2 1
 CX 1 0
@@ -309,7 +311,7 @@ CX 1 0
 CX 2 1
 "#,
         ),
-        "C_XYZ" => Some(
+        GateKind::C_XYZ => Some(
             r#"
 S 0
 S 0
@@ -317,7 +319,7 @@ S 0
 H 0
 "#,
         ),
-        "C_NXYZ" => Some(
+        GateKind::C_NXYZ => Some(
             r#"
 S 0
 S 0
@@ -327,13 +329,13 @@ S 0
 S 0
 "#,
         ),
-        "C_XNYZ" => Some(
+        GateKind::C_XNYZ => Some(
             r#"
 S 0
 H 0
 "#,
         ),
-        "C_XYNZ" => Some(
+        GateKind::C_XYNZ => Some(
             r#"
 S 0
 H 0
@@ -341,13 +343,13 @@ S 0
 S 0
 "#,
         ),
-        "C_ZYX" => Some(
+        GateKind::C_ZYX => Some(
             r#"
 H 0
 S 0
 "#,
         ),
-        "C_ZYNX" => Some(
+        GateKind::C_ZYNX => Some(
             r#"
 S 0
 S 0
@@ -355,69 +357,69 @@ H 0
 S 0
 "#,
         ),
-        "C_ZNYX" => Some(
+        GateKind::C_ZNYX => Some(
             r#"
-H 0
-S 0
-S 0
-S 0
-"#,
-        ),
-        "C_NZYX" => Some(
-            r#"
-S 0
-S 0
 H 0
 S 0
 S 0
 S 0
 "#,
         ),
-        "SQRT_X" => Some(
+        GateKind::C_NZYX => Some(
+            r#"
+S 0
+S 0
+H 0
+S 0
+S 0
+S 0
+"#,
+        ),
+        GateKind::SQRT_X => Some(
             r#"
 H 0
 S 0
 H 0
 "#,
         ),
-        "SQRT_X_DAG" => Some(
+        GateKind::SQRT_X_DAG => Some(
             r#"
 S 0
 H 0
 S 0
 "#,
         ),
-        "SQRT_Y" => Some(
+        GateKind::SQRT_Y => Some(
             r#"
 S 0
 S 0
 H 0
 "#,
         ),
-        "SQRT_Y_DAG" => Some(
+        GateKind::SQRT_Y_DAG => Some(
             r#"
 H 0
 S 0
 S 0
 "#,
         ),
-        "S" => Some(
+        GateKind::S => Some(
             r#"
 S 0
 "#,
         ),
-        "S_DAG" => Some(
+        GateKind::S_DAG => Some(
             r#"
 S 0
 S 0
 S 0
 "#,
         ),
-        "II" => Some(
+        GateKind::II => Some(
             r#"
 "#,
         ),
-        "SQRT_XX" => Some(
+        GateKind::SQRT_XX => Some(
             r#"
 H 0
 CNOT 0 1
@@ -428,7 +430,7 @@ H 0
 H 1
 "#,
         ),
-        "SQRT_XX_DAG" => Some(
+        GateKind::SQRT_XX_DAG => Some(
             r#"
 H 0
 CNOT 0 1
@@ -443,30 +445,13 @@ H 0
 H 1
 "#,
         ),
-        "SQRT_YY" => Some(
+        GateKind::SQRT_YY => Some(
             r#"
 S 0
 S 0
 S 0
 S 1
 S 1
-S 1
-H 0
-CNOT 0 1
-H 1
-S 0
-S 1
-H 0
-H 1
-S 0
-S 1
-"#,
-        ),
-        "SQRT_YY_DAG" => Some(
-            r#"
-S 0
-S 0
-S 0
 S 1
 H 0
 CNOT 0 1
@@ -477,11 +462,28 @@ H 0
 H 1
 S 0
 S 1
+"#,
+        ),
+        GateKind::SQRT_YY_DAG => Some(
+            r#"
+S 0
+S 0
+S 0
+S 1
+H 0
+CNOT 0 1
+H 1
+S 0
+S 1
+H 0
+H 1
+S 0
+S 1
 S 1
 S 1
 "#,
         ),
-        "SQRT_ZZ" => Some(
+        GateKind::SQRT_ZZ => Some(
             r#"
 H 1
 CNOT 0 1
@@ -490,7 +492,7 @@ S 0
 S 1
 "#,
         ),
-        "SQRT_ZZ_DAG" => Some(
+        GateKind::SQRT_ZZ_DAG => Some(
             r#"
 H 1
 CNOT 0 1
@@ -503,50 +505,50 @@ S 1
 S 1
 "#,
         ),
-        "SWAP" => Some(
+        GateKind::SWAP => Some(
             r#"
 CNOT 0 1
+CNOT 1 0
+CNOT 0 1
+"#,
+        ),
+        GateKind::ISWAP => Some(
+            r#"
+H 0
+CNOT 0 1
+CNOT 1 0
+H 1
+S 1
+S 0
+"#,
+        ),
+        GateKind::ISWAP_DAG => Some(
+            r#"
+S 0
+S 0
+S 0
+S 1
+S 1
+S 1
+H 1
+CNOT 1 0
+CNOT 0 1
+H 0
+"#,
+        ),
+        GateKind::CXSWAP => Some(
+            r#"
 CNOT 1 0
 CNOT 0 1
 "#,
         ),
-        "ISWAP" => Some(
-            r#"
-H 0
-CNOT 0 1
-CNOT 1 0
-H 1
-S 1
-S 0
-"#,
-        ),
-        "ISWAP_DAG" => Some(
-            r#"
-S 0
-S 0
-S 0
-S 1
-S 1
-S 1
-H 1
-CNOT 1 0
-CNOT 0 1
-H 0
-"#,
-        ),
-        "CXSWAP" => Some(
-            r#"
-CNOT 1 0
-CNOT 0 1
-"#,
-        ),
-        "SWAPCX" => Some(
+        GateKind::SWAPCX => Some(
             r#"
 CNOT 0 1
 CNOT 1 0
 "#,
         ),
-        "CZSWAP" => Some(
+        GateKind::CZSWAP => Some(
             r#"
 H 0
 CX 0 1
@@ -554,6 +556,25 @@ CX 1 0
 H 1
 "#,
         ),
-        _ => None,
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1 => None,
     }
 }

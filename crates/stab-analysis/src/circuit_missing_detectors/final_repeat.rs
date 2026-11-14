@@ -1,4 +1,6 @@
-use stab_model::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock, advanced::CircuitBuilder};
+use stab_model::{
+    Circuit, CircuitInstruction, CircuitItem, GateKind, RepeatBlock, advanced::CircuitBuilder,
+};
 
 use super::{
     MissingDetectorOptions, contains_measurement_row_instruction, missing_detectors_bounded,
@@ -63,7 +65,7 @@ fn repeat_body_proof_circuit(circuit: &Circuit) -> AnalysisResult<Option<Circuit
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE" {
+                if instruction.gate().kind() == GateKind::OBSERVABLE_INCLUDE {
                     if !observable_record_targets_are_local(instruction, measurements_seen) {
                         return Ok(None);
                     }
@@ -144,7 +146,7 @@ fn instruction_record_targets_are_local(
     instruction: &CircuitInstruction,
     measurements_seen: i64,
 ) -> bool {
-    if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE" {
+    if instruction.gate().kind() == GateKind::OBSERVABLE_INCLUDE {
         return false;
     }
     instruction.targets().iter().all(|target| {

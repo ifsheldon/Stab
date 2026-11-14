@@ -8,7 +8,7 @@ use stab_algebra::{
 use stab_model::advanced::{
     GateUnitaryRows, gate_decomposition, gate_flow_descriptors, gate_unitary_rows,
 };
-use stab_model::{Circuit, Gate, GateDecomposition};
+use stab_model::{Circuit, Gate, GateDecomposition, GateKind};
 
 use crate::{AnalysisError, AnalysisResult};
 
@@ -53,32 +53,88 @@ impl GateUnitaryMatrix {
 
 /// Resolves a closed-dialect gate into its single-qubit Clifford algebra value.
 pub fn single_qubit_clifford_for_gate(gate: Gate) -> StabilizerResult<SingleQubitClifford> {
-    let clifford = match gate.canonical_name() {
-        "I" => SingleQubitClifford::I,
-        "X" => SingleQubitClifford::X,
-        "Y" => SingleQubitClifford::Y,
-        "Z" => SingleQubitClifford::Z,
-        "H" => SingleQubitClifford::H,
-        "SQRT_Y_DAG" => SingleQubitClifford::SqrtYDag,
-        "H_NXZ" => SingleQubitClifford::Hnxz,
-        "SQRT_Y" => SingleQubitClifford::SqrtY,
-        "S" => SingleQubitClifford::S,
-        "H_XY" => SingleQubitClifford::Hxy,
-        "H_NXY" => SingleQubitClifford::Hnxy,
-        "S_DAG" => SingleQubitClifford::SDag,
-        "SQRT_X_DAG" => SingleQubitClifford::SqrtXDag,
-        "SQRT_X" => SingleQubitClifford::SqrtX,
-        "H_NYZ" => SingleQubitClifford::Hnyz,
-        "H_YZ" => SingleQubitClifford::Hyz,
-        "C_XYZ" => SingleQubitClifford::Cxyz,
-        "C_XYNZ" => SingleQubitClifford::Cxynz,
-        "C_NXYZ" => SingleQubitClifford::Cnxyz,
-        "C_XNYZ" => SingleQubitClifford::Cxnyz,
-        "C_ZYX" => SingleQubitClifford::Czyx,
-        "C_ZNYX" => SingleQubitClifford::Cznyx,
-        "C_NZYX" => SingleQubitClifford::Cnzyx,
-        "C_ZYNX" => SingleQubitClifford::Czynx,
-        _ => {
+    let clifford = match gate.kind() {
+        GateKind::I => SingleQubitClifford::I,
+        GateKind::X => SingleQubitClifford::X,
+        GateKind::Y => SingleQubitClifford::Y,
+        GateKind::Z => SingleQubitClifford::Z,
+        GateKind::H => SingleQubitClifford::H,
+        GateKind::SQRT_Y_DAG => SingleQubitClifford::SqrtYDag,
+        GateKind::H_NXZ => SingleQubitClifford::Hnxz,
+        GateKind::SQRT_Y => SingleQubitClifford::SqrtY,
+        GateKind::S => SingleQubitClifford::S,
+        GateKind::H_XY => SingleQubitClifford::Hxy,
+        GateKind::H_NXY => SingleQubitClifford::Hnxy,
+        GateKind::S_DAG => SingleQubitClifford::SDag,
+        GateKind::SQRT_X_DAG => SingleQubitClifford::SqrtXDag,
+        GateKind::SQRT_X => SingleQubitClifford::SqrtX,
+        GateKind::H_NYZ => SingleQubitClifford::Hnyz,
+        GateKind::H_YZ => SingleQubitClifford::Hyz,
+        GateKind::C_XYZ => SingleQubitClifford::Cxyz,
+        GateKind::C_XYNZ => SingleQubitClifford::Cxynz,
+        GateKind::C_NXYZ => SingleQubitClifford::Cnxyz,
+        GateKind::C_XNYZ => SingleQubitClifford::Cxnyz,
+        GateKind::C_ZYX => SingleQubitClifford::Czyx,
+        GateKind::C_ZNYX => SingleQubitClifford::Cznyx,
+        GateKind::C_NZYX => SingleQubitClifford::Cnzyx,
+        GateKind::C_ZYNX => SingleQubitClifford::Czynx,
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::XCX
+        | GateKind::XCY
+        | GateKind::XCZ
+        | GateKind::YCX
+        | GateKind::YCY
+        | GateKind::YCZ
+        | GateKind::CX
+        | GateKind::CY
+        | GateKind::CZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::II
+        | GateKind::SQRT_XX
+        | GateKind::SQRT_XX_DAG
+        | GateKind::SQRT_YY
+        | GateKind::SQRT_YY_DAG
+        | GateKind::SQRT_ZZ
+        | GateKind::SQRT_ZZ_DAG
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::SWAP
+        | GateKind::ISWAP
+        | GateKind::CXSWAP
+        | GateKind::SWAPCX
+        | GateKind::CZSWAP
+        | GateKind::ISWAP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => {
             return Err(StabilizerError::InvalidSingleQubitCliffordGate {
                 gate: gate.canonical_name().to_owned(),
             });
@@ -92,7 +148,7 @@ pub fn gate_tableau(gate: Gate) -> AnalysisResult<Tableau> {
     if let Ok(clifford) = single_qubit_clifford_for_gate(gate) {
         return Ok(clifford.tableau());
     }
-    let outputs = two_qubit_outputs(gate.canonical_name()).ok_or_else(|| {
+    let outputs = two_qubit_outputs(gate.kind()).ok_or_else(|| {
         AnalysisError::invalid_tableau_conversion(format!(
             "gate {} does not have tableau data",
             gate.canonical_name()
@@ -104,8 +160,7 @@ pub fn gate_tableau(gate: Gate) -> AnalysisResult<Tableau> {
 
 /// Returns true when [`gate_tableau`] can produce local Clifford tableau metadata for `gate`.
 pub fn gate_has_tableau(gate: Gate) -> bool {
-    single_qubit_clifford_for_gate(gate).is_ok()
-        || two_qubit_outputs(gate.canonical_name()).is_some()
+    single_qubit_clifford_for_gate(gate).is_ok() || two_qubit_outputs(gate.kind()).is_some()
 }
 
 /// Returns Stim v1.16.0 gate-table stabilizer flow metadata.
@@ -215,30 +270,88 @@ fn stabilizer_to_analysis_error(error: StabilizerError) -> AnalysisError {
     AnalysisError::invalid_tableau_conversion(error.to_string())
 }
 
-fn two_qubit_outputs(gate_name: &str) -> Option<[&'static str; 4]> {
-    match gate_name {
-        "II" => Some(["+X_", "+Z_", "+_X", "+_Z"]),
-        "XCX" => Some(["+X_", "+ZX", "+_X", "+XZ"]),
-        "XCY" => Some(["+X_", "+ZY", "+XX", "+XZ"]),
-        "XCZ" => Some(["+X_", "+ZZ", "+XX", "+_Z"]),
-        "YCX" => Some(["+XX", "+ZX", "+_X", "+YZ"]),
-        "YCY" => Some(["+XY", "+ZY", "+YX", "+YZ"]),
-        "YCZ" => Some(["+XZ", "+ZZ", "+YX", "+_Z"]),
-        "CX" => Some(["+XX", "+Z_", "+_X", "+ZZ"]),
-        "CY" => Some(["+XY", "+Z_", "+ZX", "+ZZ"]),
-        "CZ" => Some(["+XZ", "+Z_", "+ZX", "+_Z"]),
-        "SWAP" => Some(["+_X", "+_Z", "+X_", "+Z_"]),
-        "ISWAP" => Some(["+ZY", "+_Z", "+YZ", "+Z_"]),
-        "ISWAP_DAG" => Some(["-ZY", "+_Z", "-YZ", "+Z_"]),
-        "CXSWAP" => Some(["+XX", "+_Z", "+X_", "+ZZ"]),
-        "SWAPCX" => Some(["+_X", "+ZZ", "+XX", "+Z_"]),
-        "CZSWAP" => Some(["+ZX", "+_Z", "+XZ", "+Z_"]),
-        "SQRT_XX" => Some(["+X_", "-YX", "+_X", "-XY"]),
-        "SQRT_XX_DAG" => Some(["+X_", "+YX", "+_X", "+XY"]),
-        "SQRT_YY" => Some(["-ZY", "+XY", "-YZ", "+YX"]),
-        "SQRT_YY_DAG" => Some(["+ZY", "-XY", "+YZ", "-YX"]),
-        "SQRT_ZZ" => Some(["+YZ", "+Z_", "+ZY", "+_Z"]),
-        "SQRT_ZZ_DAG" => Some(["-YZ", "+Z_", "-ZY", "+_Z"]),
-        _ => None,
+fn two_qubit_outputs(kind: GateKind) -> Option<[&'static str; 4]> {
+    match kind {
+        GateKind::II => Some(["+X_", "+Z_", "+_X", "+_Z"]),
+        GateKind::XCX => Some(["+X_", "+ZX", "+_X", "+XZ"]),
+        GateKind::XCY => Some(["+X_", "+ZY", "+XX", "+XZ"]),
+        GateKind::XCZ => Some(["+X_", "+ZZ", "+XX", "+_Z"]),
+        GateKind::YCX => Some(["+XX", "+ZX", "+_X", "+YZ"]),
+        GateKind::YCY => Some(["+XY", "+ZY", "+YX", "+YZ"]),
+        GateKind::YCZ => Some(["+XZ", "+ZZ", "+YX", "+_Z"]),
+        GateKind::CX => Some(["+XX", "+Z_", "+_X", "+ZZ"]),
+        GateKind::CY => Some(["+XY", "+Z_", "+ZX", "+ZZ"]),
+        GateKind::CZ => Some(["+XZ", "+Z_", "+ZX", "+_Z"]),
+        GateKind::SWAP => Some(["+_X", "+_Z", "+X_", "+Z_"]),
+        GateKind::ISWAP => Some(["+ZY", "+_Z", "+YZ", "+Z_"]),
+        GateKind::ISWAP_DAG => Some(["-ZY", "+_Z", "-YZ", "+Z_"]),
+        GateKind::CXSWAP => Some(["+XX", "+_Z", "+X_", "+ZZ"]),
+        GateKind::SWAPCX => Some(["+_X", "+ZZ", "+XX", "+Z_"]),
+        GateKind::CZSWAP => Some(["+ZX", "+_Z", "+XZ", "+Z_"]),
+        GateKind::SQRT_XX => Some(["+X_", "-YX", "+_X", "-XY"]),
+        GateKind::SQRT_XX_DAG => Some(["+X_", "+YX", "+_X", "+XY"]),
+        GateKind::SQRT_YY => Some(["-ZY", "+XY", "-YZ", "+YX"]),
+        GateKind::SQRT_YY_DAG => Some(["+ZY", "-XY", "+YZ", "-YX"]),
+        GateKind::SQRT_ZZ => Some(["+YZ", "+Z_", "+ZY", "+_Z"]),
+        GateKind::SQRT_ZZ_DAG => Some(["-YZ", "+Z_", "-ZY", "+_Z"]),
+        GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::TICK
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS
+        | GateKind::REPEAT
+        | GateKind::MPAD
+        | GateKind::MX
+        | GateKind::MY
+        | GateKind::M
+        | GateKind::MRX
+        | GateKind::MRY
+        | GateKind::MR
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::R
+        | GateKind::H
+        | GateKind::H_XY
+        | GateKind::H_YZ
+        | GateKind::H_NXY
+        | GateKind::H_NXZ
+        | GateKind::H_NYZ
+        | GateKind::DEPOLARIZE1
+        | GateKind::DEPOLARIZE2
+        | GateKind::X_ERROR
+        | GateKind::Y_ERROR
+        | GateKind::Z_ERROR
+        | GateKind::I_ERROR
+        | GateKind::II_ERROR
+        | GateKind::PAULI_CHANNEL_1
+        | GateKind::PAULI_CHANNEL_2
+        | GateKind::E
+        | GateKind::ELSE_CORRELATED_ERROR
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::I
+        | GateKind::X
+        | GateKind::Y
+        | GateKind::Z
+        | GateKind::C_XYZ
+        | GateKind::C_ZYX
+        | GateKind::C_NXYZ
+        | GateKind::C_XNYZ
+        | GateKind::C_XYNZ
+        | GateKind::C_NZYX
+        | GateKind::C_ZNYX
+        | GateKind::C_ZYNX
+        | GateKind::SQRT_X
+        | GateKind::SQRT_X_DAG
+        | GateKind::SQRT_Y
+        | GateKind::SQRT_Y_DAG
+        | GateKind::S
+        | GateKind::S_DAG
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ => None,
     }
 }

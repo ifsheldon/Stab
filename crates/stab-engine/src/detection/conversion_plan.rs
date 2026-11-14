@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, MeasureRecordOffset, RepeatNestingLimit,
+    Cancellation, Circuit, CircuitInstruction, GateKind, MeasureRecordOffset, RepeatNestingLimit,
 };
 
 use super::buffers::{resource_amount, validate_vector_capacity};
@@ -287,14 +287,90 @@ impl ConversionPlan {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> DetectionResult<()> {
-        match instruction.gate().canonical_name() {
-            "DETECTOR" => self.record_detector(instruction),
-            "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
+        match instruction.gate().kind() {
+            GateKind::DETECTOR => self.record_detector(instruction),
+            GateKind::OBSERVABLE_INCLUDE => self.record_observable(instruction),
             // SPP instructions do not produce measurement results. Frame execution validates and
             // applies their quantum effect separately, so detection-conversion admission must not
             // allocate a temporary decomposed circuit for them.
-            "SPP" | "SPP_DAG" => Ok(()),
-            _ => self.add_measurements(instruction),
+            GateKind::SPP | GateKind::SPP_DAG => Ok(()),
+            GateKind::TICK
+            | GateKind::QUBIT_COORDS
+            | GateKind::SHIFT_COORDS
+            | GateKind::REPEAT
+            | GateKind::MPAD
+            | GateKind::MX
+            | GateKind::MY
+            | GateKind::M
+            | GateKind::MRX
+            | GateKind::MRY
+            | GateKind::MR
+            | GateKind::RX
+            | GateKind::RY
+            | GateKind::R
+            | GateKind::XCX
+            | GateKind::XCY
+            | GateKind::XCZ
+            | GateKind::YCX
+            | GateKind::YCY
+            | GateKind::YCZ
+            | GateKind::CX
+            | GateKind::CY
+            | GateKind::CZ
+            | GateKind::H
+            | GateKind::H_XY
+            | GateKind::H_YZ
+            | GateKind::H_NXY
+            | GateKind::H_NXZ
+            | GateKind::H_NYZ
+            | GateKind::DEPOLARIZE1
+            | GateKind::DEPOLARIZE2
+            | GateKind::X_ERROR
+            | GateKind::Y_ERROR
+            | GateKind::Z_ERROR
+            | GateKind::I_ERROR
+            | GateKind::II_ERROR
+            | GateKind::PAULI_CHANNEL_1
+            | GateKind::PAULI_CHANNEL_2
+            | GateKind::E
+            | GateKind::ELSE_CORRELATED_ERROR
+            | GateKind::HERALDED_ERASE
+            | GateKind::HERALDED_PAULI_CHANNEL_1
+            | GateKind::I
+            | GateKind::X
+            | GateKind::Y
+            | GateKind::Z
+            | GateKind::C_XYZ
+            | GateKind::C_ZYX
+            | GateKind::C_NXYZ
+            | GateKind::C_XNYZ
+            | GateKind::C_XYNZ
+            | GateKind::C_NZYX
+            | GateKind::C_ZNYX
+            | GateKind::C_ZYNX
+            | GateKind::SQRT_X
+            | GateKind::SQRT_X_DAG
+            | GateKind::SQRT_Y
+            | GateKind::SQRT_Y_DAG
+            | GateKind::S
+            | GateKind::S_DAG
+            | GateKind::II
+            | GateKind::SQRT_XX
+            | GateKind::SQRT_XX_DAG
+            | GateKind::SQRT_YY
+            | GateKind::SQRT_YY_DAG
+            | GateKind::SQRT_ZZ
+            | GateKind::SQRT_ZZ_DAG
+            | GateKind::MPP
+            | GateKind::SWAP
+            | GateKind::ISWAP
+            | GateKind::CXSWAP
+            | GateKind::SWAPCX
+            | GateKind::CZSWAP
+            | GateKind::ISWAP_DAG
+            | GateKind::MXX
+            | GateKind::MYY
+            | GateKind::MZZ => self.add_measurements(instruction),
         }
     }
 
@@ -376,15 +452,15 @@ impl ConversionPlan {
         let Some(target) = found_sweep else {
             return Ok(());
         };
-        match instruction.gate().canonical_name() {
-            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => {
-                self.sweep_bit_count = next_sweep_bit_count;
-                self.validate_compiled_bytes()
-            }
-            name => Err(DetectionError::invalid_result_format(format!(
-                "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {name}"
-            ))),
+        let gate = instruction.gate();
+        if gate.controlled_pauli().is_none() {
+            return Err(DetectionError::invalid_result_format(format!(
+                "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {}",
+                gate.canonical_name()
+            )));
         }
+        self.sweep_bit_count = next_sweep_bit_count;
+        self.validate_compiled_bytes()
     }
 
     pub(super) fn record_observable(

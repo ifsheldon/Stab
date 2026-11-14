@@ -1,11 +1,10 @@
 use stab_algebra::Flow;
-use stab_model::{Circuit, CircuitItem, MemoryBudget};
+use stab_model::{Circuit, MemoryBudget, ParseLimits};
 
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
 
 /// Owned flow-generator rows are admitted against the default memory budget.
 pub(crate) const FLOW_GENERATOR_MEMORY_BUDGET: MemoryBudget = MemoryBudget::DEFAULT;
-const MAX_FLOW_GENERATOR_REPEAT_NESTING: usize = 256;
 
 /// Admits the `2n` measurement-free flow rows that the ignored-only and unitary generators return,
 /// two `n`-qubit Pauli strings each, against the default flow-generator budget. Building them is
@@ -50,23 +49,11 @@ pub(crate) fn measurement_rich_flow_generator_projected_bytes(
 /// Rejects repeat nesting beyond the fixed envelope before the solver recurses. Expanded solver
 /// work is not capped: it mutates rows that the byte budget already bounds.
 pub(super) fn validate_flow_generator_repeat_nesting(circuit: &Circuit) -> AnalysisResult<()> {
-    fn count(circuit: &Circuit, depth: usize) -> AnalysisResult<()> {
-        if depth > MAX_FLOW_GENERATOR_REPEAT_NESTING {
-            return Err(flow_resource_error(
-                ResourceKind::RepeatNesting,
-                u64::try_from(depth).unwrap_or(u64::MAX),
-                MAX_FLOW_GENERATOR_REPEAT_NESTING as u64,
-            ));
-        }
-        for item in circuit.items() {
-            if let CircuitItem::RepeatBlock(repeat) = item {
-                count(repeat.body(), depth.saturating_add(1))?;
-            }
-        }
-        Ok(())
-    }
-
-    count(circuit, 0)
+    crate::folded_walk::check_repeat_nesting(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        |depth, limit| flow_resource_error(ResourceKind::RepeatNesting, depth, limit),
+    )
 }
 
 fn flow_resource_error(resource: ResourceKind, actual: u64, limit: u64) -> AnalysisError {

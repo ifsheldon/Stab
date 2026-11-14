@@ -70,6 +70,22 @@ where
     child.wait_with_output().expect("wait for stab")
 }
 
+/// Runs a command that must not read standard input, which is closed instead of piped.
+///
+/// A child that exits before reading would make a piped write fail with `BrokenPipe`, so these
+/// commands get no pipe at all; any accidental stdin read sees end of input and changes output.
+fn run_without_stdin<I, S>(args: I) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    Command::new(env!("CARGO_BIN_EXE_stab"))
+        .args(args)
+        .stdin(Stdio::null())
+        .output()
+        .expect("run stab")
+}
+
 fn assert_ok(output: &Output, label: &str) {
     assert!(
         output.status.success(),
@@ -209,24 +225,21 @@ fn convert_real_process_covers_layout_and_format_routes() {
         &circuit,
         b"M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
     );
-    let typed = run(
-        [
-            OsString::from("convert"),
-            OsString::from("--in_format=01"),
-            OsString::from("--out_format=b8"),
-            OsString::from("--types=DL"),
-            OsString::from("--in"),
-            input.clone().into_os_string(),
-            OsString::from("--out"),
-            output.clone().into_os_string(),
-            OsString::from("--circuit"),
-            circuit.into_os_string(),
-            OsString::from("--obs_out"),
-            observables.clone().into_os_string(),
-            OsString::from("--obs_out_format=dets"),
-        ],
-        b"unused stdin",
-    );
+    let typed = run_without_stdin([
+        OsString::from("convert"),
+        OsString::from("--in_format=01"),
+        OsString::from("--out_format=b8"),
+        OsString::from("--types=DL"),
+        OsString::from("--in"),
+        input.clone().into_os_string(),
+        OsString::from("--out"),
+        output.clone().into_os_string(),
+        OsString::from("--circuit"),
+        circuit.into_os_string(),
+        OsString::from("--obs_out"),
+        observables.clone().into_os_string(),
+        OsString::from("--obs_out_format=dets"),
+    ]);
     assert_ok(&typed, "convert circuit layout and side output");
     assert!(typed.stdout.is_empty());
     assert_eq!(
@@ -313,7 +326,7 @@ fn sample_real_process_covers_options_and_all_output_formats() {
                 args.push(OsString::from("--skip_reference_sample"));
             }
             let label = format!("sample {format} skip_reference={skip_reference}");
-            let output = run(args, b"unused stdin");
+            let output = run_without_stdin(args);
             assert_ok(&output, &label);
             assert!(output.stdout.is_empty());
             assert_eq!(
@@ -348,21 +361,18 @@ fn detect_real_process_covers_options_and_output_routes() {
 
     for format in FORMATS {
         let output_path = dir.path().join(format!("detections.{format}"));
-        let output = run(
-            [
-                OsString::from("detect"),
-                OsString::from("--shots=64"),
-                OsString::from("--seed=5"),
-                OsString::from("--append_observables"),
-                OsString::from("--out_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--in"),
-                circuit.clone().into_os_string(),
-                OsString::from("--out"),
-                output_path.clone().into_os_string(),
-            ],
-            b"unused stdin",
-        );
+        let output = run_without_stdin([
+            OsString::from("detect"),
+            OsString::from("--shots=64"),
+            OsString::from("--seed=5"),
+            OsString::from("--append_observables"),
+            OsString::from("--out_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--in"),
+            circuit.clone().into_os_string(),
+            OsString::from("--out"),
+            output_path.clone().into_os_string(),
+        ]);
         assert_ok(&output, &format!("detect {format}"));
         assert_eq!(
             fs::read(output_path).expect("detection output"),
@@ -372,33 +382,27 @@ fn detect_real_process_covers_options_and_output_routes() {
     }
 
     // Without --append_observables, Stim's dets output prepends the observables.
-    let prepended = run(
-        [
-            OsString::from("detect"),
-            OsString::from("--shots=2"),
-            OsString::from("--out_format=dets"),
-            OsString::from("--in"),
-            circuit.clone().into_os_string(),
-        ],
-        b"unused stdin",
-    );
+    let prepended = run_without_stdin([
+        OsString::from("detect"),
+        OsString::from("--shots=2"),
+        OsString::from("--out_format=dets"),
+        OsString::from("--in"),
+        circuit.clone().into_os_string(),
+    ]);
     assert_ok(&prepended, "detect dets default observable placement");
     assert_eq!(prepended.stdout, b"shot L1 D0 D2\nshot L1 D0 D2\n");
 
     let observables = dir.path().join("observables.ptb64");
-    let side_output = run(
-        [
-            OsString::from("detect"),
-            OsString::from("--shots=64"),
-            OsString::from("--out_format=01"),
-            OsString::from("--in"),
-            circuit.into_os_string(),
-            OsString::from("--obs_out"),
-            observables.clone().into_os_string(),
-            OsString::from("--obs_out_format=ptb64"),
-        ],
-        b"unused stdin",
-    );
+    let side_output = run_without_stdin([
+        OsString::from("detect"),
+        OsString::from("--shots=64"),
+        OsString::from("--out_format=01"),
+        OsString::from("--in"),
+        circuit.into_os_string(),
+        OsString::from("--obs_out"),
+        observables.clone().into_os_string(),
+        OsString::from("--obs_out_format=ptb64"),
+    ]);
     assert_ok(&side_output, "detect observable side output");
     assert_eq!(side_output.stdout, b"101\n".repeat(SHOTS));
     assert_eq!(
@@ -468,24 +472,21 @@ fn gen_real_process_routes_geometry_noise_and_paths() {
     let ignored_input = dir.path().join("ignored.stim");
     let output_path = dir.path().join("generated.stim");
     write(&ignored_input, b"ignored by Stim's generator contract\n");
-    let output = run(
-        [
-            OsString::from("gen"),
-            OsString::from("--code=repetition_code"),
-            OsString::from("--task=memory"),
-            OsString::from("--distance=3"),
-            OsString::from("--rounds=2"),
-            OsString::from("--after_clifford_depolarization=0.01"),
-            OsString::from("--after_reset_flip_probability=0.02"),
-            OsString::from("--before_measure_flip_probability=0.03"),
-            OsString::from("--before_round_data_depolarization=0.04"),
-            OsString::from("--in"),
-            ignored_input.into_os_string(),
-            OsString::from("--out"),
-            output_path.clone().into_os_string(),
-        ],
-        b"unused stdin",
-    );
+    let output = run_without_stdin([
+        OsString::from("gen"),
+        OsString::from("--code=repetition_code"),
+        OsString::from("--task=memory"),
+        OsString::from("--distance=3"),
+        OsString::from("--rounds=2"),
+        OsString::from("--after_clifford_depolarization=0.01"),
+        OsString::from("--after_reset_flip_probability=0.02"),
+        OsString::from("--before_measure_flip_probability=0.03"),
+        OsString::from("--before_round_data_depolarization=0.04"),
+        OsString::from("--in"),
+        ignored_input.into_os_string(),
+        OsString::from("--out"),
+        output_path.clone().into_os_string(),
+    ]);
     assert_ok(&output, "gen complete option route");
     assert!(output.stdout.is_empty());
     assert_eq!(
@@ -535,26 +536,23 @@ fn m2d_real_process_covers_measurement_sweep_and_output_routes() {
         let sweep = dir.path().join(format!("sweep.{format}"));
         write(&measurements, M2D_MEASUREMENTS.encoded(format, 1));
         write(&sweep, M2D_SWEEPS.encoded(format, 1));
-        let output = run(
-            [
-                OsString::from("m2d"),
-                OsString::from("--in_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--sweep_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--out_format=01"),
-                OsString::from("--append_observables"),
-                OsString::from("--skip_reference_sample"),
-                OsString::from("--ran_without_feedback"),
-                OsString::from("--circuit"),
-                circuit.clone().into_os_string(),
-                OsString::from("--in"),
-                measurements.into_os_string(),
-                OsString::from("--sweep"),
-                sweep.into_os_string(),
-            ],
-            b"unused stdin",
-        );
+        let output = run_without_stdin([
+            OsString::from("m2d"),
+            OsString::from("--in_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--sweep_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--out_format=01"),
+            OsString::from("--append_observables"),
+            OsString::from("--skip_reference_sample"),
+            OsString::from("--ran_without_feedback"),
+            OsString::from("--circuit"),
+            circuit.clone().into_os_string(),
+            OsString::from("--in"),
+            measurements.into_os_string(),
+            OsString::from("--sweep"),
+            sweep.into_os_string(),
+        ]);
         assert_ok(&output, &format!("m2d {format} inputs"));
         let expected = match format {
             TestFormat::Ptb64 => padded_to_ptb64_group(APPENDED_BLOCK, "0000\n"),
@@ -595,28 +593,25 @@ fn m2d_real_process_covers_measurement_sweep_and_output_routes() {
     for (format, expected_detectors, expected_observables) in separate_outputs {
         let output_path = dir.path().join(format!("detections.{format}"));
         let observables = dir.path().join(format!("observables.{format}"));
-        let output = run(
-            [
-                OsString::from("m2d"),
-                OsString::from("--in_format=01"),
-                OsString::from("--sweep_format=01"),
-                OsString::from("--out_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--obs_out_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--circuit"),
-                circuit.clone().into_os_string(),
-                OsString::from("--in"),
-                measurements.clone().into_os_string(),
-                OsString::from("--sweep"),
-                sweep.clone().into_os_string(),
-                OsString::from("--out"),
-                output_path.clone().into_os_string(),
-                OsString::from("--obs_out"),
-                observables.clone().into_os_string(),
-            ],
-            b"unused stdin",
-        );
+        let output = run_without_stdin([
+            OsString::from("m2d"),
+            OsString::from("--in_format=01"),
+            OsString::from("--sweep_format=01"),
+            OsString::from("--out_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--obs_out_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--circuit"),
+            circuit.clone().into_os_string(),
+            OsString::from("--in"),
+            measurements.clone().into_os_string(),
+            OsString::from("--sweep"),
+            sweep.clone().into_os_string(),
+            OsString::from("--out"),
+            output_path.clone().into_os_string(),
+            OsString::from("--obs_out"),
+            observables.clone().into_os_string(),
+        ]);
         assert_ok(&output, &format!("m2d {format} outputs"));
         assert_eq!(
             fs::read(output_path).expect("detection output"),
@@ -738,18 +733,15 @@ fn folded_detection_workflows_match_unrolled_outputs_including_ptb64() {
     assert_eq!(folded_m2d.1.len(), 2_usize.div_ceil(8) * SHOTS);
 
     let run_detect = |label: &str, circuit: &Path| {
-        let output = run(
-            [
-                OsString::from("detect"),
-                OsString::from("--shots=64"),
-                OsString::from("--seed=17"),
-                OsString::from("--append_observables"),
-                OsString::from("--out_format=ptb64"),
-                OsString::from("--in"),
-                circuit.as_os_str().to_owned(),
-            ],
-            b"unused stdin",
-        );
+        let output = run_without_stdin([
+            OsString::from("detect"),
+            OsString::from("--shots=64"),
+            OsString::from("--seed=17"),
+            OsString::from("--append_observables"),
+            OsString::from("--out_format=ptb64"),
+            OsString::from("--in"),
+            circuit.as_os_str().to_owned(),
+        ]);
         assert_ok(&output, &format!("{label} detect"));
         output.stdout
     };
@@ -768,22 +760,19 @@ fn analyze_errors_real_process_routes_all_nondeprecated_options() {
         &input,
         b"REPEAT 2 {\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n}\n",
     );
-    let output = run(
-        [
-            OsString::from("analyze_errors"),
-            OsString::from("--decompose_errors"),
-            OsString::from("--block_decompose_from_introducing_remnant_edges"),
-            OsString::from("--ignore_decomposition_failures"),
-            OsString::from("--fold_loops"),
-            OsString::from("--allow_gauge_detectors"),
-            OsString::from("--approximate_disjoint_errors=1"),
-            OsString::from("--in"),
-            input.into_os_string(),
-            OsString::from("--out"),
-            output_path.clone().into_os_string(),
-        ],
-        b"unused stdin",
-    );
+    let output = run_without_stdin([
+        OsString::from("analyze_errors"),
+        OsString::from("--decompose_errors"),
+        OsString::from("--block_decompose_from_introducing_remnant_edges"),
+        OsString::from("--ignore_decomposition_failures"),
+        OsString::from("--fold_loops"),
+        OsString::from("--allow_gauge_detectors"),
+        OsString::from("--approximate_disjoint_errors=1"),
+        OsString::from("--in"),
+        input.into_os_string(),
+        OsString::from("--out"),
+        output_path.clone().into_os_string(),
+    ]);
     assert_ok(&output, "analyze_errors complete option route");
     assert!(output.stdout.is_empty());
     assert_eq!(
@@ -846,28 +835,25 @@ fn sample_dem_real_process_covers_primary_side_and_replay_routes() {
         let primary = dir.path().join(format!("primary.{format}"));
         let observables = dir.path().join(format!("observables.{format}"));
         let errors = dir.path().join(format!("errors.{format}"));
-        let output = run(
-            [
-                OsString::from("sample_dem"),
-                OsString::from("--shots=64"),
-                OsString::from("--seed=5"),
-                OsString::from("--out_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--obs_out_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--err_out_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--in"),
-                dem.clone().into_os_string(),
-                OsString::from("--out"),
-                primary.clone().into_os_string(),
-                OsString::from("--obs_out"),
-                observables.clone().into_os_string(),
-                OsString::from("--err_out"),
-                errors.clone().into_os_string(),
-            ],
-            b"unused stdin",
-        );
+        let output = run_without_stdin([
+            OsString::from("sample_dem"),
+            OsString::from("--shots=64"),
+            OsString::from("--seed=5"),
+            OsString::from("--out_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--obs_out_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--err_out_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--in"),
+            dem.clone().into_os_string(),
+            OsString::from("--out"),
+            primary.clone().into_os_string(),
+            OsString::from("--obs_out"),
+            observables.clone().into_os_string(),
+            OsString::from("--err_out"),
+            errors.clone().into_os_string(),
+        ]);
         assert_ok(&output, &format!("sample_dem {format} outputs"));
         assert_eq!(
             fs::read(primary).expect("primary output"),
@@ -900,23 +886,20 @@ fn sample_dem_real_process_covers_primary_side_and_replay_routes() {
                 REPLAYED_OBSERVABLES.as_bytes().to_vec(),
             ),
         };
-        let replayed = run(
-            [
-                OsString::from("sample_dem"),
-                OsString::from(shots),
-                OsString::from("--out_format=01"),
-                OsString::from("--obs_out_format=01"),
-                OsString::from("--replay_err_in_format"),
-                OsString::from(format.as_str()),
-                OsString::from("--in"),
-                dem.clone().into_os_string(),
-                OsString::from("--replay_err_in"),
-                replay.into_os_string(),
-                OsString::from("--obs_out"),
-                replayed_observables.clone().into_os_string(),
-            ],
-            b"unused stdin",
-        );
+        let replayed = run_without_stdin([
+            OsString::from("sample_dem"),
+            OsString::from(shots),
+            OsString::from("--out_format=01"),
+            OsString::from("--obs_out_format=01"),
+            OsString::from("--replay_err_in_format"),
+            OsString::from(format.as_str()),
+            OsString::from("--in"),
+            dem.clone().into_os_string(),
+            OsString::from("--replay_err_in"),
+            replay.into_os_string(),
+            OsString::from("--obs_out"),
+            replayed_observables.clone().into_os_string(),
+        ]);
         assert_ok(&replayed, &format!("sample_dem {format} replay"));
         assert_eq!(
             replayed.stdout, expected_detectors,
@@ -990,7 +973,7 @@ fn removed_compatibility_routes_are_absent_from_real_binary_and_help() {
         ),
     ];
     for (args, removed_flag) in removed {
-        let output = run(*args, b"M 0\n");
+        let output = run_without_stdin(*args);
         assert!(!output.status.success(), "removed route accepted: {args:?}");
         assert!(
             output.stdout.is_empty(),
@@ -1011,7 +994,7 @@ fn removed_compatibility_routes_are_absent_from_real_binary_and_help() {
         &["help", "sample_dem"][..],
         &["sample_dem", "--help"][..],
     ] {
-        let output = run(args, b"");
+        let output = run_without_stdin(args);
         assert_ok(&output, &format!("help surface {args:?}"));
         let help = String::from_utf8_lossy(&output.stdout);
         for removed_flag in ["--frame0", "--prepend_observables", "--append_observables"] {

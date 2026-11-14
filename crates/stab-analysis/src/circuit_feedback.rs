@@ -1,19 +1,20 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, Gate, GateCategory,
-    MeasureRecordOffset, MemoryBudget, Pauli, QubitId, RepeatBlock, RepeatCount, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, FoldedCircuitSummary,
+    FoldedWalkError, Gate, GateCategory, GateKind, MeasureRecordOffset, MemoryBudget, ParseLimits,
+    Pauli, QubitId, RepeatBlock, RepeatCount, Target,
     advanced::{
-        CircuitBuilder, ClassicalControl, ControlledPauliTargetPair,
+        CircuitBuilder, ClassicalControl, ControlledPauliTargetPair, FoldedCircuitEvent,
         classify_controlled_pauli_target_pair,
     },
 };
 
+use crate::folded_walk::walk_folded;
 use crate::{
     AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
-const MAX_FEEDBACK_REPEAT_NESTING: usize = 256;
 /// The unrolled reversed buffer and the rebuilt output circuit each retain the expansion.
 const FEEDBACK_RETAINED_COPIES: u64 = 2;
 
@@ -135,10 +136,7 @@ impl WithoutFeedbackHelper {
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        if matches!(
-            instruction.gate().canonical_name(),
-            "CX" | "CY" | "CZ" | "XCZ" | "YCZ"
-        ) {
+        if instruction.gate().controlled_pauli().is_some() {
             return self.undo_feedback_capable_controlled_pauli(instruction);
         }
         if instruction.gate().category() == GateCategory::Controlled
@@ -242,7 +240,7 @@ impl WithoutFeedbackHelper {
                 continue;
             }
             let instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
-                Gate::from_name("OBSERVABLE_INCLUDE")?,
+                GateKind::OBSERVABLE_INCLUDE.gate(),
                 vec![observable as f64],
                 records
                     .into_iter()
@@ -287,7 +285,7 @@ impl WithoutFeedbackHelper {
                                 "measurement count overflowed while building feedback-free circuit",
                             )
                         })?;
-                    if instruction.gate().canonical_name() == "DETECTOR" {
+                    if instruction.gate().kind() == GateKind::DETECTOR {
                         let detector_id = *detectors_in_past;
                         *detectors_in_past = detectors_in_past.checked_add(1).ok_or_else(|| {
                             AnalysisError::invalid_detector_error_model(
@@ -440,50 +438,32 @@ fn feedback_resource_error(resource: ResourceKind, actual: u64, limit: u64) -> A
     .into()
 }
 
-fn validate_feedback_repeat_budget(circuit: &Circuit, budget: MemoryBudget) -> AnalysisResult<()> {
+/// Admits the projected unrolled bytes of `circuit` and returns them.
+fn validate_feedback_repeat_budget(circuit: &Circuit, budget: MemoryBudget) -> AnalysisResult<u64> {
     let mut budget = FeedbackRepeatBudget {
         budget,
         projected_bytes: 0,
     };
-    validate_feedback_repeat_budget_inner(circuit, 1, 0, &mut budget)
-}
-
-fn validate_feedback_repeat_budget_inner(
-    circuit: &Circuit,
-    multiplier: u64,
-    depth: usize,
-    budget: &mut FeedbackRepeatBudget,
-) -> AnalysisResult<()> {
-    if depth > MAX_FEEDBACK_REPEAT_NESTING {
-        return Err(feedback_resource_error(
-            ResourceKind::RepeatNesting,
-            u64::try_from(depth).unwrap_or(u64::MAX),
-            MAX_FEEDBACK_REPEAT_NESTING as u64,
-        ));
-    }
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                budget.add_projected_bytes(
-                    instruction_retained_bytes(instruction).saturating_mul(multiplier),
-                )?;
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let repeat_count = repeat.repeat_count().get();
-                let repeated_multiplier = multiplier.saturating_mul(repeat_count);
+    walk_folded(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+        |depth, limit| feedback_resource_error(ResourceKind::RepeatNesting, depth, limit),
+        |event| match event {
+            FoldedCircuitEvent::Instruction {
+                instruction,
+                executions,
+            } => budget.add_projected_bytes(
+                instruction_retained_bytes(instruction).saturating_mul(executions.saturating()),
+            ),
+            FoldedCircuitEvent::Repeat { iterations, .. } => {
                 // Each unrolled iteration retains one single-iteration repeat block.
                 let block_bytes = (size_of::<CircuitItem>() + size_of::<Circuit>()) as u64;
-                budget.add_projected_bytes(block_bytes.saturating_mul(repeated_multiplier))?;
-                validate_feedback_repeat_budget_inner(
-                    repeat.body(),
-                    repeated_multiplier,
-                    depth.saturating_add(1),
-                    budget,
-                )?;
+                budget.add_projected_bytes(block_bytes.saturating_mul(iterations.saturating()))
             }
-        }
-    }
-    Ok(())
+        },
+    )?;
+    Ok(budget.projected_bytes)
 }
 
 /// Conservative retained bytes of one copy of `instruction` in an owned circuit.
@@ -523,32 +503,22 @@ fn rewritten_detector(
 }
 
 fn detector_count(circuit: &Circuit) -> AnalysisResult<u64> {
-    let mut count = 0u64;
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                if instruction.gate().canonical_name() == "DETECTOR" {
-                    count = count.checked_add(1).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model("detector count overflowed")
-                    })?;
-                }
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let body_count = detector_count(repeat.body())?;
-                let repeated = body_count
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
-                            "repeat detector count overflowed",
-                        )
-                    })?;
-                count = count.checked_add(repeated).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model("detector count overflowed")
-                })?;
-            }
-        }
-    }
-    Ok(count)
+    FoldedCircuitSummary::of(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        &Cancellation::never(),
+    )
+    .map_err(|error| match error {
+        FoldedWalkError::RepeatNesting { depth, limit } => feedback_resource_error(
+            ResourceKind::RepeatNesting,
+            u64::try_from(depth).unwrap_or(u64::MAX),
+            limit as u64,
+        ),
+        FoldedWalkError::Cancelled(cancelled) => AnalysisError::from(cancelled),
+    })?
+    .detectors()
+    .exact()
+    .ok_or_else(|| AnalysisError::invalid_detector_error_model("detector count overflowed"))
 }
 
 fn instruction_with_targets(
@@ -564,14 +534,12 @@ fn instruction_with_targets(
 }
 
 fn feedback_pauli(gate: Gate) -> AnalysisResult<Pauli> {
-    match gate.canonical_name() {
-        "CX" | "XCZ" => Ok(Pauli::X),
-        "CY" | "YCZ" => Ok(Pauli::Y),
-        "CZ" => Ok(Pauli::Z),
-        name => Err(AnalysisError::invalid_detector_error_model(format!(
-            "{name} is not a supported feedback gate"
-        ))),
-    }
+    gate.controlled_pauli().ok_or_else(|| {
+        AnalysisError::invalid_detector_error_model(format!(
+            "{} is not a supported feedback gate",
+            gate.canonical_name()
+        ))
+    })
 }
 
 fn absolute_record_index(
@@ -936,12 +904,9 @@ mod tests {
         validate_feedback_repeat_budget(&above_old_work_cap, MemoryBudget::DEFAULT).unwrap();
 
         let one_iteration = Circuit::from_stim_str("REPEAT 1 {\nTICK\n}\n").unwrap();
-        let mut exact = FeedbackRepeatBudget {
-            budget: MemoryBudget::from_bytes(u64::MAX),
-            projected_bytes: 0,
-        };
-        validate_feedback_repeat_budget_inner(&one_iteration, 1, 0, &mut exact).unwrap();
-        let exact = exact.projected_bytes;
+        let exact =
+            validate_feedback_repeat_budget(&one_iteration, MemoryBudget::from_bytes(u64::MAX))
+                .unwrap();
         assert!(exact > 0);
         validate_feedback_repeat_budget(&one_iteration, MemoryBudget::from_bytes(exact)).unwrap();
         let error =
@@ -963,7 +928,7 @@ mod tests {
         );
 
         let mut nested = Circuit::from_stim_str("TICK\n").unwrap();
-        for _ in 0..=MAX_FEEDBACK_REPEAT_NESTING {
+        for _ in 0..=stab_model::RepeatNestingLimit::HARD_MAX {
             let mut outer = Circuit::new();
             outer.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
                 RepeatCount::try_new(1).unwrap(),
@@ -977,6 +942,9 @@ mod tests {
         assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
         assert_eq!(resource.resource(), ResourceKind::RepeatNesting);
         assert_eq!(resource.actual(), 257);
-        assert_eq!(resource.limit(), MAX_FEEDBACK_REPEAT_NESTING as u64);
+        assert_eq!(
+            resource.limit(),
+            stab_model::RepeatNestingLimit::HARD_MAX as u64
+        );
     }
 }
