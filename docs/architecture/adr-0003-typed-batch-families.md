@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for Stab 0.2 architecture work. Revised by E7 of the [engine speed and architecture plan](../plans/engine-speed-and-architecture-plan.md): bit-plane batches are no longer limited to 64 shots.
+Accepted for Stab 0.2 architecture work. Revised on 2026-11-14: bit-plane batches are no longer limited to 64 shots, and frame lane width is a session parameter.
 
 ## Context
 
@@ -10,7 +10,7 @@ One generic record container would conflate measurement, detector, observable, s
 
 Shot-major packed records and bit planes also have different layout contracts.
 
-Before E7, bit planes were one `u64` per result bit and so held at most 64 shots. Circuit sampling ran 256-lane frames, detection sampling ran 64-lane frames, and DEM sampling produced up to 1024-shot planes, so each producer re-chunked its own planes into 64-shot batches before a sink saw them, and every row-oriented output transposed again inside the encoder.
+Before the revision, bit planes were one `u64` per result bit and so held at most 64 shots. Circuit sampling ran 256-lane frames, detection sampling ran 64-lane frames, and DEM sampling produced up to 1024-shot planes, so each producer re-chunked its own planes into 64-shot batches before a sink saw them, and every row-oriented output transposed again inside the encoder.
 
 ## Decision
 
@@ -24,9 +24,9 @@ DETS retains independent `M`, `D`, and `L` namespaces.
 
 Codecs implement sinks over compatible batch views.
 
-Record input streams decode into packed shot-major batches; the record-at-a-time visitors were removed in E6 because no product caller used them.
+Record input streams decode into packed shot-major batches; the record-at-a-time visitors were removed because no product caller used them.
 
-### E7 Revision: One Multi-Word Plane View
+### Revision: One Multi-Word Plane View
 
 `BitPlaneBatchView` is the one borrowed bit-plane layout. A plane holds one result bit for any number of shots, packed 64 shots per word, and the view borrows either planes stored back to back in words or one 256-lane `BitBlock` per plane, so engine frames are handed to sinks without copying. A word-aligned shot window selects part of a wider plane set. `BitPlaneBatch` is the owned form.
 

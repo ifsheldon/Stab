@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for Stab 0.2 architecture work. Revised on 2026-11-14 by the E4 limit policy reset of the [engine speed and architecture plan](../plans/engine-speed-and-architecture-plan.md).
+Accepted for Stab 0.2 architecture work. Revised on 2026-11-14 by the limit policy reset, which the [resource policy inventory](resource-policy-inventory.md) records constant by constant.
 
 ## Context
 
@@ -23,7 +23,7 @@ CLI human output remains the default and JSON schema version 1 is additive.
 Established human parser output remains stable where the old behavior already matches pinned Stim. Direct Stim v1.16.0 evidence takes precedence over preserving an incompatible old Stab acceptance or rejection.
 
 Resource policies are owned by one concrete operation.
-Since E4 of the engine speed and architecture plan, each materializing or executing operation has exactly one admission dimension, a typed `MemoryBudget` of retained bytes, plus the shared repeat-nesting envelope where its traversal recurses.
+Each materializing or executing operation has exactly one admission dimension, a typed `MemoryBudget` of retained bytes, plus the shared repeat-nesting envelope where its traversal recurses.
 The budget defaults to one gibibyte, is admitted from conservative checked arithmetic before allocation, RNG advancement, or output, and is followed by fallible reservation.
 
 Hostile-input protection means memory safety, no panics, checked arithmetic, bounded allocation, and bounded recursion.

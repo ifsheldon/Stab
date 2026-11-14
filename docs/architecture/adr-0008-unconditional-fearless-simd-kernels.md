@@ -2,13 +2,13 @@
 
 ## Status
 
-Accepted for Stab 0.2. Supersedes [ADR 0005](adr-0005-backends-and-nightly.md) for leaf-kernel selection and the toolchain boundary, and amends the kernel edges of [ADR 0007](adr-0007-product-dependency-graph.md).
+Accepted for Stab 0.2. Replaces ADR 0005, Backend Selection And Nightly Isolation, which remains in Git history, and sets the kernel edges of [ADR 0007](adr-0007-product-dependency-graph.md).
 
 ## Context
 
 ADR 0005 isolated Nightly `std::simd` kernels in an optional `stab-kernels-simd` crate behind an additive `portable-simd` Cargo feature, so Stable component users compiled duplicate scalar paths by default.
 
-The [fearless SIMD and Stable Rust plan](../plans/fearless-simd-stable-rust-plan.md) ported the kernels to [`fearless_simd`](https://github.com/linebender/fearless_simd), which builds on Stable Rust through a safe API. Its S2 checkpoint measured the port as performance-neutral against both the `std::simd` build and the scalar build on the AArch64 development host.
+The kernels were ported to [`fearless_simd`](https://github.com/linebender/fearless_simd), which builds on Stable Rust through a safe API. Paired end-to-end and kernel-level timings measured the port as performance-neutral against both the `std::simd` build and the scalar build on the AArch64 development host.
 
 Keeping two production implementations of each kernel and a build-time switch between them doubles the code that must stay semantically identical without any measured benefit.
 
@@ -22,7 +22,7 @@ Instruction-set selection happens once per slice-level call, outside every word 
 
 `stab-kernels-simd` is the only crate allowed to depend on `fearless_simd` or `fearless_simd_macros`. It keeps `unsafe_code = "deny"`, takes no Stab dependency, owns no Stab types, logical tails, allocation, or sampling backend policy, and accepts raw word slices only.
 
-The following ADR 0005 rules carry over unchanged:
+The following backend rules carry over from ADR 0005 unchanged:
 
 - No placeholder backend enum, registry, or unavailable choice is published.
 - No dynamic dispatch occurs inside hot loops.

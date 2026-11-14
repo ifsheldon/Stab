@@ -25,9 +25,9 @@ The `compilation` object contains:
 - `configurable_limits`, currently empty;
 - `validated`.
 
-Sampling compiler schema version 6 also applies one fixed one-million-expanded-instruction boundary to measurement-bearing shots, counted as `detect` counts it. Because this is fixed compiler admission rather than a caller option, it is bound by `compiler_schema_version` and does not appear in `configurable_limits`.
+Admission is by the command's `--memory-budget`, which bounds the parsed circuit, the compiled plan, and the session a run would create. The budget is not part of either compilation identity and does not appear in `configurable_limits`.
 
-The `run` object contains shots, random policy, optional seed, reference mode, output format, whether `--skip_loop_folding` was requested, and its selected effect. The effect is `fold-invariant-reference-repeats` by default and `iterate-reference-repeats` when the flag is present. The fold policy authorizes reuse after exact recurrence when its optional snapshot fits the existing session-storage ceiling; it falls back to iteration without changing admission or output when that snapshot would not fit.
+The `run` object contains shots, random policy, optional seed, reference mode, output format, whether `--skip_loop_folding` was requested, and its selected effect. The effect is `fold-invariant-reference-repeats` by default and `iterate-reference-repeats` when the flag is present. The fold policy authorizes reuse after exact recurrence when its optional snapshot fits the memory budget; it falls back to iteration without changing admission or output when that snapshot would not fit.
 
 Shot count, random seed, reference mode, and result encoding do not alter either compilation identity. The shot count does select the frame lane width that `stab sample` would create its session with, as `stab_engine::LaneWidth::for_total_shots` defines it, so a seeded run's output depends on the seed and the shot count together; executable-contract schema `7` records that dependency. The reference-repeat policy leaves the backend-neutral request fingerprint unchanged because it does not change accepted circuit semantics or lowering, but it changes the executable plan fingerprint because it changes how reference-sample repeat work is performed.
 
@@ -35,6 +35,6 @@ Fixed-width output estimates are exact when representable. Sparse formats and ru
 
 ## Change From Version 3
 
-Version 4 turns `--skip_loop_folding` from an accepted no-op into an executable reference-sample policy. It adds the normalized policy value, replaces the no-op effect with the selected fold or iterate effect, and reports the corresponding executable-plan fingerprint. Stab does not emit a version-3 plan compatibility view. `stab capabilities` remains schema version 5 and `stab inspect` remains schema version 2.
+Version 4 turns `--skip_loop_folding` from an accepted no-op into an executable reference-sample policy. It adds the normalized policy value, replaces the no-op effect with the selected fold or iterate effect, and reports the corresponding executable-plan fingerprint. Stab does not emit a version-3 plan compatibility view. `stab capabilities` is versioned separately by [capabilities schema version 6](agent-cli-capabilities-schema-v6.md), and `stab inspect` remains on [schema version 2](agent-cli-schema-v2.md).
 
 Adding or removing a field, changing a field type or meaning, changing a closed enum, or changing successful stream framing requires a schema-version increment.

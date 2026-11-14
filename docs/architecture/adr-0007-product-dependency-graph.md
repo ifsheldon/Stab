@@ -2,13 +2,13 @@
 
 ## Status
 
-Accepted for Stab 0.2. [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md) amends the kernel edges: `stab-bits` and `stab-algebra` now depend on `stab-kernels-simd` unconditionally, the `portable-simd` feature no longer exists, and the feature-reachability and portable-SIMD source rules below are replaced by the `fearless_simd` dependency rule recorded there. ADR 0008 also replaces the Rust 1.97.1 and Nightly toolchain rules below: every product crate now declares Rust 1.100 and builds on the pinned Stable 1.100.0 toolchain.
+Accepted for Stab 0.2. Revised on 2026-11-14 for [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md): the kernel edges are unconditional, and the toolchain rule is the one recorded there.
 
 ## Context
 
-Stab began with most product behavior in `stab-core`, which made ownership easy to discover locally but coupled Stable model and record consumers to the Nightly facade. The modular architecture needs a directed Cargo graph that keeps models independent of algorithms, keeps execution independent of codecs and filesystems, isolates portable SIMD, and prevents qualification tooling from becoming a product dependency.
+Stab began with most product behavior in `stab-core`, which made ownership easy to discover locally but coupled model and record consumers to the whole facade. The modular architecture needs a directed Cargo graph that keeps models independent of algorithms, keeps execution independent of codecs and filesystems, isolates the SIMD library, and prevents qualification tooling from becoming a product dependency.
 
-A prose diagram is insufficient as the sole decision record because an apparently convenient dependency can introduce a cycle, move Nightly into a Stable consumer graph, or give two crates ownership of the same semantic contract.
+A prose diagram is insufficient as the sole decision record because an apparently convenient dependency can introduce a cycle, pull the SIMD library into a second crate, or give two crates ownership of the same semantic contract.
 
 ## Decision
 
@@ -17,10 +17,9 @@ Product dependency arrows point from a consumer to its dependency:
 ```text
 stab-kernels-simd -> no Stab crate
 
-stab-bits --portable-simd--> stab-kernels-simd
+stab-bits -> stab-kernels-simd
 stab-records -> stab-bits
-stab-algebra -> stab-bits
-stab-algebra --portable-simd--> stab-kernels-simd
+stab-algebra -> stab-bits + stab-kernels-simd
 stab-model -> no Stab crate
 stab-analysis -> stab-model + stab-algebra
 stab-engine -> stab-model + stab-records + stab-algebra + stab-analysis + stab-bits
@@ -32,13 +31,13 @@ ops -> product crates
 product crates -X-> ops
 ```
 
-The `stab-decoder` edges are active after A7 adds the physical package and the public external-decoder proof. Architecture policy continues to reject every dependency outside the graph.
+Architecture policy rejects every dependency outside the graph.
 
-`stab-model` owns closed Stim circuit and detector-error-model syntax and structure. `stab-analysis` may depend on model and algebra semantics, while `stab-engine` may depend on analysis lowering and packed bit storage; the inverse engine-to-analysis edge is forbidden. Records know packed result layouts but not circuits. SIMD kernels accept raw words and have no Stab dependency. `stab-cli` composes the owning components directly, while `stab-core` is an ergonomic facade for external consumers and not an internal service locator.
+`stab-model` owns closed Stim circuit and detector-error-model syntax and structure. `stab-analysis` may depend on model and algebra semantics, while `stab-engine` may depend on analysis algorithms and packed bit storage; the inverse analysis-to-engine edge is forbidden. Records know packed result layouts but not circuits. SIMD kernels accept raw words and have no Stab dependency. `stab-cli` composes the owning components directly, while `stab-core` is an ergonomic facade for external consumers and not an internal service locator.
 
-The engine's direct `stab-bits` edge lets one generic Pauli-frame implementation use scalar `u64` lanes for detection and a wider `BitBlock` for circuit sampling. The engine remains Stable by default. Its `portable-simd` feature only forwards the explicit `stab-bits/portable-simd` opt-in, whose implementation remains isolated in `stab-kernels-simd`.
+The engine's direct `stab-bits` edge lets one generic Pauli-frame implementation run on `u64` planes for 64-lane sessions and on `BitBlock` planes for 256-lane sessions.
 
-Stable components declare Rust 1.97.1 as their minimum supported version and must not reach `stab-kernels-simd` through default features or development dependencies. Nightly is explicit for the SIMD leaf, facade, CLI, and operational consumers that deliberately enable portable SIMD.
+Every product crate declares Rust 1.100 as its minimum supported version, and only `stab-kernels-simd` may depend on the SIMD library, as [ADR 0008](adr-0008-unconditional-fearless-simd-kernels.md) records.
 
 ## Consequences
 
@@ -50,10 +49,10 @@ Stable components declare Rust 1.97.1 as their minimum supported version and mus
 
 ## Enforcement
 
-`just architecture::check` validates the complete Cargo graph, reserved package identities, Stable and Nightly feature reachability, product-to-ops rejection, and portable-SIMD source ownership from `cargo metadata` and Rust syntax.
+`just architecture::check` validates the complete Cargo graph, reserved package identities, the exact Rust 1.100 minimum, product-to-ops rejection, and SIMD-library ownership from `cargo metadata` and Rust syntax.
 
-`just architecture::consumer-check` compiles standalone Stable component, scalar facade, portable facade, and mixed direct-component consumers and verifies their resolved feature graphs.
+`just architecture::consumer-check` compiles the standalone component-only, facade, and mixed direct-component consumers and verifies their resolved graphs.
 
 `just architecture::docs-check` validates repository-owned Markdown links and anchors so the architecture index and local evidence references cannot silently drift.
 
-The canonical-owner qualification inventory requires component behavior to execute in its owning package unless a checked cross-component or facade-integration exception names the reason direct ownership is impossible.
+The parity ledger requires each family's canonical owner test to run in its declared product-owner package.

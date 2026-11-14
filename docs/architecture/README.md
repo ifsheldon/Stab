@@ -2,7 +2,7 @@
 
 This directory defines Stab's active product architecture.
 
-The active migration sequence, tests, benchmarks, and release criteria live in [the Stim core parity and lean evidence plan](../plans/stim-core-parity-and-lean-evidence-plan.md).
+The active milestone, test contract, and acceptance criteria live in [the Stim core parity and lean evidence plan](../plans/stim-core-parity-and-lean-evidence-plan.md), and release evidence in [GOAL.md](../plans/GOAL.md).
 
 The source-current public Rust migration guide is [Migrating to Stab 0.2](../MIGRATING-0.2.md). Superseded extraction maps, migration ledgers, and package baselines remain available in Git history.
 
@@ -14,7 +14,7 @@ The stable byte contract for backend-bearing executable identities is defined by
 
 The current successful machine-output contracts are [capabilities schema version 6](agent-cli-capabilities-schema-v6.md), [plan schema version 4](agent-cli-plan-schema-v4.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Superseded schemas remain available in Git history and are not emitted as compatibility views.
 
-The E4 classification of every resource limit, including each removed one, is recorded in [the resource policy inventory](a2-resource-policy-inventory.md).
+The classification of every resource limit, including each removed one, is recorded in [the resource policy inventory](resource-policy-inventory.md).
 
 ## Architectural Center
 
@@ -64,7 +64,7 @@ Detailed component contracts use [the component contract template](component-con
 
 ## Permitted Dependencies
 
-The current product graph after the A8 circuit-pass and backend-selection boundary is:
+The current product graph is:
 
 ```text
 stab-cli -> stab-analysis + stab-bits + stab-engine + stab-model + stab-records
@@ -125,7 +125,7 @@ The workspace builds with one pinned Stable toolchain, Rust 1.100.0, recorded in
 
 No product crate may enable an unstable Rust feature; `just architecture::check` rejects any `feature(...)` gate in product and proof-crate sources.
 
-Generic packed storage lives in Stable `stab-bits`, and quantum-specific Clifford and Pauli-word operations live in Stable `stab-algebra`. A `stab-algebra` Tableau stores its generator images as packed X and Z row planes with one sign plane, conjugates 64 rows per block so each generator row is read once per block, and uses `stab-bits` matrices for transposition, so composition, inversion, random sampling, and the stabilizer solver are word-parallel with no width cap; values built from a requested size are admitted against the crate's own `AlgebraMemoryBudget`, which keeps the dependency graph unchanged. Whole-slice XOR in `stab-bits` and Clifford right multiplication in `stab-algebra` always run through the `fearless_simd` kernels in `stab-kernels-simd`, which select the instruction set once per call; the remaining word loops, including the single-block XOR and masked XOR, are scalar. The kernels accelerate only measured leaf operations. Circuit sampling, detection sampling, measurement-to-detection conversion, and sweep correction all run one generic Pauli-frame batch with scalar block operations, 256 lanes and one `BitBlock` per plane by default; circuit-sampling and detection-sampling sessions may instead be created with a 64-lane `LaneWidth`, one `u64` per plane, which the CLI selects for small requests ([ADR 0003](adr-0003-typed-batch-families.md)); E7 measured 1024-lane rows driven by the slice kernels and did not adopt them because the end-to-end cases did not improve, so the engine registers no SIMD sampling backend.
+Generic packed storage lives in Stable `stab-bits`, and quantum-specific Clifford and Pauli-word operations live in Stable `stab-algebra`. A `stab-algebra` Tableau stores its generator images as packed X and Z row planes with one sign plane, conjugates 64 rows per block so each generator row is read once per block, and uses `stab-bits` matrices for transposition, so composition, inversion, random sampling, and the stabilizer solver are word-parallel with no width cap; values built from a requested size are admitted against the crate's own `AlgebraMemoryBudget`, which keeps the dependency graph unchanged. Whole-slice XOR in `stab-bits` and Clifford right multiplication in `stab-algebra` always run through the `fearless_simd` kernels in `stab-kernels-simd`, which select the instruction set once per call; the remaining word loops, including the single-block XOR and masked XOR, are scalar. The kernels accelerate only measured leaf operations. Circuit sampling, detection sampling, measurement-to-detection conversion, and sweep correction all run one generic Pauli-frame batch with scalar block operations, 256 lanes and one `BitBlock` per plane by default; circuit-sampling and detection-sampling sessions may instead be created with a 64-lane `LaneWidth`, one `u64` per plane, which the CLI selects for small requests ([ADR 0003](adr-0003-typed-batch-families.md)); 1024-lane rows driven by the slice kernels were measured and not adopted because the end-to-end cases did not improve, so the engine registers no SIMD sampling backend.
 
 Strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs live in Stable `stab-records` behind one public `RecordFormat` type. Materialized readers and the one packed `RecordStreamReader` accept all six formats. The stream reader decodes straight into the words of a reusable `PackedShotBatch`: sparse formats set only hit bits, `01` packs eight bytes per step, `b8` copies bytes, and PTB64 transposes whole groups. It reads through one buffer that grows only while a record frame spans it, allocates record storage fallibly and only after input proves the first record exists, and delivers every record decoded before a failure ahead of that failure. Its framing options carry the `m2d` and `sample_dem` replay diagnostics (line offsets, newline and length checks, `b8` truncation, empty zero-width sweeps, set-semantics HITS), so the CLI contains no format-specific decode loop. Every product output route encodes through one `RecordEncoder`, which takes packed records as single records or as column groups that are each shot-major records or bit planes of any shot count, and drains the encoded bytes into any `io::Write`. Bit planes are the layout samplers produce; the encoder copies their words straight into PTB64 groups and transposes one 64-shot block per column group for every other format, so no engine path re-chunks or transposes planes before a sink sees them ([ADR 0003](adr-0003-typed-batch-families.md)). It owns record separators, DETS namespaces, B8 tail masking, and PTB64 grouping; sparse formats visit only set bits, and its retained state between calls is at most one incomplete PTB64 group, which callers must reject at finalization. The per-bit `MeasureRecordWriter` remains as the Stim writer-contract mirror and is fallible because PTB64 requires complete 64-record groups.
 
@@ -158,7 +158,7 @@ Explicit search budgets with budget-exhausted results remain separate caller pol
 Count caps that only proxy memory and fixed work caps are not used; a compact input that fits the budget runs for as long as its work takes unless the caller cancels it.
 Long-running library operations accept one `stab_model::Cancellation` signal on their limits or options value, poll it at bounded work intervals inside repeat interpretation and between batches, and stop with a typed `Cancelled` outcome.
 
-The [resource policy inventory](a2-resource-policy-inventory.md) classifies every remaining limit constant and records each removed one.
+The [resource policy inventory](resource-policy-inventory.md) classifies every remaining limit constant and records each removed one.
 
 Domain errors retain typed context. Applications and the CLI compose them into structured diagnostics only at their workflow boundary.
 
@@ -189,8 +189,7 @@ Requirements for a future process-isolated decoder are documented in [External D
 - [ADR 0002: Plans, Sessions, And Sinks](adr-0002-plan-session-sink.md)
 - [ADR 0003: Typed Batch Families](adr-0003-typed-batch-families.md)
 - [ADR 0004: Diagnostics And Resource Policies](adr-0004-diagnostics-and-resources.md)
-- [Resource Policy Inventory](a2-resource-policy-inventory.md)
-- [ADR 0005: Backend Selection And Nightly Isolation](adr-0005-backends-and-nightly.md), superseded by ADR 0008 for leaf-kernel selection and the toolchain boundary
+- [Resource Policy Inventory](resource-policy-inventory.md)
 - [ADR 0006: Decoder And External Extension Boundaries](adr-0006-decoder-extension-boundaries.md)
 - [External Decoder Process Protocol Requirements](external-decoder-process-protocol-requirements.md)
 - [ADR 0007: Product Dependency Graph](adr-0007-product-dependency-graph.md)

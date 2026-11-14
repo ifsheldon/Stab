@@ -1,8 +1,8 @@
 # Resource Policy Inventory
 
-This inventory records the E4 limit policy reset of the [engine speed and architecture plan](../plans/engine-speed-and-architecture-plan.md), which replaced the A2 policy record that previously lived here.
+This inventory records the limit policy reset of 2026-11-14, which [ADR 0004](adr-0004-diagnostics-and-resources.md) adopts.
 
-It classifies every limit-like constant in the product crates, as found by `rg -n "^\s*(pub(\([a-z]+\))? )?const [A-Z0-9_]*(MAX|LIMIT|CAP|BUDGET)[A-Z0-9_]*\s*:" crates/*/src --glob '!**/tests*'`, together with the parser defaults that the pattern does not match, and names every constant E4 removed.
+It classifies every limit-like constant in the product crates, as found by `rg -n "^\s*(pub(\([a-z]+\))? )?const [A-Z0-9_]*(MAX|LIMIT|CAP|BUDGET)[A-Z0-9_]*\s*:" crates/*/src --glob '!**/tests*'`, together with the parser defaults that the pattern does not match, and names every constant the reset removed.
 
 ## Policy
 
@@ -20,10 +20,10 @@ Budgets are per operation: parsing, plan compilation, reference-simulator scratc
 
 | Kind | Rule |
 | --- | --- |
-| Invariant | A format, representation, or Stim-semantic bound. Unchanged by E4. |
+| Invariant | A format, representation, or Stim-semantic bound. Unchanged by the reset. |
 | Nesting | The shared 256-level repeat-nesting envelope, or a tighter bound a recursive traversal still needs. |
 | Byte budget | A `MemoryBudget` or a value derived from one. |
-| Search budget | Explicit caller policy with a budget-exhausted result. Values unchanged by E4. |
+| Search budget | Explicit caller policy with a budget-exhausted result. Values unchanged by the reset. |
 | Threshold | An implementation choice that selects storage, batching, or an algorithm and never rejects otherwise valid work. |
 | Not a limit | Matched by the search pattern but not a resource limit. |
 
@@ -61,7 +61,7 @@ Budgets are per operation: parsing, plan compilation, reference-simulator scratc
 | `CAPABILITIES_OUTPUT_SCHEMA_VERSION` | `stab-cli/src/agent.rs` | Not a limit | A schema version. |
 | `MEMORY_BUDGET_HELP` | `stab-cli/src/diagnostics.rs` | Not a limit | Help text for budget refusals. |
 
-E4 task 6 removed every algebra bound; the search pattern also no longer matches the two analysis thresholds that replaced the dense-tableau aliases, so they are listed here:
+The reset removed every algebra bound; the search pattern also no longer matches the two analysis thresholds that replaced the dense-tableau aliases, so they are listed here:
 
 | Constant | Owner | Kind | Justification |
 | --- | --- | --- | --- |
@@ -70,7 +70,7 @@ E4 task 6 removed every algebra bound; the search pattern also no longer matches
 
 The algebra kernels choose layouts with private thresholds that never change results: `BLOCK_ROWS` and `BLOCKED_MIN_ROWS` in `stab-algebra/src/tableau/action.rs` make composition and inversion tabulate eight generators at a time for blocks of 1024 rows once there are at least 256 rows, `random.rs` blocks its triangular products by 64 rows above 256 rows, and `BITWISE_TRANSPOSE_WIDTH` transposes matrices at most 16 wide bit by bit.
 
-E4 also introduced unmatched cost-model and threshold constants: `REFERENCE_SNAPSHOT_GENERATOR_BYTES` keeps the reference-snapshot admission formula unchanged, `PREFERRED_ACTIVE_BATCH_BYTES` keeps DEM batch shape, and therefore seeded streams, independent of a larger budget, `FOLDED_FINAL_REPEAT_THRESHOLD` keeps missing-detector discovery on its count-independent proof above one million expanded instructions, and `GENERATED_BYTES_PER_PHYSICAL_QUBIT`, `COORDINATE_MAP_ENTRY_BYTES`, `SELECTED_COORDINATE_CANDIDATE_BYTES`, `DETECTING_REGION_LIVE_STATE_UNIT_BYTES`, `DECLARED_ROW_*`, `FEEDBACK_RETAINED_COPIES`, and `MEASUREMENT_RICH_RETAINED_COPIES` are conservative bytes-per-unit factors of byte admission.
+The reset also introduced unmatched cost-model and threshold constants: `REFERENCE_SNAPSHOT_GENERATOR_BYTES` keeps the reference-snapshot admission formula unchanged, `PREFERRED_ACTIVE_BATCH_BYTES` keeps DEM batch shape, and therefore seeded streams, independent of a larger budget, `FOLDED_FINAL_REPEAT_THRESHOLD` keeps missing-detector discovery on its count-independent proof above one million expanded instructions, and `GENERATED_BYTES_PER_PHYSICAL_QUBIT`, `COORDINATE_MAP_ENTRY_BYTES`, `SELECTED_COORDINATE_CANDIDATE_BYTES`, `DETECTING_REGION_LIVE_STATE_UNIT_BYTES`, `DECLARED_ROW_*`, `FEEDBACK_RETAINED_COPIES`, and `MEASUREMENT_RICH_RETAINED_COPIES` are conservative bytes-per-unit factors of byte admission.
 
 ## Operation Budgets
 
@@ -156,9 +156,9 @@ Parsing, circuit generation, circuit passes, logical-error search, and SAT mater
 | `MAX_DETECTING_REGION_LIVE_STATE_UNITS`, `_OUTPUT_BYTES` | Byte proxies | Converted to `DETECTING_REGION_MEMORY_BUDGET` at 64 bytes per live-state unit. |
 | `MAX_DETECTING_REGION_OUTPUT_REGIONS`, `_HELPER_TARGETS`, `_HELPER_TICKS` | Count caps | Removed; regions and helper vectors are charged in bytes. |
 | `MAX_ERROR_MATCHER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work caps | Removed. |
-| `MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work and count caps | Removed; E4 charged retained keys to a filter byte budget, and E8 deleted that budget with the deferred `explain_errors` surface. |
-| `ERROR_MATCHER_FILTER_MEMORY_BUDGET` | Byte budget | Removed in E8 with `ErrorMatcher`, because `explain_errors` is a deferred product surface. |
-| `MAX_FEEDBACK_REPEAT_NESTING`, `MAX_MISSING_DETECTOR_REPEAT_NESTING`, `MAX_FLOW_GENERATOR_REPEAT_NESTING` | Nesting | Removed in E8; each was 256, and the shared folded walk now applies `ParseLimits::DEFAULT_REPEAT_NESTING` with the same value and the same reported depth. |
+| `MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work and count caps | Removed; retained keys were first charged to a filter byte budget, which was then deleted with the deferred `explain_errors` surface. |
+| `ERROR_MATCHER_FILTER_MEMORY_BUDGET` | Byte budget | Removed with `ErrorMatcher`, because `explain_errors` is a deferred product surface. |
+| `MAX_FEEDBACK_REPEAT_NESTING`, `MAX_MISSING_DETECTOR_REPEAT_NESTING`, `MAX_FLOW_GENERATOR_REPEAT_NESTING` | Nesting | Removed; each was 256, and the shared folded walk now applies `ParseLimits::DEFAULT_REPEAT_NESTING` with the same value and the same reported depth. |
 | `MAX_DEM_COORDINATE_SCALAR_WORK` | Work cap | Removed; coordinate vectors are bounded by the represented model. |
 | `MAX_DEM_COORDINATE_MAP_DETECTORS` | Count cap | Converted to byte admission of the all-detector map. |
 | `MAX_GENERATED_PHYSICAL_QUBITS` | Generator cap | Converted to 2048 bytes per physical qubit against the parameters' budget, because generation is linear in its output. |

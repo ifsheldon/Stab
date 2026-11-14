@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: P10 evidence repair is active. A November audit found DEM printing, output-flush, standard-stream aliasing, argument-grammar, random-tableau, and benchmark peak-RSS defects plus weak fixture and statistical evidence; see the plan's P10 milestone. P10's fresh controlled pair is published for measured source `2c229ccd` after the fearless SIMD and engine plans closed the performance gaps that blocked it; exact-revision CI for that source is still outstanding. P0 through P9 remain complete for their recorded revisions.
+Status: P10 evidence repair is active. A November audit found DEM printing, output-flush, standard-stream aliasing, argument-grammar, random-tableau, and benchmark peak-RSS defects plus weak fixture and statistical evidence; see the plan's P10 milestone. P10's fresh controlled pair is published for measured source `2c229ccd` after the November toolchain and engine work closed the performance gaps that blocked it. Exact-revision CI is outstanding, and the shared process supervisor and documentation cleanup that landed after `7b0aa4f3` changed non-evidence paths, so a fresh pair is due before release use. P0 through P9 remain complete for their recorded revisions.
 
 ## Objective
 
@@ -22,6 +22,7 @@ Reach semantic feature parity with Stim v1.16.0 for the selected Rust and CLI pr
 - [Architecture rules](../architecture/README.md) own durable component boundaries.
 - `benchmarks/suite.toml` is the sole active performance source; [the generated suite view](../../benchmarks/SUITE.md) must match it.
 - `benchmarks/current-aarch64-evidence.toml` names the controlled evidence pair for the repaired source revision.
+- [Open items](open-items.md) lists known gaps that no milestone owns.
 
 Superseded plans, progress reports, qualification inventories, and benchmark manifests remain available through Git history. They do not create parallel requirements or promote current claims.
 

@@ -323,7 +323,7 @@ fn warmed_session_allocation_does_not_scale_with_shot_count() {
 mod storage_policy;
 
 /// Circuits whose only work is one Z measurement, optionally after one single-qubit Pauli
-/// channel on the measured qubit, ran on a dedicated direct-Z plan before E3 and now run on the
+/// channel on the measured qubit, once ran on a dedicated direct-Z plan and now run on the
 /// bit-plane Pauli frame. Their seeded streams changed, so this pins their distribution against
 /// the analytic outcome probability with a falsifiable bound.
 #[test]

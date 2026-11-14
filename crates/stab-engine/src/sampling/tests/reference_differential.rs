@@ -1,6 +1,6 @@
 //! Reference-sample differentials and properties for the inverse-tableau reference simulator.
 //!
-//! The pre-E1 generator-list simulator, iterating every repeat, is the semantic baseline. The
+//! The earlier generator-list simulator, iterating every repeat, is the semantic baseline. The
 //! inverse-tableau simulator must reproduce it exactly with and without repeat folding,
 //! including on loops whose iterations change measurement signs, cycle with a period longer than
 //! one, act on entangled state, or use every Clifford gate, reset, measurement basis, pair

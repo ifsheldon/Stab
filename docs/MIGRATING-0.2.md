@@ -53,16 +53,16 @@ The unused `stab_bits::SparseXorVec`, `inplace_xor_sort`, and `is_subset_of_sort
 
 The partial `stab_analysis::mbqc_decomposition` helper, also exposed through `stab_core::analysis`, is removed without a replacement. MBQC help decomposition remains outside the selected computational API; supported circuit base-gate lowering continues through `stab_analysis::decomposed_circuit`.
 
-`DemSamplerLimits` per-shot and total work limits were removed in E4; see Memory Budget below.
+`DemSamplerLimits` per-shot and total work limits were removed with the other count and work caps; see Memory Budget below.
 Sessions stream any number of shots whose reusable storage fits the budget.
 
-`Tableau::random` now samples uniformly over the Clifford group, signs included, using the Bravyi–Maslov construction ported from Stim. Earlier builds applied a bounded random gate walk whose distribution was not uniform, so seeded callers receive different tableaux for the same seed; the signature is unchanged. Since E4 the sampler runs on packed rows at any width the memory budget admits, and it consumes the random stream exactly as the earlier 64-qubit sampler did, so seeded tableaux of at most 64 qubits are unchanged.
+`Tableau::random` now samples uniformly over the Clifford group, signs included, using the Bravyi–Maslov construction ported from Stim. Earlier builds applied a bounded random gate walk whose distribution was not uniform, so seeded callers receive different tableaux for the same seed; the signature is unchanged. The sampler now runs on packed rows at any width the memory budget admits, and it consumes the random stream exactly as the earlier 64-qubit sampler did, so seeded tableaux of at most 64 qubits are unchanged.
 
-Circuit sampling compiles one resolved program shared with detection, and no public item was removed or renamed. Four observable behaviors changed. `SamplingCompiler::compile` then counted its fixed one-million boundary, removed in E4, in expanded circuit instructions, as `DetectionSamplingCompiler` does, so `SamplingCompileError::ExpandedOperationLimit` reports instruction counts and wide circuits that detection already accepted now compile; the sampling compiler schema is `6` and the executable-contract schema is `6`, so every sampling request and plan fingerprint changed. A circuit whose only work is one Z measurement, optionally after one single-qubit Pauli channel on the measured qubit, no longer uses a dedicated direct-Z plan, so its seeded output stream differs while its distribution does not. Without that plan, a single measurement of a very large qubit index is refused by the same frame and reference storage limits as any other circuit, including the `MeasurementToDetectionCompiler` reference sample. `count_determined_measurements` with `unknown_input` now matches pinned Stim on circuits that reset every qubit before measuring them, where it previously undercounted. The measurement-to-detection compiler schema reported by `capabilities` is `4`, because its reference sample and sweep correction now share one program admitted within the conversion's configured compiled-byte limit instead of a separate sampling plan.
+Circuit sampling compiles one resolved program shared with detection, and no public item was removed or renamed. Four observable behaviors changed. `SamplingCompiler::compile` then counted its fixed one-million boundary, since removed with the other work caps, in expanded circuit instructions, as `DetectionSamplingCompiler` does, so `SamplingCompileError::ExpandedOperationLimit` reports instruction counts and wide circuits that detection already accepted now compile; the sampling compiler schema is `6` and the executable-contract schema is `6`, so every sampling request and plan fingerprint changed. A circuit whose only work is one Z measurement, optionally after one single-qubit Pauli channel on the measured qubit, no longer uses a dedicated direct-Z plan, so its seeded output stream differs while its distribution does not. Without that plan, a single measurement of a very large qubit index is refused by the same frame and reference storage limits as any other circuit, including the `MeasurementToDetectionCompiler` reference sample. `count_determined_measurements` with `unknown_input` now matches pinned Stim on circuits that reset every qubit before measuring them, where it previously undercounted. The measurement-to-detection compiler schema reported by `capabilities` is `4`, because its reference sample and sweep correction now share one program admitted within the conversion's configured compiled-byte limit instead of a separate sampling plan.
 
 ## Memory Budget
 
-E4 replaces count and work limits with one typed byte budget per operation.
+Count and work limits are replaced by one typed byte budget per operation.
 `stab_model::MemoryBudget`, also exported from the `stab-core` root with `MemoryBudgetParseError`, parses an integer byte count with an optional `KiB`, `MiB`, or `GiB` suffix through `FromStr` and defaults to one gibibyte.
 Every admitted workload produces byte-identical output; only workloads that the removed caps refused are newly admitted.
 
@@ -85,7 +85,7 @@ The CLI's fixed 64 MiB input caps and 1 MiB or 64 MiB per-record caps are replac
 
 ## Cooperative Cancellation
 
-E4 adds one cancellation signal, `stab_model::Cancellation`, with its error `stab_model::Cancelled`, both also exported from the `stab-core` root.
+Long-running operations share one cancellation signal, `stab_model::Cancellation`, with its error `stab_model::Cancelled`, both also exported from the `stab-core` root.
 `Cancellation::new()` creates a settable signal and `Cancellation::never()`, also the `Default`, one that cannot be set, so code that never cancels keeps its behavior.
 See the resource policy inventory's Cooperative Cancellation section for where each operation polls the signal and what it returns.
 
@@ -103,7 +103,7 @@ Measurement-to-detection conversion and DEM sampling and replay report an in-bat
 
 ## Algebra Byte Admission
 
-E4 removes every count and work cap in `stab-algebra` by replacing the dense algorithms with word-parallel ones over packed rows, and admits the storage those caps bounded in bytes.
+Every count and work cap in `stab-algebra` is removed by replacing the dense algorithms with word-parallel ones over packed rows, and admits the storage those caps bounded in bytes.
 `stab_algebra::AlgebraMemoryBudget`, also exported from the `stab-core` root, is the algebra's own typed byte bound with the same one-gibibyte default as `MemoryBudget`, because `stab-algebra` does not depend on `stab-model`.
 Constructors that turn a requested size into storage admit its bytes before allocating or drawing randomness; operations on values the caller already holds reserve a bounded multiple of them fallibly.
 
@@ -158,7 +158,7 @@ The removed `CompiledSampler`, `CompiledDetectionConverter`, and `CompiledDemSam
 
 ## Wider Frame Batches
 
-E7 runs detection sampling on the same 256-lane Pauli-frame batches as circuit sampling and hands every sampled batch to its sink as bit planes without re-chunking. These changes are visible to library and CLI callers:
+Detection sampling now runs on the same 256-lane Pauli-frame batches as circuit sampling and hands every sampled batch to its sink as bit planes without re-chunking. These changes are visible to library and CLI callers:
 
 | Changed item | Migration |
 | --- | --- |
@@ -205,7 +205,7 @@ Unreleased 0.2 development revisions had an opt-in `portable-simd` feature on `s
 
 ## Deferred Surfaces, Gate Vocabulary, And Folded Summaries
 
-E8 removes the exported `explain_errors` machinery, because `explain_errors` is a deferred product surface, and gives gates and folded-circuit counts one model-owned vocabulary.
+The exported `explain_errors` machinery is removed, because `explain_errors` is a deferred product surface, and gates and folded-circuit counts share one model-owned vocabulary.
 
 | Removed or changed item | Replacement |
 | --- | --- |

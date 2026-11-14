@@ -1,10 +1,10 @@
-//! Stored expectations recorded from the pre-E3 implementation, which compiled a separate
+//! Stored expectations recorded from the earlier implementation, which compiled a separate
 //! per-target `SampleProgram` beside the frame program.
 //!
 //! The reference-sample and general-frame digests below were computed by that implementation over
 //! the corpus built here, and keep both falsifiable after the per-target program was retired.
 //!
-//! The determined-measurement digest is the one exception. The pre-E3 generator-list count was
+//! The determined-measurement digest is the one exception. That implementation's generator-list count was
 //! wrong in unknown-input mode for three corpus circuits that reset every qubit before measuring
 //! (it reported 52, 15, and 12 where the known-input counts are 57, 22, and 17), although a
 //! circuit that resets every qubit first cannot depend on its input state. Pinned Stim entangles

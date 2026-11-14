@@ -5,9 +5,8 @@ This directory contains Stab's active plans, architecture records, generated par
 ## Active Sources
 
 - [plans/GOAL.md](plans/GOAL.md) is the short current execution contract.
-- [plans/stim-core-parity-and-lean-evidence-plan.md](plans/stim-core-parity-and-lean-evidence-plan.md) owns the active rationale, milestones, tests, benchmarks, and acceptance criteria.
-- [plans/fearless-simd-stable-rust-plan.md](plans/fearless-simd-stable-rust-plan.md) records the completed move from Nightly portable SIMD to `fearless_simd` on Stable Rust 1.100; it changed no parity scope.
-- [plans/engine-speed-and-architecture-plan.md](plans/engine-speed-and-architecture-plan.md) records the completed user-scale speed, admission-limit, and execution-architecture work from the November review, with one checkpoint per milestone and the open items it leaves.
+- [plans/stim-core-parity-and-lean-evidence-plan.md](plans/stim-core-parity-and-lean-evidence-plan.md) owns the scope, the active milestone, the test contract, and the acceptance criteria.
+- [plans/open-items.md](plans/open-items.md) lists known gaps that no milestone owns.
 - [stim-parity.md](stim-parity.md) is the generated Stim v1.16.0 feature and evidence view. Its source is `oracle/stim-v1.16-parity.toml` and the bounded family fragments it names.
 - [architecture/](architecture/) owns durable product dependency rules and architecture decisions.
 - [MIGRATING-0.2.md](MIGRATING-0.2.md) covers the component-crate and public-path migration.
@@ -15,7 +14,7 @@ This directory contains Stab's active plans, architecture records, generated par
 - [../benchmarks/SUITE.md](../benchmarks/SUITE.md) is the generated active performance matrix.
 - [../benchmarks/current-aarch64-evidence.toml](../benchmarks/current-aarch64-evidence.toml) names the current controlled-host full and soak evidence.
 
-Superseded plans, progress reports, qualification dashboards, and feature inventories are retained in Git history instead of remaining beside the active contracts.
+Completed and superseded plans, progress reports, qualification dashboards, and feature inventories are retained in Git history instead of remaining beside the active contracts. The fearless SIMD plan, the engine speed and architecture plan, the Rust 1.96 to 1.100 adoption note, and the completed milestones of the parity plan are last present at commit `7b0aa4f3`; their durable decisions live in the architecture records and the migration guide.
 
 ## Correctness
 
