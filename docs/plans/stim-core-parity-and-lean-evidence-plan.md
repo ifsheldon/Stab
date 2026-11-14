@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: P0 through P9 are complete for their recorded revisions. P10 is active with one item open: tasks 1 through 6 are complete as of `6b774b9a`, and the controlled pair for task 7 is measured on `1f42845e`, which contains the shared process supervisor and the documentation cleanup that shortened this plan, and passes seeded self-regression. Exact-revision CI, the rest of task 7, has not run because the commits are unpushed.
+Status: P0 through P10 are complete for their recorded revisions, and no milestone is active. P10 closed on `94714e23`, the evidence descendant of measured source `1f42845e`, where `e2e-release-check` and exact-revision CI both pass. Known gaps that no milestone owns are listed in [open-items.md](open-items.md).
 
 ## Summary
 
@@ -89,7 +89,7 @@ The tasks, tests, and checkpoints of the completed milestones are retained in Gi
 
 The measurement contract, release matrix, and evidence procedure those milestones introduced are now owned by [benchmarks/README.md](../../benchmarks/README.md), [benchmarks/AGENTS.md](../../benchmarks/AGENTS.md), `benchmarks/suite.toml`, and [GOAL.md](GOAL.md).
 
-## Milestone P10: Repair Evidence And Rebalance Tests (Active)
+## Milestone P10: Repair Evidence And Rebalance Tests (Complete)
 
 A November test and benchmark audit found real defects hidden by evidence that looked stronger than it was. DEM decimal printing selected its notation before rounding and diverged from pinned Stim just below powers of ten; `convert` could exit successfully after an unflushed stdout write failed; standard-stream redirection could alias and truncate a command input; repeated flags and arguments after `--` diverged from Stim without a ledger record; `Tableau::random` was a bounded random walk rather than Stim's uniform sampler; and the benchmark runner's spawn path folded the runner's own high-water RSS into every child's reported peak, so the memory ceilings never measured Stab. Separately, most fixture rows only re-ran cargo tests, live-Stim fixtures never ran in CI, several statistical tolerances could not fail, CLI route owners used all-zero data, and most E2E cases were dominated by process startup.
 
@@ -103,7 +103,7 @@ A November test and benchmark audit found real defects hidden by evidence that l
 6. Share one bounded process supervisor across operations crates and replace hand-rolled confined filesystem primitives with maintained crates where the reduction is real.
 7. Produce one fresh unseeded controlled AArch64 full-and-soak pair, seed baselines from it, and pass `e2e-release-check` with exact-revision CI.
 
-Tasks 1 through 5 are complete as of `a3260617`, and task 6 as of `6b774b9a`: `ops/bench` and `ops/oracle` run every child through the shared `ops/process` supervisor, while `ops/release` keeps its own supervisor and `cap-std` was evaluated and not adopted, for the reasons `ops/AGENTS.md` records. Task 7 was blocked on five suite cases above the `1.25x` ceiling until the November engine work closed them; the first pair was measured on `2c229ccd`, its baselines are seeded, and the release check passed on `7b0aa4f3`. Task 6 and the documentation cleanup then changed non-evidence paths, so a second pair was measured on `1f42845e`; it passes Stim parity, memory, and seeded self-regression against the unchanged baselines, and it is the pair that `benchmarks/current-aarch64-evidence.toml` names. Exact-revision CI has not run.
+Tasks 1 through 5 are complete as of `a3260617`, and task 6 as of `6b774b9a`: `ops/bench` and `ops/oracle` run every child through the shared `ops/process` supervisor, while `ops/release` keeps its own supervisor and `cap-std` was evaluated and not adopted, for the reasons `ops/AGENTS.md` records. Task 7 was blocked on five suite cases above the `1.25x` ceiling until the November engine work closed them; the first pair was measured on `2c229ccd`, its baselines are seeded, and the release check passed on `7b0aa4f3`. Task 6 and the documentation cleanup then changed non-evidence paths, so a second pair was measured on `1f42845e`; it passes Stim parity, memory, and seeded self-regression against the unchanged baselines, and it is the pair that `benchmarks/current-aarch64-evidence.toml` names. The release check passes on its evidence descendant `94714e23`, and GitHub CI run `43576457529` passed on that exact revision, which completes task 7 and the milestone.
 
 ### Done Criteria
 

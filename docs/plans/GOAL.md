@@ -1,6 +1,6 @@
 # Goal: Stim Core Parity With Lean Evidence
 
-Status: P10 evidence repair is active. A November audit found DEM printing, output-flush, standard-stream aliasing, argument-grammar, random-tableau, and benchmark peak-RSS defects plus weak fixture and statistical evidence; see the plan's P10 milestone. P10's controlled pair is published for measured source `1f42845e`, which contains the November toolchain and engine work, the shared process supervisor, and the documentation cleanup, and it passes seeded self-regression against the baselines of the first pair. Exact-revision CI is the only outstanding P10 item, because the commits are unpushed. P0 through P9 remain complete for their recorded revisions.
+Status: P0 through P10 are complete for their recorded revisions, and no milestone is active. P10 repaired the evidence after a November audit found DEM printing, output-flush, standard-stream aliasing, argument-grammar, random-tableau, and benchmark peak-RSS defects plus weak fixture and statistical evidence; see the plan's P10 milestone. It closed on `94714e23`, the evidence descendant of measured source `1f42845e`, where the release check and exact-revision CI both pass. Any later revision needs its own release check and CI run before release use.
 
 ## Objective
 
@@ -28,7 +28,7 @@ Superseded plans, progress reports, qualification inventories, and benchmark man
 
 ## Current Evidence
 
-1. Measured source `1f42845e0439afa9082c9e7e8397cc054ee13f0c` is clean and local. Local verification of its product and operations code passed 1,550 workspace tests, all 141 canonical owners, all 199 fixture manifest rows, and the 83-case live result-format differential. No GitHub CI run exists for the measured source or its evidence descendant, because these commits have not been pushed.
+1. Measured source `1f42845e0439afa9082c9e7e8397cc054ee13f0c` is clean and local. Local verification of its product and operations code passed 1,550 workspace tests, all 141 canonical owners, all 199 fixture manifest rows, and the 83-case live result-format differential. GitHub CI passed on the measured source in run `43574484922` and on its evidence descendant `94714e23` in run `43576457529`, with the Rust and Compatibility Contracts jobs green in both.
 2. The controlled AArch64 full and soak bundles under `benchmarks/evidence/aarch64/1f42845e0439afa9082c9e7e8397cc054ee13f0c/` each cover all 25 release cases under the `e2e-user-workflow-v3` boundary and pass correctness, memory, and `1.25x` Stim parity on all 24 cases that have a Stim counterpart.
 3. Full worst median and confidence upper ratios are `0.968453x` and `1.069962x` (both `sample-dem.medium`); soak values are `0.960491x` (`sample-dem.medium`) and `1.014721x` (`sample-surface.d25-b8`). Every median is below `1.0x`, and the two upper bounds above `1.0x` are the only ones in either bundle. Maximum Stab peak RSS is `111,099,904` bytes for both tiers, on `analyze-decompose.d25`.
 4. Both bundles replay offline. They used CPU 4, recorded temperatures at or below `41 C`, ran with no configured swap and unchanged swap counters, and `/swap.img` was restored afterward at its prior priority `-1`. No benchmark process remained.
