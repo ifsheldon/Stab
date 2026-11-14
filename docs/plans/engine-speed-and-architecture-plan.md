@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E8 are complete; the closing formal evidence run is blocked on a host without swap activity. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Complete on 2026-11-14. E1 through E8 are complete, and the closing formal evidence is recorded by the current AArch64 evidence pointer. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -573,9 +573,13 @@ Open after this checkpoint:
 
 E1 through E8 are complete, and the Rust 1.96 through 1.100 adoption landed in `61cede6b`.
 
-The formal closing evidence is not done.
-Two full-tier runs on the clean `61cede6b` tree were refused because pages were swapped in during timing, `1353364->1353365` and `1353365->1353367`, on a shared host that holds about 15 GB in swap.
-A formal full-and-soak pair, baseline seeding, exact-revision CI, and `just bench::e2e-release-check` still need a host with swap disabled, which is a host-wide change that needs the owner's decision.
+The formal closing evidence is owned by [`benchmarks/current-aarch64-evidence.toml`](../../benchmarks/current-aarch64-evidence.toml) and [GOAL.md](GOAL.md), which name the measured commit, the full and soak bundles, and their ratios.
+This plan does not restate them, because the release check permits only evidence paths to change after the measured commit and this file is not one of them.
+
+Three full-tier attempts with swap configured were refused because pages were swapped in during timing on a shared host that held about 15 GB in swap.
+With the owner's approval, `/swap.img` was disabled for the formal runs and restored afterwards at its prior priority `-1`.
+A first full-and-soak pair measured that way on `7566b2ee` passed Stim parity and memory on every case, and was superseded by the pair measured on the commit that contains this paragraph.
+Exact-revision CI needs the commits pushed, which has not been requested.
 
 The diagnostic smoke tier ran twice on `61cede6b`, bundles `target/benchmarks/final-smoke-61cede6b-a` and `target/benchmarks/final-smoke-61cede6b-b`.
 All 25 cases pass correctness and memory in both runs.
