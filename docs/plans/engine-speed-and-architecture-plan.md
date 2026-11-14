@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E7 are complete; E8 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E8 are complete; the closing formal evidence run is pending. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -545,6 +545,29 @@ Open after this checkpoint:
 
 - No deferred product surface is exported.
 - Gate behavior has one table.
+
+### Checkpoint (2026-11-14)
+
+E8 landed in `7c7cde86`.
+
+`stab_model::GateKind` is a closed enum of the 81 canonical gates, and the gate table is indexed by it.
+Analysis and the engine match on it exhaustively: a scratch copy with one added variant fails 25 matches at compile time, 4 in the model, 19 in analysis, and 2 in the engine.
+Questions that many matches repeated are table columns, `Gate::controlled_pauli` and `Gate::collapse_basis`, checked at compile time against the target rule and category.
+One string comparison on a gate name survives outside the parser, in the oracle's ledger validation.
+
+`FoldedCircuitSummary` in `stab-model` is the one checked, cancellation-aware walk that multiplies counts through repeats, used by the analyzer, flattening, feedback inlining, missing detectors, time reversal, flow generation, the CLI, and request estimation.
+
+`ErrorMatcher`, `matched_error`, their 28 tests, and their exports are deleted, and the two `explain_errors` ledger families stay deferred.
+
+Task 4 resolved as a corrected description: the engine uses SPP decomposition, per-gate Clifford and Tableau values, noise stripping, and flow record indexing from analysis, so the dependency edge and ADR 0007 are unchanged.
+
+Review checks: 137 seeded and hostile-input outputs are byte-identical to the previous binary, and twelve paired timings are between 0.99x and 1.02x.
+
+Open after this checkpoint:
+
+- `Gate` is still an 8-byte handle beside `GateKind`; making it the enum would shrink `CircuitItem` and change every byte-admission number derived from its size.
+- The engine's admission counting inside lowering, the detecting-region snapshot walk with its 128-level bound, and the reverse-tracker metering trait still count on their own.
+- Measurement-rich time reversal now refuses programmatically built circuits nested deeper than 256 levels, where it previously recursed without a bound.
 
 ## Order And Dependencies
 
