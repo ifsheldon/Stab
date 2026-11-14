@@ -19,6 +19,13 @@ use crate::ShotCount;
 /// needs; use
 /// [`LaneWidth::for_total_shots`] when the total shot count is known before the session is
 /// created.
+///
+/// A 128-lane width was built and measured against these two and not adopted. It beat the better
+/// of them by more than 5 percent only on large frame-dominated circuits, for totals of 65 to 128
+/// shots (up to 11 percent), 193 to 256 shots (about 9 percent), and 384 shots (up to 17
+/// percent); it was 22 to 51 percent slower for 1 to 64 shots and 4 to 13 percent slower for 129
+/// to 192 shots, and showed no reproducible gain from 512 shots up. Those narrow bands do not
+/// justify a third seeded stream per plan and a third instantiation of every frame kernel.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum LaneWidth {

@@ -15,7 +15,6 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 - A single `Tableau::append` still visits every row, about 4 ns per row at 5000 qubits where the row stride makes it memory-bound, and `tableau_to_circuit` uses it because it reads the remaining Tableau between gates; `TableauAppender` and `Tableau::prepend` are the word-parallel routes.
 - `Tableau::prepend` carries about 40 ns of fixed cost per call, which is roughly three times Stim's specialized prepends below 500 qubits, and Pauli string multiplication is 1.05x to 1.23x Stim.
 - The x86-64 instruction-level kernel paths and the per-call level check have never been executed or measured on a controlled x86-64 host.
-- A 128-lane frame width was not built or measured.
 
 ## Memory
 
