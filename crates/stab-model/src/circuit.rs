@@ -673,10 +673,11 @@ impl CircuitInstruction {
     }
 
     fn can_fuse(&self, other: &Self) -> bool {
+        // The gate checks are the cheap ones and reject most pairs, so they run first.
         self.gate == other.gate
+            && self.gate.can_fuse()
             && self.args == other.args
             && self.tag == other.tag
-            && self.gate.can_fuse()
     }
 
     fn with_targets(&self, targets: Vec<Target>) -> Self {

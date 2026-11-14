@@ -155,6 +155,7 @@ impl CircuitProgram {
             ..ProgramAdmission::default()
         };
         let mut counts = CountState::default();
+        let mut simulated_qubits = 0_usize;
         let mut repeats = ArrayVec::<RepeatAdmission, { RepeatNestingLimit::HARD_MAX }>::new();
         let mut actions = FrameCliffordActionCache::default();
         let entry_bytes = byte_product(1, size_of::<ProgramEntry>())?;
@@ -170,6 +171,9 @@ impl CircuitProgram {
         visit_circuit(circuit, |event| {
             match event {
                 TraversalEvent::Instruction(instruction) => {
+                    // The source instruction, not its lowering, sizes Stim's simulated qubit count, so
+                    // instructions that lower to nothing still count.
+                    simulated_qubits = simulated_qubits.max(instruction_qubit_count(instruction)?);
                     visit_lowered_instructions(instruction, |lowered| {
                         let lowering = lower(lowered, options, &mut actions)?;
                         record_effects(lowered, lowering, &mut counts)?;
@@ -241,6 +245,7 @@ impl CircuitProgram {
                     "sweep bit count cannot fit in usize during sampler compilation",
                 )
             })?,
+            simulated_qubits,
         };
         Ok(admission)
     }

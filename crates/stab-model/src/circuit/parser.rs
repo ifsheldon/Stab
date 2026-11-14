@@ -2,7 +2,9 @@ use crate::diagnostics::bounded_parse_diagnostic_text;
 use crate::model_parse::{line_error, validation_error};
 use crate::parse_limits::ParseAdmission;
 use crate::source_text::{SourceCommands, SourceSlice};
-use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
+use crate::target::{
+    parse_plain_qubit_targets_into, parse_target_token_into, take_exact, take_exact_targets,
+};
 use crate::{
     ByteSpan, Gate, GateCategory, ModelDialect, ModelError, ModelResult, ParseErrorCode,
     ParseErrorContext, ParseLimits, RepeatCount, Target, ValidationError,
@@ -27,7 +29,21 @@ struct Parser<'a> {
     commands: SourceCommands<'a>,
     input_len: usize,
     admission: ParseAdmission,
+    scratch: ParseScratch,
     fuse_instructions: bool,
+}
+
+/// Reusable per-line storage for parsed arguments and targets.
+///
+/// Every line is parsed here first and then moved into its instruction with one exact-size
+/// allocation (none when the values fit inline), so a line with many targets never walks a
+/// reallocation chain per instruction. Each target is admitted before it is pushed, and the
+/// arguments are bounded by the already-admitted line length, so the scratch never holds more
+/// than the largest line admission accepted.
+#[derive(Default)]
+struct ParseScratch {
+    args: Vec<f64>,
+    targets: Vec<Target>,
 }
 
 impl<'a> Parser<'a> {
@@ -37,6 +53,7 @@ impl<'a> Parser<'a> {
             commands: SourceCommands::new(input),
             input_len: input.len(),
             admission,
+            scratch: ParseScratch::default(),
             fuse_instructions,
         })
     }
@@ -91,6 +108,7 @@ impl<'a> Parser<'a> {
                     line,
                     command.end_error_span(),
                     &mut self.admission,
+                    &mut self.scratch,
                 )?;
                 self.admission.admit_payload(
                     instruction.args().len(),
@@ -116,7 +134,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_repeat_header(
-        &self,
+        &mut self,
         line_number: usize,
         header: SourceSlice<'a>,
         header_span: ByteSpan,
@@ -143,7 +161,13 @@ impl<'a> Parser<'a> {
         // block brace check and then drops them for block gates, so REPEAT
         // headers accept and discard well-formed arguments while malformed
         // ones keep the shared argument diagnostics (circuit.cc:213-218).
-        let (_args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
+        let (_args, rest) = parse_optional_args(
+            line_number,
+            name.text(),
+            rest,
+            end_error_span,
+            &mut self.scratch.args,
+        )?;
         if !rest
             .text()
             .as_bytes()
@@ -246,6 +270,7 @@ fn parse_instruction(
     line: SourceSlice<'_>,
     end_error_span: ByteSpan,
     admission: &mut ParseAdmission,
+    scratch: &mut ParseScratch,
 ) -> ModelResult<CircuitInstruction> {
     if admission.target_budget_allows_upper_bound(line.text().len())
         && let Some(Ok(instruction)) = fast::parse_common_plain_instruction(line.text())
@@ -255,12 +280,20 @@ fn parse_instruction(
     }
     let (name, rest) = parse_name(line_number, line)?;
     if admission.target_budget_allows_upper_bound(rest.text().len())
-        && let Some(Ok(instruction)) = parse_simple_plain_instruction(name.text(), rest.text())
+        && let Some(instruction) =
+            parse_simple_plain_instruction(name.text(), rest.text(), &mut scratch.targets)
     {
         admission.admit_targets(instruction.targets().len(), line_number, rest.span())?;
         return Ok(instruction);
     }
-    parse_instruction_fully_generic_from_parts(line_number, name, rest, end_error_span, admission)
+    parse_instruction_fully_generic_from_parts(
+        line_number,
+        name,
+        rest,
+        end_error_span,
+        admission,
+        scratch,
+    )
 }
 
 fn parse_instruction_fully_generic_from_parts(
@@ -269,6 +302,7 @@ fn parse_instruction_fully_generic_from_parts(
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
     admission: &mut ParseAdmission,
+    scratch: &mut ParseScratch,
 ) -> ModelResult<CircuitInstruction> {
     let gate = Gate::lookup_name(name.text()).ok_or_else(|| {
         let name_excerpt = bounded_parse_diagnostic_text(name.text());
@@ -301,11 +335,24 @@ fn parse_instruction_fully_generic_from_parts(
         ));
     }
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
-    let (args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
-    let targets = parse_targets(line_number, name.text(), rest, end_error_span, admission)?;
-    gate.validate(&args.values, &targets.values)
+    let (args, rest) = parse_optional_args(
+        line_number,
+        name.text(),
+        rest,
+        end_error_span,
+        &mut scratch.args,
+    )?;
+    let targets = parse_targets(
+        line_number,
+        name.text(),
+        rest,
+        end_error_span,
+        admission,
+        &mut scratch.targets,
+    )?;
+    gate.validate(&scratch.args, &scratch.targets)
         .map_err(|error| {
-            let (code, span) = validation_span(&error, &args, &targets);
+            let (code, span) = validation_span(&error, args, targets);
             validation_error(
                 ModelDialect::StimCircuit,
                 line_number,
@@ -318,8 +365,8 @@ fn parse_instruction_fully_generic_from_parts(
         })?;
     Ok(CircuitInstruction::from_validated_parts(
         gate,
-        args.values,
-        targets.values,
+        take_exact(&mut scratch.args),
+        take_exact_targets(&mut scratch.targets),
         tag,
     ))
 }
@@ -342,6 +389,7 @@ fn parse_instruction_fully_generic(
         rest,
         line.end_span(),
         &mut admission,
+        &mut ParseScratch::default(),
     )
 }
 
@@ -477,21 +525,24 @@ fn parse_optional_tag<'a>(
     }
 }
 
+/// Source region of a parsed argument list, whose values live in the parse scratch.
+#[derive(Clone, Copy)]
 struct ParsedArguments {
-    values: Vec<f64>,
     region: ByteSpan,
 }
 
+/// Parses an optional parenthesized argument list into `values`, which is cleared first.
 fn parse_optional_args<'a>(
     line_number: usize,
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
+    values: &mut Vec<f64>,
 ) -> ModelResult<(ParsedArguments, SourceSlice<'a>)> {
+    values.clear();
     let Some(body) = rest.strip_prefix("(") else {
         return Ok((
             ParsedArguments {
-                values: Vec::new(),
                 region: rest.subspan(0, 0).unwrap_or_else(|| rest.end_span()),
             },
             rest,
@@ -514,7 +565,6 @@ fn parse_optional_args<'a>(
     let tail = body
         .suffix(end + 1)
         .ok_or_else(|| internal_parser_error(line_number, "unterminated argument list"))?;
-    let mut values = Vec::new();
     let mut first_non_finite = None;
     let mut token_start = 0;
     loop {
@@ -554,7 +604,7 @@ fn parse_optional_args<'a>(
     if let Some(token) = first_non_finite {
         let token_excerpt = bounded_parse_diagnostic_text(token.text());
         let legacy_detail = Gate::from_name(instruction)
-            .and_then(|gate| gate.validate(&values, &TargetVec::new()))
+            .and_then(|gate| gate.validate(values, &[]))
             .err()
             .map_or_else(
                 || format!("invalid argument {token_excerpt}"),
@@ -576,28 +626,31 @@ fn parse_optional_args<'a>(
     }
     Ok((
         ParsedArguments {
-            values,
             region: raw_args.span(),
         },
         tail,
     ))
 }
 
+/// Source region of a parsed target list, whose targets live in the parse scratch.
+#[derive(Clone, Copy)]
 struct ParsedTargets {
-    values: TargetVec,
     region: ByteSpan,
 }
 
+/// Parses a target list into `values`, which is cleared first, admitting each target before it
+/// is retained.
 fn parse_targets(
     line_number: usize,
     instruction: &str,
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
     admission: &mut ParseAdmission,
+    values: &mut Vec<Target>,
 ) -> ModelResult<ParsedTargets> {
+    values.clear();
     if rest.text().is_empty() {
         return Ok(ParsedTargets {
-            values: TargetVec::new(),
             region: end_error_span,
         });
     }
@@ -627,12 +680,10 @@ fn parse_targets(
     let content = trim_target_space_start(rest);
     if content.text().is_empty() {
         return Ok(ParsedTargets {
-            values: TargetVec::new(),
             region: content.end_span(),
         });
     }
 
-    let mut values = TargetVec::new();
     let mut cursor = 0;
     let mut region_start = None;
     let mut region_end = content.byte_start();
@@ -660,7 +711,7 @@ fn parse_targets(
         let token = content
             .slice(start, cursor)
             .ok_or_else(|| internal_parser_error(line_number, "invalid target"))?;
-        if let Err(error) = parse_target_token_into(token.text(), &mut values, || {
+        if let Err(error) = parse_target_token_into(token.text(), values, || {
             admission.admit_target(line_number, token.span())
         }) {
             if error.resource_limit_error().is_some() {
@@ -683,13 +734,13 @@ fn parse_targets(
     let region = region_start
         .and_then(|start| ByteSpan::try_new(start, region_end.saturating_sub(start)))
         .unwrap_or_else(|| content.end_span());
-    Ok(ParsedTargets { values, region })
+    Ok(ParsedTargets { region })
 }
 
 fn validation_span(
     error: &ModelError,
-    args: &ParsedArguments,
-    targets: &ParsedTargets,
+    args: ParsedArguments,
+    targets: ParsedTargets,
 ) -> (ParseErrorCode, ByteSpan) {
     match error {
         ModelError::Validation(ValidationError::InvalidArgumentCount { .. }) => {
@@ -847,34 +898,30 @@ fn trim_target_space_start(mut source: SourceSlice<'_>) -> SourceSlice<'_> {
     source
 }
 
+/// Parses a plain qubit-list instruction such as `H 0 1 2`, or returns `None` so the generic
+/// parser handles (and diagnoses) the line.
 fn parse_simple_plain_instruction(
     name: &str,
     rest: &str,
-) -> Option<ModelResult<CircuitInstruction>> {
+    scratch: &mut Vec<Target>,
+) -> Option<CircuitInstruction> {
     let gate = Gate::from_simple_plain_name(name)?;
     if rest.starts_with('[') || rest.starts_with('(') {
         return None;
     }
-    if !rest
-        .as_bytes()
-        .iter()
-        .all(|byte| byte.is_ascii_digit() || matches!(byte, b' ' | b'\t' | b'\r'))
-    {
+    scratch.clear();
+    if !matches!(parse_plain_qubit_targets_into(rest, scratch), Ok(true)) {
         return None;
     }
-    let targets = match parse_plain_qubit_target_text(rest) {
-        Ok(Some(targets)) => targets,
-        Ok(None) | Err(_) => return None,
-    };
-    if gate == Gate::CX && validate_simple_plain_pairs(gate.canonical_name(), &targets).is_err() {
+    if gate == Gate::CX && validate_simple_plain_pairs(gate.canonical_name(), scratch).is_err() {
         return None;
     }
-    Some(Ok(CircuitInstruction::from_validated_parts(
+    Some(CircuitInstruction::from_validated_parts(
         gate,
         Vec::new(),
-        targets,
+        take_exact_targets(scratch),
         None,
-    )))
+    ))
 }
 
 fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> ModelResult<()> {

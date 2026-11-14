@@ -161,13 +161,7 @@ impl<'a> SourceCommands<'a> {
 
         // Commands without comments or block boundaries occupy the complete line. Tags do not
         // require stateful scanning unless a comment or brace could occur inside them.
-        if command_start == 0
-            && !source
-                .text()
-                .as_bytes()
-                .iter()
-                .any(|byte| matches!(byte, b'#' | b'{' | b'}'))
-        {
+        if command_start == 0 && !line.has_command_delimiter() {
             self.current_line = None;
             return Some(SourceCommand {
                 line_number: line.line_number(),
@@ -340,10 +334,9 @@ impl<'a> SourceLines<'a> {
         }
         let byte_start = self.next_byte_start;
         let bytes = self.input.as_bytes();
-        let relative_newline = bytes
-            .get(byte_start..)?
-            .iter()
-            .position(|byte| *byte == b'\n');
+        // One pass finds the line end and notes whether a comment or brace occurs, so command
+        // splitting does not rescan delimiter-free lines.
+        let (relative_newline, has_command_delimiter) = scan_line(bytes.get(byte_start..)?);
         let (text_end, terminator, next_byte_start) =
             if let Some(relative_newline) = relative_newline {
                 let newline = byte_start + relative_newline;
@@ -377,8 +370,50 @@ impl<'a> SourceLines<'a> {
             line_number,
             source: SourceSlice::new(text, byte_start),
             terminator,
+            has_command_delimiter,
         })
     }
+}
+
+/// Finds the first `\n` in `bytes` and whether a `#`, `{`, or `}` precedes it (or occurs anywhere
+/// when there is no newline).
+///
+/// Eight bytes are classified per step with the exact zero-byte test: `zero_bytes(v)` is nonzero
+/// iff `v` has a zero byte, and its lowest set bit marks the first one, so the first newline and
+/// the delimiters before it are found without false positives.
+fn scan_line(bytes: &[u8]) -> (Option<usize>, bool) {
+    const ONES: u64 = u64::from_ne_bytes([1; 8]);
+    const HIGHS: u64 = u64::from_ne_bytes([0x80; 8]);
+    const fn zero_bytes(value: u64) -> u64 {
+        value.wrapping_sub(ONES) & !value & HIGHS
+    }
+    const fn matching(word: u64, byte: u8) -> u64 {
+        zero_bytes(word ^ (ONES * byte as u64))
+    }
+    let mut has_delimiter = false;
+    let (words, tail) = bytes.as_chunks::<8>();
+    for (index, word) in words.iter().enumerate() {
+        let word = u64::from_le_bytes(*word);
+        let newlines = matching(word, b'\n');
+        let delimiters = matching(word, b'#') | matching(word, b'{') | matching(word, b'}');
+        if newlines != 0 {
+            // Bits below the first newline's marker cover exactly the bytes before it.
+            let before_newline = newlines.isolate_lowest_one() - 1;
+            has_delimiter |= delimiters & before_newline != 0;
+            let offset = index * 8 + (newlines.trailing_zeros() / 8) as usize;
+            return (Some(offset), has_delimiter);
+        }
+        has_delimiter |= delimiters != 0;
+    }
+    let tail_start = words.len() * 8;
+    for (offset, byte) in tail.iter().enumerate() {
+        match byte {
+            b'\n' => return (Some(tail_start + offset), has_delimiter),
+            b'#' | b'{' | b'}' => has_delimiter = true,
+            _ => {}
+        }
+    }
+    (None, has_delimiter)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -386,6 +421,8 @@ pub(crate) struct SourceLine<'a> {
     line_number: usize,
     source: SourceSlice<'a>,
     terminator: Option<SourceSlice<'a>>,
+    /// Whether the line text holds a `#`, `{`, or `}`.
+    has_command_delimiter: bool,
 }
 
 impl<'a> SourceLine<'a> {
@@ -395,6 +432,10 @@ impl<'a> SourceLine<'a> {
 
     pub(crate) const fn source(self) -> SourceSlice<'a> {
         self.source
+    }
+
+    pub(crate) const fn has_command_delimiter(self) -> bool {
+        self.has_command_delimiter
     }
 
     #[cfg(test)]
@@ -423,7 +464,7 @@ mod tests {
 
     use super::{
         SourceCommands, SourceLines, SourceSlice, is_complete_block_terminator,
-        is_complete_terminal_block_command,
+        is_complete_terminal_block_command, scan_line,
     };
 
     #[test]
@@ -560,5 +601,37 @@ mod tests {
                 (3, "H 0".to_string())
             ]
         );
+    }
+
+    #[test]
+    fn word_line_scan_matches_a_bytewise_scan_at_every_alignment() {
+        // The word-at-a-time scan must find the first newline and the delimiters before it
+        // exactly, including when bytes that compare equal sit after the newline in the same
+        // word or next to bytes with the high bit set.
+        let alphabet = [
+            b'a', b'\n', b'#', b'{', b'}', b'\r', 0x00, 0x80, 0xff, 0x0b, b'\x8a',
+        ];
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        for length in 0..40 {
+            for _ in 0..400 {
+                let bytes = (0..length)
+                    .map(|_| {
+                        state ^= state << 13;
+                        state ^= state >> 7;
+                        state ^= state << 17;
+                        *alphabet
+                            .get(usize::try_from(state % alphabet.len() as u64).expect("index"))
+                            .expect("alphabet index")
+                    })
+                    .collect::<Vec<u8>>();
+                let newline = bytes.iter().position(|byte| *byte == b'\n');
+                let delimiter = bytes
+                    .get(..newline.unwrap_or(bytes.len()))
+                    .expect("line prefix")
+                    .iter()
+                    .any(|byte| matches!(byte, b'#' | b'{' | b'}'));
+                assert_eq!(scan_line(&bytes), (newline, delimiter), "{bytes:?}");
+            }
+        }
     }
 }

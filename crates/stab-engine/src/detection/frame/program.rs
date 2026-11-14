@@ -256,6 +256,9 @@ impl ProgramInstruction {
 pub(crate) struct ProgramCounts {
     pub(crate) measurements: usize,
     pub(crate) sweep_bits: usize,
+    /// One past the largest qubit target of any instruction whose targets are not pad values,
+    /// including instructions that lower to nothing, which is the qubit count Stim simulates.
+    pub(crate) simulated_qubits: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]

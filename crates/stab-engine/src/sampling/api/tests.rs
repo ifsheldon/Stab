@@ -385,3 +385,28 @@ fn former_direct_z_circuits_keep_their_analytic_outcome_distribution() {
         );
     }
 }
+
+#[test]
+fn plan_qubit_count_matches_the_circuit_simulated_qubit_count() {
+    // Instructions that lower to nothing (coordinates, identity noise, zero-probability noise)
+    // still widen Stim's simulated qubit count, while pad values never do; the count is taken
+    // from compile admission instead of a separate circuit walk, so it must agree with it.
+    for text in [
+        "QUBIT_COORDS(1, 2) 50\nM 0\n",
+        "M 0\nX_ERROR(0) 70\n",
+        "M 0\nI_ERROR(0.1) 90\nMPAD 1 1\n",
+        "MPAD 0 1\n",
+        "REPEAT 3 {\n    REPEAT 2 {\n        H 12\n    }\n    M 4\n}\nDETECTOR rec[-1]\n",
+        "SPP X3*Y9\nM 1\n",
+        "QUBIT_COORDS(0) 33\nH 2\n",
+        "",
+    ] {
+        let circuit = Circuit::from_stim_str(text).expect("parse circuit");
+        let plan = SamplingCompiler::new().compile(&circuit).expect("compile");
+        assert_eq!(
+            plan.qubit_count(),
+            stab_model::advanced::circuit_simulated_qubit_count(&circuit),
+            "{text}"
+        );
+    }
+}

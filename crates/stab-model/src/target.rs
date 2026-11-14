@@ -5,7 +5,10 @@ use crate::ids::STIM_TARGET_VALUE_LIMIT;
 use crate::{MeasureRecordOffset, ModelError, ModelResult, QubitId};
 use smallvec::SmallVec;
 
-pub(crate) type TargetVec = SmallVec<[Target; 4]>;
+/// Targets stored inline in an instruction before it spills to the heap.
+const INLINE_TARGETS: usize = 4;
+
+pub(crate) type TargetVec = SmallVec<[Target; INLINE_TARGETS]>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Pauli {
@@ -279,7 +282,7 @@ impl Display for Target {
 
 pub(crate) fn parse_target_token_into(
     token: &str,
-    targets: &mut TargetVec,
+    targets: &mut Vec<Target>,
     mut admit: impl FnMut() -> ModelResult<()>,
 ) -> ModelResult<()> {
     if token == "*" {
@@ -320,8 +323,13 @@ pub(crate) fn parse_target_token_into(
     Ok(())
 }
 
-pub(crate) fn parse_plain_qubit_target_text(text: &str) -> ModelResult<Option<TargetVec>> {
-    let mut targets = TargetVec::new();
+/// Appends the targets of a plain qubit list such as `0 1 2` to `targets`, returning `false`
+/// when the text holds anything other than ASCII digits and target spacing (space, tab, or
+/// carriage return).
+pub(crate) fn parse_plain_qubit_targets_into(
+    text: &str,
+    targets: &mut Vec<Target>,
+) -> ModelResult<bool> {
     let mut value = None;
     for byte in text.bytes() {
         if byte.is_ascii_digit() {
@@ -335,18 +343,46 @@ pub(crate) fn parse_plain_qubit_target_text(text: &str) -> ModelResult<Option<Ta
                 return Err(ModelError::invalid_domain_value("qubit target", text));
             }
             value = Some(next);
-        } else if byte.is_ascii_whitespace() {
+        } else if matches!(byte, b' ' | b'\t' | b'\r') {
             if let Some(id) = value.take() {
                 targets.push(Target::qubit(QubitId::new(id)?, false));
             }
         } else {
-            return Ok(None);
+            return Ok(false);
         }
     }
     if let Some(id) = value {
         targets.push(Target::qubit(QubitId::new(id)?, false));
     }
-    Ok(Some(targets))
+    Ok(true)
+}
+
+/// Scratch values above this count are handed over instead of copied (see [`take_exact`]).
+const SCRATCH_HANDOFF_VALUES: usize = 16 * 1024;
+
+/// Moves the values parsed into a reusable `scratch` buffer into exact-size instruction storage.
+///
+/// Ordinary lines are copied with one exact-size allocation (none when empty), so the scratch
+/// keeps its capacity for the next line. A very long line hands its scratch buffer over and
+/// shrinks it instead, so its values are never resident twice; at that size the buffer is its
+/// own mapping and shrinking it does not copy.
+pub(crate) fn take_exact<T: Clone>(scratch: &mut Vec<T>) -> Vec<T> {
+    if scratch.len() > SCRATCH_HANDOFF_VALUES {
+        let mut values = std::mem::take(scratch);
+        values.shrink_to_fit();
+        values
+    } else {
+        scratch.as_slice().to_vec()
+    }
+}
+
+/// Moves parsed targets into instruction storage: inline when they fit, otherwise exact-size
+/// heap storage as described by [`take_exact`].
+pub(crate) fn take_exact_targets(scratch: &mut Vec<Target>) -> TargetVec {
+    if scratch.len() <= INLINE_TARGETS {
+        return scratch.iter().cloned().collect();
+    }
+    TargetVec::from_vec(take_exact(scratch))
 }
 
 fn parse_u24(text: &str, kind: &'static str) -> ModelResult<u32> {

@@ -195,7 +195,9 @@ impl SamplingCompiler {
         let request_fingerprint = CompilationRequestFingerprint::for_sampling(circuit);
         let program = compile_program(circuit, self.memory_budget)?;
         let counts = program.counts();
-        let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+        // Admission already walked every instruction, so the simulated qubit count comes from
+        // that walk instead of a second pass over the circuit.
+        let qubit_count = counts.simulated_qubits;
         let fingerprint = PlanFingerprint::for_sampling(
             request_fingerprint,
             backend,

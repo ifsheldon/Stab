@@ -38,10 +38,21 @@ pub enum GateCategory {
 ///
 /// [`Gate::kind`] returns the closed [`GateKind`] identity for exhaustive per-gate matches, and
 /// the classification accessors read the same table row.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Gate {
     info: &'static GateInfo,
 }
+
+/// Gates are equal exactly when they are the same table row, which their [`GateKind`] names, so
+/// equality compares that identity instead of every field of the row.
+impl PartialEq for Gate {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.kind() == other.kind()
+    }
+}
+
+impl Eq for Gate {}
 
 impl Gate {
     const fn from_info(info: &'static GateInfo) -> Self {

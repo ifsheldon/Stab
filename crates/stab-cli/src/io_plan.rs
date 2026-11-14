@@ -97,6 +97,11 @@ impl InputFile {
             })
     }
 
+    /// The opened file itself, whose reads fill uninitialized buffer capacity directly.
+    pub(crate) fn file_mut(&mut self) -> &mut File {
+        self.identity.as_file_mut()
+    }
+
     pub(crate) fn rewind(&mut self) -> Result<(), CliError> {
         self.seek(SeekFrom::Start(0))
             .map(|_| ())

@@ -69,7 +69,7 @@ pub(crate) fn read_limited_input_file(
     if len > limit {
         return Err(CliError::InputTooLarge { kind, limit });
     }
-    read_limited_open_path_with_hint(&path, file, limit, kind, len)
+    read_limited_open_path_with_hint(&path, file.file_mut(), limit, kind, len)
 }
 
 #[cfg(test)]
@@ -126,11 +126,16 @@ where
 /// memory budget never aborts on allocation failure. `size_hint` (a file's length, already
 /// admitted) is reserved exactly up front; otherwise storage grows geometrically and is capped at
 /// `limit + 1` bytes.
+///
+/// Reads land directly in reserved capacity without zero-filling it first, and a full buffer is
+/// probed for end of input through a small stack buffer, so an input that exactly matches its
+/// hint is never copied into a larger allocation.
 fn read_bounded<R>(reader: &mut R, limit: u64, size_hint: u64) -> std::io::Result<Vec<u8>>
 where
     R: Read,
 {
     const CHUNK_BYTES: usize = 64 * 1024;
+    const PROBE_BYTES: usize = 64;
     let cap = usize::try_from(limit.saturating_add(1)).unwrap_or(usize::MAX);
     let out_of_memory = |error: std::collections::TryReserveError| {
         std::io::Error::new(std::io::ErrorKind::OutOfMemory, error)
@@ -143,25 +148,34 @@ where
             return Ok(input);
         }
         if input.len() == input.capacity() {
+            let mut probe = [0_u8; PROBE_BYTES];
+            let probe_len = PROBE_BYTES.min(cap - input.len());
+            let window = probe.get_mut(..probe_len).unwrap_or_default();
+            let read = loop {
+                match reader.read(window) {
+                    Ok(read) => break read,
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                    Err(error) => return Err(error),
+                }
+            };
+            if read == 0 {
+                return Ok(input);
+            }
+            let probed = window.get(..read).ok_or_else(|| {
+                std::io::Error::other("input reader reported more bytes than its buffer holds")
+            })?;
             let grown = input.capacity().max(CHUNK_BYTES).min(cap - input.len());
             input.try_reserve(grown).map_err(out_of_memory)?;
+            input.extend_from_slice(probed);
+            continue;
         }
-        let start = input.len();
-        let window = (input.capacity() - start).min(cap - start);
-        input.resize(start + window, 0);
-        let read = loop {
-            let window = input.get_mut(start..).unwrap_or_default();
-            match reader.read(window) {
-                Ok(read) => break read,
-                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(error) => {
-                    input.truncate(start);
-                    return Err(error);
-                }
-            }
-        };
-        input.truncate(start + read);
-        if read == 0 {
+        // `Take` bounds the read to the spare capacity, so `read_to_end` never grows `input`.
+        let window = (input.capacity() - input.len()).min(cap - input.len());
+        let read = reader
+            .by_ref()
+            .take(u64::try_from(window).unwrap_or(u64::MAX))
+            .read_to_end(&mut input)?;
+        if read < window {
             return Ok(input);
         }
     }

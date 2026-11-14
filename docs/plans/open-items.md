@@ -7,7 +7,8 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 ## Speed
 
-- A single-shot `sample` with a reference sample on 400 layers of `CZ` and `S` over 400 qubits takes 37 ms against Stim's 29 ms, which is above the `1.25x` ceiling and outside the suite.
+- Fixed parse-and-compile cost on large circuits is above Stim and outside the suite: a single-shot `sample` on a 147 MB flat circuit is about 1.3x Stim without the reference sample and 1.7x with it, 1.5 million short instructions are about 3.2x, and 400 layers of `CZ` and `S` over 400 qubits sit at the `1.25x` ceiling.
+- That remaining cost is per-instruction memory in the parsed circuit and the lowered program, and the SHA-256 plan fingerprint, which is about 20 percent of compile; Stim also streams a single shot without building the circuit.
 - The reference sample is about 58 percent of a 64-shot `sample` at distance 35 with 1000 rounds, and reference loops with a period above one are not folded.
 - Reading HITS and DETS input is slower than reading `b8` input, although still faster than Stim.
 - The stabilizer solver takes 4.27 s at 5000 qubits, single-gate `Tableau` append visits every row, and Stim's timings for the algebra operations were never measured.
