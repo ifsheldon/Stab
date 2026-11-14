@@ -1,19 +1,19 @@
-use stab_algebra::{Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString, Tableau};
-use stab_model::{Circuit, CircuitItem, DemTarget, QubitId};
+use stab_algebra::{
+    Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString, StabilizerResult, Tableau,
+};
+use stab_model::{Circuit, CircuitItem, DemTarget, GateCategory, QubitId, Target};
 
+use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
 use crate::{
     AnalysisError, AnalysisResult, circuit_to_tableau,
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
-/// Widest repeat-free circuit whose full-width flows are checked against one dense Tableau; wider
-/// circuits use the sparse reverse tracker. This selects an algorithm and never refuses work: the
-/// two paths report different mismatch diagnostics, and the sparse tracker's cost follows the
-/// flows' support instead of the quadratic Tableau, so the boundary keeps outputs and wide-circuit
-/// cost unchanged.
-const BATCH_FLOW_TABLEAU_QUBIT_THRESHOLD: usize = 512;
-
 /// Checks unsigned stabilizer flows against the supported unitary and sparse-tracker subsets.
+///
+/// Pauli-only flows of a measurement-free circuit are checked either against one dense Tableau or
+/// with the sparse reverse tracker, whichever [`FlowCheckCost`] estimates to be cheaper; both
+/// return the same result.
 pub fn check_if_circuit_has_unsigned_stabilizer_flows(
     circuit: &Circuit,
     flows: &[Flow],
@@ -21,14 +21,76 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
     if flows.is_empty() {
         return Vec::new();
     }
-    if should_use_batch_flow_tableau(circuit, flows)
-        && let Ok(tableau) = circuit_to_tableau(circuit, false, false, false)
+    check_unsigned_flows_using(select_flow_check_algorithm(circuit, flows), circuit, flows)
+}
+
+/// Chooses the cheaper algorithm for a flow query, or the sparse tracker when only it applies.
+fn select_flow_check_algorithm(circuit: &Circuit, flows: &[Flow]) -> FlowCheckAlgorithm {
+    if dense_tableau_can_check(circuit, flows) {
+        FlowCheckCost::measure(circuit, flows).cheaper_algorithm()
+    } else {
+        FlowCheckAlgorithm::SparseTracker
+    }
+}
+
+/// Reports whether one dense Tableau can check every flow: the circuit is repeat-free and acts on
+/// Pauli-only flows as a unitary, and every flow is a Pauli-only flow no wider than the circuit.
+/// Repeat blocks stay on the sparse tracker, which folds them without raising a Tableau to a power.
+fn dense_tableau_can_check(circuit: &Circuit, flows: &[Flow]) -> bool {
+    let circuit_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    circuit
+        .items()
+        .iter()
+        .all(|item| matches!(item, CircuitItem::Instruction(_)))
+        && circuit_acts_unitarily_on_pauli_flows(circuit)
+        && flows.iter().all(|flow| {
+            is_pauli_only_flow(flow)
+                && flow.input().len() <= circuit_qubits
+                && flow.output().len() <= circuit_qubits
+        })
+}
+
+/// Reports whether every instruction either is a unitary over qubit targets or cannot act on a
+/// Pauli-only flow (annotations without record targets and noise without heralds), so the circuit
+/// maps each Pauli-only flow input to exactly one output Pauli string.
+fn circuit_acts_unitarily_on_pauli_flows(circuit: &Circuit) -> bool {
+    circuit.items().iter().all(|item| match item {
+        CircuitItem::Instruction(instruction) => {
+            let gate = instruction.gate();
+            !gate.produces_measurements()
+                && !gate.is_reset()
+                && !instruction
+                    .targets()
+                    .iter()
+                    .any(Target::is_classical_bit_target)
+                && (gate.is_unitary()
+                    || matches!(
+                        gate.category(),
+                        GateCategory::Annotation | GateCategory::Noise
+                    ))
+        }
+        CircuitItem::RepeatBlock(repeat) => circuit_acts_unitarily_on_pauli_flows(repeat.body()),
+    })
+}
+
+fn is_pauli_only_flow(flow: &Flow) -> bool {
+    flow.measurements().next().is_none() && flow.observables().next().is_none()
+}
+
+/// Checks flows with the given algorithm. The dense Tableau falls back to the sparse tracker when
+/// the circuit cannot be converted, so either algorithm returns the same result for any query.
+pub(crate) fn check_unsigned_flows_using(
+    algorithm: FlowCheckAlgorithm,
+    circuit: &Circuit,
+    flows: &[Flow],
+) -> Vec<bool> {
+    if algorithm == FlowCheckAlgorithm::DenseTableau
+        && let Some(tableau) = dense_flow_tableau(circuit, flows)
     {
         return flows
             .iter()
             .map(|flow| {
-                tableau
-                    .apply(flow.input())
+                dense_flow_image(&tableau, flow.input())
                     .is_ok_and(|actual| paulis_match_unsigned(&actual, flow.output()))
             })
             .collect();
@@ -37,13 +99,34 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
         .unwrap_or_else(|_| vec![false; flows.len()])
 }
 
+/// Builds the dense Tableau when it can check every flow. Noise is skipped because unsigned flow
+/// checking ignores it, exactly as the sparse tracker does.
+fn dense_flow_tableau(circuit: &Circuit, flows: &[Flow]) -> Option<Tableau> {
+    if !dense_tableau_can_check(circuit, flows) {
+        return None;
+    }
+    circuit_to_tableau(circuit, true, false, false).ok()
+}
+
+/// Applies the Tableau to a flow input no wider than it, padding the input with identities.
+fn dense_flow_image(tableau: &Tableau, input: &PauliString) -> StabilizerResult<PauliString> {
+    if input.len() == tableau.len() {
+        return tableau.apply(input);
+    }
+    let padded = PauliString::from_bases(
+        PauliSign::Plus,
+        (0..tableau.len()).map(|index| input.get(index).unwrap_or(PauliBasis::I)),
+    )?;
+    tableau.apply(&padded)
+}
+
 fn check_unsigned_flows_with_tableau(
     tableau: &Tableau,
     flows: &[Flow],
 ) -> Vec<UnsignedStabilizerFlowCheck> {
     flows
         .iter()
-        .map(|flow| match tableau.apply(flow.input()) {
+        .map(|flow| match dense_flow_image(tableau, flow.input()) {
             Ok(actual) if paulis_match_unsigned(&actual, flow.output()) => {
                 UnsignedStabilizerFlowCheck::passed()
             }
@@ -58,20 +141,6 @@ fn check_unsigned_flows_with_tableau(
         .collect()
 }
 
-fn should_use_batch_flow_tableau(circuit: &Circuit, flows: &[Flow]) -> bool {
-    let circuit_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
-    flows.iter().all(|flow| {
-        flow.input().len() == circuit_qubits
-            && flow.output().len() == circuit_qubits
-            && flow.measurements().next().is_none()
-            && flow.observables().next().is_none()
-    }) && circuit_qubits <= BATCH_FLOW_TABLEAU_QUBIT_THRESHOLD
-        && circuit
-            .items()
-            .iter()
-            .all(|item| matches!(item, CircuitItem::Instruction(_)))
-}
-
 /// Diagnostic result for one unsigned stabilizer flow query.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UnsignedStabilizerFlowCheck {
@@ -83,13 +152,15 @@ pub struct UnsignedStabilizerFlowCheck {
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnsignedStabilizerFlowFailure {
-    /// A unitary circuit mapped the flow input to a different output Pauli string.
+    /// A circuit of unitaries, annotations, and noise mapped the input of a Pauli-only flow to a
+    /// different output Pauli string, whichever algorithm checked it.
     OutputMismatch {
         expected_output: PauliString,
         actual_output: PauliString,
     },
-    /// Sparse reverse tracking mapped the requested output, measurement, and observable terms to a
-    /// different input Pauli string.
+    /// A circuit with collapsing or classically controlled operations, or a flow with measurement
+    /// or observable terms, pulled the requested output, measurement, and observable terms back to
+    /// a different input Pauli string.
     InputMismatch {
         expected_input: PauliString,
         actual_input: PauliString,
@@ -111,6 +182,12 @@ pub enum UnsignedStabilizerFlowFailure {
 /// This is the diagnostic counterpart to
 /// [`check_if_circuit_has_unsigned_stabilizer_flows`]. It preserves the same supported subset and
 /// fail-closed semantics, but keeps the first local reason for a false row.
+///
+/// The mismatch kind depends only on the query, never on the algorithm that checked it. A
+/// Pauli-only flow of a circuit whose instructions are unitaries, annotations, or noise reports
+/// [`UnsignedStabilizerFlowFailure::OutputMismatch`] with the circuit's image of the flow input,
+/// as wide as the widest of the circuit, the input, and the output. Every other Pauli mismatch
+/// reports [`UnsignedStabilizerFlowFailure::InputMismatch`].
 pub fn check_unsigned_stabilizer_flows_with_diagnostics(
     circuit: &Circuit,
     flows: &[Flow],
@@ -118,14 +195,123 @@ pub fn check_unsigned_stabilizer_flows_with_diagnostics(
     if flows.is_empty() {
         return Vec::new();
     }
-    if should_use_batch_flow_tableau(circuit, flows)
-        && let Ok(tableau) = circuit_to_tableau(circuit, false, false, false)
+    diagnose_unsigned_flows_using(select_flow_check_algorithm(circuit, flows), circuit, flows)
+}
+
+/// Diagnoses flows with the given algorithm; either algorithm returns the same diagnostics.
+pub(crate) fn diagnose_unsigned_flows_using(
+    algorithm: FlowCheckAlgorithm,
+    circuit: &Circuit,
+    flows: &[Flow],
+) -> Vec<UnsignedStabilizerFlowCheck> {
+    if algorithm == FlowCheckAlgorithm::DenseTableau
+        && let Some(tableau) = dense_flow_tableau(circuit, flows)
     {
         return check_unsigned_flows_with_tableau(&tableau, flows);
     }
-    diagnose_unsigned_flows_with_sparse_tracker(circuit, flows).unwrap_or_else(|error| {
-        vec![UnsignedStabilizerFlowCheck::unsupported(error.to_string()); flows.len()]
-    })
+    let checks = match diagnose_unsigned_flows_with_sparse_tracker(circuit, flows) {
+        Ok(checks) => checks,
+        Err(error) => {
+            return vec![UnsignedStabilizerFlowCheck::unsupported(error.to_string()); flows.len()];
+        }
+    };
+    if circuit_acts_unitarily_on_pauli_flows(circuit) {
+        report_unitary_mismatches_as_outputs(circuit, flows, checks)
+    } else {
+        checks
+    }
+}
+
+/// Rewrites the input mismatches of Pauli-only flows of a unitary circuit as output mismatches, so
+/// the sparse tracker reports what the dense Tableau reports. The circuit's images of the failing
+/// inputs are found by tracking them backwards through the inverse of the circuit's unitary part,
+/// so this costs one more sparse pass over the failing flows only.
+fn report_unitary_mismatches_as_outputs(
+    circuit: &Circuit,
+    flows: &[Flow],
+    mut checks: Vec<UnsignedStabilizerFlowCheck>,
+) -> Vec<UnsignedStabilizerFlowCheck> {
+    let failing = flows
+        .iter()
+        .zip(&checks)
+        .enumerate()
+        .filter(|(_, (flow, check))| {
+            is_pauli_only_flow(flow)
+                && matches!(
+                    check.failure,
+                    Some(UnsignedStabilizerFlowFailure::InputMismatch { .. })
+                )
+        })
+        .map(|(index, (flow, _))| (index, flow))
+        .collect::<Vec<_>>();
+    if failing.is_empty() {
+        return checks;
+    }
+    let inputs = failing
+        .iter()
+        .map(|(_, flow)| flow.input().clone())
+        .collect::<Vec<_>>();
+    let images = crate::circuit_inverse::unitary_part_inverse(circuit)
+        .and_then(|inverse| pull_back_paulis_with_sparse_tracker(&inverse, &inputs));
+    let circuit_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
+    for (position, (index, flow)) in failing.into_iter().enumerate() {
+        let failure = match &images {
+            Ok(images) => match images.get(position) {
+                Some(image) => {
+                    let width = circuit_qubits
+                        .max(flow.input().len())
+                        .max(flow.output().len());
+                    let mut bases = vec![PauliBasis::I; width];
+                    xor_region(&mut bases, image);
+                    UnsignedStabilizerFlowFailure::OutputMismatch {
+                        expected_output: unsigned_pauli(flow.output()),
+                        actual_output: stab_algebra::advanced::pauli_from_bases_unchecked(
+                            PauliSign::Plus,
+                            bases,
+                        ),
+                    }
+                }
+                None => UnsignedStabilizerFlowFailure::UnsupportedCircuit {
+                    reason: "sparse reverse tracking returned fewer images than flows".to_owned(),
+                },
+            },
+            Err(error) => UnsignedStabilizerFlowFailure::UnsupportedCircuit {
+                reason: error.to_string(),
+            },
+        };
+        if let Some(check) = checks.get_mut(index) {
+            *check = UnsignedStabilizerFlowCheck::failed(failure);
+        }
+    }
+    checks
+}
+
+/// Tracks each Pauli string backwards through `circuit` and returns the Pauli strings it pulls
+/// back to, unsigned and only as wide as their support.
+fn pull_back_paulis_with_sparse_tracker(
+    circuit: &Circuit,
+    paulis: &[PauliString],
+) -> AnalysisResult<Vec<PauliString>> {
+    let qubit_count = paulis.iter().map(PauliString::len).fold(
+        stab_model::advanced::circuit_simulated_qubit_count(circuit),
+        usize::max,
+    );
+    let mut tracker = SparseReverseFrameTracker::new(qubit_count, 0, 0, false);
+    let targets = (0..paulis.len())
+        .map(|index| {
+            u64::try_from(index).map(DemTarget::numeric).map_err(|_| {
+                AnalysisError::invalid_detector_error_model("flow index does not fit u64")
+            })
+        })
+        .collect::<AnalysisResult<Vec<_>>>()?;
+    for (pauli, target) in paulis.iter().zip(&targets) {
+        seed_flow_pauli_output(&mut tracker, pauli, *target)?;
+    }
+    tracker.undo_circuit(circuit)?;
+    targets
+        .into_iter()
+        .map(|target| Ok(tracker.compact_region_for_target(target)?.value().clone()))
+        .collect()
 }
 
 impl UnsignedStabilizerFlowCheck {

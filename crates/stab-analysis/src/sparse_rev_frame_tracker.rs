@@ -22,6 +22,7 @@ pub(crate) use budget::{ReverseTrackerBudget, ReverseTrackerWorkBudget};
 use clifford_action::{single_qubit_action, two_qubit_action};
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
 pub(crate) use shifted_recurrence::{ShiftedRecurrenceSearch, search_shifted_recurrence};
+pub(crate) use unitary_repeat::is_supported_unitary_circuit as folds_unitary_repeat_body;
 
 /// Returns the form of a gate the tracker undoes as a classically controllable Pauli.
 fn tracked_controlled_pauli(

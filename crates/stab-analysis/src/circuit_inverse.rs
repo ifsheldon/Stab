@@ -2,16 +2,12 @@ use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, Tableau};
 use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, Target};
 
 use crate::{
-    AnalysisError, AnalysisResult, circuit_flow::check_unsigned_flows_with_sparse_tracker,
+    AnalysisError, AnalysisResult,
+    circuit_flow::{FlowCheckAlgorithm, FlowCheckCost, check_unsigned_flows_with_sparse_tracker},
+    sparse_rev_frame_tracker::folds_unitary_repeat_body,
 };
 
 mod reverse_flow;
-
-/// Widest repeat-free circuit validated against its dense Tableau even when the sparse tracker
-/// could validate it. Wider sparse-supported circuits keep the sparse tracker, whose cost follows
-/// the flows' support, and wider unsupported circuits use the dense Tableau admitted in bytes. This
-/// selects an algorithm and never refuses work.
-const DENSE_TIME_REVERSE_VALIDATION_QUBIT_THRESHOLD: usize = 512;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InverseQecOptions {
@@ -98,6 +94,35 @@ fn circuit_inverse_unitary_strict(circuit: &Circuit) -> AnalysisResult<Circuit> 
     Ok(result)
 }
 
+/// Returns the inverse of a circuit's unitary instructions, dropping every other instruction.
+///
+/// The caller guarantees the dropped instructions cannot act on the Pauli strings it tracks, for
+/// example annotations and noise around Pauli-only flows; a repeat whose inverse body is empty is
+/// dropped too.
+pub(crate) fn unitary_part_inverse(circuit: &Circuit) -> AnalysisResult<Circuit> {
+    let mut result = Circuit::new();
+    for item in circuit.items().iter().rev() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                if instruction.gate().is_unitary() {
+                    result.append_instruction(inverse_unitary_instruction(instruction)?);
+                }
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                let inverse_body = unitary_part_inverse(repeat.body())?;
+                if !inverse_body.items().is_empty() {
+                    result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
+                        repeat.repeat_count(),
+                        inverse_body,
+                        repeat.tag_bytes(),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+
 /// Returns the tracker-driven QEC inverse of a circuit.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> AnalysisResult<Circuit> {
     circuit_inverse_qec_with_options(circuit, InverseQecOptions::default())
@@ -143,6 +168,17 @@ pub fn circuit_time_reversed_for_flows_with_options(
     flows: &[Flow],
     options: TimeReversedForFlowsOptions,
 ) -> AnalysisResult<(Circuit, Vec<Flow>)> {
+    time_reversed_for_flows_using(circuit, flows, options, FlowValidation::cheaper_algorithm)
+}
+
+/// Time reversal whose unitary fast path validates the input flows with the algorithm `select`
+/// picks; every choice returns the same result.
+pub(crate) fn time_reversed_for_flows_using(
+    circuit: &Circuit,
+    flows: &[Flow],
+    options: TimeReversedForFlowsOptions,
+    select: fn(&Circuit, &[Flow]) -> FlowCheckAlgorithm,
+) -> AnalysisResult<(Circuit, Vec<Flow>)> {
     if reverse_flow::requires_general_reversal(circuit, flows) {
         return reverse_flow::reverse_flows(circuit, flows, options);
     }
@@ -157,7 +193,7 @@ pub fn circuit_time_reversed_for_flows_with_options(
     if flows.is_empty() {
         return Ok((inverse, Vec::new()));
     }
-    let validation = FlowValidation::for_circuit(circuit, &options.cancellation)?;
+    let validation = FlowValidation::build(select(circuit, flows), circuit, &options.cancellation)?;
     for (index, (flow, satisfied)) in flows
         .iter()
         .zip(validation.check_all(circuit, flows, &options.cancellation)?)
@@ -357,15 +393,36 @@ enum FlowValidation {
 }
 
 impl FlowValidation {
-    fn for_circuit(circuit: &Circuit, cancellation: &Cancellation) -> AnalysisResult<Self> {
-        let narrow = stab_model::advanced::circuit_simulated_qubit_count(circuit)
-            <= DENSE_TIME_REVERSE_VALIDATION_QUBIT_THRESHOLD;
-        let has_repeat = circuit
+    /// Chooses how the unitary fast path validates input flows. A repeat-free circuit takes the
+    /// algorithm [`FlowCheckCost`] estimates to be cheaper; the sparse tracker undoes every
+    /// top-level unitary instruction. A circuit with repeats keeps the sparse tracker when it folds
+    /// every repeat body without unrolling it, and otherwise raises the body's Tableau to the
+    /// repeat count by squaring.
+    fn cheaper_algorithm(circuit: &Circuit, flows: &[Flow]) -> FlowCheckAlgorithm {
+        let mut repeats = circuit
             .items()
             .iter()
-            .any(|item| matches!(item, CircuitItem::RepeatBlock(_)));
-        let sparse = sparse_tracker_can_validate_without_unbounded_unroll(circuit);
-        if sparse && (has_repeat || !narrow) {
+            .filter_map(|item| match item {
+                CircuitItem::RepeatBlock(repeat) => Some(repeat),
+                CircuitItem::Instruction(_) => None,
+            })
+            .peekable();
+        if repeats.peek().is_none() {
+            return FlowCheckCost::measure(circuit, flows).cheaper_algorithm();
+        }
+        if repeats.all(|repeat| folds_unitary_repeat_body(repeat.body())) {
+            FlowCheckAlgorithm::SparseTracker
+        } else {
+            FlowCheckAlgorithm::DenseTableau
+        }
+    }
+
+    fn build(
+        algorithm: FlowCheckAlgorithm,
+        circuit: &Circuit,
+        cancellation: &Cancellation,
+    ) -> AnalysisResult<Self> {
+        if algorithm == FlowCheckAlgorithm::SparseTracker {
             return Ok(Self::SparseFolded);
         }
         let options = crate::CircuitToTableauOptions {
@@ -394,114 +451,6 @@ impl FlowValidation {
             Self::SparseFolded => check_unsigned_flows_with_sparse_tracker(circuit, flows)
                 .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string())),
         }
-    }
-}
-
-fn sparse_tracker_can_validate_without_unbounded_unroll(circuit: &Circuit) -> bool {
-    circuit.items().iter().all(|item| match item {
-        CircuitItem::Instruction(instruction) => {
-            sparse_tracker_supports_folded_instruction(instruction)
-        }
-        CircuitItem::RepeatBlock(repeat) => {
-            sparse_tracker_supports_folded_unitary_repeat(repeat.body())
-        }
-    })
-}
-
-fn sparse_tracker_supports_folded_unitary_repeat(circuit: &Circuit) -> bool {
-    circuit.items().iter().all(|item| match item {
-        CircuitItem::Instruction(instruction) => {
-            sparse_tracker_supports_folded_instruction(instruction)
-        }
-        CircuitItem::RepeatBlock(repeat) => {
-            sparse_tracker_supports_folded_unitary_repeat(repeat.body())
-        }
-    })
-}
-
-fn sparse_tracker_supports_folded_instruction(instruction: &CircuitInstruction) -> bool {
-    match instruction.gate().kind() {
-        GateKind::CX
-        | GateKind::CY
-        | GateKind::CZ
-        | GateKind::H
-        | GateKind::H_XY
-        | GateKind::H_YZ
-        | GateKind::H_NXY
-        | GateKind::H_NXZ
-        | GateKind::H_NYZ
-        | GateKind::I
-        | GateKind::X
-        | GateKind::Y
-        | GateKind::Z
-        | GateKind::C_XYZ
-        | GateKind::C_ZYX
-        | GateKind::C_NXYZ
-        | GateKind::C_XNYZ
-        | GateKind::C_XYNZ
-        | GateKind::C_NZYX
-        | GateKind::C_ZNYX
-        | GateKind::C_ZYNX
-        | GateKind::SQRT_X
-        | GateKind::SQRT_X_DAG
-        | GateKind::SQRT_Y
-        | GateKind::SQRT_Y_DAG
-        | GateKind::S
-        | GateKind::S_DAG => true,
-        GateKind::DETECTOR
-        | GateKind::OBSERVABLE_INCLUDE
-        | GateKind::TICK
-        | GateKind::QUBIT_COORDS
-        | GateKind::SHIFT_COORDS
-        | GateKind::REPEAT
-        | GateKind::MPAD
-        | GateKind::MX
-        | GateKind::MY
-        | GateKind::M
-        | GateKind::MRX
-        | GateKind::MRY
-        | GateKind::MR
-        | GateKind::RX
-        | GateKind::RY
-        | GateKind::R
-        | GateKind::XCX
-        | GateKind::XCY
-        | GateKind::XCZ
-        | GateKind::YCX
-        | GateKind::YCY
-        | GateKind::YCZ
-        | GateKind::DEPOLARIZE1
-        | GateKind::DEPOLARIZE2
-        | GateKind::X_ERROR
-        | GateKind::Y_ERROR
-        | GateKind::Z_ERROR
-        | GateKind::I_ERROR
-        | GateKind::II_ERROR
-        | GateKind::PAULI_CHANNEL_1
-        | GateKind::PAULI_CHANNEL_2
-        | GateKind::E
-        | GateKind::ELSE_CORRELATED_ERROR
-        | GateKind::HERALDED_ERASE
-        | GateKind::HERALDED_PAULI_CHANNEL_1
-        | GateKind::II
-        | GateKind::SQRT_XX
-        | GateKind::SQRT_XX_DAG
-        | GateKind::SQRT_YY
-        | GateKind::SQRT_YY_DAG
-        | GateKind::SQRT_ZZ
-        | GateKind::SQRT_ZZ_DAG
-        | GateKind::MPP
-        | GateKind::SPP
-        | GateKind::SPP_DAG
-        | GateKind::SWAP
-        | GateKind::ISWAP
-        | GateKind::CXSWAP
-        | GateKind::SWAPCX
-        | GateKind::CZSWAP
-        | GateKind::ISWAP_DAG
-        | GateKind::MXX
-        | GateKind::MYY
-        | GateKind::MZZ => false,
     }
 }
 

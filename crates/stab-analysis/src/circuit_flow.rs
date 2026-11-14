@@ -1,8 +1,10 @@
+mod check_algorithm;
 mod checker;
 mod generators;
 mod solver;
 pub(crate) mod transitions;
 
+pub(crate) use check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
 pub(crate) use checker::check_unsigned_flows_with_sparse_tracker;
 pub use checker::flow_record_index;
 pub use checker::{

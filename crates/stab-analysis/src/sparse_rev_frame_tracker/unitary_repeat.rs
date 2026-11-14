@@ -267,7 +267,9 @@ fn remap_circuit_items(
     Ok(CircuitBuilder::from_unfused_items(items).finish())
 }
 
-fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
+/// Reports whether a repeat body is folded as one qubit-slot transform raised to the repeat count
+/// instead of being undone once per iteration.
+pub(crate) fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
     circuit.items().iter().all(|item| match item {
         CircuitItem::Instruction(instruction) => is_supported_unitary_instruction(instruction),
         CircuitItem::RepeatBlock(repeat) => is_supported_unitary_circuit(repeat.body()),

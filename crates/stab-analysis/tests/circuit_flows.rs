@@ -94,6 +94,31 @@ fn unsigned_stabilizer_flow_diagnostics_explain_unitary_mismatches() {
 }
 
 #[test]
+fn unsigned_stabilizer_flow_diagnostics_report_output_mismatches_for_wide_unitary_circuits() {
+    // Whichever algorithm checks a wide circuit against narrower flows, a unitary mismatch reports
+    // the circuit's image of the input, padded to the circuit width.
+    let circuit = circuit("H 0\nCX 0 1\nTICK\nI 999\n");
+    let checks = check_unsigned_stabilizer_flows_with_diagnostics(
+        &circuit,
+        &[flow("Z_ -> XX"), flow("Z -> Z")],
+    );
+    assert!(
+        checks
+            .first()
+            .is_some_and(UnsignedStabilizerFlowCheck::has_flow)
+    );
+    let mut actual_output = "XX".to_owned();
+    actual_output.push_str(&"_".repeat(998));
+    assert_eq!(
+        checks.get(1).and_then(UnsignedStabilizerFlowCheck::failure),
+        Some(&UnsignedStabilizerFlowFailure::OutputMismatch {
+            expected_output: pauli("Z"),
+            actual_output: pauli(&actual_output),
+        })
+    );
+}
+
+#[test]
 fn unsigned_stabilizer_flow_diagnostics_explain_sparse_tracker_failures() {
     let circuit = circuit("M 0\n");
     let checks = check_unsigned_stabilizer_flows_with_diagnostics(
