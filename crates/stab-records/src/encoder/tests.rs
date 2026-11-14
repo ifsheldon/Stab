@@ -6,7 +6,7 @@
 use std::io::{self, Write};
 
 use super::{DRAIN_THRESHOLD_BYTES, RecordBatchPart, RecordEncoder};
-use crate::{BitPlane64Batch, DetsResultType, PackedShotBatch, RecordFormat};
+use crate::{BitPlaneBatch, DetsResultType, PackedShotBatch, RecordFormat};
 
 #[derive(Default)]
 struct CountingWriter {
@@ -72,7 +72,7 @@ fn repeated_bit_plane_batches_reuse_encoder_storage() {
         RecordFormat::Ptb64,
     ] {
         for width in [1, 9, 64, 257, 1_009] {
-            let records = (0_usize..64)
+            let records = (0_usize..256)
                 .map(|shot| {
                     (0_usize..width)
                         .map(|bit| (shot * 17 + bit * 31).is_multiple_of(43))
@@ -80,16 +80,20 @@ fn repeated_bit_plane_batches_reuse_encoder_storage() {
                 })
                 .collect::<Vec<_>>();
             let packed = PackedShotBatch::from_records(&records, width).expect("pack records");
-            let planes = BitPlane64Batch::from_shot_major(packed.view()).expect("transpose");
+            let planes = BitPlaneBatch::from_shot_major(packed.view()).expect("transpose");
+            let parts = [RecordBatchPart::new(
+                DetsResultType::Measurement,
+                planes.view(),
+            )];
             let mut encoder = RecordEncoder::try_new(format, width).expect("encoder");
             let mut sink = io::sink();
             encoder
-                .write_bit_planes(planes.view(), DetsResultType::Measurement, &mut sink)
+                .write_batch(&parts, &mut sink)
                 .expect("warm encoder storage");
             let allocations = allocation_counter::measure(|| {
                 for _ in 0..8 {
                     encoder
-                        .write_bit_planes(planes.view(), DetsResultType::Measurement, &mut sink)
+                        .write_batch(&parts, &mut sink)
                         .expect("reuse encoder storage");
                 }
             });

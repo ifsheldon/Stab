@@ -83,17 +83,13 @@ impl MeasurementSink for MeasurementCodecSink {
         }
         self.output.reserve_records(batch.shot_count())?;
         let EncodedOutput { encoder, bytes, .. } = &mut self.output;
-        let result = if let Some(records) = batch.shot_major_records() {
-            encoder.write_batch(
-                &[RecordBatchPart::new(DetsResultType::Measurement, records)],
-                bytes,
-            )
-        } else {
-            let planes = batch
-                .bit_planes()
-                .ok_or_else(|| FormatError::invalid_data("measurement batch has no storage"))?;
-            encoder.write_bit_planes(planes, DetsResultType::Measurement, bytes)
-        };
+        let result = encoder.write_batch(
+            &[RecordBatchPart::new(
+                DetsResultType::Measurement,
+                batch.records(),
+            )],
+            bytes,
+        );
         result.map_err(in_memory_error)
     }
 

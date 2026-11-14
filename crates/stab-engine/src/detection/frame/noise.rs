@@ -4,18 +4,18 @@ use super::word::FrameWord;
 use crate::detection::error::{DetectionError, DetectionResult};
 
 #[derive(Clone, Copy)]
-pub(super) enum FrameExecutionMode<'a> {
+pub(super) enum FrameExecutionMode<'a, W> {
     Sample {
         active_lanes: usize,
     },
     SweepCorrection {
-        sweep_planes: &'a [u64],
+        sweep_planes: &'a [W],
         active_lanes: usize,
     },
 }
 
-impl FrameExecutionMode<'_> {
-    pub(super) fn random_mask<W: FrameWord>(self, rng: &mut impl Rng, probability: f64) -> W {
+impl<W: FrameWord> FrameExecutionMode<'_, W> {
+    pub(super) fn random_mask(self, rng: &mut impl Rng, probability: f64) -> W {
         match self {
             Self::Sample { active_lanes } => {
                 W::sample_mask(probability, W::active_mask(active_lanes), rng)
@@ -28,40 +28,29 @@ impl FrameExecutionMode<'_> {
         matches!(self, Self::Sample { .. })
     }
 
-    pub(super) fn sweep_mask<W: FrameWord>(self, id: u32) -> W {
+    pub(super) fn sweep_mask(self, id: u32) -> W {
         match self {
             Self::Sample { .. } => W::default(),
             Self::SweepCorrection {
                 sweep_planes,
                 active_lanes,
             } => {
-                let word = usize::try_from(id)
+                usize::try_from(id)
                     .ok()
                     .and_then(|index| sweep_planes.get(index))
                     .copied()
-                    .unwrap_or(0)
-                    & active_mask(active_lanes);
-                W::from_low_word(word)
+                    .unwrap_or_default()
+                    & W::active_mask(active_lanes)
             }
         }
     }
 
-    pub(super) fn active_mask<W: FrameWord>(self) -> W {
+    pub(super) fn active_mask(self) -> W {
         match self {
             Self::Sample { active_lanes } | Self::SweepCorrection { active_lanes, .. } => {
                 W::active_mask(active_lanes)
             }
         }
-    }
-}
-
-fn active_mask(shot_count: usize) -> u64 {
-    if shot_count >= u64::BITS as usize {
-        u64::MAX
-    } else if shot_count == 0 {
-        0
-    } else {
-        (1_u64 << shot_count) - 1
     }
 }
 
@@ -150,8 +139,4 @@ pub(super) fn for_each_set_lane<W: FrameWord>(mut lanes: W, mut visitor: impl Fn
         visitor(lane);
         lanes = lanes.clear_lowest_one();
     }
-}
-
-pub(in crate::detection) fn batch_active_mask(shot_count: usize) -> u64 {
-    active_mask(shot_count)
 }

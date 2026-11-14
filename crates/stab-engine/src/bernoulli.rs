@@ -10,15 +10,6 @@ pub(crate) enum IndexedRangeError {
     OutputWidthMismatch,
 }
 
-pub(crate) fn sample_mask(probability: f64, lanes: u64, rng: &mut impl Rng) -> u64 {
-    if lanes == 0 {
-        return 0;
-    }
-    let mut word = [0_u64; 1];
-    fill_words(probability, &mut word, rng);
-    word[0] & lanes
-}
-
 pub(crate) fn fill_words(probability: f64, output: &mut [u64], rng: &mut impl Rng) {
     sample_words(probability, output, &mut RandSource(rng));
 }

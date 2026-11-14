@@ -1,8 +1,10 @@
-use stab_records::{BitPlane64BatchView, DemSampleBatchView, DetectionBatchView, PackedShotBatch};
+use stab_records::{DemSampleBatchView, DetectionBatchView, PackedShotBatch};
 
 use stab_model::MemoryBudget;
 
-use super::{DemSamplingExecutionError, MAX_BATCH_SHOTS, ReplayRecord, internal_format_error};
+use super::{
+    DemSamplingExecutionError, MAX_REPLAY_BATCH_SHOTS, ReplayRecord, internal_format_error,
+};
 use crate::DetectionRecordBuffer;
 use crate::bernoulli::INDEXED_BLOCK_SHOTS;
 use crate::dem_sampling::{DemResourceLimitError, DemSamplerLimits, DemSamplingPlan};
@@ -102,85 +104,14 @@ impl SessionBatch {
                         message: "DEM batch omitted requested sampled-error storage".to_owned(),
                     })?
                     .view_prefix(shot_count)
-                    .map_err(internal_format_error)?,
+                    .map_err(internal_format_error)?
+                    .into(),
             )
         } else {
             None
         };
         DemSampleBatchView::try_new(detection, sampled_errors).map_err(internal_format_error)
     }
-
-    pub(super) fn copy_from_plane_chunk(
-        &mut self,
-        detector_planes: &[u64],
-        observable_planes: &[u64],
-        error_planes: Option<&[u64]>,
-        plane_word_index: usize,
-        shot_count: usize,
-        include_sampled_errors: bool,
-    ) -> Result<(), DemSamplingExecutionError> {
-        copy_plane_words(
-            &mut self.detectors,
-            detector_planes,
-            plane_word_index,
-            shot_count,
-        )?;
-        copy_plane_words(
-            &mut self.observables,
-            observable_planes,
-            plane_word_index,
-            shot_count,
-        )?;
-        if include_sampled_errors {
-            let source =
-                error_planes.ok_or_else(|| DemSamplingExecutionError::InternalInvariant {
-                    message: "DEM sample planes omitted requested sampled-error output".to_owned(),
-                })?;
-            let target = self.sampled_errors.as_mut().ok_or_else(|| {
-                DemSamplingExecutionError::InternalInvariant {
-                    message: "DEM batch omitted requested sampled-error storage".to_owned(),
-                }
-            })?;
-            copy_plane_words(target, source, plane_word_index, shot_count)?;
-        }
-        Ok(())
-    }
-}
-
-fn copy_plane_words(
-    target: &mut PackedShotBatch,
-    words: &[u64],
-    plane_word_index: usize,
-    shot_count: usize,
-) -> Result<(), DemSamplingExecutionError> {
-    if shot_count > target.shot_count() {
-        return Err(DemSamplingExecutionError::InternalInvariant {
-            message: "DEM plane chunk exceeds the reusable output batch".to_owned(),
-        });
-    }
-    let width = target.bits_per_shot();
-    let start = plane_word_index.checked_mul(width).ok_or_else(|| {
-        DemSamplingExecutionError::InternalInvariant {
-            message: "DEM plane chunk offset overflowed".to_owned(),
-        }
-    })?;
-    let end =
-        start
-            .checked_add(width)
-            .ok_or_else(|| DemSamplingExecutionError::InternalInvariant {
-                message: "DEM plane chunk end overflowed".to_owned(),
-            })?;
-    let chunk =
-        words
-            .get(start..end)
-            .ok_or_else(|| DemSamplingExecutionError::InternalInvariant {
-                message: "DEM plane chunk escaped sampled storage".to_owned(),
-            })?;
-    let source = BitPlane64BatchView::try_from_words(chunk, target.shot_count(), width)
-        .map_err(internal_format_error)?;
-    target
-        .copy_from_bit_planes(source)
-        .map_err(internal_format_error)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -207,11 +138,11 @@ pub(super) fn initial_capacities(
         ))
     };
     let include_sampled_errors = fits(1, 1, true);
-    for output in (1..=MAX_BATCH_SHOTS).rev() {
+    for output in (1..=MAX_REPLAY_BATCH_SHOTS).rev() {
         if !fits(output, 1, include_sampled_errors) {
             continue;
         }
-        if output < MAX_BATCH_SHOTS {
+        if output < MAX_REPLAY_BATCH_SHOTS {
             return Ok(SessionCapacities {
                 output,
                 sample: output,

@@ -6,8 +6,8 @@
 # implementation types belong in their owning component namespaces or crates.
 stab_model::AbsoluteTolerance
 stab_algebra::AlgebraMemoryBudget
-stab_records::BitPlane64Batch
-stab_records::BitPlane64BatchView
+stab_records::BitPlaneBatch
+stab_records::BitPlaneBatchView
 stab_model::ByteSpan
 stab_model::Cancellation
 stab_model::Cancelled
@@ -95,6 +95,7 @@ stab_algebra::PauliString
 stab_model::Probability
 stab_model::ProbabilityStimText
 stab_model::QubitId
+stab_records::RecordBatchView
 stab_records::RecordEncoding
 stab_records::RecordFormat
 stab_model::RepeatBlock

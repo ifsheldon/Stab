@@ -14,9 +14,13 @@ use super::{DemError, DemSamplerLimits};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount, SinkFailurePhase};
 
-const MAX_BATCH_SHOTS: usize = 64;
+/// Most records one replay batch holds.
+const MAX_REPLAY_BATCH_SHOTS: usize = 64;
+/// Most shots one generated-sample batch delivers: the batch bound every sampling session shares.
+const FRAME_BATCH_SHOTS: usize = crate::MAX_BATCH_SHOTS;
 
 mod batch;
+mod window;
 
 use batch::{SessionBatch, initial_capacities, validate_session_storage};
 
@@ -349,23 +353,10 @@ impl DemSamplingSession {
                 if self.is_cancelled() {
                     break 'sampling;
                 }
-                let batch_shots = self
-                    .batch
-                    .capacity()
-                    .min(sample_shots.saturating_sub(sample_offset));
-                let plane_word_index = sample_offset / u64::BITS as usize;
-                if let Err(source) = self.copy_sample_chunk(
-                    plane_word_index,
-                    batch_shots,
-                    mode.includes_sampled_errors(),
-                ) {
-                    self.poisoned = true;
-                    return Err(DemSamplingRunError::Engine {
-                        source,
-                        progress: DemSamplingRunProgress::new(committed, batch_shots as u64),
-                    });
-                }
-                self.write_active_batch(
+                let batch_shots = FRAME_BATCH_SHOTS.min(sample_shots - sample_offset);
+                self.write_sample_window(
+                    sample_shots,
+                    sample_offset,
                     batch_shots,
                     mode.includes_sampled_errors(),
                     sink,
@@ -432,22 +423,6 @@ impl DemSamplingSession {
             }
         }
         Ok(())
-    }
-
-    fn copy_sample_chunk(
-        &mut self,
-        plane_word_index: usize,
-        shot_count: usize,
-        include_sampled_errors: bool,
-    ) -> Result<(), DemSamplingExecutionError> {
-        self.batch.copy_from_plane_chunk(
-            &self.detector_planes,
-            &self.observable_planes,
-            self.error_planes.as_deref(),
-            plane_word_index,
-            shot_count,
-            include_sampled_errors,
-        )
     }
 
     fn fill_replay_batch(
@@ -789,7 +764,7 @@ impl DemReplaySession {
                 .map_err(preflight_error)?;
         }
         let mut transaction = self.start_transaction(sink)?;
-        for records in error_records.chunks(MAX_BATCH_SHOTS) {
+        for records in error_records.chunks(MAX_REPLAY_BATCH_SHOTS) {
             if transaction.write_batch(records)? == DemReplayBatchStatus::Cancelled {
                 break;
             }
@@ -806,11 +781,11 @@ impl DemReplaySession {
         Sink: DemSampleSink,
     {
         self.ensure_transaction_state()?;
-        if error_records.len() > MAX_BATCH_SHOTS {
+        if error_records.len() > MAX_REPLAY_BATCH_SHOTS {
             return Err(DemSamplingRunError::Engine {
                 source: DemSamplingExecutionError::InvalidRequest(DemError::invalid_result_format(
                     format!(
-                        "DEM replay batch supports at most {MAX_BATCH_SHOTS} records, got {}",
+                        "DEM replay batch supports at most {MAX_REPLAY_BATCH_SHOTS} records, got {}",
                         error_records.len()
                     ),
                 )),

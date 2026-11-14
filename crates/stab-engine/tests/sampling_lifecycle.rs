@@ -244,7 +244,7 @@ fn mid_run_sink_failures_poison_after_committing_written_batches() {
         ..ProbeSink::default()
     };
 
-    match session.run(ShotCount::new(70), &mut failing_sink) {
+    match session.run(ShotCount::new(262), &mut failing_sink) {
         Err(RunError::Sink {
             phase,
             source,
@@ -252,7 +252,7 @@ fn mid_run_sink_failures_poison_after_committing_written_batches() {
         }) => {
             assert_eq!(phase, SinkFailurePhase::WriteBatch);
             assert_eq!(source, TestSinkError::Write);
-            assert_eq!(progress.committed_shots(), ShotCount::new(64));
+            assert_eq!(progress.committed_shots(), ShotCount::new(256));
             assert_eq!(progress.attempted_batch_shots(), ShotCount::new(6));
         }
         other => panic!("expected second-batch sink failure, got {other:?}"),

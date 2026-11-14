@@ -235,18 +235,15 @@ fn sample_error(
     )
     .map_err(indexed_range_error)?;
     if let SampledErrorPlanes::Record(error_planes) = error_output {
-        for (word_index, mask) in active_masks.iter().copied().enumerate() {
-            let index = word_index
-                .checked_mul(error_planes.len() / word_count)
-                .and_then(|offset| offset.checked_add(stream_position))
-                .ok_or_else(plane_storage_overflow_error)?;
-            let plane = error_planes.get_mut(index).ok_or_else(|| {
+        let plane = stream_position
+            .checked_mul(word_count)
+            .and_then(|start| error_planes.get_mut(start..start.checked_add(word_count)?))
+            .ok_or_else(|| {
                 DemError::invalid_sampler_compilation(
                     "DEM sampled-error plane index escaped compiled storage",
                 )
             })?;
-            *plane = mask;
-        }
+        plane.copy_from_slice(active_masks);
     }
     if active_masks.iter().all(|mask| *mask == 0) {
         return Ok(());
@@ -274,6 +271,7 @@ fn sample_error(
     Ok(())
 }
 
+/// XORs `masks` into plane `plane_index` of bit-major planes holding `word_count` words each.
 fn xor_plane_masks(
     planes: &mut [u64],
     plane_index: usize,
@@ -281,24 +279,16 @@ fn xor_plane_masks(
     word_count: usize,
     kind: &'static str,
 ) -> DemResult<()> {
-    let width = planes
-        .len()
-        .checked_div(word_count)
-        .ok_or_else(plane_storage_overflow_error)?;
-    if plane_index >= width {
-        return Err(DemError::invalid_sampler_compilation(format!(
-            "{kind} index {plane_index} is out of range"
-        )));
-    }
-    for (word_index, mask) in masks.iter().copied().enumerate() {
-        let index = word_index
-            .checked_mul(width)
-            .and_then(|offset| offset.checked_add(plane_index))
-            .ok_or_else(plane_storage_overflow_error)?;
-        let plane = planes
-            .get_mut(index)
-            .ok_or_else(plane_storage_overflow_error)?;
-        *plane ^= mask;
+    let plane = plane_index
+        .checked_mul(word_count)
+        .and_then(|start| planes.get_mut(start..start.checked_add(word_count)?))
+        .ok_or_else(|| {
+            DemError::invalid_sampler_compilation(format!(
+                "{kind} index {plane_index} is out of range"
+            ))
+        })?;
+    for (plane, mask) in plane.iter_mut().zip(masks) {
+        *plane ^= *mask;
     }
     Ok(())
 }

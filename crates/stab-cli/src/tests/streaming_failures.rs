@@ -17,7 +17,7 @@ fn huge_outputs_stream_until_the_writer_fails() {
         (
             &["stab", "sample", "--shots=1000000000"][..],
             &b"M 0\n"[..],
-            "sampling sink write-batch failed after 0 committed shots while attempting 64 shots: \
+            "sampling sink write-batch failed after 0 committed shots while attempting 256 shots: \
              intentional write stop",
         ),
         (
@@ -56,7 +56,7 @@ fn sample_reports_second_batch_writer_failure_with_exact_progress() {
     let mut stdout = FailAfterOneWrite::default();
     let mut stderr = Vec::new();
     let status = run_from(
-        ["stab", "sample", "--shots=128"],
+        ["stab", "sample", "--shots=512"],
         b"M 0\n".as_slice(),
         &mut stdout,
         &mut stderr,
@@ -67,8 +67,8 @@ fn sample_reports_second_batch_writer_failure_with_exact_progress() {
     let stderr = String::from_utf8(stderr).expect("stderr is utf-8");
     for expected in [
         "sampling sink write-batch failed",
-        "after 64 committed shots",
-        "while attempting 64 shots",
+        "after 256 committed shots",
+        "while attempting 256 shots",
         "intentional second-batch stop",
     ] {
         assert!(stderr.contains(expected), "{stderr}");

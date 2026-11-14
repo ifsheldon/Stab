@@ -8,7 +8,7 @@ use std::io::{self, Write};
 
 use stab_records::{
     DemSampleBatchView, DetectionBatchView, DetsResultType, FormatError, FormatErrorCode,
-    PackedShotBatchView, RecordBatchPart, RecordEncoder, RecordFormat, RecordWriteError,
+    RecordBatchPart, RecordBatchView, RecordEncoder, RecordFormat, RecordWriteError,
 };
 
 use crate::{
@@ -246,7 +246,7 @@ impl DemSampleBatchEncoder {
 /// Sampled errors use the measurement namespace, so DETS writes them as `M<index>` tokens.
 fn write_single(
     encoder: &mut RecordEncoder,
-    records: PackedShotBatchView<'_>,
+    records: RecordBatchView<'_>,
     output: &mut dyn Write,
 ) -> io::Result<()> {
     encoder

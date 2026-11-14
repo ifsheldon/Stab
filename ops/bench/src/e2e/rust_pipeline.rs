@@ -150,8 +150,11 @@ impl<'a> LogicalFailureSink<'a> {
         Ok(Self {
             decoder,
             report,
-            predictions: ObservablePredictionBatch::zeros(64, correction_width)
-                .map_err(|source| source.to_string())?,
+            predictions: ObservablePredictionBatch::zeros(
+                stab_engine::MAX_BATCH_SHOTS,
+                correction_width,
+            )
+            .map_err(|source| source.to_string())?,
             cancellation: DecodeCancellation::new(),
             finished: false,
         })

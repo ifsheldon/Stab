@@ -8,7 +8,7 @@
 
 use std::convert::Infallible;
 
-use stab_records::MeasurementSink;
+use stab_records::{MeasurementSink, PackedShotBatch};
 
 use super::super::test_support::convert_measurements_to_detection_events_with_sweep;
 use super::*;
@@ -492,10 +492,54 @@ fn direct_detection_sampling_reports_widths_and_bounded_batches() {
         assert_eq!(plan.measurement_width().get(), measurements);
         assert_eq!(plan.detector_width().get(), detectors);
         assert_eq!(plan.observable_width().get(), observables);
-        let actual = run_plan(&plan, 129, 31);
-        assert_eq!(actual.records.len(), 129);
-        assert_eq!(actual.batch_sizes, vec![64, 64, 1]);
+        let actual = run_plan(&plan, 513, 31);
+        assert_eq!(actual.records.len(), 513);
+        assert_eq!(actual.batch_sizes, vec![256, 256, 1]);
         assert_eq!(actual.finish_count, 1);
+    }
+}
+
+#[test]
+fn noiseless_detection_is_exact_at_every_batch_boundary_and_partition() {
+    // Resets and measurements randomize the frame lanes, but every detector and observable is
+    // deterministic, so every record must be all false however the shots split across batches.
+    let plan = DetectionSamplingCompiler::new()
+        .compile(&circuit(
+            "RX 0\nH 0\nM 0\nDETECTOR rec[-1]\nX 1\nM 1\nOBSERVABLE_INCLUDE(0) rec[-1]\n\
+             MR 1 1\nDETECTOR rec[-1] rec[-2]\nMX 2\nMX 2\nDETECTOR rec[-1] rec[-2]\n",
+        ))
+        .expect("compile noiseless detection plan");
+    let zero = DetectionRecordBuffer {
+        detectors: vec![false; 3],
+        observables: vec![false],
+    };
+    for shots in [1_u64, 63, 64, 65, 255, 256, 257, 1000] {
+        let whole = run_plan(&plan, shots, 3);
+        assert_eq!(whole.records.len() as u64, shots);
+        assert!(
+            whole.records.iter().all(|record| *record == zero),
+            "{shots} shots"
+        );
+        assert!(
+            whole
+                .batch_sizes
+                .iter()
+                .all(|size| *size <= crate::MAX_BATCH_SHOTS)
+        );
+
+        let mut session = plan
+            .session(RandomPolicy::Seeded(Seed::new(3)))
+            .expect("create partitioned session");
+        let mut records = 0_usize;
+        for part in [shots / 3, shots - shots / 3] {
+            let mut sink = CollectSink::default();
+            session
+                .run(ShotCount::new(part), &mut sink)
+                .expect("run partition");
+            assert!(sink.records.iter().all(|record| *record == zero));
+            records += sink.records.len();
+        }
+        assert_eq!(records as u64, shots);
     }
 }
 
@@ -505,21 +549,20 @@ fn seeded_same_session_partitioning_is_exact() {
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit)
         .expect("compile detection plan");
-    let combined = run_plan(&plan, 130, 44).records;
+    let combined = run_plan(&plan, 600, 44).records;
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(44)))
         .expect("create partitioned session");
-    let mut first = CollectSink::default();
-    let mut second = CollectSink::default();
-    session
-        .run(ShotCount::new(17), &mut first)
-        .expect("run first partition");
-    session
-        .run(ShotCount::new(113), &mut second)
-        .expect("run second partition");
-    first.records.extend(second.records);
-    assert_eq!(first.records, combined);
-    assert_eq!(session.total_committed_shots(), ShotCount::new(130));
+    let mut partitioned = Vec::new();
+    for shots in [17, 300, 1, 282] {
+        let mut sink = CollectSink::default();
+        session
+            .run(ShotCount::new(shots), &mut sink)
+            .expect("run partition");
+        partitioned.extend(sink.records);
+    }
+    assert_eq!(partitioned, combined);
+    assert_eq!(session.total_committed_shots(), ShotCount::new(600));
 }
 
 #[test]
@@ -537,13 +580,13 @@ fn cancellation_stops_between_bounded_batches_and_finalizes_sink() {
         cancellation: cancellation.clone(),
     };
     let summary = session
-        .run(ShotCount::new(130), &mut sink)
+        .run(ShotCount::new(600), &mut sink)
         .expect("cancel detection run");
     assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
-    assert_eq!(summary.requested_shots(), ShotCount::new(130));
-    assert_eq!(summary.committed_shots(), ShotCount::new(64));
-    assert_eq!(summary.total_committed_shots(), ShotCount::new(64));
-    assert_eq!(sink.inner.batch_sizes, vec![64]);
+    assert_eq!(summary.requested_shots(), ShotCount::new(600));
+    assert_eq!(summary.committed_shots(), ShotCount::new(256));
+    assert_eq!(summary.total_committed_shots(), ShotCount::new(256));
+    assert_eq!(sink.inner.batch_sizes, vec![256]);
     assert_eq!(sink.inner.finish_count, 1);
     assert!(!session.is_poisoned());
     cancellation.reset();
@@ -552,7 +595,7 @@ fn cancellation_stops_between_bounded_batches_and_finalizes_sink() {
         .run(ShotCount::new(1), &mut resumed)
         .expect("resume cancelled session");
     assert_eq!(resumed.records.len(), 1);
-    assert_eq!(session.total_committed_shots(), ShotCount::new(65));
+    assert_eq!(session.total_committed_shots(), ShotCount::new(257));
 }
 
 #[test]
@@ -570,10 +613,13 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
         writes: 0,
     };
     let error = session
-        .run(ShotCount::new(65), &mut sink)
+        .run(ShotCount::new(257), &mut sink)
         .expect_err("surface write failure");
     assert_eq!(error.progress().committed_shots(), ShotCount::new(0));
-    assert_eq!(error.progress().attempted_batch_shots(), ShotCount::new(64));
+    assert_eq!(
+        error.progress().attempted_batch_shots(),
+        ShotCount::new(256)
+    );
     match error {
         DetectionRunError::Sink {
             phase,
@@ -583,7 +629,7 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
             assert_eq!(phase, SinkFailurePhase::WriteBatch);
             assert_eq!(source, TestSinkError::Write);
             assert_eq!(progress.committed_shots(), ShotCount::new(0));
-            assert_eq!(progress.attempted_batch_shots(), ShotCount::new(64));
+            assert_eq!(progress.attempted_batch_shots(), ShotCount::new(256));
         }
         DetectionRunError::Engine { .. } => panic!("expected sink error"),
     }

@@ -10,9 +10,10 @@ use std::io::{self, Write};
 use stab_bits::BitSlice;
 use thiserror::Error;
 
+use crate::batches::RecordBatchStorage;
 use crate::{
-    BitPlane64BatchView, DetsResultType, FormatError, FormatErrorCode, FormatErrorContext,
-    PackedShotBatch, PackedShotBatchView, RecordFormat, RecordResult,
+    DetsResultType, FormatError, FormatErrorCode, FormatErrorContext, PackedShotBatch,
+    RecordBatchView, RecordFormat, RecordResult,
 };
 
 /// Encoded bytes retained before they are drained into the destination writer mid-call.
@@ -44,26 +45,30 @@ impl<'a> RecordPart<'a> {
     }
 }
 
-/// One column group of a shot-major batch together with its DETS namespace.
+/// One column group of a batch together with its DETS namespace.
 ///
 /// Every part of one [`RecordEncoder::write_batch`] call must hold the same number of shots; shot
-/// `i` of the output record is the concatenation of shot `i` of every part.
+/// `i` of the output record is the concatenation of shot `i` of every part. Each part may be
+/// shot-major or bit planes of any shot count, independently of the others.
 #[derive(Clone, Copy, Debug)]
 pub struct RecordBatchPart<'a> {
     namespace: DetsResultType,
-    records: PackedShotBatchView<'a>,
+    records: RecordBatchView<'a>,
 }
 
 impl<'a> RecordBatchPart<'a> {
-    pub const fn new(namespace: DetsResultType, records: PackedShotBatchView<'a>) -> Self {
-        Self { namespace, records }
+    pub fn new(namespace: DetsResultType, records: impl Into<RecordBatchView<'a>>) -> Self {
+        Self {
+            namespace,
+            records: records.into(),
+        }
     }
 
     pub const fn namespace(self) -> DetsResultType {
         self.namespace
     }
 
-    pub const fn records(self) -> PackedShotBatchView<'a> {
+    pub const fn records(self) -> RecordBatchView<'a> {
         self.records
     }
 }
@@ -84,8 +89,10 @@ pub enum RecordWriteError {
 /// Each `write_*` call validates its input, encodes it, and drains every completed byte into the
 /// destination before returning, so no encoded record is held back between calls. The only state
 /// retained across calls is an incomplete PTB64 group of fewer than 64 records, reported by
-/// [`Self::pending_group_records`]. Working storage is bounded by one record, one batch transpose,
-/// and one PTB64 group, never by the number of records written.
+/// [`Self::pending_group_records`]. Bit-plane input is encoded 64 shots at a time: PTB64 copies
+/// whole plane words, and every other format transposes one 64-shot block per part. Working
+/// storage is bounded by one record, one 64-shot block per part, and one PTB64 group, never by
+/// the number of records or the size of a batch.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RecordEncoder {
     format: RecordFormat,
@@ -94,7 +101,10 @@ pub struct RecordEncoder {
     record: RecordState,
     ptb64_planes: Vec<u64>,
     ptb64_records: usize,
-    transpose: Option<PackedShotBatch>,
+    /// One transposed 64-shot block per bit-plane part of the current batch.
+    plane_rows: Vec<PackedShotBatch>,
+    /// One word per bit of the bit-plane part being transposed.
+    plane_column: Vec<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -129,7 +139,8 @@ impl RecordEncoder {
             record: RecordState::default(),
             ptb64_planes,
             ptb64_records: 0,
-            transpose: None,
+            plane_rows: Vec::new(),
+            plane_column: Vec::new(),
         })
     }
 
@@ -171,7 +182,7 @@ impl RecordEncoder {
         self.drain(out)
     }
 
-    /// Encodes every shot of a shot-major batch whose records are split into column groups.
+    /// Encodes every shot of a batch whose records are split into column groups.
     pub fn write_batch<W>(
         &mut self,
         parts: &[RecordBatchPart<'_>],
@@ -181,14 +192,51 @@ impl RecordEncoder {
         W: Write + ?Sized,
     {
         let shot_count = self.validate_batch(parts)?;
-        if self.format == RecordFormat::Ptb64 && self.ptb64_records == 0 && shot_count == WORD_BITS
-        {
-            return self.write_aligned_ptb64_group(parts, out);
+        let all_shot_major = parts
+            .iter()
+            .all(|part| part.records.shot_major_records().is_some());
+        if all_shot_major && self.format != RecordFormat::Ptb64 {
+            return self.write_shot_major_records(parts, shot_count, out);
         }
+        let mut block_start = 0_usize;
+        while block_start < shot_count {
+            let block_shots = WORD_BITS.min(shot_count - block_start);
+            if self.format == RecordFormat::Ptb64
+                && self.ptb64_records == 0
+                && block_shots == WORD_BITS
+            {
+                self.write_aligned_ptb64_group(parts, block_start)?;
+            } else {
+                self.write_block_records(parts, block_start, block_shots, out)?;
+            }
+            self.drain_if_full(out)?;
+            block_start += block_shots;
+        }
+        self.drain(out)
+    }
+
+    /// Encodes a batch whose parts are all shot-major, record by record.
+    fn write_shot_major_records<W>(
+        &mut self,
+        parts: &[RecordBatchPart<'_>],
+        shot_count: usize,
+        out: &mut W,
+    ) -> Result<(), RecordWriteError>
+    where
+        W: Write + ?Sized,
+    {
         for shot_index in 0..shot_count {
             self.begin_record();
             for part in parts {
-                let row = part.records.shot(shot_index)?;
+                let row = match part.records.storage() {
+                    RecordBatchStorage::ShotMajor(records) => records.shot(shot_index)?,
+                    RecordBatchStorage::BitPlanes(_) => {
+                        return Err(FormatError::invalid_data(
+                            "a shot-major batch part changed layout while it was encoded",
+                        )
+                        .into());
+                    }
+                };
                 self.encode_part(part.namespace, row.words(), row.len())?;
             }
             self.end_record();
@@ -197,71 +245,104 @@ impl RecordEncoder {
         self.drain(out)
     }
 
-    /// Encodes a bit-plane batch whose records all belong to one namespace.
-    pub fn write_bit_planes<W>(
+    /// Encodes the shots of one 64-shot block record by record.
+    fn write_block_records<W>(
         &mut self,
-        planes: BitPlane64BatchView<'_>,
-        namespace: DetsResultType,
+        parts: &[RecordBatchPart<'_>],
+        block_start: usize,
+        block_shots: usize,
         out: &mut W,
     ) -> Result<(), RecordWriteError>
     where
         W: Write + ?Sized,
     {
-        self.check_width(planes.bits_per_shot())?;
-        if self.format == RecordFormat::Ptb64
-            && self.ptb64_records == 0
-            && planes.shot_count() == WORD_BITS
-        {
-            for bit_index in 0..planes.bits_per_shot() {
-                let plane = planes.plane(bit_index)?;
-                let word = plane.words().first().copied().ok_or_else(|| {
-                    FormatError::invalid_data(
-                        "64-shot bit plane did not contain its required storage word",
-                    )
-                })?;
-                self.pending.extend_from_slice(&word.to_le_bytes());
+        let mut plane_rows = std::mem::take(&mut self.plane_rows);
+        let result = self.transpose_plane_blocks(parts, block_start, &mut plane_rows);
+        let result = result.and_then(|()| {
+            for block_shot in 0..block_shots {
+                self.begin_record();
+                for (part, rows) in parts.iter().zip(&plane_rows) {
+                    let row = match part.records.storage() {
+                        RecordBatchStorage::ShotMajor(records) => {
+                            records.shot(block_start + block_shot)?
+                        }
+                        RecordBatchStorage::BitPlanes(_) => rows.shot(block_shot)?,
+                    };
+                    self.encode_part(part.namespace, row.words(), row.len())?;
+                }
+                self.end_record();
                 self.drain_if_full(out)?;
             }
-            return self.drain(out);
-        }
-        let mut transpose = match self.transpose.take() {
-            Some(transpose)
-                if transpose.shot_count() == planes.shot_count()
-                    && transpose.bits_per_shot() == planes.bits_per_shot() =>
-            {
-                transpose
-            }
-            _ => PackedShotBatch::zeros(planes.shot_count(), planes.bits_per_shot())?,
-        };
-        transpose.copy_from_bit_planes(planes)?;
-        let result = self.write_batch(&[RecordBatchPart::new(namespace, transpose.view())], out);
-        self.transpose = Some(transpose);
+            Ok(())
+        });
+        self.plane_rows = plane_rows;
         result
     }
 
-    /// Transposes a batch of exactly 64 shots straight into one complete PTB64 group.
-    fn write_aligned_ptb64_group<W>(
+    /// Transposes block `block_start / 64` of every bit-plane part into `plane_rows`, which
+    /// receives one entry per part; shot-major parts keep an unused entry.
+    fn transpose_plane_blocks(
         &mut self,
         parts: &[RecordBatchPart<'_>],
-        out: &mut W,
-    ) -> Result<(), RecordWriteError>
-    where
-        W: Write + ?Sized,
-    {
+        block_start: usize,
+        plane_rows: &mut Vec<PackedShotBatch>,
+    ) -> Result<(), RecordWriteError> {
+        for (index, part) in parts.iter().enumerate() {
+            let width = match part.records.storage() {
+                RecordBatchStorage::BitPlanes(_) => part.records.bits_per_shot(),
+                RecordBatchStorage::ShotMajor(_) => 0,
+            };
+            match plane_rows.get(index) {
+                Some(rows) if rows.bits_per_shot() == width => {}
+                Some(_) | None => {
+                    let rows = PackedShotBatch::zeros(WORD_BITS, width)?;
+                    if let Some(slot) = plane_rows.get_mut(index) {
+                        *slot = rows;
+                    } else {
+                        plane_rows.push(rows);
+                    }
+                }
+            }
+            let RecordBatchStorage::BitPlanes(planes) = part.records.storage() else {
+                continue;
+            };
+            let rows = plane_rows.get_mut(index).ok_or_else(|| {
+                FormatError::invalid_data("bit-plane block scratch lost its part entry")
+            })?;
+            self.plane_column.resize(width, 0);
+            planes.copy_word_column_into(block_start / WORD_BITS, &mut self.plane_column)?;
+            rows.copy_transpose_from_word_column(&self.plane_column)?;
+        }
+        Ok(())
+    }
+
+    /// Writes one complete PTB64 group from the 64 shots starting at `block_start`.
+    fn write_aligned_ptb64_group(
+        &mut self,
+        parts: &[RecordBatchPart<'_>],
+        block_start: usize,
+    ) -> RecordResult<()> {
         let mut offset = 0_usize;
         for part in parts {
             let end = offset + part.records.bits_per_shot();
             let planes = self.ptb64_planes.get_mut(offset..end).ok_or_else(|| {
                 FormatError::invalid_data("ptb64 column group escaped the encoder's declared width")
             })?;
-            part.records.copy_into_bit_plane_words(planes)?;
+            match part.records.storage() {
+                RecordBatchStorage::ShotMajor(records) => {
+                    records.copy_rows_into_bit_plane_words(block_start, WORD_BITS, planes)?;
+                }
+                RecordBatchStorage::BitPlanes(bit_planes) => {
+                    bit_planes.copy_word_column_into(block_start / WORD_BITS, planes)?;
+                }
+            }
             offset = end;
         }
         for plane in &mut self.ptb64_planes {
             self.pending.extend_from_slice(&plane.to_le_bytes());
             *plane = 0;
         }
-        self.drain(out)
+        Ok(())
     }
 
     fn check_width(&self, actual: usize) -> RecordResult<()> {

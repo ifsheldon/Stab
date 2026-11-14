@@ -811,13 +811,16 @@ impl ConversionPlan {
         Ok(())
     }
 
-    pub(super) fn convert_word_planes_into(
+    pub(super) fn convert_word_planes_into<Plane>(
         &self,
-        measurement_planes: &[u64],
-        detector_planes: &mut Vec<u64>,
-        observable_planes: &mut Vec<u64>,
+        measurement_planes: &[Plane],
+        detector_planes: &mut Vec<Plane>,
+        observable_planes: &mut Vec<Plane>,
         cancellation: &Cancellation,
-    ) -> DetectionResult<()> {
+    ) -> DetectionResult<()>
+    where
+        Plane: std::ops::BitXor<Output = Plane> + std::ops::BitXorAssign + Copy + Default,
+    {
         if measurement_planes.len() != self.measurement_count {
             return Err(DetectionError::invalid_result_format(format!(
                 "measurement plane count {} does not match the compiled width {}",
@@ -825,10 +828,10 @@ impl ConversionPlan {
                 self.measurement_count
             )));
         }
-        detector_planes.resize(self.detector_count, 0);
-        detector_planes.fill(0);
-        observable_planes.resize(self.observable_count, 0);
-        observable_planes.fill(0);
+        detector_planes.resize(self.detector_count, Plane::default());
+        detector_planes.fill(Plane::default());
+        observable_planes.resize(self.observable_count, Plane::default());
+        observable_planes.fill(Plane::default());
         let mut cursor = ConversionCursor::default();
         execute_program(
             &self.program,

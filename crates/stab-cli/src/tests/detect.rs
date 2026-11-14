@@ -7,21 +7,21 @@ const FLIPPED_DETECTOR_AND_OBSERVABLE: &[u8] =
 
 #[test]
 fn detect_and_sample_enforce_the_memory_budget_without_restricting_sparse_qubit_syntax() {
-    // Under a 256 MiB budget, detection's two frame planes and both packed batches reach the
-    // budget at this ID. Sampling's wider bit-plane frame reaches it at a lower ID, and no
+    // Detection and sampling share one 256-lane frame of two 32-byte planes per qubit, so under
+    // a 256 MiB budget both admit a frame below about 4.19 million qubits, and no
     // single-measurement fast path exempts the full Stim qubit-ID range from that frame.
     for (command, qubit, expected_error) in [
-        ("detect", 16_777_150, None),
+        ("detect", 4_000_000, None),
         (
             "detect",
             16_777_215,
-            Some("detection session needs an estimated 268436496 bytes"),
+            Some("detection session needs an estimated 1073741888 bytes"),
         ),
         ("sample", 4_000_000, None),
         (
             "sample",
             16_777_215,
-            Some("sampling session needs an estimated 1073741864 bytes"),
+            Some("sampling session needs an estimated 1073741856 bytes"),
         ),
     ] {
         let input = format!("M {qubit}\nDETECTOR rec[-1]\n");

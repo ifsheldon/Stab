@@ -1,5 +1,5 @@
 use crate::{
-    BitPlane64BatchView, FormatError, RecordResult,
+    FormatError, RecordResult,
     result_packed::{
         b8_bytes_per_record, decode_next_r8_record, ptb64_prefix_layout,
         ptb64_record_count as packed_ptb64_record_count,
@@ -74,28 +74,6 @@ pub fn write_ptb64_records_checked(records: &[Vec<bool>]) -> RecordResult<Vec<u8
     validate_ptb64_shot_count(records.len())?;
     validate_uniform_record_width(records, "ptb64")?;
     Ok(write_ptb64_records(records))
-}
-
-pub fn write_bit_plane_64_batch(batch: BitPlane64BatchView<'_>) -> RecordResult<Vec<u8>> {
-    validate_ptb64_shot_count(batch.shot_count())?;
-    if batch.shot_count() == 0 {
-        return Ok(Vec::new());
-    }
-    let byte_capacity = batch
-        .bits_per_shot()
-        .checked_mul(size_of::<u64>())
-        .ok_or_else(|| FormatError::invalid_result_format("ptb64 output size overflowed"))?;
-    let mut output = Vec::with_capacity(byte_capacity);
-    for bit_index in 0..batch.bits_per_shot() {
-        let plane = batch.plane(bit_index)?;
-        let word = plane.words().first().copied().ok_or_else(|| {
-            FormatError::invalid_result_format(
-                "64-shot bit plane did not contain its required storage word",
-            )
-        })?;
-        output.extend_from_slice(&word.to_le_bytes());
-    }
-    Ok(output)
 }
 
 pub fn read_ptb64_records(

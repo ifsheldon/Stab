@@ -8,12 +8,14 @@ use rand::rngs::SmallRng;
 
 use stab_model::{Cancellation, Circuit};
 use stab_records::{
-    BitPlane64BatchView, DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView,
-    MeasurementWidth, ObservableWidth, PackedShotBatch,
+    BitPlaneBatchView, DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView,
+    MeasurementWidth, ObservableWidth,
 };
 
 use super::error::DetectionError;
-use super::frame::{DetectorFrameState, DirectDetectorFramePlan};
+use super::frame::{
+    DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FrameBatchState, FrameLanes, PendingLanes,
+};
 use super::{DetectionConversionLimits, PreparedMeasurementToDetection};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
 use crate::{RandomPolicy, ReferenceSampleMode, ShotCount, SinkFailurePhase};
@@ -28,11 +30,11 @@ pub use contracts::{
 };
 pub use delivery::MeasurementToDetectionTransaction;
 use execution::{
-    detection_rng, invariant_error, run_direct, storage_error, validate_conversion_session_storage,
+    detection_rng, invariant_error, run_direct, validate_conversion_session_storage,
     validate_direct_session_storage,
 };
 
-const MAX_BATCH_SHOTS: usize = 64;
+use crate::MAX_BATCH_SHOTS;
 
 /// Builder for immutable measurement-to-detection conversion plans.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -131,136 +133,31 @@ impl MeasurementToDetectionPlan {
     }
 }
 
-struct DetectionBatchBuffers {
-    detectors: PackedShotBatch,
-    observables: PackedShotBatch,
-}
-
-impl DetectionBatchBuffers {
-    fn storage_bytes(detector_width: DetectorWidth, observable_width: ObservableWidth) -> u128 {
-        let detector_words = stab_bits::BitLen::new(detector_width.get()).word_count() as u128;
-        let observable_words = stab_bits::BitLen::new(observable_width.get()).word_count() as u128;
-        detector_words
-            .saturating_add(observable_words)
-            .saturating_mul(MAX_BATCH_SHOTS as u128)
-            .saturating_mul(size_of::<u64>() as u128)
-    }
-
-    fn new(
-        detector_width: DetectorWidth,
-        observable_width: ObservableWidth,
-    ) -> Result<Self, DetectionExecutionError> {
-        Ok(Self {
-            detectors: PackedShotBatch::zeros(MAX_BATCH_SHOTS, detector_width.get())
-                .map_err(storage_error)?,
-            observables: PackedShotBatch::zeros(MAX_BATCH_SHOTS, observable_width.get())
-                .map_err(storage_error)?,
-        })
-    }
-
-    fn view(&self, shot_count: usize) -> Result<DetectionBatchView<'_>, DetectionExecutionError> {
-        let detectors = self
-            .detectors
-            .view_prefix(shot_count)
-            .map_err(invariant_error)?;
-        let observables = self
-            .observables
-            .view_prefix(shot_count)
-            .map_err(invariant_error)?;
-        DetectionBatchView::try_new(detectors, observables).map_err(invariant_error)
-    }
-
-    fn copy_range_from(
-        &mut self,
-        source: &Self,
-        source_start: usize,
-        shot_count: usize,
-    ) -> Result<(), DetectionExecutionError> {
-        copy_packed_range(
-            &mut self.detectors,
-            &source.detectors,
-            source_start,
-            shot_count,
-        )?;
-        copy_packed_range(
-            &mut self.observables,
-            &source.observables,
-            source_start,
-            shot_count,
-        )
-    }
-
-    fn copy_from_planes(
-        &mut self,
-        detector_planes: &[u64],
-        observable_planes: &[u64],
-    ) -> Result<(), DetectionExecutionError> {
-        copy_planes_into_packed(&mut self.detectors, detector_planes)?;
-        copy_planes_into_packed(&mut self.observables, observable_planes)
-    }
-}
-
-fn copy_planes_into_packed(
-    target: &mut PackedShotBatch,
-    planes: &[u64],
-) -> Result<(), DetectionExecutionError> {
-    if target.shot_count() != MAX_BATCH_SHOTS || target.bits_per_shot() != planes.len() {
-        return Err(DetectionExecutionError::InternalInvariant {
-            message: "detection output planes disagree with packed batch dimensions".to_owned(),
-        });
-    }
-    let source = BitPlane64BatchView::try_from_words(planes, MAX_BATCH_SHOTS, planes.len())
-        .map_err(invariant_error)?;
-    target.copy_from_bit_planes(source).map_err(invariant_error)
-}
-
-fn copy_packed_range(
-    target: &mut PackedShotBatch,
-    source: &PackedShotBatch,
-    source_start: usize,
+/// Borrows the first `shot_count` lanes of detector and observable frame planes as one batch.
+fn detection_plane_view<'a>(
+    detector_planes: &'a [FrameLanes],
+    observable_planes: &'a [FrameLanes],
     shot_count: usize,
-) -> Result<(), DetectionExecutionError> {
-    if target.bits_per_shot() != source.bits_per_shot()
-        || shot_count > target.shot_count()
-        || source_start
-            .checked_add(shot_count)
-            .is_none_or(|end| end > source.shot_count())
-    {
-        return Err(DetectionExecutionError::InternalInvariant {
-            message: "pending detection batch dimensions disagree".to_owned(),
-        });
-    }
-    for target_shot in 0..shot_count {
-        let source_shot = source_start.checked_add(target_shot).ok_or_else(|| {
-            DetectionExecutionError::InternalInvariant {
-                message: "pending detection shot index overflowed".to_owned(),
-            }
-        })?;
-        for bit_index in 0..source.bits_per_shot() {
-            let bit = source.get(source_shot, bit_index).ok_or_else(|| {
-                DetectionExecutionError::InternalInvariant {
-                    message: "pending detection source escaped its dimensions".to_owned(),
-                }
-            })?;
-            target
-                .set(target_shot, bit_index, bit)
-                .map_err(invariant_error)?;
-        }
-    }
-    Ok(())
+) -> Result<DetectionBatchView<'a>, DetectionExecutionError> {
+    DetectionBatchView::try_new(
+        BitPlaneBatchView::try_from_blocks(detector_planes, shot_count).map_err(invariant_error)?,
+        BitPlaneBatchView::try_from_blocks(observable_planes, shot_count)
+            .map_err(invariant_error)?,
+    )
+    .map_err(invariant_error)
 }
 
 /// Mutable reusable state for measurement-to-detection conversion.
 pub struct MeasurementToDetectionSession {
     plan: MeasurementToDetectionPlan,
     reference_sample: Vec<bool>,
-    sweep_correction: Option<DetectorFrameState>,
+    sweep_correction: Option<FrameBatchState>,
     correction_rng: SmallRng,
-    measurement_planes: Vec<u64>,
-    sweep_planes: Vec<u64>,
-    detector_planes: Vec<u64>,
-    observable_planes: Vec<u64>,
-    batch: DetectionBatchBuffers,
+    measurement_planes: Vec<FrameLanes>,
+    sweep_planes: Vec<FrameLanes>,
+    detector_planes: Vec<FrameLanes>,
+    observable_planes: Vec<FrameLanes>,
+    input_column: Vec<u64>,
     cancellation: OnceLock<Cancellation>,
     total_committed_shots: u64,
     poisoned: bool,
@@ -317,7 +214,12 @@ impl MeasurementToDetectionSession {
                 converter.observable_count(),
                 "measurement-to-detection observable planes",
             )?,
-            batch: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
+            input_column: try_zero_word_planes(
+                converter
+                    .measurement_count()
+                    .max(converter.sweep_bit_count()),
+                "measurement-to-detection input transpose column",
+            )?,
             cancellation: session_cancellation_slot(converter.plan.limits.cancellation()),
             plan,
             total_committed_shots: 0,
@@ -406,7 +308,11 @@ impl MeasurementToDetectionSession {
                 progress: DetectionRunProgress::new(committed_shots, shots.get()),
             });
         }
-        let batch = match self.batch.view(shot_count) {
+        let batch = match detection_plane_view(
+            &self.detector_planes,
+            &self.observable_planes,
+            shot_count,
+        ) {
             Ok(batch) => batch,
             Err(source) => {
                 self.poisoned = true;
@@ -549,11 +455,15 @@ impl MeasurementToDetectionSession {
         shot_count: usize,
     ) -> Result<(), DetectionExecutionError> {
         let converter = &self.plan.inner.converter;
-        copy_batch_into_word_planes(measurements, &mut self.measurement_planes, "measurement")?;
+        copy_batch_into_frame_planes(
+            measurements,
+            &mut self.measurement_planes,
+            &mut self.input_column,
+        )?;
         if let Some(sweeps) = sweeps {
-            copy_batch_into_word_planes(sweeps, &mut self.sweep_planes, "sweep")?;
+            copy_batch_into_frame_planes(sweeps, &mut self.sweep_planes, &mut self.input_column)?;
         } else {
-            self.sweep_planes.fill(0);
+            self.sweep_planes.fill(FrameLanes::ZERO);
         }
         converter
             .convert_word_planes_with_sweep_into(
@@ -567,9 +477,7 @@ impl MeasurementToDetectionSession {
                 &mut self.correction_rng,
                 session_cancellation(&self.cancellation),
             )
-            .map_err(DetectionExecutionError::from)?;
-        self.batch
-            .copy_from_planes(&self.detector_planes, &self.observable_planes)
+            .map_err(DetectionExecutionError::from)
     }
 
     const fn summary(
@@ -587,35 +495,62 @@ impl MeasurementToDetectionSession {
     }
 }
 
-fn try_zero_word_planes(
+fn try_zero_word_planes<Plane: Copy + Default>(
     width: usize,
     context: &'static str,
-) -> Result<Vec<u64>, DetectionExecutionError> {
+) -> Result<Vec<Plane>, DetectionExecutionError> {
     let mut planes = Vec::new();
     planes.try_reserve_exact(width).map_err(|error| {
         DetectionExecutionError::SessionStorageAllocation {
-            message: format!("could not reserve {width} words for {context}: {error}"),
+            message: format!("could not reserve {width} planes for {context}: {error}"),
         }
     })?;
-    planes.resize(width, 0);
+    planes.resize(width, Plane::default());
     Ok(planes)
 }
 
-fn copy_batch_into_word_planes(
+/// Replaces every frame plane with the records of `batch`, at most [`FRAME_BATCH_SHOTS`] of
+/// them, using `column` as scratch for one 64-shot word per result bit.
+fn copy_batch_into_frame_planes(
     batch: MeasurementBatchView<'_>,
-    target: &mut [u64],
-    kind: &'static str,
+    target: &mut [FrameLanes],
+    column: &mut [u64],
 ) -> Result<(), DetectionExecutionError> {
-    let result = if let Some(records) = batch.shot_major_records() {
-        records.copy_into_bit_plane_words(target)
-    } else if let Some(planes) = batch.bit_planes() {
-        planes.copy_words_into(target)
-    } else {
+    let width = target.len();
+    let column =
+        column
+            .get_mut(..width)
+            .ok_or_else(|| DetectionExecutionError::InternalInvariant {
+                message: "measurement-to-detection transpose column is narrower than its input"
+                    .to_owned(),
+            })?;
+    if batch.width().get() != width || batch.shot_count() > FRAME_BATCH_SHOTS {
         return Err(DetectionExecutionError::InternalInvariant {
-            message: format!("{kind} batch has no recognized storage representation"),
+            message: "measurement-to-detection input exceeds its frame planes".to_owned(),
         });
-    };
-    result.map_err(invariant_error)
+    }
+    target.fill(FrameLanes::ZERO);
+    for (word_index, row_start) in (0..batch.shot_count()).step_by(64).enumerate() {
+        let row_count = (batch.shot_count() - row_start).min(64);
+        let copied = if let Some(records) = batch.shot_major_records() {
+            records.copy_rows_into_bit_plane_words(row_start, row_count, column)
+        } else if let Some(planes) = batch.bit_planes() {
+            planes.copy_word_column_into(word_index, column)
+        } else {
+            return Err(DetectionExecutionError::InternalInvariant {
+                message: "measurement batch has no recognized storage representation".to_owned(),
+            });
+        };
+        copied.map_err(invariant_error)?;
+        for (plane, word) in target.iter_mut().zip(column.iter()) {
+            let mut words = plane.words();
+            if let Some(slot) = words.get_mut(word_index) {
+                *slot = *word;
+            }
+            *plane = FrameLanes::from_words(words);
+        }
+    }
+    Ok(())
 }
 
 /// Builder for immutable circuit detection-sampling plans.
@@ -702,11 +637,8 @@ impl DetectionSamplingPlan {
 
 struct DirectDetectionState {
     rng: SmallRng,
-    frame: DetectorFrameState,
-    batch: DetectionBatchBuffers,
-    delivery: DetectionBatchBuffers,
-    pending_start: usize,
-    pending_count: usize,
+    frame: FrameBatchState,
+    pending: PendingLanes,
     cancellation: OnceLock<Cancellation>,
 }
 
@@ -743,10 +675,7 @@ impl DetectionSamplingSession {
                 .direct
                 .state()
                 .map_err(DetectionExecutionError::Conversion)?,
-            batch: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
-            delivery: DetectionBatchBuffers::new(plan.detector_width(), plan.observable_width())?,
-            pending_start: 0,
-            pending_count: 0,
+            pending: PendingLanes::default(),
             cancellation: session_cancellation_slot(plan.inner.direct.cancellation()),
         };
         Ok(Self {

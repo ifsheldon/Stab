@@ -7,7 +7,7 @@
 )]
 
 use stab_records::{
-    BitPlane64Batch, DemSampleBatchView, DemSampleCodecSink, DemSampleSink, DetectionBatchView,
+    BitPlaneBatch, DemSampleBatchView, DemSampleCodecSink, DemSampleSink, DetectionBatchView,
     DetectionCodecSink, DetectionSink, DetectorWidth, DetsResultType, FormatErrorCode,
     MeasureRecordWriter, MeasurementBatchView, MeasurementCodecSink, MeasurementSink,
     MeasurementWidth, ObservableWidth, PackedShotBatch, RecordFormat, RecordResult,
@@ -30,7 +30,7 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
         let expected = write_records(&records, format)?;
         assert_eq!(sink.into_bytes()?, expected);
 
-        let planes = BitPlane64Batch::from_shot_major(batch.view())?;
+        let planes = BitPlaneBatch::from_shot_major(batch.view())?;
         let mut plane_sink = MeasurementCodecSink::try_new(format, MeasurementWidth::new(17))?;
         plane_sink.write_batch(MeasurementBatchView::from_bit_planes(planes.view()))?;
         assert_eq!(plane_sink.into_bytes()?, expected);
@@ -44,7 +44,7 @@ fn measurement_codec_sinks_match_every_legacy_encoding() -> RecordResult<()> {
     assert_eq!(sink.into_bytes()?, write_ptb64_records_checked(&records)?);
 
     let planes =
-        BitPlane64Batch::from_shot_major(PackedShotBatch::from_records(&records, 17)?.view())?;
+        BitPlaneBatch::from_shot_major(PackedShotBatch::from_records(&records, 17)?.view())?;
     let mut plane_sink =
         MeasurementCodecSink::try_new(RecordFormat::Ptb64, MeasurementWidth::new(17))?;
     plane_sink.write_batch(MeasurementBatchView::from_bit_planes(planes.view()))?;
@@ -189,7 +189,7 @@ fn dem_codec_routes_sampled_errors_to_their_own_stream() -> RecordResult<()> {
     let errors =
         PackedShotBatch::from_records(&[vec![false, true, true], vec![true, false, false]], 3)?;
     let detection = DetectionBatchView::try_new(detectors.view(), observables.view())?;
-    let batch = DemSampleBatchView::try_new(detection, Some(errors.view()))?;
+    let batch = DemSampleBatchView::try_new(detection, Some(errors.view().into()))?;
 
     let mut sink = DemSampleCodecSink::try_new(
         RecordFormat::Dets,

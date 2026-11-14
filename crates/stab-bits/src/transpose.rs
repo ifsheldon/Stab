@@ -47,23 +47,25 @@ pub(super) fn square_in_place(matrix: &mut BitMatrix) {
     }
 }
 
-pub(super) fn word_rows_into(source_rows: &[u64], target: &mut BitMatrix) {
-    if source_rows.is_empty() || target.rows == 0 {
+pub(super) fn word_rows_into(source_rows: &[u64], target: &mut BitMatrix, row_base: usize) {
+    let row_count = TILE_BITS.min(target.rows.saturating_sub(row_base));
+    if source_rows.is_empty() || row_count == 0 {
         return;
     }
-    let source_tail_mask = low_bits_mask(target.rows);
+    let source_tail_mask = low_bits_mask(row_count);
     for (column_base, source_chunk) in source_rows.chunks(TILE_BITS).enumerate() {
         let mut tile = [0_u64; TILE_BITS];
         for (slot, source) in tile.iter_mut().zip(source_chunk) {
             *slot = *source & source_tail_mask;
         }
         transpose_tile(&mut tile);
-        write_tile(target, 0, column_base * TILE_BITS, &tile);
+        write_tile(target, row_base, column_base * TILE_BITS, &tile);
     }
 }
 
 pub(super) fn matrix_rows_into_word_rows(
     source: &BitMatrix,
+    row_base: usize,
     row_count: usize,
     target_rows: &mut [u64],
 ) {
@@ -73,7 +75,7 @@ pub(super) fn matrix_rows_into_word_rows(
     }
     let row_mask = low_bits_mask(row_count);
     for (column_base, target_chunk) in target_rows.chunks_mut(TILE_BITS).enumerate() {
-        let mut tile = load_tile(source, 0, column_base * TILE_BITS);
+        let mut tile = load_tile(source, row_base, column_base * TILE_BITS);
         transpose_tile(&mut tile);
         for (target, word) in target_chunk.iter_mut().zip(tile) {
             *target = word & row_mask;
@@ -218,6 +220,40 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn offset_word_row_blocks_round_trip_through_tall_matrices() {
+        for (rows, width) in [(65, 1), (130, 63), (256, 65), (257, 129)] {
+            let mut source = BitMatrix::zeros(rows, width).expect("source matrix");
+            for row in 0..rows {
+                for column in 0..width {
+                    if (row * 5 + column * 3) % 11 < 4 {
+                        source.set(row, column, true).expect("source bit");
+                    }
+                }
+            }
+            let mut rebuilt = BitMatrix::zeros(rows, width).expect("rebuilt matrix");
+            let mut words = vec![u64::MAX; width];
+            for row_start in (0..rows).step_by(TILE_BITS) {
+                let row_count = TILE_BITS.min(rows - row_start);
+                source
+                    .copy_transpose_rows_into_word_rows(row_start, row_count, &mut words)
+                    .expect("block into word rows");
+                assert!(
+                    words
+                        .iter()
+                        .all(|word| *word & !low_bits_mask(row_count) == 0)
+                );
+                for word in &mut words {
+                    *word |= !low_bits_mask(row_count);
+                }
+                rebuilt
+                    .copy_transpose_from_word_rows_at(row_start, &words)
+                    .expect("word rows into block");
+            }
+            assert_eq!(rebuilt, source, "rows={rows} width={width}");
         }
     }
 

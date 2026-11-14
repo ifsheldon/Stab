@@ -23,7 +23,8 @@ use crate::{
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
 };
 
-const M2D_BATCH_SHOTS: usize = u64::BITS as usize;
+/// Records read per conversion call: the most one measurement-to-detection call accepts.
+const M2D_BATCH_SHOTS: usize = stab_engine::MAX_BATCH_SHOTS;
 
 #[derive(Debug, Args)]
 pub(crate) struct DetectArgs {

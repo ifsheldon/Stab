@@ -12,7 +12,7 @@ use stab_decoder::{
 use stab_engine::SamplingCompiler;
 use stab_model::{Circuit, DetectorErrorModel};
 use stab_records::{
-    BitPlane64Batch, MeasurementBatchView, MeasurementCodecSink, MeasurementSink, MeasurementWidth,
+    BitPlaneBatch, MeasurementBatchView, MeasurementCodecSink, MeasurementSink, MeasurementWidth,
     ObservablePredictionBatch, PackedShotBatch, RecordFormat, read_measurement_records,
 };
 
@@ -35,7 +35,7 @@ pub fn exercise_stable_components(
 
     let records = read_measurement_records(STRICT_ZERO_ONE_FIXTURE, RecordFormat::ZeroOne, 6)?;
     let shot_major = PackedShotBatch::from_records(&records, 6)?;
-    let bit_planes = BitPlane64Batch::from_shot_major(shot_major.view())?;
+    let bit_planes = BitPlaneBatch::from_shot_major(shot_major.view())?;
     let round_trip = bit_planes.to_shot_major()?.to_records()?;
     if round_trip != records {
         return Err(std::io::Error::other("typed record layout conversion changed bits").into());

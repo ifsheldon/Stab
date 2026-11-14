@@ -913,18 +913,13 @@ where
         if let Some(indices) = self.visible_measurements {
             return self.write_visible_columns(batch, indices);
         }
-        let result = if let Some(bit_planes) = batch.bit_planes() {
-            self.encoder
-                .write_bit_planes(bit_planes, DetsResultType::Measurement, self.output)
-        } else {
-            let records = batch
-                .shot_major_records()
-                .ok_or_else(|| std::io::Error::other("measurement batch has no storage"))?;
-            self.encoder.write_batch(
-                &[RecordBatchPart::new(DetsResultType::Measurement, records)],
-                self.output,
-            )
-        };
+        let result = self.encoder.write_batch(
+            &[RecordBatchPart::new(
+                DetsResultType::Measurement,
+                batch.records(),
+            )],
+            self.output,
+        );
         result.map_err(sample_write_io)
     }
 

@@ -31,9 +31,9 @@ pub use stab_model::{
     RepeatNestingLimitError, ResourceEstimate, Target, ValidationError, ValidationErrorCode,
 };
 pub use stab_records::{
-    BitPlane64Batch, BitPlane64BatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,
+    BitPlaneBatch, BitPlaneBatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,
     DemSampleSink, DetectionBatchView, DetectionSink, DetectorWidth, EncodedSizeEstimate,
     FormatError, FormatErrorCode, FormatErrorContext, MeasurementBatchView, MeasurementSink,
     MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
-    PackedShotBatchView, RecordEncoding, RecordFormat, SampledErrorWidth,
+    PackedShotBatchView, RecordBatchView, RecordEncoding, RecordFormat, SampledErrorWidth,
 };

@@ -6,12 +6,14 @@ use std::sync::{Arc, OnceLock};
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
 use stab_model::{Cancellation, Circuit, MemoryBudget};
-use stab_records::{BitPlane64Batch, MeasurementBatchView, MeasurementSink, MeasurementWidth};
+use stab_records::{BitPlaneBatchView, MeasurementBatchView, MeasurementSink, MeasurementWidth};
 use thiserror::Error;
 
 use super::{compile_program, sampler_rng};
 use crate::CompilationRequestFingerprint;
-use crate::detection::frame::{CircuitProgram, PauliFrameSamplingState};
+use crate::detection::frame::{
+    CircuitProgram, DeliveryFailure, FrameBatchSource, FrameBatchState, PendingLanes,
+};
 
 mod compile_error;
 mod session_helpers;
@@ -19,12 +21,11 @@ mod session_helpers;
 pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
 #[cfg(test)]
 pub(super) use session_helpers::compute_stabilizer_frame_reference_sample;
+use session_helpers::validate_session_storage;
 pub(super) use session_helpers::{
     compute_reference_sample, try_bool_buffer, validate_reference_width,
 };
-use session_helpers::{fill_pauli_frame_batch, validate_session_storage};
 
-const MAX_BATCH_SHOTS: usize = 64;
 /// Executable discriminator of the bit-plane Pauli frame, the only sampling executor.
 const PAULI_FRAME_EXECUTABLE_DISCRIMINATOR: u8 = 4;
 const PLAN_FINGERPRINT_DOMAIN: &[u8] = b"stab:plan-fingerprint\0";
@@ -451,11 +452,7 @@ impl SamplingPlanInner {
 #[derive(Debug)]
 enum SessionFrame {
     Empty,
-    Pauli {
-        state: PauliFrameSamplingState,
-        pending_start: usize,
-        pending_count: usize,
-    },
+    Pauli(FrameBatchState),
 }
 
 /// Signal used by sessions whose plan has no cancellable signal and that never handed one out.
@@ -646,8 +643,8 @@ pub struct SamplingSession {
     plan: SamplingPlan,
     rng: SmallRng,
     frame: SessionFrame,
+    pending: PendingLanes,
     uses_reference_sample: bool,
-    batch: BitPlane64Batch,
     cancellation: OnceLock<Cancellation>,
     total_committed_shots: u64,
     poisoned: bool,
@@ -687,28 +684,21 @@ impl SamplingSession {
         let frame = if plan.inner.measurement_count == 0 {
             SessionFrame::Empty
         } else {
-            SessionFrame::Pauli {
-                state: PauliFrameSamplingState::try_new(&plan.inner.program).map_err(|error| {
+            SessionFrame::Pauli(
+                FrameBatchState::for_measurements(&plan.inner.program).map_err(|error| {
                     SamplingExecutionError::SessionStorageAllocation {
                         message: error.to_string(),
                     }
                 })?,
-                pending_start: 0,
-                pending_count: 0,
-            }
+            )
         };
-        let batch = BitPlane64Batch::zeros(MAX_BATCH_SHOTS, plan.inner.measurement_count).map_err(
-            |source| SamplingExecutionError::SessionStorageAllocation {
-                message: source.to_string(),
-            },
-        )?;
         let cancellation = session_cancellation_slot(&plan.inner.cancellation);
         Ok(Self {
             plan,
             rng,
             frame,
+            pending: PendingLanes::default(),
             uses_reference_sample,
-            batch,
             cancellation,
             total_committed_shots: 0,
             poisoned: false,
@@ -778,52 +768,46 @@ impl SamplingSession {
             return Ok(self.summary(SamplingRunStatus::Completed, shots, 0));
         }
 
-        let mut remaining = shots.get();
-        let mut committed = 0_u64;
-        while remaining > 0 {
-            if self.is_cancelled() {
-                break;
-            }
-            let batch_shots_u64 = remaining.min(MAX_BATCH_SHOTS as u64);
-            let batch_shots = usize::try_from(batch_shots_u64).map_err(|_| RunError::Engine {
-                source: SamplingExecutionError::InternalInvariant {
-                    message: "bounded batch shot count did not fit usize".to_owned(),
-                },
-                progress: SamplingRunProgress::new(committed, batch_shots_u64),
-            })?;
-            if let Err(source) = self.fill_batch(batch_shots) {
+        let reference = match session_reference(&self.plan, self.uses_reference_sample) {
+            Ok(reference) => reference,
+            Err(source) => {
                 self.poisoned = true;
                 return Err(RunError::Engine {
                     source,
-                    progress: SamplingRunProgress::new(committed, batch_shots_u64),
+                    progress: SamplingRunProgress::new(0, 0),
                 });
             }
-            let bit_planes = self.batch.view_prefix(batch_shots);
-            let bit_planes = match bit_planes {
-                Ok(bit_planes) => bit_planes,
-                Err(source) => {
-                    self.poisoned = true;
-                    return Err(RunError::Engine {
-                        source: SamplingExecutionError::InternalInvariant {
-                            message: source.to_string(),
-                        },
-                        progress: SamplingRunProgress::new(committed, batch_shots_u64),
-                    });
-                }
-            };
-            let batch = MeasurementBatchView::from_bit_planes(bit_planes);
-            if let Err(source) = sink.write_batch(batch) {
+        };
+        let mut source = SamplingBatchSource {
+            program: &self.plan.inner.program,
+            frame: &mut self.frame,
+            reference,
+            rng: &mut self.rng,
+            cancellation: session_cancellation(&self.cancellation),
+            sink,
+        };
+        let outcome = match self.pending.deliver(shots.get(), &mut source) {
+            Ok(outcome) => outcome,
+            Err(DeliveryFailure {
+                error,
+                committed,
+                attempted,
+            }) => {
                 self.poisoned = true;
-                return Err(RunError::Sink {
-                    phase: SinkFailurePhase::WriteBatch,
-                    source,
-                    progress: SamplingRunProgress::new(committed, batch_shots_u64),
+                self.total_committed_shots += committed;
+                let progress = SamplingRunProgress::new(committed, attempted);
+                return Err(match error {
+                    SamplingDeliveryError::Engine(source) => RunError::Engine { source, progress },
+                    SamplingDeliveryError::Sink(source) => RunError::Sink {
+                        phase: SinkFailurePhase::WriteBatch,
+                        source,
+                        progress,
+                    },
                 });
             }
-            committed += batch_shots_u64;
-            self.total_committed_shots += batch_shots_u64;
-            remaining -= batch_shots_u64;
-        }
+        };
+        let committed = outcome.committed;
+        self.total_committed_shots += committed;
 
         if let Err(source) = sink.finish() {
             self.poisoned = true;
@@ -833,32 +817,12 @@ impl SamplingSession {
                 progress: SamplingRunProgress::new(committed, 0),
             });
         }
-        let status = if remaining == 0 {
+        let status = if outcome.completed {
             SamplingRunStatus::Completed
         } else {
             SamplingRunStatus::Cancelled
         };
         Ok(self.summary(status, shots, committed))
-    }
-
-    fn fill_batch(&mut self, shot_count: usize) -> Result<(), SamplingExecutionError> {
-        if self.plan.inner.measurement_count == 0 {
-            return Ok(());
-        }
-        fill_pauli_frame_batch(
-            &self.plan.inner.program,
-            &mut self.frame,
-            &mut self.batch,
-            session_reference(&self.plan, self.uses_reference_sample)?,
-            &mut self.rng,
-            shot_count,
-            session_cancellation(&self.cancellation),
-        )
-    }
-
-    #[inline(always)]
-    fn is_cancelled(&self) -> bool {
-        session_cancellation(&self.cancellation).is_cancelled()
     }
 
     const fn summary(
@@ -872,6 +836,78 @@ impl SamplingSession {
             requested_shots,
             committed_shots: ShotCount::new(committed_shots),
             total_committed_shots: ShotCount::new(self.total_committed_shots),
+        }
+    }
+}
+
+enum SamplingDeliveryError<SinkError> {
+    Engine(SamplingExecutionError),
+    Sink(SinkError),
+}
+
+/// One sampling run's view of its session frame for the shared frame-batch delivery loop.
+struct SamplingBatchSource<'run, Sink> {
+    program: &'run CircuitProgram,
+    frame: &'run mut SessionFrame,
+    reference: Option<&'run [bool]>,
+    rng: &'run mut SmallRng,
+    cancellation: &'run Cancellation,
+    sink: &'run mut Sink,
+}
+
+impl<Sink> FrameBatchSource for SamplingBatchSource<'_, Sink>
+where
+    Sink: MeasurementSink,
+{
+    type Error = SamplingDeliveryError<Sink::Error>;
+
+    fn is_cancelled(&self) -> bool {
+        self.cancellation.is_cancelled()
+    }
+
+    fn refill(&mut self) -> Result<(), Self::Error> {
+        let SessionFrame::Pauli(state) = self.frame else {
+            return Ok(());
+        };
+        state
+            .sample_measurements(self.program, self.rng, self.cancellation)
+            .map_err(|error| match error {
+                crate::detection::DetectionError::Cancelled(cancelled) => {
+                    SamplingExecutionError::Cancelled(cancelled)
+                }
+                error => SamplingExecutionError::InternalInvariant {
+                    message: error.to_string(),
+                },
+            })
+            .map_err(SamplingDeliveryError::Engine)?;
+        if let Some(reference) = self.reference {
+            state.xor_reference(reference).map_err(|error| {
+                SamplingDeliveryError::Engine(SamplingExecutionError::InternalInvariant {
+                    message: error.to_string(),
+                })
+            })?;
+        }
+        Ok(())
+    }
+
+    fn deliver(&mut self, lanes: usize) -> Result<(), Self::Error> {
+        let planes = match self.frame {
+            SessionFrame::Empty => &[][..],
+            SessionFrame::Pauli(state) => state.measurement_planes(),
+        };
+        let view = BitPlaneBatchView::try_from_blocks(planes, lanes).map_err(|source| {
+            SamplingDeliveryError::Engine(SamplingExecutionError::InternalInvariant {
+                message: source.to_string(),
+            })
+        })?;
+        self.sink
+            .write_batch(MeasurementBatchView::from_bit_planes(view))
+            .map_err(SamplingDeliveryError::Sink)
+    }
+
+    fn discard(&mut self, lanes: usize) {
+        if let SessionFrame::Pauli(state) = self.frame {
+            state.discard_delivered_lanes(lanes);
         }
     }
 }

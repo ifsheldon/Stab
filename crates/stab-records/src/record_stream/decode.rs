@@ -7,7 +7,7 @@
 
 use super::{HitsDuplicates, Ptb64Group};
 use crate::{
-    BitPlane64BatchView, DetsLayout, FormatError, PackedShotBatch, RecordFormat, RecordResult,
+    BitPlaneBatchView, DetsLayout, FormatError, PackedShotBatch, RecordFormat, RecordResult,
     result_packed::{
         b8_length_multiple_error, b8_record_byte_width, decode_next_r8_record,
         ptb64_bytes_per_group, ptb64_length_multiple_error, ptb64_zero_width_count_error,
@@ -236,8 +236,9 @@ pub(super) fn ptb64_group(frame: &[u8], width: usize, group: &mut Ptb64Group) ->
         .rows
         .as_mut()
         .ok_or_else(|| FormatError::invalid_data("ptb64 group lost its transposed rows"))?;
-    rows.copy_from_bit_planes(BitPlane64BatchView::try_from_words(
+    rows.copy_from_bit_planes(BitPlaneBatchView::try_from_words(
         &group.plane_words,
+        1,
         WORD_BITS,
         width,
     )?)?;

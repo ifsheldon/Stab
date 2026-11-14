@@ -1,19 +1,23 @@
 use stab_records::{
     DetectionBatchView, DetectorWidth, ObservablePredictionBatchViewMut, PackedShotBatchView,
-    RecordResult,
+    RecordBatchView, RecordResult,
 };
 
 use crate::DecoderLayout;
 
 /// Borrowed detector records presented to a decoder without observable truth.
+///
+/// Records arrive in whichever layout their producer delivered: shot-major from decoded files,
+/// or bit planes from samplers. [`Self::detector`] reads either.
 #[derive(Clone, Copy, Debug)]
 pub struct DecoderInputBatchView<'a> {
-    detectors: PackedShotBatchView<'a>,
+    detectors: RecordBatchView<'a>,
     detector_width: DetectorWidth,
 }
 
 impl<'a> DecoderInputBatchView<'a> {
-    pub fn from_detectors(detectors: PackedShotBatchView<'a>) -> Self {
+    pub fn from_detectors(detectors: impl Into<RecordBatchView<'a>>) -> Self {
+        let detectors = detectors.into();
         Self {
             detectors,
             detector_width: DetectorWidth::new(detectors.bits_per_shot()),
@@ -25,7 +29,7 @@ impl<'a> DecoderInputBatchView<'a> {
         Self::from_detectors(detection.detectors())
     }
 
-    pub const fn detectors(self) -> PackedShotBatchView<'a> {
+    pub const fn detectors(self) -> RecordBatchView<'a> {
         self.detectors
     }
 

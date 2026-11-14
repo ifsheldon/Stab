@@ -12,9 +12,9 @@ mod sinks;
 mod widths;
 
 pub use batches::{
-    BitPlane64Batch, BitPlane64BatchView, DemSampleBatchView, DetectionBatchView,
-    MeasurementBatchView, ObservablePredictionBatch, ObservablePredictionBatchViewMut,
-    PackedShotBatch, PackedShotBatchView,
+    BitPlaneBatch, BitPlaneBatchView, DemSampleBatchView, DetectionBatchView, MeasurementBatchView,
+    ObservablePredictionBatch, ObservablePredictionBatchViewMut, PackedShotBatch,
+    PackedShotBatchView, RecordBatchView,
 };
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext,
@@ -26,7 +26,7 @@ pub use result_formats::{
     CodecCapability, DetsLayout, DetsResultType, MeasureRecordWriter, RecordEncoding, RecordFormat,
     codec_capabilities, ptb64_record_count, read_dets_records, read_measurement_records,
     read_ptb64_records, read_ptb64_records_all, read_records, validate_ptb64_shot_count,
-    write_bit_plane_64_batch, write_ptb64_records_checked, write_records,
+    write_ptb64_records_checked, write_records,
 };
 pub use sinks::{
     DemSampleCodecSink, DemSampleEncodedRecords, DemSampleSink, DetectionCodecSink, DetectionSink,

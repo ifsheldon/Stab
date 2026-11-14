@@ -22,7 +22,7 @@ Plans are immutable, shareable, nonserializable, and carry summaries and version
 
 Sessions own RNG state, frames, scratch, buffers, and progress counters.
 
-Internal batches contain at most 64 shots.
+Delivered batches contain at most `stab_engine::MAX_BATCH_SHOTS` (256) shots, one Pauli-frame batch; DEM replay batches contain at most 64 records.
 
 Successful chunking on one seeded session reproduces one combined call.
 

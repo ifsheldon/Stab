@@ -19,10 +19,10 @@ use std::io::Read;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, FileFailurePersistence, RngAlgorithm, RngSeed};
 use stab_records::{
-    BitPlane64Batch, DetsLayout, DetsResultType, FormatErrorCode, PackedShotBatch, RecordBatchPart,
-    RecordEncoder, RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader,
-    read_dets_records, read_measurement_records, read_ptb64_records, read_ptb64_records_all,
-    read_records, write_bit_plane_64_batch, write_records,
+    DetsLayout, DetsResultType, FormatErrorCode, PackedShotBatch, RecordBatchPart, RecordEncoder,
+    RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader, read_dets_records,
+    read_measurement_records, read_ptb64_records, read_ptb64_records_all, read_records,
+    write_records,
 };
 
 const FORMATS: [RecordFormat; 6] = [
@@ -574,15 +574,7 @@ proptest! {
         };
         prop_assert_eq!(&encoded, &reference, "{}", context);
 
-        let batch_encoded = if format == RecordFormat::Ptb64 {
-            let mut out = Vec::new();
-            for group in records.chunks(64) {
-                let packed = PackedShotBatch::from_records(group, width).expect("packed group");
-                let planes = BitPlane64Batch::from_shot_major(packed.view()).expect("bit planes");
-                out.extend(write_bit_plane_64_batch(planes.view()).expect("bit-plane encode"));
-            }
-            out
-        } else {
+        let batch_encoded = {
             let packed = PackedShotBatch::from_records(&records, width).expect("packed batch");
             let mut encoder = RecordEncoder::try_new(format, width).expect("record encoder");
             let mut out = Vec::new();

@@ -23,7 +23,7 @@ use buffers::{try_false_vec, try_vec_with_capacity};
 use conversion_plan::ConversionPlan;
 use error::DetectionResult;
 use frame::{
-    CircuitProgram, DetectorFrameState, ProgramOptions, SweepCorrectionPlan,
+    CircuitProgram, FrameBatchState, FrameLanes, FrameWord, ProgramOptions, SweepCorrectionPlan,
     admit_combined_compiled_storage,
 };
 use reference::ReferenceSampleSource;
@@ -52,7 +52,7 @@ pub const DETECTION_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor =
     CompilationDescriptor::new(
         CompilationOperation::DetectionSampling,
         stab_model::ModelDialect::StimCircuit,
-        3,
+        4,
         None,
         true,
     );
@@ -196,7 +196,7 @@ impl PreparedMeasurementToDetection {
         )
     }
 
-    fn try_reusable_sweep_correction(&self) -> DetectionResult<Option<DetectorFrameState>> {
+    fn try_reusable_sweep_correction(&self) -> DetectionResult<Option<FrameBatchState>> {
         self.sweep_correction
             .as_ref()
             .map(SweepCorrectionPlan::state)
@@ -215,19 +215,19 @@ impl PreparedMeasurementToDetection {
     )]
     fn convert_word_planes_with_sweep_into(
         &self,
-        measurement_planes: &mut [u64],
-        sweep_planes: &[u64],
+        measurement_planes: &mut [FrameLanes],
+        sweep_planes: &[FrameLanes],
         shot_count: usize,
         reference_sample: &[bool],
-        detector_planes: &mut Vec<u64>,
-        observable_planes: &mut Vec<u64>,
-        correction_state: Option<&mut DetectorFrameState>,
+        detector_planes: &mut Vec<FrameLanes>,
+        observable_planes: &mut Vec<FrameLanes>,
+        correction_state: Option<&mut FrameBatchState>,
         correction_rng: &mut impl rand::Rng,
         cancellation: &stab_model::Cancellation,
     ) -> DetectionResult<()> {
         self.validate_word_plane_widths(measurement_planes, sweep_planes)?;
         reference::validate_reference_sample_len(reference_sample, self.measurement_count())?;
-        let active_mask = frame::batch_active_mask(shot_count);
+        let active_mask = FrameLanes::active_mask(shot_count);
         for (plane, reference_bit) in measurement_planes.iter_mut().zip(reference_sample) {
             if *reference_bit {
                 *plane ^= active_mask;
@@ -278,8 +278,8 @@ impl PreparedMeasurementToDetection {
 
     fn validate_word_plane_widths(
         &self,
-        measurement_planes: &[u64],
-        sweep_planes: &[u64],
+        measurement_planes: &[FrameLanes],
+        sweep_planes: &[FrameLanes],
     ) -> DetectionResult<()> {
         if measurement_planes.len() != self.plan.measurement_count {
             return Err(DetectionError::invalid_result_format(format!(
@@ -299,7 +299,11 @@ impl PreparedMeasurementToDetection {
     }
 }
 
-fn xor_words(output: &mut [u64], correction: &[u64], kind: &str) -> DetectionResult<()> {
+fn xor_words(
+    output: &mut [FrameLanes],
+    correction: &[FrameLanes],
+    kind: &str,
+) -> DetectionResult<()> {
     if output.len() != correction.len() {
         return Err(DetectionError::invalid_result_format(format!(
             "sweep {kind} correction has {} bits but output has {}",
@@ -308,7 +312,7 @@ fn xor_words(output: &mut [u64], correction: &[u64], kind: &str) -> DetectionRes
         )));
     }
     for (output, correction) in output.iter_mut().zip(correction) {
-        *output ^= correction;
+        *output ^= *correction;
     }
     Ok(())
 }

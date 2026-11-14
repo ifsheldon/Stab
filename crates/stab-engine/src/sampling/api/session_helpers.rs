@@ -1,10 +1,5 @@
-use rand::Rng;
-
-use stab_model::Cancellation;
-use stab_records::BitPlane64Batch;
-
-use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner, SessionFrame};
-use crate::detection::frame::{CircuitProgram, PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingState};
+use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner};
+use crate::detection::frame::FrameBatchState;
 use crate::sampling::reference_run::ReferenceWorkspace;
 
 pub(super) fn validate_session_storage(
@@ -28,12 +23,16 @@ pub(super) fn session_storage_bytes(
     if plan.measurement_count == 0 {
         return 0;
     }
-    let measurements = plan.measurement_count as u128;
-    let mut estimated_bytes = measurements.saturating_mul(size_of::<u64>() as u128);
+    let mut estimated_bytes = FrameBatchState::storage_bytes(
+        plan.program.frame_qubit_count(),
+        plan.measurement_count,
+        0,
+        0,
+    );
     if reference_mode == ReferenceSampleMode::UseReferenceSample {
-        estimated_bytes = estimated_bytes.saturating_add(measurements);
+        estimated_bytes = estimated_bytes.saturating_add(plan.measurement_count as u128);
     }
-    estimated_bytes.saturating_add(PauliFrameSamplingState::storage_bytes(&plan.program))
+    estimated_bytes
 }
 
 pub(in crate::sampling) fn try_bool_buffer(
@@ -124,87 +123,4 @@ pub(in crate::sampling) fn compute_stabilizer_frame_reference_sample(
         &[],
     )?;
     Ok(output)
-}
-
-pub(super) fn fill_pauli_frame_batch(
-    program: &CircuitProgram,
-    frame: &mut SessionFrame,
-    batch: &mut BitPlane64Batch,
-    reference: Option<&[bool]>,
-    rng: &mut impl Rng,
-    shot_count: usize,
-    cancellation: &Cancellation,
-) -> Result<(), SamplingExecutionError> {
-    let SessionFrame::Pauli {
-        state,
-        pending_start,
-        pending_count,
-    } = frame
-    else {
-        return Err(SamplingExecutionError::InternalInvariant {
-            message: "Pauli sampling plan did not own Pauli-frame state".to_owned(),
-        });
-    };
-    let mut output_start = 0_usize;
-    while output_start < shot_count {
-        if *pending_count == 0 {
-            state
-                .sample_batch(program, rng, cancellation)
-                .map_err(|error| match error {
-                    crate::detection::DetectionError::Cancelled(cancelled) => {
-                        SamplingExecutionError::Cancelled(cancelled)
-                    }
-                    error => SamplingExecutionError::InternalInvariant {
-                        message: error.to_string(),
-                    },
-                })?;
-            *pending_start = 0;
-            *pending_count = PAULI_FRAME_BATCH_SHOTS;
-        }
-        let take = (*pending_count).min(shot_count - output_start);
-        for bit_index in 0..state.measurement_count() {
-            let reference_mask = reference
-                .and_then(|sample| sample.get(bit_index))
-                .copied()
-                .map_or(0, |bit| if bit { u64::MAX } else { 0 });
-            let segment = state
-                .measurement_segment(bit_index, *pending_start, take)
-                .map_err(|error| SamplingExecutionError::InternalInvariant {
-                    message: error.to_string(),
-                })?
-                ^ (reference_mask & low_bits_mask(take));
-            let existing = if output_start == 0 {
-                0
-            } else {
-                batch
-                    .plane(bit_index)
-                    .map_err(|error| SamplingExecutionError::InternalInvariant {
-                        message: error.to_string(),
-                    })?
-                    .words()
-                    .first()
-                    .copied()
-                    .unwrap_or(0)
-            };
-            batch
-                .copy_plane_from_word(bit_index, existing | (segment << output_start))
-                .map_err(|error| SamplingExecutionError::InternalInvariant {
-                    message: error.to_string(),
-                })?;
-        }
-        *pending_start += take;
-        *pending_count -= take;
-        output_start += take;
-    }
-    Ok(())
-}
-
-const fn low_bits_mask(bit_count: usize) -> u64 {
-    if bit_count >= u64::BITS as usize {
-        u64::MAX
-    } else if bit_count == 0 {
-        0
-    } else {
-        (1_u64 << bit_count) - 1
-    }
 }

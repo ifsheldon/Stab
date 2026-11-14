@@ -3,7 +3,7 @@
 use std::ffi::OsString;
 
 use stab_records::{
-    BitPlane64Batch, MeasurementBatchView, MeasurementSink, RecordEncoder, RecordFormat,
+    BitPlaneBatch, MeasurementBatchView, MeasurementSink, RecordEncoder, RecordFormat,
 };
 use tempfile::tempdir;
 
@@ -12,16 +12,15 @@ use crate::{CliSampleSink, SampleOutFormatArg, run_from};
 
 #[test]
 fn warmed_cli_sample_encoding_has_no_record_count_dependent_allocation() {
-    let mut batch = BitPlane64Batch::zeros(64, 2_048).expect("construct wide batch");
+    let mut batch = BitPlaneBatch::zeros(256, 2_048).expect("construct wide batch");
     for bit_index in 0..batch.bits_per_shot() {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "bit_index modulo 64 is always representable as u32"
-        )]
-        let rotation = (bit_index % 64) as u32;
-        batch
-            .copy_plane_from_word(bit_index, u64::MAX.rotate_left(rotation))
-            .expect("populate plane");
+        for shot_index in 0..batch.shot_count() {
+            if (shot_index + bit_index) % 64 != 0 {
+                batch
+                    .set(bit_index, shot_index, true)
+                    .expect("populate plane");
+            }
+        }
     }
 
     for format in [
@@ -69,7 +68,7 @@ fn warmed_cli_sample_encoding_has_no_record_count_dependent_allocation() {
 
 #[test]
 fn warmed_filtered_cli_sample_encoding_reuses_projection_storage() {
-    let batch = BitPlane64Batch::zeros(64, 2_048).expect("construct wide batch");
+    let batch = BitPlaneBatch::zeros(256, 2_048).expect("construct wide batch");
     let visible = (0..2_048).step_by(2).collect::<Vec<_>>();
     let mut output = std::io::sink();
     let mut sink = CliSampleSink {

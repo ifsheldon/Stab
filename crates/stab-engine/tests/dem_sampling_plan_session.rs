@@ -11,7 +11,7 @@ use stab_engine::{
     DemSamplingRunError, RandomPolicy, Seed, ShotCount,
 };
 use stab_model::{DetectorErrorModel, MemoryBudget};
-use stab_records::{DemSampleBatchView, DemSampleSink, PackedShotBatchView};
+use stab_records::{DemSampleBatchView, DemSampleSink, RecordBatchView};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct TestDetectionRecord {
@@ -233,10 +233,7 @@ impl DemSampleSink for CollectSink {
     }
 }
 
-fn collect_row(
-    records: PackedShotBatchView<'_>,
-    shot_index: usize,
-) -> Result<Vec<bool>, SinkFailure> {
+fn collect_row(records: RecordBatchView<'_>, shot_index: usize) -> Result<Vec<bool>, SinkFailure> {
     (0..records.bits_per_shot())
         .map(|bit_index| {
             records
@@ -276,7 +273,7 @@ impl DemSampleSink for WitnessSink {
     }
 }
 
-fn witness(records: PackedShotBatchView<'_>, shot_count: usize) -> u64 {
+fn witness(records: RecordBatchView<'_>, shot_count: usize) -> u64 {
     let first = records.get(0, 0).unwrap_or(false) as u64;
     let last = shot_count
         .checked_sub(1)
@@ -655,24 +652,24 @@ fn cancellation_commits_only_complete_batches_and_session_resumes() {
         cancellation_for_sink.cancel();
     });
     let summary = session
-        .run(ShotCount::new(130), &mut first)
+        .run(ShotCount::new(600), &mut first)
         .expect("cancelled run");
     assert!(summary.status().is_cancelled());
-    assert_eq!(summary.committed_shots().get(), 64);
+    assert_eq!(summary.committed_shots().get(), 256);
     assert_eq!(first.finish_calls, 1);
     assert!(!session.is_poisoned());
 
     cancellation.reset();
     let mut resumed = CollectSink::default();
     session
-        .run(ShotCount::new(66), &mut resumed)
+        .run(ShotCount::new(344), &mut resumed)
         .expect("resumed run");
     let mut control = sampler
         .session(RandomPolicy::Seeded(Seed::new(5)))
         .expect("control session");
     let mut expected = CollectSink::default();
     control
-        .run(ShotCount::new(130), &mut expected)
+        .run(ShotCount::new(600), &mut expected)
         .expect("whole control run");
     first.detectors.extend(resumed.detectors);
     first.observables.extend(resumed.observables);
@@ -778,10 +775,10 @@ fn sink_failures_preserve_progress_and_poison_sessions() {
         .expect("write-failure session");
     let mut sink = CollectSink::failing_write(1);
     let error = session
-        .run(ShotCount::new(65), &mut sink)
+        .run(ShotCount::new(257), &mut sink)
         .expect_err("second batch write must fail");
     assert!(error.to_string().contains("write-failure"), "{error}");
-    assert_eq!(error.progress().committed_shots().get(), 64);
+    assert_eq!(error.progress().committed_shots().get(), 256);
     assert_eq!(error.progress().attempted_batch_shots().get(), 1);
     assert_eq!(sink.finish_calls, 0);
     assert!(session.is_poisoned());

@@ -121,8 +121,11 @@ impl<'a> LogicalFailureSink<'a> {
         Self {
             decoder,
             report,
-            predictions: ObservablePredictionBatch::zeros(64, correction_width)
-                .expect("bounded prediction batch"),
+            predictions: ObservablePredictionBatch::zeros(
+                stab_engine::MAX_BATCH_SHOTS,
+                correction_width,
+            )
+            .expect("bounded prediction batch"),
             cancellation: DecodeCancellation::new(),
             finished: false,
         }

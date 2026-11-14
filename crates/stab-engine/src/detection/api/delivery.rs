@@ -46,7 +46,7 @@ where
     /// Converts and immediately writes one validated batch without finalizing this delivery.
     ///
     /// `measurements` and `sweeps`, when supplied, must contain the same number of records and no
-    /// more than 64 records.
+    /// more than [`crate::MAX_BATCH_SHOTS`] records.
     pub fn write_batch_with_sweep(
         &mut self,
         measurements: MeasurementBatchView<'_>,

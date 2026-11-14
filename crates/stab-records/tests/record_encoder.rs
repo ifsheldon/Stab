@@ -9,16 +9,17 @@
 //! Differential properties for the Records-owned [`RecordEncoder`].
 //!
 //! Every entry point (whole batches, split batches, single records with dirty tail words, and
-//! 64-shot bit planes) must produce exactly the bytes of an independent per-bit reference encoder
-//! for random layouts, including zero-width parts, widths that are not multiples of 8 or 64,
-//! empty batches, all-zero and all-one records, and PTB64 groups.
+//! multi-word bit planes mixed with shot-major parts) must produce exactly the bytes of an
+//! independent per-bit reference encoder for random layouts, including zero-width parts, widths
+//! that are not multiples of 8 or 64, shot counts that are not multiples of 64 or 256, empty
+//! batches, all-zero and all-one records, and PTB64 groups.
 
 use proptest::prelude::*;
 use proptest::test_runner::{Config, FileFailurePersistence, RngAlgorithm, RngSeed};
-use stab_bits::BitSlice;
+use stab_bits::{BIT_BLOCK_WORDS, BitBlock, BitSlice};
 use stab_records::{
-    BitPlane64Batch, DetsResultType, FormatErrorCode, PackedShotBatch, RecordBatchPart,
-    RecordEncoder, RecordFormat, RecordPart, RecordWriteError,
+    BitPlaneBatchView, DetsResultType, FormatErrorCode, PackedShotBatch, RecordBatchPart,
+    RecordBatchView, RecordEncoder, RecordFormat, RecordPart, RecordWriteError,
 };
 
 const FORMATS: [RecordFormat; 6] = [
@@ -199,19 +200,96 @@ fn encode_dirty_records(
     Ok(out)
 }
 
+/// One part of a batch in the storage layout a producer might hand the encoder.
+enum PartStorage {
+    ShotMajor(PackedShotBatch),
+    /// Planes stored back to back with one spare word each and every inactive lane set.
+    DirtyWords {
+        words: Vec<u64>,
+        words_per_plane: usize,
+    },
+    /// One 256-lane block per plane with every inactive lane set.
+    Blocks(Vec<BitBlock>),
+}
+
+impl PartStorage {
+    fn build(layout: usize, group: &Group, shots: std::ops::Range<usize>) -> Self {
+        let shot_count = shots.len();
+        let plane_words = |words_per_plane: usize| {
+            let mut words = vec![u64::MAX; group.width * words_per_plane];
+            for bit in 0..group.width {
+                for lane in 0..shot_count {
+                    if !group.shots[shots.start + lane][bit] {
+                        words[bit * words_per_plane + lane / 64] &= !(1 << (lane % 64));
+                    }
+                }
+            }
+            words
+        };
+        match layout % 3 {
+            1 => Self::ShotMajor(packed(group, shots)),
+            2 if shot_count <= BIT_BLOCK_WORDS * 64 => Self::Blocks(
+                plane_words(BIT_BLOCK_WORDS)
+                    .as_chunks::<BIT_BLOCK_WORDS>()
+                    .0
+                    .iter()
+                    .map(|words| BitBlock::from_words(*words))
+                    .collect(),
+            ),
+            _ => {
+                let words_per_plane = shot_count.div_ceil(64) + 1;
+                Self::DirtyWords {
+                    words: plane_words(words_per_plane),
+                    words_per_plane,
+                }
+            }
+        }
+    }
+
+    fn view(&self, shot_count: usize, width: usize) -> RecordBatchView<'_> {
+        match self {
+            Self::ShotMajor(batch) => batch.view().into(),
+            Self::DirtyWords {
+                words,
+                words_per_plane,
+            } => BitPlaneBatchView::try_from_words(words, *words_per_plane, shot_count, width)
+                .expect("word planes")
+                .into(),
+            Self::Blocks(blocks) => BitPlaneBatchView::try_from_blocks(blocks, shot_count)
+                .expect("block planes")
+                .into(),
+        }
+    }
+}
+
+/// Encodes split batches whose parts rotate through every storage layout, starting the
+/// rotation at `first_layout`.
 fn encode_bit_planes(
     format: RecordFormat,
-    group: &Group,
+    groups: &[Group],
     shot_count: usize,
+    split: usize,
+    first_layout: usize,
 ) -> Result<Vec<u8>, RecordWriteError> {
-    let mut encoder = RecordEncoder::try_new(format, group.width)?;
+    let width = groups.iter().map(|group| group.width).sum();
+    let mut encoder = RecordEncoder::try_new(format, width)?;
     let mut out = Vec::new();
-    for start in (0..shot_count).step_by(64) {
-        let end = (start + 64).min(shot_count);
-        let planes =
-            BitPlane64Batch::from_shot_major(packed(group, start..end).view()).expect("bit planes");
-        encoder.write_bit_planes(planes.view(), group.namespace, &mut out)?;
+    for range in [0..split, split..shot_count] {
+        let storages = groups
+            .iter()
+            .enumerate()
+            .map(|(index, group)| PartStorage::build(first_layout + index, group, range.clone()))
+            .collect::<Vec<_>>();
+        let parts = groups
+            .iter()
+            .zip(&storages)
+            .map(|(group, storage)| {
+                RecordBatchPart::new(group.namespace, storage.view(range.len(), group.width))
+            })
+            .collect::<Vec<_>>();
+        encoder.write_batch(&parts, &mut out)?;
     }
+    assert_eq!(encoder.pending_group_records(), 0);
     Ok(out)
 }
 
@@ -241,7 +319,7 @@ fn case() -> impl Strategy<Value = (RecordFormat, Vec<Group>, usize, usize)> {
     (
         prop::sample::select(FORMATS.to_vec()),
         prop::collection::vec(width, 1..=3),
-        0_usize..=130,
+        prop_oneof![3 => 0_usize..=130, 1 => 250_usize..=330],
     )
         .prop_flat_map(|(format, widths, shots)| {
             let shot_count = if format == RecordFormat::Ptb64 {
@@ -292,9 +370,10 @@ proptest! {
         let records = encode_dirty_records(format, &groups, shot_count).expect("record encode");
         prop_assert_eq!(&records, &expected, "record: {}", context);
 
-        if let [group] = groups.as_slice() {
-            let planes = encode_bit_planes(format, group, shot_count).expect("bit-plane encode");
-            prop_assert_eq!(&planes, &expected, "bit planes: {}", context);
+        for first_layout in 0..3 {
+            let planes = encode_bit_planes(format, &groups, shot_count, split, first_layout)
+                .expect("bit-plane encode");
+            prop_assert_eq!(&planes, &expected, "bit planes from layout {}: {}", first_layout, context);
         }
     }
 }

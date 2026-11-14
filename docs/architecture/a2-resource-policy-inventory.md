@@ -56,7 +56,8 @@ Budgets are per operation: parsing, plan compilation, reference-simulator scratc
 | `SatMaterializationLimits::DEFAULT_MAX_*` (eight constants) | `stab-analysis/src/dem/sat/limits.rs` | Search budget | Explicit SAT construction policy, values unchanged. |
 | `DEFAULT_MAX_*` (fourteen constants) | `stab-analysis/src/dem/search/budget.rs` | Search budget | `LogicalErrorSearchLimits` defaults, values unchanged. |
 | `MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS` | `stab-model/src/dem/coordinate_scan.rs` | Threshold | Selects the bounded flattened scan over selected-iteration search; it never rejects a query. |
-| `MAX_BATCH_SHOTS` (three definitions) | `stab-engine` sampling, detection, and DEM sessions | Threshold | The 64-shot delivery batch. |
+| `MAX_BATCH_SHOTS` | `stab-engine/src/lib.rs` | Threshold | The public 256-shot delivery bound: one Pauli-frame batch for circuit sampling, detection sampling, and measurement-to-detection conversion, and the generated DEM sample window delivered per batch. |
+| `MAX_REPLAY_BATCH_SHOTS` | `stab-engine/src/dem_sampling/session.rs` | Threshold | The 64-record shot-major DEM replay batch, which also caps the DEM session's batch-shape search. |
 | `MAX_POOLED_SETS` | `stab-analysis/src/sparse_rev_frame_tracker.rs` | Threshold | Bounds the recycled-set pool; it never rejects work. |
 | `INITIAL_NESTED_DEM_CAPACITY` | `stab-model/src/dem/parser/items.rs` | Threshold | An initial vector capacity. |
 | `CAPABILITIES_OUTPUT_SCHEMA_VERSION` | `stab-cli/src/agent.rs` | Not a limit | A schema version. |

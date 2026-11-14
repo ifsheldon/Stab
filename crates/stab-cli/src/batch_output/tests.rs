@@ -102,7 +102,7 @@ fn sampled_errors_use_the_measurement_namespace_and_reject_partial_ptb64_groups(
     let errors = PackedShotBatch::from_records(&[vec![true, false, true]], 3).expect("errors");
     let batch = DemSampleBatchView::try_new(
         detection_batch(&detectors, &observables),
-        Some(errors.view()),
+        Some(errors.view().into()),
     )
     .expect("DEM batch");
 

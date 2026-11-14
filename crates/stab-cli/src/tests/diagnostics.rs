@@ -657,7 +657,7 @@ fn json_mode_reports_the_original_output_writer_failure() {
 fn json_sample_writer_failure_preserves_phase_and_progress() {
     let mut stderr = Vec::new();
     let status = run_from(
-        ["stab", "sample", "--shots=128", "--error-format=json"],
+        ["stab", "sample", "--shots=512", "--error-format=json"],
         b"M 0\n".as_slice(),
         FailAfterOneWrite::default(),
         &mut stderr,
@@ -668,8 +668,8 @@ fn json_sample_writer_failure_preserves_phase_and_progress() {
     assert_eq!(field(&diagnostic, "/code"), "stdout-write-failed");
     assert_eq!(field(&diagnostic, "/context/failure_kind"), "sink");
     assert_eq!(field(&diagnostic, "/context/sink_phase"), "write-batch");
-    assert_eq!(field(&diagnostic, "/context/committed_shots"), 64);
-    assert_eq!(field(&diagnostic, "/context/attempted_batch_shots"), 64);
+    assert_eq!(field(&diagnostic, "/context/committed_shots"), 256);
+    assert_eq!(field(&diagnostic, "/context/attempted_batch_shots"), 256);
     assert!(
         field(&diagnostic, "/message")
             .as_str()

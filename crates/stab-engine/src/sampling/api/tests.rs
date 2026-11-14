@@ -129,8 +129,16 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
     let mut session = plan
         .session(RandomPolicy::Seeded(Seed::new(2)))
         .expect("construct session");
-    // A zero-width batch cannot hold the plan's measurement plane.
-    session.batch = BitPlane64Batch::zeros(MAX_BATCH_SHOTS, 0).expect("zero-width batch");
+    // Frame state sized for a two-measurement program cannot record this plan's one measurement.
+    let other = crate::detection::frame::CircuitProgram::compile(
+        &Circuit::from_stim_str("M 0 1\n").expect("parse other circuit"),
+        crate::detection::frame::ProgramOptions::SAMPLING,
+    )
+    .expect("compile other program");
+    session.frame = SessionFrame::Pauli(
+        crate::detection::frame::FrameBatchState::for_measurements(&other)
+            .expect("other frame state"),
+    );
     let mut sink = RecordSink::default();
 
     assert!(matches!(

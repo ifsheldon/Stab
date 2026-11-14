@@ -126,6 +126,11 @@ impl BitBlock {
         self.words
     }
 
+    /// Borrows the block's words, lowest lanes first, without copying them.
+    pub const fn as_words(&self) -> &[u64; BIT_BLOCK_WORDS] {
+        &self.words
+    }
+
     pub fn xor(self, rhs: Self) -> Self {
         Self::from_words(scalar::xor_block(self.words, rhs.words))
     }
@@ -661,7 +666,29 @@ impl BitMatrix {
                 maximum: WORD_BITS,
             });
         }
-        transpose::word_rows_into(source_rows, self);
+        transpose::word_rows_into(source_rows, self, 0);
+        Ok(())
+    }
+
+    /// Replaces the rows of one 64-row block with the transpose of one packed word per column.
+    ///
+    /// Bit `i` of `source_rows[c]` becomes column `c` of row `row_start + i`. The block covers
+    /// rows `row_start..row_start + 64` clipped to this matrix, and source bits beyond that
+    /// clipped block are ignored. `row_start` must name an existing row, and
+    /// `source_rows.len()` must equal this matrix's column count.
+    pub fn copy_transpose_from_word_rows_at(
+        &mut self,
+        row_start: usize,
+        source_rows: &[u64],
+    ) -> BitResult<()> {
+        if source_rows.len() != self.cols() {
+            return Err(BitError::LengthMismatch {
+                left: source_rows.len(),
+                right: self.cols(),
+            });
+        }
+        self.ensure_row(row_start)?;
+        transpose::word_rows_into(source_rows, self, row_start);
         Ok(())
     }
 
@@ -692,7 +719,42 @@ impl BitMatrix {
                 maximum: WORD_BITS,
             });
         }
-        transpose::matrix_rows_into_word_rows(self, row_count, target_rows);
+        transpose::matrix_rows_into_word_rows(self, 0, row_count, target_rows);
+        Ok(())
+    }
+
+    /// Copies the transpose of `row_count` rows starting at `row_start` into one packed word per
+    /// matrix column, so bit `i` of `target_rows[c]` is column `c` of row `row_start + i`.
+    ///
+    /// At most 64 rows may be selected. Bits beyond `row_count` in each target word are cleared.
+    pub fn copy_transpose_rows_into_word_rows(
+        &self,
+        row_start: usize,
+        row_count: usize,
+        target_rows: &mut [u64],
+    ) -> BitResult<()> {
+        if target_rows.len() != self.cols() {
+            return Err(BitError::LengthMismatch {
+                left: target_rows.len(),
+                right: self.cols(),
+            });
+        }
+        if row_count > WORD_BITS {
+            return Err(BitError::MatrixToWordRowsTooTall {
+                actual: row_count,
+                maximum: WORD_BITS,
+            });
+        }
+        if row_start
+            .checked_add(row_count)
+            .is_none_or(|end| end > self.rows)
+        {
+            return Err(BitError::MatrixRowPrefixOutOfRange {
+                requested: row_start.saturating_add(row_count),
+                available: self.rows,
+            });
+        }
+        transpose::matrix_rows_into_word_rows(self, row_start, row_count, target_rows);
         Ok(())
     }
 

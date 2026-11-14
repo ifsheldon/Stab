@@ -36,8 +36,8 @@ const PROBABILITIES: [f64; 10] = [
     0.9,
     1.0 - 1e-9,
 ];
-/// Production callers request one word (`sample_mask`), one 256-lane block, and longer fills;
-/// cycling request sizes puts every per-call restart of the sparse gap walk under test.
+/// Production callers request one 256-lane block and longer fills; cycling request sizes,
+/// including single words, puts every per-call restart of the sparse gap walk under test.
 const RAND_SOURCE_CHUNK_WORDS: [usize; 4] = [1, 4, 7, 64];
 
 #[derive(Debug)]

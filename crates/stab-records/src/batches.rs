@@ -1,12 +1,16 @@
 use stab_bits::{BitMatrix, BitSlice, BitWordsMut};
 
+const WORD_BITS: usize = u64::BITS as usize;
+
 use crate::{
     CorrectionWidth, DetectorWidth, FormatError, FormatErrorCode, MeasurementWidth,
     ObservableWidth, RecordResult, SampledErrorWidth,
 };
 
+mod bit_planes;
 mod prediction_view;
 
+pub use bit_planes::{BitPlaneBatch, BitPlaneBatchView};
 pub use prediction_view::ObservablePredictionBatchViewMut;
 
 /// Owned shot-major packed records.
@@ -48,14 +52,14 @@ impl PackedShotBatch {
         Ok(batch)
     }
 
-    pub fn from_bit_planes(batch: BitPlane64BatchView<'_>) -> RecordResult<Self> {
+    pub fn from_bit_planes(batch: BitPlaneBatchView<'_>) -> RecordResult<Self> {
         let mut records = Self::zeros(batch.shot_count(), batch.bits_per_shot())?;
         records.copy_from_bit_planes(batch)?;
         Ok(records)
     }
 
     /// Replaces every record with the transpose of a borrowed bit-plane batch.
-    pub fn copy_from_bit_planes(&mut self, batch: BitPlane64BatchView<'_>) -> RecordResult<()> {
+    pub fn copy_from_bit_planes(&mut self, batch: BitPlaneBatchView<'_>) -> RecordResult<()> {
         if self.shot_count() != batch.shot_count() || self.bits_per_shot() != batch.bits_per_shot()
         {
             return Err(FormatError::invalid_data(format!(
@@ -66,8 +70,56 @@ impl PackedShotBatch {
                 batch.bits_per_shot()
             )));
         }
+        if batch.shot_count() == 0 || batch.bits_per_shot() == 0 {
+            return Ok(());
+        }
+        if let Some(words) = batch.single_word_planes() {
+            return self
+                .storage
+                .copy_transpose_from_word_rows_at(0, words)
+                .map_err(bit_storage_error);
+        }
+        let mut column = Vec::new();
+        column
+            .try_reserve_exact(batch.bits_per_shot())
+            .map_err(|error| {
+                FormatError::invalid_data(format!(
+                    "bit-plane transpose could not reserve {} words: {error}",
+                    batch.bits_per_shot()
+                ))
+            })?;
+        column.resize(batch.bits_per_shot(), 0);
+        for word_index in 0..batch.shot_count().div_ceil(WORD_BITS) {
+            self.copy_block_from_bit_planes(batch, word_index, &mut column)?;
+        }
+        Ok(())
+    }
+
+    /// Replaces the 64 records of block `word_index` from word `word_index` of every plane,
+    /// using `column` as caller-owned scratch of one word per result bit.
+    pub(crate) fn copy_block_from_bit_planes(
+        &mut self,
+        batch: BitPlaneBatchView<'_>,
+        word_index: usize,
+        column: &mut [u64],
+    ) -> RecordResult<()> {
+        batch.copy_word_column_into(word_index, column)?;
+        let row_start = word_index
+            .checked_mul(WORD_BITS)
+            .ok_or_else(|| FormatError::invalid_data("bit-plane block offset overflowed"))?;
         self.storage
-            .copy_transpose_from_word_rows(batch.planes)
+            .copy_transpose_from_word_rows_at(row_start, column)
+            .map_err(bit_storage_error)
+    }
+
+    /// Replaces the first 64 records (or all of them, when fewer) with the transpose of one word
+    /// per result bit.
+    pub(crate) fn copy_transpose_from_word_column(&mut self, column: &[u64]) -> RecordResult<()> {
+        if self.shot_count() == 0 || self.bits_per_shot() == 0 {
+            return Ok(());
+        }
+        self.storage
+            .copy_transpose_from_word_rows_at(0, column)
             .map_err(bit_storage_error)
     }
 
@@ -263,285 +315,177 @@ impl<'a> PackedShotBatchView<'a> {
             .copy_transpose_prefix_into_word_rows(self.shot_count, target)
             .map_err(bit_storage_error)
     }
-}
 
-/// Owned bit planes for at most 64 shots.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BitPlane64Batch {
-    planes: Vec<u64>,
-    shot_count: usize,
-    bits_per_shot: usize,
-}
-
-impl BitPlane64Batch {
-    pub fn zeros(shot_count: usize, bits_per_shot: usize) -> RecordResult<Self> {
-        validate_bit_plane_shots(shot_count)?;
-        let mut planes = Vec::new();
-        planes.try_reserve_exact(bits_per_shot).map_err(|error| {
-            FormatError::invalid_data(format!(
-                "bit-plane batch could not reserve {bits_per_shot} result planes: {error}"
-            ))
-        })?;
-        planes.resize(bits_per_shot, 0);
-        Ok(Self {
-            planes,
-            shot_count,
-            bits_per_shot,
-        })
-    }
-
-    pub fn from_shot_major(batch: PackedShotBatchView<'_>) -> RecordResult<Self> {
-        validate_bit_plane_shots(batch.shot_count())?;
-        let mut planes = Self::zeros(batch.shot_count(), batch.bits_per_shot())?;
-        batch.copy_into_bit_plane_words(&mut planes.planes)?;
-        Ok(planes)
-    }
-
-    #[inline]
-    pub fn shot_count(&self) -> usize {
-        self.shot_count
-    }
-
-    #[inline]
-    pub fn bits_per_shot(&self) -> usize {
-        self.bits_per_shot
-    }
-
-    pub fn get(&self, bit_index: usize, shot_index: usize) -> Option<bool> {
-        if shot_index >= self.shot_count {
-            return None;
-        }
-        self.planes
-            .get(bit_index)
-            .map(|word| word & (1_u64 << shot_index) != 0)
-    }
-
-    pub fn set(&mut self, bit_index: usize, shot_index: usize, value: bool) -> RecordResult<()> {
-        if shot_index >= self.shot_count {
+    /// Copies records `row_start..row_start + row_count` into one packed word per result bit,
+    /// with record `row_start + i` at bit `i`.
+    ///
+    /// At most 64 records may be selected. Reused target words are fully replaced and inactive
+    /// high lanes are cleared.
+    pub fn copy_rows_into_bit_plane_words(
+        self,
+        row_start: usize,
+        row_count: usize,
+        target: &mut [u64],
+    ) -> RecordResult<()> {
+        if row_start
+            .checked_add(row_count)
+            .is_none_or(|end| end > self.shot_count)
+        {
             return Err(FormatError::invalid_data(format!(
-                "bit-plane shot index {shot_index} is out of range for {} records",
+                "packed rows {row_start}..{} escape a view of {} records",
+                row_start.saturating_add(row_count),
                 self.shot_count
             )));
         }
-        let word = self.planes.get_mut(bit_index).ok_or_else(|| {
-            FormatError::invalid_data(format!(
-                "bit-plane index {bit_index} is out of range for {} result bits",
-                self.bits_per_shot
-            ))
-        })?;
-        let mask = 1_u64 << shot_index;
-        if value {
-            *word |= mask;
-        } else {
-            *word &= !mask;
-        }
-        Ok(())
-    }
-
-    pub fn copy_shot_from_bools(&mut self, shot_index: usize, record: &[bool]) -> RecordResult<()> {
-        if shot_index >= self.shot_count() {
-            return Err(FormatError::invalid_data(format!(
-                "bit-plane shot index {shot_index} is out of range for {} records",
-                self.shot_count()
-            )));
-        }
-        if record.len() != self.bits_per_shot() {
-            return Err(batch_width_mismatch(
-                "bit-plane record",
-                record.len(),
-                self.bits_per_shot(),
-            ));
-        }
-        for (bit_index, value) in record.iter().copied().enumerate() {
-            self.set(bit_index, shot_index, value)?;
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub fn copy_plane_from_word(&mut self, bit_index: usize, word: u64) -> RecordResult<()> {
-        let shot_count = self.shot_count;
-        let plane = self.planes.get_mut(bit_index).ok_or_else(|| {
-            FormatError::invalid_data(format!(
-                "bit-plane index {bit_index} is out of range for {} result bits",
-                self.bits_per_shot
-            ))
-        })?;
-        *plane = word & low_bits_mask(shot_count);
-        Ok(())
-    }
-
-    pub fn plane(&self, bit_index: usize) -> RecordResult<BitSlice<'_>> {
-        self.view().plane(bit_index)
-    }
-
-    pub fn view(&self) -> BitPlane64BatchView<'_> {
-        BitPlane64BatchView {
-            planes: &self.planes,
-            shot_count: self.shot_count,
-            bits_per_shot: self.bits_per_shot,
-        }
-    }
-
-    #[inline]
-    pub fn view_prefix(&self, shot_count: usize) -> RecordResult<BitPlane64BatchView<'_>> {
-        if shot_count > self.shot_count() {
-            return Err(FormatError::invalid_data(format!(
-                "bit-plane prefix has {shot_count} records but storage contains only {}",
-                self.shot_count()
-            )));
-        }
-        Ok(BitPlane64BatchView {
-            planes: &self.planes,
-            shot_count,
-            bits_per_shot: self.bits_per_shot,
-        })
-    }
-
-    pub fn to_shot_major(&self) -> RecordResult<PackedShotBatch> {
-        PackedShotBatch::from_bit_planes(self.view())
+        self.storage
+            .copy_transpose_rows_into_word_rows(row_start, row_count, target)
+            .map_err(bit_storage_error)
     }
 }
 
-/// Borrowed bit planes for at most 64 shots.
+/// Borrowed records of one width, stored either shot-major or as bit planes.
 ///
-/// Words supplied through [`Self::try_from_words`] may contain nonzero bits at shot indexes greater
-/// than or equal to [`Self::shot_count`]. Logical accessors hide those inactive tail bits. A plane's
-/// raw [`BitSlice::words`] retain the caller's storage and must be masked by consumers that inspect
-/// words directly.
+/// Producers deliver whichever layout they computed; consumers that need a specific layout ask
+/// for it through [`Self::shot_major_records`] or [`Self::bit_planes`], and [`Self::get`] reads
+/// either.
 #[derive(Clone, Copy, Debug)]
-pub struct BitPlane64BatchView<'a> {
-    planes: &'a [u64],
-    shot_count: usize,
-    bits_per_shot: usize,
+pub struct RecordBatchView<'a> {
+    storage: RecordBatchStorage<'a>,
 }
 
-impl<'a> BitPlane64BatchView<'a> {
-    #[inline(always)]
-    pub fn try_from_words(
-        planes: &'a [u64],
-        shot_count: usize,
-        bits_per_shot: usize,
-    ) -> RecordResult<Self> {
-        validate_bit_plane_shots(shot_count)?;
-        if planes.len() != bits_per_shot {
-            return Err(batch_width_mismatch(
-                "bit-plane word storage",
-                planes.len(),
-                bits_per_shot,
-            ));
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum RecordBatchStorage<'a> {
+    ShotMajor(PackedShotBatchView<'a>),
+    BitPlanes(BitPlaneBatchView<'a>),
+}
+
+impl<'a> RecordBatchView<'a> {
+    pub const fn from_shot_major(records: PackedShotBatchView<'a>) -> Self {
+        Self {
+            storage: RecordBatchStorage::ShotMajor(records),
         }
-        Ok(Self {
-            planes,
-            shot_count,
-            bits_per_shot,
-        })
+    }
+
+    pub const fn from_bit_planes(bit_planes: BitPlaneBatchView<'a>) -> Self {
+        Self {
+            storage: RecordBatchStorage::BitPlanes(bit_planes),
+        }
     }
 
     #[inline]
     pub fn shot_count(self) -> usize {
-        self.shot_count
+        match self.storage {
+            RecordBatchStorage::ShotMajor(records) => records.shot_count(),
+            RecordBatchStorage::BitPlanes(planes) => planes.shot_count(),
+        }
     }
 
     #[inline]
     pub fn bits_per_shot(self) -> usize {
-        self.bits_per_shot
+        match self.storage {
+            RecordBatchStorage::ShotMajor(records) => records.bits_per_shot(),
+            RecordBatchStorage::BitPlanes(planes) => planes.bits_per_shot(),
+        }
     }
 
-    #[inline]
-    pub fn get(self, bit_index: usize, shot_index: usize) -> Option<bool> {
-        if shot_index >= self.shot_count {
-            return None;
+    pub fn get(self, shot_index: usize, bit_index: usize) -> Option<bool> {
+        match self.storage {
+            RecordBatchStorage::ShotMajor(records) => records.get(shot_index, bit_index),
+            RecordBatchStorage::BitPlanes(planes) => planes.get(bit_index, shot_index),
         }
-        self.planes
-            .get(bit_index)
-            .map(|word| word & (1_u64 << shot_index) != 0)
     }
 
-    #[inline]
-    pub fn plane(self, bit_index: usize) -> RecordResult<BitSlice<'a>> {
-        let word = self.planes.get(bit_index).ok_or_else(|| {
-            FormatError::invalid_data(format!(
-                "bit-plane index {bit_index} is out of range for {} result bits",
-                self.bits_per_shot
-            ))
-        })?;
-        if self.shot_count == 0 {
-            return BitSlice::new(&[], 0).map_err(bit_storage_error);
-        }
-        BitSlice::new(std::slice::from_ref(word), self.shot_count).map_err(bit_storage_error)
+    /// Borrows the first `shot_count` records of this view.
+    pub fn prefix(self, shot_count: usize) -> RecordResult<Self> {
+        Ok(Self {
+            storage: match self.storage {
+                RecordBatchStorage::ShotMajor(records) => {
+                    RecordBatchStorage::ShotMajor(records.prefix(shot_count)?)
+                }
+                RecordBatchStorage::BitPlanes(planes) => {
+                    RecordBatchStorage::BitPlanes(planes.prefix(shot_count)?)
+                }
+            },
+        })
     }
 
-    /// Copies the logical planes into reusable word storage and clears inactive high lanes.
-    pub fn copy_words_into(self, target: &mut [u64]) -> RecordResult<()> {
-        if target.len() != self.bits_per_shot {
-            return Err(batch_width_mismatch(
-                "bit-plane target storage",
-                target.len(),
-                self.bits_per_shot,
-            ));
+    pub const fn shot_major_records(self) -> Option<PackedShotBatchView<'a>> {
+        match self.storage {
+            RecordBatchStorage::ShotMajor(records) => Some(records),
+            RecordBatchStorage::BitPlanes(_) => None,
         }
-        let mask = low_bits_mask(self.shot_count);
-        for (target, source) in target.iter_mut().zip(self.planes) {
-            *target = *source & mask;
+    }
+
+    pub const fn bit_planes(self) -> Option<BitPlaneBatchView<'a>> {
+        match self.storage {
+            RecordBatchStorage::ShotMajor(_) => None,
+            RecordBatchStorage::BitPlanes(planes) => Some(planes),
         }
-        Ok(())
+    }
+
+    pub(crate) const fn storage(self) -> RecordBatchStorage<'a> {
+        self.storage
+    }
+}
+
+impl<'a> From<PackedShotBatchView<'a>> for RecordBatchView<'a> {
+    fn from(records: PackedShotBatchView<'a>) -> Self {
+        Self::from_shot_major(records)
+    }
+}
+
+impl<'a> From<BitPlaneBatchView<'a>> for RecordBatchView<'a> {
+    fn from(bit_planes: BitPlaneBatchView<'a>) -> Self {
+        Self::from_bit_planes(bit_planes)
     }
 }
 
 /// Borrowed measurement records with explicit measurement semantics.
 #[derive(Clone, Copy, Debug)]
 pub struct MeasurementBatchView<'a> {
-    storage: MeasurementBatchStorageView<'a>,
+    records: RecordBatchView<'a>,
     width: MeasurementWidth,
 }
 
 impl<'a> MeasurementBatchView<'a> {
     pub fn new(records: PackedShotBatchView<'a>) -> Self {
+        Self::from_records(records.into())
+    }
+
+    #[inline]
+    pub fn from_bit_planes(bit_planes: BitPlaneBatchView<'a>) -> Self {
+        Self::from_records(bit_planes.into())
+    }
+
+    #[inline]
+    pub fn from_records(records: RecordBatchView<'a>) -> Self {
         Self {
-            storage: MeasurementBatchStorageView::ShotMajor(records),
+            records,
             width: MeasurementWidth::new(records.bits_per_shot()),
         }
     }
 
     #[inline]
-    pub fn from_bit_planes(bit_planes: BitPlane64BatchView<'a>) -> Self {
-        Self {
-            storage: MeasurementBatchStorageView::BitPlanes(bit_planes),
-            width: MeasurementWidth::new(bit_planes.bits_per_shot()),
-        }
-    }
-
-    #[inline]
     pub fn shot_count(self) -> usize {
-        match self.storage {
-            MeasurementBatchStorageView::ShotMajor(records) => records.shot_count(),
-            MeasurementBatchStorageView::BitPlanes(bit_planes) => bit_planes.shot_count(),
-        }
+        self.records.shot_count()
     }
 
     pub fn get(self, shot_index: usize, bit_index: usize) -> Option<bool> {
-        match self.storage {
-            MeasurementBatchStorageView::ShotMajor(records) => records.get(shot_index, bit_index),
-            MeasurementBatchStorageView::BitPlanes(bit_planes) => {
-                bit_planes.get(bit_index, shot_index)
-            }
-        }
-    }
-
-    pub const fn shot_major_records(self) -> Option<PackedShotBatchView<'a>> {
-        match self.storage {
-            MeasurementBatchStorageView::ShotMajor(records) => Some(records),
-            MeasurementBatchStorageView::BitPlanes(_) => None,
-        }
+        self.records.get(shot_index, bit_index)
     }
 
     #[inline]
-    pub const fn bit_planes(self) -> Option<BitPlane64BatchView<'a>> {
-        match self.storage {
-            MeasurementBatchStorageView::ShotMajor(_) => None,
-            MeasurementBatchStorageView::BitPlanes(bit_planes) => Some(bit_planes),
-        }
+    pub const fn records(self) -> RecordBatchView<'a> {
+        self.records
+    }
+
+    pub const fn shot_major_records(self) -> Option<PackedShotBatchView<'a>> {
+        self.records.shot_major_records()
+    }
+
+    #[inline]
+    pub const fn bit_planes(self) -> Option<BitPlaneBatchView<'a>> {
+        self.records.bit_planes()
     }
 
     #[inline]
@@ -550,26 +494,23 @@ impl<'a> MeasurementBatchView<'a> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum MeasurementBatchStorageView<'a> {
-    ShotMajor(PackedShotBatchView<'a>),
-    BitPlanes(BitPlane64BatchView<'a>),
-}
-
 /// Borrowed detector and observable records with independent planes.
 #[derive(Clone, Copy, Debug)]
 pub struct DetectionBatchView<'a> {
-    detectors: PackedShotBatchView<'a>,
-    observables: PackedShotBatchView<'a>,
+    detectors: RecordBatchView<'a>,
+    observables: RecordBatchView<'a>,
     detector_width: DetectorWidth,
     observable_width: ObservableWidth,
 }
 
 impl<'a> DetectionBatchView<'a> {
+    /// Pairs detector and observable records of the same shot count, in either layout.
     pub fn try_new(
-        detectors: PackedShotBatchView<'a>,
-        observables: PackedShotBatchView<'a>,
+        detectors: impl Into<RecordBatchView<'a>>,
+        observables: impl Into<RecordBatchView<'a>>,
     ) -> RecordResult<Self> {
+        let detectors = detectors.into();
+        let observables = observables.into();
         ensure_same_shot_count(
             detectors.shot_count(),
             observables.shot_count(),
@@ -584,11 +525,11 @@ impl<'a> DetectionBatchView<'a> {
         })
     }
 
-    pub const fn detectors(self) -> PackedShotBatchView<'a> {
+    pub const fn detectors(self) -> RecordBatchView<'a> {
         self.detectors
     }
 
-    pub const fn observables(self) -> PackedShotBatchView<'a> {
+    pub const fn observables(self) -> RecordBatchView<'a> {
         self.observables
     }
 
@@ -609,14 +550,14 @@ impl<'a> DetectionBatchView<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct DemSampleBatchView<'a> {
     detection: DetectionBatchView<'a>,
-    sampled_errors: Option<PackedShotBatchView<'a>>,
+    sampled_errors: Option<RecordBatchView<'a>>,
     sampled_error_width: Option<SampledErrorWidth>,
 }
 
 impl<'a> DemSampleBatchView<'a> {
     pub fn try_new(
         detection: DetectionBatchView<'a>,
-        sampled_errors: Option<PackedShotBatchView<'a>>,
+        sampled_errors: Option<RecordBatchView<'a>>,
     ) -> RecordResult<Self> {
         if let Some(errors) = sampled_errors {
             ensure_same_shot_count(
@@ -638,7 +579,7 @@ impl<'a> DemSampleBatchView<'a> {
         self.detection
     }
 
-    pub const fn sampled_errors(self) -> Option<PackedShotBatchView<'a>> {
+    pub const fn sampled_errors(self) -> Option<RecordBatchView<'a>> {
         self.sampled_errors
     }
 
@@ -679,24 +620,6 @@ impl ObservablePredictionBatch {
     }
 }
 
-#[inline(always)]
-fn validate_bit_plane_shots(shot_count: usize) -> RecordResult<()> {
-    if shot_count > 64 {
-        return Err(FormatError::invalid_data(format!(
-            "bit-plane batch supports at most 64 shots, got {shot_count}"
-        )));
-    }
-    Ok(())
-}
-
-const fn low_bits_mask(bit_count: usize) -> u64 {
-    if bit_count == u64::BITS as usize {
-        u64::MAX
-    } else {
-        (1_u64 << bit_count) - 1
-    }
-}
-
 fn ensure_same_shot_count(
     left: usize,
     right: usize,
@@ -711,7 +634,7 @@ fn ensure_same_shot_count(
     Ok(())
 }
 
-fn batch_width_mismatch(label: &str, actual: usize, expected: usize) -> FormatError {
+pub(super) fn batch_width_mismatch(label: &str, actual: usize, expected: usize) -> FormatError {
     FormatError::with_context(
         FormatErrorCode::InvalidRecordWidth,
         format!("{label} has {actual} bits but {expected} were expected"),
@@ -726,7 +649,6 @@ fn batch_width_mismatch(label: &str, actual: usize, expected: usize) -> FormatEr
 /// Fills `target` with the source bits starting at `source_start`; source words past the end
 /// read as zero and the caller's guard masks the target's tail.
 fn copy_bit_range(source: &[u64], source_start: usize, target: &mut [u64]) {
-    const WORD_BITS: usize = u64::BITS as usize;
     let word_offset = source_start / WORD_BITS;
     let shift = source_start % WORD_BITS;
     let word = |index: usize| source.get(index).copied().unwrap_or(0);
@@ -740,7 +662,7 @@ fn copy_bit_range(source: &[u64], source_start: usize, target: &mut [u64]) {
     }
 }
 
-fn bit_storage_error(error: stab_bits::BitError) -> FormatError {
+pub(super) fn bit_storage_error(error: stab_bits::BitError) -> FormatError {
     FormatError::invalid_data(error.to_string())
 }
 
@@ -767,7 +689,7 @@ mod tests {
             PackedShotBatch::from_records(&[vec![false, true], vec![true, false]], 2).unwrap();
 
         let detection = DetectionBatchView::try_new(detectors.view(), observables.view()).unwrap();
-        let dem = DemSampleBatchView::try_new(detection, Some(errors.view())).unwrap();
+        let dem = DemSampleBatchView::try_new(detection, Some(errors.view().into())).unwrap();
 
         assert_eq!(dem.detection().detectors().get(0, 0), Some(true));
         assert_eq!(dem.detection().observables().get(0, 0), Some(true));
@@ -782,7 +704,7 @@ mod tests {
 
         let mismatched = PackedShotBatch::zeros(1, 1).unwrap();
         assert!(DetectionBatchView::try_new(detectors.view(), mismatched.view()).is_err());
-        assert!(DemSampleBatchView::try_new(detection, Some(mismatched.view())).is_err());
+        assert!(DemSampleBatchView::try_new(detection, Some(mismatched.view().into())).is_err());
         assert!(DemSampleBatchView::try_new(detection, None).is_ok());
     }
 
@@ -795,7 +717,8 @@ mod tests {
 
         let measurement = MeasurementBatchView::new(measurements.view());
         let detection = DetectionBatchView::try_new(detectors.view(), observables.view()).unwrap();
-        let dem = DemSampleBatchView::try_new(detection, Some(sampled_errors.view())).unwrap();
+        let dem =
+            DemSampleBatchView::try_new(detection, Some(sampled_errors.view().into())).unwrap();
         let predictions = ObservablePredictionBatch::zeros(2, CorrectionWidth::new(3)).unwrap();
         let layout = crate::DetsLayout::from_widths(
             measurement.width(),
@@ -834,7 +757,7 @@ mod tests {
         assert_eq!(view.get(1, 0), Some(true));
         assert_eq!(view.shot(1).unwrap().get(0), Some(true));
 
-        let mut planes = BitPlane64Batch::from_shot_major(view).unwrap();
+        let mut planes = BitPlaneBatch::from_shot_major(view).unwrap();
         assert_eq!(planes.shot_count(), 2);
         assert_eq!(planes.bits_per_shot(), 3);
         assert_eq!(planes.get(0, 1), Some(true));
@@ -919,11 +842,10 @@ mod tests {
     }
 
     #[test]
-    fn bit_plane_prefix_and_word_copy_hide_inactive_storage() {
-        let mut planes = BitPlane64Batch::zeros(64, 2).unwrap();
-        planes
-            .copy_plane_from_word(0, 0b101)
-            .expect("copy packed plane");
+    fn bit_plane_prefix_and_shot_copy_hide_inactive_storage() {
+        let mut planes = BitPlaneBatch::zeros(64, 2).unwrap();
+        planes.set(0, 0, true).unwrap();
+        planes.set(0, 2, true).unwrap();
         planes
             .copy_shot_from_bools(1, &[false, true])
             .expect("replace one shot");
@@ -940,42 +862,99 @@ mod tests {
         assert!(planes.copy_shot_from_bools(64, &[true, false]).is_err());
     }
 
-    #[test]
-    fn packed_and_bit_plane_bulk_copies_are_exact_for_partial_batches() {
-        for shots in [0, 1, 17, 63, 64] {
-            for width in [0, 1, 7, 8, 9, 63, 64, 65, 256] {
-                let mut packed = PackedShotBatch::zeros(64, width).unwrap();
-                for shot in 0..64 {
-                    for bit in 0..width {
-                        if (shot * 5 + bit * 3) % 11 < 4 {
-                            packed.set(shot, bit, true).unwrap();
-                        }
-                    }
+    fn patterned_records(shots: usize, width: usize) -> PackedShotBatch {
+        let mut packed = PackedShotBatch::zeros(shots, width).unwrap();
+        for shot in 0..shots {
+            for bit in 0..width {
+                if (shot * 5 + bit * 3) % 11 < 4 {
+                    packed.set(shot, bit, true).unwrap();
                 }
-                let prefix = packed.view_prefix(shots).unwrap();
-                let mut words = vec![u64::MAX; width];
-                prefix.copy_into_bit_plane_words(&mut words).unwrap();
-                let borrowed = BitPlane64BatchView::try_from_words(&words, shots, width).unwrap();
-                let mut copied = vec![u64::MAX; width];
-                borrowed.copy_words_into(&mut copied).unwrap();
-                assert_eq!(copied, words);
+            }
+        }
+        packed
+    }
 
-                let round_trip = PackedShotBatch::from_bit_planes(borrowed).unwrap();
-                assert_eq!(round_trip.shot_count(), shots);
-                assert_eq!(round_trip.bits_per_shot(), width);
+    #[test]
+    fn wide_bit_planes_round_trip_partial_and_multi_word_batches() {
+        for shots in [0, 1, 17, 63, 64, 65, 255, 256, 257, 1000] {
+            for width in [0, 1, 7, 64, 65, 130] {
+                let packed = patterned_records(shots, width);
+                let planes = BitPlaneBatch::from_shot_major(packed.view()).unwrap();
+                assert_eq!(planes.shot_count(), shots);
+                assert_eq!(planes.bits_per_shot(), width);
                 for shot in 0..shots {
                     for bit in 0..width {
-                        assert_eq!(round_trip.get(shot, bit), packed.get(shot, bit));
+                        assert_eq!(planes.get(bit, shot), packed.get(shot, bit));
                     }
+                }
+                assert_eq!(planes.to_shot_major().unwrap(), packed);
+                let records = RecordBatchView::from(planes.view());
+                assert_eq!(records.shot_count(), shots);
+                assert_eq!(records.bits_per_shot(), width);
+                if shots > 0 && width > 0 {
+                    assert_eq!(
+                        records.get(shots - 1, width - 1),
+                        packed.get(shots - 1, width - 1)
+                    );
                 }
             }
         }
     }
 
     #[test]
+    fn block_planes_hide_inactive_lanes_and_match_word_planes() {
+        let shots = 200;
+        let packed = patterned_records(256, 9);
+        let words = BitPlaneBatch::from_shot_major(packed.view()).unwrap();
+        let blocks = (0..9)
+            .map(|bit| {
+                let plane = words.plane(bit).unwrap().words().to_vec();
+                stab_bits::BitBlock::from_words(std::array::from_fn(|index| plane[index]))
+            })
+            .collect::<Vec<_>>();
+        let view = BitPlaneBatchView::try_from_blocks(&blocks, shots).unwrap();
+        let rows = PackedShotBatch::from_bit_planes(view).unwrap();
+        assert_eq!(rows.shot_count(), shots);
+        for shot in 0..256 {
+            for bit in 0..9 {
+                let expected = (shot < shots).then(|| packed.get(shot, bit).unwrap());
+                assert_eq!(view.get(bit, shot), expected);
+                if shot < shots {
+                    assert_eq!(rows.get(shot, bit), expected);
+                }
+            }
+        }
+        let mut column = vec![u64::MAX; 9];
+        view.copy_word_column_into(3, &mut column).unwrap();
+        assert!(column.iter().all(|word| *word >> (shots - 192) == 0));
+        assert!(view.copy_word_column_into(4, &mut column).is_err());
+        assert!(BitPlaneBatchView::try_from_blocks(&blocks, 257).is_err());
+    }
+
+    #[test]
+    fn word_aligned_shot_windows_read_the_selected_shots_only() {
+        let packed = patterned_records(1000, 5);
+        let planes = BitPlaneBatch::from_shot_major(packed.view()).unwrap();
+        for (first, count) in [(0, 256), (256, 256), (768, 232), (960, 40), (960, 0)] {
+            let window = planes.view().shot_window(first, count).unwrap();
+            assert_eq!(window.shot_count(), count);
+            let rows = PackedShotBatch::from_bit_planes(window).unwrap();
+            for shot in 0..count {
+                for bit in 0..5 {
+                    assert_eq!(window.get(bit, shot), packed.get(first + shot, bit));
+                    assert_eq!(rows.get(shot, bit), packed.get(first + shot, bit));
+                }
+            }
+            assert_eq!(window.get(0, count), None);
+        }
+        assert!(planes.view().shot_window(1, 2).is_err());
+        assert!(planes.view().shot_window(960, 41).is_err());
+    }
+
+    #[test]
     fn borrowed_bit_plane_words_validate_layout_and_hide_tail_bits() {
         let words = [u64::MAX, 0b10];
-        let view = BitPlane64BatchView::try_from_words(&words, 2, 2).unwrap();
+        let view = BitPlaneBatchView::try_from_words(&words, 1, 2, 2).unwrap();
 
         assert_eq!(view.shot_count(), 2);
         assert_eq!(view.bits_per_shot(), 2);
@@ -988,47 +967,19 @@ mod tests {
         assert_eq!(plane.popcount(), 2);
         assert_eq!(plane.words(), &[u64::MAX]);
         let mut copied = [u64::MAX; 2];
-        view.copy_words_into(&mut copied).unwrap();
+        view.copy_word_column_into(0, &mut copied).unwrap();
         assert_eq!(copied, [0b11, 0b10]);
 
-        assert!(BitPlane64BatchView::try_from_words(&words, 65, 2).is_err());
-        assert!(BitPlane64BatchView::try_from_words(&words, 2, 1).is_err());
-        assert!(view.copy_words_into(&mut copied[..1]).is_err());
-    }
-
-    #[test]
-    fn bit_planes_reject_more_than_64_shots_before_storage() {
-        let records = PackedShotBatch::zeros(65, 1).unwrap();
-        assert!(BitPlane64Batch::from_shot_major(records.view()).is_err());
-        assert!(BitPlane64Batch::zeros(65, 1).is_err());
+        assert!(BitPlaneBatchView::try_from_words(&words, 1, 65, 2).is_err());
+        assert!(BitPlaneBatchView::try_from_words(&words, 1, 2, 1).is_err());
+        assert!(BitPlaneBatchView::try_from_words(&words, usize::MAX, 2, 2).is_err());
+        assert!(view.copy_word_column_into(0, &mut copied[..1]).is_err());
     }
 
     #[test]
     fn bit_planes_report_unaddressable_widths_without_panicking() {
-        assert!(BitPlane64Batch::zeros(1, usize::MAX).is_err());
-    }
-
-    #[test]
-    fn bit_plane_ptb64_batches_match_record_adapters() {
-        let records_64 = (0..64)
-            .map(|shot| {
-                (0..17)
-                    .map(|bit| (shot * 7 + bit * 11) % 13 == 0)
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-        let packed = PackedShotBatch::from_records(&records_64, 17).unwrap();
-        let planes = BitPlane64Batch::from_shot_major(packed.view()).unwrap();
-        assert_eq!(
-            crate::write_bit_plane_64_batch(planes.view()).unwrap(),
-            crate::write_ptb64_records_checked(&records_64).unwrap()
-        );
-
-        let empty_planes = BitPlane64Batch::zeros(0, 17).unwrap();
-        assert_eq!(
-            crate::write_bit_plane_64_batch(empty_planes.view()).unwrap(),
-            crate::write_ptb64_records_checked(&[]).unwrap()
-        );
+        assert!(BitPlaneBatch::zeros(1, usize::MAX).is_err());
+        assert!(BitPlaneBatch::zeros(65, usize::MAX).is_err());
     }
 
     proptest! {
@@ -1040,7 +991,7 @@ mod tests {
 
         #[test]
         fn shot_major_and_bit_plane_round_trip(
-            shot_count in 0usize..=64,
+            shot_count in 0usize..=300,
             bits_per_shot in 0usize..=130,
             seed in any::<u64>(),
         ) {
@@ -1056,7 +1007,7 @@ mod tests {
                 }
             }
 
-            let planes = BitPlane64Batch::from_shot_major(source.view()).unwrap();
+            let planes = BitPlaneBatch::from_shot_major(source.view()).unwrap();
             let round_trip = planes.to_shot_major().unwrap();
             prop_assert_eq!(round_trip, source);
         }

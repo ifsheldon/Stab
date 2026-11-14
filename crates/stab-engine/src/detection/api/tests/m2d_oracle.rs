@@ -7,7 +7,7 @@
 //! produce expectations, so the engine is compared against an independent model.
 
 use rand::RngExt as _;
-use stab_records::BitPlane64Batch;
+use stab_records::BitPlaneBatch;
 
 use super::*;
 
@@ -127,10 +127,14 @@ fn conversion_matches_first_principles_oracle_for_packed_and_bit_plane_input() {
                 assert_eq!(sink.finish_count, 1, "{label}");
             }
 
-            // Irregular packed chunks through one transaction, then 64-shot bit-plane chunks
-            // through another on the same reused session.
+            // Irregular packed chunks through one transaction, then irregular multi-word
+            // bit-plane chunks through another on the same reused session.
             for bit_planes in [false, true] {
-                let chunk_sizes = if bit_planes { [64; 3] } else { [17, 1, 64] };
+                let chunk_sizes = if bit_planes {
+                    [256, 65, 130]
+                } else {
+                    [17, 1, 256]
+                };
                 let mut sink = CollectSink::default();
                 let mut transaction = session
                     .start_transaction(&mut sink)
@@ -146,9 +150,9 @@ fn conversion_matches_first_principles_oracle_for_packed_and_bit_plane_input() {
                     let chunk_sweeps = packed(&sweeps[start..end], SWEEPS);
                     if bit_planes {
                         let measurement_planes =
-                            BitPlane64Batch::from_shot_major(chunk_measurements.view())
+                            BitPlaneBatch::from_shot_major(chunk_measurements.view())
                                 .expect("transpose measurements");
-                        let sweep_planes = BitPlane64Batch::from_shot_major(chunk_sweeps.view())
+                        let sweep_planes = BitPlaneBatch::from_shot_major(chunk_sweeps.view())
                             .expect("transpose sweeps");
                         transaction
                             .write_batch_with_sweep(

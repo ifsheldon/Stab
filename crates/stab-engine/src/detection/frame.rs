@@ -8,6 +8,7 @@ use super::try_vec_with_capacity;
 mod clifford;
 #[cfg(test)]
 mod clifford_tests;
+mod delivery;
 mod helpers;
 mod noise;
 mod plan;
@@ -15,26 +16,28 @@ mod program;
 mod word;
 
 use helpers::{TWO_QUBIT_FRAME_BASES, measurement_record_word, try_zero_words};
-pub(in crate::detection) use noise::batch_active_mask;
 use noise::{
     FrameExecutionMode, for_each_set_lane, sample_categorical_masks,
     visit_sparse_categorical_events,
 };
 
+pub(crate) use delivery::{DeliveryFailure, FrameBatchSource, PendingLanes};
 pub(super) use plan::{
-    DetectorFrameState, DirectDetectorFramePlan, SweepCorrectionPlan,
-    admit_combined_compiled_storage,
+    DirectDetectorFramePlan, SweepCorrectionPlan, admit_combined_compiled_storage,
 };
-pub(crate) use plan::{PAULI_FRAME_BATCH_SHOTS, PauliFrameSamplingState};
+pub(crate) use plan::{FRAME_BATCH_SHOTS, FrameBatchState};
 pub(crate) use program::{
     CircuitProgram, CliffordStep, ControlledPair, FrameGate, PauliProductMeasurement, ProgramEntry,
     ProgramInstruction, ProgramOptions, ReferenceClifford,
 };
 pub(in crate::detection) use program::{TraversalEvent, visit_circuit};
-use word::FrameWord;
+pub(crate) use word::FrameWord;
+
+/// The lane word every frame batch runs on: one 256-shot [`stab_bits::BitBlock`] per plane.
+pub(crate) type FrameLanes = stab_bits::BitBlock;
 
 #[derive(Debug)]
-pub(in crate::detection) struct BitPlaneDetectionFrame<W: FrameWord = u64> {
+pub(in crate::detection) struct BitPlaneDetectionFrame<W: FrameWord> {
     xs: Vec<W>,
     zs: Vec<W>,
     pub(in crate::detection) measurements: Vec<W>,
@@ -60,7 +63,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         })
     }
 
-    fn reset(&mut self, rng: &mut impl Rng, mode: FrameExecutionMode<'_>) {
+    fn reset(&mut self, rng: &mut impl Rng, mode: FrameExecutionMode<'_, W>) {
         self.xs.fill(W::default());
         for bit in &mut self.zs {
             *bit = mode.random_mask(rng, 0.5);
@@ -74,7 +77,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         &mut self,
         program: &CircuitProgram,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
         cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         let mut cursor = program.cursor(cancellation);
@@ -88,7 +91,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         &mut self,
         instruction: &ProgramInstruction,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         match instruction {
             ProgramInstruction::Clifford { frame, targets, .. } => match frame {
@@ -214,7 +217,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         reset: bool,
         probability: f64,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         let measurement_start = self.measurements.len();
         for &qubit in targets {
@@ -261,7 +264,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         targets: &[usize],
         probabilities: [f64; 3],
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         if !mode.samples_noise() {
             return Ok(());
@@ -307,7 +310,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         targets: &[usize],
         probabilities: [f64; 15],
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         if !mode.samples_noise() {
             return Ok(());
@@ -376,7 +379,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         &mut self,
         measurement: &PauliProductMeasurement,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         for product in measurement.products() {
             let (terms, _) = product?;
@@ -413,7 +416,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         terms: &[(usize, PauliBasis)],
         flip_probability: f64,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         let mut result = mode.random_mask(rng, flip_probability);
         for (qubit, basis) in terms {
@@ -438,7 +441,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         &mut self,
         terms: &[(usize, PauliBasis)],
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         let mask = mode.random_mask(rng, 0.5);
         for (qubit, basis) in terms {
@@ -460,7 +463,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         basis: PauliBasis,
         map: clifford::TwoQubitFrameMap,
         pairs: &[ControlledPair],
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         for pair in pairs {
             match *pair {
@@ -485,7 +488,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         else_branch: bool,
         probability: f64,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         if !else_branch {
             self.correlated_error_occurred = W::default();
@@ -493,8 +496,8 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         if !mode.samples_noise() {
             return Ok(());
         }
-        let eligible = mode.active_mask::<W>() & !self.correlated_error_occurred;
-        let occurred = mode.random_mask::<W>(rng, probability) & eligible;
+        let eligible = mode.active_mask() & !self.correlated_error_occurred;
+        let occurred = mode.random_mask(rng, probability) & eligible;
         self.correlated_error_occurred |= occurred;
         for &(qubit, basis) in terms {
             self.apply_pauli_mask(qubit, basis, occurred)?;
@@ -507,7 +510,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         targets: &[usize],
         probability: f64,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         if !mode.samples_noise() {
             self.measurements
@@ -538,7 +541,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         targets: &[usize],
         probabilities: [f64; 4],
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         if !mode.samples_noise() {
             self.measurements
@@ -562,7 +565,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         qubit: usize,
         basis: PauliBasis,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
@@ -588,7 +591,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         qubit: usize,
         basis: PauliBasis,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<W> {
         let result = self.frame_measurement_bit(qubit, basis)?;
         self.randomize_measured_basis(qubit, basis, rng, mode)?;
@@ -609,7 +612,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         qubit: usize,
         basis: PauliBasis,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_>,
+        mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}

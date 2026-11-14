@@ -3,13 +3,13 @@ use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, N
 use rand::Rng;
 use stab_bits::{BIT_BLOCK_WORDS, BitBlock};
 
-use crate::bernoulli::{fill_words as fill_bernoulli_words, sample_mask as sample_bernoulli_mask};
+use crate::bernoulli::fill_words as fill_bernoulli_words;
 use crate::detection::error::DetectionResult;
 
 use super::BitPlaneDetectionFrame;
 use super::helpers::{frame_word, set_frame_word, xor_frame_word};
 
-pub(in crate::detection) trait FrameWord:
+pub(crate) trait FrameWord:
     BitAnd<Output = Self>
     + BitAndAssign
     + BitOr<Output = Self>
@@ -24,57 +24,15 @@ pub(in crate::detection) trait FrameWord:
     const LANE_COUNT: usize;
 
     fn active_mask(lanes: usize) -> Self;
-    fn from_low_word(word: u64) -> Self;
+    /// Moves lane `lanes + i` to lane `i` and clears the vacated high lanes.
+    fn shift_lanes_down(self, lanes: usize) -> Self;
     fn prefix_len(self) -> Option<usize>;
     fn one_hot(index: usize) -> Self;
     fn isolate_lowest_one(self) -> Option<Self>;
     fn clear_lowest_one(self) -> Self;
     fn sample_mask(probability: f64, active: Self, rng: &mut impl Rng) -> Self;
+    #[cfg(test)]
     fn extract_u64(self, start: usize, count: usize) -> u64;
-}
-
-impl FrameWord for u64 {
-    const LANE_COUNT: usize = u64::BITS as usize;
-
-    fn active_mask(lanes: usize) -> Self {
-        low_bits_mask(lanes)
-    }
-
-    fn from_low_word(word: u64) -> Self {
-        word
-    }
-
-    fn prefix_len(self) -> Option<usize> {
-        let lanes = self.trailing_ones() as usize;
-        (self == low_bits_mask(lanes)).then_some(lanes)
-    }
-
-    fn one_hot(index: usize) -> Self {
-        if index < Self::LANE_COUNT {
-            1_u64 << index
-        } else {
-            0
-        }
-    }
-
-    fn isolate_lowest_one(self) -> Option<Self> {
-        (self != 0).then(|| u64::isolate_lowest_one(self))
-    }
-
-    fn clear_lowest_one(self) -> Self {
-        self & self.wrapping_sub(1)
-    }
-
-    fn sample_mask(probability: f64, active: Self, rng: &mut impl Rng) -> Self {
-        sample_bernoulli_mask(probability, active, rng)
-    }
-
-    fn extract_u64(self, start: usize, count: usize) -> u64 {
-        if start >= Self::LANE_COUNT {
-            return 0;
-        }
-        (self >> start) & low_bits_mask(count)
-    }
 }
 
 impl FrameWord for BitBlock {
@@ -95,12 +53,20 @@ impl FrameWord for BitBlock {
         Self::from_words(words)
     }
 
-    fn from_low_word(word: u64) -> Self {
-        let mut words = [0; BIT_BLOCK_WORDS];
-        if let Some(low) = words.first_mut() {
-            *low = word;
-        }
-        Self::from_words(words)
+    fn shift_lanes_down(self, lanes: usize) -> Self {
+        let words = self.words();
+        let word_shift = lanes / u64::BITS as usize;
+        let bit_shift = lanes % u64::BITS as usize;
+        let word = |index: usize| words.get(index).copied().unwrap_or(0);
+        Self::from_words(std::array::from_fn(|index| {
+            let low = word(index + word_shift);
+            if bit_shift == 0 {
+                low
+            } else {
+                (low >> bit_shift)
+                    | (word(index + word_shift + 1) << (u64::BITS as usize - bit_shift))
+            }
+        }))
     }
 
     fn prefix_len(self) -> Option<usize> {
@@ -163,6 +129,7 @@ impl FrameWord for BitBlock {
         Self::from_words(words) & active
     }
 
+    #[cfg(test)]
     fn extract_u64(self, start: usize, count: usize) -> u64 {
         let words = self.words();
         let word_index = start / u64::BITS as usize;
@@ -245,5 +212,30 @@ mod tests {
         assert_eq!(block.extract_u64(60, 64), 0xedcb_a987_6543_2100);
         assert_eq!(block.extract_u64(192, 64), 0x1234_5678_9abc_def0);
         assert_eq!(block.extract_u64(255, 1), 0);
+    }
+
+    #[test]
+    fn bit_block_lane_shifts_keep_the_undelivered_suffix_in_order() {
+        let block = BitBlock::from_words([
+            0x0123_4567_89ab_cdef,
+            0xfedc_ba98_7654_3210,
+            0x0f0f_f0f0_aaaa_5555,
+            0x1234_5678_9abc_def0,
+        ]);
+        for shift in [0, 1, 37, 63, 64, 65, 128, 200, 255, 256] {
+            let shifted = block.shift_lanes_down(shift);
+            for lane in 0..BitBlock::LANE_COUNT {
+                let expected = if lane + shift < BitBlock::LANE_COUNT {
+                    block.extract_u64(lane + shift, 1)
+                } else {
+                    0
+                };
+                assert_eq!(
+                    shifted.extract_u64(lane, 1),
+                    expected,
+                    "shift {shift} lane {lane}"
+                );
+            }
+        }
     }
 }

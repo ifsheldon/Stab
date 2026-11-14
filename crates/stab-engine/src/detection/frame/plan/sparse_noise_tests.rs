@@ -1,9 +1,9 @@
 //! Statistical contract for the sparse categorical noise walk.
 //!
 //! `visit_sparse_categorical_events` replaces per-target categorical masks whenever a channel's
-//! total probability is at most 0.125. These tests drive it through both frame word widths that
-//! use it in production: the 256-lane `BitBlock` measurement-sampling frame and the 64-lane `u64`
-//! detection frame, including a partial final detection batch.
+//! total probability is at most 0.125. These tests drive it through both frame batch states that
+//! use it in production: the measurement-sampling state with full batches and the detection state,
+//! including a partial final detection batch.
 //!
 //! Each data qubit is half of a Bell pair that is decoded after the noise, so its measured flip
 //! pair identifies the applied Pauli exactly: a Z component flips the data measurement and an X
@@ -25,8 +25,9 @@ use rand::rngs::SmallRng;
 use stab_model::Circuit;
 
 use super::super::program::{CircuitProgram, ProgramOptions};
-use super::{DirectDetectorFramePlan, PauliFrameSamplingState};
+use super::{DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FrameBatchState};
 use crate::detection::DetectionConversionLimits;
+use crate::detection::frame::{FrameLanes, FrameWord as _};
 
 const DATA_QUBITS: usize = 50;
 const SIGMA: f64 = 5.0;
@@ -36,9 +37,9 @@ const PAULI_CHANNEL_2: [f64; 15] = [
     0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.010, 0.011, 0.012, 0.013,
     0.014, 0.015,
 ];
-const BIT_BLOCK_BATCHES: usize = 32;
-const U64_FULL_BATCHES: usize = 128;
-const U64_FINAL_LANES: usize = 37;
+const SAMPLING_BATCHES: usize = 32;
+const DETECTION_FULL_BATCHES: usize = 32;
+const DETECTION_FINAL_LANES: usize = 37;
 
 /// Noise channel under test; categories index Paulis as 0=I, 1=X, 2=Y, 3=Z per qubit, which
 /// is Stim's channel argument order once the identity category is dropped.
@@ -214,60 +215,68 @@ fn assert_binomial(label: &str, successes: u64, trials: u64, probability: f64) {
 }
 
 #[test]
-fn bit_block_sampling_frame_sparse_channels_match_category_target_and_lane_marginals() {
+fn sampling_frame_sparse_channels_match_category_target_and_lane_marginals() {
     for (channel, seed) in [(Channel::Single, 0x5A11), (Channel::Pair, 0x5A12)] {
         let circuit = channel.circuit();
         let program = CircuitProgram::compile(&circuit, ProgramOptions::SAMPLING)
             .expect("compile Pauli-frame sampling program");
         assert_eq!(program.counts().measurements, 2 * DATA_QUBITS);
         let mut state =
-            PauliFrameSamplingState::try_new(&program).expect("allocate Pauli-frame state");
+            FrameBatchState::for_measurements(&program).expect("allocate Pauli-frame state");
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut tally = Tally::new(channel, 4);
-        for _ in 0..BIT_BLOCK_BATCHES {
+        for _ in 0..SAMPLING_BATCHES {
             state
-                .sample_batch(&program, &mut rng, &stab_model::Cancellation::never())
-                .expect("sample BitBlock batch");
+                .sample_measurements(&program, &mut rng, &stab_model::Cancellation::never())
+                .expect("sample frame batch");
+            let planes = state.measurement_planes();
             for lane_word in 0..4 {
                 tally.add_lane_word(lane_word, u64::MAX, |measurement| {
-                    state
-                        .measurement_segment(measurement, lane_word * 64, 64)
-                        .expect("measurement segment")
+                    planes[measurement].words()[lane_word]
                 });
             }
-            tally.shots += 256;
+            tally.shots += FRAME_BATCH_SHOTS as u64;
         }
-        tally.assert_matches("BitBlock sampling frame");
+        tally.assert_matches("sampling frame");
     }
 }
 
 #[test]
-fn u64_detection_frame_sparse_channels_match_marginals_and_never_touch_inactive_lanes() {
+fn detection_frame_sparse_channels_match_marginals_and_never_touch_inactive_lanes() {
     for (channel, seed) in [(Channel::Single, 0xD311), (Channel::Pair, 0xD312)] {
         let circuit = channel.circuit();
         let plan = DirectDetectorFramePlan::compile(&circuit, DetectionConversionLimits::default())
             .expect("compile direct detector-frame plan");
         let mut state = plan.state().expect("allocate detector-frame state");
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut tally = Tally::new(channel, 1);
-        for lanes in std::iter::repeat_n(64, U64_FULL_BATCHES).chain([U64_FINAL_LANES]) {
+        let mut tally = Tally::new(channel, 4);
+        for lanes in std::iter::repeat_n(FRAME_BATCH_SHOTS, DETECTION_FULL_BATCHES)
+            .chain([DETECTION_FINAL_LANES])
+        {
             plan.sample_batch(
                 &mut state,
                 &mut rng,
                 lanes,
                 &stab_model::Cancellation::never(),
             )
-            .expect("sample u64 batch");
-            let active = super::super::batch_active_mask(lanes);
-            let measurements = &state.frame.measurements;
+            .expect("sample detection batch");
+            let active = FrameLanes::active_mask(lanes);
+            let measurements = state.measurement_planes();
             assert_eq!(measurements.len(), 2 * DATA_QUBITS);
             assert!(
-                measurements.iter().all(|word| word & !active == 0),
+                measurements
+                    .iter()
+                    .all(|plane| *plane & !active == FrameLanes::ZERO),
                 "{lanes}-lane batch flipped an inactive lane"
             );
-            tally.add_lane_word(0, active, |measurement| measurements[measurement]);
+            for lane_word in 0..4 {
+                let active_word = active.words()[lane_word];
+                tally.add_lane_word(lane_word, active_word, |measurement| {
+                    measurements[measurement].words()[lane_word]
+                });
+            }
             tally.shots += lanes as u64;
         }
-        tally.assert_matches("u64 detection frame");
+        tally.assert_matches("detection frame");
     }
 }
