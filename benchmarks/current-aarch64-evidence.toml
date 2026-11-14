@@ -1,4 +1,4 @@
 schema_version = 1
-measured_source_commit = "2c229ccd59b51657e0f68e349f4de98e157672ef"
-full_bundle = "benchmarks/evidence/aarch64/2c229ccd59b51657e0f68e349f4de98e157672ef/full"
-soak_bundle = "benchmarks/evidence/aarch64/2c229ccd59b51657e0f68e349f4de98e157672ef/soak"
+measured_source_commit = "1f42845e0439afa9082c9e7e8397cc054ee13f0c"
+full_bundle = "benchmarks/evidence/aarch64/1f42845e0439afa9082c9e7e8397cc054ee13f0c/full"
+soak_bundle = "benchmarks/evidence/aarch64/1f42845e0439afa9082c9e7e8397cc054ee13f0c/soak"

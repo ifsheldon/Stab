@@ -1,6 +1,6 @@
 # Stim Core Parity And Lean Evidence Plan
 
-Status: P0 through P9 are complete for their recorded revisions. P10 is active with its last task open: tasks 1 through 6 are complete as of `6b774b9a`, and the controlled pair measured on `2c229ccd`, which passed `e2e-release-check` on the evidence descendant `7b0aa4f3`, must be measured again because the shared process supervisor and the documentation cleanup that shortened this plan changed non-evidence paths after it. Exact-revision CI has not run because the commits are unpushed.
+Status: P0 through P9 are complete for their recorded revisions. P10 is active with one item open: tasks 1 through 6 are complete as of `6b774b9a`, and the controlled pair for task 7 is measured on `1f42845e`, which contains the shared process supervisor and the documentation cleanup that shortened this plan, and passes seeded self-regression. Exact-revision CI, the rest of task 7, has not run because the commits are unpushed.
 
 ## Summary
 
@@ -103,7 +103,7 @@ A November test and benchmark audit found real defects hidden by evidence that l
 6. Share one bounded process supervisor across operations crates and replace hand-rolled confined filesystem primitives with maintained crates where the reduction is real.
 7. Produce one fresh unseeded controlled AArch64 full-and-soak pair, seed baselines from it, and pass `e2e-release-check` with exact-revision CI.
 
-Tasks 1 through 5 are complete as of `a3260617`, and task 6 as of `6b774b9a`: `ops/bench` and `ops/oracle` run every child through the shared `ops/process` supervisor, while `ops/release` keeps its own supervisor and `cap-std` was evaluated and not adopted, for the reasons `ops/AGENTS.md` records. Task 7 was blocked on five suite cases above the `1.25x` ceiling until the November engine work closed them; a first pair is published, its baselines are seeded, and the release check passed on `7b0aa4f3`. Task 6 changed operations crates, which are not evidence paths, so the pair is now due to be measured again, and exact-revision CI has not run.
+Tasks 1 through 5 are complete as of `a3260617`, and task 6 as of `6b774b9a`: `ops/bench` and `ops/oracle` run every child through the shared `ops/process` supervisor, while `ops/release` keeps its own supervisor and `cap-std` was evaluated and not adopted, for the reasons `ops/AGENTS.md` records. Task 7 was blocked on five suite cases above the `1.25x` ceiling until the November engine work closed them; the first pair was measured on `2c229ccd`, its baselines are seeded, and the release check passed on `7b0aa4f3`. Task 6 and the documentation cleanup then changed non-evidence paths, so a second pair was measured on `1f42845e`; it passes Stim parity, memory, and seeded self-regression against the unchanged baselines, and it is the pair that `benchmarks/current-aarch64-evidence.toml` names. Exact-revision CI has not run.
 
 ### Done Criteria
 

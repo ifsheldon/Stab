@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "suite_sha256": "7a5bdc4afbd0e2c611e718d8122264375f7612ccea468a74d74a171e3afd06ad",
-  "source_commit": "2c229ccd59b51657e0f68e349f4de98e157672ef",
+  "suite_sha256": "05a9ba46b06b942ee6027887fcc6fc190eceae20dcfdc83f208154c2775e5cc9",
+  "source_commit": "1f42845e0439afa9082c9e7e8397cc054ee13f0c",
   "source_clean": true,
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "stim_binary_sha256": "b91eee32e452c7af813a85cad61c0b4890aa244adcf32f05c3fb15652f72bddb",
   "stab_binary_sha256": "9dce1bb396a393c9725c32502c6ca46332c3dcff711b4a416edc77b93a3cdb6a",
-  "bench_binary_sha256": "67cd52fcd6e37ad9a88c1b895d62ce544b1cdf86d85a0261cfd01462643fe75d",
+  "bench_binary_sha256": "d6c63d20c1d539689238ba014a4d1824cd7e27251b7e0030d4b8d6b998888064",
   "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
   "target": "aarch64-unknown-linux-gnu",
   "tier": "soak",
@@ -21,43 +21,43 @@
       {
         "zone": "thermal_zone0",
         "kind": "acpitz",
-        "millidegrees": 65100
+        "millidegrees": 39700
       },
       {
         "zone": "thermal_zone1",
         "kind": "acpitz",
-        "millidegrees": 50300
+        "millidegrees": 36900
       },
       {
         "zone": "thermal_zone2",
         "kind": "acpitz",
-        "millidegrees": 50600
+        "millidegrees": 36500
       },
       {
         "zone": "thermal_zone3",
         "kind": "acpitz",
-        "millidegrees": 50000
+        "millidegrees": 36100
       },
       {
         "zone": "thermal_zone4",
         "kind": "acpitz",
-        "millidegrees": 65100
+        "millidegrees": 36900
       },
       {
         "zone": "thermal_zone5",
         "kind": "acpitz",
-        "millidegrees": 50000
+        "millidegrees": 39700
       },
       {
         "zone": "thermal_zone6",
         "kind": "acpitz",
-        "millidegrees": 55500
+        "millidegrees": 35800
       }
     ],
     "swap": {
       "configured": [],
-      "pages_in": 4652970,
-      "pages_out": 5522829
+      "pages_in": 4670241,
+      "pages_out": 5540169
     }
   },
   "host_after": {
@@ -70,43 +70,43 @@
       {
         "zone": "thermal_zone0",
         "kind": "acpitz",
-        "millidegrees": 54200
+        "millidegrees": 40400
       },
       {
         "zone": "thermal_zone1",
         "kind": "acpitz",
-        "millidegrees": 48100
+        "millidegrees": 40400
       },
       {
         "zone": "thermal_zone2",
         "kind": "acpitz",
-        "millidegrees": 54200
+        "millidegrees": 38200
       },
       {
         "zone": "thermal_zone3",
         "kind": "acpitz",
-        "millidegrees": 45900
+        "millidegrees": 37400
       },
       {
         "zone": "thermal_zone4",
         "kind": "acpitz",
-        "millidegrees": 47300
+        "millidegrees": 38300
       },
       {
         "zone": "thermal_zone5",
         "kind": "acpitz",
-        "millidegrees": 48000
+        "millidegrees": 40400
       },
       {
         "zone": "thermal_zone6",
         "kind": "acpitz",
-        "millidegrees": 45500
+        "millidegrees": 36900
       }
     ],
     "swap": {
       "configured": [],
-      "pages_in": 4652970,
-      "pages_out": 5522829
+      "pages_in": 4670241,
+      "pages_out": 5540169
     }
   },
   "selected_cases": [

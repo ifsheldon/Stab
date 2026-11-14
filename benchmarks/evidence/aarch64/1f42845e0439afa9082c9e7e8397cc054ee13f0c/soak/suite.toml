@@ -305,3 +305,278 @@ batch = 1
 work = { amount = 262144, unit = "shots" }
 maximum_stab_peak_rss_bytes = 536870912
 workload = { kind = "rust-pipeline", shots = 262144, minimum_logical_failures = 5242, maximum_logical_failures = 13107, seed = 2815672542 }
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "generate.surface-large"
+case_digest = "20b2c12b5eafd522cbea65610d519fd0490426844e0a3f05c05fd499dc8a7d79"
+median_seconds_per_work = 0.000000027330411562667515
+upper_seconds_per_work = 0.00000002817597133157299
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "generate.color-large"
+case_digest = "77706c19ac60c2844f7a75432ac366338856eef35cbd8b7b8b3606e4b6e66a88"
+median_seconds_per_work = 0.000000024475102959729697
+upper_seconds_per_work = 0.00000002502415203236706
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "convert.sparse-r8-wide"
+case_digest = "77b2dc9687af12aa423514664a0b84cb02a293202d506d72207b6a51bd7934e7"
+median_seconds_per_work = 0.000000635345458984375
+upper_seconds_per_work = 0.00000072347802734375
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "convert.dense-b8-to-01"
+case_digest = "52dc24da28053c3e5cdd62836a4ad7fc198105240c4a4b5dbe2d9b0a7c428fe7"
+median_seconds_per_work = 0.00000120366015625
+upper_seconds_per_work = 0.00000136019482421875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "convert.typed-dets-wide"
+case_digest = "b0d75eb9b33043bee0cafaa1da5b7a1f41bb4a07678e1d56ef5a005fc5173aa6"
+median_seconds_per_work = 0.000000521660400390625
+upper_seconds_per_work = 0.000000536377197265625
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "sample-surface.medium"
+case_digest = "e8c15e98226cbb4068ef6b69f9573e71197ae906c6405e846c95475f2f3afc9a"
+median_seconds_per_work = 0.0000003365008544921875
+upper_seconds_per_work = 0.0000003451883544921875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "sample-surface.large"
+case_digest = "ef3a9ad2d94ae6c7dfd9a340de33adc5ceb1283515e48c3576272fa8f127ecc2"
+median_seconds_per_work = 0.0000009101298828125
+upper_seconds_per_work = 0.0000009169033203125
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "sample-surface.d25-b8"
+case_digest = "43a22d17aae464470fa9b46029e5ca544fe8849c938de67053f85db9e6856c13"
+median_seconds_per_work = 0.00001024739296
+upper_seconds_per_work = 0.0000111657156
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "sample-folded-ptb64.large"
+case_digest = "99ac4fb2b498ea6814af2741d7b7d15a9ba27c09d7497a510a5158a4c353bccc"
+median_seconds_per_work = 0.000000616966796875
+upper_seconds_per_work = 0.0000006279044189453125
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "detect-observables.medium"
+case_digest = "60a31d2e0da107e1e8c78184a1aa1d63b0797df942592e9406f5eec419fc15d0"
+median_seconds_per_work = 0.0000003666766357421875
+upper_seconds_per_work = 0.0000003747215576171875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "detect-observables.large"
+case_digest = "ebf617a71c0de9d1da7d93fb8f76605bb3935bb07b7b287c9332dfb11a2f8556"
+median_seconds_per_work = 0.000000930673095703125
+upper_seconds_per_work = 0.0000009653876953125
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "detect-observables.d11-b8"
+case_digest = "ade177f140fcec6c8a2ee87fe4293148d31cccab1445fb65bf6210148c3f264a"
+median_seconds_per_work = 0.0000006939209742857143
+upper_seconds_per_work = 0.0000006965976171428572
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "detect-observables.d11-sparse-hits"
+case_digest = "1a53be2823d1e8648cc0499a36d193639d029d2b646c1d42e06c041532794653"
+median_seconds_per_work = 0.0000009544302666666666
+upper_seconds_per_work = 0.0000009576621766666668
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "detect-observables.color-d9-b8"
+case_digest = "e9ca89dc5021222250535dd054ac8f37d6e271c294539988b6dab41d158bde00"
+median_seconds_per_work = 0.000000228283766
+upper_seconds_per_work = 0.00000022857201999999998
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "m2d.sweep-medium"
+case_digest = "5b01d473e5329f6353c4179d02cba1291da0b1aa33673c029584d2762b6b526c"
+median_seconds_per_work = 0.00000027242456054687504
+upper_seconds_per_work = 0.000000278831787109375
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "m2d.sweep-large"
+case_digest = "92d6ae608a803d240db7f55b642c5ff1ba152d818c460b2b415ab3c17c5b3fa1"
+median_seconds_per_work = 0.00000028588153076171874
+upper_seconds_per_work = 0.0000002881569213867187
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "m2d.surface-d11"
+case_digest = "9dc93269e8c0a5eab03fa0d7729f527bad81708f81e699cbb96d28e085b3e781"
+median_seconds_per_work = 0.0000005093942666666667
+upper_seconds_per_work = 0.0000005448493833333333
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "analyze-folded.large"
+case_digest = "f4b8e01074ce5f032e9095d8b61085e3d5bec2dc47c7345c454d2278e629f5ca"
+median_seconds_per_work = 0.00000006927870568179366
+upper_seconds_per_work = 0.00000006998875725599362
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "analyze-decompose.d15"
+case_digest = "51536091df61d8f7af1e5d926ccc70cb552f639348483e393ba7ad0069227a7e"
+median_seconds_per_work = 0.0000017704367870783554
+upper_seconds_per_work = 0.000001778255256491043
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "analyze-decompose.d25"
+case_digest = "380c395a50af8e265eae3b39f91ab901781afa484c9ea3b38823fbfc0f04d486"
+median_seconds_per_work = 0.0000032252387603986527
+upper_seconds_per_work = 0.0000032453613922658604
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "sample-dem.medium"
+case_digest = "2e1d9f8b8041dee37aec930f3da29eefd344d0a5f5e21c264e0a563b656382ab"
+median_seconds_per_work = 0.0000010874586181640624
+upper_seconds_per_work = 0.00000109181201171875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "sample-dem.large"
+case_digest = "31a4e7ec57aada1f24b99cdd31fc5ab7a61c507f70287e8b475f70eb650b4923"
+median_seconds_per_work = 0.0000030035771484375
+upper_seconds_per_work = 0.000003057276123046875
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "sample-dem.surface-d11-side-outputs"
+case_digest = "980a57193f09b712764501333c02fb57ebd9e47c9fe0832d4b6b938b23c0768c"
+median_seconds_per_work = 0.000006913230839999999
+upper_seconds_per_work = 0.00000694550502
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "qec-cli-pipeline.large"
+case_digest = "4f038e224f1d135c8be164d48ca77d56c7ddf81c0a117920e25129a0b30448ec"
+median_seconds_per_work = 0.0000015071173095703125
+upper_seconds_per_work = 0.0000015133302001953125
+
+[[self_baselines]]
+architecture = "aarch64"
+cpu_model = "AI TOP ATOM (0xd85,0xd87)"
+rustc = "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+target = "aarch64-unknown-linux-gnu"
+timing_boundary = "e2e-user-workflow-v3"
+case_id = "qec-rust-pipeline.large"
+case_digest = "2c139489937d1a1b75dc6d059c6229d3504d5c3c76215261dd3274c5504e3797"
+median_seconds_per_work = 0.00000006236120986938476
+upper_seconds_per_work = 0.0000000628857421875
