@@ -466,6 +466,37 @@ Open items: `hits` and `dets` input remain far slower than `b8` because the shar
 
 - Sampling and detection share one lane width and one batch-delivery path.
 
+### Checkpoint (2026-11-14)
+
+E7 landed in `6ae43882`.
+
+One frame state serves sampling, detection, measurement-to-detection conversion, and sweep correction on 256-lane planes with one delivery loop.
+`stab-records` has one multi-word plane view that sinks and `RecordEncoder` take directly, and the three 64-shot re-chunkers are gone; DEM replay keeps 64-record shot-major batches because it builds records one at a time.
+
+Paired timings pinned to one core, best of seven, against the previous binary and pinned Stim:
+
+| Workload | Before | After | Stim |
+| --- | ---: | ---: | ---: |
+| `detect`, d=7 with 1000 rounds, 100k shots | 3203.3 ms | 2224.1 ms | 2952.0 ms |
+| `detect` with observables, d=11, 350k shots | 303.0 ms | 226.2 ms | 285.1 ms |
+| `detect` with observables, color d=9, 1M shots | 311.7 ms | 217.8 ms | 274.5 ms |
+| `detect`, d=35 with 1000 rounds, 1000 shots | 706.6 ms | 678.6 ms | 1489.9 ms |
+| `sample`, d=11, 300k shots | 198.0 ms | 179.6 ms | 250.7 ms |
+| `detect`, d=35 with 1000 rounds, 64 shots | 63.4 ms | 179.1 ms | 135.8 ms |
+| `sample`, d=35 with 1000 rounds, 64 shots | 227.6 ms | 226.8 ms | 134.8 ms |
+
+The diagnostic smoke tier has all 25 cases at or below 0.97x Stim, with the five `detect-observables` cases between 0.39x and 0.85x.
+
+Task 3 was measured and rejected: a 1024-lane frame through the slice kernels was slower on every case but one, by 1.07x to 1.5x at scale and up to 4.2x at 64 shots, and would have changed seeded `sample` output.
+
+Seeded `detect` output changes for circuits with randomness, and the detect compiler schema moves from 3 to 4.
+Review checks: 83 seeded `sample`, `sample_dem`, `m2d`, `analyze_errors`, and deterministic `detect` outputs are byte-identical to the previous binary, and every statistical fixture row passes.
+
+Open after this checkpoint:
+
+- Every batch samples 256 lanes, so a request of at most 64 shots on a very wide circuit does four times the frame work it needs; the last two table rows are above the Stim ceiling, and peak memory for the d=35 `detect` rose from 45 MB to 102 MB. A session-level lane width is the follow-up.
+- `convert` from `b8` to `01` measured 1.03x to 1.05x of the previous build when writing to `/dev/null` and 0.98x into a pipe, which was not explained.
+
 ## Milestone E8: Deletions And Shared Vocabulary
 
 ### Tasks
