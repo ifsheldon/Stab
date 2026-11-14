@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E8 are complete; the closing formal evidence run is pending. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E8 are complete; the closing formal evidence run is blocked on a host without swap activity. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -568,6 +568,58 @@ Open after this checkpoint:
 - `Gate` is still an 8-byte handle beside `GateKind`; making it the enum would shrink `CircuitItem` and change every byte-admission number derived from its size.
 - The engine's admission counting inside lowering, the detecting-region snapshot walk with its 128-level bound, and the reverse-tracker metering trait still count on their own.
 - Measurement-rich time reversal now refuses programmatically built circuits nested deeper than 256 levels, where it previously recursed without a bound.
+
+## Closing State (2026-11-14)
+
+E1 through E8 are complete, and the Rust 1.96 through 1.100 adoption landed in `61cede6b`.
+
+The formal closing evidence is not done.
+Two full-tier runs on the clean `61cede6b` tree were refused because pages were swapped in during timing, `1353364->1353365` and `1353365->1353367`, on a shared host that holds about 15 GB in swap.
+A formal full-and-soak pair, baseline seeding, exact-revision CI, and `just bench::e2e-release-check` still need a host with swap disabled, which is a host-wide change that needs the owner's decision.
+
+The diagnostic smoke tier ran twice on `61cede6b`, bundles `target/benchmarks/final-smoke-61cede6b-a` and `target/benchmarks/final-smoke-61cede6b-b`.
+All 25 cases pass correctness and memory in both runs.
+Smoke timing is one sample per case and promotes no claim.
+The first column is the reference recorded when this plan started, from the fearless SIMD plan's S5 smoke run.
+
+| Case | Stab/Stim at plan start | Run a | Run b |
+| --- | ---: | ---: | ---: |
+| `generate.surface-large` | 0.739x | 0.662x | 0.637x |
+| `generate.color-large` | 0.771x | 0.671x | 0.646x |
+| `convert.sparse-r8-wide` | 0.806x | 0.052x | 0.040x |
+| `convert.dense-b8-to-01` | 0.176x | 0.130x | 0.120x |
+| `convert.typed-dets-wide` | 0.867x | 0.233x | 0.227x |
+| `sample-surface.medium` | 0.916x | 0.736x | 0.767x |
+| `sample-surface.large` | 0.909x | 0.815x | 0.795x |
+| `sample-surface.d25-b8` | 6.962x | 1.013x | 1.000x |
+| `sample-folded-ptb64.large` | 1.089x | 0.750x | 0.753x |
+| `detect-observables.medium` | 1.089x | 0.796x | 0.821x |
+| `detect-observables.large` | 0.997x | 0.797x | 0.816x |
+| `detect-observables.d11-b8` | 1.102x | 0.774x | 0.817x |
+| `detect-observables.d11-sparse-hits` | 1.540x | 0.341x | 0.346x |
+| `detect-observables.color-d9-b8` | 1.460x | 0.795x | 0.803x |
+| `m2d.sweep-medium` | 1.053x | 0.885x | 0.924x |
+| `m2d.sweep-large` | 1.060x | 0.774x | 0.814x |
+| `m2d.surface-d11` | 0.545x | 0.493x | 0.508x |
+| `analyze-folded.large` | 1.131x | 0.870x | 0.891x |
+| `analyze-decompose.d15` | 1.167x | 0.508x | 0.518x |
+| `analyze-decompose.d25` | 1.228x | 0.569x | 0.601x |
+| `sample-dem.medium` | 1.086x | 1.001x | 0.910x |
+| `sample-dem.large` | 1.006x | 0.939x | 0.916x |
+| `sample-dem.surface-d11-side-outputs` | 4.366x | 0.460x | 0.455x |
+| `qec-cli-pipeline.large` | 1.003x | 0.712x | 0.718x |
+| `qec-rust-pipeline.large` | n/a | n/a | n/a |
+
+Every case with a Stim counterpart is at or below `1.013x` in both runs, against five cases above the `1.25x` ceiling at the start.
+
+Open items that no milestone owns:
+
+- Sampling a DEM by replaying sparse HITS input is several times slower than Stim, because the engine walks every error per shot.
+- Peak memory at large record widths is far above Stim's for streaming shapes, such as 415 MB against 6 MB for a 5M-round repetition-code `sample`.
+- `sample_dem` on a d=7 model with 1000 rounds takes about 22 s for 100k shots.
+- The CLI memory budget is per stage, not per command.
+- A single-shot `sample` with a reference sample on 400 layers of CZ and S is `1.29x` Stim.
+- The x86 instruction-level kernel paths have never been executed or measured, because no x86 host was available.
 
 ## Order And Dependencies
 
