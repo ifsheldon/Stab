@@ -287,7 +287,8 @@ fn reference_snapshot_storage_is_limited_to_fold_candidates() {
                 && !reference_state_snapshot_fits(*qubits, 1, MemoryBudget::DEFAULT)
         })
         .expect("reference snapshot has a fallback-only storage interval");
-    let fallback_repetitions = fallback_qubits.saturating_mul(2).saturating_add(1);
+    // Enough iterations that folding them could repay a snapshot of this many qubits.
+    let fallback_repetitions = 1_000_000_000_u64;
     let fallback_circuit = Circuit::from_stim_str(&format!(
         "REPEAT {fallback_repetitions} {{\n    H {}\n}}\nM {}\n",
         fallback_qubits - 1,

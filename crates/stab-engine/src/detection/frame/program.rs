@@ -321,16 +321,6 @@ impl CircuitProgram {
         ProgramCursor::new(&self.entries, 0, self.entries.len(), cancellation)
     }
 
-    /// A cursor over `entries[start..end]`, which must hold whole repeat blocks.
-    pub(crate) fn cursor_range<'a>(
-        &'a self,
-        start: usize,
-        end: usize,
-        cancellation: &'a Cancellation,
-    ) -> ProgramCursor<'a> {
-        ProgramCursor::new(&self.entries, start, end, cancellation)
-    }
-
     #[cfg(test)]
     pub(crate) fn entry_count(&self) -> usize {
         self.entries.len()

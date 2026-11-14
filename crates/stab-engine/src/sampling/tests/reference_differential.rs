@@ -610,3 +610,193 @@ fn memory_experiment_rounds_fold_once_the_state_recurs() {
         assert_eq!(paths.folded_stats.reused_iterations, 58, "{task:?}");
     }
 }
+
+/// Qubit registers whose joint state cycles through a chosen transient and period.
+///
+/// Each register is a row of qubits holding one excitation, so its states are distinct
+/// computational basis states, and every register measures a qubit each iteration so the output
+/// depends on the cycle phase:
+///
+/// - A conveyor of `transient` qubits starts with its excitation on the first qubit. Each
+///   iteration first resets the last qubit, then moves the excitation one qubit along by swapping
+///   from the far end inward, and measures the last qubit. After `transient - 1` iterations the
+///   excitation sits on the last qubit, the next iteration resets it, and from then on the
+///   register stays empty: transient `transient`, period 1.
+/// - A rotor of `period` qubits starts with its excitation on the first qubit. The same swap
+///   sweep rotates the excitation cyclically, and the first qubit is measured: transient 0,
+///   period `period`. A helper qubit copies the first rotor qubit and is measured in the X basis,
+///   so every iteration also collapses a random outcome whose state depends on the phase.
+/// - A Bell pair with a parity ancilla is measured and reset each iteration. Its tableau changes
+///   while its state does not, so recurrences need the stabilizer-state comparison.
+///
+/// The joint state has transient `transient` (0 without a conveyor) and period `period`
+/// (1 without a rotor).
+struct CycleRegisters {
+    prefix: String,
+    body: String,
+    next_qubit: usize,
+}
+
+impl CycleRegisters {
+    fn new(transient: usize, period: usize) -> Self {
+        let mut registers = Self {
+            prefix: String::new(),
+            body: String::new(),
+            next_qubit: 0,
+        };
+        let bell = registers.take(3);
+        let (left, right, parity) = (bell, bell + 1, bell + 2);
+        writeln!(registers.prefix, "H {left}\nCX {left} {right}").expect("bell");
+        writeln!(
+            registers.body,
+            "CX {left} {parity} {right} {parity}\nMR {parity}"
+        )
+        .expect("bell parity");
+        if transient > 0 {
+            let first = registers.take(transient);
+            let last = first + transient - 1;
+            writeln!(registers.prefix, "X {first}").expect("conveyor start");
+            writeln!(registers.body, "R {last}").expect("conveyor reset");
+            registers.sweep(first, transient);
+            writeln!(registers.body, "M {last}").expect("conveyor measurement");
+        }
+        if period > 1 {
+            let first = registers.take(period);
+            let helper = registers.take(1);
+            writeln!(registers.prefix, "X {first}").expect("rotor start");
+            registers.sweep(first, period);
+            writeln!(
+                registers.body,
+                "M {first}\nCX {first} {helper}\nMX {helper}\nR {helper}"
+            )
+            .expect("rotor measurements");
+        }
+        registers
+    }
+
+    /// Allocates `count` consecutive qubits and returns the first.
+    fn take(&mut self, count: usize) -> usize {
+        let first = self.next_qubit;
+        self.next_qubit += count;
+        first
+    }
+
+    /// Swaps neighbours of `first..first + len` from the far end inward, which moves every
+    /// excitation one qubit along and wraps the last qubit's excitation to the first.
+    fn sweep(&mut self, first: usize, len: usize) {
+        for qubit in (first..first + len.saturating_sub(1)).rev() {
+            writeln!(self.body, "SWAP {qubit} {}", qubit + 1).expect("sweep");
+        }
+    }
+
+    fn circuit(&self, count: u64) -> String {
+        format!("{}REPEAT {count} {{\n{}}}\nM 0 1\n", self.prefix, self.body)
+    }
+}
+
+/// Runs `test` with cost-independent fold probing, restoring the default afterwards.
+fn with_forced_probes(test: impl FnOnce()) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            super::super::reference_fold::force_fold_probes(false);
+        }
+    }
+    let _restore = Restore;
+    super::super::reference_fold::force_fold_probes(true);
+    test();
+}
+
+#[test]
+fn folds_cycles_with_transients_and_periods_at_every_remainder() {
+    with_forced_probes(|| {
+        for (transient, period) in [
+            (1, 1),
+            (2, 1),
+            (5, 1),
+            (0, 2),
+            (0, 3),
+            (0, 4),
+            (3, 3),
+            (2, 4),
+            (5, 2),
+        ] {
+            let registers = CycleRegisters::new(transient, period);
+            // Brent's schedule finds the cycle within 2 * max(transient, period) + period
+            // iterations; the following counts leave every remainder modulo the period.
+            for count in (40..40 + period as u64).chain([2, 3]) {
+                let text = registers.circuit(count);
+                let label = format!("transient {transient}, period {period}, count {count}");
+                let paths = ReferencePaths::compute(&parse(&text));
+                paths.assert_agree(&format!("{label}:\n{text}"));
+                if count >= 40 {
+                    assert_eq!(paths.folded_stats.folded_repeats, 1, "{label}");
+                    assert_eq!(paths.folded_stats.longest_period, period as u64, "{label}");
+                    assert!(paths.folded_stats.reused_iterations >= 20, "{label}");
+                }
+            }
+        }
+    });
+}
+
+#[test]
+fn folds_nested_repeats_at_both_levels() {
+    with_forced_probes(|| {
+        // The inner rotor has period 3 and runs a multiple of 3 iterations, so each outer
+        // iteration returns it to its start; the outer conveyor then sets a transient of 2 and
+        // the outer X toggle a period of 2.
+        let inner = CycleRegisters::new(0, 3);
+        let toggle = inner.next_qubit + 2;
+        let text = format!(
+            "{prefix}X {conveyor}\nREPEAT 45 {{\nREPEAT 30 {{\n{body}}}\nR {last}\nSWAP {conveyor} {last}\nM {last}\nX {toggle}\nM {toggle}\n}}\nM 0 1\n",
+            prefix = inner.prefix,
+            body = inner.body,
+            conveyor = inner.next_qubit,
+            last = inner.next_qubit + 1,
+        );
+        let paths = ReferencePaths::compute(&parse(&text));
+        paths.assert_agree(&text);
+        // The inner repeat folds in the first outer iteration, before the outer repeat holds
+        // the snapshot. The outer repeat then finds its period-2 cycle after 4 iterations and
+        // copies 40 of the 41 later ones; the inner repeat folds again in the leftover one.
+        assert_eq!(paths.folded_stats.folded_repeats, 3, "{text}");
+        assert_eq!(paths.folded_stats.longest_period, 3, "{text}");
+        assert!(paths.folded_stats.reused_iterations >= 30, "{text}");
+    });
+}
+
+#[test]
+fn loops_that_do_not_recur_within_the_probe_bound_are_iterated() {
+    with_forced_probes(|| {
+        // A 70-qubit rotor has period 70, beyond the iterations a probe may run.
+        let registers = CycleRegisters::new(0, 70);
+        let text = registers.circuit(300);
+        let paths = ReferencePaths::compute(&parse(&text));
+        paths.assert_agree(&text);
+        assert_eq!(paths.folded_stats, ReferenceExecutionStats::default());
+    });
+}
+
+#[test]
+fn fold_probes_are_skipped_when_the_saved_iterations_cannot_repay_them() {
+    // Without forced probes, a two-iteration memory experiment saves at most one round, which
+    // costs less than a snapshot and comparison, while a long one folds.
+    let probability = Probability::try_new(0.001).expect("valid generated-circuit noise");
+    for (rounds, folds) in [(3, false), (200, true)] {
+        let params = SurfaceCodeParams::new(
+            RoundCount::try_new(rounds).expect("valid round count"),
+            CodeDistance::try_new(9).expect("valid code distance"),
+            SurfaceCodeTask::RotatedMemoryX,
+        )
+        .expect("valid surface-code parameters")
+        .with_after_clifford_depolarization(probability);
+        let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+        let paths = ReferencePaths::compute(generated.circuit());
+        paths.assert_agree(&format!("{rounds} rounds"));
+        assert_eq!(
+            paths.folded_stats.folded_repeats == 1,
+            folds,
+            "{rounds} rounds"
+        );
+    }
+}

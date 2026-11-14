@@ -17,8 +17,16 @@
 //!
 //! The API takes qubit indices and Pauli bases only, so callers can drive it from any resolved
 //! circuit representation.
+//!
+//! The simulator also tallies the work it performs in [`WorkModel`] units, so repeat folding
+//! can weigh the cost of a body iteration against the cost of a state snapshot and comparison
+//! with numbers measured on the run itself.
 
 use stab_algebra::PauliBasis;
+
+mod snapshot;
+
+pub(super) use snapshot::ReferenceStateSnapshot;
 
 /// Failure while building or driving the reference simulator.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
@@ -59,17 +67,143 @@ impl LocalCliffordInverse {
     }
 }
 
-/// Exact copy of a simulator state, used to detect that a repeat iteration left it unchanged.
-#[derive(Debug)]
-pub(super) struct ReferenceStateSnapshot {
-    rows: Vec<u64>,
-    signs: Vec<bool>,
+/// Relative costs of the simulator's primitive operations, in units of one copied word.
+///
+/// The weights were calibrated on this simulator by timing gate-, collapse-, and
+/// comparison-dominated circuits at 9 to 2449 qubits; see the `reference_fold` module.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct WorkModel {
+    qubit_count: u64,
+    row_words: u64,
 }
 
-impl ReferenceStateSnapshot {
-    pub(super) fn try_new(qubit_count: usize) -> SimResult<Self> {
-        let (rows, signs) = try_identity_storage(qubit_count)?;
-        Ok(Self { rows, signs })
+impl WorkModel {
+    /// One word copied, compared, swapped, or counted.
+    const COPY_WORD: u64 = 1;
+    /// One word of a phase-tracking Pauli product.
+    const MULTIPLY_WORD: u64 = 3;
+    /// Fixed cost of one Pauli product: the call, its phase reduction, and the sign update.
+    const MULTIPLY_FIXED: u64 = 48;
+    /// One word read from each of many rows a row length apart.
+    const STRIDED_WORD: u64 = 5;
+    /// One `64 x 64` bit-tile transposition, including its scattered row writes.
+    const TRANSPOSE_TILE: u64 = 160;
+    /// Bookkeeping of one dispatched operation, independent of the state size.
+    const DISPATCH: u64 = 12;
+    /// Fixed cost of checking one snapshot stabilizer: building its terms and two products.
+    const STABILIZER_FIXED: u64 = 600;
+    /// One word of fresh snapshot storage: reserving, zeroing, and first touching it.
+    const ALLOCATED_WORD: u64 = 20;
+
+    fn new(qubit_count: usize, words: usize) -> Self {
+        Self {
+            qubit_count: qubit_count as u64,
+            row_words: (words as u64).saturating_mul(2),
+        }
+    }
+
+    pub(super) fn qubit_count(self) -> u64 {
+        self.qubit_count
+    }
+
+    /// Bookkeeping of one operation that touches no rows.
+    pub(super) fn dispatch() -> u64 {
+        Self::DISPATCH
+    }
+
+    pub(super) fn for_qubits(qubit_count: usize) -> Self {
+        Self::new(qubit_count, qubit_count.div_ceil(u64::BITS as usize))
+    }
+
+    /// Multiplying one tableau row into another, as a Clifford row update does.
+    pub(super) fn row_multiply(self) -> u64 {
+        self.row_words
+            .saturating_mul(Self::MULTIPLY_WORD)
+            .saturating_add(Self::MULTIPLY_FIXED)
+    }
+
+    /// Copying or swapping one tableau row.
+    pub(super) fn row_copy(self) -> u64 {
+        self.row_words
+            .saturating_mul(Self::COPY_WORD)
+            .saturating_add(Self::DISPATCH)
+    }
+
+    /// Scanning one bit of every row, as a random-outcome collapse does to find its rows.
+    pub(super) fn collapse_scan(self) -> u64 {
+        self.qubit_count
+            .saturating_mul(2 * Self::STRIDED_WORD)
+            .saturating_add(Self::DISPATCH)
+    }
+
+    /// Copying, comparing, or counting the whole tableau once.
+    pub(super) fn tableau_pass(self) -> u64 {
+        self.qubit_count
+            .saturating_mul(2)
+            .saturating_mul(self.row_words)
+            .saturating_mul(Self::COPY_WORD)
+    }
+
+    /// Transposing one 64-stabilizer block of a snapshot's X halves.
+    fn transpose_block(self) -> u64 {
+        let tiles = self
+            .qubit_count
+            .div_ceil(u64::from(u64::BITS))
+            .saturating_mul(2);
+        self.qubit_count
+            .saturating_mul(2 * Self::STRIDED_WORD)
+            .saturating_add(tiles.saturating_mul(Self::TRANSPOSE_TILE))
+    }
+
+    /// Building one snapshot stabilizer's terms from its transposed support.
+    fn support_scan(self) -> u64 {
+        self.row_words
+            .saturating_mul(Self::COPY_WORD)
+            .saturating_add(Self::STABILIZER_FIXED)
+    }
+
+    /// Allocating snapshot storage: the tableau copy and its transposed X halves.
+    pub(super) fn snapshot_allocation(self) -> u64 {
+        let tableau_words = self
+            .qubit_count
+            .saturating_mul(2)
+            .saturating_mul(self.row_words);
+        tableau_words
+            .saturating_add(tableau_words / 2)
+            .saturating_mul(Self::ALLOCATED_WORD)
+    }
+
+    /// Capturing a snapshot: copying the tableau and counting its X halves.
+    pub(super) fn capture(self) -> u64 {
+        let pass = self.tableau_pass();
+        pass.saturating_add(pass / 2)
+    }
+
+    /// Comparing a state against a snapshot whose stabilizers all match, given the snapshot's
+    /// row products and its comparison data that is not prepared yet.
+    pub(super) fn comparison(
+        self,
+        support_rows: u64,
+        untransposed_blocks: u64,
+        unphased_rows: u64,
+    ) -> u64 {
+        let stabilizers = self
+            .support_scan()
+            .saturating_add(self.row_copy().saturating_mul(2))
+            .saturating_mul(self.qubit_count);
+        self.tableau_pass()
+            .saturating_add(untransposed_blocks.saturating_mul(self.transpose_block()))
+            .saturating_add(stabilizers)
+            .saturating_add(
+                self.row_multiply()
+                    .saturating_mul(support_rows.saturating_add(unphased_rows)),
+            )
+    }
+
+    /// Comparing a state against a fresh capture of a state with `support_rows` row products.
+    pub(super) fn fresh_comparison(self, support_rows: u64) -> u64 {
+        let blocks = self.qubit_count.div_ceil(u64::from(u64::BITS));
+        self.comparison(support_rows, blocks, support_rows)
     }
 }
 
@@ -77,13 +211,19 @@ impl ReferenceStateSnapshot {
 pub(super) struct InverseTableauSimulator {
     qubit_count: usize,
     words: usize,
+    model: WorkModel,
+    /// Work performed since construction, in [`WorkModel`] units.
+    work: u64,
     rows: Vec<u64>,
     signs: Vec<bool>,
     product: Vec<u64>,
     multiplier: Vec<u64>,
     local_rows: Vec<u64>,
     local_signs: Vec<bool>,
-    collapse_flags: Vec<bool>,
+    /// Rows anticommuting with the collapse generator, gathered by one collapse.
+    collapse_rows: Vec<usize>,
+    /// Rows of the measured observable's own support, which commute with `m` oppositely.
+    collapse_flips: Vec<usize>,
     stabilizer_terms: Vec<(usize, PauliBasis)>,
 }
 
@@ -101,19 +241,18 @@ impl InverseTableauSimulator {
         Ok(Self {
             qubit_count,
             words,
+            model: WorkModel::new(qubit_count, words),
+            work: 0,
             rows,
             signs,
             product: try_zeroed(row_words, "reference simulator product row")?,
             multiplier: try_zeroed(row_words, "reference simulator multiplier row")?,
             local_rows: Vec::new(),
             local_signs: Vec::new(),
-            collapse_flags: Vec::new(),
+            collapse_rows: Vec::new(),
+            collapse_flips: Vec::new(),
             stabilizer_terms: Vec::new(),
         })
-    }
-
-    pub(super) fn qubit_count(&self) -> usize {
-        self.qubit_count
     }
 
     /// Returns to `|0...0>` without reallocating.
@@ -126,92 +265,17 @@ impl InverseTableauSimulator {
         );
     }
 
-    pub(super) fn capture(&self, snapshot: &mut ReferenceStateSnapshot) -> bool {
-        if snapshot.rows.len() != self.rows.len() || snapshot.signs.len() != self.signs.len() {
-            return false;
-        }
-        snapshot.rows.copy_from_slice(&self.rows);
-        snapshot.signs.copy_from_slice(&self.signs);
-        true
+    pub(super) fn work_model(&self) -> WorkModel {
+        self.model
     }
 
-    /// Reports whether the current state equals the snapshot's state.
-    ///
-    /// Identical tableaux are accepted directly. Otherwise each stabilizer generator
-    /// `S_k = T_s Z_k T_s^-1` of the snapshot state is rebuilt from the snapshot's X-bit
-    /// columns, signed by `T_s^-1 S_k T_s = +Z_k`, and checked to be a stabilizer of the current
-    /// state with the same sign. This recognizes states that recur although the tableau that
-    /// prepares them does not, as in every round of a memory experiment.
-    pub(super) fn same_state_as(&mut self, snapshot: &ReferenceStateSnapshot) -> SimResult<bool> {
-        if snapshot.signs == self.signs && snapshot.rows == self.rows {
-            return Ok(true);
-        }
-        if snapshot.rows.len() != self.rows.len() || snapshot.signs.len() != self.signs.len() {
-            return Ok(false);
-        }
-        let row_words = 2 * self.words;
-        let mut terms = std::mem::take(&mut self.stabilizer_terms);
-        if terms.capacity() < self.qubit_count {
-            terms
-                .try_reserve_exact(self.qubit_count - terms.len())
-                .map_err(|_| ReferenceSimulatorError::Allocation {
-                    component: "reference state comparison terms",
-                    items: self.qubit_count,
-                })?;
-        }
-        let mut result = Ok(true);
-        for column in 0..self.qubit_count {
-            let word = column / u64::BITS as usize;
-            let mask = 1_u64 << (column % u64::BITS as usize);
-            let x_bit = |row: usize| {
-                snapshot
-                    .rows
-                    .get(row * row_words + word)
-                    .is_some_and(|bits| bits & mask != 0)
-            };
-            terms.clear();
-            for qubit in 0..self.qubit_count {
-                // x_j(S_k) = <S_k, Z_j> and z_j(S_k) = <S_k, X_j>, read through T_s^-1.
-                let basis = PauliBasis::from_xz(x_bit(self.qubit_count + qubit), x_bit(qubit));
-                if basis != PauliBasis::I {
-                    terms.push((qubit, basis));
-                }
-            }
-            let snapshot_log_i = match pauli_image_into(
-                &snapshot.rows,
-                &snapshot.signs,
-                self.qubit_count,
-                self.words,
-                &terms,
-                &mut self.product,
-            ) {
-                Ok(log_i) => log_i,
-                Err(error) => {
-                    result = Err(error);
-                    break;
-                }
-            };
-            let (image_x, _) = self.product.split_at(self.words);
-            if first_set_bit(image_x).is_some() {
-                result = Err(invariant("snapshot stabilizer did not map back to Z"));
-                break;
-            }
-            let current_log_i = match self.observable_into_product(&terms) {
-                Ok(log_i) => log_i,
-                Err(error) => {
-                    result = Err(error);
-                    break;
-                }
-            };
-            let (image_x, _) = self.product.split_at(self.words);
-            if first_set_bit(image_x).is_some() || current_log_i != snapshot_log_i {
-                result = Ok(false);
-                break;
-            }
-        }
-        terms.clear();
-        self.stabilizer_terms = terms;
-        result
+    /// Work performed since construction, in [`WorkModel`] units.
+    pub(super) fn work(&self) -> u64 {
+        self.work
+    }
+
+    fn charge(&mut self, units: u64) {
+        self.work = self.work.saturating_add(units);
     }
 
     pub(super) fn apply_hadamard(&mut self, qubit: usize) -> SimResult<()> {
@@ -227,6 +291,7 @@ impl InverseTableauSimulator {
             .ok_or(invariant("Hadamard Z row is outside the tableau"))?;
         x.swap_with_slice(z);
         self.signs.swap(x_row, z_row);
+        self.charge(self.model.row_copy().saturating_mul(2));
         Ok(())
     }
 
@@ -243,6 +308,44 @@ impl InverseTableauSimulator {
         self.multiply_row_into_row(target_z, control_z)
     }
 
+    /// Applies `CZ`, which maps `X_a` to `X_a Z_b` and `X_b` to `Z_a X_b` and fixes both Z.
+    pub(super) fn apply_controlled_z(&mut self, left: usize, right: usize) -> SimResult<()> {
+        if left == right {
+            return Err(invariant("controlled-Z targets coincide"));
+        }
+        let left_x = self.x_row_index(left)?;
+        let right_x = self.x_row_index(right)?;
+        let left_z = self.z_row_index(left)?;
+        let right_z = self.z_row_index(right)?;
+        self.multiply_row_into_row(left_x, right_z)?;
+        self.multiply_row_into_row(right_x, left_z)
+    }
+
+    /// Applies `SWAP` by exchanging the two qubits' rows.
+    pub(super) fn apply_swap(&mut self, left: usize, right: usize) -> SimResult<()> {
+        if left == right {
+            return Err(invariant("swap targets coincide"));
+        }
+        for (first, second) in [
+            (self.x_row_index(left)?, self.x_row_index(right)?),
+            (self.z_row_index(left)?, self.z_row_index(right)?),
+        ] {
+            let row_words = 2 * self.words;
+            let (low, high) = (first.min(second), first.max(second));
+            let (head, tail) = self.rows.split_at_mut(high * row_words);
+            let low_row = head
+                .get_mut(low * row_words..(low + 1) * row_words)
+                .ok_or(invariant("swap row is outside the tableau"))?;
+            let high_row = tail
+                .get_mut(..row_words)
+                .ok_or(invariant("swap row is outside the tableau"))?;
+            low_row.swap_with_slice(high_row);
+            self.signs.swap(low, high);
+        }
+        self.charge(self.model.row_copy().saturating_mul(4));
+        Ok(())
+    }
+
     /// Applies `S`. Since `S^-1 X S = -i X Z` and `S^-1 Z S = Z`, only the X row changes.
     pub(super) fn apply_s(&mut self, qubit: usize) -> SimResult<()> {
         let x_row = self.x_row_index(qubit)?;
@@ -250,8 +353,16 @@ impl InverseTableauSimulator {
         self.multiply_row_into_row_with_phase(x_row, z_row, 3)
     }
 
+    /// Applies `S_DAG`. Since `S X S^-1 = i X Z` and `Z` is fixed, only the X row changes.
+    pub(super) fn apply_s_dag(&mut self, qubit: usize) -> SimResult<()> {
+        let x_row = self.x_row_index(qubit)?;
+        let z_row = self.z_row_index(qubit)?;
+        self.multiply_row_into_row_with_phase(x_row, z_row, 1)
+    }
+
     /// Applies a Pauli gate, which flips the signs of the anticommuting input rows.
     pub(super) fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) -> SimResult<()> {
+        self.charge(WorkModel::DISPATCH);
         if basis.z_bit() {
             let row = self.x_row_index(qubit)?;
             flip(&mut self.signs, row)?;
@@ -314,6 +425,17 @@ impl InverseTableauSimulator {
                     .get(local)
                     .ok_or(invariant("local Clifford image is missing"))?;
                 let negative = self.local_image_into_product(image)?;
+                let multiplied = image
+                    .bases
+                    .iter()
+                    .map(|basis| u64::from(basis.x_bit()) + u64::from(basis.z_bit()))
+                    .sum::<u64>();
+                self.charge(
+                    self.model
+                        .row_multiply()
+                        .saturating_mul(multiplied)
+                        .saturating_add(self.model.row_copy().saturating_mul(2)),
+                );
                 let row_storage = row_slice_mut(&mut self.rows, row, row_words)?;
                 row_storage.copy_from_slice(&self.product);
                 *self
@@ -370,27 +492,64 @@ impl InverseTableauSimulator {
         }
 
         let row_count = 2 * self.qubit_count;
-        let mut anticommuting = std::mem::take(&mut self.collapse_flags);
-        try_resize(&mut anticommuting, row_count, "collapse row flags")?;
-        for (row, flag) in anticommuting.iter_mut().enumerate() {
-            *flag = self
-                .rows
-                .get(row * row_words + pivot_word)
-                .is_some_and(|word| word & pivot_mask != 0);
+        let mut anticommuting = std::mem::take(&mut self.collapse_rows);
+        anticommuting.clear();
+        let flip_count = terms.len().saturating_mul(2);
+        let listed = row_count.saturating_add(flip_count);
+        if anticommuting.capacity() < listed {
+            anticommuting.try_reserve_exact(listed).map_err(|_| {
+                ReferenceSimulatorError::Allocation {
+                    component: "collapse rows",
+                    items: listed,
+                }
+            })?;
+        }
+        let mut flips = std::mem::take(&mut self.collapse_flips);
+        flips.clear();
+        if flips.capacity() < flip_count {
+            flips.try_reserve_exact(flip_count).map_err(|_| {
+                ReferenceSimulatorError::Allocation {
+                    component: "collapse support rows",
+                    items: flip_count,
+                }
+            })?;
         }
         for (qubit, basis) in terms {
             if basis.z_bit() {
-                flip(&mut anticommuting, self.x_row_index(*qubit)?)?;
+                flips.push(self.x_row_index(*qubit)?);
             }
             if basis.x_bit() {
-                flip(&mut anticommuting, self.z_row_index(*qubit)?)?;
+                flips.push(self.z_row_index(*qubit)?);
             }
         }
+        flips.sort_unstable();
+        // A row anticommutes with `m Z_k` when its pivot X bit and its commutation with `m`
+        // disagree; only the rows of `M`'s own support fail to commute with `m`, so those
+        // rows toggle membership of the scanned set.
+        let scanned = self
+            .rows
+            .chunks_exact(row_words)
+            .take(row_count)
+            .enumerate()
+            .filter(|(_, row)| {
+                row.get(pivot_word)
+                    .is_some_and(|word| word & pivot_mask != 0)
+            })
+            .map(|(row, _)| row);
+        symmetric_difference_into(scanned, &flips, &mut anticommuting);
+        self.collapse_flips = flips;
+        self.charge(
+            self.model
+                .collapse_scan()
+                .saturating_add(self.model.row_copy())
+                .saturating_add(
+                    self.model
+                        .row_multiply()
+                        .saturating_mul(anticommuting.len() as u64),
+                ),
+        );
         let mut result = Ok(());
-        for (row, flag) in anticommuting.iter().enumerate() {
-            if !*flag {
-                continue;
-            }
+        for &row in &anticommuting {
             let row_storage = match row_slice_mut(&mut self.rows, row, row_words) {
                 Ok(storage) => storage,
                 Err(error) => {
@@ -412,7 +571,7 @@ impl InverseTableauSimulator {
                 }
             }
         }
-        self.collapse_flags = anticommuting;
+        self.collapse_rows = anticommuting;
         result?;
         self.fix_collapse_gauge(terms)?;
         Ok(false)
@@ -452,14 +611,16 @@ impl InverseTableauSimulator {
     /// Writes `T^-1 M T` for a product of distinct-qubit Paulis into `product`, returning its
     /// phase as a power of `i`.
     fn observable_into_product(&mut self, terms: &[(usize, PauliBasis)]) -> SimResult<u8> {
-        pauli_image_into(
+        let log_i = pauli_image_into(
             &self.rows,
             &self.signs,
             self.qubit_count,
             self.words,
             terms,
             &mut self.product,
-        )
+        )?;
+        self.charge(pauli_image_work(self.model, terms));
+        Ok(log_i)
     }
 
     /// Writes the product of saved local rows named by `image` into `product`, returning
@@ -520,6 +681,7 @@ impl InverseTableauSimulator {
             return Err(invariant("row multiplication is outside the tableau"));
         };
         let delta = right_multiply(destination_row, source_row, self.words);
+        self.work = self.work.saturating_add(self.model.row_multiply());
         let source_sign = sign(&self.signs, source)?;
         let destination_sign = self
             .signs
@@ -582,6 +744,56 @@ fn pauli_image_into(
     Ok(log_i)
 }
 
+/// Writes the ascending rows that appear in `scanned` or an odd number of times in `toggles`,
+/// but not both, into `output`. Both inputs must be ascending.
+fn symmetric_difference_into(
+    scanned: impl Iterator<Item = usize>,
+    toggles: &[usize],
+    output: &mut Vec<usize>,
+) {
+    let mut toggles = toggles.iter().copied().peekable();
+    // Pops the next distinct toggle up to `limit` with whether it appears an odd number of times.
+    let mut next_toggle = |limit: usize| {
+        let toggle = toggles.next_if(|&toggle| toggle <= limit)?;
+        let mut odd = true;
+        while toggles.next_if_eq(&toggle).is_some() {
+            odd = !odd;
+        }
+        Some((toggle, odd))
+    };
+    for row in scanned {
+        let mut keep = true;
+        while let Some((toggle, odd)) = next_toggle(row) {
+            if toggle == row {
+                keep ^= odd;
+            } else if odd {
+                output.push(toggle);
+            }
+        }
+        if keep {
+            output.push(row);
+        }
+    }
+    while let Some((toggle, odd)) = next_toggle(usize::MAX) {
+        if odd {
+            output.push(toggle);
+        }
+    }
+}
+
+/// Work of [`pauli_image_into`] for `terms`: clearing the product and one row product per
+/// X or Z component.
+fn pauli_image_work(model: WorkModel, terms: &[(usize, PauliBasis)]) -> u64 {
+    let multiplied = terms
+        .iter()
+        .map(|(_, basis)| u64::from(basis.x_bit()) + u64::from(basis.z_bit()))
+        .sum::<u64>();
+    model
+        .row_multiply()
+        .saturating_mul(multiplied)
+        .saturating_add(model.row_copy())
+}
+
 pub(super) fn reset_correction(basis: PauliBasis) -> PauliBasis {
     match basis {
         PauliBasis::I | PauliBasis::Z => PauliBasis::X,
@@ -591,34 +803,106 @@ pub(super) fn reset_correction(basis: PauliBasis) -> PauliBasis {
 
 /// Right-multiplies the packed Pauli `destination` by `source`, returning the scalar phase of
 /// the product as a power of `i` (signs excluded).
+///
+/// Each bit position keeps its own two-bit phase counter, so the words are processed in
+/// independent lanes whose counters are summed at the end; this lets the compiler vectorize
+/// the loop without changing the result.
 #[inline]
 fn right_multiply(destination: &mut [u64], source: &[u64], words: usize) -> u8 {
     let (destination_x, destination_z) = destination.split_at_mut(words);
     let (source_x, source_z) = source.split_at(words.min(source.len()));
-    let mut count_1 = 0_u64;
-    let mut count_2 = 0_u64;
-    for (((x1, z1), x2), z2) in destination_x
+    let len = destination_x
+        .len()
+        .min(destination_z.len())
+        .min(source_x.len())
+        .min(source_z.len());
+    let (destination_x, _) = destination_x.split_at_mut(len);
+    let (destination_z, _) = destination_z.split_at_mut(len);
+    let (source_x, _) = source_x.split_at(len);
+    let (source_z, _) = source_z.split_at(len);
+    let mut count_1 = [0_u64; MULTIPLY_LANES];
+    let mut count_2 = [0_u64; MULTIPLY_LANES];
+    let (x1_chunks, x1_tail) = destination_x.as_chunks_mut::<MULTIPLY_LANES>();
+    let (z1_chunks, z1_tail) = destination_z.as_chunks_mut::<MULTIPLY_LANES>();
+    let (x2_chunks, x2_tail) = source_x.as_chunks::<MULTIPLY_LANES>();
+    let (z2_chunks, z2_tail) = source_z.as_chunks::<MULTIPLY_LANES>();
+    for (((x1, z1), x2), z2) in x1_chunks
         .iter_mut()
-        .zip(destination_z.iter_mut())
-        .zip(source_x)
-        .zip(source_z)
+        .zip(z1_chunks.iter_mut())
+        .zip(x2_chunks)
+        .zip(z2_chunks)
     {
-        let old_x1 = *x1;
-        let old_z1 = *z1;
-        *x1 ^= *x2;
-        *z1 ^= *z2;
-        let x1_z2 = old_x1 & *z2;
-        let anticommutes = (*x2 & old_z1) ^ x1_z2;
-        count_2 ^= (count_1 ^ *x1 ^ *z1 ^ x1_z2) & anticommutes;
-        count_1 ^= anticommutes;
+        let [a0, a1, a2, a3, a4, a5, a6, a7] = *x1;
+        let [b0, b1, b2, b3, b4, b5, b6, b7] = *z1;
+        let [c0, c1, c2, c3, c4, c5, c6, c7] = *x2;
+        let [d0, d1, d2, d3, d4, d5, d6, d7] = *z2;
+        let [e0, e1, e2, e3, e4, e5, e6, e7] = count_1;
+        let [f0, f1, f2, f3, f4, f5, f6, f7] = count_2;
+        let lane0 = multiply_word(a0, b0, c0, d0, e0, f0);
+        let lane1 = multiply_word(a1, b1, c1, d1, e1, f1);
+        let lane2 = multiply_word(a2, b2, c2, d2, e2, f2);
+        let lane3 = multiply_word(a3, b3, c3, d3, e3, f3);
+        let lane4 = multiply_word(a4, b4, c4, d4, e4, f4);
+        let lane5 = multiply_word(a5, b5, c5, d5, e5, f5);
+        let lane6 = multiply_word(a6, b6, c6, d6, e6, f6);
+        let lane7 = multiply_word(a7, b7, c7, d7, e7, f7);
+        *x1 = [
+            lane0.0, lane1.0, lane2.0, lane3.0, lane4.0, lane5.0, lane6.0, lane7.0,
+        ];
+        *z1 = [
+            lane0.1, lane1.1, lane2.1, lane3.1, lane4.1, lane5.1, lane6.1, lane7.1,
+        ];
+        count_1 = [
+            lane0.2, lane1.2, lane2.2, lane3.2, lane4.2, lane5.2, lane6.2, lane7.2,
+        ];
+        count_2 = [
+            lane0.3, lane1.3, lane2.3, lane3.3, lane4.3, lane5.3, lane6.3, lane7.3,
+        ];
     }
-    let phase = (count_1.count_ones() + 2 * count_2.count_ones()) & 3;
+    let [mut tail_1, rest_1 @ ..] = count_1;
+    let [mut tail_2, rest_2 @ ..] = count_2;
+    for (((x1, z1), x2), z2) in x1_tail
+        .iter_mut()
+        .zip(z1_tail.iter_mut())
+        .zip(x2_tail)
+        .zip(z2_tail)
+    {
+        (*x1, *z1, tail_1, tail_2) = multiply_word(*x1, *z1, *x2, *z2, tail_1, tail_2);
+    }
+    let ones = |first: u64, rest: [u64; MULTIPLY_LANES - 1]| {
+        rest.iter().fold(first.count_ones(), |total, count| {
+            total + count.count_ones()
+        })
+    };
+    let phase = (ones(tail_1, rest_1) + 2 * ones(tail_2, rest_2)) & 3;
     #[allow(
         clippy::cast_possible_truncation,
         reason = "the phase is reduced modulo four before narrowing"
     )]
     let phase = phase as u8;
     phase
+}
+
+/// Independent word lanes of [`right_multiply`].
+const MULTIPLY_LANES: usize = 8;
+
+/// Multiplies one word pair of a packed Pauli, returning the new X and Z words and that bit
+/// lane's advanced two-bit phase counter.
+#[inline(always)]
+fn multiply_word(
+    x1: u64,
+    z1: u64,
+    x2: u64,
+    z2: u64,
+    count_1: u64,
+    count_2: u64,
+) -> (u64, u64, u64, u64) {
+    let x = x1 ^ x2;
+    let z = z1 ^ z2;
+    let x1_z2 = x1 & z2;
+    let anticommutes = (x2 & z1) ^ x1_z2;
+    let count_2 = count_2 ^ ((count_1 ^ x ^ z ^ x1_z2) & anticommutes);
+    (x, z, count_1 ^ anticommutes, count_2)
 }
 
 fn hermitian_sign(log_i: u8) -> SimResult<bool> {

@@ -20,6 +20,7 @@ mod local_tableau;
 mod noise;
 pub(crate) mod pauli_product;
 mod reference;
+mod reference_fold;
 mod reference_run;
 mod reference_simulator;
 #[cfg(test)]
@@ -117,8 +118,10 @@ const REFERENCE_SNAPSHOT_GENERATOR_BYTES: u128 = 96;
 /// Admission estimate for a reference repeat-fold snapshot.
 ///
 /// This keeps the generator-list formula used before the inverse-tableau simulator so that
-/// admission decisions do not change; it over-estimates the simulator's actual snapshot, which
-/// holds `2n` rows of `2 * ceil(n / 64)` words and `2n` sign bytes.
+/// admission decisions do not change. It over-estimates the simulator's actual snapshot, which
+/// holds `2n` rows of `2 * ceil(n / 64)` words and `2n` sign bytes, plus the transposed X halves
+/// used to compare states (`2n` rows of `ceil(n / 64)` words), one gathered word and one phase
+/// byte per qubit: at most `0.75 n^2 + 59 n` bytes against the admitted `n^2 + 96 n`.
 fn reference_snapshot_admission_bytes(qubit_count: usize) -> u128 {
     (qubit_count as u128)
         .saturating_mul(REFERENCE_SNAPSHOT_GENERATOR_BYTES)

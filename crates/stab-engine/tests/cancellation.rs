@@ -34,6 +34,12 @@ const CANCEL_DELAY: Duration = Duration::from_millis(50);
 /// Unitary work repeated far beyond any test's lifetime before the only measurement.
 const ENDLESS_SAMPLING: &str = "REPEAT 1000000000000 {\n    H 0\n}\nM 0\nDETECTOR rec[-1]\n";
 
+/// The same endless work for a reference run, which folds a loop whose state recurs: the
+/// sweep-controlled Pauli makes every iteration depend on more than the state it starts from,
+/// so the reference simulation must run each one.
+const ENDLESS_REFERENCE: &str =
+    "REPEAT 1000000000000 {\n    H 0\n    CX sweep[0] 1\n}\nM 0\nDETECTOR rec[-1]\n";
+
 #[derive(Debug, Default)]
 struct CountingSink {
     writes: usize,
@@ -234,7 +240,7 @@ fn measurement_to_detection_reference_sample_stops_when_cancelled() {
         let compiler = MeasurementToDetectionCompiler::new()
             .limits(DetectionConversionLimits::default().with_cancellation(signal));
         started();
-        compiler.compile(&circuit(ENDLESS_SAMPLING)).map(drop)
+        compiler.compile(&circuit(ENDLESS_REFERENCE)).map(drop)
     });
     assert_eq!(
         result,

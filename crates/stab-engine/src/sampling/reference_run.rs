@@ -1,11 +1,13 @@
 //! Drives the inverse-tableau reference simulator over the resolved circuit program.
 
+use stab_algebra::PauliBasis;
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{Cancellation, RepeatNestingLimit};
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
+use super::reference_fold::{FoldProbe, ProbeStep, SnapshotSlot};
 use super::reference_simulator::{
-    InverseTableauSimulator, ReferenceSimulatorError, ReferenceStateSnapshot, reset_correction,
+    InverseTableauSimulator, ReferenceSimulatorError, WorkModel, reset_correction,
 };
 use crate::detection::frame::{
     CircuitProgram, CliffordStep, ControlledPair, ProgramEntry, ProgramInstruction,
@@ -13,14 +15,14 @@ use crate::detection::frame::{
 };
 use stab_model::MeasureRecordOffset;
 
-/// Below this many repeated work units a repeat is iterated rather than snapshotted.
-const MIN_REFERENCE_FOLD_WORK: u128 = 64;
+pub(super) use super::reference_fold::has_reference_fold_candidate;
 
 /// Reusable simulator storage for computing reference samples of one program.
 #[derive(Debug)]
 pub(super) struct ReferenceWorkspace {
     simulator: InverseTableauSimulator,
-    snapshot: Option<ReferenceStateSnapshot>,
+    /// Snapshot storage when the plan admitted one; it is allocated on first capture.
+    snapshot: Option<SnapshotSlot>,
 }
 
 impl ReferenceWorkspace {
@@ -29,13 +31,9 @@ impl ReferenceWorkspace {
         with_snapshot: bool,
     ) -> Result<Self, SamplingExecutionError> {
         let simulator = InverseTableauSimulator::try_new(qubit_count).map_err(simulator_error)?;
-        let snapshot = with_snapshot
-            .then(|| ReferenceStateSnapshot::try_new(qubit_count))
-            .transpose()
-            .map_err(simulator_error)?;
         Ok(Self {
             simulator,
-            snapshot,
+            snapshot: with_snapshot.then(|| SnapshotSlot::new(qubit_count)),
         })
     }
 
@@ -59,132 +57,40 @@ impl ReferenceWorkspace {
             ReferenceSampleLoopPolicy::Fold => self.snapshot.as_mut(),
             ReferenceSampleLoopPolicy::Iterate => None,
         };
-        run_entries(
+        if let Some(slot) = snapshot.as_deref()
+            && !slot.is_free()
+        {
+            return Err(run_invariant(
+                "a reference run started with a held snapshot",
+            ));
+        }
+        let result = run_entries(
             program,
             &mut self.simulator,
             snapshot,
             sweep_record,
             output,
             cancellation,
-        )
+        );
+        if let Some(slot) = self.snapshot.as_mut() {
+            slot.release();
+        }
+        result
     }
 }
 
-/// Whether any repeat of `program` may be folded, so a reference run needs a state snapshot.
-pub(super) fn has_reference_fold_candidate(program: &CircuitProgram, qubit_count: usize) -> bool {
-    let entries = program.entries();
-    entries
-        .iter()
-        .enumerate()
-        .any(|(index, entry)| match entry {
-            ProgramEntry::Repeat { count, body_end }
-                if *body_end > index
-                    && matches!(entries.get(*body_end), Some(ProgramEntry::EndRepeat)) =>
-            {
-                reference_fold_is_profitable(program, index + 1, *body_end, *count, qubit_count)
-            }
-            _ => false,
-        })
-}
-
-fn reference_fold_is_profitable(
-    program: &CircuitProgram,
-    start: usize,
-    end: usize,
-    repeat_count: u64,
-    qubit_count: usize,
-) -> bool {
-    let body = program.entries().get(start..end).unwrap_or_default();
-    if body.iter().any(|entry| {
-        matches!(
-            entry,
-            ProgramEntry::Instruction(ProgramInstruction::ControlledPauli { pairs, .. })
-                if pairs.iter().any(|pair| !matches!(pair, ControlledPair::Quantum { .. }))
-        )
-    }) {
-        return false;
-    }
-    let repeated_work = reference_work_units(program, body, qubit_count)
-        .saturating_mul(u128::from(repeat_count.saturating_sub(1)));
-    let snapshot_work = (qubit_count as u128)
-        .saturating_mul(qubit_count as u128)
-        .saturating_mul(2);
-    repeated_work >= MIN_REFERENCE_FOLD_WORK.max(snapshot_work)
-}
-
-/// Estimated simulator work of one pass over `body`, per target dispatch: a Clifford costs one
-/// row update per qubit and target, a collapse one per qubit squared, and the rest one unit.
-fn reference_work_units(
-    program: &CircuitProgram,
-    body: &[ProgramEntry],
-    qubit_count: usize,
-) -> u128 {
-    let qubits = (qubit_count as u128).max(1);
-    let collapse = qubits.saturating_mul(qubits);
-    let gate_work = |arity: usize, clifford: Option<&ReferenceClifford>| match clifford {
-        Some(ReferenceClifford::Hadamard | ReferenceClifford::ControlledX) => qubits,
-        _ => qubits.saturating_mul(arity.max(1) as u128),
-    };
-    body.iter()
-        .filter_map(|entry| match entry {
-            ProgramEntry::Instruction(instruction) => Some(instruction),
-            ProgramEntry::Repeat { .. } | ProgramEntry::EndRepeat => None,
-        })
-        .fold(0_u128, |work, instruction| {
-            let units = match instruction {
-                ProgramInstruction::Clifford {
-                    reference, targets, ..
-                } => {
-                    let clifford = program.reference_clifford(*reference).ok();
-                    let arity = clifford.map_or(1, ReferenceClifford::arity).max(1);
-                    gate_work(arity, clifford).saturating_mul((targets.len() / arity) as u128)
-                }
-                ProgramInstruction::Reset { targets, .. }
-                | ProgramInstruction::Measure { targets, .. } => {
-                    collapse.saturating_mul(targets.len() as u128)
-                }
-                ProgramInstruction::MeasurePairs { targets, .. } => {
-                    collapse.saturating_mul((targets.len() / 2) as u128)
-                }
-                ProgramInstruction::PauliProducts(measurement) => {
-                    collapse.saturating_mul(measurement.product_count() as u128)
-                }
-                ProgramInstruction::MeasurePads { values, .. } => values.len() as u128,
-                ProgramInstruction::SinglePauliNoise { targets, .. }
-                | ProgramInstruction::HeraldedErase { targets, .. }
-                | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len() as u128,
-                ProgramInstruction::TwoQubitPauliNoise { targets, .. } => {
-                    (targets.len() / 2) as u128
-                }
-                ProgramInstruction::CorrelatedError { .. } => 1,
-                ProgramInstruction::ControlledPauli {
-                    reference, pairs, ..
-                } => {
-                    let clifford = program.reference_clifford(*reference).ok();
-                    pairs.iter().fold(0_u128, |units, pair| {
-                        units.saturating_add(match pair {
-                            ControlledPair::Quantum { .. } => gate_work(2, clifford),
-                            ControlledPair::Record { .. } | ControlledPair::Sweep { .. } => 1,
-                        })
-                    })
-                }
-                ProgramInstruction::Observable { .. } => 0,
-            };
-            work.saturating_add(units)
-        })
-}
-
-#[derive(Clone, Copy)]
 struct RepeatFrame {
     body_start: usize,
     body_end: usize,
     remaining: u64,
+    /// Cycle detection of this repeat while it may still fold.
+    probe: Option<FoldProbe>,
 }
 
 fn run_entries(
     program: &CircuitProgram,
     simulator: &mut InverseTableauSimulator,
-    mut snapshot: Option<&mut ReferenceStateSnapshot>,
+    mut snapshot: Option<&mut SnapshotSlot>,
     sweep_record: &[bool],
     output: &mut Vec<bool>,
     cancellation: &Cancellation,
@@ -213,59 +119,27 @@ fn run_entries(
                     ));
                 }
                 let body_start = index + 1;
-                let after_body = body_end.checked_add(1).ok_or_else(|| {
-                    run_invariant("reference sampling repeat-end index overflowed")
-                })?;
-                let mut remaining = *count;
-                if let Some(fold_snapshot) = snapshot.as_deref_mut()
-                    && reference_fold_is_profitable(
-                        program,
-                        body_start,
-                        *body_end,
-                        *count,
-                        simulator.qubit_count(),
-                    )
-                    && simulator.capture(fold_snapshot)
-                {
-                    let output_start = output.len();
-                    let mut cursor = program.cursor_range(body_start, *body_end, cancellation);
-                    while let Some(instruction) =
-                        cursor.next_instruction().map_err(program_error)?
-                    {
-                        apply_instruction(program, instruction, simulator, sweep_record, output)?;
+                let probe = match snapshot.as_deref_mut() {
+                    Some(slot) => {
+                        countdown.tick(cancellation)?;
+                        FoldProbe::begin(
+                            program,
+                            body_start,
+                            *body_end,
+                            *count,
+                            simulator,
+                            slot,
+                            output.len(),
+                        )?
                     }
-                    if simulator
-                        .same_state_as(fold_snapshot)
-                        .map_err(simulator_error)?
-                    {
-                        // The iteration returned to the state it started from and the body
-                        // reads no measurement record, so every later iteration repeats it.
-                        append_repeated_bits(output, output_start, count - 1)?;
-                        #[cfg(test)]
-                        record_fold(
-                            count - 1,
-                            (entries
-                                .get(body_start..*body_end)
-                                .unwrap_or_default()
-                                .iter()
-                                .filter(|entry| matches!(entry, ProgramEntry::Instruction(_)))
-                                .count() as u128)
-                                .saturating_mul(u128::from(count - 1)),
-                        );
-                        index = after_body;
-                        continue;
-                    }
-                    remaining -= 1;
-                }
-                if remaining == 0 {
-                    index = after_body;
-                    continue;
-                }
+                    None => None,
+                };
                 repeats
                     .try_push(RepeatFrame {
                         body_start,
                         body_end: *body_end,
-                        remaining,
+                        remaining: *count,
+                        probe,
                     })
                     .map_err(|_| {
                         run_invariant("reference sampling exceeded the admitted repeat nesting")
@@ -281,6 +155,45 @@ fn run_entries(
                         "reference sampling repeat end disagrees with its marker",
                     ));
                 }
+                if let (Some(probe), Some(slot)) = (frame.probe.as_mut(), snapshot.as_deref_mut()) {
+                    // A probe step compares whole tableaux, so it polls cancellation directly.
+                    cancellation.check()?;
+                    match probe.end_iteration(simulator, slot, output.len())? {
+                        ProbeStep::Continue => {}
+                        ProbeStep::GiveUp => frame.probe = None,
+                        ProbeStep::Fold {
+                            period,
+                            block_start,
+                        } => {
+                            frame.probe = None;
+                            slot.release();
+                            // Every later iteration repeats the last `period` ones, which
+                            // depend only on the recurring state.
+                            let later = frame.remaining - 1;
+                            let copies = later
+                                .checked_div(period)
+                                .ok_or_else(|| run_invariant("a folded repeat had no period"))?;
+                            append_repeated_bits(output, block_start, copies)?;
+                            #[cfg(test)]
+                            record_fold(
+                                entries.get(frame.body_start..frame.body_end),
+                                copies.saturating_mul(period),
+                                period,
+                            );
+                            // The leftover iterations are simulated so the state after the
+                            // repeat is exact.
+                            let leftover = later % period;
+                            if leftover == 0 {
+                                repeats.pop();
+                                index += 1;
+                            } else {
+                                frame.remaining = leftover;
+                                index = frame.body_start;
+                            }
+                            continue;
+                        }
+                    }
+                }
                 if frame.remaining > 1 {
                     frame.remaining -= 1;
                     index = frame.body_start;
@@ -295,6 +208,64 @@ fn run_entries(
     repeats
         .is_empty()
         .ok_or_else(|| run_invariant("reference sampling ended inside a repeat"))
+}
+
+/// A gate whose `H`/`S`/`CX` decomposition the simulator applies as one row operation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DirectClifford {
+    ControlledZ,
+    Swap,
+    SDag,
+    Pauli(PauliBasis),
+}
+
+impl DirectClifford {
+    /// Recognizes decompositions whose conjugation action is one direct row operation, so
+    /// applying it gives exactly the rows the steps would.
+    fn from_steps(steps: &[CliffordStep]) -> Option<Self> {
+        use CliffordStep::{Cx, H, S};
+        match steps {
+            [H(1), Cx(0, 1), H(1)] => Some(Self::ControlledZ),
+            [Cx(0, 1), Cx(1, 0), Cx(0, 1)] => Some(Self::Swap),
+            [S(0), S(0), S(0)] => Some(Self::SDag),
+            [H(0), S(0), S(0), H(0)] => Some(Self::Pauli(PauliBasis::X)),
+            [S(0), S(0)] => Some(Self::Pauli(PauliBasis::Z)),
+            [S(0), S(0), H(0), S(0), S(0), H(0)] => Some(Self::Pauli(PauliBasis::Y)),
+            _ => None,
+        }
+    }
+
+    fn arity(self) -> usize {
+        match self {
+            Self::ControlledZ | Self::Swap => 2,
+            Self::SDag | Self::Pauli(_) => 1,
+        }
+    }
+
+    fn apply(
+        self,
+        group: &[usize],
+        simulator: &mut InverseTableauSimulator,
+    ) -> Result<(), ReferenceSimulatorError> {
+        match (self, group) {
+            (Self::ControlledZ, &[left, right]) => simulator.apply_controlled_z(left, right),
+            (Self::Swap, &[left, right]) => simulator.apply_swap(left, right),
+            (Self::SDag, &[qubit]) => simulator.apply_s_dag(qubit),
+            (Self::Pauli(basis), &[qubit]) => simulator.apply_pauli(qubit, basis),
+            _ => Err(ReferenceSimulatorError::Invariant(
+                "direct gate targets disagree with its arity",
+            )),
+        }
+    }
+
+    fn work(self, model: WorkModel) -> u64 {
+        match self {
+            Self::ControlledZ => model.row_multiply().saturating_mul(2),
+            Self::Swap => model.row_copy().saturating_mul(4),
+            Self::SDag => model.row_multiply(),
+            Self::Pauli(_) => WorkModel::dispatch(),
+        }
+    }
 }
 
 /// Applies a resolved unitary gate to every target group of `targets`.
@@ -321,7 +292,15 @@ fn apply_clifford(
         }
         ReferenceClifford::Tableau { transform, steps } => {
             let arity = transform.target_count().max(1);
+            let direct = steps
+                .as_deref()
+                .and_then(DirectClifford::from_steps)
+                .filter(|direct| direct.arity() == arity);
             for group in targets.chunks(arity) {
+                if let Some(direct) = direct {
+                    direct.apply(group, simulator)?;
+                    continue;
+                }
                 let Some(steps) = steps else {
                     simulator.apply_local_clifford(group, transform.inverse())?;
                     continue;
@@ -346,6 +325,39 @@ fn apply_clifford(
         }
     }
     Ok(())
+}
+
+/// Estimated simulator work of applying `clifford` to one target group, as charged by the
+/// simulator when [`apply_clifford`] runs it.
+pub(super) fn clifford_group_work(clifford: &ReferenceClifford, model: WorkModel) -> u64 {
+    let swap = model.row_copy().saturating_mul(2);
+    let multiply = model.row_multiply();
+    match clifford {
+        ReferenceClifford::Hadamard => swap,
+        ReferenceClifford::ControlledX => multiply.saturating_mul(2),
+        ReferenceClifford::Tableau { transform, steps } => {
+            let arity = transform.target_count().max(1) as u64;
+            match steps.as_deref() {
+                Some(steps) => match DirectClifford::from_steps(steps) {
+                    Some(direct) => direct.work(model),
+                    None => steps
+                        .iter()
+                        .map(|step| match step {
+                            CliffordStep::H(_) => swap,
+                            CliffordStep::S(_) => multiply,
+                            CliffordStep::Cx(..) => multiply.saturating_mul(2),
+                        })
+                        .fold(0, u64::saturating_add),
+                },
+                // Each of the 2k rows is saved, rebuilt from up to k saved rows, and stored.
+                None => arity.saturating_mul(2).saturating_mul(
+                    multiply
+                        .saturating_mul(arity)
+                        .saturating_add(model.row_copy().saturating_mul(2)),
+                ),
+            }
+        }
+    }
 }
 
 fn apply_instruction(
@@ -659,6 +671,8 @@ pub(super) struct ReferenceExecutionStats {
     pub(super) folded_repeats: u64,
     pub(super) reused_iterations: u64,
     pub(super) reused_operation_dispatches: u128,
+    /// Longest cycle period any fold found.
+    pub(super) longest_period: u64,
 }
 
 #[cfg(test)]
@@ -668,6 +682,7 @@ thread_local! {
             folded_repeats: 0,
             reused_iterations: 0,
             reused_operation_dispatches: 0,
+            longest_period: 0,
         }) };
     static REFERENCE_RUNS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
@@ -689,14 +704,20 @@ pub(super) fn reference_run_count() -> u64 {
 }
 
 #[cfg(test)]
-fn record_fold(reused_iterations: u64, reused_operation_dispatches: u128) {
+fn record_fold(body: Option<&[ProgramEntry]>, reused_iterations: u64, period: u64) {
+    let dispatches = body
+        .unwrap_or_default()
+        .iter()
+        .filter(|entry| matches!(entry, ProgramEntry::Instruction(_)))
+        .count() as u128;
     REFERENCE_EXECUTION_STATS.with(|cell| {
         let mut stats = cell.get();
         stats.folded_repeats = stats.folded_repeats.saturating_add(1);
         stats.reused_iterations = stats.reused_iterations.saturating_add(reused_iterations);
         stats.reused_operation_dispatches = stats
             .reused_operation_dispatches
-            .saturating_add(reused_operation_dispatches);
+            .saturating_add(dispatches.saturating_mul(u128::from(reused_iterations)));
+        stats.longest_period = stats.longest_period.max(period);
         cell.set(stats);
     });
 }
