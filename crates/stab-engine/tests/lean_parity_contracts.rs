@@ -8,7 +8,7 @@ use std::convert::Infallible;
 
 use stab_engine::{
     DetectionCompileError, DetectionError, DetectionRunStatus, DetectionSamplingCompiler,
-    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, SamplingCompiler,
+    LaneWidth, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, SamplingCompiler,
     SamplingRunStatus, Seed, ShotCount,
 };
 use stab_model::Circuit;
@@ -47,11 +47,24 @@ impl MeasurementSink for MeasurementCollector {
 }
 
 fn sample(source: &str, shots: u64, reference_mode: ReferenceSampleMode) -> Vec<Vec<bool>> {
+    sample_at(source, shots, reference_mode, LaneWidth::default())
+}
+
+fn sample_at(
+    source: &str,
+    shots: u64,
+    reference_mode: ReferenceSampleMode,
+    lane_width: LaneWidth,
+) -> Vec<Vec<bool>> {
     let plan = SamplingCompiler::new()
         .compile(&circuit(source))
         .expect("compile sampling fixture");
     let mut session = plan
-        .session_with_reference_mode(RandomPolicy::Seeded(Seed::new(SEED)), reference_mode)
+        .session_with_lane_width(
+            RandomPolicy::Seeded(Seed::new(SEED)),
+            reference_mode,
+            lane_width,
+        )
         .expect("create sampling session");
     let mut sink = MeasurementCollector::default();
     let summary = session
@@ -107,11 +120,15 @@ impl DetectionSink for DetectionCollector {
 }
 
 fn detect(source: &str, shots: u64) -> DetectionCollector {
+    detect_at(source, shots, LaneWidth::default())
+}
+
+fn detect_at(source: &str, shots: u64, lane_width: LaneWidth) -> DetectionCollector {
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit(source))
         .expect("compile detection fixture");
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(SEED)))
+        .session_with_lane_width(RandomPolicy::Seeded(Seed::new(SEED)), lane_width)
         .expect("create detection session");
     let mut sink = DetectionCollector::default();
     let summary = session
@@ -329,8 +346,17 @@ fn sampling_noise_complete_contract() {
         },
     ];
 
-    for case in statistical_cases {
-        let records = ordinary_samples(case.source, SHOTS);
+    for (case, lane_width) in statistical_cases.iter().flat_map(|case| {
+        LaneWidth::ALL
+            .iter()
+            .map(move |&lane_width| (case, lane_width))
+    }) {
+        let records = sample_at(
+            case.source,
+            SHOTS,
+            ReferenceSampleMode::UseReferenceSample,
+            lane_width,
+        );
         for (bit, &expected_rate) in case.expected_rates.iter().enumerate() {
             let hits = records
                 .iter()
@@ -343,12 +369,16 @@ fn sampling_noise_complete_contract() {
                 .count();
             let observed_rate = hits as f64 / SHOTS as f64;
             if expected_rate == 0.0 || expected_rate == 1.0 {
-                assert_eq!(observed_rate, expected_rate, "{} bit {bit}", case.name);
+                assert_eq!(
+                    observed_rate, expected_rate,
+                    "{} bit {bit} at {lane_width:?}",
+                    case.name
+                );
             } else {
                 let sigma = (expected_rate * (1.0 - expected_rate) / SHOTS as f64).sqrt();
                 assert!(
                     (observed_rate - expected_rate).abs() <= SIGMAS * sigma,
-                    "{} bit {bit}: expected {expected_rate:.5}, observed {observed_rate:.5}",
+                    "{} bit {bit} at {lane_width:?}: expected {expected_rate:.5}, observed {observed_rate:.5}",
                     case.name
                 );
             }
@@ -497,20 +527,24 @@ fn detection_common_frame_gate_surface_contract() {
         },
     ];
 
-    for case in cases {
-        let output = detect(case.source, 1);
-        assert_eq!(
-            output.detectors,
-            vec![case.detectors.to_vec()],
-            "{}",
-            case.name
-        );
-        assert_eq!(
-            output.observables,
-            vec![case.observables.to_vec()],
-            "{}",
-            case.name
-        );
+    // Every lane of a batch, and the lanes of a second narrow batch, must take each path.
+    const SHOTS: usize = 70;
+    for &lane_width in LaneWidth::ALL {
+        for case in &cases {
+            let output = detect_at(case.source, SHOTS as u64, lane_width);
+            assert_eq!(
+                output.detectors,
+                vec![case.detectors.to_vec(); SHOTS],
+                "{} at {lane_width:?}",
+                case.name
+            );
+            assert_eq!(
+                output.observables,
+                vec![case.observables.to_vec(); SHOTS],
+                "{} at {lane_width:?}",
+                case.name
+            );
+        }
     }
 }
 

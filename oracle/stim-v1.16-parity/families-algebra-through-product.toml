@@ -766,7 +766,7 @@ name = "cq2_dem_materialized_transform_matrix_matches_stim"
 [[families]]
 id = "detection.common-frame-gate-surface"
 area = "detection"
-contract = "Detection sampling runs the 256-lane Pauli-frame batches shared with circuit sampling and implements the selected Clifford, measurement, reset, pair-product, MPP, MPAD, Pauli-observable, noise, feedback, and bounded-repeat frame paths."
+contract = "Detection sampling runs the Pauli-frame batches shared with circuit sampling at both 64-lane and 256-lane session widths and implements the selected Clifford, measurement, reset, pair-product, MPP, MPAD, Pauli-observable, noise, feedback, and bounded-repeat frame paths."
 stim_refs = ["src/stim/simulators/frame_simulator_util.test.cc"]
 status = "done"
 owner = "stab-engine"

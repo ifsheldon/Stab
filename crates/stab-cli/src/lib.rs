@@ -43,8 +43,8 @@ use stab_analysis::{
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 use stab_engine::{
-    RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingCompiler,
-    SamplingSession, Seed, ShotCount,
+    LaneWidth, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
+    SamplingCompiler, SamplingSession, Seed, ShotCount,
 };
 use stab_model::{
     Circuit, CircuitItem, MemoryBudget, MemoryBudgetParseError, ModelResult, ParseLimits,
@@ -338,6 +338,10 @@ struct SampleArgs {
     out_format: SampleOutFormatArg,
 
     /// Partially deterministic random seed for noisy sampling.
+    ///
+    /// The seeded output is a function of the circuit, the seed, and the total `--shots`, which
+    /// selects the frame lane width: totals of 1-192 and 257-448 shots sample 64-lane batches and
+    /// every other total samples 256-lane batches.
     #[arg(long, value_parser = parse_stim_u64)]
     seed: Option<u64>,
 
@@ -795,10 +799,16 @@ where
     } else {
         ReferenceSampleMode::UseReferenceSample
     };
-    let mut session = plan
-        .session_with_reference_mode(random_policy, reference_mode)
-        .map_err(CliError::from)?;
     let shots = ShotCount::try_from(args.shots).map_err(CliError::from)?;
+    // The CLI knows the whole request up front, so a small request samples narrow batches; the
+    // seeded stream is therefore a function of the seed and the total shot count.
+    let mut session = plan
+        .session_with_lane_width(
+            random_policy,
+            reference_mode,
+            LaneWidth::for_total_shots(shots),
+        )
+        .map_err(CliError::from)?;
     let output_width = visible_measurements
         .as_ref()
         .map_or(plan.measurement_width().get(), Vec::len);

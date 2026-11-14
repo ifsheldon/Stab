@@ -136,7 +136,7 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
     )
     .expect("compile other program");
     session.frame = SessionFrame::Pauli(
-        crate::detection::frame::FrameBatchState::for_measurements(&other)
+        crate::detection::frame::LaneFrameBatch::for_measurements(&other, LaneWidth::default())
             .expect("other frame state"),
     );
     let mut sink = RecordSink::default();
@@ -205,27 +205,71 @@ fn pauli_frame_preserves_reference_modes_and_seeded_partitions() {
         )
     ));
 
-    let mut combined_session = plan
-        .session(RandomPolicy::Seeded(Seed::new(47)))
-        .expect("construct combined session");
-    let mut partitioned_session = plan
-        .session(RandomPolicy::Seeded(Seed::new(47)))
-        .expect("construct partitioned session");
-    let mut combined = RecordSink::default();
-    combined_session
-        .run(ShotCount::new(130), &mut combined)
-        .expect("sample combined stream");
-    let mut first = RecordSink::default();
-    let mut second = RecordSink::default();
-    partitioned_session
-        .run(ShotCount::new(17), &mut first)
-        .expect("sample first partition");
-    partitioned_session
-        .run(ShotCount::new(113), &mut second)
-        .expect("sample second partition");
-    first.records.extend(second.records);
-    assert_eq!(partitioned_session.total_committed_shots().get(), 130);
-    assert_eq!(combined.records, first.records);
+    let mut streams = Vec::new();
+    for &lane_width in LaneWidth::ALL {
+        let session = || {
+            plan.session_with_lane_width(
+                RandomPolicy::Seeded(Seed::new(47)),
+                ReferenceSampleMode::UseReferenceSample,
+                lane_width,
+            )
+            .expect("construct session")
+        };
+        let mut combined_session = session();
+        let mut partitioned_session = session();
+        assert_eq!(partitioned_session.lane_width(), lane_width);
+        let mut combined = RecordSink::default();
+        combined_session
+            .run(ShotCount::new(330), &mut combined)
+            .expect("sample combined stream");
+        let mut partitioned = Vec::new();
+        for shots in [17, 47, 1, 63, 113, 89] {
+            let mut part = RecordSink::default();
+            partitioned_session
+                .run(ShotCount::new(shots), &mut part)
+                .expect("sample partition");
+            partitioned.extend(part.records);
+        }
+        assert_eq!(partitioned_session.total_committed_shots().get(), 330);
+        assert_eq!(combined.records, partitioned, "{lane_width:?}");
+        streams.push(combined.records);
+    }
+    // The seeded stream is a function of the lane width as well as the seed.
+    assert_eq!(streams.len(), LaneWidth::ALL.len());
+    assert_ne!(streams.first(), streams.last());
+}
+
+#[test]
+fn deterministic_sampling_is_identical_at_every_lane_width_and_shot_count() {
+    // Resets, measurements, and H randomize the frame lanes, but every measurement result is
+    // fixed by the reference sample, so each width must produce the same records.
+    let circuit =
+        Circuit::from_stim_str("X 0\nM 0\nH 5\nMR 0\nRX 2\nMX 2\nX 3\nCX 3 4\nM 3 4\nMPP X2*Z3\n")
+            .expect("parse fixture");
+    let plan = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile fixture");
+    let expected = [true, true, false, true, true, true];
+    for shots in [1_u64, 63, 64, 65, 255, 256, 257, 1000] {
+        for &lane_width in LaneWidth::ALL {
+            let mut session = plan
+                .session_with_lane_width(
+                    RandomPolicy::Seeded(Seed::new(shots)),
+                    ReferenceSampleMode::UseReferenceSample,
+                    lane_width,
+                )
+                .expect("construct session");
+            let mut sink = RecordSink::default();
+            session
+                .run(ShotCount::new(shots), &mut sink)
+                .expect("sample deterministic records");
+            assert_eq!(sink.records.len() as u64, shots);
+            assert!(
+                sink.records.iter().all(|record| *record == expected),
+                "{shots} shots at {lane_width:?}"
+            );
+        }
+    }
 }
 
 #[test]

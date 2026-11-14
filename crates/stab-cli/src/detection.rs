@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::Args;
 use stab_analysis::{FeedbackInliningLimits, circuit_with_inlined_feedback_with_limits};
 use stab_engine::{
-    DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler,
+    DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler, LaneWidth,
     MeasurementToDetectionCompiler, MeasurementToDetectionTransaction, RandomPolicy,
     ReferenceSampleMode, Seed, ShotCount,
 };
@@ -45,6 +45,10 @@ pub(crate) struct DetectArgs {
     out_format: SampleOutFormatArg,
 
     /// Partially deterministic random seed for noisy detection.
+    ///
+    /// The seeded output is a function of the circuit, the seed, and the total `--shots`, which
+    /// selects the frame lane width: totals of 1-192 and 257-448 shots sample 64-lane batches and
+    /// every other total samples 256-lane batches.
     #[arg(long, value_parser = super::parse_stim_u64)]
     seed: Option<u64>,
 
@@ -183,11 +187,14 @@ where
         outputs: DeferredDetectOutputs::new(io, stdout),
         encoder,
     };
+    let shots = shot_count(args.shots)?;
+    // The CLI knows the whole request up front, so a small request samples narrow batches; the
+    // seeded stream is therefore a function of the seed and the total shot count.
     let mut session = plan
-        .session(random_policy(args.seed))
+        .session_with_lane_width(random_policy(args.seed), LaneWidth::for_total_shots(shots))
         .map_err(CliError::from)?;
     session
-        .run(shot_count(args.shots)?, &mut sink)
+        .run(shots, &mut sink)
         .map(|_| ())
         .map_err(map_detection_run_error)
 }

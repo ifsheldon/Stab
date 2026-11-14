@@ -4,13 +4,15 @@ use stab_model::{Cancellation, Circuit};
 use super::program::{CircuitProgram, ProgramOptions};
 use super::word::FrameWord;
 use super::{BitPlaneDetectionFrame, FrameExecutionMode, FrameLanes};
+use crate::LaneWidth;
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
 use crate::detection::{ConversionPlan, DetectionConversionLimits};
 
-/// Shots in one frame batch: the lane count of [`FrameLanes`], shared by circuit sampling,
-/// detection sampling, measurement-to-detection conversion, and sweep correction.
+/// Shots in one frame batch of the widest lane word, [`FrameLanes`]: the default for circuit
+/// sampling and detection sampling, and the only width of measurement-to-detection conversion and
+/// sweep correction.
 pub(crate) const FRAME_BATCH_SHOTS: usize = FrameLanes::LANE_COUNT;
 
 #[derive(Clone, Debug)]
@@ -81,7 +83,7 @@ impl DirectDetectorFramePlan {
             .ok_or_else(storage_overflow)
     }
 
-    pub(in crate::detection) fn state(&self) -> DetectionResult<FrameBatchState> {
+    pub(in crate::detection) fn state<W: FrameWord>(&self) -> DetectionResult<FrameBatchState<W>> {
         FrameBatchState::for_detection(
             self.qubit_count(),
             self.measurement_count(),
@@ -90,8 +92,9 @@ impl DirectDetectorFramePlan {
         )
     }
 
-    pub(in crate::detection) fn state_storage_bytes(&self) -> u128 {
-        FrameBatchState::storage_bytes(
+    pub(in crate::detection) fn state_storage_bytes(&self, lane_width: LaneWidth) -> u128 {
+        frame_state_storage_bytes(
+            lane_width,
             self.qubit_count(),
             self.measurement_count(),
             self.detector_count(),
@@ -100,9 +103,9 @@ impl DirectDetectorFramePlan {
     }
 
     /// Samples one batch of `shot_count` active lanes and converts it to detection planes.
-    pub(in crate::detection) fn sample_batch(
+    pub(in crate::detection) fn sample_batch<W: FrameWord>(
         &self,
-        state: &mut FrameBatchState,
+        state: &mut FrameBatchState<W>,
         rng: &mut impl Rng,
         shot_count: usize,
         cancellation: &Cancellation,
@@ -142,7 +145,7 @@ impl SweepCorrectionPlan {
         }
     }
 
-    pub(in crate::detection) fn state(&self) -> DetectionResult<FrameBatchState> {
+    pub(in crate::detection) fn state(&self) -> DetectionResult<FrameBatchState<FrameLanes>> {
         FrameBatchState::for_detection(
             self.executable.frame_qubit_count(),
             self.measurement_count,
@@ -152,7 +155,8 @@ impl SweepCorrectionPlan {
     }
 
     pub(in crate::detection) fn state_storage_bytes(&self) -> u128 {
-        FrameBatchState::storage_bytes(
+        frame_state_storage_bytes(
+            LaneWidth::Lanes256,
             self.executable.frame_qubit_count(),
             self.measurement_count,
             self.detector_count,
@@ -165,7 +169,7 @@ impl SweepCorrectionPlan {
         conversion: &ConversionPlan,
         sweep_planes: &[FrameLanes],
         shot_count: usize,
-        state: &'a mut FrameBatchState,
+        state: &'a mut FrameBatchState<FrameLanes>,
         rng: &mut impl Rng,
         cancellation: &Cancellation,
     ) -> DetectionResult<(&'a [FrameLanes], &'a [FrameLanes])> {
@@ -211,35 +215,36 @@ enum FrameRecords {
 /// Reusable storage for one frame batch: the Pauli frame and what the batch records.
 ///
 /// Circuit sampling records only the frame's measurement planes; detection sampling and sweep
-/// correction also convert them into detector and observable planes. Every plane is one
-/// [`FrameLanes`] value per result bit, so a batch holds [`FRAME_BATCH_SHOTS`] shots.
+/// correction also convert them into detector and observable planes. Every plane is one lane
+/// word `W` per result bit, so a batch holds `W::LANE_COUNT` shots.
 #[derive(Debug)]
-pub(crate) struct FrameBatchState {
-    frame: BitPlaneDetectionFrame<FrameLanes>,
+pub(crate) struct FrameBatchState<W: FrameWord> {
+    frame: BitPlaneDetectionFrame<W>,
     records: FrameRecords,
     measurement_count: usize,
-    detector_planes: Vec<FrameLanes>,
-    observable_planes: Vec<FrameLanes>,
+    detector_planes: Vec<W>,
+    observable_planes: Vec<W>,
 }
 
-impl FrameBatchState {
-    /// Conservative reusable storage of a state with the given widths: two frame planes per
-    /// qubit, one plane per measurement and detector, and two per observable (the frame's
-    /// Pauli-observable accumulator and the converted output).
-    pub(crate) fn storage_bytes(
-        qubit_count: usize,
-        measurement_count: usize,
-        detector_count: usize,
-        observable_count: usize,
-    ) -> u128 {
-        (qubit_count as u128)
-            .saturating_mul(2)
-            .saturating_add(measurement_count as u128)
-            .saturating_add(detector_count as u128)
-            .saturating_add((observable_count as u128).saturating_mul(2))
-            .saturating_mul(size_of::<FrameLanes>() as u128)
-    }
+/// Conservative reusable storage of a frame batch state with the given widths at `lane_width`:
+/// two frame planes per qubit, one plane per measurement and detector, and two per observable
+/// (the frame's Pauli-observable accumulator and the converted output).
+pub(crate) fn frame_state_storage_bytes(
+    lane_width: LaneWidth,
+    qubit_count: usize,
+    measurement_count: usize,
+    detector_count: usize,
+    observable_count: usize,
+) -> u128 {
+    (qubit_count as u128)
+        .saturating_mul(2)
+        .saturating_add(measurement_count as u128)
+        .saturating_add(detector_count as u128)
+        .saturating_add((observable_count as u128).saturating_mul(2))
+        .saturating_mul(lane_width.plane_bytes() as u128)
+}
 
+impl<W: FrameWord> FrameBatchState<W> {
     /// State that records only the measurement planes of `program`.
     pub(crate) fn for_measurements(program: &CircuitProgram) -> DetectionResult<Self> {
         let mut state = Self::for_detection(
@@ -277,7 +282,7 @@ impl FrameBatchState {
         })
     }
 
-    /// Samples one full batch of [`FRAME_BATCH_SHOTS`] shots of `program`'s measurements.
+    /// Samples one full batch of `W::LANE_COUNT` shots of `program`'s measurements.
     pub(crate) fn sample_measurements(
         &mut self,
         program: &CircuitProgram,
@@ -285,7 +290,7 @@ impl FrameBatchState {
         cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         let mode = FrameExecutionMode::Sample {
-            active_lanes: FRAME_BATCH_SHOTS,
+            active_lanes: W::LANE_COUNT,
         };
         self.run_program(program, rng, mode, cancellation)
     }
@@ -294,7 +299,7 @@ impl FrameBatchState {
         &mut self,
         program: &CircuitProgram,
         rng: &mut impl Rng,
-        mode: FrameExecutionMode<'_, FrameLanes>,
+        mode: FrameExecutionMode<'_, W>,
         cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         self.frame.reset(rng, mode);
@@ -310,7 +315,7 @@ impl FrameBatchState {
         Ok(())
     }
 
-    pub(crate) fn measurement_planes(&self) -> &[FrameLanes] {
+    pub(crate) fn measurement_planes(&self) -> &[W] {
         &self.frame.measurements
     }
 
@@ -323,7 +328,7 @@ impl FrameBatchState {
                 self.frame.measurements.len()
             )));
         }
-        let all_lanes = FrameLanes::active_mask(FRAME_BATCH_SHOTS);
+        let all_lanes = W::active_mask(W::LANE_COUNT);
         for (plane, bit) in self.frame.measurements.iter_mut().zip(reference) {
             if *bit {
                 *plane ^= all_lanes;
@@ -332,14 +337,14 @@ impl FrameBatchState {
         Ok(())
     }
 
-    pub(in crate::detection) fn detection_planes(&self) -> (&[FrameLanes], &[FrameLanes]) {
+    pub(in crate::detection) fn detection_planes(&self) -> (&[W], &[W]) {
         (&self.detector_planes, &self.observable_planes)
     }
 
     /// Moves the lanes after the first `delivered` lanes of every recorded output plane down to
     /// lane zero, so the undelivered rest of a batch can be delivered as a prefix later.
     pub(crate) fn discard_delivered_lanes(&mut self, delivered: usize) {
-        let planes: &mut [FrameLanes] = match self.records {
+        let planes: &mut [W] = match self.records {
             FrameRecords::Measurements => &mut self.frame.measurements,
             FrameRecords::Detection => &mut self.detector_planes,
         };
@@ -379,6 +384,40 @@ impl FrameBatchState {
             *plane ^= *frame_observable;
         }
         Ok(())
+    }
+}
+
+/// One session's frame batch state at the lane width the session was created with.
+///
+/// Each variant is a separate monomorphization of the frame, so a session dispatches on its
+/// width once per run and every batch runs on a fixed-size lane word.
+#[derive(Debug)]
+pub(crate) enum LaneFrameBatch {
+    Lanes64(FrameBatchState<u64>),
+    Lanes256(FrameBatchState<FrameLanes>),
+}
+
+impl LaneFrameBatch {
+    /// State at `lane_width` that records only the measurement planes of `program`.
+    pub(crate) fn for_measurements(
+        program: &CircuitProgram,
+        lane_width: LaneWidth,
+    ) -> DetectionResult<Self> {
+        Ok(match lane_width {
+            LaneWidth::Lanes64 => Self::Lanes64(FrameBatchState::for_measurements(program)?),
+            LaneWidth::Lanes256 => Self::Lanes256(FrameBatchState::for_measurements(program)?),
+        })
+    }
+
+    /// Detection state at `lane_width` for `plan`.
+    pub(in crate::detection) fn for_detection(
+        plan: &DirectDetectorFramePlan,
+        lane_width: LaneWidth,
+    ) -> DetectionResult<Self> {
+        Ok(match lane_width {
+            LaneWidth::Lanes64 => Self::Lanes64(plan.state()?),
+            LaneWidth::Lanes256 => Self::Lanes256(plan.state()?),
+        })
     }
 }
 

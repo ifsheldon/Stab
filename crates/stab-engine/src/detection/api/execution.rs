@@ -9,10 +9,11 @@ use super::{
     detection_plane_view,
 };
 use crate::detection::frame::{
-    DeliveryFailure, FRAME_BATCH_SHOTS, FrameBatchSource, FrameBatchState, FrameLanes,
+    DeliveryFailure, DeliveryOutcome, FrameBatchSource, FrameBatchState, FrameLanes, FrameWord,
+    LaneFrameBatch, PendingLanes,
 };
 use crate::sampling::session_cancellation;
-use crate::{RandomPolicy, ShotCount, SinkFailurePhase};
+use crate::{LaneWidth, RandomPolicy, ShotCount, SinkFailurePhase};
 
 pub(super) fn run_direct<Sink>(
     direct: &DirectDetectorFramePlan,
@@ -29,14 +30,32 @@ where
         pending,
         cancellation,
     } = state;
-    let mut source = DetectionBatchSource {
-        direct,
-        frame,
-        rng,
-        cancellation: session_cancellation(cancellation),
-        sink,
+    let cancellation = session_cancellation(cancellation);
+    let delivered = match frame {
+        LaneFrameBatch::Lanes64(frame) => deliver_lanes(
+            pending,
+            shots,
+            DetectionBatchSource {
+                direct,
+                frame,
+                rng,
+                cancellation,
+                sink: &mut *sink,
+            },
+        ),
+        LaneFrameBatch::Lanes256(frame) => deliver_lanes(
+            pending,
+            shots,
+            DetectionBatchSource {
+                direct,
+                frame,
+                rng,
+                cancellation,
+                sink: &mut *sink,
+            },
+        ),
     };
-    let outcome = pending.deliver(shots.get(), &mut source).map_err(
+    let outcome = delivered.map_err(
         |DeliveryFailure {
              error,
              committed,
@@ -55,7 +74,7 @@ where
             }
         },
     )?;
-    if let Err(source) = source.sink.finish() {
+    if let Err(source) = sink.finish() {
         return Err(DetectionRunError::Sink {
             phase: SinkFailurePhase::Finish,
             source,
@@ -79,20 +98,36 @@ enum DetectionDeliveryError<SinkError> {
     Sink(SinkError),
 }
 
+/// Runs the shared delivery loop over one session frame at a fixed lane word.
+fn deliver_lanes<W, Sink>(
+    pending: &mut PendingLanes,
+    shots: ShotCount,
+    mut source: DetectionBatchSource<'_, W, Sink>,
+) -> Result<DeliveryOutcome, DeliveryFailure<DetectionDeliveryError<Sink::Error>>>
+where
+    W: FrameWord,
+    Sink: DetectionSink,
+{
+    pending.deliver(shots.get(), &mut source)
+}
+
 /// One detection run's view of its session frame for the shared frame-batch delivery loop.
-struct DetectionBatchSource<'run, Sink> {
+struct DetectionBatchSource<'run, W: FrameWord, Sink> {
     direct: &'run DirectDetectorFramePlan,
-    frame: &'run mut FrameBatchState,
+    frame: &'run mut FrameBatchState<W>,
     rng: &'run mut SmallRng,
     cancellation: &'run Cancellation,
     sink: &'run mut Sink,
 }
 
-impl<Sink> FrameBatchSource for DetectionBatchSource<'_, Sink>
+impl<W, Sink> FrameBatchSource for DetectionBatchSource<'_, W, Sink>
 where
+    W: FrameWord,
     Sink: DetectionSink,
 {
     type Error = DetectionDeliveryError<Sink::Error>;
+
+    const BATCH_SHOTS: usize = W::LANE_COUNT;
 
     fn is_cancelled(&self) -> bool {
         self.cancellation.is_cancelled()
@@ -100,7 +135,7 @@ where
 
     fn refill(&mut self) -> Result<(), Self::Error> {
         self.direct
-            .sample_batch(self.frame, self.rng, FRAME_BATCH_SHOTS, self.cancellation)
+            .sample_batch(self.frame, self.rng, W::LANE_COUNT, self.cancellation)
             .map_err(|source| DetectionDeliveryError::Engine(source.into()))
     }
 
@@ -151,14 +186,21 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
 
 pub(super) fn validate_direct_session_storage(
     plan: &DirectDetectorFramePlan,
+    lane_width: LaneWidth,
 ) -> Result<(), DetectionExecutionError> {
-    validate_session_storage(direct_session_storage_bytes(plan), plan.memory_budget())
+    validate_session_storage(
+        direct_session_storage_bytes(plan, lane_width),
+        plan.memory_budget(),
+    )
 }
 
-/// Reusable storage of a detection-sampling session: its frame batch state, which holds the
-/// delivered detector and observable planes as well.
-pub(super) fn direct_session_storage_bytes(plan: &DirectDetectorFramePlan) -> u128 {
-    plan.state_storage_bytes()
+/// Reusable storage of a detection-sampling session at `lane_width`: its frame batch state,
+/// which holds the delivered detector and observable planes as well.
+pub(super) fn direct_session_storage_bytes(
+    plan: &DirectDetectorFramePlan,
+    lane_width: LaneWidth,
+) -> u128 {
+    plan.state_storage_bytes(lane_width)
 }
 
 fn validate_session_storage(

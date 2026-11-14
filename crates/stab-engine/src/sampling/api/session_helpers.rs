@@ -1,12 +1,14 @@
 use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner};
-use crate::detection::frame::FrameBatchState;
+use crate::LaneWidth;
+use crate::detection::frame::frame_state_storage_bytes;
 use crate::sampling::reference_run::ReferenceWorkspace;
 
 pub(super) fn validate_session_storage(
     plan: &SamplingPlanInner,
     reference_mode: ReferenceSampleMode,
+    lane_width: LaneWidth,
 ) -> Result<(), SamplingExecutionError> {
-    let estimated_bytes = session_storage_bytes(plan, reference_mode);
+    let estimated_bytes = session_storage_bytes(plan, reference_mode, lane_width);
     if !plan.memory_budget.admits(estimated_bytes) {
         return Err(SamplingExecutionError::SessionStorageLimit {
             estimated_bytes,
@@ -19,11 +21,13 @@ pub(super) fn validate_session_storage(
 pub(super) fn session_storage_bytes(
     plan: &SamplingPlanInner,
     reference_mode: ReferenceSampleMode,
+    lane_width: LaneWidth,
 ) -> u128 {
     if plan.measurement_count == 0 {
         return 0;
     }
-    let mut estimated_bytes = FrameBatchState::storage_bytes(
+    let mut estimated_bytes = frame_state_storage_bytes(
+        lane_width,
         plan.program.frame_qubit_count(),
         plan.measurement_count,
         0,

@@ -7,21 +7,38 @@ const FLIPPED_DETECTOR_AND_OBSERVABLE: &[u8] =
 
 #[test]
 fn detect_and_sample_enforce_the_memory_budget_without_restricting_sparse_qubit_syntax() {
-    // Detection and sampling share one 256-lane frame of two 32-byte planes per qubit, so under
-    // a 256 MiB budget both admit a frame below about 4.19 million qubits, and no
-    // single-measurement fast path exempts the full Stim qubit-ID range from that frame.
-    for (command, qubit, expected_error) in [
-        ("detect", 4_000_000, None),
+    // Detection and sampling share one frame of two planes per qubit. At 200 shots the session
+    // runs 256-lane frames of 32-byte planes, so a 256 MiB budget admits a frame below about
+    // 4.19 million qubits; at one shot it runs 64-lane frames of 8-byte planes, which admit four
+    // times as many. No single-measurement fast path exempts the full Stim qubit-ID range.
+    for (command, shots, qubit, expected_error) in [
+        ("detect", "200", 4_000_000, None),
         (
             "detect",
+            "200",
             16_777_215,
             Some("detection session needs an estimated 1073741888 bytes"),
         ),
-        ("sample", 4_000_000, None),
+        ("detect", "1", 16_000_000, None),
+        (
+            "detect",
+            "1",
+            16_777_215,
+            Some("detection session needs an estimated 268435472 bytes"),
+        ),
+        ("sample", "200", 4_000_000, None),
         (
             "sample",
+            "200",
             16_777_215,
             Some("sampling session needs an estimated 1073741856 bytes"),
+        ),
+        ("sample", "1", 16_000_000, None),
+        (
+            "sample",
+            "1",
+            16_777_215,
+            Some("sampling session needs an estimated 268435464 bytes"),
         ),
     ] {
         let input = format!("M {qubit}\nDETECTOR rec[-1]\n");
@@ -31,16 +48,16 @@ fn detect_and_sample_enforce_the_memory_budget_without_restricting_sparse_qubit_
                 "stab",
                 command,
                 "--shots",
-                "1",
+                shots,
                 "--skip_reference_sample",
                 "--memory-budget=256MiB",
             ]
         } else {
-            &["stab", command, "--shots", "1", "--memory-budget=256MiB"]
+            &["stab", command, "--shots", shots, "--memory-budget=256MiB"]
         };
         let result = run(args, input.as_bytes());
         match expected_error {
-            None => result.assert_ok(b"0\n"),
+            None => result.assert_ok("0\n".repeat(shots.parse().expect("shot count")).as_bytes()),
             Some(message) => {
                 result.assert_err(&[message, "268435456-byte memory budget", "--memory-budget"])
             }

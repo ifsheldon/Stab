@@ -5,6 +5,7 @@ mod dem_sampling;
 mod descriptor;
 mod detection;
 mod fingerprint;
+mod lane_width;
 mod probability;
 mod reference_sample_tree;
 mod resource_amount;
@@ -34,6 +35,7 @@ pub use detection::{
     validate_detection_sampling_circuit_with_limits,
 };
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
+pub use lane_width::LaneWidth;
 pub use probability::biased_randomize_bits;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
 pub use resource_amount::ResourceAmount;
@@ -52,8 +54,8 @@ pub use sampling_estimate::estimate_sampling_request;
 /// measurement-to-detection call accepts.
 ///
 /// Circuit sampling, detection sampling, and DEM sampling deliver bit-plane batches of at most
-/// this many shots; a sink that preallocates per-batch storage, such as decoder predictions, can
-/// size it once from this bound.
+/// this many shots, the widest [`LaneWidth`]; a sink that preallocates per-batch storage, such as
+/// decoder predictions, can size it once from this bound.
 pub const MAX_BATCH_SHOTS: usize = detection::frame::FRAME_BATCH_SHOTS;
 
 /// Compiler registrations exposed through product capability discovery.

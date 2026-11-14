@@ -14,12 +14,34 @@ use crate::{
     Circuit, CircuitInstruction, Gate, MeasureRecordOffset, MeasurementBatchView, MeasurementSink,
     Pauli, QubitId, Target,
     execution::{
-        RandomPolicy, ReferenceSampleMode, SamplingCompileError, SamplingCompiler, SamplingPlan,
-        Seed, ShotCount,
+        LaneWidth, RandomPolicy, ReferenceSampleMode, SamplingCompileError, SamplingCompiler,
+        SamplingPlan, Seed, ShotCount,
     },
 };
 
 mod execution;
+
+thread_local! {
+    /// Lane width of every sampling and detection session the contract helpers create on this
+    /// test thread.
+    static SESSION_LANE_WIDTH: std::cell::Cell<LaneWidth> =
+        std::cell::Cell::new(LaneWidth::default());
+}
+
+/// The lane width contract helpers on this thread create sessions with.
+fn session_lane_width() -> LaneWidth {
+    SESSION_LANE_WIDTH.with(std::cell::Cell::get)
+}
+
+/// Runs `check` once at every shipped lane width, so statistical contracts hold for each width's
+/// own random stream rather than for the default width alone.
+fn at_every_lane_width(check: impl Fn()) {
+    for &lane_width in LaneWidth::ALL {
+        let previous = SESSION_LANE_WIDTH.with(|width| width.replace(lane_width));
+        check();
+        SESSION_LANE_WIDTH.with(|width| width.set(previous));
+    }
+}
 
 #[derive(Debug)]
 struct SamplingFixture {
@@ -53,7 +75,7 @@ impl SamplingFixture {
         };
         let mut session = self
             .plan
-            .session_with_reference_mode(random_policy, reference_mode)
+            .session_with_lane_width(random_policy, reference_mode, session_lane_width())
             .expect("construct semantic sampling session");
         let mut sink = MeasurementCollector::default();
         session

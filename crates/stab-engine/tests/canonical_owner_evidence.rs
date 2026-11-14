@@ -217,7 +217,7 @@ fn a4_sampling_plan_fingerprint_contract() {
 
     let mut executable = Sha256::new();
     executable.update(b"stab:sampling-executable-contract\0");
-    executable.update(6_u16.to_be_bytes());
+    executable.update(7_u16.to_be_bytes());
     // Scalar backend, bit-plane Pauli frame, fold policy.
     executable.update([1_u8, 4_u8, 1_u8]);
     let executable_digest: [u8; 32] = executable.finalize().into();
@@ -240,6 +240,6 @@ fn a4_sampling_plan_fingerprint_contract() {
     assert_eq!(fingerprint.digest(), reconstructed_digest);
     assert_eq!(
         fingerprint.digest_hex(),
-        "9aaeadd0765842bb713dfc254564cc4fb67ec0fd11b65ec70e0d13a99df667fd"
+        "8de0679e515d503b7a0db67cd6d8ef2f87a19571e97d2b46ac554fc4bcffa1a2"
     );
 }

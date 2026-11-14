@@ -127,7 +127,8 @@ pub(super) fn collect_detection_samples(
     let random_policy = seed.map_or(RandomPolicy::Entropy, |seed| {
         RandomPolicy::Seeded(Seed::new(seed))
     });
-    let mut session = plan.session(random_policy)?;
+    let mut session =
+        plan.session_with_lane_width(random_policy, super::super::session_lane_width())?;
     let mut sink = DetectionCollector::default();
     session
         .run(ShotCount::new(u64::try_from(shots)?), &mut sink)

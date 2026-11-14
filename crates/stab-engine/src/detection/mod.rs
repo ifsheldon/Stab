@@ -52,7 +52,7 @@ pub const DETECTION_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor =
     CompilationDescriptor::new(
         CompilationOperation::DetectionSampling,
         stab_model::ModelDialect::StimCircuit,
-        4,
+        5,
         None,
         true,
     );
@@ -196,7 +196,9 @@ impl PreparedMeasurementToDetection {
         )
     }
 
-    fn try_reusable_sweep_correction(&self) -> DetectionResult<Option<FrameBatchState>> {
+    fn try_reusable_sweep_correction(
+        &self,
+    ) -> DetectionResult<Option<FrameBatchState<FrameLanes>>> {
         self.sweep_correction
             .as_ref()
             .map(SweepCorrectionPlan::state)
@@ -221,7 +223,7 @@ impl PreparedMeasurementToDetection {
         reference_sample: &[bool],
         detector_planes: &mut Vec<FrameLanes>,
         observable_planes: &mut Vec<FrameLanes>,
-        correction_state: Option<&mut FrameBatchState>,
+        correction_state: Option<&mut FrameBatchState<FrameLanes>>,
         correction_rng: &mut impl rand::Rng,
         cancellation: &stab_model::Cancellation,
     ) -> DetectionResult<()> {

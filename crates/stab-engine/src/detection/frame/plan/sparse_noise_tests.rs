@@ -2,8 +2,8 @@
 //!
 //! `visit_sparse_categorical_events` replaces per-target categorical masks whenever a channel's
 //! total probability is at most 0.125. These tests drive it through both frame batch states that
-//! use it in production: the measurement-sampling state with full batches and the detection state,
-//! including a partial final detection batch.
+//! use it in production, at every shipped lane width: the measurement-sampling state with full
+//! batches and the detection state, including a partial final detection batch.
 //!
 //! Each data qubit is half of a Bell pair that is decoded after the noise, so its measured flip
 //! pair identifies the applied Pauli exactly: a Z component flips the data measurement and an X
@@ -27,7 +27,7 @@ use stab_model::Circuit;
 use super::super::program::{CircuitProgram, ProgramOptions};
 use super::{DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FrameBatchState};
 use crate::detection::DetectionConversionLimits;
-use crate::detection::frame::{FrameLanes, FrameWord as _};
+use crate::detection::frame::{FrameLanes, FrameWord};
 
 const DATA_QUBITS: usize = 50;
 const SIGMA: f64 = 5.0;
@@ -214,44 +214,49 @@ fn assert_binomial(label: &str, successes: u64, trials: u64, probability: f64) {
     );
 }
 
-#[test]
-fn sampling_frame_sparse_channels_match_category_target_and_lane_marginals() {
+/// Samples `SAMPLING_BATCHES` widest batches' worth of shots through measurement-sampling
+/// frames of lane word `W`.
+fn assert_sampling_frame_marginals<W: FrameWord>(label: &str) {
+    let lane_words = W::LANE_COUNT / u64::BITS as usize;
+    let batches = SAMPLING_BATCHES * FRAME_BATCH_SHOTS / W::LANE_COUNT;
     for (channel, seed) in [(Channel::Single, 0x5A11), (Channel::Pair, 0x5A12)] {
         let circuit = channel.circuit();
         let program = CircuitProgram::compile(&circuit, ProgramOptions::SAMPLING)
             .expect("compile Pauli-frame sampling program");
         assert_eq!(program.counts().measurements, 2 * DATA_QUBITS);
         let mut state =
-            FrameBatchState::for_measurements(&program).expect("allocate Pauli-frame state");
+            FrameBatchState::<W>::for_measurements(&program).expect("allocate Pauli-frame state");
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut tally = Tally::new(channel, 4);
-        for _ in 0..SAMPLING_BATCHES {
+        let mut tally = Tally::new(channel, lane_words);
+        for _ in 0..batches {
             state
                 .sample_measurements(&program, &mut rng, &stab_model::Cancellation::never())
                 .expect("sample frame batch");
             let planes = state.measurement_planes();
-            for lane_word in 0..4 {
+            for lane_word in 0..lane_words {
                 tally.add_lane_word(lane_word, u64::MAX, |measurement| {
-                    planes[measurement].words()[lane_word]
+                    planes[measurement].extract_u64(lane_word * 64, 64)
                 });
             }
-            tally.shots += FRAME_BATCH_SHOTS as u64;
+            tally.shots += W::LANE_COUNT as u64;
         }
-        tally.assert_matches("sampling frame");
+        tally.assert_matches(label);
     }
 }
 
-#[test]
-fn detection_frame_sparse_channels_match_marginals_and_never_touch_inactive_lanes() {
+/// Samples `DETECTION_FULL_BATCHES` widest batches' worth of full batches and one partial batch
+/// through detection frames of lane word `W`.
+fn assert_detection_frame_marginals<W: FrameWord>(label: &str) {
+    let lane_words = W::LANE_COUNT / u64::BITS as usize;
+    let full_batches = DETECTION_FULL_BATCHES * FRAME_BATCH_SHOTS / W::LANE_COUNT;
     for (channel, seed) in [(Channel::Single, 0xD311), (Channel::Pair, 0xD312)] {
         let circuit = channel.circuit();
         let plan = DirectDetectorFramePlan::compile(&circuit, DetectionConversionLimits::default())
             .expect("compile direct detector-frame plan");
-        let mut state = plan.state().expect("allocate detector-frame state");
+        let mut state = plan.state::<W>().expect("allocate detector-frame state");
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut tally = Tally::new(channel, 4);
-        for lanes in std::iter::repeat_n(FRAME_BATCH_SHOTS, DETECTION_FULL_BATCHES)
-            .chain([DETECTION_FINAL_LANES])
+        let mut tally = Tally::new(channel, lane_words);
+        for lanes in std::iter::repeat_n(W::LANE_COUNT, full_batches).chain([DETECTION_FINAL_LANES])
         {
             plan.sample_batch(
                 &mut state,
@@ -260,23 +265,35 @@ fn detection_frame_sparse_channels_match_marginals_and_never_touch_inactive_lane
                 &stab_model::Cancellation::never(),
             )
             .expect("sample detection batch");
-            let active = FrameLanes::active_mask(lanes);
+            let active = W::active_mask(lanes);
             let measurements = state.measurement_planes();
             assert_eq!(measurements.len(), 2 * DATA_QUBITS);
             assert!(
                 measurements
                     .iter()
-                    .all(|plane| *plane & !active == FrameLanes::ZERO),
-                "{lanes}-lane batch flipped an inactive lane"
+                    .all(|plane| *plane & !active == W::default()),
+                "{label}: {lanes}-lane batch flipped an inactive lane"
             );
-            for lane_word in 0..4 {
-                let active_word = active.words()[lane_word];
+            for lane_word in 0..lane_words {
+                let active_word = active.extract_u64(lane_word * 64, 64);
                 tally.add_lane_word(lane_word, active_word, |measurement| {
-                    measurements[measurement].words()[lane_word]
+                    measurements[measurement].extract_u64(lane_word * 64, 64)
                 });
             }
             tally.shots += lanes as u64;
         }
-        tally.assert_matches("detection frame");
+        tally.assert_matches(label);
     }
+}
+
+#[test]
+fn sampling_frame_sparse_channels_match_category_target_and_lane_marginals() {
+    assert_sampling_frame_marginals::<u64>("64-lane sampling frame");
+    assert_sampling_frame_marginals::<FrameLanes>("256-lane sampling frame");
+}
+
+#[test]
+fn detection_frame_sparse_channels_match_marginals_and_never_touch_inactive_lanes() {
+    assert_detection_frame_marginals::<u64>("64-lane detection frame");
+    assert_detection_frame_marginals::<FrameLanes>("256-lane detection frame");
 }

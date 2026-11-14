@@ -1,19 +1,20 @@
 //! The one delivery loop shared by every session that samples frame batches.
 //!
-//! A frame batch always samples [`FRAME_BATCH_SHOTS`] lanes. A run delivers lanes as prefixes
-//! of the current batch and keeps any lanes it did not need for the next run, so partitioning a
-//! seeded run across calls never changes its output stream.
-
-use super::FRAME_BATCH_SHOTS;
+//! A frame batch always samples every lane of the session's lane width. A run delivers lanes as
+//! prefixes of the current batch and keeps any lanes it did not need for the next run, so
+//! partitioning a seeded run across calls never changes its output stream.
 
 /// A session's frame batch as seen by [`PendingLanes::deliver`].
 pub(crate) trait FrameBatchSource {
     type Error;
 
+    /// Lanes in every batch [`Self::refill`] samples: the lane count of the session's frame word.
+    const BATCH_SHOTS: usize;
+
     /// Whether the caller asked the run to stop before its next batch.
     fn is_cancelled(&self) -> bool;
 
-    /// Samples a fresh batch of [`FRAME_BATCH_SHOTS`] lanes.
+    /// Samples a fresh batch of [`Self::BATCH_SHOTS`] lanes.
     fn refill(&mut self) -> Result<(), Self::Error>;
 
     /// Hands the first `lanes` pending lanes to the sink.
@@ -65,16 +66,15 @@ impl PendingLanes {
             if source.is_cancelled() {
                 break;
             }
-            let wanted = usize::try_from(remaining).map_or(FRAME_BATCH_SHOTS, |remaining| {
-                remaining.min(FRAME_BATCH_SHOTS)
-            });
+            let wanted = usize::try_from(remaining)
+                .map_or(S::BATCH_SHOTS, |remaining| remaining.min(S::BATCH_SHOTS));
             if self.count == 0 {
                 source.refill().map_err(|error| DeliveryFailure {
                     error,
                     committed,
                     attempted: wanted as u64,
                 })?;
-                self.count = FRAME_BATCH_SHOTS;
+                self.count = S::BATCH_SHOTS;
                 self.delivered = 0;
             } else if self.delivered != 0 {
                 source.discard(self.delivered);

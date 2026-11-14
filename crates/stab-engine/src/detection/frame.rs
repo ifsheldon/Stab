@@ -21,11 +21,13 @@ use noise::{
     visit_sparse_categorical_events,
 };
 
-pub(crate) use delivery::{DeliveryFailure, FrameBatchSource, PendingLanes};
+pub(crate) use delivery::{DeliveryFailure, DeliveryOutcome, FrameBatchSource, PendingLanes};
 pub(super) use plan::{
     DirectDetectorFramePlan, SweepCorrectionPlan, admit_combined_compiled_storage,
 };
-pub(crate) use plan::{FRAME_BATCH_SHOTS, FrameBatchState};
+pub(crate) use plan::{
+    FRAME_BATCH_SHOTS, FrameBatchState, LaneFrameBatch, frame_state_storage_bytes,
+};
 pub(crate) use program::{
     CircuitProgram, CliffordStep, ControlledPair, FrameGate, PauliProductMeasurement, ProgramEntry,
     ProgramInstruction, ProgramOptions, ReferenceClifford,
@@ -33,8 +35,18 @@ pub(crate) use program::{
 pub(in crate::detection) use program::{TraversalEvent, visit_circuit};
 pub(crate) use word::FrameWord;
 
-/// The lane word every frame batch runs on: one 256-shot [`stab_bits::BitBlock`] per plane.
+/// The widest lane word: one 256-shot [`stab_bits::BitBlock`] per plane. Sessions at the
+/// default [`crate::LaneWidth`] and every measurement-to-detection batch run on it.
 pub(crate) type FrameLanes = stab_bits::BitBlock;
+
+/// The lane word each [`crate::LaneWidth`] runs on, checked where both are defined.
+const _: () = {
+    assert!(<u64 as FrameWord>::LANE_COUNT == crate::LaneWidth::Lanes64.shots_per_batch());
+    assert!(size_of::<u64>() == crate::LaneWidth::Lanes64.plane_bytes());
+    assert!(<FrameLanes as FrameWord>::LANE_COUNT == crate::LaneWidth::Lanes256.shots_per_batch());
+    assert!(size_of::<FrameLanes>() == crate::LaneWidth::Lanes256.plane_bytes());
+    assert!(FRAME_BATCH_SHOTS == crate::LaneWidth::WIDEST.shots_per_batch());
+};
 
 #[derive(Debug)]
 pub(in crate::detection) struct BitPlaneDetectionFrame<W: FrameWord> {

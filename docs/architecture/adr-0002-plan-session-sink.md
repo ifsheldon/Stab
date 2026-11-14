@@ -22,9 +22,11 @@ Plans are immutable, shareable, nonserializable, and carry summaries and version
 
 Sessions own RNG state, frames, scratch, buffers, and progress counters.
 
-Delivered batches contain at most `stab_engine::MAX_BATCH_SHOTS` (256) shots, one Pauli-frame batch; DEM replay batches contain at most 64 records.
+Delivered batches contain at most `stab_engine::MAX_BATCH_SHOTS` (256) shots, one Pauli-frame batch at the widest lane width; DEM replay batches contain at most 64 records.
 
-Successful chunking on one seeded session reproduces one combined call.
+Circuit-sampling and detection-sampling sessions fix their Pauli-frame lane width, a typed `stab_engine::LaneWidth` of 64 or 256 lanes, when they are created, and deliver batches of at most that many shots. The default is 256 lanes. The seeded stream of a session is a function of its plan, seed, and lane width.
+
+Successful chunking on one seeded session reproduces one combined call at every lane width.
 
 Cancellation is checked between bounded internal batches.
 

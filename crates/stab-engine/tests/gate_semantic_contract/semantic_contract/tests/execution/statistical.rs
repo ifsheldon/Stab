@@ -2,6 +2,10 @@ use super::*;
 
 #[test]
 fn gate_surface_contract_mpp_stochastic() {
+    super::super::at_every_lane_width(gate_surface_contract_mpp_stochastic_at_lane_width);
+}
+
+fn gate_surface_contract_mpp_stochastic_at_lane_width() {
     let plan = statistical_plan("pfm3-contract-mpp-stochastic");
     let sampler_circuit = circuit("MPP(0.25) Z0\n");
     let sampler = SamplingFixture::compile(&sampler_circuit).expect("compile stochastic MPP");
@@ -65,6 +69,10 @@ fn gate_surface_contract_mpp_stochastic() {
 
 #[test]
 fn gate_surface_contract_mpad_stochastic() {
+    super::super::at_every_lane_width(gate_surface_contract_mpad_stochastic_at_lane_width);
+}
+
+fn gate_surface_contract_mpad_stochastic_at_lane_width() {
     let plan = statistical_plan("pfm3-contract-mpad-stochastic");
     let sampler_circuit = circuit("MPAD(0.25) 0\n");
     let sampler = SamplingFixture::compile(&sampler_circuit).expect("compile stochastic MPAD");
@@ -142,6 +150,10 @@ fn assert_independent_pair_flips(case_id: &'static str, text: &str) {
 
 #[test]
 fn gate_surface_contract_pauli_noise() {
+    super::super::at_every_lane_width(gate_surface_contract_pauli_noise_at_lane_width);
+}
+
+fn gate_surface_contract_pauli_noise_at_lane_width() {
     assert_family_names(
         &[GateSemanticFamily::PauliNoise],
         &["X_ERROR", "Y_ERROR", "Z_ERROR"],
@@ -158,6 +170,12 @@ fn gate_surface_contract_pauli_noise() {
 
 #[test]
 fn gate_surface_contract_pauli_noise_general_circuit() {
+    super::super::at_every_lane_width(
+        gate_surface_contract_pauli_noise_general_circuit_at_lane_width,
+    );
+}
+
+fn gate_surface_contract_pauli_noise_general_circuit_at_lane_width() {
     let text = "RX 2\nX_ERROR(1) 0\nY_ERROR(1) 1\nZ_ERROR(1) 2\nM 0 1\nMX 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n";
     assert_deterministic_noise_effect(
         text,
@@ -168,6 +186,10 @@ fn gate_surface_contract_pauli_noise_general_circuit() {
 
 #[test]
 fn gate_surface_contract_pauli_channels() {
+    super::super::at_every_lane_width(gate_surface_contract_pauli_channels_at_lane_width);
+}
+
+fn gate_surface_contract_pauli_channels_at_lane_width() {
     assert_family_names(
         &[GateSemanticFamily::PauliChannel],
         &["PAULI_CHANNEL_1", "PAULI_CHANNEL_2"],
@@ -217,6 +239,12 @@ fn gate_surface_contract_pauli_channels() {
 
 #[test]
 fn gate_surface_contract_pauli_channels_general_circuit() {
+    super::super::at_every_lane_width(
+        gate_surface_contract_pauli_channels_general_circuit_at_lane_width,
+    );
+}
+
+fn gate_surface_contract_pauli_channels_general_circuit_at_lane_width() {
     let text = "PAULI_CHANNEL_1(1,0,0) 0\nPAULI_CHANNEL_2(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n";
     assert_deterministic_noise_effect(
         text,
@@ -227,6 +255,10 @@ fn gate_surface_contract_pauli_channels_general_circuit() {
 
 #[test]
 fn gate_surface_contract_depolarization() {
+    super::super::at_every_lane_width(gate_surface_contract_depolarization_at_lane_width);
+}
+
+fn gate_surface_contract_depolarization_at_lane_width() {
     assert_family_names(
         &[GateSemanticFamily::Depolarization],
         &["DEPOLARIZE1", "DEPOLARIZE2"],
@@ -273,6 +305,12 @@ fn gate_surface_contract_depolarization() {
 
 #[test]
 fn gate_surface_contract_depolarization_general_circuit() {
+    super::super::at_every_lane_width(
+        gate_surface_contract_depolarization_general_circuit_at_lane_width,
+    );
+}
+
+fn gate_surface_contract_depolarization_general_circuit_at_lane_width() {
     assert_depolarizing_gate_effect(
         "DEPOLARIZE1(0.75) 0\nM 0\nDETECTOR rec[-1]\n",
         &[0.45..=0.55],
@@ -287,6 +325,10 @@ fn gate_surface_contract_depolarization_general_circuit() {
 
 #[test]
 fn gate_surface_contract_correlated_errors() {
+    super::super::at_every_lane_width(gate_surface_contract_correlated_errors_at_lane_width);
+}
+
+fn gate_surface_contract_correlated_errors_at_lane_width() {
     assert_family_names(
         &[GateSemanticFamily::CorrelatedError],
         &["E", "ELSE_CORRELATED_ERROR"],
@@ -323,12 +365,22 @@ fn gate_surface_contract_correlated_errors() {
 
 #[test]
 fn gate_surface_contract_correlated_errors_general_circuit() {
+    super::super::at_every_lane_width(
+        gate_surface_contract_correlated_errors_general_circuit_at_lane_width,
+    );
+}
+
+fn gate_surface_contract_correlated_errors_general_circuit_at_lane_width() {
     let text = "E(1) X0\nELSE_CORRELATED_ERROR(1) Y0\nE(0) X1\nELSE_CORRELATED_ERROR(1) X1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n";
     assert_deterministic_noise_effect(text, &[true, true], "error(1) D0\nerror(1) D1\n");
 }
 
 #[test]
 fn gate_surface_contract_heralded_noise() {
+    super::super::at_every_lane_width(gate_surface_contract_heralded_noise_at_lane_width);
+}
+
+fn gate_surface_contract_heralded_noise_at_lane_width() {
     assert_family_names(
         &[GateSemanticFamily::HeraldedNoise],
         &["HERALDED_ERASE", "HERALDED_PAULI_CHANNEL_1"],
@@ -342,6 +394,10 @@ fn gate_surface_contract_heralded_noise() {
 
 #[test]
 fn gate_surface_contract_heralded_channel() {
+    super::super::at_every_lane_width(gate_surface_contract_heralded_channel_at_lane_width);
+}
+
+fn gate_surface_contract_heralded_channel_at_lane_width() {
     let plan = statistical_plan("pfm3-contract-heralded-channel");
     let channel = "HERALDED_PAULI_CHANNEL_1(0.05,0.1,0.15,0.25) 0\n";
     assert_heralded_plan_across_surfaces(plan, channel, false);
@@ -351,6 +407,10 @@ fn gate_surface_contract_heralded_channel() {
 
 #[test]
 fn gate_surface_contract_heralded_erase_offset() {
+    super::super::at_every_lane_width(gate_surface_contract_heralded_erase_offset_at_lane_width);
+}
+
+fn gate_surface_contract_heralded_erase_offset_at_lane_width() {
     let plan = statistical_plan("pfm3-contract-heralded-erase-offset");
     let erase = "HERALDED_ERASE(0.1) 2\n";
     let circuit = heralded_bell_detection_circuit_on(erase, 2, 3);
@@ -361,6 +421,10 @@ fn gate_surface_contract_heralded_erase_offset() {
 
 #[test]
 fn gate_surface_contract_heralded_channel_offset() {
+    super::super::at_every_lane_width(gate_surface_contract_heralded_channel_offset_at_lane_width);
+}
+
+fn gate_surface_contract_heralded_channel_offset_at_lane_width() {
     let plan = statistical_plan("pfm3-contract-heralded-channel-offset");
     let channel = "HERALDED_PAULI_CHANNEL_1(0.05,0.1,0.15,0.25) 2\n";
     let circuit = heralded_bell_detection_circuit_on(channel, 2, 3);

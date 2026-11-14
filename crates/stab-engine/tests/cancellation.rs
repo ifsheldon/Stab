@@ -18,8 +18,8 @@ use stab_engine::{
     DemReplayBatchStatus, DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError,
     DemSamplingRunError, DetectionCompileError, DetectionConversionLimits, DetectionError,
     DetectionExecutionError, DetectionRunError, DetectionRunStatus, DetectionSamplingCompiler,
-    MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, RunError, SamplingCompiler,
-    SamplingExecutionError, Seed, ShotCount, SinkFailurePhase,
+    LaneWidth, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, RunError,
+    SamplingCompiler, SamplingExecutionError, Seed, ShotCount, SinkFailurePhase,
 };
 use stab_model::{Cancellation, Cancelled, Circuit, DetectorErrorModel};
 use stab_records::{
@@ -160,64 +160,69 @@ fn reference_sample_computation_stops_when_cancelled() {
 
 #[test]
 fn sampling_batch_stops_without_delivering_a_partial_batch() {
-    let cancellation = Cancellation::new();
-    let signal = cancellation.clone();
-    let (result, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
-        let plan = SamplingCompiler::new()
-            .cancellation(signal)
-            .compile(&circuit(ENDLESS_SAMPLING))
-            .expect("compile endless sampler");
-        let mut session = plan
-            .session_with_reference_mode(
-                RandomPolicy::Seeded(Seed::new(3)),
-                ReferenceSampleMode::SkipReferenceSample,
-            )
-            .expect("skip-reference session needs no reference simulation");
-        let mut sink = CountingSink::default();
-        started();
-        let result = session.run(ShotCount::new(1), &mut sink);
-        (result, sink, session.is_poisoned())
-    });
-    match result {
-        Err(RunError::Engine {
-            source: SamplingExecutionError::Cancelled(Cancelled),
-            progress,
-        }) => assert_eq!(progress.committed_shots(), ShotCount::new(0)),
-        other => panic!("expected an in-batch cancellation, got {other:?}"),
+    for &lane_width in LaneWidth::ALL {
+        let cancellation = Cancellation::new();
+        let signal = cancellation.clone();
+        let (result, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
+            let plan = SamplingCompiler::new()
+                .cancellation(signal)
+                .compile(&circuit(ENDLESS_SAMPLING))
+                .expect("compile endless sampler");
+            let mut session = plan
+                .session_with_lane_width(
+                    RandomPolicy::Seeded(Seed::new(3)),
+                    ReferenceSampleMode::SkipReferenceSample,
+                    lane_width,
+                )
+                .expect("skip-reference session needs no reference simulation");
+            let mut sink = CountingSink::default();
+            started();
+            let result = session.run(ShotCount::new(1), &mut sink);
+            (result, sink, session.is_poisoned())
+        });
+        match result {
+            Err(RunError::Engine {
+                source: SamplingExecutionError::Cancelled(Cancelled),
+                progress,
+            }) => assert_eq!(progress.committed_shots(), ShotCount::new(0)),
+            other => panic!("expected an in-batch cancellation at {lane_width:?}, got {other:?}"),
+        }
+        assert_eq!((sink.writes, sink.finishes), (0, 0));
+        assert!(
+            poisoned,
+            "the random stream advanced into the discarded batch"
+        );
     }
-    assert_eq!((sink.writes, sink.finishes), (0, 0));
-    assert!(
-        poisoned,
-        "the random stream advanced into the discarded batch"
-    );
 }
 
 #[test]
 fn detection_sampling_batch_stops_without_delivering_a_partial_batch() {
-    let cancellation = Cancellation::new();
-    let signal = cancellation.clone();
-    let (result, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
-        let plan = DetectionSamplingCompiler::new()
-            .limits(DetectionConversionLimits::default().with_cancellation(signal))
-            .compile(&circuit(ENDLESS_SAMPLING))
-            .expect("compile endless detection sampler");
-        let mut session = plan
-            .session(RandomPolicy::Seeded(Seed::new(5)))
-            .expect("create detection session");
-        let mut sink = CountingSink::default();
-        started();
-        let result = session.run(ShotCount::new(1), &mut sink);
-        (result, sink, session.is_poisoned())
-    });
-    match result {
-        Err(DetectionRunError::Engine {
-            source: DetectionExecutionError::Cancelled(Cancelled),
-            progress,
-        }) => assert_eq!(progress.committed_shots(), ShotCount::new(0)),
-        other => panic!("expected an in-batch cancellation, got {other:?}"),
+    for &lane_width in LaneWidth::ALL {
+        let cancellation = Cancellation::new();
+        let signal = cancellation.clone();
+        let (result, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
+            let plan = DetectionSamplingCompiler::new()
+                .limits(DetectionConversionLimits::default().with_cancellation(signal))
+                .compile(&circuit(ENDLESS_SAMPLING))
+                .expect("compile endless detection sampler");
+            let mut session = plan
+                .session_with_lane_width(RandomPolicy::Seeded(Seed::new(5)), lane_width)
+                .expect("create detection session");
+            let mut sink = CountingSink::default();
+            started();
+            let result = session.run(ShotCount::new(1), &mut sink);
+            (result, sink, session.is_poisoned())
+        });
+        match result {
+            Err(DetectionRunError::Engine {
+                source: DetectionExecutionError::Cancelled(Cancelled),
+                progress,
+            }) => assert_eq!(progress.committed_shots(), ShotCount::new(0)),
+            other => panic!("expected an in-batch cancellation at {lane_width:?}, got {other:?}"),
+        }
+        assert_eq!((sink.writes, sink.finishes), (0, 0));
+        assert!(poisoned);
     }
-    assert_eq!((sink.writes, sink.finishes), (0, 0));
-    assert!(poisoned);
 }
 
 #[test]

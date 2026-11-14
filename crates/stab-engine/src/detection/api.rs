@@ -8,17 +8,18 @@ use rand::rngs::SmallRng;
 
 use stab_model::{Cancellation, Circuit};
 use stab_records::{
-    BitPlaneBatchView, DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView,
-    MeasurementWidth, ObservableWidth,
+    DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView, MeasurementWidth,
+    ObservableWidth,
 };
 
 use super::error::DetectionError;
 use super::frame::{
-    DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FrameBatchState, FrameLanes, PendingLanes,
+    DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FrameBatchState, FrameLanes, FrameWord,
+    LaneFrameBatch, PendingLanes,
 };
 use super::{DetectionConversionLimits, PreparedMeasurementToDetection};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
-use crate::{RandomPolicy, ReferenceSampleMode, ShotCount, SinkFailurePhase};
+use crate::{LaneWidth, RandomPolicy, ReferenceSampleMode, ShotCount, SinkFailurePhase};
 
 mod contracts;
 mod delivery;
@@ -134,15 +135,14 @@ impl MeasurementToDetectionPlan {
 }
 
 /// Borrows the first `shot_count` lanes of detector and observable frame planes as one batch.
-fn detection_plane_view<'a>(
-    detector_planes: &'a [FrameLanes],
-    observable_planes: &'a [FrameLanes],
+fn detection_plane_view<'a, W: FrameWord>(
+    detector_planes: &'a [W],
+    observable_planes: &'a [W],
     shot_count: usize,
 ) -> Result<DetectionBatchView<'a>, DetectionExecutionError> {
     DetectionBatchView::try_new(
-        BitPlaneBatchView::try_from_blocks(detector_planes, shot_count).map_err(invariant_error)?,
-        BitPlaneBatchView::try_from_blocks(observable_planes, shot_count)
-            .map_err(invariant_error)?,
+        W::plane_view(detector_planes, shot_count).map_err(invariant_error)?,
+        W::plane_view(observable_planes, shot_count).map_err(invariant_error)?,
     )
     .map_err(invariant_error)
 }
@@ -151,7 +151,7 @@ fn detection_plane_view<'a>(
 pub struct MeasurementToDetectionSession {
     plan: MeasurementToDetectionPlan,
     reference_sample: Vec<bool>,
-    sweep_correction: Option<FrameBatchState>,
+    sweep_correction: Option<FrameBatchState<FrameLanes>>,
     correction_rng: SmallRng,
     measurement_planes: Vec<FrameLanes>,
     sweep_planes: Vec<FrameLanes>,
@@ -631,13 +631,26 @@ impl DetectionSamplingPlan {
         &self,
         random_policy: RandomPolicy,
     ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
-        DetectionSamplingSession::new(self.clone(), random_policy)
+        self.session_with_lane_width(random_policy, LaneWidth::default())
+    }
+
+    /// Creates a session whose frame batches sample `lane_width` shots at a time.
+    ///
+    /// The seeded stream is a function of this plan, the seed, and `lane_width`; the default
+    /// width reproduces [`Self::session`]. Session storage is admitted at this width against the
+    /// compiler's memory budget.
+    pub fn session_with_lane_width(
+        &self,
+        random_policy: RandomPolicy,
+        lane_width: LaneWidth,
+    ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
+        DetectionSamplingSession::new(self.clone(), random_policy, lane_width)
     }
 }
 
 struct DirectDetectionState {
     rng: SmallRng,
-    frame: FrameBatchState,
+    frame: LaneFrameBatch,
     pending: PendingLanes,
     cancellation: OnceLock<Cancellation>,
 }
@@ -666,14 +679,12 @@ impl DetectionSamplingSession {
     fn new(
         plan: DetectionSamplingPlan,
         random_policy: RandomPolicy,
+        lane_width: LaneWidth,
     ) -> Result<Self, DetectionExecutionError> {
-        validate_direct_session_storage(&plan.inner.direct)?;
+        validate_direct_session_storage(&plan.inner.direct, lane_width)?;
         let state = DirectDetectionState {
             rng: detection_rng(random_policy),
-            frame: plan
-                .inner
-                .direct
-                .state()
+            frame: LaneFrameBatch::for_detection(&plan.inner.direct, lane_width)
                 .map_err(DetectionExecutionError::Conversion)?,
             pending: PendingLanes::default(),
             cancellation: session_cancellation_slot(plan.inner.direct.cancellation()),
@@ -704,6 +715,14 @@ impl DetectionSamplingSession {
 
     pub fn is_poisoned(&self) -> bool {
         self.poisoned
+    }
+
+    /// Shots this session's frame batches sample together.
+    pub const fn lane_width(&self) -> LaneWidth {
+        match self.state.frame {
+            LaneFrameBatch::Lanes64(_) => LaneWidth::Lanes64,
+            LaneFrameBatch::Lanes256(_) => LaneWidth::Lanes256,
+        }
     }
 
     pub const fn total_committed_shots(&self) -> ShotCount {

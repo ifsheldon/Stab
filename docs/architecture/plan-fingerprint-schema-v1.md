@@ -33,7 +33,7 @@ Schema version 1 first calculates an executable-contract SHA-256 digest from:
 | Order | Field | Encoding |
 | --- | --- | --- |
 | 1 | domain | exact bytes `stab:sampling-executable-contract\0` |
-| 2 | executable-contract schema | big-endian `u16`, current value `6` |
+| 2 | executable-contract schema | big-endian `u16`, current value `7` |
 | 3 | backend | one discriminator byte |
 | 4 | private executable variant | one discriminator byte |
 | 5 | reference-sample loop policy | one discriminator byte |
@@ -77,7 +77,9 @@ Executable-contract schema version `4` gives zero-width sampling a constant-work
 
 Executable-contract schema version `5` replaces the redundant per-shot small-frame executor with a reusable 64-shot bit-plane Pauli frame for general compatible Clifford circuits. Unconsumed lanes remain in the session so partitioning a seeded run does not change its output stream. The existing scalar operation program remains the reference-sample and analysis representation, while unsupported circuits retain the general stabilizer-frame fallback.
 
-Current executable-contract schema version `6` compiles one resolved circuit program per plan and drives every executor from it: the bit-plane Pauli frame, the inverse-tableau reference sample, deterministic-measurement counting, and, until E4, the general stabilizer frame. The separate per-target scalar operation program is retired. The direct Z measurement variant is removed, so a circuit whose only operation is one Z measurement, optionally preceded by a single-qubit Pauli channel on the measured qubit, now selects the bit-plane Pauli frame; its seeded output stream changes while its distribution does not. Until E4 the general stabilizer frame remained selected for a measurement-bearing program whose retained size exceeded the bit-plane frame's 256 MiB compiled budget. E4 removes that fallback: such a program is now refused with a typed compiled-bytes error against the caller's memory budget, so every admitted plan has the bit-plane Pauli-frame executable this schema already identifies, and the schema version is unchanged.
+Executable-contract schema version `6` compiles one resolved circuit program per plan and drives every executor from it: the bit-plane Pauli frame, the inverse-tableau reference sample, deterministic-measurement counting, and, until E4, the general stabilizer frame. The separate per-target scalar operation program is retired. The direct Z measurement variant is removed, so a circuit whose only operation is one Z measurement, optionally preceded by a single-qubit Pauli channel on the measured qubit, now selects the bit-plane Pauli frame; its seeded output stream changes while its distribution does not. Until E4 the general stabilizer frame remained selected for a measurement-bearing program whose retained size exceeded the bit-plane frame's 256 MiB compiled budget. E4 removes that fallback: such a program is now refused with a typed compiled-bytes error against the caller's memory budget, so every admitted plan has the bit-plane Pauli-frame executable this schema already identifies, and the schema version is unchanged.
+
+Current executable-contract schema version `7` keeps the schema-6 executable and makes the bit-plane Pauli frame's lane width a session parameter, the typed `LaneWidth` of 64 or 256 lanes. A plan's seeded stream is therefore a function of the plan, the seed, and the session's lane width; at the default 256 lanes it is byte-identical to schema 6, and partitioning a seeded run across calls on one session still reproduces the combined call at either width. The lane width is chosen per session, not per plan, so it is not part of the executable-contract digest; the CLI chooses it from the total shot count.
 
 ## Plan Fingerprint Encoding
 
@@ -114,13 +116,13 @@ Scalar compilation selects the bit-plane Pauli frame variant.
 The executable-contract digest is:
 
 ```text
-4e4716e1ca5a58cfb6801f5b64b86e782eefd4994b6e520732534e82d7fbb369
+74126cd438e4ea9b25331e6c2094e4a3b46d23acb11c4c59fbc31c249985f488
 ```
 
 The final plan fingerprint is:
 
 ```text
-9aaeadd0765842bb713dfc254564cc4fb67ec0fd11b65ec70e0d13a99df667fd
+8de0679e515d503b7a0db67cd6d8ef2f87a19571e97d2b46ac554fc4bcffa1a2
 ```
 
 The test reconstructs both digests independently from the tables above instead of calling the production fingerprint constructor.

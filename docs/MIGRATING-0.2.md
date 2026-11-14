@@ -173,6 +173,22 @@ New supporting items are `stab_engine::MAX_BATCH_SHOTS`, `PackedShotBatchView::c
 
 Seeded `detect` output changes for every noisy circuit, because a 256-lane frame draws the random stream in a different order; noiseless `detect` output and its distribution are unchanged, and the `detect` compiler schema reported by `capabilities` moves from `3` to `4` to mark the new stream. Seeded `sample` and `sample_dem` output and all `m2d`, `convert`, and `analyze_errors` output are byte-identical to the previous build.
 
+## Session Lane Widths
+
+Circuit-sampling and detection-sampling sessions take an explicit Pauli-frame lane width, so a request for a few shots on a wide circuit no longer samples and stores a full 256-lane batch. Existing calls keep the 256-lane default and their seeded output.
+
+| Changed item | Migration |
+| --- | --- |
+| `stab_engine::LaneWidth` | New closed, non-exhaustive width type with `Lanes64` and `Lanes256` (the default). `shots_per_batch` reports its batch size, `ALL` and `WIDEST` name the widths, and `for_total_shots(ShotCount)` picks the width for a known total: below `WIDEST_FROM_TOTAL_SHOTS` (512) the width that samples the fewest lanes for the whole request, preferring the wider on a tie, and 256 lanes from 512 shots on. With the shipped widths that is 64 lanes for totals of 1 to 192 and 257 to 448 shots. |
+| `SamplingPlan::session_with_lane_width`, `DetectionSamplingPlan::session_with_lane_width` | New constructors that fix the session's lane width. `session` and `session_with_reference_mode` are unchanged and use `LaneWidth::default()`. `SamplingSession::lane_width` and `DetectionSamplingSession::lane_width` report it. |
+| Seeded streams | A session's seeded output is a function of its plan, seed, and lane width. Partitioning a seeded run across calls on one session reproduces the combined call at either width, but two sessions with the same seed and different widths draw different streams with the same distribution. |
+| Batch sizes | A 64-lane session delivers batches of at most 64 shots. `MAX_BATCH_SHOTS` remains the bound across every width. |
+| Session memory | A 64-lane session admits and allocates 8 bytes per frame plane instead of 32, so a budget too small for a 256-lane session may admit a 64-lane one. |
+| Executable-contract schema | Moves from `6` to `7` because the seeded stream now also depends on the session lane width, so every sampling plan fingerprint changes. The sampling request fingerprint and compiler schema are unchanged. |
+| `detect` compiler schema | Reported by `capabilities` as `5` instead of `4`, to mark the CLI's width-dependent `detect` stream. |
+
+The CLI's `sample` and `detect` create their session with `LaneWidth::for_total_shots` of `--shots`. Seeded `sample` and `detect` output therefore changes for totals of 1 to 192 and 257 to 448 shots on circuits with random results, and is byte-identical to the previous build for every other total and for every circuit whose results are deterministic. `m2d`, `sample_dem`, `convert`, and `analyze_errors` output is unchanged.
+
 ## Extension APIs
 
 The typed circuit-pass seam is canonical in `stab-analysis`. It admits folded input, requires a conservative output-resource projection before proportional allocation, validates the returned closed-dialect circuit, and reports typed input, projection, or output failures. The separate Stable `stab-reference-noise-pass` crate proves this public boundary without depending on `stab-core`.

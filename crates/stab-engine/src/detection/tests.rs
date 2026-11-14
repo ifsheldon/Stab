@@ -313,6 +313,59 @@ fn compact_nested_conversion_matches_the_same_unrolled_record_program() {
 }
 
 #[test]
+fn word_plane_conversion_is_lane_wise_at_every_frame_width() {
+    use rand::{RngExt as _, SeedableRng as _};
+    // A folded program with nested repeats, multi-term detectors, an empty detector, and two
+    // observables: converting 256-lane planes must equal converting each 64-lane word of them on
+    // its own, so 64-lane detection batches see the same conversion as 256-lane ones.
+    let circuit = Circuit::from_stim_str(
+        "M 0 1 2\nDETECTOR\nREPEAT 3 {\n    M 0 1\n    DETECTOR rec[-1] rec[-3]\n    \
+         REPEAT 2 {\n        M 2\n        DETECTOR rec[-1] rec[-2] rec[-4]\n        \
+         OBSERVABLE_INCLUDE(1) rec[-1]\n    }\n    OBSERVABLE_INCLUDE(0) rec[-2]\n}\n",
+    )
+    .expect("parse conversion fixture");
+    let plan =
+        ConversionPlan::from_circuit_with_limits(&circuit, DetectionConversionLimits::default())
+            .expect("compile conversion fixture");
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(0x1A9E);
+    let measurements = (0..plan.measurement_count)
+        .map(|_| stab_bits::BitBlock::from_words(std::array::from_fn(|_| rng.random())))
+        .collect::<Vec<_>>();
+    let never = stab_model::Cancellation::never();
+    let (mut wide_detectors, mut wide_observables) = (Vec::new(), Vec::new());
+    plan.convert_word_planes_into(
+        &measurements,
+        &mut wide_detectors,
+        &mut wide_observables,
+        &never,
+    )
+    .expect("convert 256-lane planes");
+    assert_eq!(wide_detectors.len(), 10);
+    assert_eq!(wide_observables.len(), 2);
+    let (mut detectors, mut observables) = (Vec::new(), Vec::new());
+    for word in 0..stab_bits::BIT_BLOCK_WORDS {
+        let narrow = measurements
+            .iter()
+            .map(|plane| plane.words()[word])
+            .collect::<Vec<u64>>();
+        plan.convert_word_planes_into(&narrow, &mut detectors, &mut observables, &never)
+            .expect("convert 64-lane planes");
+        let column = |planes: &[stab_bits::BitBlock]| {
+            planes
+                .iter()
+                .map(|plane| plane.words()[word])
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(detectors, column(&wide_detectors), "detector word {word}");
+        assert_eq!(
+            observables,
+            column(&wide_observables),
+            "observable word {word}"
+        );
+    }
+}
+
+#[test]
 fn detection_conversion_handles_empty_detector_circuits() {
     let output = convert("M 0\n", &[&[false], &[true]], true);
 

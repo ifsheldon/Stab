@@ -328,7 +328,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             {
                 "operation": "detect",
                 "input_dialect": "stim-circuit",
-                "compiler_schema_version": 4,
+                "compiler_schema_version": 5,
                 "request_fingerprint_schema_version": null,
                 "configurable_limits": true
             },

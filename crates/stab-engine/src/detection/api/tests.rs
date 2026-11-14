@@ -144,9 +144,19 @@ fn packed(records: &[Vec<bool>], width: usize) -> PackedShotBatch {
 }
 
 fn run_plan(plan: &DetectionSamplingPlan, shots: u64, seed: u64) -> CollectSink {
+    run_plan_at(plan, shots, seed, LaneWidth::default())
+}
+
+fn run_plan_at(
+    plan: &DetectionSamplingPlan,
+    shots: u64,
+    seed: u64,
+    lane_width: LaneWidth,
+) -> CollectSink {
     let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(seed)))
+        .session_with_lane_width(RandomPolicy::Seeded(Seed::new(seed)), lane_width)
         .expect("create detection session");
+    assert_eq!(session.lane_width(), lane_width);
     let mut sink = CollectSink::default();
     let summary = session
         .run(ShotCount::new(shots), &mut sink)
@@ -496,6 +506,10 @@ fn direct_detection_sampling_reports_widths_and_bounded_batches() {
         assert_eq!(actual.records.len(), 513);
         assert_eq!(actual.batch_sizes, vec![256, 256, 1]);
         assert_eq!(actual.finish_count, 1);
+        let narrow = run_plan_at(&plan, 129, 31, LaneWidth::Lanes64);
+        assert_eq!(narrow.records.len(), 129);
+        assert_eq!(narrow.batch_sizes, vec![64, 64, 1]);
+        assert_eq!(narrow.finish_count, 1);
     }
 }
 
@@ -513,33 +527,35 @@ fn noiseless_detection_is_exact_at_every_batch_boundary_and_partition() {
         detectors: vec![false; 3],
         observables: vec![false],
     };
-    for shots in [1_u64, 63, 64, 65, 255, 256, 257, 1000] {
-        let whole = run_plan(&plan, shots, 3);
-        assert_eq!(whole.records.len() as u64, shots);
-        assert!(
-            whole.records.iter().all(|record| *record == zero),
-            "{shots} shots"
-        );
-        assert!(
-            whole
-                .batch_sizes
-                .iter()
-                .all(|size| *size <= crate::MAX_BATCH_SHOTS)
-        );
+    for &lane_width in LaneWidth::ALL {
+        for shots in [1_u64, 63, 64, 65, 255, 256, 257, 1000] {
+            let whole = run_plan_at(&plan, shots, 3, lane_width);
+            assert_eq!(whole.records.len() as u64, shots);
+            assert!(
+                whole.records.iter().all(|record| *record == zero),
+                "{shots} shots at {lane_width:?}"
+            );
+            assert!(
+                whole
+                    .batch_sizes
+                    .iter()
+                    .all(|size| *size <= lane_width.shots_per_batch())
+            );
 
-        let mut session = plan
-            .session(RandomPolicy::Seeded(Seed::new(3)))
-            .expect("create partitioned session");
-        let mut records = 0_usize;
-        for part in [shots / 3, shots - shots / 3] {
-            let mut sink = CollectSink::default();
-            session
-                .run(ShotCount::new(part), &mut sink)
-                .expect("run partition");
-            assert!(sink.records.iter().all(|record| *record == zero));
-            records += sink.records.len();
+            let mut session = plan
+                .session_with_lane_width(RandomPolicy::Seeded(Seed::new(3)), lane_width)
+                .expect("create partitioned session");
+            let mut records = 0_usize;
+            for part in [shots / 3, shots - shots / 3] {
+                let mut sink = CollectSink::default();
+                session
+                    .run(ShotCount::new(part), &mut sink)
+                    .expect("run partition");
+                assert!(sink.records.iter().all(|record| *record == zero));
+                records += sink.records.len();
+            }
+            assert_eq!(records as u64, shots);
         }
-        assert_eq!(records as u64, shots);
     }
 }
 
@@ -549,20 +565,27 @@ fn seeded_same_session_partitioning_is_exact() {
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit)
         .expect("compile detection plan");
-    let combined = run_plan(&plan, 600, 44).records;
-    let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(44)))
-        .expect("create partitioned session");
-    let mut partitioned = Vec::new();
-    for shots in [17, 300, 1, 282] {
-        let mut sink = CollectSink::default();
-        session
-            .run(ShotCount::new(shots), &mut sink)
-            .expect("run partition");
-        partitioned.extend(sink.records);
+    let mut streams = Vec::new();
+    for &lane_width in LaneWidth::ALL {
+        let combined = run_plan_at(&plan, 600, 44, lane_width).records;
+        let mut session = plan
+            .session_with_lane_width(RandomPolicy::Seeded(Seed::new(44)), lane_width)
+            .expect("create partitioned session");
+        let mut partitioned = Vec::new();
+        for shots in [17, 47, 1, 63, 300, 1, 171] {
+            let mut sink = CollectSink::default();
+            session
+                .run(ShotCount::new(shots), &mut sink)
+                .expect("run partition");
+            partitioned.extend(sink.records);
+        }
+        assert_eq!(partitioned, combined, "{lane_width:?}");
+        assert_eq!(session.total_committed_shots(), ShotCount::new(600));
+        streams.push(combined);
     }
-    assert_eq!(partitioned, combined);
-    assert_eq!(session.total_committed_shots(), ShotCount::new(600));
+    // The seeded stream is a function of the lane width as well as the seed.
+    assert_eq!(streams.len(), LaneWidth::ALL.len());
+    assert_ne!(streams.first(), streams.last());
 }
 
 #[test]
@@ -571,31 +594,38 @@ fn cancellation_stops_between_bounded_batches_and_finalizes_sink() {
     let plan = DetectionSamplingCompiler::new()
         .compile(&circuit)
         .expect("compile detection plan");
-    let mut session = plan
-        .session(RandomPolicy::Seeded(Seed::new(7)))
-        .expect("create cancellable session");
-    let cancellation = session.cancellation();
-    let mut sink = CancellingSink {
-        inner: CollectSink::default(),
-        cancellation: cancellation.clone(),
-    };
-    let summary = session
-        .run(ShotCount::new(600), &mut sink)
-        .expect("cancel detection run");
-    assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
-    assert_eq!(summary.requested_shots(), ShotCount::new(600));
-    assert_eq!(summary.committed_shots(), ShotCount::new(256));
-    assert_eq!(summary.total_committed_shots(), ShotCount::new(256));
-    assert_eq!(sink.inner.batch_sizes, vec![256]);
-    assert_eq!(sink.inner.finish_count, 1);
-    assert!(!session.is_poisoned());
-    cancellation.reset();
-    let mut resumed = CollectSink::default();
-    session
-        .run(ShotCount::new(1), &mut resumed)
-        .expect("resume cancelled session");
-    assert_eq!(resumed.records.len(), 1);
-    assert_eq!(session.total_committed_shots(), ShotCount::new(257));
+    for &lane_width in LaneWidth::ALL {
+        let batch = lane_width.shots_per_batch();
+        let batch_shots = ShotCount::new(batch as u64);
+        let mut session = plan
+            .session_with_lane_width(RandomPolicy::Seeded(Seed::new(7)), lane_width)
+            .expect("create cancellable session");
+        let cancellation = session.cancellation();
+        let mut sink = CancellingSink {
+            inner: CollectSink::default(),
+            cancellation: cancellation.clone(),
+        };
+        let summary = session
+            .run(ShotCount::new(600), &mut sink)
+            .expect("cancel detection run");
+        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert_eq!(summary.requested_shots(), ShotCount::new(600));
+        assert_eq!(summary.committed_shots(), batch_shots);
+        assert_eq!(summary.total_committed_shots(), batch_shots);
+        assert_eq!(sink.inner.batch_sizes, vec![batch]);
+        assert_eq!(sink.inner.finish_count, 1);
+        assert!(!session.is_poisoned());
+        cancellation.reset();
+        let mut resumed = CollectSink::default();
+        session
+            .run(ShotCount::new(1), &mut resumed)
+            .expect("resume cancelled session");
+        assert_eq!(resumed.records.len(), 1);
+        assert_eq!(
+            session.total_committed_shots(),
+            ShotCount::new(batch as u64 + 1)
+        );
+    }
 }
 
 #[test]
@@ -917,19 +947,21 @@ fn session_storage_estimates_match_retained_allocations_at_word_boundaries() {
         let direct = DetectionSamplingCompiler::new()
             .compile(&circuit(&text))
             .expect("compile direct allocation fixture");
-        let mut session = None;
-        let allocated = allocation_counter::measure(|| {
-            session = Some(
-                direct
-                    .session(RandomPolicy::Seeded(Seed::new(1)))
-                    .expect("allocate direct session"),
+        for &lane_width in LaneWidth::ALL {
+            let mut session = None;
+            let allocated = allocation_counter::measure(|| {
+                session = Some(
+                    direct
+                        .session_with_lane_width(RandomPolicy::Seeded(Seed::new(1)), lane_width)
+                        .expect("allocate direct session"),
+                );
+            });
+            assert_eq!(
+                execution::direct_session_storage_bytes(&direct.inner.direct, lane_width),
+                u128::try_from(allocated.bytes_current).expect("retained direct allocation"),
+                "direct widths {detectors}/{observables} at {lane_width:?}"
             );
-        });
-        assert_eq!(
-            execution::direct_session_storage_bytes(&direct.inner.direct),
-            u128::try_from(allocated.bytes_current).expect("retained direct allocation"),
-            "direct widths {detectors}/{observables}"
-        );
+        }
 
         for sweep in [false, true] {
             let text = if sweep {
@@ -959,35 +991,46 @@ fn direct_session_storage_admits_the_exact_budget_and_rejects_the_first_excess_b
     let probe = DetectionSamplingCompiler::new()
         .compile(&fixture)
         .expect("compile storage probe");
-    let exact = execution::direct_session_storage_bytes(&probe.inner.direct);
-    let at_limit = DetectionSamplingCompiler::new()
-        .limits(budget(exact))
-        .compile(&fixture)
-        .expect("the plan fits the session budget");
-    at_limit
-        .session(RandomPolicy::Seeded(Seed::new(1)))
-        .expect("admit the exact session budget");
-
-    let over_limit = DetectionSamplingCompiler::new()
-        .limits(budget(exact - 1))
-        .compile(&fixture)
-        .expect("the plan still fits one byte less");
-    let mut rejected = None;
-    let allocated = allocation_counter::measure(|| {
-        rejected = Some(
-            over_limit
-                .session(RandomPolicy::Seeded(Seed::new(1)))
-                .expect_err("reject the first excess byte before allocation"),
-        );
-    });
-    assert_eq!(allocated.bytes_total, 0);
+    let seeded = RandomPolicy::Seeded(Seed::new(1));
+    let narrow = execution::direct_session_storage_bytes(&probe.inner.direct, LaneWidth::Lanes64);
+    let wide = execution::direct_session_storage_bytes(&probe.inner.direct, LaneWidth::Lanes256);
     assert_eq!(
-        rejected,
-        Some(DetectionExecutionError::SessionStorageLimit {
-            estimated_bytes: exact,
-            limit_bytes: u64::try_from(exact - 1).expect("small budget"),
-        })
+        wide,
+        4 * narrow,
+        "a narrow session holds a quarter of the planes"
     );
+    for &lane_width in LaneWidth::ALL {
+        let exact = execution::direct_session_storage_bytes(&probe.inner.direct, lane_width);
+        let at_limit = DetectionSamplingCompiler::new()
+            .limits(budget(exact))
+            .compile(&fixture)
+            .expect("the plan fits the session budget");
+        at_limit
+            .session_with_lane_width(seeded, lane_width)
+            .expect("admit the exact session budget");
+
+        let over_limit = DetectionSamplingCompiler::new()
+            .limits(budget(exact - 1))
+            .compile(&fixture)
+            .expect("the plan still fits one byte less");
+        let mut rejected = None;
+        let allocated = allocation_counter::measure(|| {
+            rejected = Some(
+                over_limit
+                    .session_with_lane_width(seeded, lane_width)
+                    .expect_err("reject the first excess byte before allocation"),
+            );
+        });
+        assert_eq!(allocated.bytes_total, 0, "{lane_width:?}");
+        assert_eq!(
+            rejected,
+            Some(DetectionExecutionError::SessionStorageLimit {
+                estimated_bytes: exact,
+                limit_bytes: u64::try_from(exact - 1).expect("small budget"),
+            }),
+            "{lane_width:?}"
+        );
+    }
 }
 
 #[test]

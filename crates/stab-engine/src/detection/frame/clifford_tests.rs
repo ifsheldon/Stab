@@ -148,6 +148,7 @@ fn unitary_gates() -> Vec<Gate> {
 #[test]
 fn every_unitary_gate_kernel_matches_its_per_bit_tableau_reference() {
     for (seed, gate) in (0_u64..).zip(unitary_gates()) {
+        assert_gate_matches_reference::<u64>(gate, seed);
         assert_gate_matches_reference::<BitBlock>(gate, seed);
     }
 }
@@ -210,6 +211,7 @@ fn warmed_pauli_product_execution_does_not_allocate() {
     let program = compile(
         "MPP X0*Z1 Y2 X3*X3*Z4 Z0*Z1*Z2\nSPP X0*Y1\nSPP_DAG Z2*Z3 X4\nMPP(0.125) X0*X1 !Y4\nSPP !X1*X2\n",
     );
+    assert_warmed_execution_does_not_allocate::<u64>(&program);
     assert_warmed_execution_does_not_allocate::<BitBlock>(&program);
 }
 
