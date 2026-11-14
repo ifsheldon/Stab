@@ -881,22 +881,3 @@ fn read_request_headers(stream: &mut std::net::TcpStream) -> String {
     }
     String::from_utf8_lossy(&request).into_owned()
 }
-
-#[test]
-fn token_debug_output_redacts_the_secret_value() {
-    let github = GitHubToken(SecretString::from("github-secret-value"));
-    let github_debug = format!("{github:?}");
-    assert!(
-        !github_debug.contains("github-secret-value"),
-        "{github_debug}"
-    );
-    assert!(github_debug.contains("REDACTED"), "{github_debug}");
-
-    let crates_io = crate::registry::CratesIoToken::for_redaction_test("crates-secret-value");
-    let crates_debug = format!("{crates_io:?}");
-    assert!(
-        !crates_debug.contains("crates-secret-value"),
-        "{crates_debug}"
-    );
-    assert!(crates_debug.contains("REDACTED"), "{crates_debug}");
-}

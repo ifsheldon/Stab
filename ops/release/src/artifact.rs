@@ -974,54 +974,44 @@ mod tests {
     }
 
     #[test]
-    fn reviewed_assets_detect_same_inode_overwrite() {
-        let (root, assets) = tagged_asset_repository();
-        let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
-        let path = root.path().join(&assets).join("stab-linux-aarch64");
-        let byte_count = fs::metadata(&path).expect("asset metadata").len();
-        let byte_count = usize::try_from(byte_count).expect("asset size fits usize");
-        fs::write(&path, vec![0x5a; byte_count]).expect("overwrite asset");
+    fn reviewed_assets_detect_same_inode_content_changes() {
+        type Mutation = fn(&Path);
+        let cases: [(&str, Mutation); 3] = [
+            ("overwrite", |path| {
+                let byte_count = fs::metadata(path).expect("asset metadata").len();
+                let byte_count = usize::try_from(byte_count).expect("asset size fits usize");
+                fs::write(path, vec![0x5a; byte_count]).expect("overwrite asset");
+            }),
+            ("truncation", |path| {
+                let byte_count = fs::metadata(path).expect("asset metadata").len();
+                fs::OpenOptions::new()
+                    .write(true)
+                    .open(path)
+                    .expect("open asset")
+                    .set_len(byte_count - 1)
+                    .expect("truncate asset");
+            }),
+            ("append", |path| {
+                fs::OpenOptions::new()
+                    .append(true)
+                    .open(path)
+                    .expect("open asset")
+                    .write_all(b"appended")
+                    .expect("append asset");
+            }),
+        ];
+        for (name, mutate) in cases {
+            let (root, assets) = tagged_asset_repository();
+            let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
+            mutate(&root.path().join(&assets).join("stab-linux-aarch64"));
 
-        assert_matches!(
-            reviewed.revalidate(),
-            Err(ReleaseError::BinaryContract(detail))
-                if detail.contains("changed after validation")
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_detect_same_inode_truncation() {
-        let (root, assets) = tagged_asset_repository();
-        let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
-        let path = root.path().join(&assets).join("stab-linux-aarch64");
-        let byte_count = fs::metadata(&path).expect("asset metadata").len();
-        fs::OpenOptions::new()
-            .write(true)
-            .open(&path)
-            .expect("open asset")
-            .set_len(byte_count - 1)
-            .expect("truncate asset");
-
-        assert_matches!(
-            reviewed.revalidate(),
-            Err(ReleaseError::BinaryContract(detail))
-                if detail.contains("changed after validation")
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_detect_same_inode_append() {
-        let (root, assets) = tagged_asset_repository();
-        let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
-        let path = root.path().join(&assets).join("stab-linux-aarch64");
-        fs::OpenOptions::new()
-            .append(true)
-            .open(&path)
-            .expect("open asset")
-            .write_all(b"appended")
-            .expect("append asset");
-
-        assert!(reviewed.revalidate().is_err());
+            assert_matches!(
+                reviewed.revalidate(),
+                Err(ReleaseError::BinaryContract(detail))
+                    if detail.contains("changed after validation"),
+                "{name}"
+            );
+        }
     }
 
     #[test]
@@ -1038,124 +1028,69 @@ mod tests {
     }
 
     #[test]
-    fn reviewed_assets_reject_mutated_cargo_identity() {
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
-            toolchain.cargo_version =
-                toolchain
-                    .cargo_version
-                    .replacen("commit-hash: ", "commit-hash: mutated-", 1);
-        });
-
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_reject_mutated_rustc_identity() {
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
-            toolchain.rustc_version =
-                toolchain
-                    .rustc_version
-                    .replacen("commit-hash: ", "commit-hash: mutated-", 1);
-        });
-
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_reject_mutated_active_toolchain() {
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
-            toolchain.active_toolchain.insert_str(0, "mutated-");
-        });
-
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_reject_missing_verbose_identity_fields() {
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
-            toolchain.cargo_version = remove_verbose_field(&toolchain.cargo_version, "ssl");
-        });
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
-
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
-            toolchain.rustc_version =
-                remove_verbose_field(&toolchain.rustc_version, "LLVM version");
-        });
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_reject_arbitrary_platform_identity_fields() {
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
-            toolchain.cargo_version =
-                replace_verbose_field(&toolchain.cargo_version, "libcurl", "arbitrary");
-        });
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_reject_linux_metadata_for_macos() {
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
-            toolchain.cargo_version = replace_verbose_field(
-                &toolchain.cargo_version,
-                "os",
-                "Ubuntu 24.4.0 (noble) [64-bit]",
-            );
-        });
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
-    }
-
-    #[test]
-    fn reviewed_assets_reject_mismatched_toolchain_roots() {
-        let (root, assets) = tagged_asset_repository();
-        mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
-            let rustc = Path::new(&toolchain.rustc_program)
-                .file_name()
-                .expect("rustc program name");
-            toolchain.rustc_program = Path::new("/different/.rustup/toolchains")
-                .join(
+    fn reviewed_assets_reject_mutated_toolchain_identity() {
+        type Mutation = fn(&mut repository::ToolchainIdentity);
+        let cases: [(&str, &str, Mutation); 8] = [
+            ("cargo commit", "linux-aarch64", |toolchain| {
+                toolchain.cargo_version =
                     toolchain
-                        .active_toolchain
-                        .split_once(" (overridden by '")
-                        .map(|(name, _)| name)
-                        .expect("active toolchain name"),
-                )
-                .join("bin")
-                .join(rustc)
-                .display()
-                .to_string();
-        });
-        assert_matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
-            Err(ReleaseError::ToolchainIdentity(_))
-        );
+                        .cargo_version
+                        .replacen("commit-hash: ", "commit-hash: mutated-", 1);
+            }),
+            ("rustc commit", "macos-aarch64", |toolchain| {
+                toolchain.rustc_version =
+                    toolchain
+                        .rustc_version
+                        .replacen("commit-hash: ", "commit-hash: mutated-", 1);
+            }),
+            ("active toolchain", "linux-aarch64", |toolchain| {
+                toolchain.active_toolchain.insert_str(0, "mutated-");
+            }),
+            ("missing cargo ssl", "linux-aarch64", |toolchain| {
+                toolchain.cargo_version = remove_verbose_field(&toolchain.cargo_version, "ssl");
+            }),
+            ("missing rustc LLVM", "macos-aarch64", |toolchain| {
+                toolchain.rustc_version =
+                    remove_verbose_field(&toolchain.rustc_version, "LLVM version");
+            }),
+            ("arbitrary libcurl", "linux-aarch64", |toolchain| {
+                toolchain.cargo_version =
+                    replace_verbose_field(&toolchain.cargo_version, "libcurl", "arbitrary");
+            }),
+            ("Linux os on macOS", "macos-aarch64", |toolchain| {
+                toolchain.cargo_version = replace_verbose_field(
+                    &toolchain.cargo_version,
+                    "os",
+                    "Ubuntu 24.4.0 (noble) [64-bit]",
+                );
+            }),
+            ("mismatched toolchain root", "macos-aarch64", |toolchain| {
+                let rustc = Path::new(&toolchain.rustc_program)
+                    .file_name()
+                    .expect("rustc program name");
+                toolchain.rustc_program = Path::new("/different/.rustup/toolchains")
+                    .join(
+                        toolchain
+                            .active_toolchain
+                            .split_once(" (overridden by '")
+                            .map(|(name, _)| name)
+                            .expect("active toolchain name"),
+                    )
+                    .join("bin")
+                    .join(rustc)
+                    .display()
+                    .to_string();
+            }),
+        ];
+        for (name, label, mutate) in cases {
+            let (root, assets) = tagged_asset_repository();
+            mutate_manifest_toolchain(root.path(), &assets, label, mutate);
+
+            assert_matches!(
+                review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
+                Err(ReleaseError::ToolchainIdentity(_)),
+                "{name}"
+            );
+        }
     }
 }

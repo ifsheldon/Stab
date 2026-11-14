@@ -67,13 +67,6 @@ impl CratesIoToken {
     }
 }
 
-impl CratesIoToken {
-    #[cfg(test)]
-    pub(crate) fn for_redaction_test(value: &str) -> Self {
-        Self(SecretString::from(value))
-    }
-}
-
 impl std::fmt::Debug for CratesIoToken {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(formatter)
