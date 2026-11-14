@@ -141,10 +141,27 @@ impl PackedShotBatch {
             .map_err(bit_storage_error)
     }
 
+    /// Replaces one shot from a dense flag record of exactly this batch's width.
+    ///
+    /// Flags are packed eight per step, so the copy costs one pass over the record rather than
+    /// one branch per flag.
     pub fn copy_shot_from_bools(&mut self, shot_index: usize, record: &[bool]) -> RecordResult<()> {
-        self.storage
-            .copy_row_from_bools(shot_index, record)
-            .map_err(bit_storage_error)
+        if record.len() != self.bits_per_shot() {
+            return Err(bit_storage_error(stab_bits::BitError::LengthMismatch {
+                left: record.len(),
+                right: self.bits_per_shot(),
+            }));
+        }
+        let mut words = self.shot_words_mut(shot_index)?;
+        let mut targets = words.iter_mut();
+        // Zip the source first so exhausting it never consumes an extra target word.
+        for (flags, target) in record.chunks(WORD_BITS).zip(targets.by_ref()) {
+            *target = pack_flag_word(flags);
+        }
+        for target in targets {
+            *target = 0;
+        }
+        Ok(())
     }
 
     /// Replaces one shot from a B8-format little-endian packed record.
@@ -662,6 +679,24 @@ fn copy_bit_range(source: &[u64], source_start: usize, target: &mut [u64]) {
     }
 }
 
+/// Packs up to 64 flags into one word, flag `i` becoming bit `i`.
+fn pack_flag_word(flags: &[bool]) -> u64 {
+    /// Multiplying eight 0-or-1 bytes by this gathers them into the top byte, byte `i`
+    /// becoming bit `56 + i`.
+    const GATHER_LOW_BITS: u64 = 0x0102_0408_1020_4080;
+    let (octets, tail) = flags.as_chunks::<8>();
+    let mut word = 0_u64;
+    for (octet_index, octet) in octets.iter().enumerate() {
+        let bytes = u64::from_le_bytes(octet.map(u8::from));
+        word |= (bytes.wrapping_mul(GATHER_LOW_BITS) >> 56) << (octet_index * 8);
+    }
+    let tail_offset = octets.len() * 8;
+    for (flag_index, flag) in tail.iter().enumerate() {
+        word |= u64::from(*flag) << (tail_offset + flag_index);
+    }
+    word
+}
+
 pub(super) fn bit_storage_error(error: stab_bits::BitError) -> FormatError {
     FormatError::invalid_data(error.to_string())
 }
@@ -1010,6 +1045,36 @@ mod tests {
             let planes = BitPlaneBatch::from_shot_major(source.view()).unwrap();
             let round_trip = planes.to_shot_major().unwrap();
             prop_assert_eq!(round_trip, source);
+        }
+
+        #[test]
+        fn packed_flag_copy_matches_the_per_flag_reference(
+            width in prop::sample::select(vec![0_usize, 1, 7, 8, 63, 64, 65, 1000]),
+            length_delta in prop::sample::select(vec![0_isize, 0, 0, -1, 1]),
+            shot_index in 0_usize..4,
+            density in 0_u32..=8,
+            seed in any::<u64>(),
+            dirty in any::<bool>(),
+        ) {
+            let length = width.saturating_add_signed(length_delta);
+            let record = (0..length)
+                .map(|bit| (seed.wrapping_mul(bit as u64 | 1) >> 61) < u64::from(density))
+                .collect::<Vec<_>>();
+            let mut packed = PackedShotBatch::zeros(3, width).unwrap();
+            let mut reference = BitMatrix::zeros(3, width).unwrap();
+            if dirty {
+                // A previously written row must be fully replaced, not merged.
+                for bit in 0..width {
+                    packed.set(shot_index.min(2), bit, true).unwrap();
+                    reference.set(shot_index.min(2), bit, true).unwrap();
+                }
+            }
+            let copied = packed.copy_shot_from_bools(shot_index, &record);
+            let expected = reference
+                .copy_row_from_bools(shot_index, &record)
+                .map_err(bit_storage_error);
+            prop_assert_eq!(copied, expected);
+            prop_assert_eq!(packed.storage, reference);
         }
     }
 }

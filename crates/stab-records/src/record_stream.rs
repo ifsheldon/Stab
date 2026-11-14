@@ -21,6 +21,7 @@ use crate::{
 };
 
 mod decode;
+mod fast_text;
 
 #[cfg(test)]
 mod tests;
@@ -109,6 +110,9 @@ struct ReaderOptions {
     hits_duplicates: HitsDuplicates,
     empty_zero_width_input: bool,
     blank_dets_line_budget: bool,
+    /// Test-only reference mode: decode every text line through the full grammar alone.
+    #[cfg(test)]
+    grammar_only: bool,
 }
 
 #[derive(Debug)]
@@ -298,6 +302,14 @@ impl<R: Read> RecordStreamReader<R> {
     #[must_use]
     pub const fn with_blank_dets_line_budget(mut self) -> Self {
         self.options.blank_dets_line_budget = true;
+        self
+    }
+
+    /// Test-only reference mode that decodes every text line through the full grammar alone.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) const fn with_grammar_only(mut self) -> Self {
+        self.options.grammar_only = true;
         self
     }
 
@@ -583,11 +595,65 @@ impl<R: Read> RecordStreamReader<R> {
         ))
     }
 
+    /// Decodes a canonical HITS or DETS line at the record boundary in one pass, framing and
+    /// parsing together, once the first record has proven its frame and allocated the batch.
+    ///
+    /// A line that outruns the buffered bytes resumes after each refill where it stopped. While
+    /// no newline is buffered this refills exactly when line framing would, so transport
+    /// failures surface identically. Returns `false`, leaving the row unspecified and nothing
+    /// consumed, whenever the full grammar must judge the line (including at end of input and at
+    /// the record byte limit); the caller then frames and decodes it normally, which overwrites
+    /// the row and owns every diagnostic.
+    fn fast_text_record(
+        &mut self,
+        row: usize,
+        capacity: usize,
+    ) -> Result<bool, RecordStreamReadError> {
+        #[cfg(test)]
+        if self.options.grammar_only {
+            return Ok(false);
+        }
+        if self.batch.is_none() {
+            return Ok(false);
+        }
+        self.ensure_batch(capacity)?;
+        let mut resume = None;
+        loop {
+            let decoded = fast_text_line(
+                &self.decoder,
+                self.options.hits_duplicates,
+                self.batch.as_mut(),
+                self.buffer.get(self.start..self.end).unwrap_or_default(),
+                self.max_text_record_bytes,
+                row,
+                resume,
+            )?;
+            match decoded {
+                fast_text::FastLine::Record(line_len) => {
+                    self.consume(line_len)?;
+                    return Ok(true);
+                }
+                fast_text::FastLine::Incomplete(offset)
+                    if !self.eof && self.available() < self.max_text_record_bytes =>
+                {
+                    self.refill()?;
+                    resume = Some(offset);
+                }
+                fast_text::FastLine::Incomplete(_) | fast_text::FastLine::Declined => {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+
     fn next_stream_text_record(
         &mut self,
         row: usize,
         capacity: usize,
     ) -> Result<bool, RecordStreamReadError> {
+        if self.fast_text_record(row, capacity)? {
+            return Ok(true);
+        }
         loop {
             let Some(line_len) = self.frame_text_line()? else {
                 return Ok(false);
@@ -611,6 +677,10 @@ impl<R: Read> RecordStreamReader<R> {
         row: usize,
         capacity: usize,
     ) -> Result<bool, RecordStreamReadError> {
+        if self.fast_text_record(row, capacity)? {
+            self.blank_line_bytes = 0;
+            return Ok(true);
+        }
         loop {
             let Some(line_len) = self.frame_text_line()? else {
                 return Ok(false);
@@ -800,6 +870,39 @@ impl<R: Read> RecordStreamReader<R> {
         group.served += 1;
         Ok(true)
     }
+}
+
+/// Runs the HITS or DETS single-pass decoder over `input` into batch row `row`, resuming at
+/// `resume` when set; every other format, and a missing batch, declines.
+fn fast_text_line(
+    decoder: &StreamDecoder,
+    duplicates: HitsDuplicates,
+    batch: Option<&mut PackedShotBatch>,
+    input: &[u8],
+    max_line_bytes: usize,
+    row: usize,
+    resume: Option<usize>,
+) -> RecordResult<fast_text::FastLine> {
+    let (StreamDecoder::Text { format, layout }, Some(batch)) = (decoder, batch) else {
+        return Ok(fast_text::FastLine::Declined);
+    };
+    let mut words = batch.shot_words_mut(row)?;
+    Ok(match format {
+        RecordFormat::Hits => fast_text::hits_line(
+            input,
+            layout.total_bits(),
+            duplicates,
+            max_line_bytes,
+            &mut words,
+            resume,
+        ),
+        RecordFormat::Dets => {
+            fast_text::dets_line(input, *layout, max_line_bytes, &mut words, resume)
+        }
+        RecordFormat::ZeroOne | RecordFormat::B8 | RecordFormat::R8 | RecordFormat::Ptb64 => {
+            fast_text::FastLine::Declined
+        }
+    })
 }
 
 fn internal_decoder_mismatch() -> FormatError {
