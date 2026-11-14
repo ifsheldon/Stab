@@ -6,12 +6,13 @@ pub(crate) mod frame;
 mod limits;
 mod reference;
 mod reference_signs;
+mod streaming;
 
 pub use api::{
     DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
     DetectionRunStatus, DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
     DetectionSamplingSession, MeasurementToDetectionCompiler, MeasurementToDetectionPlan,
-    MeasurementToDetectionSession, MeasurementToDetectionTransaction,
+    MeasurementToDetectionSession, MeasurementToDetectionTransaction, StreamingDetectionRun,
 };
 pub use error::{DetectionError, DetectionResourceKind, DetectionResourceLimitError};
 pub use limits::DetectionConversionLimits;

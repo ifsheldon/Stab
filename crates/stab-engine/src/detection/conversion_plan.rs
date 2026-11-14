@@ -14,7 +14,10 @@ use super::{
 
 mod execution;
 
-use self::execution::{ConversionCursor, RecordValues, execute_program, validate_repeat_marker};
+use self::execution::{
+    ConversionCursor, ConversionIo, RecordValues, execute_program, validate_repeat_marker,
+};
+pub(super) use self::execution::{ConversionRunner, ConversionStop};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ConversionOperation {
@@ -921,6 +924,68 @@ impl ConversionPlan {
         if cursor.measurement != self.measurement_count || cursor.detector != self.detector_count {
             return Err(DetectionError::invalid_sampler_compilation(format!(
                 "compact word conversion finished at measurement {} and detector {}, expected {} and {}",
+                cursor.measurement, cursor.detector, self.measurement_count, self.detector_count
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl ConversionPlan {
+    /// The most measurements back from the current one that any detector or observable reads.
+    pub(super) fn max_record_lookback(&self) -> usize {
+        self.program
+            .iter()
+            .flat_map(|operation| match operation {
+                ConversionOperation::Detector(terms)
+                | ConversionOperation::Observable { terms, .. } => terms.as_slice(),
+                ConversionOperation::AdvanceMeasurements(_)
+                | ConversionOperation::Repeat { .. }
+                | ConversionOperation::EndRepeat => &[],
+            })
+            .map(|offset| super::frame::lookback_distance(*offset))
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Continues `runner` over the measurement planes `base..base + measurements.len()`,
+    /// writing detectors from absolute index `detector_base` into `detectors` and XOR-ing
+    /// observables into `observables`, until the program ends or needs what it lacks.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the window of each record the conversion reads or writes is one argument"
+    )]
+    pub(super) fn convert_window<Plane>(
+        &self,
+        runner: &mut ConversionRunner,
+        measurements: &[Plane],
+        base: usize,
+        detectors: &mut [Plane],
+        detector_base: usize,
+        observables: &mut [Plane],
+        cancellation: &Cancellation,
+    ) -> DetectionResult<ConversionStop>
+    where
+        Plane: std::ops::BitXor<Output = Plane> + std::ops::BitXorAssign + Copy + Default,
+    {
+        let mut io = ConversionIo {
+            measurements: RecordValues::Values(measurements),
+            measurement_base: base,
+            reference_sample: RecordValues::Zero,
+            available_measurements: base + measurements.len(),
+            detectors,
+            detector_base,
+            observables,
+        };
+        runner.run(&self.program, &mut io, cancellation)
+    }
+
+    /// Checks that a finished streaming conversion covered every measurement and detector.
+    pub(super) fn check_finished(&self, runner: &ConversionRunner) -> DetectionResult<()> {
+        let cursor = runner.cursor;
+        if cursor.measurement != self.measurement_count || cursor.detector != self.detector_count {
+            return Err(DetectionError::invalid_sampler_compilation(format!(
+                "streaming conversion finished at measurement {} and detector {}, expected {} and {}",
                 cursor.measurement, cursor.detector, self.measurement_count, self.detector_count
             )));
         }

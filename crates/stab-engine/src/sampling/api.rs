@@ -6,26 +6,32 @@ use std::sync::{Arc, OnceLock};
 use rand::rngs::SmallRng;
 use sha2::{Digest as _, Sha256};
 use stab_model::{Cancellation, Circuit, MemoryBudget};
-use stab_records::{MeasurementBatchView, MeasurementSink, MeasurementWidth};
+use stab_records::{MeasurementSink, MeasurementWidth};
 use thiserror::Error;
 
+use super::reference_bits::ReferenceBits;
 use super::{compile_program, sampler_rng};
 use crate::detection::frame::{
-    CircuitProgram, DeliveryFailure, DeliveryOutcome, FrameBatchSource, FrameBatchState,
-    FrameLanes, FrameWord, LaneFrameBatch, PendingLanes,
+    CircuitProgram, DeliveryFailure, FrameBatchState, FrameLanes, LaneFrameBatch, PendingLanes,
+    ShotRecordTransposer, WindowShape,
 };
 use crate::{CompilationRequestFingerprint, LaneWidth};
 
 mod compile_error;
+mod delivery;
 mod session_helpers;
+
+use delivery::{
+    SamplingBatchSource, SamplingDeliveryError, StreamingDelivery, StreamingFrame, deliver_lanes,
+};
 
 pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
 #[cfg(test)]
 pub(super) use session_helpers::compute_stabilizer_frame_reference_sample;
-use session_helpers::validate_session_storage;
 pub(super) use session_helpers::{
     compute_reference_sample, try_bool_buffer, validate_reference_width,
 };
+use session_helpers::{validate_session_storage, validate_streaming_storage};
 
 /// Executable discriminator of the bit-plane Pauli frame, the only sampling executor.
 const PAULI_FRAME_EXECUTABLE_DISCRIMINATOR: u8 = 4;
@@ -227,17 +233,15 @@ impl SamplingCompiler {
 fn session_reference(
     plan: &SamplingPlan,
     uses_reference_sample: bool,
-) -> Result<Option<&[bool]>, SamplingExecutionError> {
+) -> Result<Option<&ReferenceBits>, SamplingExecutionError> {
     if !uses_reference_sample {
         return Ok(None);
     }
-    plan.inner
-        .reference_sample
-        .get()
-        .map(|sample| Some(sample.as_slice()))
-        .ok_or_else(|| SamplingExecutionError::InternalInvariant {
+    plan.inner.reference_sample.get().map(Some).ok_or_else(|| {
+        SamplingExecutionError::InternalInvariant {
             message: "sampling session lost its plan-cached reference sample".to_owned(),
-        })
+        }
+    })
 }
 
 /// Backend-bearing identity of one immutable compiled plan.
@@ -419,7 +423,74 @@ impl SamplingPlan {
         reference_mode: ReferenceSampleMode,
         lane_width: LaneWidth,
     ) -> Result<SamplingSession, SamplingExecutionError> {
-        SamplingSession::new(self.clone(), random_policy, reference_mode, lane_width)
+        SamplingSession::new(
+            self.clone(),
+            random_policy,
+            reference_mode,
+            lane_width,
+            None,
+        )
+    }
+
+    /// Prepares one run of exactly `shots` shots that streams wide records.
+    ///
+    /// The run's output equals the first [`SamplingSession::run`] of `shots` shots on
+    /// [`Self::session_with_lane_width`] with the same arguments. Instead of materializing one
+    /// plane per measurement for every lane of a batch, it hands the planes over in bounded
+    /// windows and keeps shot-major records of only the lanes it delivers, so its storage is
+    /// admitted for `min(shots, lane_width)` records rather than `lane_width` planes per
+    /// measurement. Because it keeps no undelivered lanes, it runs once.
+    pub fn streaming_run(
+        &self,
+        random_policy: RandomPolicy,
+        reference_mode: ReferenceSampleMode,
+        lane_width: LaneWidth,
+        shots: ShotCount,
+    ) -> Result<StreamingSamplingRun, SamplingExecutionError> {
+        let session = SamplingSession::new(
+            self.clone(),
+            random_policy,
+            reference_mode,
+            lane_width,
+            Some(shots),
+        )?;
+        Ok(StreamingSamplingRun { session, shots })
+    }
+}
+
+/// One prepared streaming sampling run; see [`SamplingPlan::streaming_run`].
+#[derive(Debug)]
+pub struct StreamingSamplingRun {
+    session: SamplingSession,
+    shots: ShotCount,
+}
+
+impl StreamingSamplingRun {
+    /// The signal the run polls between and inside batches, as for
+    /// [`SamplingSession::cancellation`].
+    pub fn cancellation(&self) -> Cancellation {
+        self.session.cancellation()
+    }
+
+    /// Shots each frame batch of the run samples together.
+    pub const fn lane_width(&self) -> LaneWidth {
+        self.session.lane_width()
+    }
+
+    /// Shots the run delivers.
+    pub const fn shots(&self) -> ShotCount {
+        self.shots
+    }
+
+    /// Executes the run with the sink lifecycle of [`SamplingSession::run`].
+    ///
+    /// Cooperative cancellation before a batch ends the run with
+    /// [`SamplingRunStatus::Cancelled`] and the sink finalized; nothing can resume it.
+    pub fn run<Sink>(mut self, sink: &mut Sink) -> Result<SamplingRunSummary, RunError<Sink::Error>>
+    where
+        Sink: MeasurementSink,
+    {
+        self.session.run(self.shots, sink)
     }
 }
 
@@ -432,8 +503,9 @@ pub(super) struct SamplingPlanInner {
     pub(super) memory_budget: MemoryBudget,
     pub(super) cancellation: Cancellation,
     pub(super) reference_sample_loop_policy: ReferenceSampleLoopPolicy,
-    /// The all-zero-sweep reference sample, computed at most once per successful plan.
-    reference_sample: OnceLock<Vec<bool>>,
+    /// The all-zero-sweep reference sample, packed one bit per measurement and computed at most
+    /// once per successful plan.
+    reference_sample: OnceLock<ReferenceBits>,
     backend: SamplingBackend,
     request_fingerprint: CompilationRequestFingerprint,
     fingerprint: PlanFingerprint,
@@ -443,7 +515,7 @@ impl SamplingPlanInner {
     /// Returns the plan's reference sample, computing it on first use.
     ///
     /// Failures are returned to the caller and not cached, so a later call retries.
-    pub(super) fn cached_reference_sample(&self) -> Result<&[bool], SamplingExecutionError> {
+    pub(super) fn cached_reference_sample(&self) -> Result<&ReferenceBits, SamplingExecutionError> {
         if let Some(sample) = self.reference_sample.get() {
             return Ok(sample);
         }
@@ -471,6 +543,42 @@ enum SessionFrame {
     /// A plan without measurements delivers zero-width batches of this width.
     Empty(LaneWidth),
     Pauli(LaneFrameBatch),
+    Streaming64(StreamingFrame<u64>),
+    Streaming256(StreamingFrame<FrameLanes>),
+}
+
+impl SessionFrame {
+    fn streaming(
+        program: &CircuitProgram,
+        lane_width: LaneWidth,
+        shots: ShotCount,
+    ) -> Result<Self, SamplingExecutionError> {
+        let measurements = program.counts().measurements;
+        let lanes = usize::try_from(shots.get()).map_or(lane_width.shots_per_batch(), |shots| {
+            shots.min(lane_width.shots_per_batch())
+        });
+        let shape = WindowShape::for_program(program, lane_width.plane_bytes(), 0);
+        let allocation = |error: crate::detection::DetectionError| {
+            SamplingExecutionError::SessionStorageAllocation {
+                message: error.to_string(),
+            }
+        };
+        let records = ShotRecordTransposer::try_new(lanes, measurements).map_err(allocation)?;
+        Ok(match lane_width {
+            LaneWidth::Lanes64 => Self::Streaming64(StreamingFrame {
+                state: FrameBatchState::for_measurement_window(program, shape.capacity())
+                    .map_err(allocation)?,
+                shape,
+                records,
+            }),
+            LaneWidth::Lanes256 => Self::Streaming256(StreamingFrame {
+                state: FrameBatchState::for_measurement_window(program, shape.capacity())
+                    .map_err(allocation)?,
+                shape,
+                records,
+            }),
+        })
+    }
 }
 
 /// Signal used by sessions whose plan has no cancellable signal and that never handed one out.
@@ -685,13 +793,20 @@ impl fmt::Debug for SamplingSession {
 }
 
 impl SamplingSession {
+    /// A materializing session, or the session of one streaming run of `streaming_shots` shots.
     fn new(
         plan: SamplingPlan,
         random_policy: RandomPolicy,
         reference_mode: ReferenceSampleMode,
         lane_width: LaneWidth,
+        streaming_shots: Option<ShotCount>,
     ) -> Result<Self, SamplingExecutionError> {
-        validate_session_storage(&plan.inner, reference_mode, lane_width)?;
+        match streaming_shots {
+            None => validate_session_storage(&plan.inner, reference_mode, lane_width)?,
+            Some(shots) => {
+                validate_streaming_storage(&plan.inner, reference_mode, lane_width, shots)?;
+            }
+        }
         let rng = match random_policy {
             RandomPolicy::Entropy => sampler_rng(None),
             RandomPolicy::Seeded(seed) => sampler_rng(Some(seed.get())),
@@ -702,6 +817,8 @@ impl SamplingSession {
         }
         let frame = if plan.inner.measurement_count == 0 {
             SessionFrame::Empty(lane_width)
+        } else if let Some(shots) = streaming_shots {
+            SessionFrame::streaming(&plan.inner.program, lane_width, shots)?
         } else {
             SessionFrame::Pauli(
                 LaneFrameBatch::for_measurements(&plan.inner.program, lane_width).map_err(
@@ -741,8 +858,12 @@ impl SamplingSession {
     pub const fn lane_width(&self) -> LaneWidth {
         match &self.frame {
             SessionFrame::Empty(lane_width) => *lane_width,
-            SessionFrame::Pauli(LaneFrameBatch::Lanes64(_)) => LaneWidth::Lanes64,
-            SessionFrame::Pauli(LaneFrameBatch::Lanes256(_)) => LaneWidth::Lanes256,
+            SessionFrame::Pauli(LaneFrameBatch::Lanes64(_)) | SessionFrame::Streaming64(_) => {
+                LaneWidth::Lanes64
+            }
+            SessionFrame::Pauli(LaneFrameBatch::Lanes256(_)) | SessionFrame::Streaming256(_) => {
+                LaneWidth::Lanes256
+            }
         }
     }
 
@@ -831,6 +952,24 @@ impl SamplingSession {
                 shots,
                 SamplingBatchSource::new(program, Some(state), reference, rng, cancellation, sink),
             ),
+            SessionFrame::Streaming64(frame) => StreamingDelivery {
+                program,
+                frame,
+                reference,
+                rng,
+                cancellation,
+                sink,
+            }
+            .deliver(shots),
+            SessionFrame::Streaming256(frame) => StreamingDelivery {
+                program,
+                frame,
+                reference,
+                rng,
+                cancellation,
+                sink,
+            }
+            .deliver(shots),
         };
         let outcome = match delivered {
             Ok(outcome) => outcome,
@@ -882,115 +1021,6 @@ impl SamplingSession {
             requested_shots,
             committed_shots: ShotCount::new(committed_shots),
             total_committed_shots: ShotCount::new(self.total_committed_shots),
-        }
-    }
-}
-
-enum SamplingDeliveryError<SinkError> {
-    Engine(SamplingExecutionError),
-    Sink(SinkError),
-}
-
-/// Runs the shared delivery loop over one session frame at a fixed lane word.
-fn deliver_lanes<W, Sink>(
-    pending: &mut PendingLanes,
-    shots: ShotCount,
-    mut source: SamplingBatchSource<'_, W, Sink>,
-) -> Result<DeliveryOutcome, DeliveryFailure<SamplingDeliveryError<Sink::Error>>>
-where
-    W: FrameWord,
-    Sink: MeasurementSink,
-{
-    pending.deliver(shots.get(), &mut source)
-}
-
-/// One sampling run's view of its session frame for the shared frame-batch delivery loop.
-struct SamplingBatchSource<'run, W: FrameWord, Sink> {
-    program: &'run CircuitProgram,
-    /// The frame state, or `None` for a plan without measurements.
-    frame: Option<&'run mut FrameBatchState<W>>,
-    reference: Option<&'run [bool]>,
-    rng: &'run mut SmallRng,
-    cancellation: &'run Cancellation,
-    sink: &'run mut Sink,
-}
-
-impl<'run, W: FrameWord, Sink> SamplingBatchSource<'run, W, Sink> {
-    const fn new(
-        program: &'run CircuitProgram,
-        frame: Option<&'run mut FrameBatchState<W>>,
-        reference: Option<&'run [bool]>,
-        rng: &'run mut SmallRng,
-        cancellation: &'run Cancellation,
-        sink: &'run mut Sink,
-    ) -> Self {
-        Self {
-            program,
-            frame,
-            reference,
-            rng,
-            cancellation,
-            sink,
-        }
-    }
-}
-
-impl<W, Sink> FrameBatchSource for SamplingBatchSource<'_, W, Sink>
-where
-    W: FrameWord,
-    Sink: MeasurementSink,
-{
-    type Error = SamplingDeliveryError<Sink::Error>;
-
-    const BATCH_SHOTS: usize = W::LANE_COUNT;
-
-    fn is_cancelled(&self) -> bool {
-        self.cancellation.is_cancelled()
-    }
-
-    fn refill(&mut self) -> Result<(), Self::Error> {
-        let Some(state) = self.frame.as_deref_mut() else {
-            return Ok(());
-        };
-        state
-            .sample_measurements(self.program, self.rng, self.cancellation)
-            .map_err(|error| match error {
-                crate::detection::DetectionError::Cancelled(cancelled) => {
-                    SamplingExecutionError::Cancelled(cancelled)
-                }
-                error => SamplingExecutionError::InternalInvariant {
-                    message: error.to_string(),
-                },
-            })
-            .map_err(SamplingDeliveryError::Engine)?;
-        if let Some(reference) = self.reference {
-            state.xor_reference(reference).map_err(|error| {
-                SamplingDeliveryError::Engine(SamplingExecutionError::InternalInvariant {
-                    message: error.to_string(),
-                })
-            })?;
-        }
-        Ok(())
-    }
-
-    fn deliver(&mut self, lanes: usize) -> Result<(), Self::Error> {
-        let planes = self
-            .frame
-            .as_deref()
-            .map_or(&[][..], FrameBatchState::measurement_planes);
-        let view = W::plane_view(planes, lanes).map_err(|source| {
-            SamplingDeliveryError::Engine(SamplingExecutionError::InternalInvariant {
-                message: source.to_string(),
-            })
-        })?;
-        self.sink
-            .write_batch(MeasurementBatchView::from_bit_planes(view))
-            .map_err(SamplingDeliveryError::Sink)
-    }
-
-    fn discard(&mut self, lanes: usize) {
-        if let Some(state) = self.frame.as_deref_mut() {
-            state.discard_delivered_lanes(lanes);
         }
     }
 }

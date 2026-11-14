@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use super::*;
-use stab_records::{MeasurementCodecSink, RecordFormat};
+use stab_records::{MeasurementBatchView, MeasurementCodecSink, RecordFormat};
 
 #[derive(Default)]
 struct RecordSink {

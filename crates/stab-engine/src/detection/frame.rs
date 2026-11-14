@@ -13,6 +13,7 @@ mod helpers;
 mod noise;
 mod plan;
 mod program;
+mod window;
 mod word;
 
 use helpers::{TWO_QUBIT_FRAME_BASES, measurement_record_word, try_zero_words};
@@ -30,9 +31,14 @@ pub(crate) use plan::{
 };
 pub(crate) use program::{
     CircuitProgram, CliffordStep, ControlledPair, FrameGate, PauliProductMeasurement, ProgramEntry,
-    ProgramInstruction, ProgramOptions, ReferenceClifford,
+    ProgramInstruction, ProgramOptions, ReferenceClifford, lookback_distance,
 };
 pub(in crate::detection) use program::{TraversalEvent, visit_circuit};
+#[cfg(test)]
+pub(crate) use window::with_window_planes;
+pub(crate) use window::{
+    PlaneConsumer, PlaneWindow, SampledRecords, ShotRecordTransposer, WindowShape, window_planes,
+};
 pub(crate) use word::FrameWord;
 
 /// The widest lane word: one 256-shot [`stab_bits::BitBlock`] per plane. Sessions at the
@@ -52,7 +58,11 @@ const _: () = {
 pub(in crate::detection) struct BitPlaneDetectionFrame<W: FrameWord> {
     xs: Vec<W>,
     zs: Vec<W>,
+    /// The retained measurement planes: every plane of the batch, or the newest ones when the
+    /// batch streams through a [`PlaneWindow`].
     pub(in crate::detection) measurements: Vec<W>,
+    /// Absolute measurement index of `measurements[0]`.
+    measurement_base: usize,
     pub(in crate::detection) observables: Vec<W>,
     correlated_error_occurred: W,
 }
@@ -70,6 +80,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 measurement_count,
                 "detection frame measurement record",
             )?,
+            measurement_base: 0,
             observables: try_zero_words(observable_count, "detection frame observable record")?,
             correlated_error_occurred: W::default(),
         })
@@ -81,6 +92,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             *bit = mode.random_mask(rng, 0.5);
         }
         self.measurements.clear();
+        self.measurement_base = 0;
         self.observables.fill(W::default());
         self.correlated_error_occurred = W::default();
     }
@@ -97,6 +109,36 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             self.execute_instruction(instruction, rng, mode)?;
         }
         Ok(())
+    }
+
+    /// Executes `program` like [`Self::execute_program`], handing the measurement planes to
+    /// `window` whenever it fills and once at the end.
+    ///
+    /// It is a separate function so the materializing loop compiles exactly as before.
+    #[inline(never)]
+    fn execute_program_windowed(
+        &mut self,
+        program: &CircuitProgram,
+        rng: &mut impl Rng,
+        mode: FrameExecutionMode<'_, W>,
+        cancellation: &Cancellation,
+        window: &mut PlaneWindow<'_, W>,
+    ) -> DetectionResult<()> {
+        let mut cursor = program.cursor(cancellation);
+        while let Some(instruction) = cursor.next_instruction()? {
+            self.execute_instruction(instruction, rng, mode)?;
+            if self.measurements.len() >= window.hand_over_at {
+                self.measurement_base =
+                    window.hand_over(self.measurement_base, &mut self.measurements, false)?;
+            }
+        }
+        window.hand_over(self.measurement_base, &mut self.measurements, true)?;
+        Ok(())
+    }
+
+    /// Measurement planes recorded by the batch so far, retained or already handed over.
+    fn recorded_measurements(&self) -> usize {
+        self.measurement_base + self.measurements.len()
     }
 
     fn execute_instruction(

@@ -9,8 +9,10 @@ const FLIPPED_DETECTOR_AND_OBSERVABLE: &[u8] =
 fn detect_and_sample_enforce_the_memory_budget_without_restricting_sparse_qubit_syntax() {
     // Detection and sampling share one frame of two planes per qubit. At 200 shots the session
     // runs 256-lane frames of 32-byte planes, so a 256 MiB budget admits a frame below about
-    // 4.19 million qubits; at one shot it runs 64-lane frames of 8-byte planes, which admit four
-    // times as many. No single-measurement fast path exempts the full Stim qubit-ID range.
+    // 4.19 million qubits; one shot streams on 64-lane frames of 8-byte planes, which admit four
+    // times as many, and its estimate also counts the delivered record and 32 KiB of transpose
+    // scratch per record kind. No single-measurement fast path exempts the full Stim qubit-ID
+    // range.
     for (command, shots, qubit, expected_error) in [
         ("detect", "200", 4_000_000, None),
         (
@@ -24,7 +26,7 @@ fn detect_and_sample_enforce_the_memory_budget_without_restricting_sparse_qubit_
             "detect",
             "1",
             16_777_215,
-            Some("detection session needs an estimated 268435472 bytes"),
+            Some("detection session needs an estimated 268501016 bytes"),
         ),
         ("sample", "200", 4_000_000, None),
         (
@@ -38,7 +40,7 @@ fn detect_and_sample_enforce_the_memory_budget_without_restricting_sparse_qubit_
             "sample",
             "1",
             16_777_215,
-            Some("sampling session needs an estimated 268435464 bytes"),
+            Some("sampling session needs an estimated 268468240 bytes"),
         ),
     ] {
         let input = format!("M {qubit}\nDETECTOR rec[-1]\n");

@@ -1,6 +1,7 @@
 use stab_model::{Cancellation, MemoryBudget};
 
-use super::api::{ReferenceSampleLoopPolicy, try_bool_buffer, validate_reference_width};
+use super::api::{ReferenceSampleLoopPolicy, validate_reference_width};
+use super::reference_bits::ReferenceBits;
 use super::reference_run::{ReferenceWorkspace, has_reference_fold_candidate};
 use super::{
     SamplingExecutionError, SamplingPlan, reference_state_snapshot_fits,
@@ -49,7 +50,9 @@ impl SamplingPlan {
             return Ok(());
         }
         if !sweep_record.contains(&true) {
-            record.extend_from_slice(self.inner.cached_reference_sample()?);
+            self.inner
+                .cached_reference_sample()?
+                .extend_bools_into(record);
             return Ok(());
         }
         let output = program_reference_sample(
@@ -112,7 +115,8 @@ pub(crate) fn program_reference_sample(
     }
     let needs_snapshot = uses_snapshot(program, qubit_count, loop_policy, budget);
     validate_simulator_work_storage(qubit_count, measurement_count, needs_snapshot, budget)?;
-    let mut output = try_bool_buffer(measurement_count, "reference measurement output")?;
+    let mut output =
+        ReferenceBits::try_with_capacity(measurement_count, "reference measurement output")?;
     ReferenceWorkspace::try_new(qubit_count, needs_snapshot)?.run(
         program,
         loop_policy,
@@ -120,6 +124,6 @@ pub(crate) fn program_reference_sample(
         &mut output,
         cancellation,
     )?;
-    validate_reference_width(&output, measurement_count)?;
-    Ok(output)
+    validate_reference_width(output.len(), measurement_count)?;
+    output.to_bools("reference measurement output")
 }

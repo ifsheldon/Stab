@@ -227,7 +227,7 @@ impl PackedShotBatch {
     }
 
     /// Borrows one shot's storage words; bits beyond the declared width are cleared on drop.
-    pub(crate) fn shot_words_mut(&mut self, shot_index: usize) -> RecordResult<BitWordsMut<'_>> {
+    pub fn shot_words_mut(&mut self, shot_index: usize) -> RecordResult<BitWordsMut<'_>> {
         self.storage
             .row_words_mut(shot_index)
             .map_err(bit_storage_error)

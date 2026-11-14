@@ -19,6 +19,14 @@ use crate::{
 /// Encoded bytes retained before they are drained into the destination writer mid-call.
 const DRAIN_THRESHOLD_BYTES: usize = 64 * 1024;
 
+/// Bits of one wide record part encoded between two drain checks, so a single record wider than
+/// this never holds its whole encoding (eight times its packed size for `01`) at once.
+const SEGMENT_BITS: usize = 64 * 1024;
+
+/// Encoded bytes retained inside one wide record before they are drained, larger than
+/// [`DRAIN_THRESHOLD_BYTES`] so a wide record costs few writes.
+const SEGMENT_DRAIN_BYTES: usize = 1 << 20;
+
 const WORD_BITS: usize = u64::BITS as usize;
 
 /// One contiguous run of a record's bits together with its DETS namespace.
@@ -176,7 +184,7 @@ impl RecordEncoder {
         self.check_width(actual)?;
         self.begin_record();
         for part in parts {
-            self.encode_part(part.namespace, part.bits.words(), part.bits.len())?;
+            self.encode_part(part.namespace, part.bits.words(), part.bits.len(), 0)?;
         }
         self.end_record();
         self.drain(out)
@@ -237,7 +245,7 @@ impl RecordEncoder {
                         .into());
                     }
                 };
-                self.encode_part(part.namespace, row.words(), row.len())?;
+                self.encode_part_draining(part.namespace, row.words(), row.len(), out)?;
             }
             self.end_record();
             self.drain_if_full(out)?;
@@ -268,7 +276,7 @@ impl RecordEncoder {
                         }
                         RecordBatchStorage::BitPlanes(_) => rows.shot(block_shot)?,
                     };
-                    self.encode_part(part.namespace, row.words(), row.len())?;
+                    self.encode_part_draining(part.namespace, row.words(), row.len(), out)?;
                 }
                 self.end_record();
                 self.drain_if_full(out)?;
@@ -393,11 +401,52 @@ impl RecordEncoder {
         }
     }
 
+    /// Encodes one part like [`Self::encode_part`], draining between segments of a wide part.
+    ///
+    /// A part split at word boundaries encodes exactly as the whole part: every format but DETS
+    /// positions bits by the record offset, and DETS numbers each segment from its start within
+    /// the part. PTB64 buffers whole groups, so it encodes the part at once.
+    fn encode_part_draining<W>(
+        &mut self,
+        namespace: DetsResultType,
+        words: &[u64],
+        len: usize,
+        out: &mut W,
+    ) -> Result<(), RecordWriteError>
+    where
+        W: Write + ?Sized,
+    {
+        if len <= SEGMENT_BITS || self.format == RecordFormat::Ptb64 {
+            return Ok(self.encode_part(namespace, words, len, 0)?);
+        }
+        let mut start = 0_usize;
+        while start < len {
+            let segment = (len - start).min(SEGMENT_BITS);
+            let first_word = start / WORD_BITS;
+            let segment_words = words
+                .get(first_word..first_word + segment.div_ceil(WORD_BITS))
+                .ok_or_else(|| {
+                    FormatError::invalid_data(
+                        "packed record omitted words inside its declared width",
+                    )
+                })?;
+            self.encode_part(namespace, segment_words, segment, start)?;
+            if self.pending.len() >= SEGMENT_DRAIN_BYTES {
+                self.drain(out)?;
+            }
+            start += segment;
+        }
+        Ok(())
+    }
+
+    /// Encodes `len` bits of one part; `part_start` is the index of the first of them within
+    /// their part, which only DETS numbering reads.
     fn encode_part(
         &mut self,
         namespace: DetsResultType,
         words: &[u64],
         len: usize,
+        part_start: usize,
     ) -> RecordResult<()> {
         if words.len() < len.div_ceil(WORD_BITS) {
             return Err(FormatError::invalid_data(
@@ -433,7 +482,7 @@ impl RecordEncoder {
                 let prefix = namespace.prefix();
                 for_each_set_bit(words, len, |index| {
                     pending.extend_from_slice(&[b' ', prefix]);
-                    push_decimal(pending, index);
+                    push_decimal(pending, part_start + index);
                 });
             }
             RecordFormat::Ptb64 => {

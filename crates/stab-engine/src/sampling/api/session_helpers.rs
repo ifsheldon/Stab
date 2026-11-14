@@ -1,6 +1,7 @@
-use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner};
+use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner, ShotCount};
 use crate::LaneWidth;
-use crate::detection::frame::frame_state_storage_bytes;
+use crate::detection::frame::{ShotRecordTransposer, WindowShape, frame_state_storage_bytes};
+use crate::sampling::reference_bits::ReferenceBits;
 use crate::sampling::reference_run::ReferenceWorkspace;
 
 pub(super) fn validate_session_storage(
@@ -18,6 +19,8 @@ pub(super) fn validate_session_storage(
     Ok(())
 }
 
+/// Reusable storage of a materializing session: the frame with one plane per measurement and
+/// the packed reference sample when the session uses it.
 pub(super) fn session_storage_bytes(
     plan: &SamplingPlanInner,
     reference_mode: ReferenceSampleMode,
@@ -26,17 +29,68 @@ pub(super) fn session_storage_bytes(
     if plan.measurement_count == 0 {
         return 0;
     }
-    let mut estimated_bytes = frame_state_storage_bytes(
+    frame_state_storage_bytes(
         lane_width,
         plan.program.frame_qubit_count(),
         plan.measurement_count,
         0,
         0,
-    );
-    if reference_mode == ReferenceSampleMode::UseReferenceSample {
-        estimated_bytes = estimated_bytes.saturating_add(plan.measurement_count as u128);
+    )
+    .saturating_add(reference_storage_bytes(plan, reference_mode))
+}
+
+pub(super) fn validate_streaming_storage(
+    plan: &SamplingPlanInner,
+    reference_mode: ReferenceSampleMode,
+    lane_width: LaneWidth,
+    shots: ShotCount,
+) -> Result<(), SamplingExecutionError> {
+    let estimated_bytes = streaming_storage_bytes(plan, reference_mode, lane_width, shots);
+    if !plan.memory_budget.admits(estimated_bytes) {
+        return Err(SamplingExecutionError::SessionStorageLimit {
+            estimated_bytes,
+            limit_bytes: plan.memory_budget.bytes(),
+        });
     }
-    estimated_bytes
+    Ok(())
+}
+
+/// Reusable storage of a streaming run of `shots` shots: the frame with its bounded window of
+/// measurement planes, shot-major records of the `min(shots, lane_width)` lanes one batch
+/// delivers with their transpose scratch, and the packed reference sample when the run uses it.
+pub(super) fn streaming_storage_bytes(
+    plan: &SamplingPlanInner,
+    reference_mode: ReferenceSampleMode,
+    lane_width: LaneWidth,
+    shots: ShotCount,
+) -> u128 {
+    if plan.measurement_count == 0 {
+        return 0;
+    }
+    let shape = WindowShape::for_program(&plan.program, lane_width.plane_bytes(), 0);
+    let lanes = usize::try_from(shots.get()).map_or(lane_width.shots_per_batch(), |shots| {
+        shots.min(lane_width.shots_per_batch())
+    });
+    frame_state_storage_bytes(
+        lane_width,
+        plan.program.frame_qubit_count(),
+        shape.capacity(),
+        0,
+        0,
+    )
+    .saturating_add(ShotRecordTransposer::storage_bytes(
+        lanes,
+        plan.measurement_count,
+    ))
+    .saturating_add(reference_storage_bytes(plan, reference_mode))
+}
+
+fn reference_storage_bytes(plan: &SamplingPlanInner, reference_mode: ReferenceSampleMode) -> u128 {
+    if reference_mode == ReferenceSampleMode::UseReferenceSample {
+        ReferenceBits::storage_bytes(plan.measurement_count)
+    } else {
+        0
+    }
 }
 
 pub(in crate::sampling) fn try_bool_buffer(
@@ -54,9 +108,9 @@ pub(in crate::sampling) fn try_bool_buffer(
 
 pub(in crate::sampling) fn compute_reference_sample(
     plan: &SamplingPlanInner,
-) -> Result<Vec<bool>, SamplingExecutionError> {
+) -> Result<ReferenceBits, SamplingExecutionError> {
     if plan.measurement_count == 0 {
-        return Ok(Vec::new());
+        return Ok(ReferenceBits::default());
     }
     let needs_snapshot = plan.uses_reference_state_snapshot();
     crate::sampling::validate_simulator_work_storage(
@@ -65,7 +119,8 @@ pub(in crate::sampling) fn compute_reference_sample(
         needs_snapshot,
         plan.memory_budget,
     )?;
-    let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
+    let mut output =
+        ReferenceBits::try_with_capacity(plan.measurement_count, "reference measurement output")?;
     ReferenceWorkspace::try_new(plan.qubit_count, needs_snapshot)?.run(
         &plan.program,
         plan.reference_sample_loop_policy,
@@ -73,21 +128,20 @@ pub(in crate::sampling) fn compute_reference_sample(
         &mut output,
         &plan.cancellation,
     )?;
-    validate_reference_width(&output, plan.measurement_count)?;
+    validate_reference_width(output.len(), plan.measurement_count)?;
     Ok(output)
 }
 
 pub(in crate::sampling) fn validate_reference_width(
-    output: &[bool],
+    width: usize,
     measurement_count: usize,
 ) -> Result<(), SamplingExecutionError> {
-    if output.len() == measurement_count {
+    if width == measurement_count {
         Ok(())
     } else {
         Err(SamplingExecutionError::InternalInvariant {
             message: format!(
-                "reference simulation produced {} measurements but {measurement_count} were compiled",
-                output.len()
+                "reference simulation produced {width} measurements but {measurement_count} were compiled"
             ),
         })
     }

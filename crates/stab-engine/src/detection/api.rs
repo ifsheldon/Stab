@@ -24,6 +24,7 @@ use crate::{LaneWidth, RandomPolicy, ReferenceSampleMode, ShotCount, SinkFailure
 mod contracts;
 mod delivery;
 mod execution;
+mod streaming;
 
 pub use contracts::{
     DetectionCompileError, DetectionExecutionError, DetectionRunError, DetectionRunProgress,
@@ -34,6 +35,7 @@ use execution::{
     detection_rng, invariant_error, run_direct, validate_conversion_session_storage,
     validate_direct_session_storage,
 };
+pub use streaming::StreamingDetectionRun;
 
 use crate::MAX_BATCH_SHOTS;
 

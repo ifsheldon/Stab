@@ -5,7 +5,7 @@
 
 use std::io::{self, Write};
 
-use super::{DRAIN_THRESHOLD_BYTES, RecordBatchPart, RecordEncoder};
+use super::{DRAIN_THRESHOLD_BYTES, RecordBatchPart, RecordEncoder, RecordPart, SEGMENT_BITS};
 use crate::{BitPlaneBatch, DetsResultType, PackedShotBatch, RecordFormat};
 
 #[derive(Default)]
@@ -100,6 +100,69 @@ fn repeated_bit_plane_batches_reuse_encoder_storage() {
             assert_eq!(
                 allocations.count_total, 0,
                 "{format:?} width {width}: {allocations:?}"
+            );
+        }
+    }
+}
+
+/// Batch encoding splits a record part wider than `SEGMENT_BITS` into word-aligned segments and
+/// drains between them; the bytes must equal the unsplit single-record encoding in every
+/// format, including DETS indices that continue across segments and B8 parts that start
+/// mid-byte, while one wide record never holds its whole encoding.
+#[test]
+fn wide_parts_encode_in_segments_exactly_like_whole_records() {
+    // Wide enough that the `01` encoding alone exceeds the pending bound asserted below.
+    let wide = 80 * SEGMENT_BITS + 77;
+    for format in [
+        RecordFormat::ZeroOne,
+        RecordFormat::B8,
+        RecordFormat::R8,
+        RecordFormat::Hits,
+        RecordFormat::Dets,
+    ] {
+        for (leading, density) in [(0_usize, 3_usize), (5, 997)] {
+            let width = leading + wide;
+            let bits = (0..width)
+                .map(|bit| (bit * 7 + bit / 64).is_multiple_of(density))
+                .collect::<Vec<_>>();
+            let (head_bits, body_bits) = bits.split_at(leading);
+            let head = PackedShotBatch::from_records(&[head_bits.to_vec()], leading)
+                .expect("pack leading part");
+            let body =
+                PackedShotBatch::from_records(&[body_bits.to_vec()], wide).expect("pack wide part");
+            let parts = [
+                RecordBatchPart::new(DetsResultType::Observable, head.view()),
+                RecordBatchPart::new(DetsResultType::Detector, body.view()),
+            ];
+            let mut segmented = Vec::new();
+            RecordEncoder::try_new(format, width)
+                .expect("encoder")
+                .write_batch(&parts, &mut segmented)
+                .expect("encode batch");
+            let mut whole = Vec::new();
+            RecordEncoder::try_new(format, width)
+                .expect("encoder")
+                .write_record(
+                    &[
+                        RecordPart::new(DetsResultType::Observable, head.shot(0).expect("head")),
+                        RecordPart::new(DetsResultType::Detector, body.shot(0).expect("body")),
+                    ],
+                    &mut whole,
+                )
+                .expect("encode record");
+            assert_eq!(
+                segmented, whole,
+                "{format:?} leading {leading} density {density}"
+            );
+            let mut counted = CountingWriter::default();
+            let mut encoder = RecordEncoder::try_new(format, width).expect("encoder");
+            encoder
+                .write_batch(&parts, &mut counted)
+                .expect("encode batch");
+            assert!(
+                encoder.pending.capacity() <= 4 * super::SEGMENT_DRAIN_BYTES,
+                "{format:?}: a wide record kept {} bytes pending",
+                encoder.pending.capacity()
             );
         }
     }

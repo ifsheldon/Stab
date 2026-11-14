@@ -28,7 +28,7 @@ pub use detection::{
     DetectionRunSummary, DetectionSamplingCompiler, DetectionSamplingPlan,
     DetectionSamplingSession, MEASUREMENT_TO_DETECTION_COMPILATION_DESCRIPTOR,
     MeasurementToDetectionCompiler, MeasurementToDetectionPlan, MeasurementToDetectionSession,
-    MeasurementToDetectionTransaction, circuit_reference_signs,
+    MeasurementToDetectionTransaction, StreamingDetectionRun, circuit_reference_signs,
     circuit_reference_signs_with_limits, detection_record_width,
     detection_record_width_with_limits, measurement_record_count,
     measurement_record_count_with_limits, validate_detection_sampling_circuit,
@@ -46,7 +46,8 @@ pub use sampling::{
     ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingBackend,
     SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
     SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
-    Seed, ShotCount, SinkFailurePhase, circuit_reference_sample, count_determined_measurements,
+    Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun, circuit_reference_sample,
+    count_determined_measurements,
 };
 pub use sampling_estimate::estimate_sampling_request;
 

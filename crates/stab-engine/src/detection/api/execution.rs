@@ -203,7 +203,7 @@ pub(super) fn direct_session_storage_bytes(
     plan.state_storage_bytes(lane_width)
 }
 
-fn validate_session_storage(
+pub(super) fn validate_session_storage(
     estimated_bytes: u128,
     budget: stab_model::MemoryBudget,
 ) -> Result<(), DetectionExecutionError> {

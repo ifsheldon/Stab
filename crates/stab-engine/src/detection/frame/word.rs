@@ -35,6 +35,8 @@ pub(crate) trait FrameWord:
     fn sample_mask(probability: f64, active: Self, rng: &mut impl Rng) -> Self;
     /// Borrows the first `shot_count` lanes of one plane per result bit as a batch view.
     fn plane_view(planes: &[Self], shot_count: usize) -> RecordResult<BitPlaneBatchView<'_>>;
+    /// Lanes `64 * block..64 * block + 64` as one word, zero past the last lane.
+    fn lane_word(self, block: usize) -> u64;
     #[cfg(test)]
     fn extract_u64(self, start: usize, count: usize) -> u64;
 }
@@ -86,6 +88,11 @@ impl FrameWord for u64 {
 
     fn plane_view(planes: &[Self], shot_count: usize) -> RecordResult<BitPlaneBatchView<'_>> {
         BitPlaneBatchView::try_from_words(planes, 1, shot_count, planes.len())
+    }
+
+    #[inline(always)]
+    fn lane_word(self, block: usize) -> u64 {
+        if block == 0 { self } else { 0 }
     }
 
     #[cfg(test)]
@@ -190,6 +197,11 @@ impl FrameWord for BitBlock {
 
     fn plane_view(planes: &[Self], shot_count: usize) -> RecordResult<BitPlaneBatchView<'_>> {
         BitPlaneBatchView::try_from_blocks(planes, shot_count)
+    }
+
+    #[inline(always)]
+    fn lane_word(self, block: usize) -> u64 {
+        self.as_words().get(block).copied().unwrap_or(0)
     }
 
     #[cfg(test)]

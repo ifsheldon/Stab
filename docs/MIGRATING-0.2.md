@@ -194,6 +194,21 @@ Circuit-sampling and detection-sampling sessions take an explicit Pauli-frame la
 
 The CLI's `sample` and `detect` create their session with `LaneWidth::for_total_shots` of `--shots`. Seeded `sample` and `detect` output therefore changes for totals of 1 to 192 and 257 to 448 shots on circuits with random results, and is byte-identical to the previous build for every other total and for every circuit whose results are deterministic. `m2d`, `sample_dem`, `convert`, and `analyze_errors` output is unchanged.
 
+## Streaming Runs
+
+Circuit sampling and detection sampling can run one request of a known shot count without materializing a plane per measurement for every lane, so wide records no longer cost the record width times the lane width. Existing sessions and their seeded output are unchanged.
+
+| Changed item | Migration |
+| --- | --- |
+| `SamplingPlan::streaming_run(random_policy, reference_mode, lane_width, shots)` and `stab_engine::StreamingSamplingRun` | New. The run hands frame planes over in bounded windows and keeps shot-major records of only the `min(shots, lane_width)` lanes a batch delivers. `run(self, sink)` consumes it and returns the same summary and errors as `SamplingSession::run`; its output equals the first `run` of `shots` shots on `session_with_lane_width` with the same arguments. It cannot be resumed after a cooperative cancellation, because it keeps no undelivered lanes. |
+| `DetectionSamplingPlan::streaming_run(random_policy, lane_width, shots)` and `stab_engine::StreamingDetectionRun` | New, with the same contract against `DetectionSamplingSession::run`. Detectors and observables arrive as shot-major records. |
+| Batch layout | Streaming runs deliver shot-major `MeasurementBatchView` and `DetectionBatchView` batches; materializing sessions still deliver bit planes. Sinks must accept either layout, as `RecordBatchView` already allows. |
+| Session and reference admission | A streaming run admits its frame, one window, its records, and transpose scratch, as listed in the [resource policy inventory](architecture/resource-policy-inventory.md). The reference sample and the reference simulator's output record are charged and stored at one bit per measurement instead of one byte, so `SessionStorageLimit` estimates for sessions and reference runs report smaller byte counts, and a budget that refused a reference run by less than the difference now admits it. |
+| `stab_records::PackedShotBatch::shot_words_mut` | Now public, returning the shot's storage words with bits past the width cleared on drop. |
+| `RecordEncoder` | Encodes a record part wider than 65,536 bits in segments and drains between them; its output is unchanged. |
+
+The CLI's `sample` and `detect` use a streaming run for 1 to 63 shots, less than one batch of the narrowest lane width, and their output is byte-identical to the previous build. On a 5,000,000-round distance-3 repetition code (10,000,000 measurements) `sample --shots 1` peaks at about 7 MB instead of 249 MB, and `detect --shots 1` at about 7 MB instead of 317 MB. Budget refusals of `sample` and `detect` report the new estimates.
+
 ## Extension APIs
 
 The typed circuit-pass seam is canonical in `stab-analysis`. It admits folded input, requires a conservative output-resource projection before proportional allocation, validates the returned closed-dialect circuit, and reports typed input, projection, or output failures. The separate Stable `stab-reference-noise-pass` crate proves this public boundary without depending on `stab-core`.

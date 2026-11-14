@@ -20,6 +20,7 @@ mod local_tableau;
 mod noise;
 pub(crate) mod pauli_product;
 mod reference;
+mod reference_bits;
 mod reference_fold;
 mod reference_run;
 mod reference_simulator;
@@ -30,11 +31,12 @@ pub use api::{
     PlanFingerprint, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
     SamplingBackend, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
     SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
-    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase,
+    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun,
 };
 pub(crate) use api::{session_cancellation, session_cancellation_slot};
 pub(crate) use local_tableau::LocalTableauTransform;
 pub(crate) use reference::{program_reference_sample, reference_work_storage_bytes};
+pub(crate) use reference_bits::ReferenceBits;
 
 /// Sampling compiler descriptor consumed by facade capability aggregation.
 pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
@@ -72,10 +74,9 @@ impl SamplingPlan {
     ///
     /// The sample is computed once per plan and reused by later calls and sessions.
     pub fn try_reference_sample(&self) -> Result<Vec<bool>, SamplingExecutionError> {
-        let cached = self.inner.cached_reference_sample()?;
-        let mut sample = api::try_bool_buffer(cached.len(), "reference sample copy")?;
-        sample.extend_from_slice(cached);
-        Ok(sample)
+        self.inner
+            .cached_reference_sample()?
+            .to_bools("reference sample copy")
     }
 
     pub(crate) fn sweep_bit_count(&self) -> usize {
@@ -149,19 +150,21 @@ pub(crate) fn validate_simulator_work_storage(
     Ok(())
 }
 
-/// Conservative scratch storage of one reference-simulator run, including its output record.
+/// Conservative scratch storage of one reference-simulator run, including its output record of
+/// one bit per measurement.
 fn simulator_work_storage_bytes(
     qubit_count: usize,
     measurement_count: usize,
     include_reference_snapshot: bool,
 ) -> u128 {
     let qubits = qubit_count as u128;
-    let measurements = measurement_count as u128;
     let base = qubits
         .saturating_mul(qubits)
         .saturating_mul(4)
         .saturating_add(qubits.saturating_mul(256))
-        .saturating_add(measurements);
+        .saturating_add(reference_bits::ReferenceBits::storage_bytes(
+            measurement_count,
+        ));
     if include_reference_snapshot {
         base.saturating_add(reference_snapshot_admission_bytes(qubit_count))
     } else {

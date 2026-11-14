@@ -8,7 +8,7 @@ use rand::{Rng, RngExt as _};
 
 use super::api::SamplingExecutionError;
 use super::noise;
-use super::reference_run::{program_error, record_lookback};
+use super::reference_run::program_error;
 use super::stabilizer_frame::{MeasurementRandomness, StabilizerFrame};
 use crate::detection::frame::{
     CircuitProgram, ControlledPair, ProgramInstruction, ReferenceClifford,
@@ -309,4 +309,16 @@ fn execute_instruction(
         ProgramInstruction::Observable { .. } => {}
     }
     Ok(())
+}
+
+/// The record bit `offset` steps back from the end of `record`, or false before its start.
+fn record_lookback(record: &[bool], offset: stab_model::MeasureRecordOffset) -> bool {
+    let index = i64::try_from(record.len())
+        .ok()
+        .and_then(|len| len.checked_add(i64::from(offset.get())))
+        .and_then(|index| usize::try_from(index).ok());
+    index
+        .and_then(|index| record.get(index))
+        .copied()
+        .unwrap_or(false)
 }

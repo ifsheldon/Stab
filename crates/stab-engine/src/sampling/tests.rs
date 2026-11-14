@@ -152,7 +152,7 @@ fn count_determined(input: &str, unknown_input: bool) -> u64 {
 fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionStats) {
     let mut workspace =
         ReferenceWorkspace::try_new(plan.inner.qubit_count, true).expect("reference workspace");
-    let mut output = Vec::with_capacity(plan.inner.measurement_count);
+    let mut output = super::ReferenceBits::default();
     reset_reference_execution_stats();
     workspace
         .run(
@@ -164,7 +164,9 @@ fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionSt
         )
         .expect("execute reference program");
     let stats = take_reference_execution_stats();
-    (output, stats)
+    let mut bools = Vec::new();
+    output.extend_bools_into(&mut bools);
+    (bools, stats)
 }
 
 #[test]

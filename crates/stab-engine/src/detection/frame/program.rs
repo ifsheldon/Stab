@@ -251,6 +251,15 @@ impl ProgramInstruction {
     }
 }
 
+/// Retention a frame needs to run a program over bounded windows of measurement planes.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct MeasurementWindowNeeds {
+    /// Most planes back from the newest that a classical control reads.
+    pub(crate) feedback_lookback: usize,
+    /// Most measurement planes one instruction records.
+    pub(crate) largest_instruction: usize,
+}
+
 /// Counts that admission derives from the resolved program.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ProgramCounts {
@@ -319,6 +328,43 @@ impl CircuitProgram {
     /// A cursor over the whole tape that polls `cancellation` while it expands repeats.
     pub(crate) fn cursor<'a>(&'a self, cancellation: &'a Cancellation) -> ProgramCursor<'a> {
         ProgramCursor::new(&self.entries, 0, self.entries.len(), cancellation)
+    }
+
+    /// What a frame must retain to run this program over bounded windows of measurement planes:
+    /// the deepest classical-control record lookback and the most measurements one instruction
+    /// records, since a window is handed over only between instructions.
+    pub(crate) fn measurement_window_needs(&self) -> MeasurementWindowNeeds {
+        let mut needs = MeasurementWindowNeeds::default();
+        for entry in &self.entries {
+            let ProgramEntry::Instruction(instruction) = entry else {
+                continue;
+            };
+            let recorded = match instruction {
+                ProgramInstruction::Measure { targets, .. }
+                | ProgramInstruction::HeraldedErase { targets, .. }
+                | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len(),
+                ProgramInstruction::MeasurePairs { targets, .. } => targets.len() / 2,
+                ProgramInstruction::MeasurePads { values, .. } => values.len(),
+                ProgramInstruction::PauliProducts(measurement) => measurement.product_count(),
+                ProgramInstruction::ControlledPauli { pairs, .. } => {
+                    for pair in pairs {
+                        if let ControlledPair::Record { offset, .. } = pair {
+                            needs.feedback_lookback =
+                                needs.feedback_lookback.max(lookback_distance(*offset));
+                        }
+                    }
+                    0
+                }
+                ProgramInstruction::Clifford { .. }
+                | ProgramInstruction::Reset { .. }
+                | ProgramInstruction::SinglePauliNoise { .. }
+                | ProgramInstruction::TwoQubitPauliNoise { .. }
+                | ProgramInstruction::CorrelatedError { .. }
+                | ProgramInstruction::Observable { .. } => 0,
+            };
+            needs.largest_instruction = needs.largest_instruction.max(recorded);
+        }
+        needs
     }
 
     #[cfg(test)]
@@ -547,6 +593,11 @@ fn admission_drift() -> DetectionError {
     DetectionError::invalid_sampler_compilation(
         "detector-frame materialization disagreed with allocation-free admission",
     )
+}
+
+/// Planes back from the newest that `offset` reads.
+pub(crate) fn lookback_distance(offset: MeasureRecordOffset) -> usize {
+    usize::try_from(offset.get().unsigned_abs()).unwrap_or(usize::MAX)
 }
 
 fn program_shape_error() -> DetectionError {

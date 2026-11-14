@@ -5,6 +5,7 @@ use stab_model::advanced::CancellationCountdown;
 use stab_model::{Cancellation, RepeatNestingLimit};
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
+use super::reference_bits::ReferenceBits;
 use super::reference_fold::{FoldProbe, ProbeStep, SnapshotSlot};
 use super::reference_simulator::{
     InverseTableauSimulator, ReferenceSimulatorError, WorkModel, reset_correction,
@@ -13,7 +14,6 @@ use crate::detection::frame::{
     CircuitProgram, CliffordStep, ControlledPair, ProgramEntry, ProgramInstruction,
     ReferenceClifford,
 };
-use stab_model::MeasureRecordOffset;
 
 pub(super) use super::reference_fold::has_reference_fold_candidate;
 
@@ -46,7 +46,7 @@ impl ReferenceWorkspace {
         program: &CircuitProgram,
         loop_policy: ReferenceSampleLoopPolicy,
         sweep_record: &[bool],
-        output: &mut Vec<bool>,
+        output: &mut ReferenceBits,
         cancellation: &Cancellation,
     ) -> Result<(), SamplingExecutionError> {
         #[cfg(test)]
@@ -92,7 +92,7 @@ fn run_entries(
     simulator: &mut InverseTableauSimulator,
     mut snapshot: Option<&mut SnapshotSlot>,
     sweep_record: &[bool],
-    output: &mut Vec<bool>,
+    output: &mut ReferenceBits,
     cancellation: &Cancellation,
 ) -> Result<(), SamplingExecutionError> {
     let entries = program.entries();
@@ -173,7 +173,7 @@ fn run_entries(
                             let copies = later
                                 .checked_div(period)
                                 .ok_or_else(|| run_invariant("a folded repeat had no period"))?;
-                            append_repeated_bits(output, block_start, copies)?;
+                            output.append_repeated(block_start, copies)?;
                             #[cfg(test)]
                             record_fold(
                                 entries.get(frame.body_start..frame.body_end),
@@ -365,7 +365,7 @@ fn apply_instruction(
     instruction: &ProgramInstruction,
     simulator: &mut InverseTableauSimulator,
     sweep_record: &[bool],
-    output: &mut Vec<bool>,
+    output: &mut ReferenceBits,
 ) -> Result<(), SamplingExecutionError> {
     match instruction {
         ProgramInstruction::Clifford {
@@ -429,12 +429,12 @@ fn apply_instruction(
             Ok(())
         }
         ProgramInstruction::MeasurePads { values, .. } => {
-            output.extend_from_slice(values);
+            output.extend_from_bools(values);
             Ok(())
         }
         ProgramInstruction::HeraldedErase { targets, .. }
         | ProgramInstruction::HeraldedPauliChannel { targets, .. } => {
-            output.extend(std::iter::repeat_n(false, targets.len()));
+            output.extend_zeros(targets.len());
             Ok(())
         }
         ProgramInstruction::SinglePauliNoise { .. }
@@ -456,7 +456,7 @@ fn apply_instruction(
                         apply_clifford(clifford, &[control, target], simulator)
                     }
                     ControlledPair::Record { offset, qubit } => {
-                        if record_lookback(output, offset) {
+                        if output.lookback(offset) {
                             simulator.apply_pauli(qubit, *basis)
                         } else {
                             Ok(())
@@ -510,7 +510,7 @@ pub(super) fn count_determined_measurements(
                 .map_err(simulator_error)?;
         }
     }
-    let mut record = Vec::new();
+    let mut record = ReferenceBits::default();
     let mut count = 0_u64;
     let mut cursor = program.cursor(cancellation);
     while let Some(instruction) = cursor.next_instruction().map_err(program_error)? {
@@ -595,9 +595,7 @@ pub(super) fn count_determined_measurements(
                         ControlledPair::Quantum { control, target } => {
                             apply_clifford(clifford, &[control, target], &mut simulator)
                         }
-                        ControlledPair::Record { offset, qubit }
-                            if record_lookback(&record, offset) =>
-                        {
+                        ControlledPair::Record { offset, qubit } if record.lookback(offset) => {
                             simulator.apply_pauli(qubit, *basis)
                         }
                         ControlledPair::Record { .. } | ControlledPair::Sweep { .. } => Ok(()),
@@ -609,30 +607,6 @@ pub(super) fn count_determined_measurements(
         }
     }
     Ok(count)
-}
-
-fn append_repeated_bits(
-    output: &mut Vec<bool>,
-    output_start: usize,
-    repetitions: u64,
-) -> Result<(), SamplingExecutionError> {
-    let pattern_len = output.len().saturating_sub(output_start);
-    if pattern_len == 0 {
-        return Ok(());
-    }
-    let total = usize::try_from(repetitions)
-        .ok()
-        .and_then(|repetitions| repetitions.checked_mul(pattern_len))
-        .ok_or_else(|| run_invariant("reference folding output length overflowed"))?;
-    output.try_reserve(total).map_err(|error| {
-        SamplingExecutionError::SessionStorageAllocation {
-            message: format!("reference folding output capacity {total}: {error}"),
-        }
-    })?;
-    for _ in 0..repetitions {
-        output.extend_from_within(output_start..output_start + pattern_len);
-    }
-    Ok(())
 }
 
 pub(super) fn simulator_error(error: ReferenceSimulatorError) -> SamplingExecutionError {
@@ -720,16 +694,4 @@ fn record_fold(body: Option<&[ProgramEntry]>, reused_iterations: u64, period: u6
         stats.longest_period = stats.longest_period.max(period);
         cell.set(stats);
     });
-}
-
-/// The record bit `offset` steps back from the end of `record`, or false before its start.
-pub(super) fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> bool {
-    let index = i64::try_from(record.len())
-        .ok()
-        .and_then(|len| len.checked_add(i64::from(offset.get())))
-        .and_then(|index| usize::try_from(index).ok());
-    index
-        .and_then(|index| record.get(index))
-        .copied()
-        .unwrap_or(false)
 }

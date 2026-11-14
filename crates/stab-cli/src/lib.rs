@@ -44,7 +44,7 @@ use stab_analysis::{
 };
 use stab_engine::{
     LaneWidth, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
-    SamplingCompiler, SamplingSession, Seed, ShotCount,
+    SamplingCompiler, SamplingSession, Seed, ShotCount, StreamingSamplingRun,
 };
 use stab_model::{
     Cancellation, Circuit, FoldedCircuitSummary, FoldedCount, GateKind, MemoryBudget,
@@ -802,13 +802,18 @@ where
     let shots = ShotCount::try_from(args.shots).map_err(CliError::from)?;
     // The CLI knows the whole request up front, so a small request samples narrow batches; the
     // seeded stream is therefore a function of the seed and the total shot count.
-    let mut session = plan
-        .session_with_lane_width(
-            random_policy,
-            reference_mode,
-            LaneWidth::for_total_shots(shots),
+    let lane_width = LaneWidth::for_total_shots(shots);
+    let run = if !streams_one_partial_batch(shots, lane_width) {
+        SampleRun::Session(
+            plan.session_with_lane_width(random_policy, reference_mode, lane_width)
+                .map_err(CliError::from)?,
         )
-        .map_err(CliError::from)?;
+    } else {
+        SampleRun::Streaming(
+            plan.streaming_run(random_policy, reference_mode, lane_width, shots)
+                .map_err(CliError::from)?,
+        )
+    };
     let output_width = visible_measurements
         .as_ref()
         .map_or(plan.measurement_width().get(), Vec::len);
@@ -816,7 +821,7 @@ where
     let mut outputs = io.activate()?;
     if let Some(mut output) = outputs.take(FileRole::Output) {
         return write_sample_output(
-            &mut session,
+            run,
             shots,
             visible_measurements.as_deref(),
             encoder,
@@ -827,14 +832,8 @@ where
             source,
         });
     }
-    write_sample_output(
-        &mut session,
-        shots,
-        visible_measurements.as_deref(),
-        encoder,
-        stdout,
-    )
-    .map_err(CliError::SampleOutput)
+    write_sample_output(run, shots, visible_measurements.as_deref(), encoder, stdout)
+        .map_err(CliError::SampleOutput)
 }
 
 pub(crate) fn parse_circuit_bytes(
@@ -847,8 +846,29 @@ pub(crate) fn parse_circuit_bytes(
     )?)
 }
 
+/// Whether a `sample` or `detect` request runs as one streaming run.
+///
+/// A request smaller than the narrowest batch (1 to 63 shots, which `LaneWidth::for_total_shots`
+/// samples at 64 lanes) streams: it keeps shot-major records of only its shots instead of one
+/// plane per measurement for every lane, which is where streaming saves memory on wide records.
+/// A larger request keeps about as many record bits as planes and measured 5 to 15 percent
+/// slower streaming, so it materializes; that includes every PTB64 request, which needs whole
+/// 64-shot groups.
+pub(crate) fn streams_one_partial_batch(shots: ShotCount, lane_width: LaneWidth) -> bool {
+    let narrowest = LaneWidth::Lanes64
+        .shots_per_batch()
+        .min(lane_width.shots_per_batch());
+    usize::try_from(shots.get()).is_ok_and(|shots| shots < narrowest)
+}
+
+/// The one run a `sample` command executes.
+enum SampleRun {
+    Session(SamplingSession),
+    Streaming(StreamingSamplingRun),
+}
+
 fn write_sample_output<W>(
-    session: &mut SamplingSession,
+    run: SampleRun,
     shots: ShotCount,
     visible_measurements: Option<&[usize]>,
     encoder: RecordEncoder,
@@ -863,7 +883,10 @@ where
         encoder,
         output,
     };
-    session.run(shots, &mut sink).map(|_| ())
+    match run {
+        SampleRun::Session(mut session) => session.run(shots, &mut sink).map(|_| ()),
+        SampleRun::Streaming(run) => run.run(&mut sink).map(|_| ()),
+    }
 }
 
 /// Routes sampled measurements to the shared encoder.

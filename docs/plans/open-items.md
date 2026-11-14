@@ -19,7 +19,8 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 ## Memory
 
 - The CLI applies `--memory-budget` per stage, not per command, so one command can retain a small multiple of the budget; a 147 MB flattened circuit peaks at 1.35 GB under the 1 GiB default.
-- Peak memory at large record widths is far above Stim's for shapes that Stim streams, such as 415 MB against 6 MB for a 5,000,000-round repetition-code `sample`.
+- `sample` and `detect` stream only requests of 1 to 63 shots: one shot of a 5,000,000-round repetition code (10,000,000 measurements) peaks at about 7 MB against Stim's 6 MB. From 64 shots on they still keep one plane per measurement (and detector) for every lane plus about 16 bytes per record bit of encoder transpose scratch, 240 MB at 64 shots and 475 MB at 256 to 1000 shots on that circuit (786 MB for `detect --shots 1000`), below Stim's 268 MB to 2.36 GB but proportional to the lane width; the streaming run that would keep only the delivered records measured 5 to 15 percent slower once it fills whole batches.
+- `m2d` converts whole 256-record batches of input records through full measurement and detector planes, 1.2 GB for one record of that circuit against Stim's 6.9 GB, and PTB64 output always materializes its planes.
 - Sampled flows (`sample_if_circuit_has_stabilizer_flows` in `stab-engine`), flow checking, Pauli conjugation (`pauli_after_circuit`, `pauli_before_circuit`), and `Flow` text parsing admit against the default budget and take no caller budget; the engine function needs an options value, and the analysis ones a budgeted sibling.
 
 ## Cancellation

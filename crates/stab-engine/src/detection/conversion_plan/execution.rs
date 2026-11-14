@@ -36,6 +36,216 @@ impl RepeatExecutionFrame {
     };
 }
 
+/// Why [`ConversionRunner::run`] returned.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ConversionStop {
+    /// The whole program ran.
+    Finished,
+    /// The next detector or observable reads a measurement that is not available yet.
+    NeedsMeasurements,
+    /// The next detector has no slot left in the detector window.
+    DetectorWindowFull,
+}
+
+/// Where a conversion reads measurement values and writes detector values.
+pub(super) struct ConversionIo<'a, 'b, Value> {
+    pub(super) measurements: RecordValues<'a, Value>,
+    /// Absolute measurement index of the first value of `measurements`.
+    pub(super) measurement_base: usize,
+    pub(super) reference_sample: RecordValues<'a, Value>,
+    /// Measurements below this absolute index are available.
+    pub(super) available_measurements: usize,
+    pub(super) detectors: &'b mut [Value],
+    /// Absolute detector index of `detectors[0]`.
+    pub(super) detector_base: usize,
+    pub(super) observables: &'b mut [Value],
+}
+
+/// A conversion program's execution state, resumable after it stops for more input or output
+/// room, so a streaming batch converts its measurement windows as they are recorded.
+pub(crate) struct ConversionRunner {
+    program_counter: usize,
+    repeat_stack: [RepeatExecutionFrame; RepeatNestingLimit::HARD_MAX],
+    repeat_depth: usize,
+    pub(super) cursor: ConversionCursor,
+    countdown: CancellationCountdown,
+}
+
+impl Default for ConversionRunner {
+    fn default() -> Self {
+        Self {
+            program_counter: 0,
+            repeat_stack: [RepeatExecutionFrame::EMPTY; RepeatNestingLimit::HARD_MAX],
+            repeat_depth: 0,
+            cursor: ConversionCursor::default(),
+            countdown: CancellationCountdown::new(),
+        }
+    }
+}
+
+impl ConversionRunner {
+    /// Runs `program` from where it last stopped until it ends or needs what `io` lacks.
+    pub(super) fn run<Value>(
+        &mut self,
+        program: &[ConversionOperation],
+        io: &mut ConversionIo<'_, '_, Value>,
+        cancellation: &Cancellation,
+    ) -> DetectionResult<ConversionStop>
+    where
+        Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+    {
+        // The loop state lives in locals so the hot loop keeps it in registers; it is stored
+        // back whenever the run returns, so a later call resumes where this one stopped.
+        let mut program_counter = self.program_counter;
+        let mut repeat_depth = self.repeat_depth;
+        let mut cursor = self.cursor;
+        let mut countdown = self.countdown;
+        let repeat_stack = &mut self.repeat_stack;
+        let result = (|| {
+            while let Some(operation) = program.get(program_counter) {
+                match operation {
+                    ConversionOperation::AdvanceMeasurements(count) => {
+                        cursor.measurement = cursor
+                            .measurement
+                            .checked_add(*count)
+                            .ok_or_else(compilation_overflow)?;
+                        program_counter = next_program_counter(program_counter)?;
+                    }
+                    ConversionOperation::Detector(terms) => {
+                        if cursor.measurement > io.available_measurements {
+                            return Ok(ConversionStop::NeedsMeasurements);
+                        }
+                        let slot =
+                            cursor
+                                .detector
+                                .checked_sub(io.detector_base)
+                                .ok_or_else(|| {
+                                    DetectionError::invalid_sampler_compilation(
+                                        "compact conversion detector fell behind its window",
+                                    )
+                                })?;
+                        let Some(detector) = io.detectors.get_mut(slot) else {
+                            return Ok(ConversionStop::DetectorWindowFull);
+                        };
+                        countdown.tick(cancellation)?;
+                        *detector = parity_of_terms(
+                            terms,
+                            cursor.measurement,
+                            io.measurements,
+                            io.measurement_base,
+                            io.reference_sample,
+                        )?;
+                        cursor.detector = cursor
+                            .detector
+                            .checked_add(1)
+                            .ok_or_else(compilation_overflow)?;
+                        program_counter = next_program_counter(program_counter)?;
+                    }
+                    ConversionOperation::Observable { id, terms } => {
+                        if cursor.measurement > io.available_measurements {
+                            return Ok(ConversionStop::NeedsMeasurements);
+                        }
+                        countdown.tick(cancellation)?;
+                        let value = parity_of_terms(
+                            terms,
+                            cursor.measurement,
+                            io.measurements,
+                            io.measurement_base,
+                            io.reference_sample,
+                        )?;
+                        let observable = io.observables.get_mut(*id).ok_or_else(|| {
+                            DetectionError::invalid_sampler_compilation(format!(
+                                "compact conversion observable index {id} is out of range"
+                            ))
+                        })?;
+                        *observable ^= value;
+                        program_counter = next_program_counter(program_counter)?;
+                    }
+                    ConversionOperation::Repeat {
+                        count,
+                        body_end,
+                        measurement_count,
+                        detector_count,
+                        requires_iteration: false,
+                    } => {
+                        validate_repeat_marker(program, program_counter, *body_end)?;
+                        cursor.measurement = repeated_usize_total(
+                            cursor.measurement,
+                            *measurement_count,
+                            *count,
+                            "runtime measurement cursor",
+                        )?;
+                        cursor.detector = repeated_usize_total(
+                            cursor.detector,
+                            *detector_count,
+                            *count,
+                            "runtime detector cursor",
+                        )?;
+                        program_counter = next_program_counter(*body_end)?;
+                    }
+                    ConversionOperation::Repeat {
+                        count,
+                        body_end,
+                        requires_iteration: true,
+                        ..
+                    } => {
+                        validate_repeat_marker(program, program_counter, *body_end)?;
+                        if *count == 0 {
+                            program_counter = next_program_counter(*body_end)?;
+                            continue;
+                        }
+                        let frame = repeat_stack
+                            .get_mut(repeat_depth)
+                            .ok_or_else(compilation_shape_mismatch)?;
+                        *frame = RepeatExecutionFrame {
+                            body_start: next_program_counter(program_counter)?,
+                            body_end: *body_end,
+                            remaining: *count,
+                        };
+                        repeat_depth = repeat_depth
+                            .checked_add(1)
+                            .ok_or_else(compilation_overflow)?;
+                        program_counter = next_program_counter(program_counter)?;
+                    }
+                    ConversionOperation::EndRepeat => {
+                        let frame_index = repeat_depth
+                            .checked_sub(1)
+                            .ok_or_else(compilation_shape_mismatch)?;
+                        let frame = repeat_stack
+                            .get_mut(frame_index)
+                            .ok_or_else(compilation_shape_mismatch)?;
+                        if frame.body_end != program_counter || frame.remaining == 0 {
+                            return Err(compilation_shape_mismatch());
+                        }
+                        frame.remaining -= 1;
+                        if frame.remaining == 0 {
+                            repeat_depth = frame_index;
+                            program_counter = next_program_counter(program_counter)?;
+                        } else {
+                            program_counter = frame.body_start;
+                            countdown.tick(cancellation)?;
+                        }
+                    }
+                }
+            }
+            if repeat_depth != 0 {
+                return Err(compilation_shape_mismatch());
+            }
+            Ok(ConversionStop::Finished)
+        })();
+        self.program_counter = program_counter;
+        self.repeat_depth = repeat_depth;
+        self.cursor = cursor;
+        self.countdown = countdown;
+        result
+    }
+}
+
+/// Runs a whole conversion program over complete records.
+///
+/// This is the loop of [`ConversionRunner::run`] without its window checks and resumable
+/// state; materializing sessions and measurement-to-detection conversion run it per batch, and
+/// routing them through the resumable runner measured 5 to 10 percent slower on detection.
 pub(super) fn execute_program<Value>(
     program: &[ConversionOperation],
     measurements: RecordValues<'_, Value>,
@@ -64,7 +274,7 @@ where
             ConversionOperation::Detector(terms) => {
                 countdown.tick(cancellation)?;
                 let value =
-                    parity_of_terms(terms, cursor.measurement, measurements, reference_sample)?;
+                    parity_of_terms(terms, cursor.measurement, measurements, 0, reference_sample)?;
                 let detector = detectors.get_mut(cursor.detector).ok_or_else(|| {
                     DetectionError::invalid_sampler_compilation(format!(
                         "compact conversion detector index {} is out of range",
@@ -81,7 +291,7 @@ where
             ConversionOperation::Observable { id, terms } => {
                 countdown.tick(cancellation)?;
                 let value =
-                    parity_of_terms(terms, cursor.measurement, measurements, reference_sample)?;
+                    parity_of_terms(terms, cursor.measurement, measurements, 0, reference_sample)?;
                 let observable = observables.get_mut(*id).ok_or_else(|| {
                     DetectionError::invalid_sampler_compilation(format!(
                         "compact conversion observable index {id} is out of range"
@@ -186,6 +396,7 @@ fn parity_of_terms<Value>(
     terms: &[MeasureRecordOffset],
     measurement_cursor: usize,
     measurements: RecordValues<'_, Value>,
+    measurement_base: usize,
     reference_sample: RecordValues<'_, Value>,
 ) -> DetectionResult<Value>
 where
@@ -202,12 +413,16 @@ where
             })?,
             RecordValues::Zero => Value::default(),
         };
+        // An index below the base wraps past every slice length and reads as out of range.
         let measurement = match measurements {
-            RecordValues::Values(record) => record.get(index).copied().ok_or_else(|| {
-                DetectionError::invalid_result_format(format!(
-                    "measurement index {index} is out of range"
-                ))
-            })?,
+            RecordValues::Values(record) => record
+                .get(index.wrapping_sub(measurement_base))
+                .copied()
+                .ok_or_else(|| {
+                    DetectionError::invalid_result_format(format!(
+                        "measurement index {index} is out of range"
+                    ))
+                })?,
             RecordValues::Zero => Value::default(),
         };
         parity ^= measurement ^ reference;

@@ -21,6 +21,7 @@ use crate::{
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
+    streams_one_partial_batch,
 };
 
 /// Records read per conversion call: the most one measurement-to-detection call accepts.
@@ -190,11 +191,19 @@ where
     let shots = shot_count(args.shots)?;
     // The CLI knows the whole request up front, so a small request samples narrow batches; the
     // seeded stream is therefore a function of the seed and the total shot count.
-    let mut session = plan
-        .session_with_lane_width(random_policy(args.seed), LaneWidth::for_total_shots(shots))
-        .map_err(CliError::from)?;
-    session
-        .run(shots, &mut sink)
+    let lane_width = LaneWidth::for_total_shots(shots);
+    if !streams_one_partial_batch(shots, lane_width) {
+        let mut session = plan
+            .session_with_lane_width(random_policy(args.seed), lane_width)
+            .map_err(CliError::from)?;
+        return session
+            .run(shots, &mut sink)
+            .map(|_| ())
+            .map_err(map_detection_run_error);
+    }
+    plan.streaming_run(random_policy(args.seed), lane_width, shots)
+        .map_err(CliError::from)?
+        .run(&mut sink)
         .map(|_| ())
         .map_err(map_detection_run_error)
 }
