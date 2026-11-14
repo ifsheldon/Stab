@@ -602,6 +602,9 @@ pub(super) fn display_status(status: Option<i32>) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    use std::assert_matches;
+
     #[cfg(unix)]
     use std::ffi::OsString;
     #[cfg(unix)]
@@ -636,9 +639,10 @@ mod tests {
         )
         .expect_err("stdout beyond the process limit must fail closed");
 
-        assert!(
-            matches!(&error, OracleError::OutputLimitExceeded { .. }),
-            "unexpected process error: {error}"
+        assert_matches!(
+            &error,
+            OracleError::OutputLimitExceeded { .. },
+            "unexpected process error: {error}",
         );
         if let OracleError::OutputLimitExceeded {
             stream,
@@ -670,7 +674,7 @@ mod tests {
         )
         .expect_err("unbounded stdout must be terminated at the capture limit");
 
-        assert!(matches!(error, OracleError::OutputLimitExceeded { .. }));
+        assert_matches!(error, OracleError::OutputLimitExceeded { .. });
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
@@ -723,7 +727,7 @@ mod tests {
         .expect_err("controller cancellation must terminate the child tree");
         trigger.join().expect("cancellation trigger");
 
-        assert!(matches!(error, OracleError::Interrupted { .. }));
+        assert_matches!(error, OracleError::Interrupted { .. });
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
@@ -751,7 +755,7 @@ mod tests {
         )
         .expect_err("sticky cancellation must reject a later spawn");
 
-        assert!(matches!(error, OracleError::Interrupted { .. }));
+        assert_matches!(error, OracleError::Interrupted { .. });
         assert!(!marker.exists());
     }
 
@@ -768,7 +772,7 @@ mod tests {
         )
         .expect_err("process tree should time out");
 
-        assert!(matches!(error, OracleError::TimedOut { .. }));
+        assert_matches!(error, OracleError::TimedOut { .. });
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
@@ -791,10 +795,7 @@ mod tests {
         )
         .expect_err("oversized auxiliary output must terminate the child");
 
-        assert!(matches!(
-            error,
-            OracleError::AuxiliaryOutputLimitExceeded { .. }
-        ));
+        assert_matches!(error, OracleError::AuxiliaryOutputLimitExceeded { .. });
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
@@ -829,7 +830,7 @@ mod tests {
         )
         .expect_err("blocked stdin writes should remain subject to the process deadline");
 
-        assert!(matches!(error, OracleError::TimedOut { .. }));
+        assert_matches!(error, OracleError::TimedOut { .. });
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 

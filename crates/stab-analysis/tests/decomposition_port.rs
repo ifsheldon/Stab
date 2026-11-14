@@ -77,8 +77,7 @@ fn decomposition_components_xor_back_and_never_repeat() {
         decomposed_symptoms.push(symptom_set(line));
         let components = line
             .split_once(") ")
-            .map(|(_, targets)| targets)
-            .unwrap_or_default()
+            .map_or_default(|(_, targets)| targets)
             .split(" ^ ")
             .collect::<Vec<_>>();
         let mut seen = std::collections::BTreeSet::new();
@@ -110,10 +109,7 @@ fn decomposition_components_xor_back_and_never_repeat() {
 }
 
 fn symptom_set(line: &str) -> Vec<String> {
-    let targets = line
-        .split_once(") ")
-        .map(|(_, rest)| rest)
-        .unwrap_or_default();
+    let targets = line.split_once(") ").map_or_default(|(_, rest)| rest);
     let mut set = std::collections::BTreeSet::new();
     for token in targets.split_whitespace() {
         if token == "^" {

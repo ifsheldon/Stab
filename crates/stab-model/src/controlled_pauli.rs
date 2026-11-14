@@ -151,6 +151,8 @@ mod tests {
         reason = "fixed gate and target fixtures must be valid before classification"
     )]
 
+    use std::assert_matches;
+
     use super::*;
 
     fn q(id: u32) -> Target {
@@ -167,27 +169,27 @@ mod tests {
         let cz = Gate::from_name("CZ").expect("CZ");
         let xcz = Gate::from_name("XCZ").expect("XCZ");
 
-        assert!(matches!(
+        assert_matches!(
             classify_controlled_pauli_target_pair(cx, &[rec(-1), q(0)]),
             ControlledPauliTargetPair::Classical {
                 control: ClassicalControl::Record(_),
                 target,
             } if target.get() == 0
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             classify_controlled_pauli_target_pair(xcz, &[q(0), Target::sweep_bit(3)]),
             ControlledPauliTargetPair::Classical {
                 control: ClassicalControl::Sweep(3),
                 target,
             } if target.get() == 0
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             classify_controlled_pauli_target_pair(cz, &[rec(-1), Target::sweep_bit(2)]),
             ControlledPauliTargetPair::ClassicalNoop {
                 first: ClassicalControl::Record(_),
                 second: ClassicalControl::Sweep(2),
             }
-        ));
+        );
         assert_eq!(
             classify_controlled_pauli_target_pair(cx, &[q(0), Target::sweep_bit(0)]),
             ControlledPauliTargetPair::Unsupported

@@ -58,8 +58,8 @@ pub(super) fn apply_words(
     for (plane, generator_offset) in [(in_x, 0), (in_z, num_qubits)] {
         for (word_index, word) in plane.iter().copied().enumerate() {
             let mut bits = word;
-            while bits != 0 {
-                let qubit = word_index * WORD_BITS + bits.trailing_zeros() as usize;
+            while let Some(bit) = bits.lowest_one() {
+                let qubit = word_index * WORD_BITS + bit as usize;
                 bits &= bits - 1;
                 if qubit >= num_qubits {
                     return Err(StabilizerError::LengthMismatch {

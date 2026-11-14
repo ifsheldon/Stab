@@ -630,7 +630,7 @@ fn filesystem_violation(
     message: String,
 ) -> DocsViolation {
     DocsViolation {
-        path: path.strip_prefix(root).unwrap_or(path).to_path_buf(),
+        path: path.trim_prefix(root).to_path_buf(),
         line: 1,
         column: 1,
         code,

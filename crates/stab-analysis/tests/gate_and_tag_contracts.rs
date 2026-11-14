@@ -3,6 +3,8 @@
     reason = "analysis contract tests use direct fixture assertions"
 )]
 
+use std::assert_matches;
+
 use stab_algebra::SingleQubitClifford;
 use stab_analysis::{
     AnalysisError, circuit_without_tags, gate_decomposition_to_circuit,
@@ -34,11 +36,11 @@ fn gate_decomposition_is_a_valid_model_without_implying_tableau_support() {
     assert!(gate_has_h_s_cx_m_r_decomposition(measurement));
     assert!(!gate_has_tableau(measurement));
     let error = gate_tableau(measurement).expect_err("measurement has no unitary tableau");
-    assert!(matches!(
+    assert_matches!(
         error,
         AnalysisError::InvalidTableauConversion { ref message }
             if message.contains("does not have tableau data")
-    ));
+    );
 }
 
 #[test]

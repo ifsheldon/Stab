@@ -4,6 +4,7 @@
     reason = "resource-contract fixtures use direct setup assertions"
 )]
 
+use std::assert_matches;
 use std::hint::black_box;
 
 use stab_records::{
@@ -146,10 +147,7 @@ fn declared_widths_beyond_the_input_fail_typed_without_width_sized_allocation() 
     // fallibly, so an unsatisfiable width is a typed error rather than an abort.
     let error = measurements(b"\n", RecordFormat::Hits, usize::MAX / 2)
         .expect_err("unsatisfiable record storage");
-    assert!(
-        matches!(error, RecordStreamReadError::Format(_)),
-        "{error:?}"
-    );
+    assert_matches!(error, RecordStreamReadError::Format(_));
 }
 
 fn duplicate_dets_record(repetitions: usize) -> Vec<u8> {

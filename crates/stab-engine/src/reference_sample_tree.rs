@@ -355,6 +355,8 @@ mod tests {
         reason = "reference-sample-tree tests use compact upstream-style assertions"
     )]
 
+    use std::assert_matches;
+
     use stab_model::Circuit;
 
     use super::ReferenceSampleTree;
@@ -452,12 +454,12 @@ mod tests {
             ",
         )
         .expect("parse wide circuit");
-        assert!(matches!(
+        assert_matches!(
             ReferenceSampleTree::from_circuit_reference_sample(&circuit),
             Err(ReferenceSampleTreeError::SamplingExecution(
                 SamplingExecutionError::SessionStorageLimit { .. }
             ))
-        ));
+        );
     }
 
     #[test]

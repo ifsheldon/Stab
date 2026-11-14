@@ -70,8 +70,8 @@ pub(crate) async fn run_command(
 
     Ok(CommandOutput {
         status: status.code(),
-        stdout: String::from_utf8_lossy(&stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        stdout: String::from_utf8_lossy_owned(stdout),
+        stderr: String::from_utf8_lossy_owned(stderr),
         truncated: stdout_truncated || stderr_truncated,
     })
 }

@@ -224,7 +224,7 @@ impl FromStr for Target {
         if raw == "*" {
             return Ok(Self::Combiner);
         }
-        if let Some(offset) = raw.strip_prefix("rec[-").and_then(|v| v.strip_suffix(']')) {
+        if let Some(offset) = raw.strip_circumfix("rec[-", ']') {
             let offset = parse_u24(offset, "measurement record target")?;
             let offset = i32::try_from(offset)
                 .map_err(|_| ModelError::invalid_domain_value("measurement record target", raw))?;
@@ -232,7 +232,7 @@ impl FromStr for Target {
                 MeasureRecordOffset::from_stim_text(-offset)?,
             ));
         }
-        if let Some(index) = raw.strip_prefix("sweep[").and_then(|v| v.strip_suffix(']')) {
+        if let Some(index) = raw.strip_circumfix("sweep[", ']') {
             let id = parse_u24(index, "sweep target")?;
             return Ok(Self::sweep_bit(id));
         }

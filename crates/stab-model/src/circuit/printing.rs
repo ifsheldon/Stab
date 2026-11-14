@@ -1,4 +1,4 @@
-use std::fmt::{self, Write as _};
+use std::fmt::{self, NumBuffer, Write as _};
 use std::io::{self, Write};
 
 use crate::{Pauli, Target};
@@ -167,63 +167,19 @@ pub(super) fn write_target_io(out: &mut impl Write, target: &Target) -> io::Resu
 }
 
 fn push_i32(out: &mut String, value: i32) {
-    if value < 0 {
-        out.push('-');
-    }
-    push_u64(out, u64::from(value.unsigned_abs()));
+    out.push_str(value.format_into(&mut NumBuffer::new()));
 }
 
-#[allow(
-    clippy::expect_used,
-    reason = "the local buffer contains only ASCII decimal digits written below"
-)]
 pub(super) fn push_u64(out: &mut String, value: u64) {
-    let (digits, start) = encode_u64(value);
-    let encoded = digits
-        .get(start..)
-        .expect("decimal cursor remains in bounds");
-    out.push_str(std::str::from_utf8(encoded).expect("decimal digits are valid UTF-8"));
+    out.push_str(value.format_into(&mut NumBuffer::new()));
 }
 
 fn write_i32_io(out: &mut impl Write, value: i32) -> io::Result<()> {
-    if value < 0 {
-        out.write_all(b"-")?;
-    }
-    write_u64_io(out, u64::from(value.unsigned_abs()))
+    out.write_all(value.format_into(&mut NumBuffer::new()).as_bytes())
 }
 
-#[allow(
-    clippy::expect_used,
-    reason = "the decimal encoder proves its returned cursor is inside the fixed buffer"
-)]
 fn write_u64_io(out: &mut impl Write, value: u64) -> io::Result<()> {
-    let (digits, start) = encode_u64(value);
-    out.write_all(
-        digits
-            .get(start..)
-            .expect("decimal cursor remains in bounds"),
-    )
-}
-
-#[allow(
-    clippy::expect_used,
-    reason = "a u64 has at most 20 decimal digits and each remainder fits in u8"
-)]
-fn encode_u64(mut value: u64) -> ([u8; 20], usize) {
-    let mut digits = [0_u8; 20];
-    let mut start = digits.len();
-    loop {
-        start -= 1;
-        *digits
-            .get_mut(start)
-            .expect("decimal cursor remains inside the fixed buffer") =
-            b'0' + u8::try_from(value % 10).expect("decimal digit fits in u8");
-        value /= 10;
-        if value == 0 {
-            break;
-        }
-    }
-    (digits, start)
+    out.write_all(value.format_into(&mut NumBuffer::new()).as_bytes())
 }
 
 fn decimal_len_i32(value: i32) -> usize {
@@ -310,7 +266,9 @@ fn format_stim_float<const N: usize>(
         IntegralDoubles::GeneralFormat => !(value == 0.0 && value.is_sign_negative()),
     };
     if integral_shortcut && let Some(integer) = stim_integer_like_i64(value) {
-        write!(&mut result, "{integer}").expect("integer fits in float buffer");
+        result
+            .write_str(integer.format_into(&mut NumBuffer::new()))
+            .expect("integer fits in float buffer");
         return FormattedFloat { text: result };
     }
 

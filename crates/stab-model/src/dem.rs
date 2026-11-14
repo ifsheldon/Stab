@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Formatter, NumBuffer};
 use std::io::{self, Write};
 use std::str::FromStr;
 
@@ -365,7 +365,7 @@ impl DemRepeatBlock {
         out.push_str("repeat");
         write_optional_tag(out, self.tag.as_ref());
         out.push(' ');
-        out.push_str(&self.repeat_count.get().to_string());
+        out.push_str(self.repeat_count.get().format_into(&mut NumBuffer::new()));
         out.push_str(" {\n");
         // Pinned Stim prints one blank line inside an empty repeat body.
         if self.body.items.is_empty() {
@@ -671,16 +671,24 @@ impl DemTarget {
     pub fn numeric(value: u64) -> Self {
         Self::Numeric(value)
     }
+
+    /// Splits this target's DEM text into its letter prefix and its decimal digits.
+    fn text_parts(self, digits: &mut NumBuffer<u64>) -> (&'static str, &str) {
+        match self {
+            Self::RelativeDetector(id) => ("D", id.get().format_into(digits)),
+            Self::LogicalObservable(id) => ("L", id.get().format_into(digits)),
+            Self::Separator => ("^", ""),
+            Self::Numeric(value) => ("", value.format_into(digits)),
+        }
+    }
 }
 
 impl Display for DemTarget {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::RelativeDetector(id) => write!(f, "D{}", id.get()),
-            Self::LogicalObservable(id) => write!(f, "L{}", id.get()),
-            Self::Separator => f.write_str("^"),
-            Self::Numeric(value) => write!(f, "{value}"),
-        }
+        let mut digits = NumBuffer::new();
+        let (prefix, number) = self.text_parts(&mut digits);
+        f.write_str(prefix)?;
+        f.write_str(number)
     }
 }
 
@@ -880,15 +888,22 @@ fn write_args_io<W: Write>(
 }
 
 fn write_dem_targets(out: &mut String, targets: &[DemTarget]) {
+    let mut digits = NumBuffer::new();
     for target in targets {
+        let (prefix, number) = target.text_parts(&mut digits);
         out.push(' ');
-        out.push_str(&target.to_string());
+        out.push_str(prefix);
+        out.push_str(number);
     }
 }
 
 fn write_dem_targets_io<W: Write>(out: &mut W, targets: &[DemTarget]) -> io::Result<()> {
+    let mut digits = NumBuffer::new();
     for target in targets {
-        write!(out, " {target}")?;
+        let (prefix, number) = target.text_parts(&mut digits);
+        out.write_all(b" ")?;
+        out.write_all(prefix.as_bytes())?;
+        out.write_all(number.as_bytes())?;
     }
     Ok(())
 }

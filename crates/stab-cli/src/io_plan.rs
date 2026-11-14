@@ -514,6 +514,8 @@ fn reject_output_aliases(outputs: &[PendingOutput]) -> Result<(), CliError> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use tempfile::tempdir;
 
     use super::{FileRole, PendingIo};
@@ -534,13 +536,13 @@ mod tests {
             .with_outputs([(FileRole::Output, Some(output_path.as_path()))])
             .expect_err("delayed identity comparison must reject the new alias");
 
-        assert!(matches!(
+        assert_matches!(
             error,
             CliError::ConflictingFileRoles {
                 first: "--in",
                 second: "--out"
             }
-        ));
+        );
         assert_eq!(
             std::fs::read(input_path).expect("read preserved input"),
             b"sentinel\n"

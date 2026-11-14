@@ -4,6 +4,7 @@
     reason = "these contract tests must fail immediately when fixed fixtures or pass assertions break"
 )]
 
+use std::assert_matches;
 use std::cell::Cell;
 use std::convert::Infallible;
 
@@ -319,7 +320,7 @@ fn circuit_pass_validates_output_and_preserves_typed_diagnostics() {
         &CircuitPassContext::default(),
     )
     .expect_err("preserve pass-specific diagnostic");
-    assert!(matches!(diagnostic, CircuitPassError::Diagnostic(_)));
+    assert_matches!(diagnostic, CircuitPassError::Diagnostic(_));
     assert_eq!(
         diagnostic
             .diagnostic()

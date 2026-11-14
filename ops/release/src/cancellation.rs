@@ -71,6 +71,8 @@ impl ReleaseCancellation {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     #[test]
@@ -78,10 +80,10 @@ mod tests {
         let cancellation = ReleaseCancellation::for_test();
         cancellation.cancel();
         let started = Instant::now();
-        assert!(matches!(
+        assert_matches!(
             cancellation.sleep(Duration::from_secs(5), "test wait"),
             Err(ReleaseError::OperationInterrupted { .. })
-        ));
+        );
         assert!(started.elapsed() < Duration::from_millis(100));
     }
 }

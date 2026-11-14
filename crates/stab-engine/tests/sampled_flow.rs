@@ -3,6 +3,7 @@
     reason = "sampled-flow parity tests mirror compact upstream examples"
 )]
 
+use std::assert_matches;
 use std::str::FromStr;
 
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
@@ -203,7 +204,7 @@ fn assert_malformed_measurement_references_are_rejected() {
     )
     .expect_err("reject out-of-range sampled flow record");
 
-    assert!(matches!(error, SampledFlowError::InvalidFlow { .. }));
+    assert_matches!(error, SampledFlowError::InvalidFlow { .. });
     assert!(
         error.to_string().contains("outside sampled flow circuit"),
         "{error}"
@@ -214,7 +215,7 @@ fn assert_malformed_measurement_references_are_rejected() {
 fn sampled_flow_preserves_sampling_storage_admission() {
     let wide = PauliString::from_bases(PauliSign::Plus, vec![PauliBasis::X; 17_000])
         .expect("wide active Pauli");
-    assert!(matches!(
+    assert_matches!(
         sample_if_circuit_has_stabilizer_flows(
             &Circuit::new(),
             &[Flow::from_paulis(wide.clone(), wide)],
@@ -224,7 +225,7 @@ fn sampled_flow_preserves_sampling_storage_admission() {
         Err(SampledFlowError::SamplingExecution(
             SamplingExecutionError::SessionStorageLimit { .. }
         ))
-    ));
+    );
 }
 
 #[test]

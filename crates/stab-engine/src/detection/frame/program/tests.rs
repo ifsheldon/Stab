@@ -4,6 +4,8 @@
     reason = "program tests use direct structural fixture assertions"
 )]
 
+use std::assert_matches;
+
 use super::*;
 
 #[test]
@@ -28,11 +30,11 @@ fn spp_lowering_stops_at_the_first_compiled_byte_rejection() {
     let circuit = Circuit::from_stim_str("SPP X0 X1*Z1\n").expect("parse SPP fixture");
     let error = CircuitProgram::admit(&circuit, ProgramOptions::DETECTION, 0, 0)
         .expect_err("the first lowered instruction exceeds a zero-byte budget");
-    assert!(matches!(
+    assert_matches!(
         error,
         DetectionError::ResourceLimit(ref resource)
             if resource.kind() == crate::detection::DetectionResourceKind::CompiledBytes
-    ));
+    );
 }
 
 /// Every unitary gate reaches the inverse-tableau reference simulator through its exact pinned

@@ -4,6 +4,7 @@
     reason = "generated-code tests use bounded independently constructed tables"
 )]
 
+use std::assert_matches;
 use std::ops::ControlFlow;
 
 use stab_analysis::{
@@ -45,12 +46,10 @@ fn predictions_match_independent_oracle(model: &DetectorErrorModel, label: &str)
                 expected,
                 "{label} syndrome={syndrome}"
             ),
-            None => assert!(
-                matches!(
-                    session.prediction_for_syndrome(syndrome),
-                    Err(ExactMlDecodeError::ImpossibleSyndrome { .. })
-                ),
-                "{label} syndrome={syndrome}"
+            None => assert_matches!(
+                session.prediction_for_syndrome(syndrome),
+                Err(ExactMlDecodeError::ImpossibleSyndrome { .. }),
+                "{label} syndrome={syndrome}",
             ),
         }
     }

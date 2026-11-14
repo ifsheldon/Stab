@@ -4,6 +4,7 @@
     reason = "contract tests use direct assertions for impossible canonical metadata states"
 )]
 
+use std::assert_matches;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::Infallible;
 
@@ -315,26 +316,26 @@ fn gate_surface_contract_unsupported_shapes_have_narrow_typed_reasons() {
                 match exclusion {
                     GateShapeExclusion::AntiHermitianPauliProduct => {
                         assert_eq!(pattern, GateTargetPattern::AntiHermitianPauliProduct);
-                        assert!(matches!(gate.canonical_name(), "MPP" | "SPP" | "SPP_DAG"));
+                        assert_matches!(gate.canonical_name(), "MPP" | "SPP" | "SPP_DAG");
                     }
                     GateShapeExclusion::QuantumCannotControlClassical => {
-                        assert!(matches!(
+                        assert_matches!(
                             pattern,
                             GateTargetPattern::QubitRecord
                                 | GateTargetPattern::QubitSweep
                                 | GateTargetPattern::RecordQubit
                                 | GateTargetPattern::SweepQubit
-                        ));
+                        );
                     }
                     GateShapeExclusion::ClassicalOnlyPairRequiresSymmetricCz => {
                         assert_ne!(gate.canonical_name(), "CZ");
-                        assert!(matches!(
+                        assert_matches!(
                             pattern,
                             GateTargetPattern::RecordRecord
                                 | GateTargetPattern::RecordSweep
                                 | GateTargetPattern::SweepRecord
                                 | GateTargetPattern::SweepSweep
-                        ));
+                        );
                     }
                 }
             }

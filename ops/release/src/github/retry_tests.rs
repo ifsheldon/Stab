@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
@@ -166,7 +167,7 @@ fn cancellation_interrupts_get_retry_backoff() {
     let error = api
         .get_public_json::<serde_json::Value>(&format!("{host}/cancel"), "cancel retry test")
         .expect_err("cancellation must interrupt backoff");
-    assert!(matches!(error, ReleaseError::OperationInterrupted { .. }));
+    assert_matches!(error, ReleaseError::OperationInterrupted { .. });
     assert!(started.elapsed() < Duration::from_secs(1));
     assert_eq!(server.join().expect("server"), "/cancel");
 }

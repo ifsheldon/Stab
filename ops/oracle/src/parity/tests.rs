@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use super::*;
 
 mod catalog_semantics;
@@ -446,15 +448,13 @@ fn canonical_semantic_tests_run_in_the_product_owner_package() {
             evidence: Evidence::Verified { test, .. },
             ..
         } => test.package = "stab-core".to_string(),
-        disposition => assert!(
-            matches!(
-                disposition,
-                Disposition::Done {
-                    evidence: Evidence::Verified { .. },
-                    ..
-                }
-            ),
-            "valid ledger starts with verified done evidence"
+        disposition => assert_matches!(
+            disposition,
+            Disposition::Done {
+                evidence: Evidence::Verified { .. },
+                ..
+            },
+            "valid ledger starts with verified done evidence",
         ),
     }
 

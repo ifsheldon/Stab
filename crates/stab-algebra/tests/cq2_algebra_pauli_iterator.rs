@@ -3,6 +3,8 @@
     reason = "integration tests use direct assertions for semantic mismatch diagnostics"
 )]
 
+use std::assert_matches;
+
 use stab_algebra::{
     AlgebraMemoryBudget, PauliBasis, PauliSign, PauliStringIterator, StabilizerError,
     StabilizerResource, StabilizerResult,
@@ -58,14 +60,14 @@ fn cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference() -
     let wide = 1_048_577;
     let accepted = PauliStringIterator::new(wide, 1, 1, true, true, true)?;
     assert_eq!(accepted.result().len(), wide);
-    assert!(matches!(
+    assert_matches!(
         PauliStringIterator::new(usize::MAX / 2, 1, 1, true, true, true),
         Err(StabilizerError::MemoryBudgetExceeded {
             resource: StabilizerResource::PauliString,
             budget_bytes,
             ..
         }) if budget_bytes == AlgebraMemoryBudget::DEFAULT.bytes()
-    ));
+    );
     Ok(())
 }
 

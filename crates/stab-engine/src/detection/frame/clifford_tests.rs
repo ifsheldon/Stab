@@ -12,6 +12,8 @@
     reason = "differential frame tests fail immediately on fixture errors"
 )]
 
+use std::assert_matches;
+
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use stab_algebra::{PauliBasis, PauliString};
@@ -175,15 +177,13 @@ fn every_unitary_gate_compiles_to_one_program_operation() {
             gate.kind(),
             GateKind::I | GateKind::X | GateKind::Y | GateKind::Z | GateKind::II
         );
-        assert!(
-            matches!(
-                program.entries().first(),
-                Some(super::program::ProgramEntry::Instruction(
-                    super::program::ProgramInstruction::Clifford { frame, .. }
-                )) if (*frame == super::program::FrameGate::Identity) == frame_identity
-            ),
+        assert_matches!(
+            program.entries().first(),
+            Some(super::program::ProgramEntry::Instruction(
+                super::program::ProgramInstruction::Clifford { frame, .. }
+            )) if (*frame == super::program::FrameGate::Identity) == frame_identity,
             "{} must keep its reference action and drop only its frame action",
-            gate.canonical_name()
+            gate.canonical_name(),
         );
     }
 }

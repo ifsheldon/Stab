@@ -462,7 +462,7 @@ fn capture_version_from_descriptor(
 }
 
 fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
-    if path.as_os_str().is_empty()
+    if path.is_empty()
         || path.is_absolute()
         || path
             .components()
@@ -475,6 +475,7 @@ fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::fs;
     use std::io::Write as _;
     #[cfg(unix)]
@@ -929,14 +930,14 @@ mod tests {
     fn release_asset_output_is_no_replace() {
         let root = tempfile::tempdir().expect("root");
         fs::create_dir_all(root.path().join("target/releases/dist")).expect("existing output");
-        assert!(matches!(
+        assert_matches!(
             safe_fs::RetainedDirectory::create_new_under(
                 root.path(),
                 Path::new("target/releases/dist"),
                 Some(Path::new("target/releases"))
             ),
             Err(ReleaseError::OutputExists(_))
-        ));
+        );
     }
 
     #[test]
@@ -966,10 +967,10 @@ mod tests {
         )
         .expect("retained bytes");
         assert_eq!(archive::sha256_bytes(&retained_bytes), original);
-        assert!(matches!(
+        assert_matches!(
             reviewed.revalidate(),
             Err(ReleaseError::FileIdentityChanged(_))
-        ));
+        );
     }
 
     #[test]
@@ -981,11 +982,11 @@ mod tests {
         let byte_count = usize::try_from(byte_count).expect("asset size fits usize");
         fs::write(&path, vec![0x5a; byte_count]).expect("overwrite asset");
 
-        assert!(matches!(
+        assert_matches!(
             reviewed.revalidate(),
             Err(ReleaseError::BinaryContract(detail))
                 if detail.contains("changed after validation")
-        ));
+        );
     }
 
     #[test]
@@ -1001,11 +1002,11 @@ mod tests {
             .set_len(byte_count - 1)
             .expect("truncate asset");
 
-        assert!(matches!(
+        assert_matches!(
             reviewed.revalidate(),
             Err(ReleaseError::BinaryContract(detail))
                 if detail.contains("changed after validation")
-        ));
+        );
     }
 
     #[test]
@@ -1029,11 +1030,11 @@ mod tests {
         let reviewed = review_assets(root.path(), &assets, RELEASE_TAG).expect("review assets");
         fs::write(root.path().join(&assets).join("unexpected"), b"extra").expect("extra entry");
 
-        assert!(matches!(
+        assert_matches!(
             reviewed.revalidate(),
             Err(ReleaseError::BinaryContract(detail))
                 if detail.contains("release asset set differs")
-        ));
+        );
     }
 
     #[test]
@@ -1046,10 +1047,10 @@ mod tests {
                     .replacen("commit-hash: ", "commit-hash: mutated-", 1);
         });
 
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
     }
 
     #[test]
@@ -1062,10 +1063,10 @@ mod tests {
                     .replacen("commit-hash: ", "commit-hash: mutated-", 1);
         });
 
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
     }
 
     #[test]
@@ -1075,10 +1076,10 @@ mod tests {
             toolchain.active_toolchain.insert_str(0, "mutated-");
         });
 
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
     }
 
     #[test]
@@ -1087,20 +1088,20 @@ mod tests {
         mutate_manifest_toolchain(root.path(), &assets, "linux-aarch64", |toolchain| {
             toolchain.cargo_version = remove_verbose_field(&toolchain.cargo_version, "ssl");
         });
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
 
         let (root, assets) = tagged_asset_repository();
         mutate_manifest_toolchain(root.path(), &assets, "macos-aarch64", |toolchain| {
             toolchain.rustc_version =
                 remove_verbose_field(&toolchain.rustc_version, "LLVM version");
         });
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
     }
 
     #[test]
@@ -1110,10 +1111,10 @@ mod tests {
             toolchain.cargo_version =
                 replace_verbose_field(&toolchain.cargo_version, "libcurl", "arbitrary");
         });
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
     }
 
     #[test]
@@ -1126,10 +1127,10 @@ mod tests {
                 "Ubuntu 24.4.0 (noble) [64-bit]",
             );
         });
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
     }
 
     #[test]
@@ -1152,9 +1153,9 @@ mod tests {
                 .display()
                 .to_string();
         });
-        assert!(matches!(
-            review_assets(root.path(), &assets, RELEASE_TAG),
+        assert_matches!(
+            review_assets(root.path(), &assets, RELEASE_TAG).map(drop),
             Err(ReleaseError::ToolchainIdentity(_))
-        ));
+        );
     }
 }

@@ -12,6 +12,8 @@
 //! reference on sampled rows and random Paulis, and against algebraic identities where a scalar
 //! reference over every row would be too slow in a debug build.
 
+use std::assert_matches;
+
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use stab_algebra::{
@@ -49,10 +51,7 @@ fn reference_apply(tableau: &Tableau, input: &PauliString) -> PauliString {
         .expect("generator image");
         accumulated = accumulated.multiply(&flex(&image)).expect("image product");
     }
-    assert!(matches!(
-        accumulated.phase(),
-        PauliPhase::Plus | PauliPhase::Minus
-    ));
+    assert_matches!(accumulated.phase(), PauliPhase::Plus | PauliPhase::Minus);
     accumulated.try_into_real().expect("real image")
 }
 
@@ -250,18 +249,18 @@ fn stabilizer_solver_reproduces_stabilizers_beyond_1000_qubits() {
         .multiply_real(&stabilizers[7])
         .expect("commuting product");
     early.insert(8, early_product.clone());
-    assert!(matches!(
+    assert_matches!(
         stabilizers_to_tableau(&early, false, false, false),
         Err(StabilizerError::RedundantStabilizer { .. })
-    ));
+    );
     early[8] = early_product.with_sign(match early_product.sign() {
         PauliSign::Plus => PauliSign::Minus,
         PauliSign::Minus => PauliSign::Plus,
     });
-    assert!(matches!(
+    assert_matches!(
         stabilizers_to_tableau(&early, true, false, false),
         Err(StabilizerError::InconsistentStabilizer { .. })
-    ));
+    );
     // Like Stim, the first anticommuting pair in input order is reported, later member first.
     early[8] = solved.x_output(10).expect("destabilizer of Z_10");
     assert_eq!(

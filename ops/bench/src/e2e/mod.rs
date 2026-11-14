@@ -221,11 +221,9 @@ fn validate_prerequisites(root: &RepoRoot, suite: &model::Suite) -> Result<(), B
             )),
         }
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(BenchError::E2e(errors.join("\n")))
-    }
+    errors
+        .is_empty()
+        .ok_or_else(|| BenchError::E2e(errors.join("\n")))
 }
 
 #[derive(Deserialize)]

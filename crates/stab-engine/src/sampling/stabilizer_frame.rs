@@ -546,7 +546,7 @@ impl StabilizerGenerator {
         let x = *x_word & mask != 0;
         let z = *z_word & mask != 0;
         if x && z {
-            self.negative = !self.negative;
+            self.negative.toggle();
         }
         if x != z {
             *x_word ^= mask;
@@ -580,7 +580,7 @@ impl StabilizerGenerator {
             .get(target_word)
             .is_some_and(|word| word & target_mask != 0);
         if control_x && target_z && !(target_x ^ control_z) {
-            self.negative = !self.negative;
+            self.negative.toggle();
         }
         if target_z && let Some(word) = self.zs.get_mut(control_word) {
             *word ^= control_mask;
@@ -592,7 +592,7 @@ impl StabilizerGenerator {
 
     pub(super) fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
         if anticommutes(self.basis(qubit), basis) {
-            self.negative = !self.negative;
+            self.negative.toggle();
         }
     }
 

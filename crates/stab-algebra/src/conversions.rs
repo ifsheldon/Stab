@@ -457,8 +457,8 @@ fn for_each_set_bit(
 ) -> StabilizerResult<()> {
     for (word_index, word) in words.iter().copied().enumerate() {
         let mut bits = word;
-        while bits != 0 {
-            visit(word_index * WORD_BITS + bits.trailing_zeros() as usize)?;
+        while let Some(bit) = bits.lowest_one() {
+            visit(word_index * WORD_BITS + bit as usize)?;
             bits &= bits - 1;
         }
     }

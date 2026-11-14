@@ -236,11 +236,7 @@ fn is_memory_budget_refusal(error: &CliError) -> bool {
 
 pub(crate) fn write_clap_error(writer: &mut impl Write, error: &clap::Error) -> io::Result<()> {
     let rendered = error.to_string();
-    let message = rendered
-        .strip_prefix("error: ")
-        .unwrap_or(&rendered)
-        .trim_end()
-        .to_string();
+    let message = rendered.trim_prefix("error: ").trim_end().to_string();
     write_json(
         writer,
         &JsonDiagnostic {

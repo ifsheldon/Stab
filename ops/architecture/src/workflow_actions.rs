@@ -72,7 +72,7 @@ fn inspect_workflow_with_post_open_hook(
     report: &mut WorkflowActionReport,
     post_open_hook: impl FnOnce(),
 ) -> Result<(), CheckError> {
-    let relative = path.strip_prefix(root).unwrap_or(path);
+    let relative = path.trim_prefix(root);
     let file = match open_workflow_descriptor(path) {
         Ok(file) => file,
         Err(WorkflowOpenError::Symlink) => {
@@ -248,9 +248,7 @@ fn inspect_workflow_source(path: &Path, source: &str, report: &mut WorkflowActio
                 );
             }
             let location = format!("{job_name}.steps[{index}]");
-            let step_secrets = mapping_value(step, "env")
-                .map(release_secrets)
-                .unwrap_or_default();
+            let step_secrets = mapping_value(step, "env").map_or_default(release_secrets);
             if step_secrets.any() || mapping_contains_release_token_expression_except(step, &[]) {
                 inspect_secret_bearing_step(
                     path,

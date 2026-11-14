@@ -439,10 +439,7 @@ fn parse_bucket_probabilities(text: &str) -> Result<Vec<(String, f64)>, String> 
     if buckets.is_empty() {
         return Err("bucket statistical plan has no buckets".to_string());
     }
-    let bucket_width = buckets
-        .first()
-        .map(|(bucket, _)| bucket.len())
-        .unwrap_or_default();
+    let bucket_width = buckets.first().map_or_default(|(bucket, _)| bucket.len());
     if buckets
         .iter()
         .any(|(bucket, _)| bucket.len() != bucket_width)

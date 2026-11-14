@@ -514,10 +514,7 @@ fn validate_program(entries: &[ProgramEntry]) -> DetectionResult<()> {
             }
         }
     }
-    repeat_ends
-        .is_empty()
-        .then_some(())
-        .ok_or_else(program_shape_error)
+    repeat_ends.is_empty().ok_or_else(program_shape_error)
 }
 
 fn materialized_retained_bytes(

@@ -68,8 +68,8 @@ impl BitStatistics {
             // Visit the minority bit value so dense and sparse words cost the same.
             if ones <= 32 {
                 let mut remaining = word;
-                while remaining != 0 {
-                    statistics.position_ones[remaining.trailing_zeros() as usize] += 1;
+                while let Some(bit) = remaining.lowest_one() {
+                    statistics.position_ones[bit as usize] += 1;
                     remaining &= remaining - 1;
                 }
             } else {
@@ -77,8 +77,8 @@ impl BitStatistics {
                     *count += 1;
                 }
                 let mut remaining = !word;
-                while remaining != 0 {
-                    statistics.position_ones[remaining.trailing_zeros() as usize] -= 1;
+                while let Some(bit) = remaining.lowest_one() {
+                    statistics.position_ones[bit as usize] -= 1;
                     remaining &= remaining - 1;
                 }
             }

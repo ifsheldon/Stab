@@ -4,6 +4,7 @@
     reason = "canonical owner tests use fixed compatibility fixtures and inspect exact values"
 )]
 
+use std::assert_matches;
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_complex::Complex32;
@@ -155,9 +156,10 @@ fn cq2_gate_unitary_matrix_contract() {
         let matrix = gate_unitary_matrix(gate).expect("gate unitary");
         let matrix_rows = matrix.to_vecs();
         let dimension = matrix.dimension();
-        assert!(
-            matches!(dimension, 2 | 4),
-            "{gate_name} should have one- or two-qubit unitary metadata"
+        assert_matches!(
+            dimension,
+            2 | 4,
+            "{gate_name} should have one- or two-qubit unitary metadata",
         );
         assert_eq!(
             matrix.num_qubits(),
@@ -512,13 +514,11 @@ fn assert_h_s_cx_m_r_base(circuit: &Circuit, gate_name: &str) {
         let instruction = item
             .as_instruction()
             .expect("gate decomposition should not contain repeat blocks");
-        assert!(
-            matches!(
-                instruction.gate().canonical_name(),
-                "H" | "S" | "CX" | "M" | "R"
-            ),
+        assert_matches!(
+            instruction.gate().canonical_name(),
+            "H" | "S" | "CX" | "M" | "R",
             "{gate_name} decomposition used non-base gate {}",
-            instruction.gate().canonical_name()
+            instruction.gate().canonical_name(),
         );
     }
 }

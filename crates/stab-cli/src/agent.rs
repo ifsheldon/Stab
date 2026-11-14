@@ -358,10 +358,7 @@ fn collect_command_descriptions(
         } else {
             format!("{prefix} {}", subcommand.get_name())
         };
-        let summary = subcommand
-            .get_about()
-            .map(ToString::to_string)
-            .unwrap_or_default();
+        let summary = subcommand.get_about().map_or_default(ToString::to_string);
         descriptions.push((name.clone(), summary));
         collect_command_descriptions(&name, subcommand, descriptions);
     }

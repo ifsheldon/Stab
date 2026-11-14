@@ -3,6 +3,7 @@
     reason = "M6 circuit-flow parity tests mirror compact upstream examples"
 )]
 
+use std::assert_matches;
 use std::str::FromStr;
 
 use stab_algebra::{Flow, FlowMeasurementIndex, PauliString};
@@ -149,12 +150,10 @@ fn unsigned_stabilizer_flow_diagnostics_keep_unsupported_circuits_fail_closed() 
     );
     assert!(!check.has_flow(), "{text}");
     let failure = check.failure().expect("unsupported diagnostic");
-    assert!(
-        matches!(
-            failure,
-            UnsignedStabilizerFlowFailure::UnsupportedCircuit { .. }
-        ),
-        "{text}: {failure:?}"
+    assert_matches!(
+        failure,
+        UnsignedStabilizerFlowFailure::UnsupportedCircuit { .. },
+        "{text}: {failure:?}",
     );
     if let UnsignedStabilizerFlowFailure::UnsupportedCircuit { reason } = failure {
         assert!(!reason.is_empty(), "{text}");

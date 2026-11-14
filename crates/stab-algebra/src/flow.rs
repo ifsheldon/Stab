@@ -396,8 +396,7 @@ fn bracket_body<'a>(
 ) -> StabilizerResult<&'a str> {
     let body = token
         .strip_prefix(prefix)
-        .and_then(|rest| rest.strip_prefix('['))
-        .and_then(|rest| rest.strip_suffix(']'))
+        .and_then(|rest| rest.strip_circumfix('[', ']'))
         .ok_or_else(|| invalid_flow_text(original_text))?;
     if body.is_empty() {
         Err(invalid_flow_text(original_text))
@@ -492,7 +491,7 @@ fn xor_sort<T: Copy + Ord>(values: &mut Vec<T>) {
     let mut odd_count = false;
     for value in values.iter().copied() {
         if pending == Some(value) {
-            odd_count = !odd_count;
+            odd_count.toggle();
         } else {
             if let Some(previous) = pending
                 && odd_count

@@ -6,6 +6,8 @@
     reason = "streaming reader tests use direct fixture assertions for compact diagnostics"
 )]
 
+use std::assert_matches;
+
 use super::*;
 use crate::{read_records, write_records};
 
@@ -236,50 +238,48 @@ fn record_framing_reports_line_offsets_terminators_and_limits() {
         (&b"1\n9"[..], RecordFormat::Hits),
     ] {
         let (_, error) = framed(input, format, 3);
-        assert!(
-            matches!(
-                error,
-                Some(RecordStreamReadError::UnterminatedRecord {
-                    byte_offset: 2..=4,
-                    line_len: 1..=3,
-                    ..
-                })
-            ),
-            "{format:?}: {error:?}"
+        assert_matches!(
+            error,
+            Some(RecordStreamReadError::UnterminatedRecord {
+                byte_offset: 2..=4,
+                line_len: 1..=3,
+                ..
+            }),
+            "{format:?}: {error:?}",
         );
     }
     assert_eq!(framed(b"shot M1", RecordFormat::Dets, 3).0.len(), 1);
 
     // Lines and, under the budget, runs of blank DETS lines are bounded by the record limit.
-    assert!(matches!(
+    assert_matches!(
         framed(b"010101010\n", RecordFormat::ZeroOne, 9).1,
         Some(RecordStreamReadError::RecordTooLarge { limit: 8 })
-    ));
+    );
     let blank = b"\n\n\n\n\n\n\n\n\nshot M0\n";
     assert_eq!(framed(blank, RecordFormat::Dets, 3).0.len(), 1);
     let mut reader = RecordStreamReader::measurements(&blank[..], RecordFormat::Dets, 3, 8)
         .with_framing(RecordFraming::Records)
         .with_blank_dets_line_budget();
-    assert!(matches!(
+    assert_matches!(
         drain(&mut reader, 64).1,
         Some(RecordStreamReadError::RecordTooLarge { limit: 8 })
-    ));
+    );
 
     // Packed formats report truncation and zero widths structurally.
     let (records, error) = framed(&[1, 2, 3], RecordFormat::B8, 9);
     assert_eq!(records.len(), 1);
-    assert!(matches!(
+    assert_matches!(
         error,
         Some(RecordStreamReadError::TruncatedRecord {
             bytes_read: 1,
             record_bytes: 2
         })
-    ));
+    );
     for format in [RecordFormat::B8, RecordFormat::Ptb64] {
-        assert!(matches!(
+        assert_matches!(
             framed(b"", format, 0).1,
             Some(RecordStreamReadError::ZeroWidthRecords)
-        ));
+        );
     }
 }
 
@@ -301,10 +301,10 @@ fn empty_zero_width_input_supplies_records_only_when_empty() {
     let mut reader = RecordStreamReader::measurements(&[0_u8][..], RecordFormat::B8, 0, 0)
         .with_framing(RecordFraming::Records)
         .with_empty_zero_width_input();
-    assert!(matches!(
+    assert_matches!(
         reader.has_more_records(),
         Err(RecordStreamReadError::NonEmptyZeroWidthInput)
-    ));
+    );
 }
 
 #[test]
@@ -353,8 +353,5 @@ fn transport_failures_surface_as_io_errors() {
     }
     let mut reader =
         RecordStreamReader::measurements(FailingTransport, RecordFormat::ZeroOne, 1, 8);
-    assert!(matches!(
-        reader.read_batch(1),
-        Err(RecordStreamReadError::Io(_))
-    ));
+    assert_matches!(reader.read_batch(1), Err(RecordStreamReadError::Io(_)));
 }

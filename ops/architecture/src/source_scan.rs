@@ -500,8 +500,7 @@ fn collect_rust_sources(
 }
 
 fn relative_to_root(root: &Path, path: &Path) -> PathBuf {
-    path.strip_prefix(root)
-        .map_or_else(|_| path.to_path_buf(), Path::to_path_buf)
+    path.trim_prefix(root).to_path_buf()
 }
 
 fn package_for_source<'a>(

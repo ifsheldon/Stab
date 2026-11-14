@@ -256,6 +256,8 @@ fn resolved_packages(
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     fn resolved(packages: &[(&str, usize)]) -> ResolvedPackages {
@@ -310,14 +312,12 @@ mod tests {
             }
             let error = validate_resolved_packages(fixture, &resolved(&flipped))
                 .expect_err("facade presence must match the fixture contract");
-            assert!(
-                matches!(
-                    (fixture.requires_core, &error),
-                    (true, ConsumerCheckError::MissingPackage { .. })
-                        | (false, ConsumerCheckError::UnexpectedPackage { .. })
-                ),
+            assert_matches!(
+                (fixture.requires_core, &error),
+                (true, ConsumerCheckError::MissingPackage { .. })
+                    | (false, ConsumerCheckError::UnexpectedPackage { .. }),
                 "{}: {error}",
-                fixture.id
+                fixture.id,
             );
         }
     }

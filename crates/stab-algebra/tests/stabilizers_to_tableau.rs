@@ -4,6 +4,7 @@
     reason = "M6 stabilizers-to-tableau parity tests mirror compact upstream examples"
 )]
 
+use std::assert_matches;
 use std::str::FromStr;
 
 use rand::SeedableRng as _;
@@ -102,12 +103,12 @@ fn stabilizers_to_tableau_reports_typed_errors_across_word_boundaries() {
     );
 
     let distant_x = pauli(&format!("+X{}", "_".repeat(500)));
-    assert!(matches!(
+    assert_matches!(
         stabilizers_to_tableau(&[pauli("+Z"), distant_x], false, false, false),
         Err(StabilizerError::AntiCommutingStabilizer { .. })
-    ));
+    );
     let distant_zx = pauli(&format!("+Z{}X", "_".repeat(500)));
-    assert!(matches!(
+    assert_matches!(
         stabilizers_to_tableau(
             &[pauli("+Z_"), pauli("-_Z"), distant_zx.clone(), pauli("+ZZ")],
             false,
@@ -115,8 +116,8 @@ fn stabilizers_to_tableau_reports_typed_errors_across_word_boundaries() {
             false,
         ),
         Err(StabilizerError::InconsistentStabilizer { .. })
-    ));
-    assert!(matches!(
+    );
+    assert_matches!(
         stabilizers_to_tableau(
             &[
                 pauli("-Z_"),
@@ -130,7 +131,7 @@ fn stabilizers_to_tableau_reports_typed_errors_across_word_boundaries() {
             false,
         ),
         Err(StabilizerError::RedundantStabilizer { .. })
-    ));
+    );
 }
 
 fn stabilizers_to_tableau_preserves_overconstrained_generator_order() {
@@ -150,10 +151,10 @@ fn stabilizers_to_tableau_preserves_overconstrained_generator_order() {
             stabilizers.push(source.z_output(index).expect("source stabilizer"));
         }
 
-        assert!(matches!(
+        assert_matches!(
             stabilizers_to_tableau(&stabilizers, false, false, false),
             Err(StabilizerError::RedundantStabilizer { .. })
-        ));
+        );
         let actual = stabilizers_to_tableau(&stabilizers, true, false, false)
             .expect("ignore dependent stabilizers");
         for index in 0..num_qubits {

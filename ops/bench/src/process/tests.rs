@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use super::*;
 use std::io::BufRead as _;
 
@@ -72,32 +74,32 @@ fn measured_wall_time_stops_at_child_completion() {
 fn rejects_missing_binary_and_all_stream_limits() {
     let mut missing = request("success");
     missing.program = PathBuf::from("/definitely/missing/stab-bench-worker");
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&missing),
         Err(ProcessError::Spawn { .. })
-    ));
+    );
 
     let mut stdin = request("success");
     stdin.stdin = vec![0_u8; 2];
     stdin.limits.stdin_bytes = 1;
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&stdin),
         Err(ProcessError::StdinLimit { .. })
-    ));
+    );
 
     let mut stdout = request("stdout-overflow");
     stdout.limits.stdout = 32.into();
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&stdout),
         Err(ProcessError::OutputLimit(error)) if error.stream == "stdout"
-    ));
+    );
 
     let mut stderr = request("stderr-overflow");
     stderr.limits.stderr = 32.into();
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&stderr),
         Err(ProcessError::OutputLimit(error)) if error.stream == "stderr"
-    ));
+    );
 }
 
 #[test]
@@ -105,7 +107,7 @@ fn propagates_writer_failure() {
     let mut request = request("close-stdin");
     request.stdin = vec![0_u8; 8 << 20];
     let result = run_bounded_process(&request);
-    assert!(matches!(result, Err(ProcessError::WriteStdin { .. })));
+    assert_matches!(result, Err(ProcessError::WriteStdin { .. }));
 }
 
 #[test]
@@ -139,7 +141,7 @@ fn cancellation_terminates_blocked_io() {
     let result = run_bounded_process_with_cancellation(&request, &cancellation);
     canceller.join().expect("cancellation thread");
 
-    assert!(matches!(result, Err(ProcessError::Interrupted(_))));
+    assert_matches!(result, Err(ProcessError::Interrupted(_)));
 }
 
 #[test]
@@ -277,10 +279,10 @@ fn pins_threads_that_the_child_created_before_the_affinity_request() {
 fn rejects_invalid_affinity_and_bounds_regular_files() {
     let mut invalid_affinity = request("success");
     invalid_affinity.affinity_cpu = Some(rustix::thread::CpuSet::MAX_CPU);
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&invalid_affinity),
         Err(ProcessError::SetAffinity { .. })
-    ));
+    );
 
     let directory = tempfile::tempdir().expect("temporary output directory");
     let output = directory.path().join("bounded-output");
@@ -292,10 +294,10 @@ fn rejects_invalid_affinity_and_bounds_regular_files() {
         OsString::from(OUTPUT_PATH_ENV),
         output.as_os_str().to_os_string(),
     ));
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&bounded_file),
         Err(ProcessError::FileLimit(error)) if error.maximum == 64
-    ));
+    );
     assert!(
         std::fs::metadata(output)
             .expect("bounded output exists")
@@ -316,7 +318,7 @@ fn timeout_kills_the_entire_process_group() {
     let mut request = request("child-tree");
     request.limits.timeout = Duration::from_millis(100);
     let error = run_bounded_process(&request).expect_err("helper must time out");
-    assert!(matches!(error, ProcessError::TimedOut(_)));
+    assert_matches!(error, ProcessError::TimedOut(_));
     let ProcessError::TimedOut(error) = error else {
         unreachable!("timeout shape checked above");
     };
@@ -487,17 +489,17 @@ fn measured_runs_report_the_program_status_affinity_and_file_limit() {
         OsString::from(OUTPUT_PATH_ENV),
         output.as_os_str().to_os_string(),
     ));
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&bounded_file),
         Err(ProcessError::FileLimit(error)) if error.maximum == 64
-    ));
+    );
 
     let mut invalid_affinity = measured("success");
     invalid_affinity.affinity_cpu = Some(rustix::thread::CpuSet::MAX_CPU);
-    assert!(matches!(
+    assert_matches!(
         run_bounded_process(&invalid_affinity),
         Err(ProcessError::Launch { .. })
-    ));
+    );
 }
 
 #[test]

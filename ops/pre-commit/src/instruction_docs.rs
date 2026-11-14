@@ -478,14 +478,11 @@ fn canonical_link_path(path: &Path) -> Result<PathBuf, std::io::Error> {
 }
 
 fn display_target(root: &Path, target: &Path) -> PathBuf {
-    target
-        .strip_prefix(root)
-        .map_or_else(|_| target.to_path_buf(), Path::to_path_buf)
+    target.trim_prefix(root).to_path_buf()
 }
 
 fn relative_path(root: &Path, path: &Path) -> PathBuf {
-    path.strip_prefix(root)
-        .map_or_else(|_| path.to_path_buf(), Path::to_path_buf)
+    path.trim_prefix(root).to_path_buf()
 }
 
 fn display_path(path: &Path) -> String {

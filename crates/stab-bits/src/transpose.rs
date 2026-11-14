@@ -146,6 +146,8 @@ fn transpose_tile(tile: &mut [u64; 64]) {
     reason = "fixed-size transpose tests use bounded fixture indexes and fail-fast setup"
 )]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
     use crate::BitLen;
 
@@ -288,23 +290,23 @@ mod tests {
     fn packed_matrix_prefix_transpose_rejects_invalid_dimensions() {
         let source = BitMatrix::zeros(65, 7).expect("source matrix");
         let mut target = [0_u64; 7];
-        assert!(matches!(
+        assert_matches!(
             source.copy_transpose_prefix_into_word_rows(66, &mut target),
             Err(super::super::BitError::MatrixRowPrefixOutOfRange {
                 requested: 66,
                 available: 65
             })
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             source.copy_transpose_prefix_into_word_rows(65, &mut target),
             Err(super::super::BitError::MatrixToWordRowsTooTall {
                 actual: 65,
                 maximum: 64
             })
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             source.copy_transpose_prefix_into_word_rows(64, &mut target[..6]),
             Err(super::super::BitError::LengthMismatch { left: 6, right: 7 })
-        ));
+        );
     }
 }

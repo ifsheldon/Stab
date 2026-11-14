@@ -3,6 +3,7 @@
     reason = "PFM-B4 exact parity tests use compact pinned Stim examples"
 )]
 
+use std::assert_matches;
 use std::str::FromStr;
 
 use stab_algebra::Flow;
@@ -315,10 +316,10 @@ fn assert_flow_diagnostics() {
 
     let diagnostics = check_unsigned_stabilizer_flows_with_diagnostics(&circuit, &flows);
     assert!(diagnostics.first().is_some_and(|check| check.has_flow()));
-    assert!(matches!(
+    assert_matches!(
         diagnostics.get(1).and_then(|check| check.failure()),
         Some(UnsignedStabilizerFlowFailure::OutputMismatch { .. })
-    ));
+    );
 }
 
 fn generator_strings(text: &str) -> Vec<String> {

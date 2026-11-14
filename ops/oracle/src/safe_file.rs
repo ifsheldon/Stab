@@ -138,6 +138,7 @@ fn open_regular_file_unix(path: &Path) -> Result<std::fs::File, SafeFileError> {
 #[cfg(unix)]
 fn atomic_write_regular_file_unix(path: &Path, bytes: &[u8]) -> Result<(), SafeFileError> {
     use rustix::fs::AtFlags;
+    use std::mem::DropGuard;
 
     let (directory, file_name) = open_or_create_parent_unix(path)?;
     let (temporary_name, descriptor) = create_temporary_file_unix(&directory)?;
@@ -145,18 +146,17 @@ fn atomic_write_regular_file_unix(path: &Path, bytes: &[u8]) -> Result<(), SafeF
     if !file.metadata()?.is_file() {
         return Err(SafeFileError::NotRegular);
     }
-    let result = (|| -> Result<(), SafeFileError> {
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        rustix::fs::renameat(&directory, &temporary_name, &directory, file_name)
-            .map_err(std::io::Error::from)?;
-        rustix::fs::fsync(&directory).map_err(std::io::Error::from)?;
-        Ok(())
-    })();
-    if result.is_err() {
-        let _ = rustix::fs::unlinkat(&directory, &temporary_name, AtFlags::empty());
-    }
-    result
+    // Any failure from here on removes the temporary file; success dismisses the cleanup.
+    let cleanup = DropGuard::new(&temporary_name, |name| {
+        let _ = rustix::fs::unlinkat(&directory, name, AtFlags::empty());
+    });
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    rustix::fs::renameat(&directory, &temporary_name, &directory, file_name)
+        .map_err(std::io::Error::from)?;
+    rustix::fs::fsync(&directory).map_err(std::io::Error::from)?;
+    DropGuard::dismiss(cleanup);
+    Ok(())
 }
 
 #[cfg(unix)]

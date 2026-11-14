@@ -4,6 +4,7 @@
     reason = "semantic parity failures need direct fixture context"
 )]
 
+use std::assert_matches;
 use std::str::FromStr;
 
 use stab_algebra::{PauliBasis, PauliString, Tableau, TableauIterator};
@@ -175,10 +176,11 @@ fn assert_synthesis_round_trip(tableau: &Tableau) {
         let CircuitItem::Instruction(instruction) = item else {
             panic!("tableau synthesis emitted a repeat block");
         };
-        assert!(
-            matches!(instruction.gate().canonical_name(), "H" | "S" | "CX"),
+        assert_matches!(
+            instruction.gate().canonical_name(),
+            "H" | "S" | "CX",
             "{}",
-            instruction.gate().canonical_name()
+            instruction.gate().canonical_name(),
         );
     }
 }

@@ -708,6 +708,7 @@ fn rustup_environment() -> Result<Vec<(OsString, OsString)>, ReleaseError> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::fs;
 
     use super::*;
@@ -730,10 +731,10 @@ mod tests {
         fs::rename(&target, root.path().join("rustup-displaced")).expect("displace tool");
         fs::write(&target, b"replacement").expect("replacement tool");
 
-        assert!(matches!(
+        assert_matches!(
             program.revalidate(),
             Err(ReleaseError::FileIdentityChanged(_))
-        ));
+        );
     }
 
     fn git(root: &Path, args: &[&str]) {
@@ -773,20 +774,20 @@ mod tests {
         );
 
         fs::write(root.path().join("tracked"), b"changed").expect("dirty file");
-        assert!(matches!(
+        assert_matches!(
             require_clean_tag(root.path(), RELEASE_TAG),
             Err(ReleaseError::DirtyRepository(_))
-        ));
+        );
     }
 
     #[test]
     fn lightweight_tags_are_rejected_and_other_annotated_tags_are_supported() {
         let root = repository();
         git(root.path(), &["tag", RELEASE_TAG]);
-        assert!(matches!(
+        assert_matches!(
             require_clean_tag(root.path(), RELEASE_TAG),
             Err(ReleaseError::TagKind { .. })
-        ));
+        );
         git(root.path(), &["tag", "-a", "other-tag", "-m", "other"]);
         require_clean_tag(root.path(), "other-tag").expect("alternate annotated tag");
     }

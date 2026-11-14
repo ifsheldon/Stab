@@ -588,6 +588,7 @@ fn transport_error(error: ReleaseError) -> UreqClientError {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::io::{Read, Seek, SeekFrom, Write};
     use std::net::TcpListener;
     use std::thread;
@@ -711,7 +712,7 @@ mod tests {
         }
         let cancellation = ReleaseCancellation::for_test();
         cancellation.cancel();
-        assert!(matches!(
+        assert_matches!(
             wait_for_matching_checksum(
                 &Missing,
                 &cancellation,
@@ -720,7 +721,7 @@ mod tests {
                 &"a".repeat(64),
             ),
             Err(ReleaseError::OperationInterrupted { .. })
-        ));
+        );
     }
 
     struct FixedRegistry(Option<RegistryVersion>);
@@ -755,7 +756,7 @@ mod tests {
             )
             .expect("matching")
         );
-        assert!(matches!(
+        assert_matches!(
             require_absent_or_matching(
                 &FixedRegistry(Some(registry_version("d".repeat(64), false))),
                 "stab-core",
@@ -763,8 +764,8 @@ mod tests {
                 &expected
             ),
             Err(ReleaseError::RegistryChecksum { .. })
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             require_absent_or_matching(
                 &FixedRegistry(Some(registry_version(expected.clone(), true))),
                 "stab-core",
@@ -772,8 +773,8 @@ mod tests {
                 &expected
             ),
             Err(ReleaseError::RegistryYanked { .. })
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             wait_for_matching_checksum(
                 &FixedRegistry(Some(registry_version(expected.clone(), true))),
                 &ReleaseCancellation::for_test(),
@@ -782,7 +783,7 @@ mod tests {
                 &expected,
             ),
             Err(ReleaseError::RegistryYanked { .. })
-        ));
+        );
     }
 
     fn read_request(stream: &mut std::net::TcpStream) -> Vec<u8> {

@@ -4,6 +4,8 @@
     reason = "folded-summary contract tests use compact fixture setup and direct assertions"
 )]
 
+use std::assert_matches;
+
 use stab_model::advanced::{
     FoldedCircuitEvent, FoldedVisitError, repeat_block_with_tag_bytes, visit_folded_circuit,
 };
@@ -153,5 +155,5 @@ fn a_cancelled_signal_stops_the_walk() {
         ParseLimits::DEFAULT_REPEAT_NESTING,
         &cancellation,
     );
-    assert!(matches!(cancelled, Err(FoldedWalkError::Cancelled(_))));
+    assert_matches!(cancelled, Err(FoldedWalkError::Cancelled(_)));
 }

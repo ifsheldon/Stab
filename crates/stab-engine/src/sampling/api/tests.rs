@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use super::*;
 use stab_records::{MeasurementCodecSink, RecordFormat};
 
@@ -110,13 +112,13 @@ fn counter_overflow_rejects_before_work_without_poisoning() {
     let mut sink = MeasurementCodecSink::try_new(RecordFormat::ZeroOne, MeasurementWidth::new(1))
         .expect("construct sink");
 
-    assert!(matches!(
+    assert_matches!(
         session.run(ShotCount::new(1), &mut sink),
         Err(RunError::Engine {
             source: SamplingExecutionError::ShotCounterOverflow,
             ..
         })
-    ));
+    );
     assert!(!session.is_poisoned());
 }
 
@@ -141,21 +143,21 @@ fn internal_batch_invariant_failure_poisons_with_exact_progress() {
     );
     let mut sink = RecordSink::default();
 
-    assert!(matches!(
+    assert_matches!(
         session.run(ShotCount::new(1), &mut sink),
         Err(RunError::Engine {
             source: SamplingExecutionError::InternalInvariant { .. },
             progress,
         }) if progress == SamplingRunProgress::new(0, 1)
-    ));
+    );
     assert!(session.is_poisoned());
-    assert!(matches!(
+    assert_matches!(
         session.run(ShotCount::new(1), &mut sink),
         Err(RunError::Engine {
             source: SamplingExecutionError::SessionPoisoned,
             progress,
         }) if progress == SamplingRunProgress::new(0, 0)
-    ));
+    );
 }
 
 #[test]

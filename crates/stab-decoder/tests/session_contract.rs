@@ -4,6 +4,7 @@
     reason = "decoder contract tests use compact exact fixtures"
 )]
 
+use std::assert_matches;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
@@ -196,13 +197,13 @@ fn decoder_session_preflight_is_atomic() {
         &DecodeCancellation::new(),
     )
     .expect_err("detector width mismatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Preflight(DecodePreflightError::DetectorWidth {
             expected,
             actual
         }) if expected == DetectorWidth::new(1) && actual == DetectorWidth::new(2)
-    ));
+    );
     assert_eq!(predictions, before);
 
     let mut wrong_correction_width = filled_predictions(2, 2, true);
@@ -214,13 +215,13 @@ fn decoder_session_preflight_is_atomic() {
         &DecodeCancellation::new(),
     )
     .expect_err("correction width mismatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Preflight(DecodePreflightError::CorrectionWidth {
             expected,
             actual
         }) if expected == CorrectionWidth::new(1) && actual == CorrectionWidth::new(2)
-    ));
+    );
     assert_eq!(wrong_correction_width, before);
 
     let mut too_short = filled_predictions(1, 1, true);
@@ -232,13 +233,13 @@ fn decoder_session_preflight_is_atomic() {
         &DecodeCancellation::new(),
     )
     .expect_err("prediction capacity mismatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Preflight(DecodePreflightError::PredictionShotCapacity {
             required: 2,
             available: 1
         })
-    ));
+    );
     assert_eq!(too_short, before);
     assert_eq!(preflight_session.calls, 0);
 }
@@ -302,7 +303,7 @@ fn decoder_session_cancellation_and_failure_preserve_progress() {
         &DecodeCancellation::new(),
     )
     .expect_err("session failure");
-    assert!(matches!(&error, DecodeBatchError::Session(_)));
+    assert_matches!(&error, DecodeBatchError::Session(_));
     if let DecodeBatchError::Session(failure) = error {
         assert_eq!(failure.completed_shots(), 1);
         assert_eq!(failure.source_ref(), &FixtureError);
@@ -326,13 +327,13 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &DecodeCancellation::new(),
     )
     .expect_err("failure progress beyond request");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Contract(DecodeContractError::FailureProgress {
             requested: 3,
             actual: 4
         })
-    ));
+    );
 
     let one_detector = detector_records(&[vec![true], vec![false]]);
     let mut invalid_summary_session = FixtureSession::new(layout(1, 1));
@@ -345,13 +346,13 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &DecodeCancellation::new(),
     )
     .expect_err("wrong requested shot count");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Contract(DecodeContractError::RequestedShotCount {
             expected: 2,
             actual: 3
         })
-    ));
+    );
 
     let mut overflow_summary_session = FixtureSession::new(layout(1, 1));
     overflow_summary_session.returned_summary = Some(DecodeBatchSummary::cancelled(2, 3));
@@ -362,13 +363,13 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &DecodeCancellation::new(),
     )
     .expect_err("completed progress beyond request");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Contract(DecodeContractError::CompletedShotCount {
             requested: 2,
             actual: 3
         })
-    ));
+    );
 
     let mut changing_layout_session = FixtureSession::new(layout(1, 1));
     changing_layout_session.replacement_layout = Some(layout(2, 1));
@@ -379,10 +380,10 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &DecodeCancellation::new(),
     )
     .expect_err("layout changed during dispatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Contract(DecodeContractError::SessionLayoutChanged { .. })
-    ));
+    );
 
     let empty_detectors = PackedShotBatch::zeros(0, 1).expect("empty detectors");
     let mut reusable_predictions = filled_predictions(3, 1, true);

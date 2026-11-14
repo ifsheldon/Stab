@@ -353,11 +353,7 @@ impl Suite {
         }
         validate_families(&self.families, &mut errors);
         validate_baselines(&self.self_baselines, &self.families, &mut errors);
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors.join("\n"))
-        }
+        errors.is_empty().ok_or_else(|| errors.join("\n"))
     }
 
     pub(super) fn case_count(&self) -> usize {

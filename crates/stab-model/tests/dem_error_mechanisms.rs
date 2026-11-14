@@ -3,6 +3,7 @@
     reason = "mechanism traversal tests use compact exact DEM fixtures"
 )]
 
+use std::assert_matches;
 use std::convert::Infallible;
 use std::ops::ControlFlow;
 
@@ -144,13 +145,13 @@ fn mechanism_count_is_admitted_before_callbacks_and_visitor_stop_is_immediate() 
     let error = model
         .try_visit_error_mechanisms(DemErrorMechanismTraversalLimits::new(2, 100), &mut rejected)
         .expect_err("three represented mechanisms exceed two");
-    assert!(matches!(
+    assert_matches!(
         error,
         DemErrorMechanismVisitError::MechanismLimit {
             actual: 3,
             limit: 2
         }
-    ));
+    );
     assert!(rejected.mechanisms.is_empty());
 
     let mut stopped = RecordingVisitor {
@@ -176,13 +177,13 @@ fn represented_instruction_work_is_bounded_independently_of_mechanism_count() {
     let error = model
         .try_visit_error_mechanisms(DemErrorMechanismTraversalLimits::new(3, 7), &mut visitor)
         .expect_err("eighth represented instruction exceeds work limit");
-    assert!(matches!(
+    assert_matches!(
         error,
         DemErrorMechanismVisitError::InstructionVisitLimit {
             actual_at_least: 8,
             limit: 7
         }
-    ));
+    );
 }
 
 #[test]
@@ -339,5 +340,5 @@ fn traversal_distinguishes_model_failures_from_visitor_failures() {
             &mut RecordingVisitor::default(),
         )
         .expect_err("aggregate detector offset overflow");
-    assert!(matches!(model_error, DemErrorMechanismVisitError::Model(_)));
+    assert_matches!(model_error, DemErrorMechanismVisitError::Model(_));
 }

@@ -108,6 +108,8 @@ impl FromStr for MemoryBudget {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::{MemoryBudget, MemoryBudgetParseError};
 
     #[test]
@@ -130,21 +132,17 @@ mod tests {
         for text in [
             "", "GiB", "1 GiB", " 1", "1gib", "1GB", "1MB", "1K", "1.5GiB", "-1", "+1", "1TiB",
         ] {
-            assert!(
-                matches!(
-                    text.parse::<MemoryBudget>(),
-                    Err(MemoryBudgetParseError::Syntax { .. })
-                ),
-                "{text}"
+            assert_matches!(
+                text.parse::<MemoryBudget>(),
+                Err(MemoryBudgetParseError::Syntax { .. }),
+                "{text}",
             );
         }
         for text in ["18446744073709551616", "17179869184GiB"] {
-            assert!(
-                matches!(
-                    text.parse::<MemoryBudget>(),
-                    Err(MemoryBudgetParseError::Overflow { .. })
-                ),
-                "{text}"
+            assert_matches!(
+                text.parse::<MemoryBudget>(),
+                Err(MemoryBudgetParseError::Overflow { .. }),
+                "{text}",
             );
         }
     }

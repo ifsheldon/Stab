@@ -623,26 +623,28 @@ fn sampled_flow_random_policy(random_policy: RandomPolicy, flow_index: usize) ->
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::{SAMPLED_FLOW_SAMPLE_WORD_WIDTH, ShotCount, rounded_sampled_flow_count};
 
     #[test]
     fn sampled_flow_counts_round_to_stim_word_width() {
-        assert!(matches!(
+        assert_matches!(
             rounded_sampled_flow_count(ShotCount::new(0)),
             Ok(count) if count == ShotCount::new(0)
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             rounded_sampled_flow_count(ShotCount::new(1)),
             Ok(count) if count == ShotCount::new(SAMPLED_FLOW_SAMPLE_WORD_WIDTH)
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             rounded_sampled_flow_count(ShotCount::new(SAMPLED_FLOW_SAMPLE_WORD_WIDTH)),
             Ok(count) if count == ShotCount::new(SAMPLED_FLOW_SAMPLE_WORD_WIDTH)
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             rounded_sampled_flow_count(ShotCount::new(SAMPLED_FLOW_SAMPLE_WORD_WIDTH + 1)),
             Ok(count) if count == ShotCount::new(SAMPLED_FLOW_SAMPLE_WORD_WIDTH * 2)
-        ));
+        );
         assert!(
             rounded_sampled_flow_count(ShotCount::new(u64::MAX)).is_err(),
             "overflow should stay fail-closed"

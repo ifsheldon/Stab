@@ -4,6 +4,7 @@
     reason = "parity tests use compact fixture setup and exact contract failures"
 )]
 
+use std::assert_matches;
 use std::convert::Infallible;
 
 use stab_engine::{
@@ -790,13 +791,11 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
         .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
         .compile(&invalid_nested_reference)
         .expect_err("a lookback available only after a later iteration must reject");
-    assert!(
-        matches!(
-            error,
-            DetectionCompileError::InvalidCircuit(
-                DetectionError::InvalidResultFormat { ref message }
-            ) if message.contains("rec[-2]") && message.contains("not available")
-        ),
-        "unexpected nested lookback error: {error}"
+    assert_matches!(
+        error,
+        DetectionCompileError::InvalidCircuit(
+            DetectionError::InvalidResultFormat { ref message }
+        ) if message.contains("rec[-2]") && message.contains("not available"),
+        "unexpected nested lookback error: {error}",
     );
 }

@@ -5,6 +5,8 @@
 
 mod support;
 
+use std::assert_matches;
+
 use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
 use stab_engine::{
     DetectionCompileError, DetectionError, MeasurementToDetectionCompiler, ReferenceSampleMode,
@@ -36,10 +38,10 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
         .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample)
         .compile(&exact)
         .expect_err("zero lookback must not compile for detection conversion");
-    assert!(matches!(
+    assert_matches!(
         conversion_error,
         DetectionCompileError::InvalidCircuit(DetectionError::InvalidResultFormat { .. })
-    ));
+    );
     assert!(conversion_error.to_string().contains("rec[-0]"));
 
     let detector_model = circuit_to_detector_error_model(&exact, ErrorAnalyzerOptions::default())
@@ -62,10 +64,10 @@ fn stim_negative_zero_target_preserves_boundary_semantics() {
     let sampling_error = SamplingCompiler::new()
         .compile(&feedback)
         .expect_err("zero lookback must not compile for sampling");
-    assert!(matches!(
+    assert_matches!(
         sampling_error,
         stab_engine::SamplingCompileError::InvalidCircuit { .. }
-    ));
+    );
     assert!(sampling_error.to_string().contains("rec[-0]"));
 
     let detection_feedback = Circuit::from_stim_str("M 0\nCX rec[-0] 1\nM 1\nDETECTOR rec[-1]\n")

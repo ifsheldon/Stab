@@ -6,6 +6,7 @@
     reason = "focused detection lifecycle tests use compact fixture assertions"
 )]
 
+use std::assert_matches;
 use std::convert::Infallible;
 
 use stab_records::{MeasurementSink, PackedShotBatch};
@@ -262,13 +263,13 @@ fn composed_conversion_cancellation_reports_the_committed_transaction_prefix() {
         MeasurementSink::write_batch(&mut transaction, MeasurementBatchView::new(input.view()))
             .expect_err("cancel second conversion batch");
 
-    assert!(matches!(
+    assert_matches!(
         &error,
         DetectionRunError::Engine {
             source: DetectionExecutionError::CancelledComposition,
             ..
         }
-    ));
+    );
     assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
     assert_eq!(error.progress().attempted_batch_shots(), ShotCount::new(1));
     cancellation.reset();
@@ -337,13 +338,13 @@ fn record_at_a_time_conversion_preserves_valid_prefix_and_preflight_reuse() {
     let error = delivery
         .write_batch_with_sweep(MeasurementBatchView::new(invalid.view()), None)
         .expect_err("reject malformed later record");
-    assert!(matches!(
+    assert_matches!(
         error,
         DetectionRunError::Engine {
             source: DetectionExecutionError::Conversion(_),
             ..
         }
-    ));
+    );
     assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
 
     delivery
@@ -374,24 +375,24 @@ fn incremental_delivery_finalizes_once_and_rejects_post_finish_writes() {
     MeasurementSink::finish(&mut delivery).expect("finish delivery once");
 
     let repeated = MeasurementSink::finish(&mut delivery).expect_err("reject double finish");
-    assert!(matches!(
+    assert_matches!(
         repeated,
         DetectionRunError::Engine {
             source: DetectionExecutionError::DeliveryFinished,
             ..
         }
-    ));
+    );
     assert_eq!(repeated.progress().committed_shots(), ShotCount::new(1));
     let post_finish = delivery
         .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
         .expect_err("reject write after finish");
-    assert!(matches!(
+    assert_matches!(
         post_finish,
         DetectionRunError::Engine {
             source: DetectionExecutionError::DeliveryFinished,
             ..
         }
-    ));
+    );
     assert_eq!(post_finish.progress().committed_shots(), ShotCount::new(1));
     drop(delivery);
 
@@ -424,14 +425,14 @@ fn incremental_finish_failure_reports_committed_prefix_and_poisons_session() {
             .expect("write committed prefix");
     }
     let error = delivery.finish().expect_err("surface finish failure");
-    assert!(matches!(
+    assert_matches!(
         error,
         DetectionRunError::Sink {
             phase: SinkFailurePhase::Finish,
             source: TestSinkError::Finish,
             ..
         }
-    ));
+    );
     assert_eq!(error.progress().committed_shots(), ShotCount::new(2));
     assert!(session.is_poisoned());
     assert_eq!(session.total_committed_shots(), ShotCount::new(2));
@@ -669,13 +670,13 @@ fn sink_failures_preserve_first_error_progress_and_poison_sessions() {
         fail_finish: false,
         writes: 0,
     };
-    assert!(matches!(
+    assert_matches!(
         session.run(ShotCount::new(1), &mut untouched),
         Err(DetectionRunError::Engine {
             source: DetectionExecutionError::SessionPoisoned,
             ..
         })
-    ));
+    );
     assert!(
         DetectionExecutionError::SessionPoisoned
             .to_string()
@@ -769,19 +770,13 @@ fn compilation_rejects_limits_before_session_or_sink_work() {
         .limits(limits.clone())
         .compile(&circuit)
         .expect_err("reject conversion plan beyond its record limit");
-    assert!(matches!(
-        &conversion_error,
-        DetectionCompileError::InvalidCircuit(_)
-    ));
+    assert_matches!(&conversion_error, DetectionCompileError::InvalidCircuit(_));
     assert!(conversion_error.to_string().contains("memory budget"));
     let sampling_error = DetectionSamplingCompiler::new()
         .limits(limits.clone())
         .compile(&circuit)
         .expect_err("reject detection sampling plan beyond its record limit");
-    assert!(matches!(
-        &sampling_error,
-        DetectionCompileError::InvalidCircuit(_)
-    ));
+    assert_matches!(&sampling_error, DetectionCompileError::InvalidCircuit(_));
     assert!(sampling_error.to_string().contains("memory budget"));
 }
 
@@ -1108,6 +1103,6 @@ fn direct_frame_rejects_anti_hermitian_spp_during_compilation() {
         .compile(&circuit)
         .expect_err("reject anti-Hermitian SPP before a session exists");
 
-    assert!(matches!(error, DetectionCompileError::InvalidCircuit(_)));
+    assert_matches!(error, DetectionCompileError::InvalidCircuit(_));
     assert!(error.to_string().contains("anti-Hermitian"));
 }

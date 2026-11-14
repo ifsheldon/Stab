@@ -6,7 +6,7 @@ fmt-check:
 # Lint Rust.
 [working-directory: '..']
 clippy:
-    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy --workspace --all-targets --config "build.warnings='deny'"
 
 # Run Rust tests.
 [working-directory: '..']

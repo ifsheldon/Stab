@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use super::{compare_two_sample_plan, validate_two_sample_plan};
 use crate::fixtures::{FixtureError, FixtureManifest, RunFilter, compare_fixture};
 
@@ -219,15 +221,13 @@ fn manifest_two_sample_rows_run_under_statistical_filter_and_report_mismatches()
     assert!(!RunFilter::Exact.matches(row));
     let error = compare_fixture(row, &process_output(&stim), &process_output(&stab))
         .expect_err("deterministic disagreement must fail the row");
-    assert!(
-        matches!(
-            &error,
-            FixtureError::ComparatorMismatch {
-                comparator: "two-sample",
-                ..
-            }
-        ),
-        "{error}"
+    assert_matches!(
+        &error,
+        FixtureError::ComparatorMismatch {
+            comparator: "two-sample",
+            ..
+        },
+        "{error}",
     );
     compare_fixture(row, &process_output(&stim), &process_output(&stim))
         .expect("identical samples must pass");

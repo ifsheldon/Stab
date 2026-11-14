@@ -4,6 +4,7 @@
     reason = "DEM session tests use exact fixture failures for compact diagnostics"
 )]
 
+use std::assert_matches;
 use std::fmt;
 
 use stab_engine::{
@@ -634,10 +635,10 @@ fn replay_batch_validation_is_retryable_and_abandonment_retains_no_sink() {
     assert_eq!(error.progress().committed_shots(), ShotCount::new(1));
     assert_eq!(second_sink.write_calls, 0);
     assert_eq!(second_sink.finish_calls, 0);
-    assert!(matches!(
+    assert_matches!(
         replay.reset(),
         Err(DemSamplingExecutionError::ReplayLifecycle { .. })
-    ));
+    );
 }
 
 #[test]
@@ -722,10 +723,10 @@ fn cancellation_commits_only_complete_batches_and_session_resumes() {
     assert_eq!(replay_sink.finish_calls, 1);
     assert!(!replay_session.is_poisoned());
 
-    assert!(matches!(
+    assert_matches!(
         replay_session.reset(),
         Err(DemSamplingExecutionError::ReplayLifecycle { .. })
-    ));
+    );
     replay_cancellation.reset();
     replay_session
         .reset()
@@ -878,13 +879,13 @@ fn replay_session_admits_poisoning_before_record_widths() {
     let poison_error = poisoned
         .run(&[Vec::new()], &mut second_untouched)
         .expect_err("poison admission must precede record widths");
-    assert!(matches!(
+    assert_matches!(
         poison_error,
         DemSamplingRunError::Engine {
             source: DemSamplingExecutionError::SessionPoisoned,
             ..
         }
-    ));
+    );
     assert_eq!(second_untouched.write_calls, 0);
     assert_eq!(second_untouched.finish_calls, 0);
 }

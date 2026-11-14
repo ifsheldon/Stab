@@ -4,6 +4,8 @@
     reason = "decomposition parity tests use fixed validated fixtures"
 )]
 
+use std::assert_matches;
+
 use stab_analysis::{AnalysisError, decomposed_circuit};
 use stab_model::{Circuit, CircuitItem};
 use std::ops::ControlFlow;
@@ -18,11 +20,11 @@ fn decomposed_circuit_reports_typed_anti_hermitian_failures() {
     );
 
     let error = decomposed_circuit(&circuit("SPP X0*Z0\n")).expect_err("anti-Hermitian product");
-    assert!(matches!(
+    assert_matches!(
         error,
         AnalysisError::InvalidCircuitSimplification { ref message }
             if message.contains("anti-Hermitian")
-    ));
+    );
 }
 
 #[test]

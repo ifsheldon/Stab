@@ -5,6 +5,7 @@
     reason = "integration tests use direct assertions for compact diagnostics"
 )]
 
+use std::assert_matches;
 use std::collections::BTreeSet;
 
 use stab_analysis::{
@@ -762,10 +763,11 @@ impl SearchResultSignature {
         };
 
         for item in model.items() {
-            assert!(
-                matches!(item, DemItem::Instruction(_)),
+            assert_matches!(
+                item,
+                DemItem::Instruction(_),
                 "search output should not contain repeat blocks: {}",
-                model.to_dem_string()
+                model.to_dem_string(),
             );
             let DemItem::Instruction(instruction) = item else {
                 continue;

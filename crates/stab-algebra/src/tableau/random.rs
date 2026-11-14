@@ -373,8 +373,8 @@ fn for_each_selected_blocked(
         for row in 0..rows {
             for word_index in 0..words_per_row {
                 let mut selected = selection_word(row, word_index)?;
-                while selected != 0 {
-                    let bit = selected.trailing_zeros() as usize;
+                while let Some(bit) = selected.lowest_one() {
+                    let bit = bit as usize;
                     selected &= selected - 1;
                     visit(row, word_index * WORD_BITS + bit)?;
                 }
@@ -400,8 +400,8 @@ fn for_each_selected_blocked(
             tile.copy_transpose_from_word_rows(&words)?;
             for bit in 0..WORD_BITS {
                 let mut selected = word_at(tile.row(bit)?.words(), 0)?;
-                while selected != 0 {
-                    let offset = selected.trailing_zeros() as usize;
+                while let Some(offset) = selected.lowest_one() {
+                    let offset = offset as usize;
                     selected &= selected - 1;
                     visit(first + offset, word_index * WORD_BITS + bit)?;
                 }

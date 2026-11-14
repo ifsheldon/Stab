@@ -360,13 +360,9 @@ impl FixtureManifest {
             }
         }
         self.check_unique_ids(&mut violations);
-        if violations.is_empty() {
-            Ok(())
-        } else {
-            Err(FixtureError::Validation(
-                violations.join("\n").into_boxed_str(),
-            ))
-        }
+        violations
+            .is_empty()
+            .ok_or_else(|| FixtureError::Validation(violations.join("\n").into_boxed_str()))
     }
 
     fn check_unique_ids(&self, violations: &mut Vec<String>) {

@@ -3,6 +3,8 @@
     reason = "resource-contract tests use direct fixture setup assertions for focused failures"
 )]
 
+use std::assert_matches;
+
 use stab_engine::{
     DetectionSamplingCompiler, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode,
     SamplingCompiler, SamplingExecutionError, Seed,
@@ -20,15 +22,12 @@ fn sparse_single_measurement_circuit() -> Circuit {
 }
 
 fn assert_storage_limit(error: SamplingExecutionError) {
-    assert!(
-        matches!(
-            error,
-            SamplingExecutionError::SessionStorageLimit {
-                limit_bytes: 1_073_741_824,
-                ..
-            }
-        ),
-        "{error:?}"
+    assert_matches!(
+        error,
+        SamplingExecutionError::SessionStorageLimit {
+            limit_bytes: 1_073_741_824,
+            ..
+        }
     );
 }
 

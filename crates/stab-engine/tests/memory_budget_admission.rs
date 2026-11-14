@@ -8,6 +8,7 @@
 //! only when its conservative storage exceeds the caller's memory budget, before allocating
 //! that storage, advancing randomness, or touching a sink.
 
+use std::assert_matches;
 use std::convert::Infallible;
 
 use stab_engine::{
@@ -129,10 +130,7 @@ fn a_wide_compact_record_is_refused_against_the_budget_without_allocating_it() {
         let error = plan
             .session(RandomPolicy::Seeded(Seed::new(1)))
             .expect_err("the session record exceeds the budget");
-        assert!(
-            matches!(error, SamplingExecutionError::SessionStorageLimit { .. }),
-            "{error:?}"
-        );
+        assert_matches!(error, SamplingExecutionError::SessionStorageLimit { .. });
         assert!(error.to_string().contains("memory budget"), "{error}");
     });
     assert!(measured.bytes_max < 1 << 20, "{measured:?}");

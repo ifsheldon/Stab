@@ -574,6 +574,8 @@ fn terminate_process_group(
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
     use std::io::Write as _;
     use std::path::PathBuf;
@@ -605,7 +607,7 @@ mod tests {
     #[test]
     fn child_output_is_bounded_before_capture_completes() {
         let (program, args, environment) = helper_request("flood");
-        assert!(matches!(
+        assert_matches!(
             run(
                 Path::new(env!("CARGO_MANIFEST_DIR")),
                 &program,
@@ -615,13 +617,13 @@ mod tests {
                 4096,
             ),
             Err(ReleaseError::CommandOutputLimit { limit: 4096, .. })
-        ));
+        );
     }
 
     #[test]
     fn child_timeout_terminates_the_process_group() {
         let (program, args, environment) = helper_request("sleep");
-        assert!(matches!(
+        assert_matches!(
             run(
                 Path::new(env!("CARGO_MANIFEST_DIR")),
                 &program,
@@ -631,7 +633,7 @@ mod tests {
                 4096,
             ),
             Err(ReleaseError::CommandTimeout { .. })
-        ));
+        );
     }
 
     #[test]
@@ -736,10 +738,7 @@ mod tests {
         );
         canceller.join().expect("cancellation thread");
 
-        assert!(matches!(
-            result,
-            Err(ReleaseError::CommandInterrupted { .. })
-        ));
+        assert_matches!(result, Err(ReleaseError::CommandInterrupted { .. }));
         assert_process_gone(wait_for_pid(&started, Duration::from_secs(5)))
             .expect("mock publication process is gone");
         assert!(

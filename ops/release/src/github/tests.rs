@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::thread;
@@ -44,7 +45,7 @@ fn exact_remote_asset_identity_is_required() {
 
 #[test]
 fn draft_creation_requires_an_exact_version_confirmation() {
-    assert!(matches!(
+    assert_matches!(
         create_verified_draft(
             Path::new("."),
             Path::new("target/releases/not-opened"),
@@ -52,7 +53,7 @@ fn draft_creation_requires_an_exact_version_confirmation() {
             "0.2.1"
         ),
         Err(ReleaseError::PublicationConfirmation { .. })
-    ));
+    );
 }
 
 #[test]
@@ -102,13 +103,9 @@ impl DraftPublisher for MovingTagPublisher {
         _token: &GitHubToken,
     ) -> Result<(), ReleaseError> {
         self.events.push("tag-check");
-        if self.remote_commit == commit {
-            Ok(())
-        } else {
-            Err(ReleaseError::GitHubRelease(
-                "remote tag moved after draft validation".to_string(),
-            ))
-        }
+        (self.remote_commit == commit).ok_or_else(|| {
+            ReleaseError::GitHubRelease("remote tag moved after draft validation".to_string())
+        })
     }
 
     fn create_draft(
@@ -179,11 +176,11 @@ fn late_remote_tag_change_is_rejected_after_final_validation() {
         },
     );
 
-    assert!(matches!(
+    assert_matches!(
         result,
         Err(ReleaseError::GitHubRelease(detail))
             if detail == "remote tag moved after draft validation"
-    ));
+    );
     assert_eq!(
         publisher.events,
         [
@@ -542,9 +539,10 @@ fn draft_verification_survives_the_published_only_by_tag_endpoint() {
     let token = GitHubToken(SecretString::from("reviewed-token"));
 
     let by_tag = api.published_release_by_tag(RELEASE_TAG, &token);
-    assert!(
-        matches!(by_tag, Err(ReleaseError::GitHubRelease(detail)) if detail.contains("404")),
-        "the by-tag endpoint must be pinned as unable to see drafts"
+    assert_matches!(
+        by_tag,
+        Err(ReleaseError::GitHubRelease(detail)) if detail.contains("404"),
+        "the by-tag endpoint must be pinned as unable to see drafts",
     );
     let release = api
         .unique_draft_release(RELEASE_TAG, &token)
@@ -649,10 +647,10 @@ fn draft_state_routes_to_the_list_lookup_and_published_state_to_by_tag() {
         RemoteReleaseState::Published,
         &token,
     );
-    assert!(matches!(
+    assert_matches!(
         published,
         Err(ReleaseError::GitHubRelease(detail)) if detail.contains("invisible")
-    ));
+    );
     assert_eq!(
         publisher.events,
         ["unique-draft-lookup", "published-by-tag"]

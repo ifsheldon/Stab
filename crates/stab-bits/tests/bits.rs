@@ -376,7 +376,7 @@ fn bits_range_xor_word_chunk_edges_match_reference() {
         for offset in 0..count {
             if source_bools[source_start + offset] {
                 let target = target_start + offset;
-                expected[target] = !expected[target];
+                expected[target].toggle();
             }
         }
         assert_eq!(bools_from_bitvec(&actual), expected);

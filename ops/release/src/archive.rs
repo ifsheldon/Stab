@@ -249,6 +249,7 @@ struct CargoGitIdentity {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::io::{self, Write as _};
 
     use flate2::Compression;
@@ -335,7 +336,7 @@ mod tests {
         let path = Path::new("stab-core-0.2.0.crate");
         let error = validate_bytes(path, crate_bytes(stale), "stab-core", "0.2.0", expected)
             .expect_err("stale archive must fail");
-        assert!(matches!(error, ReleaseError::ArchiveContract { .. }));
+        assert_matches!(error, ReleaseError::ArchiveContract { .. });
 
         let reviewed = validate_bytes(path, crate_bytes(expected), "stab-core", "0.2.0", expected)
             .expect("current archive");

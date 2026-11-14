@@ -1,3 +1,5 @@
+use std::fmt::NumBuffer;
+
 use crate::{
     FormatError, RecordResult,
     result_packed::{
@@ -307,23 +309,8 @@ impl MeasureRecordWriter {
     }
 }
 
-#[allow(
-    clippy::cast_possible_truncation,
-    reason = "value modulo 10 is always representable as u8"
-)]
-fn append_usize_decimal(output: &mut Vec<u8>, mut value: usize) {
-    let mut digits = [0_u8; size_of::<usize>() * 3];
-    let mut used = 0_usize;
-    for digit in digits.iter_mut().rev() {
-        *digit = b'0' + (value % 10) as u8;
-        used += 1;
-        value /= 10;
-        if value == 0 {
-            break;
-        }
-    }
-    let start = digits.len() - used;
-    output.extend(digits.into_iter().skip(start));
+fn append_usize_decimal(output: &mut Vec<u8>, value: usize) {
+    output.extend_from_slice(value.format_into(&mut NumBuffer::new()).as_bytes());
 }
 
 pub fn read_records(

@@ -632,11 +632,10 @@ fn hermitian_sign(log_i: u8) -> SimResult<bool> {
 }
 
 fn first_set_bit(words: &[u64]) -> Option<usize> {
-    words
-        .iter()
-        .enumerate()
-        .find(|(_, word)| **word != 0)
-        .map(|(index, word)| index * u64::BITS as usize + word.trailing_zeros() as usize)
+    words.iter().enumerate().find_map(|(index, word)| {
+        word.lowest_one()
+            .map(|bit| index * u64::BITS as usize + bit as usize)
+    })
 }
 
 fn sign(signs: &[bool], row: usize) -> SimResult<bool> {

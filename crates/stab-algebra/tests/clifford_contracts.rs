@@ -4,6 +4,7 @@
     reason = "Clifford qualification uses a reviewed 24-element compatibility table and exact failures keep diagnostics readable"
 )]
 
+use std::assert_matches;
 use std::collections::BTreeSet;
 
 use rand::Rng as _;
@@ -205,16 +206,13 @@ fn cq2_algebra_clifford_growth_admits_bytes_and_rejects_overflow() {
 
     let budget = AlgebraMemoryBudget::DEFAULT.bytes();
     let refused = |result: Result<CliffordString, StabilizerError>| {
-        assert!(
-            matches!(
-                result,
-                Err(StabilizerError::MemoryBudgetExceeded {
-                    resource: StabilizerResource::CliffordString,
-                    budget_bytes,
-                    ..
-                }) if budget_bytes == budget
-            ),
-            "{result:?}"
+        assert_matches!(
+            result,
+            Err(StabilizerError::MemoryBudgetExceeded {
+                resource: StabilizerResource::CliffordString,
+                budget_bytes,
+                ..
+            }) if budget_bytes == budget
         );
     };
     refused(CliffordString::identity(usize::MAX / 2));

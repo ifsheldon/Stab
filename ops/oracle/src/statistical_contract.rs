@@ -130,6 +130,8 @@ pub(crate) fn two_proportion_outcome(
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::{
         AcceptedCountRange, TwoProportionOutcome, rejection_boundaries, two_proportion_outcome,
     };
@@ -149,12 +151,9 @@ mod tests {
     fn two_proportion_outcome_scores_pooled_difference_and_zero_variance_edges() {
         // Pooled p = 0.525, standard error = sqrt(0.525 * 0.475 * 2 / 20000) ~= 0.0049937.
         let outcome = two_proportion_outcome(11_000, 10_000, 20_000);
-        assert!(
-            matches!(
-                outcome,
-                Some(TwoProportionOutcome::Scored { z }) if (z - 0.05 / 0.004_993_746).abs() < 1e-3
-            ),
-            "{outcome:?}"
+        assert_matches!(
+            outcome,
+            Some(TwoProportionOutcome::Scored { z }) if (z - 0.05 / 0.004_993_746).abs() < 1e-3
         );
         assert_eq!(
             two_proportion_outcome(0, 0, 20),

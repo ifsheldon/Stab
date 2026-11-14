@@ -479,9 +479,8 @@ async fn run_rust_checks(repo_root: PathBuf, enabled: bool) -> Vec<CheckOutcome>
             "clippy",
             "--workspace",
             "--all-targets",
-            "--",
-            "-D",
-            "warnings",
+            "--config",
+            "build.warnings='deny'",
         ]
         .into_iter()
         .map(str::to_string)

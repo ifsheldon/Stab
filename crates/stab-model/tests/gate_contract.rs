@@ -3,6 +3,8 @@
     reason = "closed Stim gate contract fixtures use named lookups for compact diagnostics"
 )]
 
+use std::assert_matches;
+
 use stab_model::{
     Gate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule, ModelError, QubitId,
     Target, ValidationError,
@@ -63,16 +65,16 @@ fn gate_validation_reports_model_owned_errors() {
     let q0 = Target::qubit(QubitId::new(0).expect("q0"), false);
     let q1 = Target::qubit(QubitId::new(1).expect("q1"), false);
     validate_gate(h, &[], std::slice::from_ref(&q0)).expect("valid H");
-    assert!(matches!(
+    assert_matches!(
         validate_gate(h, &[0.5], std::slice::from_ref(&q0)),
         Err(ModelError::Validation(
             ValidationError::InvalidArgumentCount { gate: "H", .. }
         ))
-    ));
+    );
 
     let cx = Gate::from_name("CX").expect("CX");
     validate_gate_targets(cx, &[q0.clone(), q1]).expect("valid CX");
-    assert!(matches!(
+    assert_matches!(
         validate_gate_targets(cx, std::slice::from_ref(&q0)),
         Err(ModelError::Validation(
             ValidationError::InvalidTargetCount {
@@ -80,22 +82,22 @@ fn gate_validation_reports_model_owned_errors() {
                 count: 1
             }
         ))
-    ));
-    assert!(matches!(
+    );
+    assert_matches!(
         validate_gate_targets(cx, &[q0.clone(), q0]),
         Err(ModelError::Validation(ValidationError::InvalidTarget {
             gate: "CX",
             ..
         }))
-    ));
+    );
 
     let channel = Gate::from_name("PAULI_CHANNEL_1").expect("channel");
-    assert!(matches!(
+    assert_matches!(
         validate_gate(channel, &[0.6, 0.6, 0.0], &[]),
         Err(ModelError::Validation(
             ValidationError::InvalidArgument { .. }
         ))
-    ));
+    );
 }
 
 #[test]

@@ -891,11 +891,7 @@ fn process_rss_bytes(pid: u32) -> Result<Option<u64>, ProcessError> {
 }
 
 fn ensure_linux() -> Result<(), ProcessError> {
-    if cfg!(target_os = "linux") {
-        Ok(())
-    } else {
-        Err(ProcessError::UnsupportedHost)
-    }
+    cfg!(target_os = "linux").ok_or(ProcessError::UnsupportedHost)
 }
 
 #[derive(Debug, Error)]

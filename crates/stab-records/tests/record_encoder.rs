@@ -14,6 +14,8 @@
 //! that are not multiples of 8 or 64, shot counts that are not multiples of 64 or 256, empty
 //! batches, all-zero and all-one records, and PTB64 groups.
 
+use std::assert_matches;
+
 use proptest::prelude::*;
 use proptest::test_runner::{Config, FileFailurePersistence, RngAlgorithm, RngSeed};
 use stab_bits::{BIT_BLOCK_WORDS, BitBlock, BitSlice};
@@ -431,10 +433,10 @@ fn mismatched_layouts_are_rejected_before_any_byte_is_written() {
             &mut out,
         )
         .expect_err("width mismatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         RecordWriteError::Format(ref error) if error.code() == FormatErrorCode::InvalidRecordWidth
-    ));
+    );
 
     let detectors = PackedShotBatch::zeros(2, 2).expect("detectors");
     let observables = PackedShotBatch::zeros(3, 2).expect("observables");
@@ -485,7 +487,8 @@ fn destination_failures_surface_as_io_errors() {
             &mut FailAfter { budget: 1000 },
         )
         .expect_err("injected failure");
-    assert!(
-        matches!(error, RecordWriteError::Io(ref error) if error.to_string() == "injected write failure")
+    assert_matches!(
+        error,
+        RecordWriteError::Io(ref error) if error.to_string() == "injected write failure"
     );
 }

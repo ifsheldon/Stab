@@ -1,6 +1,7 @@
 # Rust 1.96–1.100: Changes Relevant To Stab
 
-Reviewed on 2026-11-13. This is a research note, not an active contract; it is not linked from `docs/README.md`.
+Reviewed on 2026-11-13 and updated on 2026-11-14 after an adoption pass on the Stable 1.100 pin.
+This is a research note, not an active contract; it is not linked from `docs/README.md`.
 
 ## Sources
 
@@ -20,126 +21,241 @@ On 2026-11-13 the 1.98.0 blog URL served the 1.99.0 post; the 1.98.0 content was
 
 ## Where Stab Stands
 
-- The pinned toolchain `nightly-2026-06-20` is `rustc 1.98.0-nightly (f428d123a 2026-06-19)`.
-- Stable component crates declare `rust-version = "1.97.1"` (ADR 0005).
-- So everything up to 1.97 is usable everywhere, most 1.98 library APIs already compile on the pin but need an MSRV bump before stable crates may use them, and 1.99/1.100 features need both a pin bump and an MSRV bump.
-- 1.98 availability on the pin was checked by compiling a probe per API with `rustc +nightly-2026-06-20` and no feature gates; the 1.97 bit-op signatures below were checked with `rustc +1.97.1`.
+- `rust-toolchain.toml` pins Stable `1.100.0` (`rustc 1.100.0 (0ef1bc386 2026-11-09)`), set by `f285fcb4` in the [fearless SIMD plan](plans/fearless-simd-stable-rust-plan.md); [ADR 0008](architecture/adr-0008-unconditional-fearless-simd-kernels.md) superseded the Nightly boundary of ADR 0005.
+- Every product crate declares `rust-version = "1.100"`, so every feature in this note is usable in every crate; no MSRV or pin bump is needed for any of them.
+- The pin includes every point-release fix in the table above.
+- Each API adopted below was probed on the pin with a one-line program compiled by `rustc 1.100.0` with no feature gate; all of them compiled, including `core::range`, `DropGuard`, `NumBuffer`, and `assert_matches!`.
+- The move to the pin already absorbed the new Clippy lints: S4 converted 22 `chunks_exact_to_as_chunks` sites and one `manual_slice_fill` site to the suggested form, and no lint was silenced with an `allow`.
 
-## Recommendation: Consider Bumping The Nightly Pin
+## Adoption Summary
 
-The pin predates three point-release miscompilation fixes: 1.96.1 (MIR optimization), 1.98.1 (vtable with a null function slot, which is UB), and possibly 1.97.1 (LLVM; reported on x86_64, Stab's primary host is AArch64). Whether the pinned nightly actually contains each bug was not verified. 1.99 also moves to LLVM 23, which can shift SIMD codegen in either direction.
+The adoption pass started from `7c7cde86` and was behavior-preserving: every CLI output, including error text, stayed byte-identical (see [Evidence](#evidence)).
 
-A pin bump is not free: `benchmarks/AGENTS.md` binds baselines to the Rust toolchain, so a new pin needs fresh E2E evidence before any Stim performance ratio is promoted, and newer Clippy brings lints that will fail the `-D warnings` CI gates (see [Pin-bump checklist](#pin-bump-checklist)).
-
-## Usable Now In Every Crate (≤ 1.97.1)
-
-### Integer bit operations (1.97)
-
-New on all unsigned integers and `NonZero` (probed on 1.97.1):
-
-| Method | `u64` result | `NonZero<u64>` result |
+| Feature | Version | Status in Stab |
 | --- | --- | --- |
-| `highest_one()` | `Option<u32>` (bit index) | `u32` |
-| `lowest_one()` | `Option<u32>` | `u32` |
-| `isolate_highest_one()` | `u64` | `NonZero<u64>` |
-| `isolate_lowest_one()` | `u64` | `NonZero<u64>` |
-| `bit_width()` | `u32` | `u32` |
+| `<int>::format_into(&mut NumBuffer<_>)` | 1.98 | Adopted on the circuit, DEM, and `convert` integer output paths; measured and rejected in the streaming record encoder |
+| `str::trim_prefix`, `Path::trim_prefix` | 1.100 | Adopted at 7 sites |
+| `str::strip_circumfix` | 1.98 | Adopted at 3 sites |
+| `str::substr_range` / `[T]::subslice_range` | 1.98 | Not adopted |
+| `assert_matches!` | 1.96 | Adopted at 182 test assertions in 67 files |
+| `bool::ok_or` / `ok_or_else` | 1.98 | Adopted at 8 sites |
+| `Option::map_or_default` | 1.98 | Adopted at 5 sites |
+| `NonZero::<int>::from_str_radix`, iterable `NonZero` ranges | 1.98, 1.96 | No sites |
+| `lowest_one` and the other 1.97 bit operations | 1.97 | `lowest_one` adopted at 8 set-bit scans; measured neutral |
+| `core::range` types | 1.96 | Not adopted |
+| `DropGuard` | 1.100 | Adopted at 1 site |
+| `Path::is_empty` | 1.98 | Adopted at 2 sites |
+| `String::from_utf8_lossy_owned` | 1.99 | Adopted at 2 sites |
+| `std::fs::set_times`, `PathBuf::into_string` | 1.99, 1.98 | No sites |
+| `bool::toggle` | 1.100 | Adopted at 5 sites |
+| `Vec::from_fn`, `Box::map`, `Vec::into_parts`, `IntoIterator for Box<[T; N]>` | 1.100, 1.99 | Not adopted |
+| `build.warnings = "deny"` | 1.97 | Adopted for the Clippy gate in `just`, CI, the pre-commit hook, and `CONTRIBUTE.md` |
+| `[lints.cargo]` `unused_dependencies` | 1.100 | Declared in `[workspace.lints.cargo]`; no unused dependency found |
+| Workspace `default-features = false` override | 1.99 | Adopted for `rand` in `stab-algebra` and `hashbrown` in `stab-analysis` |
+| `chunks_exact_to_as_chunks`, `manual_isolate_lowest_one`, `manual_bit_width`, `mismatched_bit_width_type` | Clippy 1.98–1.99 | Already clean; nothing silenced |
+| `f32`/`f64::algebraic_*`, `Allocator`, `mem::conjure_zst`, NEON `vdot*` | 1.98–1.100 | Rejected |
+| `registry.global-min-publish-age` | 1.100 | Open decision for the project owner |
 
-`bit_width` exists on unsigned types only (`i64::bit_width` does not exist, despite `RELEASES.md` saying `{integer}`). They give names to idioms such as `u64::BITS - x.leading_zeros()` and `x & x.wrapping_neg()`; a 2026-11-13 search of `crates/` found neither idiom, so they mainly matter for new bit-kernel code. Clippy 1.98 adds `manual_isolate_lowest_one` (complexity) and 1.99 adds `manual_bit_width` (pedantic) and `mismatched_bit_width_type` (suspicious) to push code toward them. The bit-scan loop in `crates/stab-analysis/src/circuit_to_dem/reverse_fold.rs:648` (`trailing_zeros` then `mask & (mask - 1)`) clears rather than isolates, so it is already idiomatic.
+## Library Features
 
-### `core::range` types (1.96)
+### Integer formatting: `format_into` (1.98)
 
-`core::range::{Range, RangeFrom, RangeToInclusive}` are `Copy` and implement `IntoIterator` rather than `Iterator`. They suit stored spans such as parser diagnostics byte ranges or record windows that currently store `start`/`end` pairs or clone `ops::Range`. Range syntax still produces the legacy `core::ops` types until a future edition, so prefer `impl RangeBounds` in public signatures, as the announcement recommends.
+`<int>::format_into(&mut core::fmt::NumBuffer<_>) -> &str` formats an integer into a stack buffer without `fmt` dispatch.
+
+Adopted sites:
+
+- `stab-records`: `append_usize_decimal` in the per-record writers (`convert` to `hits` and `dets`) replaced a one-digit-at-a-time loop and lost a `cast_possible_truncation` allow.
+- `stab-model` circuit printing: `push_u64`, `push_i32`, `write_u64_io`, and `write_i32_io` now call `format_into`, the hand-rolled `encode_u64` helper and its three `expect_used` allows are gone, and the single-pass float printer's integer shortcut (`DETECTOR(1, 2, 0)` style coordinates) uses `format_into` instead of `write!`.
+- `stab-model` DEM printing: `DemTarget::text_parts` splits a target into its letter and digits, and `Display for DemTarget`, the string writer, and the byte writer all use it, so `write_dem_bytes` no longer goes through `write!(out, " {target}")` and the string writer no longer allocates a `String` per target.
+
+`decimal_len_u64` in circuit capacity estimation still counts digits by division, because no 1.96–1.100 API replaces it and `checked_ilog10` predates this window.
+
+`format_into` on `i32` writes the sign itself, which matches the old sign-then-magnitude code, including `i32::MIN`.
+
+Measured and rejected: `push_decimal` in the streaming record encoder (`hits` and `dets` output of `detect`, `sample`, `sample_dem`, and `m2d`) keeps its two-digit lookup table.
+With `format_into` there, `detect --out_format dets` on `suite_d11.stim` at 300k shots was 3.6% faster (300.1 ms to 289.3 ms) but `--out_format hits` was 3% slower (272.9 ms to 281.1 ms), and an `#[inline]` hint did not change either number, so the table stays.
+
+The A/B timing in [Evidence](#evidence) found every kept integer-formatting change equal or faster, by up to 14% for noisy `gen` at distance 400.
+
+### Prefix trimming and circumfix stripping (1.98, 1.100)
+
+- `trim_prefix` replaced `strip_prefix(x).unwrap_or(original)` and its `map_or_else(|_| path.to_path_buf(), …)` form at 7 sites: the target-error classifier in `stab-model` (`trim_prefix('-')`), the clap JSON diagnostic in `stab-cli` (`trim_prefix("error: ")`), and five root-relative path displays in `ops/architecture` and `ops/pre-commit` (`Path::trim_prefix`).
+- `strip_circumfix` replaced `strip_prefix(..).and_then(|v| v.strip_suffix(']'))` for `rec[-N]` and `sweep[N]` targets in `stab-model/src/target.rs` and for `X[..]`-style flow terms in `stab-algebra/src/flow.rs`.
+- The `[` and `(` argument openers in the circuit and DEM parsers were left alone, because they search for the matching closer and report a distinct error for each half.
+- The fixture-token parser in `ops/oracle/src/fixtures/outputs.rs` was left alone, because it reports a missing suffix differently from a missing prefix.
+
+### Byte offsets: `substr_range` / `subslice_range` (1.98)
+
+Not adopted.
+Parser diagnostics carry offsets through `SourceSlice` in `stab-model/src/source_text.rs`, which threads a `byte_start` with each slice by construction; `substr_range` would return an `Option` that the callers would have to turn into an internal error, so it would add a failure path without removing any arithmetic.
 
 ### `assert_matches!` / `debug_assert_matches!` (1.96)
 
-These print the value's `Debug` form when they fail. The workspace has about 150 `assert!(matches!(..))` calls in tests, and they would give more useful failure output after migrating. Both macros must be imported (`use core::assert_matches;`). Migrate opportunistically; a mass rewrite has little value.
+Both macros live at the crate root and need an import on stable 1.100: `use std::assert_matches;` (or `use core::assert_matches;`).
 
-### Other small items
+Every `assert!(matches!(..))` in the workspace, 182 assertions in 67 files, was converted mechanically, so a failure now prints the value that did not match.
+The import sits in the innermost module that uses the macro, in that module's `std` import group.
 
-- `NonZero` integer ranges are iterable (1.96), useful if typed IDs are `NonZero`-backed.
-- `Default for RepeatN` (1.97) and `From<T> for LazyLock<T, F>` (1.96).
-- `char::is_control` is const (1.97).
+- Six assertions dropped a custom message that only repeated the asserted value with `{value:?}`, because the macro now prints it.
+- Eight release tests assert on `review_assets(..).map(drop)`, because the success type `ReviewedAssets` deliberately has no `Debug` implementation.
+- Three `assert!(!matches!(..))` assertions stay, because there is no negated form.
+- Guarded patterns (`P if cond`) keep their hand-formatted layout, because rustfmt cannot format a macro argument that is not an expression.
 
-### Cargo and CI (1.97)
+### `bool::ok_or` and `Option::map_or_default` (1.98)
 
-- `build.warnings = "deny"` (`CARGO_BUILD_WARNINGS=deny`) replaces `RUSTFLAGS=-Dwarnings` without invalidating the build cache. Stab passes `-- -D warnings` to Clippy in `justfiles/rust.just` and `.github/workflows/ci.yml`; those runs could switch, and `just rust::*` recipes could share one cache across checked and unchecked runs. It does not cover `RUSTDOCFLAGS="-D warnings"` in `justfiles/docs.just`.
-- The `linker_messages` lint is warn-by-default and outside the `warnings` group. Stab already sets `linker_messages = "allow"` in `[workspace.lints.rust]`.
-- `resolver.lockfile-path` allows a custom lockfile path, which helps read-only source trees such as the release operator's isolated builds.
-- `cargo clean` refuses a `--target-dir` that does not look like a Cargo target directory.
-- v0 symbol mangling is the stable default. It affects backtrace text and older profilers only; it does not affect the pinned nightly, which already used v0.
+- `bool::ok_or_else` replaced `cond.then_some(()).ok_or_else(..)` at 2 sites and `if cond { Ok(()) } else { Err(..) }` at 5 sites, and `bool::ok_or` replaced the Linux host check in `ops/bench/src/process.rs`.
+  Every allocating error stays lazy.
+- The `ELSE_CORRELATED_ERROR` check in `stab-analysis/src/circuit_to_dem/reverse_fold.rs` stays an `if`/`else`, because its long message reads worse inside a closure.
+- `map_or_default(f)` replaced `map(f).unwrap_or_default()` at 5 sites.
+- `map_or(0, <[u8]>::len)` and similar calls stay, because the explicit zero is the clearer statement of a byte count.
 
-## Usable On The Pin, Needs An MSRV Bump For Stable Crates (1.98)
+### `NonZero` parsing and ranges (1.96, 1.98)
 
-All of these compile on `nightly-2026-06-20` except the `Atomic::from_mut*` APIs.
+No sites.
+The only `NonZero` value in the product crates is the `rec[-N]` lookback (`NonZeroI32`), which is parsed as a bounded unsigned value and negated, so `from_str_radix` does not fit.
 
-- **`<int>::format_into(&mut core::fmt::NumBuffer<_>) -> &str`** formats integers without `fmt` dispatch, with `itoa`-like speed. `append_usize_decimal` in `crates/stab-records/src/result_formats.rs:817` is a hand-rolled version of this on the `dets` output path. Replacing it removes code and a `cast_possible_truncation` allow, but `stab-records` is a 1.97.1-MSRV crate and the output path is benchmarked, so it needs an MSRV decision and an A/B measurement.
-- **`NonZero::<int>::from_str_radix`** parses directly into `NonZero` typed values, in line with the typed-boundary rules.
-- **`str::strip_circumfix` / `[T]::strip_circumfix`** strip a prefix and a suffix in one call, for example bracketed parser arguments.
-- **`str::substr_range` / `[T]::subslice_range`** recover a byte range from a subslice, which helps point parser diagnostics at a location.
-- **`bool::ok_or` / `ok_or_else`** and **`Option` / `Result::map_or_default`** shorten validation chains that end in domain errors.
-- **`Path::is_empty`** and **`PathBuf::into_string`** are useful for typed path validation in the `ops` crates.
-- **`Send` / `Sync` for `std::process::CommandArgs`.**
-- **`f32` / `f64::algebraic_*`** let LLVM reassociate float arithmetic, at the cost of non-deterministic results. Do not use them in probability, noise-model, or DEM-weight paths where Stim parity or seeded self-regression must stay reproducible.
-- **NEON `vdot*` intrinsics** (aarch64) are stable. They compute int8 dot products, which do not match Stab's XOR/popcount bit kernels, and they would need `unsafe`, which is denied workspace-wide. They are not relevant.
+### Integer bit operations (1.97)
 
-## Needs A Pin Bump And An MSRV Bump (1.99, 1.100)
+The 2026-11-14 search found no `BITS - leading_zeros`, `x & x.wrapping_neg()`, or `63 - leading_zeros` idioms, and Clippy with `manual_bit_width`, `manual_isolate_lowest_one`, and `mismatched_bit_width_type` forced on reported nothing.
 
-### Most relevant
+`lowest_one` replaced the `while bits != 0 { bits.trailing_zeros() … }` set-bit scans at 8 sites: `for_each_set_bit` in the record encoder, the bit visitors in `stab-algebra/src/conversions.rs` and `tableau/action.rs`, the two selection scans in `tableau/random.rs`, `first_set_bit` in the reference simulator, and two scans in the Bernoulli statistical tests.
+The loop condition and the index now come from one call, so no index is ever read from a zero word.
 
-- **`DropGuard` (1.100)** runs a closure on drop unless `DropGuard::dismiss` is called. It suits rollback-on-error code such as partial-output cleanup in `ops/release`.
-- **`str::trim_prefix` / `trim_suffix`, `[T]::trim_*`, `Path::trim_prefix` (1.100)** replace `strip_prefix(x).unwrap_or(original)`. Current sites include `crates/stab-model/src/circuit/parser.rs:778`, `ops/architecture/src/markdown.rs:633`, and `ops/architecture/src/workflow_actions.rs:75`.
-- **Workspace `default-features` override (1.99, Cargo, edition 2024 members only)**: `dep = { workspace = true, default-features = false }` is now honored even when the workspace definition enables defaults. This lets product crates trim features from shared `[workspace.dependencies]` entries.
-- **`[lints.cargo]` with `cargo::unused_dependencies` (1.100, warn by default)** helps keep the dependency graph minimal, in line with ADR 0007. It only fires when every target that could use a dependency is built, and it never reports dev-dependencies.
-- **`registry.global-min-publish-age` (1.100)** adds a dependency cooldown in `.cargo/config.toml` as a supply-chain defense. It interacts with the rule to add new dependencies at their latest crates.io version: a cooldown can make Cargo reject a version published within the window. Decide that interaction before adopting it.
-- **`std::fs::set_times` / `set_times_nofollow` (1.99)** set file timestamps by path, with a no-follow variant that fits the symlink-hostile filesystem rules in `ops/release`.
-- **`String::from_utf8_lossy_owned` / `FromUtf8Error::into_utf8_lossy` (1.99)** avoid a copy when lossily decoding owned bytes, for example captured subprocess output in the oracle and bench tooling.
+The record-encoder scan is on the measured `hits`/`dets` path; an A/B against the integer-formatting build alone was neutral (see [Evidence](#evidence)).
 
-### Also available
+The `reverse_fold.rs` combination loop keeps `trailing_zeros` with `mask & (mask - 1)`, because it walks a nonzero counter rather than scanning bits.
 
-- 1.99:
-  - `IntoIterator` for `Box<[T; N]>` and its references.
-  - `Vec::into_parts` / `from_parts`.
-  - `FusedIterator for StepBy`.
-  - `Box::into_non_null` / `from_non_null`.
-  - Layout queries on raw pointers.
-  - Defining C-variadic functions (not needed).
-- 1.100:
-  - `Vec::from_fn`.
-  - `bool::toggle`.
-  - `Box`/`Rc`/`Arc::map`.
-  - `PartialEq<Cow<[U]>>` for `Vec` and slices.
-  - The stable `Allocator` API with `Vec::new_in` / `Box::new_in`. An arena for parser or analysis allocations would need `unsafe impl Allocator`, so it would need an ADR-level exception to `unsafe_code = "deny"` and is not recommended now.
-  - `mem::conjure_zst` (unsafe).
-- 1.100 makes the never type `!` stable, and `Infallible` becomes an alias for `!`. Stab's `type Error = Infallible` impls keep working. The repo has no `impl … for Infallible` or `From<Infallible>` impls that could start overlapping.
+`bit_width` exists on unsigned types only (`i64::bit_width` does not exist, despite `RELEASES.md` saying `{integer}`).
 
-## Pin-Bump Checklist
+### `core::range` types (1.96)
 
-These items will need attention when the pinned nightly moves past 2026-06-19:
+Not adopted.
+The only stored span list, `Vec<Range<usize>>` in `stab-model/src/model_bytes.rs`, is read through `.start`/`.end` in production; the Copy range would only remove four `.clone()` calls in its tests while adding conversions where production pushes `start..end`.
+Public signatures already take `impl RangeBounds<usize>`.
 
-1. **New Clippy lints under `-D warnings`.**
-   - `chunks_exact_to_as_chunks` (style, 1.98) suggests `as_chunks` for constant chunk sizes; there are about 25 `chunks_exact(` calls in `crates/`, and some sit in hot kernels, so measure before accepting the suggestion.
-   - `manual_isolate_lowest_one` (complexity, 1.98) and `mismatched_bit_width_type` (suspicious, 1.99) also fire by default.
-   - `nonminimal_bool` and `overly_complex_bool_expr` moved to pedantic in 1.97, so they stop firing.
-   - `unwrap_used`'s `allow-unwrap-in-tests` now covers integration tests (1.100). Check `clippy.toml` before relying on it, because the workspace warns on `unwrap_used`.
-2. **Benchmark evidence.** A toolchain change invalidates the AArch64 baselines (`benchmarks/AGENTS.md`), and the 1.99 LLVM 23 update makes a codegen shift likely. Re-run the E2E evidence before quoting ratios.
-3. **CLI stderr text.** 1.98 escapes more characters in `Debug` output, and 1.100 makes `str::escape_debug` always escape grapheme extenders. `stab-cli` diagnostics format user input with `{:?}`, so error text can change for unusual input. Compatibility is defined on stderr class, so this is cosmetic, but snapshot-style tests may need updating.
-4. **Lint behavior.**
-   - The `unsafe_code` lint now fires consistently on all unsafe attributes (1.98; already in the pin).
-   - `semicolon_in_expressions_from_non_local_macros` now warns for macros from other crates (1.99).
-   - `unreachable_cfg_select_predicates` joins the `unused` group (1.99).
-   - Legacy integer modules such as `std::u64::MAX` are fully deprecated (1.99); the repo has none.
-5. **Cargo behavior.**
-   - Incremental compilation is off by default when `CI` is set (1.99), which can change CI build times.
-   - The new `build-dir` layout (1.100) only matters to tools that read Cargo's intermediate artifacts. Stab's ops code uses its own `target/releases/` subtree and `CARGO_BIN_EXE_*`, so no impact is expected.
-   - `cargo install` uses the packaged lockfile by default (1.100), which makes `--locked` redundant but harmless.
-6. **Semantics to keep in mind.**
-   - Iterating an exhausted `RangeInclusive` may now leave different `start()`/`end()` values (1.99).
-   - `Iterator::min`/`max` call different `Ord` methods (1.100).
-   - `assert_eq!` gets its own temporary scope (1.98).
-   - `derive(PartialOrd)` takes a fast path when `Ord` is also derived (1.98).
-   - None of these should matter with lawful `Ord` impls.
+### `DropGuard` (1.100)
+
+Adopted in `atomic_write_regular_file_unix` in `ops/oracle/src/safe_file.rs`: a `DropGuard` unlinks the temporary file on any early return and is dismissed after the rename and directory sync, replacing an immediately invoked closure plus `if result.is_err()`.
+The guard is created at the same point as the old cleanup scope, so the cleanup covers exactly the same failures.
+
+Not adopted:
+
+- The `cfg(not(any(unix, windows)))` fallback in the same file has the same shape, but it cannot be compiled on the development host, so it was left unchanged.
+- `ops/release` never deletes partial output; it writes into no-replace retained directories, so there is no rollback for a guard to own.
+- The existing `Drop` implementations (`ManagedChild` in `ops/bench` and `ops/release`, the engine transactions, `BitWordsMut`) clean up state owned by their type, which is not a closure-shaped guard.
+
+### Filesystem and string helpers (1.98, 1.99)
+
+- `Path::is_empty` replaced `path.as_os_str().is_empty()` in the two `validate_relative` checks in `ops/release`.
+- `String::from_utf8_lossy_owned` replaced `String::from_utf8_lossy(&bytes).into_owned()` for the captured stdout and stderr in `ops/pre-commit/src/support.rs`, which avoids a copy when the output is valid UTF-8.
+- The opaque-tag display strings in `stab-model` stay on `from_utf8_lossy`, because they keep the original bytes and the bytes are known to be invalid.
+- `std::fs::set_times` / `set_times_nofollow` and `PathBuf::into_string` have no sites: no ops tool sets timestamps, and the only path-to-`String` conversion borrows an `OsStr`.
+
+### Other small items (1.96–1.100)
+
+- `bool::toggle` replaced `x = !x` at 5 sites (`stabilizer_frame.rs`, `flow.rs`, and one test).
+- `Vec::from_fn` was not adopted: the candidates are `(0..n).map(f).collect()` chains that usually feed a `join`, and the iterator form is just as clear.
+- `Box`/`Rc`/`Arc::map`, `Vec::into_parts` / `from_parts`, `IntoIterator for Box<[T; N]>`, `Default for RepeatN`, `From<T> for LazyLock`, `FusedIterator for StepBy`, `PartialEq<Cow<[U]>>`, and `Send`/`Sync` for `CommandArgs` have no sites.
+
+### Rejected
+
+- **`f32` / `f64::algebraic_*`** let LLVM reassociate float arithmetic, at the cost of non-deterministic results.
+  They would break Stim parity and seeded self-regression in probability, noise-model, and DEM-weight paths.
+- **The `Allocator` API** with `Vec::new_in` / `Box::new_in` would need `unsafe impl Allocator` for an arena, and `unsafe_code` is denied workspace-wide.
+- **`mem::conjure_zst`** is unsafe.
+- **NEON `vdot*` intrinsics** compute int8 dot products, which do not match Stab's XOR/popcount bit kernels, and need `unsafe`.
+
+## Cargo And Lints
+
+- **`build.warnings = "deny"` (1.97).** `just rust::clippy`, the CI Clippy step, the pre-commit hook, and `CONTRIBUTE.md` now run `cargo clippy --workspace --all-targets --config "build.warnings='deny'"` instead of `-- -D warnings`.
+  It exits with status 101 on the same rustc and Clippy warnings, and it shares the build cache with a plain `cargo clippy`, because the deny setting is not a compiler flag.
+  It also fails on Cargo manifest-lint warnings such as `cargo::unused_dependencies`, which `-D warnings` ignored; that makes the gate stricter, and the workspace has none today.
+  `RUSTDOCFLAGS="-D warnings"` in `justfiles/docs.just` is unchanged, because `build.warnings` does not cover rustdoc flags.
+  The release recipes and release workflow were not touched.
+- **`[lints.cargo]` `unused_dependencies` (1.100).** The lint is already `warn` by default; the workspace now states it in `[workspace.lints.cargo]`, which every member inherits.
+  It fired on a deliberately unused probe dependency and reports nothing for the real workspace with `--all-targets`; it never checks dev-dependencies or dependencies behind disabled features.
+- **Workspace `default-features = false` override (1.99).** `stab-algebra` now takes `rand` without default features, because it only uses the `Rng`/`RngExt` traits and `SmallRng`; its tests get the defaults back through a dev-dependency, so a standalone `stab-algebra` build no longer pulls `getrandom` or `chacha20`.
+  `stab-analysis` takes `hashbrown` with only `inline-more`, because it uses `HashTable` with the std `RandomState`; that drops `foldhash`, `allocator-api2`, and `equivalent` from every product build and from the three external consumer lockfiles under `test-support/consumers/`.
+  The root `Cargo.lock` is unchanged, because `ops` tools still use those crates.
+  The `stab-engine` `rand` dependency keeps its defaults, because unseeded runs call `rand::random`.
+- **`registry.global-min-publish-age` (1.100)** adds a dependency cooldown in `.cargo/config.toml`.
+  It conflicts with the rule to add new dependencies at their latest crates.io version, because a cooldown can reject a version published within the window, so it is left as an open decision for the project owner.
+- `resolver.lockfile-path` (1.97) remains a possible fit for read-only source trees such as the release operator's isolated builds; it was not adopted because no current workflow needs it.
+- The `linker_messages` lint (1.97) is already `allow` in `[workspace.lints.rust]`.
+
+## Effects Of The 1.100 Pin To Keep In Mind
+
+1. **CLI stderr text.** 1.98 escapes more characters in `Debug` output, and 1.100 makes `str::escape_debug` always escape grapheme extenders.
+   `stab-cli` diagnostics format user input with `{:?}`, so error text can differ from a pre-pin build for unusual input.
+   Compatibility is defined on stderr class, so this is cosmetic.
+2. **Lint behavior.** `semicolon_in_expressions_from_non_local_macros` warns for macros from other crates (1.99), `unreachable_cfg_select_predicates` joins the `unused` group (1.99), and legacy integer modules such as `std::u64::MAX` are fully deprecated (1.99); the repo has none of these.
+3. **Cargo behavior.** Incremental compilation is off by default when `CI` is set (1.99).
+   The new `build-dir` layout (1.100) only matters to tools that read Cargo's intermediate artifacts; Stab's ops code uses its own `target/releases/` subtree and `CARGO_BIN_EXE_*`.
+   `cargo install` uses the packaged lockfile by default (1.100).
+   v0 symbol mangling is the default (1.97).
+4. **Semantics.** Iterating an exhausted `RangeInclusive` may leave different `start()`/`end()` values (1.99), `Iterator::min`/`max` call different `Ord` methods (1.100), `assert_eq!` gets its own temporary scope (1.98), and `derive(PartialOrd)` takes a fast path when `Ord` is also derived (1.98).
+   None of these matter with lawful `Ord` impls.
+5. **Never type.** 1.100 makes `!` stable and `Infallible` an alias for it.
+   Stab's `type Error = Infallible` impls keep working, and the repo has no `impl … for Infallible` or `From<Infallible>` impls that could start overlapping.
+6. **Benchmark evidence.** The toolchain move invalidated the AArch64 baselines (`benchmarks/AGENTS.md`), and 1.99 moved to LLVM 23, so ratios must come from evidence recorded on the 1.100 pin.
+
+## Evidence
+
+All timings below are best of 9 interleaved runs pinned to CPU 4 on the AArch64 development host, comparing a release build of `7c7cde86` with a release build of the adoption pass.
+
+Integer formatting and bit-scan A/B (best of 9, milliseconds; `fmt` is the build with only the integer-formatting and trimming changes, `bits` adds `lowest_one`):
+
+| Case | `7c7cde86` | `fmt` | Ratio | `bits` vs `fmt` |
+| --- | ---: | ---: | ---: | ---: |
+| `detect --out_format dets`, `suite_d11.stim`, 300k shots | 303.5 | 289.0 | 0.95 | 1.00 |
+| `detect --out_format hits`, `suite_d11.stim`, 300k shots | 278.1 | 281.7 | 1.01 | 1.00 |
+| `sample_dem --out_format hits`, `suite_d11.dec.dem`, 100k shots | 328.3 | 329.0 | 1.00 | 1.00 |
+| `sample_dem --out_format dets`, `suite_d11.dec.dem`, 100k shots | 334.6 | 329.7 | 0.99 | 1.00 |
+| `analyze_errors`, `d21r21.stim` | 262.3 | 251.9 | 0.96 | — |
+| `analyze_errors`, `d15r150.stim` | 1072.3 | 1021.3 | 0.95 | — |
+| `gen` rotated surface code, distance 400, 1 round | 776.3 | 712.1 | 0.92 | — |
+| `gen` rotated surface code, distance 400, 3 noisy rounds | 963.6 | 821.3 | 0.85 | — |
+| `convert` b8 to `dets`, 2048 bits, 40k shots | 262.9 | 256.2 | 0.97 | 1.00 |
+| `convert` b8 to `hits`, 2048 bits, 40k shots | 257.5 | 254.0 | 0.99 | 1.00 |
+
+The `hits` regression traced to `format_into` in the streaming encoder, which was reverted as described in [Integer formatting](#integer-formatting-format_into-198).
+
+Final adoption build against `7c7cde86` over the review set plus the sparse-output cases (best of 9, milliseconds):
+
+| Case | `7c7cde86` | Adoption | Ratio |
+| --- | ---: | ---: | ---: |
+| `detect` d7r1000 100k b8 | 2217.7 | 2211.4 | 1.00 |
+| `detect` suite_d11 350k b8 with observables | 228.9 | 226.3 | 0.99 |
+| `detect` color_d9 1M b8 | 219.6 | 219.7 | 1.00 |
+| `detect` d35r1000 64 shots | 64.9 | 64.7 | 1.00 |
+| `detect` d35r1000 1 shot | 63.8 | 64.2 | 1.01 |
+| `detect` d35r1000 1000 shots | 680.6 | 677.6 | 1.00 |
+| `sample` d35r1000 64 shots | 124.8 | 125.5 | 1.01 |
+| `sample` d35r1000 1000 shots | 695.8 | 706.3 | 1.01 |
+| `detect` d21r21 64 shots | 4.2 | 4.2 | 0.99 |
+| `sample` d11r11 300k b8 | 181.4 | 180.7 | 1.00 |
+| `m2d` d11r11 200k b8 | 87.9 | 87.5 | 1.00 |
+| `sample_dem` suite_d11 100k b8 | 299.4 | 299.1 | 1.00 |
+| `detect` suite_d11 300k `dets` | 302.3 | 299.6 | 0.99 |
+| `detect` suite_d11 300k `hits` | 277.0 | 273.3 | 0.99 |
+| `sample_dem` suite_d11 100k `hits` | 328.5 | 326.9 | 1.00 |
+| `sample_dem` suite_d11 100k `dets` | 335.4 | 334.3 | 1.00 |
+| `analyze_errors` d21r21 | 263.2 | 251.7 | 0.96 |
+| `analyze_errors` d15r150 | 1101.2 | 1079.1 | 0.98 |
+| `gen` distance 400 | 777.0 | 714.5 | 0.92 |
+| `gen` distance 400, noisy | 966.8 | 823.7 | 0.85 |
+| `convert` b8 to `dets` | 262.3 | 258.0 | 0.98 |
+| `convert` b8 to `hits` | 257.2 | 256.7 | 1.00 |
+
+A 15-round recheck of `sample` d35r1000 1000 shots measured 696.9 ms before and 695.0 ms after; intermediate builds of the same code ranged from 694.8 ms to 710.1 ms, so the 1.01 row is build-to-build layout noise rather than a change in the sampling code, which this pass did not touch beyond `bool::toggle`.
+
+Output identity: 523 commands (sampling, detection, `m2d`, `convert` in every sparse format, `analyze_errors` with folding and decomposition, `gen`, `inspect`, `plan`, hostile circuits and DEMs, malformed `rec[...]` and `sweep[...]` targets, and clap and JSON diagnostics) produced the same stdout, stderr, and exit status from both release builds when both binaries had the same file name.
+A first run with different binary names differed only in the three clap usage lines that print `argv[0]`.
+
+The E2E smoke tier (`just bench::e2e-run --tier smoke --affinity-cpu 4 --allow-dirty`) completed all 25 cases with memory `Passed` and parity and self-regression `Diagnostic`; smoke ratios are diagnostic only and are not quoted here as Stim performance claims.
 
 ## Not Relevant To Stab
 
-Nothing in 1.96–1.100 touches `std::simd` or `portable_simd`. Platform tier changes did not touch `aarch64-unknown-linux-gnu`. The WebAssembly, LoongArch, NVPTX, PowerPC, Windows, and embedded target changes, C-variadics, `extern "custom"`, the rustdoc flag stabilizations, and `-Cprofile-sample-use` do not affect current milestones.
+Nothing in 1.96–1.100 touches `std::simd` or `portable_simd`.
+Platform tier changes did not touch `aarch64-unknown-linux-gnu`.
+The WebAssembly, LoongArch, NVPTX, PowerPC, Windows, and embedded target changes, C-variadics, `extern "custom"`, the rustdoc flag stabilizations, and `-Cprofile-sample-use` do not affect current milestones.

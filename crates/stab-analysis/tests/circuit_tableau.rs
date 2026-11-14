@@ -3,6 +3,8 @@
     reason = "M6 circuit/tableau parity tests mirror compact upstream examples"
 )]
 
+use std::assert_matches;
+
 use stab_algebra::Tableau;
 use stab_analysis::{
     AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceOperation,
@@ -453,7 +455,7 @@ fn circuit_to_tableau_admits_bytes_and_squares_repeats_cancellably() {
             ..CircuitToTableauOptions::default()
         },
     );
-    assert!(matches!(cancelled, Err(AnalysisError::Cancelled(_))));
+    assert_matches!(cancelled, Err(AnalysisError::Cancelled(_)));
 
     // A signal set while a wide power is being squared stops it between compositions; without
     // polling, the 124 compositions of 1100-qubit Tableaux would run for minutes in a debug build.
@@ -471,7 +473,7 @@ fn circuit_to_tableau_admits_bytes_and_squares_repeats_cancellably() {
         },
     );
     canceller.join().expect("canceller thread");
-    assert!(matches!(cancelled, Err(AnalysisError::Cancelled(_))));
+    assert_matches!(cancelled, Err(AnalysisError::Cancelled(_)));
 }
 
 fn circuit(text: &str) -> Circuit {

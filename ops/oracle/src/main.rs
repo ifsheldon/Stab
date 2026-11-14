@@ -865,6 +865,8 @@ fn compare_exact(stim: &ProcessOutput, stab: &ProcessOutput) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use clap::Parser;
 
     use super::{Cli, Command, ProcessOutput, compare_exact, compare_help_health};
@@ -879,21 +881,21 @@ mod tests {
         let structural = Cli::try_parse_from(["stab-oracle", "run", "--all-rows", "--structural"])
             .expect("parse structural run command");
 
-        assert!(matches!(exact.command, Command::Run { exact: true, .. }));
-        assert!(matches!(
+        assert_matches!(exact.command, Command::Run { exact: true, .. });
+        assert_matches!(
             statistical.command,
             Command::Run {
                 statistical: true,
                 ..
             }
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             structural.command,
             Command::Run {
                 structural: true,
                 ..
             }
-        ));
+        );
     }
 
     #[test]

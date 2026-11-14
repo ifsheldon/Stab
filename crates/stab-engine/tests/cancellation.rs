@@ -10,6 +10,7 @@
 //! observing its cancellation signal. The worker reports when it is about to start the call; the
 //! test cancels shortly after, and the deadline only guards against a hang.
 
+use std::assert_matches;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -142,20 +143,20 @@ fn reference_sample_computation_stops_when_cancelled() {
     // The plan computes its reference sample lazily, so a signal set after compilation is
     // observed only by the reference simulator's repeat interpretation.
     cancellation.cancel();
-    assert!(matches!(
+    assert_matches!(
         plan.session(RandomPolicy::Seeded(Seed::new(1))),
         Err(SamplingExecutionError::Cancelled(Cancelled))
-    ));
-    assert!(matches!(
+    );
+    assert_matches!(
         plan.try_reference_sample(),
         Err(SamplingExecutionError::Cancelled(Cancelled))
-    ));
-    assert!(matches!(
+    );
+    assert_matches!(
         SamplingCompiler::new()
             .cancellation(cancellation)
             .compile(&circuit(ENDLESS_SAMPLING)),
         Err(stab_engine::SamplingCompileError::Cancelled(Cancelled))
-    ));
+    );
 }
 
 #[test]
@@ -359,21 +360,21 @@ fn a_sink_error_stops_measurement_to_detection_within_one_batch() {
     let error = transaction
         .write_batch_with_sweep(MeasurementBatchView::new(input.view()), None)
         .expect_err("the sink rejects the first batch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DetectionRunError::Sink {
             phase: SinkFailurePhase::WriteBatch,
             source: SinkFailed,
             ..
         }
-    ));
-    assert!(matches!(
+    );
+    assert_matches!(
         transaction.write_batch_with_sweep(MeasurementBatchView::new(input.view()), None),
         Err(DetectionRunError::Engine {
             source: DetectionExecutionError::SessionPoisoned,
             ..
         })
-    ));
+    );
     drop(transaction);
     assert_eq!((sink.writes, sink.finishes), (1, 0));
     assert!(session.is_poisoned());
@@ -399,8 +400,8 @@ fn a_sink_error_stops_dem_replay_within_one_batch() {
     }
     assert_eq!((sink.writes, sink.finishes), (1, 0));
     assert!(replay.is_poisoned());
-    assert!(matches!(
+    assert_matches!(
         replay.reset(),
         Err(DemSamplingExecutionError::SessionPoisoned)
-    ));
+    );
 }

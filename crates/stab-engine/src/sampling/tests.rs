@@ -4,6 +4,8 @@
     reason = "sampling unit tests use direct fixture parsing assertions for compact diagnostics"
 )]
 
+use std::assert_matches;
+
 use super::reference_run::{
     ReferenceExecutionStats, ReferenceWorkspace, reset_reference_execution_stats,
     take_reference_execution_stats,
@@ -790,14 +792,12 @@ fn count_determined_measurements_rejects_pad_and_heralded_records_like_stim() {
         let circuit = Circuit::from_stim_str(input).expect("parse circuit");
         let error = count_determined_measurements(&circuit, false)
             .expect_err("pad and heralded records must be rejected");
-        assert!(
-            matches!(
-                error,
-                CountDeterminedMeasurementsError::Execution(
-                    SamplingExecutionError::UnsupportedDeterminedMeasurementGate { .. }
-                )
+        assert_matches!(
+            error,
+            CountDeterminedMeasurementsError::Execution(
+                SamplingExecutionError::UnsupportedDeterminedMeasurementGate { .. }
             ),
-            "{input}: {error}"
+            "{input}: {error}",
         );
     }
 }

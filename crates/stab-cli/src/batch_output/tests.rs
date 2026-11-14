@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::cell::RefCell;
 use std::io::{self, Write};
 use std::path::Path;
@@ -146,10 +147,7 @@ fn sampled_errors_use_the_measurement_namespace_and_reject_partial_ptb64_groups(
         .expect_err("partial PTB64 group");
     drop(primary);
     assert_eq!(stdout, b"0\n\x01");
-    assert!(matches!(
-        error,
-        CliError::IncompletePtb64OutputGroup { count: 1 }
-    ));
+    assert_matches!(error, CliError::IncompletePtb64OutputGroup { count: 1 });
 }
 
 #[test]
@@ -235,11 +233,11 @@ fn buffered_file_failures_surface_mid_stream_and_at_flush() {
             break;
         }
     }
-    assert!(matches!(
+    assert_matches!(
         failure,
         Some(CliError::WritePath { ref path, ref source })
             if path == Path::new("mid.01") && source.to_string() == "injected file write failure"
-    ));
+    );
 
     let mut encoder = new_encoder();
     let (file, log) = probe_file("flush.01", usize::MAX, true);
@@ -255,10 +253,10 @@ fn buffered_file_failures_surface_mid_stream_and_at_flush() {
     let error = encoder
         .finish(&mut primary, None)
         .expect_err("flush failure");
-    assert!(matches!(
+    assert_matches!(
         error,
         CliError::WritePath { ref path, ref source }
             if path == Path::new("flush.01") && source.to_string() == "injected file flush failure"
-    ));
+    );
     assert_eq!(log.borrow().bytes.len(), 64 * 301);
 }

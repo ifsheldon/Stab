@@ -893,7 +893,7 @@ fn parent_display_path(path: &Path) -> &Path {
 }
 
 fn validate_relative(path: &Path) -> Result<(), ReleaseError> {
-    if path.as_os_str().is_empty()
+    if path.is_empty()
         || path.is_absolute()
         || path
             .components()
@@ -942,6 +942,7 @@ fn absolute_components(path: &Path) -> Result<Vec<&OsStr>, ReleaseError> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::cell::Cell;
     use std::fs;
     use std::rc::Rc;
@@ -976,10 +977,10 @@ mod tests {
         fs::rename(&path, root.path().join("displaced")).expect("displace program");
         fs::write(&path, b"replacement").expect("replacement program");
 
-        assert!(matches!(
+        assert_matches!(
             program.revalidate(),
             Err(ReleaseError::FileIdentityChanged(_))
-        ));
+        );
     }
 
     #[test]
@@ -1002,10 +1003,10 @@ mod tests {
         )
         .expect("displace directory");
         fs::create_dir(root.path().join("target/release-review")).expect("replacement");
-        assert!(matches!(
+        assert_matches!(
             directory.revalidate(),
             Err(ReleaseError::FileIdentityChanged(_))
-        ));
+        );
     }
 
     #[test]
@@ -1026,10 +1027,10 @@ mod tests {
         let mut names = directory.entry_names(2).expect("entry names");
         names.sort();
         assert_eq!(names, [OsString::from("alpha"), OsString::from("beta")]);
-        assert!(matches!(
+        assert_matches!(
             directory.entry_names(1),
             Err(ReleaseError::DirectoryTooLarge { limit: 1, .. })
-        ));
+        );
     }
 
     #[cfg(unix)]
@@ -1074,10 +1075,10 @@ mod tests {
         fs::create_dir(&work_path).expect("replacement");
         fs::write(work_path.join("sentinel"), b"replacement").expect("sentinel");
 
-        assert!(matches!(
+        assert_matches!(
             work.remove_tree(),
             Err(ReleaseError::FileIdentityChanged(_))
-        ));
+        );
         assert_eq!(
             fs::read(work_path.join("sentinel")).expect("replacement survives"),
             b"replacement"
@@ -1119,7 +1120,7 @@ mod tests {
             || work.remove_tree(),
         );
 
-        assert!(matches!(result, Err(ReleaseError::FileIdentityChanged(_))));
+        assert_matches!(result, Err(ReleaseError::FileIdentityChanged(_)));
         assert!(replacement_seen.get());
         assert_eq!(
             fs::read(work_path.join("sentinel")).expect("replacement survives"),
@@ -1184,9 +1185,6 @@ mod tests {
         fs::write(&real, b"bytes").expect("real file");
         let alias = root.path().join("alias");
         symlink(&real, &alias).expect("symlink");
-        assert!(matches!(
-            open_regular_file(&alias),
-            Err(ReleaseError::SymlinkPath(_))
-        ));
+        assert_matches!(open_regular_file(&alias), Err(ReleaseError::SymlinkPath(_)));
     }
 }

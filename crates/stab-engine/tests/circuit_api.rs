@@ -5,6 +5,8 @@
 
 mod support;
 
+use std::assert_matches;
+
 use stab_engine::{
     DetectionError, ReferenceSampleTree, circuit_reference_sample, circuit_reference_signs,
     count_determined_measurements, detection_record_width, measurement_record_count,
@@ -140,10 +142,10 @@ fn circuit_reference_signs_match_stim_ordering_and_reference_semantics() {
 
     let invalid =
         Circuit::from_stim_str("DETECTOR rec[-1]\n").expect("parse unavailable record target");
-    assert!(matches!(
+    assert_matches!(
         circuit_reference_signs(&invalid),
         Err(DetectionError::InvalidResultFormat { .. })
-    ));
+    );
 }
 
 #[test]

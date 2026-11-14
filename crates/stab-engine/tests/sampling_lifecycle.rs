@@ -4,6 +4,8 @@
     reason = "sampling lifecycle tests use fixed valid fixtures and explicit failure matching"
 )]
 
+use std::assert_matches;
+
 use stab_engine::{
     RandomPolicy, RunError, SamplingCompiler, SamplingExecutionError, SamplingPlan,
     SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
@@ -264,13 +266,13 @@ fn mid_run_sink_failures_poison_after_committing_written_batches() {
     assert!(session.is_poisoned());
 
     let mut rejected_sink = ProbeSink::default();
-    assert!(matches!(
+    assert_matches!(
         session.run(ShotCount::new(1), &mut rejected_sink),
         Err(RunError::Engine {
             source: SamplingExecutionError::SessionPoisoned,
             ..
         })
-    ));
+    );
     assert_eq!(
         (rejected_sink.write_calls, rejected_sink.finish_calls),
         (0, 0)

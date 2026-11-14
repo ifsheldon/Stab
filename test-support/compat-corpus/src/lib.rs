@@ -462,6 +462,8 @@ fn decode_canonical_01(
     reason = "corpus validation tests mutate compact serde_json fixtures and require precise failure setup"
 )]
 mod tests {
+    use std::assert_matches;
+
     use serde_json::{Value, json};
 
     use super::{CheckedCorpus, CorpusError, PINNED_STIM_COMMIT, PINNED_STIM_TAG};
@@ -560,7 +562,7 @@ mod tests {
     fn unknown_fields_are_rejected() {
         let mut value = valid_corpus();
         value["unknown"] = json!(true);
-        assert!(matches!(parse(&value), Err(CorpusError::Parse(_))));
+        assert_matches!(parse(&value), Err(CorpusError::Parse(_)));
     }
 
     #[test]

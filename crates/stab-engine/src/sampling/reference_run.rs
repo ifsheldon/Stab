@@ -292,11 +292,9 @@ fn run_entries(
             }
         }
     }
-    if repeats.is_empty() {
-        Ok(())
-    } else {
-        Err(run_invariant("reference sampling ended inside a repeat"))
-    }
+    repeats
+        .is_empty()
+        .ok_or_else(|| run_invariant("reference sampling ended inside a repeat"))
 }
 
 /// Applies a resolved unitary gate to every target group of `targets`.

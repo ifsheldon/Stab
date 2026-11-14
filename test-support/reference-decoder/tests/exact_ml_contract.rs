@@ -4,6 +4,8 @@
     reason = "exact decoder tests use compact admitted fixtures"
 )]
 
+use std::assert_matches;
+
 use stab_decoder::{
     DecodeBatchError, DecodeBatchStatus, DecodeCancellation, DecodePreflightError,
     DecoderInputBatchView, decode_batch,
@@ -84,10 +86,10 @@ fn exact_predictions_cover_certain_tied_duplicate_and_zero_observable_models() {
         DetectorErrorModel::from_dem_str("error(1) D0 D0 L0 L0\n").expect("duplicate DEM");
     let session = ExactMlDecoderSession::try_compile_model(&duplicate).expect("compile duplicate");
     assert!(!session.prediction_for_syndrome(0).expect("zero effect"));
-    assert!(matches!(
+    assert_matches!(
         session.prediction_for_syndrome(1),
         Err(ExactMlDecodeError::ImpossibleSyndrome { syndrome: 1 })
-    ));
+    );
 
     let no_observable =
         DetectorErrorModel::from_dem_str("error(0.25) D0\n").expect("zero-observable DEM");
@@ -132,7 +134,7 @@ fn impossible_batch_syndrome_fails_before_any_prediction_mutation() {
     )
     .expect_err("second syndrome is impossible");
 
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Session(failure)
             if failure.completed_shots() == 0
@@ -143,7 +145,7 @@ fn impossible_batch_syndrome_fails_before_any_prediction_mutation() {
                         syndrome: 0
                     }
                 )
-    ));
+    );
     assert_eq!(output, before);
 }
 
@@ -167,13 +169,13 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
         &DecodeCancellation::new(),
     )
     .expect_err("detector width mismatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Preflight(DecodePreflightError::DetectorWidth {
             expected,
             actual,
         }) if expected == DetectorWidth::new(1) && actual == DetectorWidth::new(2)
-    ));
+    );
     assert_eq!(output, before);
 
     let records = records(&[vec![false], vec![true]]);
@@ -187,13 +189,13 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
         &DecodeCancellation::new(),
     )
     .expect_err("correction width mismatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Preflight(DecodePreflightError::CorrectionWidth {
             expected,
             actual,
         }) if expected == CorrectionWidth::new(1) && actual == CorrectionWidth::new(0)
-    ));
+    );
     assert_eq!(wrong_correction, before);
 
     let mut too_short =
@@ -210,13 +212,13 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
         &DecodeCancellation::new(),
     )
     .expect_err("prediction capacity mismatch");
-    assert!(matches!(
+    assert_matches!(
         error,
         DecodeBatchError::Preflight(DecodePreflightError::PredictionShotCapacity {
             required: 2,
             available: 1,
         })
-    ));
+    );
     assert_eq!(too_short, before);
 
     let mut cancelled_output =
@@ -370,7 +372,7 @@ fn exact_tie_resolution_rejects_the_first_workspace_excess() {
     let expected_bytes =
         ((ExactMlDecoderSession::MAX_JOINT_STATES as u128) * 2 + 4) * (size_of::<u64>() as u128);
 
-    assert!(matches!(
+    assert_matches!(
         ExactMlDecoderSession::try_compile_model(&first_two_limb_model),
         Err(ExactMlCompileError::ExactWorkspaceLimit {
             actual_at_least,
@@ -378,7 +380,7 @@ fn exact_tie_resolution_rejects_the_first_workspace_excess() {
         }) if actual_at_least == expected_bytes
             && actual_at_least == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES + 32
             && limit == ExactMlDecoderSession::MAX_TIE_WORKSPACE_BYTES
-    ));
+    );
 }
 
 #[test]
@@ -390,14 +392,14 @@ fn exact_limb_work_limit_rejects_before_exact_allocation() {
     dem.push_str("error(0.5) L0\n");
     let model = DetectorErrorModel::from_dem_str(&dem).expect("limb-heavy tied DEM");
 
-    assert!(matches!(
+    assert_matches!(
         ExactMlDecoderSession::try_compile_model(&model),
         Err(ExactMlCompileError::ExactWorkLimit {
             actual_at_least: 270_765_056,
             limit,
         }) if limit == ExactMlDecoderSession::MAX_EXACT_LIMB_TRANSITIONS
             && limit == (1 << 28)
-    ));
+    );
 }
 
 #[test]
@@ -408,23 +410,23 @@ fn fixed_width_and_mechanism_limits_accept_maxima_and_reject_first_excess() {
 
     let detector_over =
         DetectorErrorModel::from_dem_str("error(0) D20 L0\n").expect("21-detector DEM");
-    assert!(matches!(
+    assert_matches!(
         ExactMlDecoderSession::try_compile_model(&detector_over),
         Err(ExactMlCompileError::DetectorWidth {
             actual: 21,
             limit: 20
         })
-    ));
+    );
 
     let observable_over =
         DetectorErrorModel::from_dem_str("error(0) L1\n").expect("two-observable DEM");
-    assert!(matches!(
+    assert_matches!(
         ExactMlDecoderSession::try_compile_model(&observable_over),
         Err(ExactMlCompileError::ObservableWidth {
             actual: 2,
             limit: 1
         })
-    ));
+    );
 
     let mechanism_max = DetectorErrorModel::from_dem_str("repeat 256 {\n    error(0) D0\n}\n")
         .expect("256-mechanism DEM");
@@ -432,13 +434,13 @@ fn fixed_width_and_mechanism_limits_accept_maxima_and_reject_first_excess() {
 
     let mechanism_over = DetectorErrorModel::from_dem_str("repeat 257 {\n    error(0) D0\n}\n")
         .expect("257-mechanism DEM");
-    assert!(matches!(
+    assert_matches!(
         ExactMlDecoderSession::try_compile_model(&mechanism_over),
         Err(ExactMlCompileError::MechanismLimit {
             actual: 257,
             limit: 256
         })
-    ));
+    );
 }
 
 #[test]
@@ -447,13 +449,13 @@ fn represented_instruction_limit_accepts_exact_maximum_and_rejects_next() {
     assert!(ExactMlDecoderSession::try_compile_model(&at_limit).is_ok());
 
     let over_limit = model_with_instruction_visits(65_537);
-    assert!(matches!(
+    assert_matches!(
         ExactMlDecoderSession::try_compile_model(&over_limit),
         Err(ExactMlCompileError::InstructionVisitLimit {
             actual_at_least: 65_537,
             limit: 65_536
         })
-    ));
+    );
 }
 
 fn model_with_instruction_visits(instruction_count: usize) -> DetectorErrorModel {

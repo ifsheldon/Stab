@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::sync::OnceLock;
@@ -693,13 +694,11 @@ fn missing_detector_gate_cases() -> Vec<CatalogCase> {
             let source = if target_rule == GateTargetRule::AnySingleQubit {
                 format!("{} 0 1 2\nMPP X0 Y1 Z2\n", gate.canonical_name())
             } else {
-                assert!(
-                    matches!(
-                        target_rule,
-                        GateTargetRule::PlainPairs | GateTargetRule::ClassicalControlPairs
-                    ),
+                assert_matches!(
+                    target_rule,
+                    GateTargetRule::PlainPairs | GateTargetRule::ClassicalControlPairs,
                     "fixed-tableau gate {} has unsupported target rule {target_rule:?}",
-                    gate.canonical_name()
+                    gate.canonical_name(),
                 );
                 two_qubit_missing_detector_probe(gate)
             };

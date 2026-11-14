@@ -1112,6 +1112,8 @@ mod storage_tests;
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
     use crate::DemSamplingCompiler;
     use stab_model::DetectorErrorModel;
@@ -1129,10 +1131,10 @@ mod tests {
         replay.finished = true;
         replay.session.total_committed_shots = u64::MAX;
 
-        assert!(matches!(
+        assert_matches!(
             replay.reset(),
             Err(DemSamplingExecutionError::ShotCounterOverflow)
-        ));
+        );
         assert!(
             replay.finished,
             "a rejected reset must not reopen the replay"

@@ -784,7 +784,7 @@ fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> ModelResult
 fn target_parse_error_code(error: &ModelError) -> ParseErrorCode {
     match error {
         ModelError::Validation(ValidationError::InvalidDomainValue { value, .. }) => {
-            let digits = value.strip_prefix('-').unwrap_or(value);
+            let digits = value.trim_prefix('-');
             if !digits.is_empty() && digits.as_bytes().iter().all(u8::is_ascii_digit) {
                 ParseErrorCode::IntegerOutOfRange
             } else {

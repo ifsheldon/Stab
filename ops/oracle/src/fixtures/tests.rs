@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement,
     compare_fixture,
@@ -95,10 +97,7 @@ fn fixture_input_read_enforces_aggregate_byte_limit() {
     let error = super::paths::read_fixture_file(&root, "inputs/oversized.json")
         .expect_err("oversized fixture input must fail closed");
 
-    assert!(matches!(
-        error,
-        super::FixtureError::FixtureFileTooLarge { .. }
-    ));
+    assert_matches!(error, super::FixtureError::FixtureFileTooLarge { .. });
 }
 
 #[test]
@@ -781,10 +780,7 @@ fn child_fixture_output_read_enforces_descriptor_byte_limit() {
     let error = outputs::read_actual_fixture_output(row, &output)
         .expect_err("oversized child output must fail closed");
 
-    assert!(matches!(
-        error,
-        super::FixtureError::AuxiliaryOutputTooLarge { .. }
-    ));
+    assert_matches!(error, super::FixtureError::AuxiliaryOutputTooLarge { .. });
 }
 
 #[cfg(unix)]

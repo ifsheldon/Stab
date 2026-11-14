@@ -3,6 +3,8 @@
     reason = "RPF2 transform parity tests use compact exact-output assertions"
 )]
 
+use std::assert_matches;
+
 use stab_analysis::{
     AnalysisError, AnalysisResult, ErrorAnalyzerOptions, ResourceKind, ResourceOperation,
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
@@ -581,10 +583,7 @@ fn with_inlined_feedback_rejects_synthesized_negative_zero_detector_target() {
         .with_inlined_feedback()
         .expect_err("Stim rejects a rewritten detector with a surviving zero lookback");
 
-    assert!(matches!(
-        error,
-        AnalysisError::InvalidDetectorErrorModel { .. }
-    ));
+    assert_matches!(error, AnalysisError::InvalidDetectorErrorModel { .. });
     assert!(error.to_string().contains("rec[-0]"));
 }
 
@@ -878,6 +877,6 @@ fn flattened_rejects_coordinate_overflow() {
         .flattened()
         .expect_err("reject coordinate overflow");
 
-    assert!(matches!(error, AnalysisError::InvalidResultFormat { .. }));
+    assert_matches!(error, AnalysisError::InvalidResultFormat { .. });
     assert!(error.to_string().contains("coordinate shift overflowed"));
 }

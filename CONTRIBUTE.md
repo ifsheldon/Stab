@@ -18,10 +18,13 @@ Prefer targeted crate tests during iteration. Before a requested commit, run the
 
 ```text
 cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --config "build.warnings='deny'"
 cargo test --workspace
 just maintenance::pre-commit
 ```
+
+The Clippy gate denies warnings through Cargo's `build.warnings` setting rather than `-- -D warnings`, so it fails on any rustc, Clippy, or Cargo manifest-lint warning (such as `cargo::unused_dependencies`) while sharing the build cache with plain `cargo clippy` runs.
+`just rust::clippy`, the pre-commit hook, and CI run the same command.
 
 Architecture changes also require:
 

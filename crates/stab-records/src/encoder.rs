@@ -564,8 +564,8 @@ fn for_each_set_bit(words: &[u64], len: usize, mut visit: impl FnMut(usize)) {
         let chunk_bits = remaining.min(WORD_BITS);
         let mut bits = *word & low_word_mask(chunk_bits);
         let base = word_index * WORD_BITS;
-        while bits != 0 {
-            visit(base + bits.trailing_zeros() as usize);
+        while let Some(bit) = bits.lowest_one() {
+            visit(base + bit as usize);
             bits &= bits - 1;
         }
         remaining -= chunk_bits;

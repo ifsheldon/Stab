@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::str::FromStr;
 
 use stab_model::{
@@ -99,13 +100,13 @@ fn probability_stim_text_matches_pinned_ostream_formatting() {
 )]
 fn model_errors_expose_validation_from_real_model_failures() {
     let domain_error = QubitId::new(1 << 24).expect_err("reject oversized Stim qubit id");
-    assert!(matches!(
+    assert_matches!(
         domain_error.validation_error(),
         Some(ValidationError::InvalidDomainValue {
             kind: "qubit id",
             ..
         })
-    ));
+    );
     let domain_validation = domain_error
         .validation_error()
         .expect("oversized id is a validation failure");
@@ -119,10 +120,10 @@ fn model_errors_expose_validation_from_real_model_failures() {
 
     let gate_error = stab_model::Gate::from_name("missing")
         .expect_err("reject a name outside the closed Stim gate table");
-    assert!(matches!(
+    assert_matches!(
         gate_error.validation_error(),
         Some(ValidationError::UnknownGate(name)) if name == "missing"
-    ));
+    );
     assert_eq!(
         gate_error
             .validation_error()
