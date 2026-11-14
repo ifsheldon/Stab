@@ -125,7 +125,7 @@ fn low_bits_mask(bits: usize) -> u64 {
     }
 }
 
-fn transpose_tile(tile: &mut [u64; 64]) {
+pub(super) fn transpose_tile(tile: &mut [u64; 64]) {
     for (shift, mask) in TRANSPOSE_STAGES {
         for block in tile.chunks_exact_mut(shift * 2) {
             let (low_rows, high_rows) = block.split_at_mut(shift);

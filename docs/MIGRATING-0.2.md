@@ -115,6 +115,7 @@ Constructors that turn a requested size into storage admit its bytes before allo
 | `Tableau::x_output` and `Tableau::z_output` returning `&PauliString` | Both return an owned `PauliString`, because generator images are packed rows rather than stored strings |
 | `stab_algebra::advanced::{tableau_identity_unchecked, tableau_from_output_columns_unchecked}` | `Tableau::identity_with_budget` and `Tableau::from_conjugated_generators`; a Tableau with mismatched generator shapes can no longer be constructed |
 | None | `Tableau::identity_with_budget`, `Tableau::random_with_budget`, `stabilizers_to_tableau_with_budget`, `Tableau::is_identity`, `stab_analysis::circuit_to_tableau_with_options` with `CircuitToTableauOptions`, and `stab_analysis::ResourceOperation::TableauConversion`, which exhaustive matches on `ResourceOperation` must add |
+| None | `Tableau::prepend(&mut self, gate: &Tableau, targets: &[usize])`, which rewrites only the target generator rows, and `stab_algebra::TableauAppender` with `identity_with_budget`, `new(Tableau)`, `append`, `len`, `is_empty`, and `finish`, which holds a Tableau transposed so each appended one- or two-qubit gate costs `O(n / 64)` word operations; `stab_bits::transpose_bit_tile` exposes the 64 by 64 block transpose it uses |
 
 Behavior changes for workloads the removed caps admitted:
 

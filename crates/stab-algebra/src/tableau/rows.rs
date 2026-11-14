@@ -77,7 +77,7 @@ impl PauliRows {
         self.row_count
     }
 
-    const fn row_words(&self) -> usize {
+    pub(crate) const fn row_words(&self) -> usize {
         2 * self.half_words
     }
 
@@ -152,13 +152,17 @@ impl PauliRows {
         }
         if first < second {
             let (head, tail) = self.words.split_at_mut(second_range.start);
-            let first_words = head.get_mut(first_range).ok_or(out_of_range(first))?;
-            let second_words = tail.get_mut(..width).ok_or(out_of_range(second))?;
+            let first_words = head
+                .get_mut(first_range)
+                .ok_or_else(|| out_of_range(first))?;
+            let second_words = tail.get_mut(..width).ok_or_else(|| out_of_range(second))?;
             Ok((first_words, second_words))
         } else {
             let (head, tail) = self.words.split_at_mut(first_range.start);
-            let second_words = head.get_mut(second_range).ok_or(out_of_range(second))?;
-            let first_words = tail.get_mut(..width).ok_or(out_of_range(first))?;
+            let second_words = head
+                .get_mut(second_range)
+                .ok_or_else(|| out_of_range(second))?;
+            let first_words = tail.get_mut(..width).ok_or_else(|| out_of_range(first))?;
             Ok((first_words, second_words))
         }
     }
@@ -192,7 +196,7 @@ impl PauliRows {
             .signs
             .get(row / WORD_BITS)
             .filter(|_| row < self.row_count)
-            .ok_or(out_of_range(row))?;
+            .ok_or_else(|| out_of_range(row))?;
         Ok(word >> (row % WORD_BITS) & 1 != 0)
     }
 
@@ -202,7 +206,7 @@ impl PauliRows {
             .signs
             .get_mut(row / WORD_BITS)
             .filter(|_| row < len)
-            .ok_or(out_of_range(row))?;
+            .ok_or_else(|| out_of_range(row))?;
         let mask = 1_u64 << (row % WORD_BITS);
         if value {
             *word |= mask;
@@ -220,6 +224,19 @@ impl PauliRows {
     /// The packed sign plane, one bit per row.
     pub(crate) fn sign_words(&self) -> &[u64] {
         &self.signs
+    }
+
+    /// Every packed row word in row order, then the packed sign plane.
+    pub(crate) fn words_and_signs(&self) -> (&[u64], &[u64]) {
+        (&self.words, &self.signs)
+    }
+
+    /// Mutably borrows every packed row word in row order and the packed sign plane.
+    ///
+    /// Callers must keep the bits past `num_qubits` in each half and past `row_count` in the
+    /// sign plane zero.
+    pub(crate) fn words_and_signs_mut(&mut self) -> (&mut [u64], &mut [u64]) {
+        (&mut self.words, &mut self.signs)
     }
 
     /// Sets one qubit's Pauli bits in `row`.
@@ -260,7 +277,7 @@ impl PauliRows {
         let words = self.row_mut(row)?;
         let half = words
             .get_mut(plane * half_words..(plane + 1) * half_words)
-            .ok_or(out_of_range(row))?;
+            .ok_or_else(|| out_of_range(row))?;
         write_bit(half, index, true)
     }
 
@@ -353,14 +370,16 @@ fn out_of_range(index: usize) -> StabilizerError {
 }
 
 fn read_bit(words: &[u64], index: usize) -> StabilizerResult<bool> {
-    let word = words.get(index / WORD_BITS).ok_or(out_of_range(index))?;
+    let word = words
+        .get(index / WORD_BITS)
+        .ok_or_else(|| out_of_range(index))?;
     Ok(word >> (index % WORD_BITS) & 1 != 0)
 }
 
 fn write_bit(words: &mut [u64], index: usize, value: bool) -> StabilizerResult<()> {
     let word = words
         .get_mut(index / WORD_BITS)
-        .ok_or(out_of_range(index))?;
+        .ok_or_else(|| out_of_range(index))?;
     let mask = 1_u64 << (index % WORD_BITS);
     if value {
         *word |= mask;

@@ -1,8 +1,7 @@
-use stab_algebra::{AlgebraMemoryBudget, StabilizerError, Tableau};
+use stab_algebra::{AlgebraMemoryBudget, StabilizerError, Tableau, TableauAppender};
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, MemoryBudget, QubitId,
-    Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, MemoryBudget, Target,
 };
 
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
@@ -47,7 +46,9 @@ pub fn circuit_to_tableau(
 /// The Tableau's packed rows are admitted against the options' memory budget before
 /// materialization, and every repeat body is raised to its repeat count by squaring, so a count up
 /// to `2^63 - 1` costs at most 126 compositions of `O(n^3 / 64)` word operations each; the
-/// cancellation signal is polled before every composition and once per instruction.
+/// cancellation signal is polled before every composition and once per instruction. Runs of gates
+/// are appended through a [`TableauAppender`], so a one- or two-qubit gate costs `O(n / 64)` word
+/// operations, plus one `O(n^2 / 64)` transpose around each repeat block.
 pub fn circuit_to_tableau_with_options(
     circuit: &Circuit,
     options: &CircuitToTableauOptions,
@@ -55,14 +56,16 @@ pub fn circuit_to_tableau_with_options(
     options.cancellation.check()?;
     let num_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     let budget = AlgebraMemoryBudget::from_bytes(options.memory_budget.bytes());
-    let mut result =
-        Tableau::identity_with_budget(num_qubits, budget).map_err(map_tableau_error)?;
+    let result =
+        TableauAppender::identity_with_budget(num_qubits, budget).map_err(map_tableau_error)?;
     let mut conversion = Conversion {
         options,
         countdown: CancellationCountdown::new(),
     };
-    conversion.apply_circuit(circuit, &mut result)?;
-    Ok(result)
+    conversion
+        .apply_circuit(circuit, result)?
+        .finish()
+        .map_err(map_tableau_error)
 }
 
 struct Conversion<'a> {
@@ -71,17 +74,23 @@ struct Conversion<'a> {
 }
 
 impl Conversion<'_> {
-    fn apply_circuit(&mut self, circuit: &Circuit, result: &mut Tableau) -> AnalysisResult<()> {
+    fn apply_circuit(
+        &mut self,
+        circuit: &Circuit,
+        mut result: TableauAppender,
+    ) -> AnalysisResult<TableauAppender> {
         for item in circuit.items() {
             match item {
                 CircuitItem::Instruction(instruction) => {
                     self.countdown.tick(&self.options.cancellation)?;
-                    self.apply_instruction(instruction, result)?;
+                    result = self.apply_instruction(instruction, result)?;
                 }
                 CircuitItem::RepeatBlock(repeat) => {
                     // The body has the result's width, so it fits wherever the result does.
-                    let mut body = identity_like(result)?;
-                    self.apply_circuit(repeat.body(), &mut body)?;
+                    let body = self
+                        .apply_circuit(repeat.body(), identity_appender(result.len())?)?
+                        .finish()
+                        .map_err(map_tableau_error)?;
                     if body.is_identity() {
                         continue;
                     }
@@ -89,15 +98,17 @@ impl Conversion<'_> {
                     if repeated.is_identity() {
                         continue;
                     }
-                    *result = if result.is_identity() {
+                    let prefix = result.finish().map_err(map_tableau_error)?;
+                    let combined = if prefix.is_identity() {
                         repeated
                     } else {
-                        self.compose(result, &repeated)?
+                        self.compose(&prefix, &repeated)?
                     };
+                    result = TableauAppender::new(combined).map_err(map_tableau_error)?;
                 }
             }
         }
-        Ok(())
+        Ok(result)
     }
 
     /// Raises `base` to `exponent` by squaring, polling cancellation before each composition.
@@ -131,8 +142,8 @@ impl Conversion<'_> {
     fn apply_instruction(
         &mut self,
         instruction: &CircuitInstruction,
-        result: &mut Tableau,
-    ) -> AnalysisResult<()> {
+        mut result: TableauAppender,
+    ) -> AnalysisResult<TableauAppender> {
         let gate = instruction.gate();
         let options = self.options;
 
@@ -164,7 +175,7 @@ impl Conversion<'_> {
             | GateCategory::ControlFlow
             | GateCategory::HeraldedNoise
             | GateCategory::Noise
-            | GateCategory::PairMeasurement => Ok(()),
+            | GateCategory::PairMeasurement => Ok(result),
             GateCategory::Controlled
             | GateCategory::HadamardLike
             | GateCategory::Pauli
@@ -174,11 +185,16 @@ impl Conversion<'_> {
             | GateCategory::Swap => {
                 let local = crate::gate_tableau(gate)?;
                 for group in instruction.target_groups() {
-                    apply_unitary_group_to_tableau(gate.canonical_name(), &local, group, result)?;
+                    apply_unitary_group_to_tableau(
+                        gate.canonical_name(),
+                        &local,
+                        group,
+                        &mut result,
+                    )?;
                 }
-                Ok(())
+                Ok(result)
             }
-            GateCategory::PauliProduct if !gate.is_unitary() => Ok(()),
+            GateCategory::PauliProduct if !gate.is_unitary() => Ok(result),
             GateCategory::PauliProduct => {
                 let decomposed = crate::advanced::decomposed_single_instruction(instruction)
                     .map_err(|error| {
@@ -188,6 +204,12 @@ impl Conversion<'_> {
             }
         }
     }
+}
+
+/// An identity appender of an already admitted width.
+fn identity_appender(num_qubits: usize) -> AnalysisResult<TableauAppender> {
+    TableauAppender::identity_with_budget(num_qubits, AlgebraMemoryBudget::from_bytes(u64::MAX))
+        .map_err(map_tableau_error)
 }
 
 /// An identity Tableau of `tableau`'s width, which is already admitted.
@@ -200,9 +222,26 @@ fn apply_unitary_group_to_tableau(
     gate_name: &str,
     local: &Tableau,
     targets: &[Target],
-    result: &mut Tableau,
+    result: &mut TableauAppender,
 ) -> AnalysisResult<()> {
-    let target_ids = target_qubit_ids(gate_name, targets)?;
+    // One- and two-qubit groups, nearly every group, convert their targets on the stack.
+    let mut narrow = [0_usize; 2];
+    let wide;
+    let target_ids: &[usize] = match narrow.get_mut(..targets.len()) {
+        Some(slots) => {
+            for (slot, target) in slots.iter_mut().zip(targets) {
+                *slot = target_qubit_index(gate_name, target)?;
+            }
+            slots
+        }
+        None => {
+            wide = targets
+                .iter()
+                .map(|target| target_qubit_index(gate_name, target))
+                .collect::<AnalysisResult<Vec<_>>>()?;
+            &wide
+        }
+    };
     if local.len() != target_ids.len() {
         return Err(AnalysisError::invalid_tableau_conversion(format!(
             "gate {gate_name} expected {} tableau targets but got {}",
@@ -210,25 +249,18 @@ fn apply_unitary_group_to_tableau(
             target_ids.len()
         )));
     }
-    let targets = target_ids
-        .iter()
-        .map(|target| target.get() as usize)
-        .collect::<Vec<_>>();
-    result.append(local, &targets).map_err(map_tableau_error)?;
-    Ok(())
+    result.append(local, target_ids).map_err(map_tableau_error)
 }
 
-fn target_qubit_ids(gate_name: &str, targets: &[Target]) -> AnalysisResult<Vec<QubitId>> {
-    targets
-        .iter()
-        .map(|target| {
-            target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_tableau_conversion(format!(
-                    "gate {gate_name} has non-qubit tableau target {target}"
-                ))
-            })
+fn target_qubit_index(gate_name: &str, target: &Target) -> AnalysisResult<usize> {
+    target
+        .qubit_id()
+        .map(|qubit| qubit.get() as usize)
+        .ok_or_else(|| {
+            AnalysisError::invalid_tableau_conversion(format!(
+                "gate {gate_name} has non-qubit tableau target {target}"
+            ))
         })
-        .collect()
 }
 
 /// Maps algebra failures, reporting a refused Tableau as a memory-budget refusal.

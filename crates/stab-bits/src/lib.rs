@@ -14,6 +14,14 @@ const WORD_BITS: usize = u64::BITS as usize;
 
 pub type BitResult<T> = Result<T, BitError>;
 
+/// Transposes a 64 by 64 bit tile in place, so bit `j` of word `i` becomes bit `i` of word `j`.
+///
+/// This is the block kernel behind [`BitMatrix::transpose`], for callers that store packed rows
+/// in their own layout and move one aligned 64 by 64 block at a time.
+pub fn transpose_bit_tile(tile: &mut [u64; 64]) {
+    transpose::transpose_tile(tile);
+}
+
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum BitError {
     #[error("bit length mismatch: left={left} right={right}")]

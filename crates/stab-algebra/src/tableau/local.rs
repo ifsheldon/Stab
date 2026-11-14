@@ -2,14 +2,17 @@
 //!
 //! Appending `G` on targets `t` replaces each row's local Pauli on `t` by its image under `G`
 //! and multiplies the row sign by the image sign, because Paulis on disjoint qubits commute and
-//! the row's other qubits are unchanged. One- and two-qubit gates use a precomputed table of at
-//! most sixteen local images and allocate nothing; wider gates conjugate each gathered local
-//! Pauli through the gate's own rows. Either way a gate costs `O(n)` row visits.
+//! the row's other qubits are unchanged. One- and two-qubit gates are compiled once into a
+//! sixteen-entry signed image table; each row then reads its target bits from precomputed word
+//! offsets, looks up its image, writes the new bits, and collects sign flips 64 rows per sign
+//! word. Wider gates conjugate each gathered local Pauli through the gate's own rows. Either way
+//! a gate costs `O(n)` row visits.
 
 use super::action::{apply_words, generator_phases};
-use super::{PauliRows, Tableau, pauli_xyz};
+use super::small_gate::{LocalImage, SmallGate};
+use super::{PauliRows, Tableau};
 use crate::budget::{StabilizerResource, try_zeroed_words};
-use crate::{PauliBasis, PauliPhase, StabilizerError, StabilizerResult};
+use crate::{StabilizerError, StabilizerResult};
 
 const WORD_BITS: usize = u64::BITS as usize;
 
@@ -18,119 +21,115 @@ pub(super) fn append(
     gate: &Tableau,
     targets: &[usize],
 ) -> StabilizerResult<()> {
-    if gate.len() <= 2 {
-        append_small(rows, gate, targets)
-    } else {
-        append_general(rows, gate, targets)
+    match SmallGate::compile(gate)? {
+        Some(small) => append_small(rows, &small, targets),
+        None => append_general(rows, gate, targets),
     }
 }
 
-#[derive(Clone, Copy)]
-struct LocalPauliImage {
-    phase: PauliPhase,
-    bases: [PauliBasis; 2],
+/// Bit positions of the local code bits within one packed row.
+struct TargetBits<const BITS: usize> {
+    words: [usize; BITS],
+    shifts: [u32; BITS],
 }
 
-impl LocalPauliImage {
-    const IDENTITY: Self = Self {
-        phase: PauliPhase::Plus,
-        bases: [PauliBasis::I; 2],
-    };
-}
-
-fn append_small(rows: &mut PauliRows, gate: &Tableau, targets: &[usize]) -> StabilizerResult<()> {
-    let images = local_pauli_images(gate)?;
-    let local_count = gate.len();
-    for row in 0..rows.row_count() {
-        let mut code = 0_usize;
-        for (local_index, target) in targets.iter().copied().enumerate() {
-            let (x, z) = rows.bits(row, target)?;
-            code |= usize::from(pauli_xyz(PauliBasis::from_xz(x, z))) << (2 * local_index);
+impl<const BITS: usize> TargetBits<BITS> {
+    /// Locates local bit `2i` (X) and `2i + 1` (Z) of each target `i` in a row of `half` X words
+    /// followed by `half` Z words.
+    fn new(rows: &PauliRows, targets: &[usize]) -> StabilizerResult<Self> {
+        let half = rows.half_words();
+        let mut words = [0_usize; BITS];
+        let mut shifts = [0_u32; BITS];
+        if targets.len() * 2 != BITS {
+            return Err(StabilizerError::TableauTargetCountMismatch {
+                tableau_qubits: BITS / 2,
+                target_count: targets.len(),
+            });
         }
-        let image = images
-            .get(code)
-            .ok_or(StabilizerError::TableauIndexOutOfRange {
-                index: code,
-                len: images.len(),
+        for (local, target) in targets.iter().copied().enumerate() {
+            if target >= rows.num_qubits() {
+                return Err(StabilizerError::TableauTargetOutOfRange {
+                    target,
+                    num_qubits: rows.num_qubits(),
+                });
+            }
+            let word = target / WORD_BITS;
+            let shift = u32::try_from(target % WORD_BITS).map_err(|_| {
+                StabilizerError::TableauTargetOutOfRange {
+                    target,
+                    num_qubits: rows.num_qubits(),
+                }
             })?;
-        if image.phase.is_negative() {
-            rows.flip_sign(row)?;
+            for (plane, offset) in [(0, 0), (1, half)] {
+                let bit = 2 * local + plane;
+                if let (Some(word_slot), Some(shift_slot)) =
+                    (words.get_mut(bit), shifts.get_mut(bit))
+                {
+                    *word_slot = offset + word;
+                    *shift_slot = shift;
+                }
+            }
         }
-        for (basis, target) in image.bases.iter().zip(targets).take(local_count) {
-            rows.set_bits(row, *target, basis.x_bit(), basis.z_bit())?;
+        Ok(Self { words, shifts })
+    }
+}
+
+fn append_small(rows: &mut PauliRows, gate: &SmallGate, targets: &[usize]) -> StabilizerResult<()> {
+    match gate.arity() {
+        0 => Ok(()),
+        1 => append_table::<2>(rows, gate.images(), &TargetBits::new(rows, targets)?),
+        _ => append_table::<4>(rows, gate.images(), &TargetBits::new(rows, targets)?),
+    }
+}
+
+fn append_table<const BITS: usize>(
+    rows: &mut PauliRows,
+    images: &[LocalImage; 16],
+    bits: &TargetBits<BITS>,
+) -> StabilizerResult<()> {
+    let row_words = rows.row_words();
+    let row_count = rows.row_count();
+    if row_words == 0 {
+        return Ok(());
+    }
+    let (words, signs) = rows.words_and_signs_mut();
+    let Some(words) = words.get_mut(..row_count * row_words) else {
+        return Err(StabilizerError::TableauIndexOutOfRange {
+            index: row_count,
+            len: words.len() / row_words.max(1),
+        });
+    };
+    let out_of_row = |index: usize| StabilizerError::TableauIndexOutOfRange {
+        index,
+        len: row_words,
+    };
+    for (block, sign_word) in words
+        .chunks_mut(WORD_BITS * row_words)
+        .zip(signs.iter_mut())
+    {
+        let mut flips = 0_u64;
+        for (row_bit, row) in block.chunks_exact_mut(row_words).enumerate() {
+            let mut code = 0_usize;
+            for (bit, (word, shift)) in bits.words.iter().zip(bits.shifts).enumerate() {
+                let value = *row.get(*word).ok_or_else(|| out_of_row(*word))?;
+                code |= ((value >> shift & 1) as usize) << bit;
+            }
+            let Some(image) = images.get(code) else {
+                return Err(StabilizerError::TableauIndexOutOfRange {
+                    index: code,
+                    len: images.len(),
+                });
+            };
+            for (bit, (word, shift)) in bits.words.iter().zip(bits.shifts).enumerate() {
+                let slot = row.get_mut(*word).ok_or_else(|| out_of_row(*word))?;
+                let value = u64::from(image.code >> bit & 1);
+                *slot = (*slot & !(1 << shift)) | (value << shift);
+            }
+            flips |= u64::from(image.negative) << row_bit;
         }
+        *sign_word ^= flips;
     }
     Ok(())
-}
-
-fn local_pauli_images(gate: &Tableau) -> StabilizerResult<[LocalPauliImage; 16]> {
-    let image_count = 1_usize << (2 * gate.len());
-    let mut images = [LocalPauliImage::IDENTITY; 16];
-    for (code, image) in images.iter_mut().enumerate().take(image_count) {
-        for index in 0..gate.len() {
-            let basis = basis_from_xyz((code >> (2 * index)) & 3);
-            let factor = local_generator_image(gate, index, basis)?;
-            multiply_local_images(image, factor);
-        }
-        if image.phase.is_imaginary() {
-            return Err(StabilizerError::ImaginaryProduct { phase: image.phase });
-        }
-    }
-    Ok(images)
-}
-
-fn local_generator_image(
-    gate: &Tableau,
-    index: usize,
-    basis: PauliBasis,
-) -> StabilizerResult<LocalPauliImage> {
-    let num_qubits = gate.len();
-    match basis {
-        PauliBasis::I => Ok(LocalPauliImage::IDENTITY),
-        PauliBasis::X => local_image_from_row(gate, index),
-        PauliBasis::Z => local_image_from_row(gate, num_qubits + index),
-        PauliBasis::Y => {
-            let mut image = local_image_from_row(gate, index)?;
-            multiply_local_images(&mut image, local_image_from_row(gate, num_qubits + index)?);
-            image.phase = image.phase.multiply(PauliPhase::PlusI);
-            Ok(image)
-        }
-    }
-}
-
-fn local_image_from_row(gate: &Tableau, row: usize) -> StabilizerResult<LocalPauliImage> {
-    let rows = gate.rows();
-    let mut image = LocalPauliImage {
-        phase: if rows.sign(row)? {
-            PauliPhase::Minus
-        } else {
-            PauliPhase::Plus
-        },
-        ..LocalPauliImage::IDENTITY
-    };
-    for (qubit, basis) in image.bases.iter_mut().enumerate().take(gate.len()) {
-        let (x, z) = rows.bits(row, qubit)?;
-        *basis = PauliBasis::from_xz(x, z);
-    }
-    Ok(image)
-}
-
-fn multiply_local_images(left: &mut LocalPauliImage, right: LocalPauliImage) {
-    left.phase = left.phase.multiply(right.phase);
-    for (left_basis, right_basis) in left.bases.iter_mut().zip(right.bases) {
-        let (basis, phase) = left_basis.multiply(right_basis);
-        *left_basis = basis;
-        left.phase = left.phase.multiply(phase);
-    }
-}
-
-fn basis_from_xyz(code: usize) -> PauliBasis {
-    match code {
-        0 => PauliBasis::I,
-        1 => PauliBasis::X,
-        2 => PauliBasis::Y,
-        _ => PauliBasis::Z,
-    }
 }
 
 fn append_general(rows: &mut PauliRows, gate: &Tableau, targets: &[usize]) -> StabilizerResult<()> {

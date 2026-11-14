@@ -3,10 +3,18 @@ use std::fmt::{Display, Formatter};
 use rand::Rng;
 
 mod action;
+mod appender;
 mod local;
+mod prepend;
 mod random;
+#[cfg(test)]
+mod reference;
 pub(crate) mod rows;
+mod small_gate;
+#[cfg(test)]
+mod tests;
 
+pub use appender::TableauAppender;
 pub(crate) use rows::PauliRows;
 
 use super::budget::{AlgebraMemoryBudget, StabilizerResource, tableau_bytes};
@@ -314,12 +322,25 @@ impl Tableau {
 
     /// Appends a local Clifford action to the selected output qubits in place.
     ///
-    /// This is semantically equivalent to composing with `gate.embedded(self.len(), targets)`.
+    /// This is semantically equivalent to `self.then(&gate.embedded(self.len(), targets)?)`.
     /// One- and two-qubit gates rewrite the target bits of every row from a precomputed local
     /// image table without allocating; wider gates conjugate each row's gathered local Pauli.
+    /// Either way the cost is `O(n)` row visits; for many consecutive appends,
+    /// [`TableauAppender`] costs `O(n / 64)` word operations per one- or two-qubit gate.
     pub fn append(&mut self, gate: &Self, targets: &[usize]) -> StabilizerResult<()> {
         validate_tableau_targets(gate.len(), self.len(), targets)?;
         local::append(&mut self.rows, gate, targets)
+    }
+
+    /// Prepends a local Clifford action on the selected input qubits in place.
+    ///
+    /// This is semantically equivalent to `*self = gate.embedded(self.len(), targets)?.then(self)?`,
+    /// with the same target errors as [`Self::append`]. Only the `2k` generator rows of the `k`
+    /// targets change, each becoming a signed product of those rows, so a one- or two-qubit gate
+    /// costs `O(n / 64)` word operations and a `k`-qubit gate `O(k^2 n / 64)`.
+    pub fn prepend(&mut self, gate: &Self, targets: &[usize]) -> StabilizerResult<()> {
+        validate_tableau_targets(gate.len(), self.len(), targets)?;
+        prepend::prepend(&mut self.rows, gate, targets)
     }
 
     /// Raises this Tableau to a signed integer power by repeated squaring, in `O(log |exponent|)`

@@ -18,7 +18,7 @@ pub use error::{StabilizerError, StabilizerResult};
 pub use flow::{Flow, FlowMeasurementIndex};
 pub use iter::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator};
 pub use pauli::{FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString};
-pub use tableau::Tableau;
+pub use tableau::{Tableau, TableauAppender};
 pub use unitary::unitary_to_tableau;
 
 /// Low-level constructors for algorithms that have already performed resource and shape admission.
