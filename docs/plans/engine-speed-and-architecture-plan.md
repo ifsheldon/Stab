@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1, E2, E3, E5, and E6 are complete; E4 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E6 are complete; E7 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -313,6 +313,36 @@ Open after this checkpoint:
 - `stab_decoder::DecodeCancellation` is still a separate signal type.
 - The CLI budget is still per stage; a command-level budget needs retained-byte reports from parsing and compiled plans and a per-session budget override, which is new public API on four types and was not forced into this change.
 - A single-shot `sample` of 400 CZ+S layers on 400 qubits with its reference sample takes 37 ms against Stim's 29 ms, which is outside the suite and above the ceiling.
+
+### Checkpoint (2026-11-14): Packed Algebra, E4 Complete
+
+Task 6 landed in `3f6385f9`, which completes E4.
+
+A `Tableau` is packed signed Pauli rows.
+Composition and batched application tabulate eight generators at a time, inversion transposes quadrants, powers use repeated squaring, random Tableaus use the Bravyi-Maslov sampler, and the stabilizer solver is a port of Stim's elimination.
+Size-requested constructors admit bytes against a typed `AlgebraMemoryBudget`, the dependency graph is unchanged, and no constant remains in the inventory's Algebra kind.
+
+Single release runs on one core, with the previous code on the same 512-qubit inputs:
+
+| Qubits | Random | Inverse | Compose | Solve | Power $2^{40}$ |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 512, previous | refused | 142.9 ms | 90.8 ms | 1.897 s | 61.76 s |
+| 512 | 3.18 ms | 0.98 ms | 0.81 ms | 4.99 ms | 28.4 ms |
+| 1000 | 14.1 ms | 4.48 ms | 4.21 ms | 34.3 ms | 0.167 s |
+| 2000 | 72.9 ms | 31.9 ms | 30.3 ms | 0.212 s | 1.21 s |
+| 5000 | 0.815 s | 0.494 s | 0.486 s | 4.27 s | 19.6 s |
+
+`stabilizers_to_tableau` now returns Stim's destabilizers and Stim's completion of underconstrained inputs, where it previously returned valid but different ones.
+Review check: a scratch harness linked against the vendored Stim library agreed with Stab on 20,000 random stabilizer sets up to 130 qubits, 9,994 with identical Tableaus and 10,006 with matching refusals, covering redundant, underconstrained, inconsistent, and anticommuting inputs.
+Seeded random Tableaus up to 64 qubits are byte-identical to the previous code, 41 end-to-end seeded outputs are byte-identical, and end-to-end timings are unchanged.
+
+Open after this checkpoint:
+
+- Single-gate `Tableau` append visits every row, so `circuit_to_tableau` costs the gate count times the qubit count plus one cubic composition per repeat; a transposed batch-append path would need a new public type.
+- Two 512-qubit thresholds remain in analysis and only select dense or sparse checking; the crossover between the two was reasoned, not measured.
+- The stabilizer solver is the slowest operation, at 4.27 s for 5000 qubits.
+- Stim's own timings for these operations were not measured, because no Stim Python package is installed on the host.
+- Caller-selectable algebra budgets exist on Tableau construction, random Tableaus, the solver, and circuit-to-Tableau conversion; Pauli and Clifford strings admit against the default only.
 
 ## Milestone E5: Faster Error Analysis
 
