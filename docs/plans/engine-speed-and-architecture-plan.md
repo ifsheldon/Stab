@@ -1,6 +1,6 @@
 # Engine Speed And Architecture Plan
 
-Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E6 are complete; E7 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
+Status: Active since 2026-11-14, after the fearless SIMD plan completed. E1 through E7 are complete; E8 is in progress. This plan follows a November architecture and performance review and is separate from the [Stim core parity plan](stim-core-parity-and-lean-evidence-plan.md) and the [fearless SIMD plan](fearless-simd-stable-rust-plan.md).
 
 ## Summary
 
@@ -496,6 +496,36 @@ Open after this checkpoint:
 
 - Every batch samples 256 lanes, so a request of at most 64 shots on a very wide circuit does four times the frame work it needs; the last two table rows are above the Stim ceiling, and peak memory for the d=35 `detect` rose from 45 MB to 102 MB. A session-level lane width is the follow-up.
 - `convert` from `b8` to `01` measured 1.03x to 1.05x of the previous build when writing to `/dev/null` and 0.98x into a pipe, which was not explained.
+
+### Checkpoint (2026-11-14): Session Lane Width
+
+The few-shot follow-up landed in `f821025a`.
+
+The frame lane width is an explicit session parameter, `stab_engine::LaneWidth`, with 64-lane and 256-lane instantiations of one generic frame.
+The default stays 256, so library callers and their seeded output are unchanged, and partition invariance holds within a session at either width.
+`LaneWidth::for_total_shots` picks the width that samples the fewest lanes below 512 shots, and the CLI uses it for `sample` and `detect`: totals of 1 to 192 and 257 to 448 shots run on 64 lanes.
+
+Paired timings pinned to one core, best of seven:
+
+| Workload | E7 | After | Stim |
+| --- | ---: | ---: | ---: |
+| `detect`, d=35 with 1000 rounds, 64 shots | 177.5 ms | 64.6 ms | 133.9 ms |
+| `sample`, d=35 with 1000 rounds, 64 shots | 228.2 ms | 126.1 ms | 134.7 ms |
+| `detect`, d=21 with 21 rounds, 64 shots | 5.0 ms | 4.2 ms | 4.3 ms |
+| `detect`, d=7 with 1000 rounds, 100k shots | 2221.1 ms | 2210.5 ms | 2927.1 ms |
+| `sample`, d=11, 300k shots | 183.0 ms | 180.8 ms | 250.6 ms |
+
+Peak memory for the d=35 run at 64 shots returns to 45 MB for `detect` and falls from 65 MB to 36 MB for `sample`.
+
+Seeded CLI `sample` and `detect` output changes for the shot totals that select 64 lanes, the detect compiler schema moves from 4 to 5, and the sampling executable-contract schema from 6 to 7.
+Review checks: 95 outputs at unchanged widths, deterministic `detect` at narrow widths, and the other commands are byte-identical to the E7 binary.
+
+Open after this checkpoint:
+
+- The reference sample is 58 percent of a 64-shot `sample` at d=35, about 73 ms of 126 ms.
+- No statistical fixture row runs at fewer than 1200 shots, so the 64-lane width is covered statistically by engine tests and not by the pinned-Stim rows.
+- `stab plan` does not report the lane width that a shot count implies.
+- A 128-lane width was not built or measured.
 
 ## Milestone E8: Deletions And Shared Vocabulary
 
