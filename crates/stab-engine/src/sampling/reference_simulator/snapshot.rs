@@ -13,9 +13,11 @@
 use stab_algebra::PauliBasis;
 use stab_bits::BitMatrix;
 
+use crate::work_poll::{WorkPoll, chunk_units};
+
 use super::{
-    InverseTableauSimulator, ReferenceSimulatorError, SimResult, WorkModel, first_set_bit,
-    invariant, pauli_image_into, pauli_image_work, try_resize, try_zeroed,
+    InverseTableauSimulator, ReferenceSimulatorError, SimResult, SimulatorWork, WorkModel,
+    first_set_bit, invariant, pauli_image_append, try_resize, try_zeroed,
 };
 
 const BLOCK_BITS: usize = u64::BITS as usize;
@@ -230,17 +232,42 @@ impl InverseTableauSimulator {
     pub(in crate::sampling) fn same_state_as(
         &mut self,
         snapshot: &mut ReferenceStateSnapshot,
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
     ) -> SimResult<bool> {
         let row_words = (2 * self.words).max(1);
         if snapshot.signs == self.signs {
-            let mismatch = snapshot
-                .rows
-                .chunks(row_words)
-                .zip(self.rows.chunks(row_words))
-                .position(|(snapshot_row, row)| snapshot_row != row);
-            let compared = mismatch.map_or(2 * self.qubit_count, |row| row + 1) as u64;
-            self.charge(self.model.row_copy().saturating_mul(compared));
-            if mismatch.is_none() && snapshot.rows.len() == self.rows.len() {
+            let row_copy_work = self.model.row_copy();
+            let chunk_rows = (chunk_units()
+                / usize::try_from(row_copy_work.max(1)).unwrap_or(usize::MAX))
+            .max(1);
+            let total_rows = 2 * self.qubit_count;
+            let mut row_start = 0;
+            let mut found_mismatch = false;
+            while row_start < total_rows {
+                let row_end = (row_start + chunk_rows).min(total_rows);
+                let byte_range = row_start * row_words..row_end * row_words;
+                let mismatch = match (
+                    snapshot.rows.get(byte_range.clone()),
+                    self.rows.get(byte_range),
+                ) {
+                    (Some(snap_slice), Some(cur_slice)) => snap_slice
+                        .chunks(row_words)
+                        .zip(cur_slice.chunks(row_words))
+                        .position(|(snapshot_row, row)| snapshot_row != row),
+                    _ => Some(0),
+                };
+                if let Some(offset) = mismatch {
+                    self.charge(row_copy_work.saturating_mul((offset + 1) as u64));
+                    work.charge(self, poll)?;
+                    found_mismatch = true;
+                    break;
+                }
+                self.charge(row_copy_work.saturating_mul((row_end - row_start) as u64));
+                work.charge(self, poll)?;
+                row_start = row_end;
+            }
+            if !found_mismatch && snapshot.rows.len() == self.rows.len() {
                 return Ok(true);
             }
         }
@@ -251,17 +278,20 @@ impl InverseTableauSimulator {
             return Ok(false);
         }
         let mut terms = std::mem::take(&mut self.stabilizer_terms);
-        if terms.capacity() < self.qubit_count {
-            terms
+        if terms.capacity() < self.qubit_count
+            && terms
                 .try_reserve_exact(self.qubit_count - terms.len())
-                .map_err(|_| ReferenceSimulatorError::Allocation {
-                    component: "reference state comparison terms",
-                    items: self.qubit_count,
-                })?;
+                .is_err()
+        {
+            self.stabilizer_terms = terms;
+            return Err(ReferenceSimulatorError::Allocation {
+                component: "reference state comparison terms",
+                items: self.qubit_count,
+            });
         }
         let mut result = Ok(true);
         for stabilizer in 0..self.qubit_count {
-            match self.stabilizer_recurs(snapshot, stabilizer, &mut terms) {
+            match self.stabilizer_recurs(snapshot, stabilizer, &mut terms, poll, work) {
                 Ok(true) => {}
                 Ok(false) => {
                     result = Ok(false);
@@ -284,12 +314,16 @@ impl InverseTableauSimulator {
         snapshot: &mut ReferenceStateSnapshot,
         stabilizer: usize,
         terms: &mut Vec<(usize, PauliBasis)>,
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
     ) -> SimResult<bool> {
         if snapshot.ensure_transposed(stabilizer / BLOCK_BITS, self.words)? {
             self.charge(self.model.transpose_block());
+            work.charge(self, poll)?;
         }
         snapshot.support_terms(stabilizer, terms)?;
         self.charge(self.model.support_scan());
+        work.charge(self, poll)?;
         let snapshot_log_i = if stabilizer < snapshot.phased {
             snapshot
                 .phases
@@ -298,15 +332,30 @@ impl InverseTableauSimulator {
                 .ok_or(invariant("snapshot stabilizer phase is missing"))?
         } else if stabilizer == snapshot.phased {
             // x_j(S_k) = <S_k, Z_j> and z_j(S_k) = <S_k, X_j>, read through T_s^-1.
-            let log_i = pauli_image_into(
-                &snapshot.rows,
-                &snapshot.signs,
-                self.qubit_count,
-                self.words,
-                terms,
-                &mut self.product,
-            )?;
-            self.charge(pauli_image_work(self.model, terms));
+            self.product.fill(0);
+            self.charge(self.model.row_copy());
+            let per_term_units =
+                usize::try_from(self.model.row_multiply().saturating_mul(2).max(1))
+                    .unwrap_or(usize::MAX);
+            let chunk_terms = (chunk_units() / per_term_units).max(1);
+            let mut log_i = 0_u8;
+            for chunk in terms.chunks(chunk_terms) {
+                let multiplied = chunk
+                    .iter()
+                    .map(|(_, basis)| u64::from(basis.x_bit()) + u64::from(basis.z_bit()))
+                    .sum::<u64>();
+                self.charge(self.model.row_multiply().saturating_mul(multiplied));
+                work.charge(self, poll)?;
+                let delta = pauli_image_append(
+                    &snapshot.rows,
+                    &snapshot.signs,
+                    self.qubit_count,
+                    self.words,
+                    chunk,
+                    &mut self.product,
+                )?;
+                log_i = (log_i + delta) & 3;
+            }
             let (image_x, _) = self.product.split_at(self.words);
             if first_set_bit(image_x).is_some() {
                 return Err(invariant("snapshot stabilizer did not map back to Z"));
@@ -322,7 +371,7 @@ impl InverseTableauSimulator {
                 "snapshot stabilizer phases were prepared out of order",
             ));
         };
-        let current_log_i = self.observable_into_product(terms)?;
+        let current_log_i = self.observable_into_product(terms, poll, work)?;
         let (image_x, _) = self.product.split_at(self.words);
         Ok(first_set_bit(image_x).is_none() && current_log_i == snapshot_log_i)
     }

@@ -367,3 +367,37 @@ fn sat_generation_over_an_astronomical_repeat_is_cancellable() {
         likeliest_error_sat_problem_with_limits(&model, 100, unbounded(signal))
     });
 }
+
+#[test]
+fn wide_flow_regions_and_long_sat_clauses_honor_a_set_signal() {
+    use std::fmt::Write as _;
+
+    // Force the sparse reverse tracker on a 4,096-qubit measurement flow.
+    let wide_circuit = circuit("M 0\nH 4095\n");
+    let mut flow_text = String::from("_");
+    flow_text.push_str(&"_".repeat(4094));
+    flow_text.push_str("X -> _");
+    flow_text.push_str(&"_".repeat(4094));
+    flow_text.push_str("Z xor rec[-1]");
+    let wide_flows = flows(&[&flow_text]);
+    assert_cancelled(check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+        &wide_circuit,
+        &wide_flows,
+        &UnsignedFlowCheckOptions {
+            cancellation: cancelled(),
+            ..UnsignedFlowCheckOptions::default()
+        },
+    ));
+
+    // A single SAT observable clause with 2,048 literals exercises intra-clause polling.
+    let mut dem_text = String::from("error(0.1)");
+    for obs in 0..2_048 {
+        let _ = write!(dem_text, " L{obs}");
+    }
+    dem_text.push('\n');
+    let wide_dem = DetectorErrorModel::from_dem_str(&dem_text).expect("parse wide observable DEM");
+    assert_cancelled(shortest_error_sat_problem_with_limits(
+        &wide_dem,
+        SatMaterializationLimits::default().with_cancellation(cancelled()),
+    ));
+}

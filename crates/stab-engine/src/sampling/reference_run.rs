@@ -1,13 +1,13 @@
 //! Drives the inverse-tableau reference simulator over the resolved circuit program.
 
 use stab_algebra::PauliBasis;
-use stab_model::{Cancellation, Cancelled, RepeatNestingLimit};
+use stab_model::{Cancellation, RepeatNestingLimit};
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
 use super::reference_bits::ReferenceBits;
 use super::reference_fold::{FoldProbe, ProbeStep, SnapshotSlot};
 use super::reference_simulator::{
-    InverseTableauSimulator, ReferenceSimulatorError, WorkModel, reset_correction,
+    InverseTableauSimulator, ReferenceSimulatorError, SimulatorWork, WorkModel, reset_correction,
 };
 use crate::detection::frame::{
     CircuitProgram, CliffordStep, ControlledPair, ProgramEntry, ProgramInstruction,
@@ -21,36 +21,6 @@ pub(super) use super::reference_fold::has_reference_fold_candidate;
 /// Unitary target groups applied between two charges of simulator work. A group of the largest
 /// admissible tableau costs a few thousand work units, so a chunk stays far below a poll interval.
 const CLIFFORD_GROUPS_PER_CHARGE: usize = 64;
-
-/// The simulator work already charged to a [`WorkPoll`].
-///
-/// Every simulator primitive adds its [`WorkModel`] estimate, about one unit per copied word, to
-/// the simulator's work counter. The run charges the counter's growth after each target or
-/// small chunk of targets, so a wide instruction or a large tableau polls within a bounded
-/// amount of tableau work.
-struct SimulatorWork {
-    seen: u64,
-}
-
-impl SimulatorWork {
-    fn new(simulator: &InverseTableauSimulator) -> Self {
-        Self {
-            seen: simulator.work(),
-        }
-    }
-
-    #[inline]
-    fn charge(
-        &mut self,
-        simulator: &InverseTableauSimulator,
-        poll: &mut WorkPoll<'_>,
-    ) -> Result<(), Cancelled> {
-        let work = simulator.work();
-        let done = work.saturating_sub(self.seen);
-        self.seen = work;
-        poll.charge(usize::try_from(done).unwrap_or(usize::MAX))
-    }
-}
 
 /// Reusable simulator storage for computing reference samples of one program.
 #[derive(Debug)]
@@ -199,9 +169,11 @@ fn run_entries(
                     ));
                 }
                 if let (Some(probe), Some(slot)) = (frame.probe.as_mut(), snapshot.as_deref_mut()) {
-                    // A probe step compares whole tableaux, so it polls cancellation directly.
+                    // A probe step compares whole tableaux, so it polls cancellation directly
+                    // and in inner chunks.
                     cancellation.check()?;
-                    let step = probe.end_iteration(simulator, slot, output.len())?;
+                    let step =
+                        probe.end_iteration(simulator, slot, output.len(), &mut poll, &mut work)?;
                     work.charge(simulator, &mut poll)?;
                     match step {
                         ProbeStep::Continue => {}
@@ -431,7 +403,9 @@ fn apply_instruction(
         }
         ProgramInstruction::Reset { basis, targets } => {
             for &qubit in targets {
-                simulator.reset(qubit, *basis).map_err(simulator_error)?;
+                simulator
+                    .reset(qubit, *basis, poll, work)
+                    .map_err(simulator_error)?;
                 work.charge(simulator, poll)?;
             }
             Ok(())
@@ -445,7 +419,9 @@ fn apply_instruction(
         } => {
             // Stim's reference sample is noiseless, so result-flip probabilities are ignored.
             for (index, &qubit) in targets.iter().enumerate() {
-                let measured = simulator.measure(qubit, *basis).map_err(simulator_error)?;
+                let measured = simulator
+                    .measure(qubit, *basis, poll, work)
+                    .map_err(simulator_error)?;
                 output.push(measured ^ inverted.get(index).copied().unwrap_or(false));
                 if *reset && measured {
                     simulator
@@ -467,7 +443,7 @@ fn apply_instruction(
                     return Err(run_invariant("pair measurement targets are not paired"));
                 };
                 let measured = simulator
-                    .measure_product(&[(left, *basis), (right, *basis)])
+                    .measure_product(&[(left, *basis), (right, *basis)], poll, work)
                     .map_err(simulator_error)?;
                 let flip = inverted.get(2 * index).copied().unwrap_or(false)
                     ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
@@ -479,7 +455,9 @@ fn apply_instruction(
         ProgramInstruction::PauliProducts(measurement) => {
             for product in measurement.products() {
                 let (terms, inverted) = product.map_err(program_error)?;
-                let measured = simulator.measure_product(terms).map_err(simulator_error)?;
+                let measured = simulator
+                    .measure_product(terms, poll, work)
+                    .map_err(simulator_error)?;
                 output.push(measured ^ inverted);
                 work.charge(simulator, poll)?;
             }
@@ -594,10 +572,12 @@ pub(super) fn count_determined_measurements(
                     let terms = [(qubit, *basis)];
                     count += u64::from(
                         simulator
-                            .is_deterministic(&terms)
+                            .is_deterministic(&terms, cursor.poll(), &mut work)
                             .map_err(simulator_error)?,
                     );
-                    let measured = simulator.measure(qubit, *basis).map_err(simulator_error)?;
+                    let measured = simulator
+                        .measure(qubit, *basis, cursor.poll(), &mut work)
+                        .map_err(simulator_error)?;
                     record.push(measured ^ inverted.get(index).copied().unwrap_or(false));
                     if *reset && measured {
                         simulator
@@ -620,10 +600,12 @@ pub(super) fn count_determined_measurements(
                     let terms = [(left, *basis), (right, *basis)];
                     count += u64::from(
                         simulator
-                            .is_deterministic(&terms)
+                            .is_deterministic(&terms, cursor.poll(), &mut work)
                             .map_err(simulator_error)?,
                     );
-                    let measured = simulator.measure_product(&terms).map_err(simulator_error)?;
+                    let measured = simulator
+                        .measure_product(&terms, cursor.poll(), &mut work)
+                        .map_err(simulator_error)?;
                     let flip = inverted.get(2 * index).copied().unwrap_or(false)
                         ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
                     record.push(measured ^ flip);
@@ -633,8 +615,14 @@ pub(super) fn count_determined_measurements(
             ProgramInstruction::PauliProducts(measurement) => {
                 for product in measurement.products() {
                     let (terms, inverted) = product.map_err(program_error)?;
-                    count += u64::from(simulator.is_deterministic(terms).map_err(simulator_error)?);
-                    let measured = simulator.measure_product(terms).map_err(simulator_error)?;
+                    count += u64::from(
+                        simulator
+                            .is_deterministic(terms, cursor.poll(), &mut work)
+                            .map_err(simulator_error)?,
+                    );
+                    let measured = simulator
+                        .measure_product(terms, cursor.poll(), &mut work)
+                        .map_err(simulator_error)?;
                     record.push(measured ^ inverted);
                     work.charge(&simulator, cursor.poll())?;
                 }
@@ -690,6 +678,9 @@ pub(super) fn count_determined_measurements(
 
 pub(super) fn simulator_error(error: ReferenceSimulatorError) -> SamplingExecutionError {
     match error {
+        ReferenceSimulatorError::Cancelled(cancelled) => {
+            SamplingExecutionError::Cancelled(cancelled)
+        }
         ReferenceSimulatorError::Allocation { .. } => {
             SamplingExecutionError::SessionStorageAllocation {
                 message: error.to_string(),

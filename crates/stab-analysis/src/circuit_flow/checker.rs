@@ -430,7 +430,7 @@ fn report_unitary_mismatches_as_outputs(
                         .max(flow.input().len())
                         .max(flow.output().len());
                     let mut bases = vec![PauliBasis::I; width];
-                    xor_region(&mut bases, image);
+                    xor_region(&mut bases, image, &options.cancellation)?;
                     UnsignedStabilizerFlowFailure::OutputMismatch {
                         expected_output: unsigned_pauli(flow.output()),
                         actual_output: stab_algebra::advanced::pauli_from_bases_unchecked(
@@ -673,15 +673,22 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                     UnsignedStabilizerFlowFailure::CollapseAnticommutation,
                 ));
             }
-            let mut bases = vec![PauliBasis::I; flow.input().len()];
-            xor_region(
-                &mut bases,
-                tracker
-                    .compact_region_for_target(tracked_target, options.algebra_budget())?
-                    .value(),
-            );
+            let region =
+                tracker.compact_region_for_target(tracked_target, options.algebra_budget())?;
+            let region_pauli = region.value();
+            let target_len = flow.input().len().max(region_pauli.len());
+            let mut bases = Vec::new();
+            let mut remaining = target_len;
+            while remaining > 0 {
+                options.cancellation.check()?;
+                let step =
+                    remaining.min(stab_model::advanced::CancellationCountdown::INTERVAL as usize);
+                bases.resize(bases.len() + step, PauliBasis::I);
+                remaining -= step;
+            }
+            xor_region(&mut bases, region_pauli, &options.cancellation)?;
             let actual = stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, bases);
-            if paulis_match_unsigned(&actual, flow.input()) {
+            if paulis_match_unsigned_polled(&actual, flow.input(), &options.cancellation)? {
                 Ok(UnsignedStabilizerFlowCheck::passed())
             } else {
                 Ok(UnsignedStabilizerFlowCheck::failed(
@@ -711,7 +718,12 @@ fn seed_flow_pauli_output(
     output: &PauliString,
     target: DemTarget,
 ) -> AnalysisResult<()> {
-    for (index, basis) in output.active_terms() {
+    for index in 0..output.len() {
+        tracker.poll_cancellation()?;
+        let basis = output.get(index).unwrap_or(PauliBasis::I);
+        if basis == PauliBasis::I {
+            continue;
+        }
         let qubit = u32::try_from(index)
             .ok()
             .and_then(|index| QubitId::new(index).ok())
@@ -720,7 +732,6 @@ fn seed_flow_pauli_output(
                     "flow output qubit index {index} is outside the supported target range"
                 ))
             })?;
-        tracker.poll_cancellation()?;
         tracker.toggle_pauli_target(qubit, basis, target)?;
     }
     Ok(())
@@ -739,15 +750,25 @@ pub fn flow_record_index(index: i32, measurement_count: usize) -> Option<usize> 
         .filter(|index| *index < measurement_count)
 }
 
-fn xor_region(bases: &mut Vec<PauliBasis>, region: &PauliString) {
+fn xor_region(
+    bases: &mut Vec<PauliBasis>,
+    region: &PauliString,
+    cancellation: &stab_model::Cancellation,
+) -> AnalysisResult<()> {
     if region.len() > bases.len() {
         bases.resize(region.len(), PauliBasis::I);
     }
-    for (index, basis) in region.active_terms() {
-        if let Some(existing) = bases.get_mut(index) {
+    let mut countdown = stab_model::advanced::CancellationCountdown::new();
+    for index in 0..region.len() {
+        countdown.tick(cancellation)?;
+        let basis = region.get(index).unwrap_or(PauliBasis::I);
+        if basis != PauliBasis::I
+            && let Some(existing) = bases.get_mut(index)
+        {
             *existing = xor_basis(*existing, basis);
         }
     }
+    Ok(())
 }
 
 fn xor_basis(left: PauliBasis, right: PauliBasis) -> PauliBasis {
@@ -755,9 +776,47 @@ fn xor_basis(left: PauliBasis, right: PauliBasis) -> PauliBasis {
 }
 
 fn paulis_match_unsigned(left: &PauliString, right: &PauliString) -> bool {
-    (0..left.len().max(right.len())).all(|index| {
-        left.get(index).unwrap_or(PauliBasis::I) == right.get(index).unwrap_or(PauliBasis::I)
-    })
+    word_planes_match(left.x_bits(), right.x_bits())
+        && word_planes_match(left.z_bits(), right.z_bits())
+}
+
+fn paulis_match_unsigned_polled(
+    left: &PauliString,
+    right: &PauliString,
+    cancellation: &stab_model::Cancellation,
+) -> AnalysisResult<bool> {
+    let mut countdown = stab_model::advanced::CancellationCountdown::new();
+    Ok(
+        word_planes_match_polled(left.x_bits(), right.x_bits(), cancellation, &mut countdown)?
+            && word_planes_match_polled(
+                left.z_bits(),
+                right.z_bits(),
+                cancellation,
+                &mut countdown,
+            )?,
+    )
+}
+
+fn word_planes_match(left: &[u64], right: &[u64]) -> bool {
+    let max_words = left.len().max(right.len());
+    (0..max_words)
+        .all(|word| left.get(word).copied().unwrap_or(0) == right.get(word).copied().unwrap_or(0))
+}
+
+fn word_planes_match_polled(
+    left: &[u64],
+    right: &[u64],
+    cancellation: &stab_model::Cancellation,
+    countdown: &mut stab_model::advanced::CancellationCountdown,
+) -> AnalysisResult<bool> {
+    let max_words = left.len().max(right.len());
+    for word in 0..max_words {
+        countdown.tick(cancellation)?;
+        if left.get(word).copied().unwrap_or(0) != right.get(word).copied().unwrap_or(0) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn unsigned_pauli(pauli: &PauliString) -> PauliString {

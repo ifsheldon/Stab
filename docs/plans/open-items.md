@@ -23,8 +23,7 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 ## Cancellation
 
-- Sampling polls are spaced by estimated work, and one reference-simulator collapse or fold comparison is not split: about 1.3 ms at 12,000 qubits, growing with the square of the qubit count up to tens of milliseconds for the largest tableau the 1 GiB default admits. Session creation, session teardown, delivering pending lanes, and the caller's sink also run without polls.
-- One extracted flow region, one search state's successor list, and one emitted SAT clause are single polling ticks, so a very wide flow, a very high-degree detector, or a very long clause runs between polls.
+- Sampling polls are spaced by estimated work rather than wall-clock time, and session setup outside the reference sample, session teardown, delivering pending lanes, and the caller's sink run without polls.
 
 ## Structure And Evidence
 

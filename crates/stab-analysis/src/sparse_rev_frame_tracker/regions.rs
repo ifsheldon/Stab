@@ -1,8 +1,11 @@
 use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, StabilizerError};
+use stab_model::advanced::CancellationCountdown;
 use stab_model::{DemTarget, QubitId};
 
 use super::{SparseReverseFrameTracker, qubit_index};
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+
+const REGION_CHUNK_QUBITS: usize = CancellationCountdown::INTERVAL as usize;
 
 impl SparseReverseFrameTracker {
     /// Returns the full-width region of `target`, admitted against `budget`.
@@ -26,13 +29,18 @@ impl SparseReverseFrameTracker {
         target: DemTarget,
         budget: AlgebraMemoryBudget,
     ) -> AnalysisResult<FlexPauliString> {
-        let len = self
-            .xs
-            .iter()
-            .chain(&self.zs)
-            .filter_map(|(qubit, targets)| targets.contains(&target).then_some(qubit.get()))
-            .max()
-            .map(|max_qubit| qubit_index(QubitId::new(max_qubit)?).map(|index| index + 1))
+        let signal = self.cancellation_signal();
+        let mut countdown = CancellationCountdown::new();
+        let mut max_qubit: Option<u32> = None;
+        for (qubit, targets) in self.xs.iter().chain(&self.zs) {
+            countdown.tick(signal)?;
+            if targets.contains(&target) {
+                let id = qubit.get();
+                max_qubit = Some(max_qubit.map_or(id, |prev| prev.max(id)));
+            }
+        }
+        let len = max_qubit
+            .map(|max_id| qubit_index(QubitId::new(max_id)?).map(|index| index + 1))
             .transpose()?
             .unwrap_or(0);
         self.region_for_target_with_len(target, len, budget, ResourceOperation::FlowCheck)
@@ -45,8 +53,27 @@ impl SparseReverseFrameTracker {
         budget: AlgebraMemoryBudget,
         operation: ResourceOperation,
     ) -> AnalysisResult<FlexPauliString> {
-        let mut bases = vec![PauliBasis::I; len];
+        let signal = self.cancellation_signal();
+        signal.check()?;
+        let mut countdown = CancellationCountdown::new();
+        let mut bases = Vec::new();
+        let mut remaining = len;
+        while remaining > 0 {
+            signal.check()?;
+            let step = remaining.min(REGION_CHUNK_QUBITS);
+            bases.try_reserve(step).map_err(|_| {
+                ResourceLimitError::memory_budget(
+                    operation,
+                    ResourceKind::MaterializedBytes,
+                    u64::try_from(len).unwrap_or(u64::MAX),
+                    budget.bytes(),
+                )
+            })?;
+            bases.resize(bases.len() + step, PauliBasis::I);
+            remaining -= step;
+        }
         for (qubit, xs) in &self.xs {
+            countdown.tick(signal)?;
             if xs.contains(&target) {
                 let index = qubit_index(*qubit)?;
                 let basis = bases.get_mut(index).ok_or_else(|| {
@@ -59,6 +86,7 @@ impl SparseReverseFrameTracker {
             }
         }
         for (qubit, zs) in &self.zs {
+            countdown.tick(signal)?;
             if zs.contains(&target) {
                 let index = qubit_index(*qubit)?;
                 let basis = bases.get_mut(index).ok_or_else(|| {
@@ -79,6 +107,7 @@ impl SparseReverseFrameTracker {
                 };
             }
         }
+        signal.check()?;
         FlexPauliString::from_phase_and_bases_with_budget(PauliPhase::Plus, bases, budget).map_err(
             |error| match error {
                 StabilizerError::MemoryBudgetExceeded {

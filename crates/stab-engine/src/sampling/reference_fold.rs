@@ -24,8 +24,11 @@ use stab_model::RepeatNestingLimit;
 
 use super::api::SamplingExecutionError;
 use super::reference_run::{clifford_group_work, simulator_error};
-use super::reference_simulator::{InverseTableauSimulator, ReferenceStateSnapshot, WorkModel};
+use super::reference_simulator::{
+    InverseTableauSimulator, ReferenceStateSnapshot, SimulatorWork, WorkModel,
+};
 use crate::detection::frame::{CircuitProgram, ControlledPair, ProgramEntry, ProgramInstruction};
+use crate::work_poll::WorkPoll;
 
 /// After its first step, a probe may spend at most this fraction (one over the divisor) of the
 /// loop's work.
@@ -186,6 +189,8 @@ impl FoldProbe {
         simulator: &mut InverseTableauSimulator,
         slot: &mut SnapshotSlot,
         output_len: usize,
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
     ) -> Result<ProbeStep, SamplingExecutionError> {
         self.completed = self.completed.saturating_add(1);
         let iteration_work = simulator.work().saturating_sub(self.iteration_start);
@@ -193,7 +198,7 @@ impl FoldProbe {
         if let Some(held) = self.held {
             let before = simulator.work();
             let recurred = simulator
-                .same_state_as(slot.held_snapshot()?)
+                .same_state_as(slot.held_snapshot()?, poll, work)
                 .map_err(simulator_error)?;
             self.charge(simulator.work().saturating_sub(before));
             if recurred {

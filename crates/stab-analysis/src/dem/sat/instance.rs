@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use stab_model::advanced::CancellationCountdown;
 
 use super::SatMaterializationLimits;
@@ -55,20 +57,6 @@ impl BoolRef {
         match self.atom {
             BoolAtom::Variable(index) => Some(index),
             BoolAtom::Constant(_) => None,
-        }
-    }
-
-    fn to_wdimacs_literal(self) -> AnalysisResult<Option<String>> {
-        let Some(index) = self.variable_index() else {
-            return Ok(None);
-        };
-        let one_based = index.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("SAT variable index overflowed")
-        })?;
-        if self.negated {
-            Ok(Some(format!("-{one_based}")))
-        } else {
-            Ok(Some(one_based.to_string()))
         }
     }
 }
@@ -186,7 +174,11 @@ impl MaxSatInstance {
     }
 
     pub(super) fn add_clause(&mut self, clause: Clause) -> AnalysisResult<()> {
-        self.countdown.tick(self.limits.cancellation())?;
+        if clause.vars.len() >= CancellationCountdown::INTERVAL as usize {
+            self.limits.cancellation().check()?;
+        } else {
+            self.countdown.tick(self.limits.cancellation())?;
+        }
         if let ClauseWeight::Soft(weight) = clause.weight {
             if !weight.is_finite() || weight <= 0.0 {
                 return Err(AnalysisError::invalid_detector_error_model(
@@ -284,11 +276,24 @@ impl MaxSatInstance {
             if weight == 0 {
                 continue;
             }
-            out.push_str(&weight.to_string());
+            write!(out, "{weight}")
+                .map_err(|_| AnalysisError::invalid_detector_error_model("SAT format failed"))?;
             for var in &clause.vars {
-                if let Some(literal) = var.to_wdimacs_literal()? {
-                    out.push(' ');
-                    out.push_str(&literal);
+                countdown.tick(self.limits.cancellation())?;
+                let Some(index) = var.variable_index() else {
+                    continue;
+                };
+                let one_based = index.checked_add(1).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model("SAT variable index overflowed")
+                })?;
+                if var.negated {
+                    write!(out, " -{one_based}").map_err(|_| {
+                        AnalysisError::invalid_detector_error_model("SAT format failed")
+                    })?;
+                } else {
+                    write!(out, " {one_based}").map_err(|_| {
+                        AnalysisError::invalid_detector_error_model("SAT format failed")
+                    })?;
                 }
             }
             out.push_str(" 0\n");
@@ -314,6 +319,7 @@ impl MaxSatInstance {
             }
             bytes = checked_output_add(bytes, decimal_digits(weight))?;
             for var in &clause.vars {
+                countdown.tick(self.limits.cancellation())?;
                 let Some(index) = var.variable_index() else {
                     continue;
                 };

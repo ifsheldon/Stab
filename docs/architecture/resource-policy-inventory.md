@@ -155,7 +155,7 @@ The one step that is not split is a single reference-simulator collapse or fold 
 
 `stab-algebra` operations take no signal: each call is polynomial in bytes already admitted, at most `O(n^3 / 64)` word operations for an `n`-qubit Tableau, or `O(log |k|)` such compositions for `Tableau::pow(k)`, and callers that loop over them poll between calls.
 Parsing and circuit generation take no signal, because they are linear in their admitted bytes.
-A region extraction of the sparse flow checker, one search state's successor list, and one emitted clause are single ticks, so each can be as large as one flow's support, one detector's edge list, or one clause.
+Sparse flow-region extraction, logical-error search transitions, and SAT clause sizing and serialization also tick within their inner qubit, term, and literal loops, so wide flows, high-degree states, and long clauses remain bounded between polls.
 
 ## Removed Constants
 

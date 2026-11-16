@@ -40,6 +40,7 @@ impl SatTargetIndex {
         for error in errors {
             countdown.tick(cancellation)?;
             for target in &error.targets {
+                countdown.tick(cancellation)?;
                 match *target {
                     DemTarget::RelativeDetector(detector) => {
                         detectors.insert(detector);
@@ -112,6 +113,7 @@ fn preflight_sat_shape(
             soft_clause_count = checked_sat_add(soft_clause_count, 1, "soft clause count")?;
         }
         for target in &error.targets {
+            countdown.tick(limits.cancellation())?;
             let seen = match *target {
                 DemTarget::RelativeDetector(detector) => {
                     let slot = target_index.detector_slot(detector)?;
@@ -252,13 +254,14 @@ fn sat_problem_as_wcnf_string(
                 errors.len()
             ))
         })?;
+    let mut countdown = CancellationCountdown::new();
     for _ in &errors {
+        countdown.tick(limits.cancellation())?;
         errors_activated.push(instance.new_bool()?);
     }
 
     let mut detectors_activated = vec![BoolRef::false_ref(); target_index.detector_to_slot.len()];
     let mut observables_flipped = vec![BoolRef::false_ref(); target_index.observable_to_slot.len()];
-    let mut countdown = CancellationCountdown::new();
     for (error_index, error) in errors.iter().enumerate() {
         countdown.tick(limits.cancellation())?;
         let error_ref = errors_activated
@@ -273,21 +276,27 @@ fn sat_problem_as_wcnf_string(
                 &target_index,
                 &mut detectors_activated,
                 &mut observables_flipped,
+                limits.cancellation(),
+                &mut countdown,
             )?;
         }
         add_error_soft_clause(&mut instance, mode, error_ref, error.probability)?;
     }
 
     for detector in detectors_activated {
+        countdown.tick(limits.cancellation())?;
         if detector.variable_index().is_some() {
             instance.add_clause(Clause::hard(vec![detector.not()]))?;
         }
     }
 
-    let observable_clause_vars = observables_flipped
-        .into_iter()
-        .filter(|observable| observable.variable_index().is_some())
-        .collect();
+    let mut observable_clause_vars = Vec::new();
+    for observable in observables_flipped {
+        countdown.tick(limits.cancellation())?;
+        if observable.variable_index().is_some() {
+            observable_clause_vars.push(observable);
+        }
+    }
     instance.add_clause(Clause::hard(observable_clause_vars))?;
     instance.validate_shape(shape)?;
     instance.to_wdimacs(mode)
@@ -302,6 +311,10 @@ fn unsat_wdimacs(limits: &SatMaterializationLimits) -> AnalysisResult<String> {
     Ok(UNSAT_WDIMACS.to_owned())
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "threads the caller cancellation countdown alongside the SAT parity tables"
+)]
 fn add_error_parity_terms(
     instance: &mut MaxSatInstance,
     error_ref: BoolRef,
@@ -309,8 +322,11 @@ fn add_error_parity_terms(
     target_index: &SatTargetIndex,
     detectors_activated: &mut [BoolRef],
     observables_flipped: &mut [BoolRef],
+    cancellation: &Cancellation,
+    countdown: &mut CancellationCountdown,
 ) -> AnalysisResult<()> {
     for target in targets {
+        countdown.tick(cancellation)?;
         match *target {
             DemTarget::RelativeDetector(detector) => {
                 let index = target_index.detector_slot(detector)?;

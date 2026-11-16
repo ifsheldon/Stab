@@ -201,6 +201,10 @@ impl SparseReverseFrameTracker {
         Ok(self.cancellation.signal.check()?)
     }
 
+    pub(crate) fn cancellation_signal(&self) -> &Cancellation {
+        &self.cancellation.signal
+    }
+
     /// Counts one bounded unit of reverse work, failing once cancellation is observed.
     #[inline]
     pub(crate) fn poll_cancellation(&mut self) -> AnalysisResult<()> {

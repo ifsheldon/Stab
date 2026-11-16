@@ -45,9 +45,10 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
     back_map.insert(empty.clone(), empty.clone());
 
     for (source_index, node) in graph.nodes.iter().enumerate() {
+        budget.poll_cancellation()?;
         let source = graph.detector_for_node_index(source_index)?;
         for edge in &node.edges {
-            budget.poll_cancellation()?;
+            budget.poll_cancellation_steps(edge.observables.len().saturating_add(1))?;
             if !edge.observables.is_empty() && edge.detector.is_none_or(|target| source < target) {
                 let start_terms = edge
                     .observables
@@ -71,6 +72,7 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
     }
 
     while let Some(current) = queue.pop_front() {
+        budget.poll_cancellation()?;
         let Some(active) = current.detector_active else {
             return Err(AnalysisError::invalid_detector_error_model(
                 "graphlike search reached a state without an active detector",
@@ -85,6 +87,7 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
         let current_terms = current.term_count()?;
         for edge in &node.edges {
             budget.record_transition()?;
+            budget.poll_cancellation_steps(current_terms.saturating_add(edge.observables.len()))?;
             let next_terms = edge
                 .observables
                 .symmetric_difference_len(&current.observables)
@@ -107,7 +110,7 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
                 let mut inserted = entry.key().clone();
                 entry.insert(current.clone());
                 if undetected {
-                    return backtrack_path(&back_map, &inserted);
+                    return backtrack_path(&back_map, &inserted, &mut budget);
                 }
                 if inserted.detector_active.is_none() {
                     std::mem::swap(&mut inserted.detector_active, &mut inserted.detector_held);
@@ -118,17 +121,19 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
     }
 
     Err(AnalysisError::invalid_detector_error_model(
-        no_graphlike_logical_error_message(model, &graph)?,
+        no_graphlike_logical_error_message(model, &graph, &mut budget)?,
     ))
 }
 
 fn backtrack_path(
     back_map: &BTreeMap<SearchState, SearchState>,
     final_state: &SearchState,
+    budget: &mut SearchBudget,
 ) -> AnalysisResult<DetectorErrorModel> {
     let mut out = DetectorErrorModel::new();
     let mut current = final_state.clone();
     loop {
+        budget.poll_cancellation()?;
         let Some(previous) = back_map.get(&current) else {
             return Err(AnalysisError::invalid_detector_error_model(
                 "graphlike search backtracking reached an unknown state",
@@ -165,6 +170,7 @@ fn sorted_error_model(model: DetectorErrorModel) -> AnalysisResult<DetectorError
 fn no_graphlike_logical_error_message(
     model: &DetectorErrorModel,
     graph: &Graph,
+    budget: &mut SearchBudget,
 ) -> AnalysisResult<String> {
     let mut message = String::from("Failed to find any graphlike logical errors.");
     if graph.num_observables == 0 {
@@ -181,7 +187,7 @@ fn no_graphlike_logical_error_message(
         message.push_str(
             "\n    WARNING: NO ERRORS. The circuit or detector error model didn't include any errors, making it vacuously impossible to find a logical error.",
         );
-    } else if !graph_has_edges(graph) {
+    } else if !graph_has_edges(graph, budget)? {
         message.push_str(
             "\n    WARNING: NO GRAPHLIKE ERRORS. Although the circuit or detector error model does define some errors, none of them are graphlike (i.e. have at most two detection events), making it vacuously impossible to find a graphlike logical error.",
         );
@@ -189,8 +195,14 @@ fn no_graphlike_logical_error_message(
     Ok(message)
 }
 
-fn graph_has_edges(graph: &Graph) -> bool {
-    graph.nodes.iter().any(|node| !node.edges.is_empty())
+fn graph_has_edges(graph: &Graph, budget: &mut SearchBudget) -> AnalysisResult<bool> {
+    for node in &graph.nodes {
+        budget.poll_cancellation()?;
+        if !node.edges.is_empty() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 #[cfg(test)]

@@ -264,3 +264,63 @@ fn sampling_cancelled_during_the_reference_sample_retries_identically() {
         assert!(resumed.0 == expected.0, "retried plan diverged");
     });
 }
+
+#[test]
+fn single_collapse_and_fold_comparison_poll_in_chunks_and_retry_cleanly() {
+    use std::fmt::Write as _;
+
+    // Entangle 64 qubits into a cat state and measure qubit 0 once: the single random collapse
+    // scans 128 rows and multiplies 64 anticommuting rows.
+    let mut collapse_src = String::from("H 0\nCX");
+    for q in 0..63 {
+        let _ = write!(collapse_src, " {q} {}", q + 1);
+    }
+    collapse_src.push_str("\nM 0\n");
+    let collapse_circuit = Circuit::from_stim_str(&collapse_src).expect("parse collapse circuit");
+
+    // A foldable repeat with non-trivial stabilizers so `same_state_as` runs inner row/stabilizer
+    // comparison chunks.
+    let mut fold_src = String::from("H 0\nCX");
+    for q in 0..63 {
+        let _ = write!(fold_src, " {q} {}", q + 1);
+    }
+    fold_src.push_str("\nREPEAT 100 {\n    H 0\n    H 0\n    M 1\n}\n");
+    let fold_circuit = Circuit::from_stim_str(&fold_src).expect("parse fold circuit");
+
+    let seed = RandomPolicy::Seeded(Seed::new(17));
+    for (circuit, policy) in [
+        (&collapse_circuit, ReferenceSampleLoopPolicy::Iterate),
+        (&fold_circuit, ReferenceSampleLoopPolicy::Fold),
+    ] {
+        let compile = || {
+            SamplingCompiler::new()
+                .reference_sample_loop_policy(policy)
+                .compile(circuit)
+                .expect("compile fixture")
+        };
+        let mut expected = Shots::default();
+        compile()
+            .session(seed)
+            .expect("baseline session")
+            .run_shots(64, &mut expected);
+
+        test_hook::with_units_per_poll(64, || {
+            let counted = compile();
+            let (created, polls) = test_hook::count_polls(|| counted.session(seed));
+            created.expect("counted session");
+            assert!(polls >= 8, "expected chunked inner polls, got {polls}");
+            let plan = compile();
+            let (interrupted, fired) =
+                test_hook::cancel_at_poll(polls - 2, || plan.session(seed).map(drop));
+            assert!(fired);
+            assert_eq!(
+                interrupted,
+                Err(SamplingExecutionError::Cancelled(stab_model::Cancelled))
+            );
+            let mut resumed = Shots::default();
+            let mut session = plan.session(seed).expect("retry session");
+            assert_eq!(session.run_shots(64, &mut resumed), (true, 64));
+            assert_eq!(resumed.0, expected.0);
+        });
+    }
+}

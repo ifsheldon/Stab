@@ -247,7 +247,8 @@ impl Graph {
         targets: &[DemTarget],
         max_weight: usize,
     ) -> AnalysisResult<()> {
-        let (detectors, observables) = toggled_dem_targets(targets)?;
+        let cancellation = self.construction_budget.limits().cancellation().clone();
+        let (detectors, observables) = toggled_dem_targets(targets, &cancellation)?;
         if detectors.is_empty() {
             if !observables.is_empty() {
                 self.distance_1_error_mask = observables;
@@ -300,7 +301,9 @@ impl Graph {
         if !inserted {
             return Ok(());
         }
+        let mut countdown = stab_model::advanced::CancellationCountdown::new();
         for detector in detectors {
+            countdown.tick(&cancellation)?;
             let index = self.node_index_for_detector(detector)?;
             let Some(node) = self.nodes.get_mut(index) else {
                 return Err(AnalysisError::invalid_detector_error_model(format!(
@@ -485,10 +488,14 @@ pub fn find_undetectable_logical_error_with_limits(
     back_map.insert(empty.clone(), empty.clone());
 
     for (node_index, node) in graph.nodes.iter().enumerate() {
+        budget.poll_cancellation()?;
         let source = graph.detector_for_node_index(node_index)?;
         for edge_id in &node.edge_ids {
             let edge = graph.edge(*edge_id)?;
             budget.record_transition()?;
+            budget.poll_cancellation_steps(
+                edge.detectors.len().saturating_add(edge.observables.len()),
+            )?;
             if edge.observables.is_empty() || edge.detectors.iter().next() != Some(&source) {
                 continue;
             }
@@ -519,6 +526,7 @@ pub fn find_undetectable_logical_error_with_limits(
     }
 
     while let Some(current) = queue.pop_front() {
+        budget.poll_cancellation()?;
         let Some(active) = current.detectors.iter().next().copied() else {
             return Err(AnalysisError::invalid_detector_error_model(
                 "hypergraph search reached a state without an active detector",
@@ -534,6 +542,11 @@ pub fn find_undetectable_logical_error_with_limits(
         for edge_id in &node.edge_ids {
             let edge = graph.edge(*edge_id)?;
             budget.record_transition()?;
+            budget.poll_cancellation_steps(
+                current_terms
+                    .saturating_add(edge.detectors.len())
+                    .saturating_add(edge.observables.len()),
+            )?;
             let next_detector_terms = current
                 .detectors
                 .symmetric_difference(&edge.detectors)
@@ -575,7 +588,7 @@ pub fn find_undetectable_logical_error_with_limits(
                         "hypergraph search reached an empty logical state unexpectedly",
                     ));
                 }
-                return backtrack_path(&back_map, &next);
+                return backtrack_path(&back_map, &next, &mut budget);
             }
             queue.push_back(next);
         }
@@ -589,10 +602,12 @@ pub fn find_undetectable_logical_error_with_limits(
 fn backtrack_path(
     back_map: &BTreeMap<SearchState, SearchState>,
     final_state: &SearchState,
+    budget: &mut SearchBudget,
 ) -> AnalysisResult<DetectorErrorModel> {
     let mut out = DetectorErrorModel::new();
     let mut current = final_state.clone();
     loop {
+        budget.poll_cancellation()?;
         let Some(previous) = back_map.get(&current) else {
             return Err(AnalysisError::invalid_detector_error_model(
                 "hypergraph search backtracking reached an unknown state",
@@ -665,10 +680,13 @@ fn no_hypergraph_logical_error_message(
 
 fn toggled_dem_targets(
     targets: &[DemTarget],
+    cancellation: &stab_model::Cancellation,
 ) -> AnalysisResult<(BTreeSet<DemDetectorId>, ObservableMask)> {
     let mut detectors = BTreeSet::new();
     let mut observables = ObservableMask::new();
+    let mut countdown = stab_model::advanced::CancellationCountdown::new();
     for target in targets {
+        countdown.tick(cancellation)?;
         match *target {
             DemTarget::RelativeDetector(detector) => {
                 if !detectors.insert(detector) {

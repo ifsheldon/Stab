@@ -144,6 +144,16 @@ fn units_per_poll() -> u32 {
     UNITS_PER_POLL
 }
 
+/// Maximum work units per inner chunk, scaling with [`units_per_poll`] in unit tests.
+#[inline(always)]
+pub(crate) fn chunk_units() -> usize {
+    #[cfg(test)]
+    if let Some(units) = test_hook::units_per_poll() {
+        return (units as usize / 4).max(1);
+    }
+    CHUNK_UNITS
+}
+
 /// Polls `cancellation`; in this crate's unit tests a hook can stand in for the signal.
 #[inline]
 fn poll(cancellation: &Cancellation) -> Result<(), Cancelled> {

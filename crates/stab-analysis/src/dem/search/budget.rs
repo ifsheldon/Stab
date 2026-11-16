@@ -389,6 +389,16 @@ impl SearchBudget {
         Ok(self.countdown.tick(&self.limits.cancellation)?)
     }
 
+    /// Charges `steps` term-level units of search work against cancellation.
+    #[inline]
+    pub(super) fn poll_cancellation_steps(&mut self, steps: usize) -> AnalysisResult<()> {
+        if steps >= CancellationCountdown::INTERVAL as usize {
+            Ok(self.limits.cancellation.check()?)
+        } else {
+            self.poll_cancellation()
+        }
+    }
+
     pub(super) fn preflight_state_terms(&self, state_terms: usize) -> AnalysisResult<()> {
         let limit = self.limits.max_search_state_terms();
         if state_terms > limit {

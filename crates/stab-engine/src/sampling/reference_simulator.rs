@@ -23,14 +23,45 @@
 //! with numbers measured on the run itself.
 
 use stab_algebra::PauliBasis;
+use stab_model::Cancelled;
+
+use crate::work_poll::{WorkPoll, chunk_units};
 
 mod snapshot;
 
 pub(super) use snapshot::ReferenceStateSnapshot;
 
+/// Tracks simulator work already forwarded to a [`WorkPoll`].
+#[derive(Debug)]
+pub(in crate::sampling) struct SimulatorWork {
+    seen: u64,
+}
+
+impl SimulatorWork {
+    pub(in crate::sampling) fn new(simulator: &InverseTableauSimulator) -> Self {
+        Self {
+            seen: simulator.work(),
+        }
+    }
+
+    #[inline]
+    pub(in crate::sampling) fn charge(
+        &mut self,
+        simulator: &InverseTableauSimulator,
+        poll: &mut WorkPoll<'_>,
+    ) -> Result<(), Cancelled> {
+        let work = simulator.work();
+        let done = work.saturating_sub(self.seen);
+        self.seen = work;
+        poll.charge(usize::try_from(done).unwrap_or(usize::MAX))
+    }
+}
+
 /// Failure while building or driving the reference simulator.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub(super) enum ReferenceSimulatorError {
+    #[error(transparent)]
+    Cancelled(#[from] Cancelled),
     #[error("could not allocate {component} with {items} items")]
     Allocation {
         component: &'static str,
@@ -85,11 +116,11 @@ impl WorkModel {
     /// Fixed cost of one Pauli product: the call, its phase reduction, and the sign update.
     const MULTIPLY_FIXED: u64 = 48;
     /// One word read from each of many rows a row length apart.
-    const STRIDED_WORD: u64 = 5;
+    pub(in crate::sampling) const STRIDED_WORD: u64 = 5;
     /// One `64 x 64` bit-tile transposition, including its scattered row writes.
     const TRANSPOSE_TILE: u64 = 160;
     /// Bookkeeping of one dispatched operation, independent of the state size.
-    const DISPATCH: u64 = 12;
+    pub(in crate::sampling) const DISPATCH: u64 = 12;
     /// Fixed cost of checking one snapshot stabilizer: building its terms and two products.
     const STABILIZER_FIXED: u64 = 600;
     /// One word of fresh snapshot storage: reserving, zeroing, and first touching it.
@@ -448,21 +479,38 @@ impl InverseTableauSimulator {
     }
 
     /// Measures one qubit in `basis`, collapsing a random outcome onto the false branch.
-    pub(super) fn measure(&mut self, qubit: usize, basis: PauliBasis) -> SimResult<bool> {
-        self.measure_product(&[(qubit, basis)])
+    pub(super) fn measure(
+        &mut self,
+        qubit: usize,
+        basis: PauliBasis,
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
+    ) -> SimResult<bool> {
+        self.measure_product(&[(qubit, basis)], poll, work)
     }
 
     /// Measures one qubit and leaves it in the false eigenstate of `basis`.
-    pub(super) fn reset(&mut self, qubit: usize, basis: PauliBasis) -> SimResult<()> {
-        if self.measure(qubit, basis)? {
+    pub(super) fn reset(
+        &mut self,
+        qubit: usize,
+        basis: PauliBasis,
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
+    ) -> SimResult<()> {
+        if self.measure(qubit, basis, poll, work)? {
             self.apply_pauli(qubit, reset_correction(basis))?;
         }
         Ok(())
     }
 
     /// Reports whether measuring the Hermitian product `terms` has a determined outcome.
-    pub(super) fn is_deterministic(&mut self, terms: &[(usize, PauliBasis)]) -> SimResult<bool> {
-        self.observable_into_product(terms)?;
+    pub(super) fn is_deterministic(
+        &mut self,
+        terms: &[(usize, PauliBasis)],
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
+    ) -> SimResult<bool> {
+        self.observable_into_product(terms, poll, work)?;
         let (product_x, _) = self.product.split_at(self.words);
         Ok(first_set_bit(product_x).is_none())
     }
@@ -470,8 +518,13 @@ impl InverseTableauSimulator {
     /// Measures a Hermitian product of single-qubit Paulis on distinct qubits.
     ///
     /// Returns the deterministic outcome, or `false` after collapsing a random outcome.
-    pub(super) fn measure_product(&mut self, terms: &[(usize, PauliBasis)]) -> SimResult<bool> {
-        let log_i = self.observable_into_product(terms)?;
+    pub(super) fn measure_product(
+        &mut self,
+        terms: &[(usize, PauliBasis)],
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
+    ) -> SimResult<bool> {
+        let log_i = self.observable_into_product(terms, poll, work)?;
         let row_words = 2 * self.words;
         let (product_x, _) = self.product.split_at(self.words);
         let Some(pivot) = first_set_bit(product_x) else {
@@ -479,6 +532,8 @@ impl InverseTableauSimulator {
         };
         // multiplier = m * Z_k, the inverse image of the anti-Hermitian collapse generator M S.
         self.multiplier.copy_from_slice(&self.product);
+        self.charge(self.model.row_copy());
+        work.charge(self, poll)?;
         let pivot_word = pivot / u64::BITS as usize;
         let pivot_mask = 1_u64 << (pivot % u64::BITS as usize);
         let pivot_z = self
@@ -496,79 +551,143 @@ impl InverseTableauSimulator {
         anticommuting.clear();
         let flip_count = terms.len().saturating_mul(2);
         let listed = row_count.saturating_add(flip_count);
-        if anticommuting.capacity() < listed {
-            anticommuting.try_reserve_exact(listed).map_err(|_| {
-                ReferenceSimulatorError::Allocation {
-                    component: "collapse rows",
-                    items: listed,
-                }
-            })?;
+        if anticommuting.capacity() < listed && anticommuting.try_reserve_exact(listed).is_err() {
+            self.collapse_rows = anticommuting;
+            return Err(ReferenceSimulatorError::Allocation {
+                component: "collapse rows",
+                items: listed,
+            });
         }
         let mut flips = std::mem::take(&mut self.collapse_flips);
         flips.clear();
-        if flips.capacity() < flip_count {
-            flips.try_reserve_exact(flip_count).map_err(|_| {
-                ReferenceSimulatorError::Allocation {
-                    component: "collapse support rows",
-                    items: flip_count,
-                }
-            })?;
+        if flips.capacity() < flip_count && flips.try_reserve_exact(flip_count).is_err() {
+            self.collapse_rows = anticommuting;
+            self.collapse_flips = flips;
+            return Err(ReferenceSimulatorError::Allocation {
+                component: "collapse support rows",
+                items: flip_count,
+            });
         }
         for (qubit, basis) in terms {
             if basis.z_bit() {
-                flips.push(self.x_row_index(*qubit)?);
+                match self.x_row_index(*qubit) {
+                    Ok(row) => flips.push(row),
+                    Err(error) => {
+                        self.collapse_rows = anticommuting;
+                        self.collapse_flips = flips;
+                        return Err(error);
+                    }
+                }
             }
             if basis.x_bit() {
-                flips.push(self.z_row_index(*qubit)?);
+                match self.z_row_index(*qubit) {
+                    Ok(row) => flips.push(row),
+                    Err(error) => {
+                        self.collapse_rows = anticommuting;
+                        self.collapse_flips = flips;
+                        return Err(error);
+                    }
+                }
             }
         }
         flips.sort_unstable();
-        // A row anticommutes with `m Z_k` when its pivot X bit and its commutation with `m`
-        // disagree; only the rows of `M`'s own support fail to commute with `m`, so those
-        // rows toggle membership of the scanned set.
-        let scanned = self
-            .rows
-            .chunks_exact(row_words)
-            .take(row_count)
-            .enumerate()
-            .filter(|(_, row)| {
-                row.get(pivot_word)
-                    .is_some_and(|word| word & pivot_mask != 0)
-            })
-            .map(|(row, _)| row);
-        symmetric_difference_into(scanned, &flips, &mut anticommuting);
+        // Scan pivot X bits in bounded row chunks so wide collapses observe cancellation.
+        let scan_chunk_rows =
+            (chunk_units() / usize::try_from(WorkModel::STRIDED_WORD).unwrap_or(5)).max(1);
+        self.charge(WorkModel::DISPATCH);
+        let mut scan_result: SimResult<()> = Ok(());
+        {
+            let mut toggle_iter = flips.iter().copied().peekable();
+            let mut next_toggle = |limit: usize| {
+                let toggle = toggle_iter.next_if(|&toggle| toggle <= limit)?;
+                let mut odd = true;
+                while toggle_iter.next_if_eq(&toggle).is_some() {
+                    odd = !odd;
+                }
+                Some((toggle, odd))
+            };
+            let mut row_start = 0;
+            while row_start < row_count {
+                let row_end = (row_start + scan_chunk_rows).min(row_count);
+                let chunk_len = row_end - row_start;
+                self.charge(WorkModel::STRIDED_WORD.saturating_mul(chunk_len as u64));
+                if let Err(cancelled) = work.charge(self, poll) {
+                    scan_result = Err(cancelled.into());
+                    break;
+                }
+                if row_words > 0
+                    && let Some(slice) = self.rows.get(row_start * row_words..row_end * row_words)
+                {
+                    for (offset, row_slice) in slice.chunks_exact(row_words).enumerate() {
+                        if row_slice
+                            .get(pivot_word)
+                            .is_some_and(|word| word & pivot_mask != 0)
+                        {
+                            let row = row_start + offset;
+                            let mut keep = true;
+                            while let Some((toggle, odd)) = next_toggle(row) {
+                                if toggle == row {
+                                    keep ^= odd;
+                                } else if odd {
+                                    anticommuting.push(toggle);
+                                }
+                            }
+                            if keep {
+                                anticommuting.push(row);
+                            }
+                        }
+                    }
+                }
+                row_start = row_end;
+            }
+            if scan_result.is_ok() {
+                while let Some((toggle, odd)) = next_toggle(usize::MAX) {
+                    if odd {
+                        anticommuting.push(toggle);
+                    }
+                }
+            }
+        }
         self.collapse_flips = flips;
-        self.charge(
-            self.model
-                .collapse_scan()
-                .saturating_add(self.model.row_copy())
-                .saturating_add(
-                    self.model
-                        .row_multiply()
-                        .saturating_mul(anticommuting.len() as u64),
-                ),
-        );
-        let mut result = Ok(());
-        for &row in &anticommuting {
-            let row_storage = match row_slice_mut(&mut self.rows, row, row_words) {
-                Ok(storage) => storage,
-                Err(error) => {
-                    result = Err(error);
-                    break;
-                }
-            };
-            let delta = right_multiply(row_storage, &self.multiplier, self.words);
-            let Some(row_sign) = self.signs.get_mut(row) else {
-                result = Err(invariant("collapse row sign is outside the tableau"));
+        if let Err(error) = scan_result {
+            self.collapse_rows = anticommuting;
+            return Err(error);
+        }
+
+        let row_mul_work = self.model.row_multiply();
+        let mul_chunk_rows =
+            (chunk_units() / usize::try_from(row_mul_work.max(1)).unwrap_or(usize::MAX)).max(1);
+        let mut result: SimResult<()> = Ok(());
+        for chunk in anticommuting.chunks(mul_chunk_rows) {
+            self.charge(row_mul_work.saturating_mul(chunk.len() as u64));
+            if let Err(cancelled) = work.charge(self, poll) {
+                result = Err(cancelled.into());
                 break;
-            };
-            match (u8::from(*row_sign) * 2 + multiplier_log_i + delta) & 3 {
-                0 => *row_sign = false,
-                2 => *row_sign = true,
-                _ => {
-                    result = Err(invariant("collapse produced a non-Hermitian row"));
+            }
+            for &row in chunk {
+                let row_storage = match row_slice_mut(&mut self.rows, row, row_words) {
+                    Ok(storage) => storage,
+                    Err(error) => {
+                        result = Err(error);
+                        break;
+                    }
+                };
+                let delta = right_multiply(row_storage, &self.multiplier, self.words);
+                let Some(row_sign) = self.signs.get_mut(row) else {
+                    result = Err(invariant("collapse row sign is outside the tableau"));
                     break;
+                };
+                match (u8::from(*row_sign) * 2 + multiplier_log_i + delta) & 3 {
+                    0 => *row_sign = false,
+                    2 => *row_sign = true,
+                    _ => {
+                        result = Err(invariant("collapse produced a non-Hermitian row"));
+                        break;
+                    }
                 }
+            }
+            if result.is_err() {
+                break;
             }
         }
         self.collapse_rows = anticommuting;
@@ -610,16 +729,35 @@ impl InverseTableauSimulator {
 
     /// Writes `T^-1 M T` for a product of distinct-qubit Paulis into `product`, returning its
     /// phase as a power of `i`.
-    fn observable_into_product(&mut self, terms: &[(usize, PauliBasis)]) -> SimResult<u8> {
-        let log_i = pauli_image_into(
-            &self.rows,
-            &self.signs,
-            self.qubit_count,
-            self.words,
-            terms,
-            &mut self.product,
-        )?;
-        self.charge(pauli_image_work(self.model, terms));
+    fn observable_into_product(
+        &mut self,
+        terms: &[(usize, PauliBasis)],
+        poll: &mut WorkPoll<'_>,
+        work: &mut SimulatorWork,
+    ) -> SimResult<u8> {
+        self.product.fill(0);
+        self.charge(self.model.row_copy());
+        let per_term_units = usize::try_from(self.model.row_multiply().saturating_mul(2).max(1))
+            .unwrap_or(usize::MAX);
+        let chunk_terms = (chunk_units() / per_term_units).max(1);
+        let mut log_i = 0_u8;
+        for chunk in terms.chunks(chunk_terms) {
+            let multiplied = chunk
+                .iter()
+                .map(|(_, basis)| u64::from(basis.x_bit()) + u64::from(basis.z_bit()))
+                .sum::<u64>();
+            self.charge(self.model.row_multiply().saturating_mul(multiplied));
+            work.charge(self, poll)?;
+            let delta = pauli_image_append(
+                &self.rows,
+                &self.signs,
+                self.qubit_count,
+                self.words,
+                chunk,
+                &mut self.product,
+            )?;
+            log_i = (log_i + delta) & 3;
+        }
         Ok(log_i)
     }
 
@@ -710,9 +848,8 @@ impl InverseTableauSimulator {
     }
 }
 
-/// Writes `T^-1 M T` for a product `M` of distinct-qubit Paulis into `product`, returning its
-/// phase as a power of `i`.
-fn pauli_image_into(
+/// Multiplies `T^-1 M_chunk T` into an existing `product` buffer and returns its phase delta.
+fn pauli_image_append(
     rows: &[u64],
     signs: &[bool],
     qubit_count: usize,
@@ -720,7 +857,6 @@ fn pauli_image_into(
     terms: &[(usize, PauliBasis)],
     product: &mut [u64],
 ) -> SimResult<u8> {
-    product.fill(0);
     let row_words = 2 * words;
     let mut log_i = 0_u8;
     for (qubit, basis) in terms {
@@ -742,56 +878,6 @@ fn pauli_image_into(
         log_i &= 3;
     }
     Ok(log_i)
-}
-
-/// Writes the ascending rows that appear in `scanned` or an odd number of times in `toggles`,
-/// but not both, into `output`. Both inputs must be ascending.
-fn symmetric_difference_into(
-    scanned: impl Iterator<Item = usize>,
-    toggles: &[usize],
-    output: &mut Vec<usize>,
-) {
-    let mut toggles = toggles.iter().copied().peekable();
-    // Pops the next distinct toggle up to `limit` with whether it appears an odd number of times.
-    let mut next_toggle = |limit: usize| {
-        let toggle = toggles.next_if(|&toggle| toggle <= limit)?;
-        let mut odd = true;
-        while toggles.next_if_eq(&toggle).is_some() {
-            odd = !odd;
-        }
-        Some((toggle, odd))
-    };
-    for row in scanned {
-        let mut keep = true;
-        while let Some((toggle, odd)) = next_toggle(row) {
-            if toggle == row {
-                keep ^= odd;
-            } else if odd {
-                output.push(toggle);
-            }
-        }
-        if keep {
-            output.push(row);
-        }
-    }
-    while let Some((toggle, odd)) = next_toggle(usize::MAX) {
-        if odd {
-            output.push(toggle);
-        }
-    }
-}
-
-/// Work of [`pauli_image_into`] for `terms`: clearing the product and one row product per
-/// X or Z component.
-fn pauli_image_work(model: WorkModel, terms: &[(usize, PauliBasis)]) -> u64 {
-    let multiplied = terms
-        .iter()
-        .map(|(_, basis)| u64::from(basis.x_bit()) + u64::from(basis.z_bit()))
-        .sum::<u64>();
-    model
-        .row_multiply()
-        .saturating_mul(multiplied)
-        .saturating_add(model.row_copy())
 }
 
 pub(super) fn reset_correction(basis: PauliBasis) -> PauliBasis {
