@@ -9,6 +9,7 @@ mod convert;
 mod detect;
 mod generate; // `gen` is a reserved keyword in edition 2024.
 mod m2d;
+mod memory_ledger;
 mod sample;
 mod sample_dem;
 

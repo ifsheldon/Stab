@@ -6,10 +6,9 @@ use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
 use stab_model::Probability;
 
 use crate::{
-    CliError, MemoryBudgetArg,
+    CliError, MemoryBudgetArg, MemoryLedger,
     input::{read_limited_input_file, read_limited_stdin},
     io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
-    parse_circuit_bytes,
     streaming::OutputSink,
 };
 
@@ -77,17 +76,16 @@ where
             writes_stdout: args.output.is_none(),
         },
     )?;
+    let mut ledger = MemoryLedger::new(args.memory);
+    let input_cap = ledger.stage().input_bytes();
     let mut input_file = io.take_input(FileRole::Input);
     let input_bytes = if let Some(input_file) = input_file.as_mut() {
-        read_limited_input_file(
-            input_file,
-            args.memory.input_bytes(),
-            "analyze_errors input",
-        )?
+        read_limited_input_file(input_file, input_cap, "analyze_errors input")?
     } else {
-        read_limited_stdin(input, args.memory.input_bytes(), "analyze_errors input")?
+        read_limited_stdin(input, input_cap, "analyze_errors input")?
     };
-    let circuit = parse_circuit_bytes(&input_bytes, args.memory)?;
+    let (circuit, circuit_hold) = ledger.parse_circuit(input_bytes)?;
+    let analysis = ledger.stage();
     let dem = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
@@ -98,10 +96,13 @@ where
             block_decomposition_from_introducing_remnant_edges: args
                 .block_decompose_from_introducing_remnant_edges,
             approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
-            memory_budget: args.memory.get(),
+            memory_budget: analysis.get(),
             cancellation: stab_model::Cancellation::never(),
         },
-    )?;
+    )
+    .map_err(|error| analysis.refusal(error))?;
+    drop(circuit);
+    ledger.release(circuit_hold);
     let mut outputs = io.activate()?;
     let mut output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     output.write_with(|mut writer| {

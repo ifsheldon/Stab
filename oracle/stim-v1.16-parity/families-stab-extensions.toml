@@ -70,7 +70,7 @@ name = "circuit_pass_validates_output_and_preserves_typed_diagnostics"
 [[families]]
 id = "stab-extensions.cooperative-cancellation"
 area = "stab-extensions"
-contract = "Library sampling, detection, measurement-to-detection, DEM sampling and replay, error analysis, flattening, feedback inlining, time reversal, flow generation, missing-detector, and detecting-region operations poll a caller-supplied stab_model::Cancellation inside repeat interpretation and between batches, and stop with a typed Cancelled outcome without delivering a partially computed batch."
+contract = "Library sampling, detection, measurement-to-detection, DEM sampling and replay, sampled and unsigned flow checking, Pauli conjugation, error analysis, flattening, feedback inlining, time reversal, flow generation, missing-detector, detecting-region, circuit-pass, logical-error-search, SAT-materialization, and decoder-session operations poll a caller-supplied stab_model::Cancellation by bounded work or between records and batches, and stop with a typed Cancelled outcome without delivering a partially computed batch while keeping interrupted sampling sessions resumable."
 stim_refs = ["doc/usage_command_line.md"]
 status = "divergence"
 owner = "stab-engine"
@@ -82,7 +82,7 @@ status = "verified"
 package = "stab-engine"
 kind = "test"
 target = "cancellation"
-name = "sampling_batch_stops_without_delivering_a_partial_batch"
+name = "sampling_batch_cancellation_delivers_no_partial_batch_and_stays_resumable"
 
 [[families]]
 id = "stab-extensions.decoder-session-layout-and-reuse"
@@ -174,7 +174,7 @@ name = "json_diagnostics_real_process_keeps_machine_output_separate"
 [[families]]
 id = "stab-extensions.memory-budget"
 area = "stab-extensions"
-contract = "Every command that reads, compiles, executes, or materializes work accepts --memory-budget SIZE, an integer byte count with an optional KiB, MiB, or GiB suffix defaulting to 1 GiB, admits each input, parsed model, compiled plan, session, and materialized output against it, and refuses work beyond it with a diagnostic that names the budget and the option; running time is not capped."
+contract = "Every command that reads, compiles, executes, or materializes work accepts --memory-budget SIZE, an integer byte count with an optional KiB, MiB, or GiB suffix defaulting to 1 GiB, shares that budget across the command's active stages while releasing dropped stage storage, and refuses work beyond it with a diagnostic that names the budget, any bytes held by earlier stages, and the option; running time is not capped."
 stim_refs = ["doc/usage_command_line.md"]
 coverage = ["extension:memory-budget"]
 status = "divergence"

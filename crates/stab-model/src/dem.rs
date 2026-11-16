@@ -40,7 +40,7 @@ use crate::{
     AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
     ParseLimits, Probability, RepeatNestingLimit,
 };
-use parser::{parse_dem, parse_unsigned_dem_text_value};
+use parser::{parse_dem, parse_dem_admitted, parse_unsigned_dem_text_value};
 use tag::DemTag;
 type DemArgVec = SmallVec<[f64; 3]>;
 type DemTargetVec = SmallVec<[DemTarget; 5]>;
@@ -67,13 +67,21 @@ impl DetectorErrorModel {
     }
 
     pub fn from_dem_bytes_with_limits(input: &[u8], limits: ParseLimits) -> ModelResult<Self> {
+        Self::from_dem_bytes_admitted(input, limits).map(|(model, _)| model)
+    }
+
+    /// Parses like [`Self::from_dem_bytes_with_limits`] and also returns the retained model bytes
+    /// the parse admitted against `limits`, excluding the `input` bytes it also charged.
+    ///
+    /// A caller that drops `input` after parsing holds about this many bytes for the model.
+    pub fn from_dem_bytes_admitted(input: &[u8], limits: ParseLimits) -> ModelResult<(Self, u64)> {
         let prepared = PreparedModelText::new(input, ModelDialect::DetectorErrorModel, limits)?;
-        let parsed = prepared.resolve(Self::from_dem_str_with_limits(prepared.text(), limits));
-        let mut model = parsed?;
+        let parsed = prepared.resolve(parse_dem_admitted(prepared.text(), limits));
+        let (mut model, model_bytes) = parsed?;
         if let Some(tags) = prepared.into_tags() {
             model.restore_byte_tags(tags)?;
         }
-        Ok(model)
+        Ok((model, model_bytes))
     }
 
     pub fn from_dem_str_with_limits(input: &str, limits: ParseLimits) -> ModelResult<Self> {

@@ -169,6 +169,16 @@ pub(crate) enum CliError {
 
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
+
+    /// A stage's budget refusal while earlier stages of the same command held part of the budget.
+    #[error(
+        "{source}; earlier stages of this command hold {held_bytes} bytes of its {budget_bytes}-byte memory budget"
+    )]
+    CommandMemoryBudget {
+        source: Box<CliError>,
+        held_bytes: u64,
+        budget_bytes: u64,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -229,7 +239,7 @@ const MEMORY_BUDGET_HELP: &str =
     "Raise the budget with `--memory-budget <SIZE>`, for example `--memory-budget 4GiB`.";
 
 /// Every typed budget refusal renders the budget it exceeded as an `N-byte memory budget`.
-fn is_memory_budget_refusal(error: &CliError) -> bool {
+pub(crate) fn is_memory_budget_refusal(error: &CliError) -> bool {
     matches!(error, CliError::InputTooLarge { .. })
         || error.to_string().contains("-byte memory budget")
 }
@@ -296,6 +306,14 @@ fn write_json(writer: &mut impl Write, diagnostic: &JsonDiagnostic) -> io::Resul
 }
 
 fn cli_error_diagnostic(error: &CliError) -> JsonDiagnostic {
+    if let CliError::CommandMemoryBudget {
+        source,
+        held_bytes,
+        budget_bytes,
+    } = error
+    {
+        return command_budget_diagnostic(source, *held_bytes, *budget_bytes);
+    }
     if let Some((parse_error, byte_offset)) = parse_error_with_offset(error) {
         return JsonDiagnostic {
             schema_version: JSON_DIAGNOSTIC_SCHEMA_VERSION,
@@ -334,6 +352,33 @@ fn cli_error_diagnostic(error: &CliError) -> JsonDiagnostic {
         help: cli_error_help(error),
         context: format_error.map_or_else(|| cli_error_context(error), format_error_context),
     }
+}
+
+/// A stage refusal keeps its own code, span, and context, and adds what earlier stages held.
+fn command_budget_diagnostic(
+    source: &CliError,
+    held_bytes: u64,
+    budget_bytes: u64,
+) -> JsonDiagnostic {
+    let mut diagnostic = cli_error_diagnostic(source);
+    diagnostic.message = format!(
+        "{}; earlier stages of this command hold {held_bytes} bytes of its {budget_bytes}-byte memory budget",
+        diagnostic.message
+    );
+    diagnostic.help = Some(MEMORY_BUDGET_HELP);
+    let command_budget = json!({
+        "held_bytes": held_bytes,
+        "budget_bytes": budget_bytes,
+    });
+    match &mut diagnostic.context {
+        Value::Object(fields) => {
+            fields.insert("command_memory_budget".to_owned(), command_budget);
+        }
+        context => {
+            *context = json!({ "command_memory_budget": command_budget });
+        }
+    }
+    diagnostic
 }
 
 fn cli_error_code(error: &CliError) -> &'static str {
@@ -380,6 +425,7 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::IncompletePtb64OutputGroup { .. } => "incomplete-ptb64-output-group",
         CliError::UnknownHelpTopic { .. } => "unknown-help-topic",
         CliError::MeasurementCountOverflow => "measurement-count-overflow",
+        CliError::CommandMemoryBudget { source, .. } => cli_error_code(source),
     }
 }
 
@@ -575,6 +621,7 @@ fn cli_error_context(error: &CliError) -> Value {
         CliError::UnknownHelpTopic { topic } => json!({
             "topic": topic,
         }),
+        CliError::CommandMemoryBudget { source, .. } => cli_error_context(source),
     }
 }
 

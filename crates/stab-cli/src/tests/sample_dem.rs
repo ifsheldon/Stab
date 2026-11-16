@@ -335,3 +335,113 @@ fn sample_dem_record_format_options_reject_the_stim_circuit_format() {
         result.assert_stderr_contains(&["invalid value 'stim'"]);
     }
 }
+
+/// Replay retention under a generous budget, upfront release when the budget fits only the
+/// session, and mid-stream release after a sparse first batch must emit identical outputs and
+/// still reject a malformed trailing record before creating any output file.
+#[test]
+fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
+    use stab_engine::{DemSamplerLimits, DemSamplingCompiler, ShotCount};
+    use stab_model::{DetectorErrorModel, MemoryBudget, ParseLimits};
+
+    const DEM: &[u8] = b"repeat 64 {\n    error(0.5) D0 L0\n    shift_detectors 1\n}\n";
+    const SHOTS: usize = 130;
+
+    let (parsed, _) =
+        DetectorErrorModel::from_dem_bytes_admitted(DEM, ParseLimits::default()).expect("parse");
+    let plan = DemSamplingCompiler::new()
+        .compile(&parsed)
+        .expect("compile");
+    let fits_store = |bytes: u64| {
+        plan.replay_record_store(
+            &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
+            ShotCount::new(SHOTS as u64),
+        )
+        .is_retaining()
+    };
+    let (mut refused, mut retained_budget) = (0_u64, MemoryBudget::DEFAULT.bytes());
+    while refused + 1 < retained_budget {
+        let mid = refused + (retained_budget - refused) / 2;
+        if fits_store(mid) {
+            retained_budget = mid;
+        } else {
+            refused = mid;
+        }
+    }
+    let released_budget = retained_budget - 1;
+
+    let dense_records: String = (0..SHOTS)
+        .map(|shot| {
+            let mut bits: String = (0..64)
+                .map(|bit| if (shot + bit) % 2 == 0 { '1' } else { '0' })
+                .collect();
+            bits.push('\n');
+            bits
+        })
+        .collect();
+    let scratch = Scratch::new();
+    let dense_path = scratch.file("dense.01", &dense_records);
+
+    let run_with_budget = |tag: &str, path: &str, budget: u64| {
+        let out = scratch.path(&format!("{tag}.dets"));
+        let obs = scratch.path(&format!("{tag}.obs"));
+        let err = scratch.path(&format!("{tag}.err"));
+        let budget_arg = format!("--memory-budget={budget}");
+        let shots_arg = SHOTS.to_string();
+        let cli = sample_dem(
+            &[
+                "--replay_err_in",
+                path,
+                "--out",
+                &out,
+                "--obs_out",
+                &obs,
+                "--err_out",
+                &err,
+                "--shots",
+                &shots_arg,
+                &budget_arg,
+            ],
+            DEM,
+        );
+        (cli, out, obs, err)
+    };
+
+    let (kept, kept_out, kept_obs, kept_err) =
+        run_with_budget("kept", &dense_path, retained_budget);
+    kept.assert_ok(b"");
+    let (rewound, rewound_out, rewound_obs, rewound_err) =
+        run_with_budget("rewound", &dense_path, released_budget);
+    rewound.assert_ok(b"");
+    assert_eq!(
+        std::fs::read(&rewound_out).expect("out"),
+        std::fs::read(&kept_out).expect("out")
+    );
+    assert_eq!(
+        std::fs::read(&rewound_obs).expect("obs"),
+        std::fs::read(&kept_obs).expect("obs")
+    );
+    assert_eq!(
+        std::fs::read(&rewound_err).expect("err"),
+        std::fs::read(&kept_err).expect("err")
+    );
+
+    // A sparse first batch releases mid-stream during validation; a malformed final record in
+    // the skipped suffix must still abort before activating any output path.
+    let mut sparse_then_bad: String = format!("{}\n", "0".repeat(64)).repeat(SHOTS - 1);
+    sparse_then_bad.push_str("bad\n");
+    let bad_path = scratch.file("sparse_bad.01", &sparse_then_bad);
+    for (tag, budget) in [
+        ("bad_sparse_midstream", retained_budget),
+        ("bad_released_upfront", released_budget),
+    ] {
+        let (bad, out, obs, err) = run_with_budget(tag, &bad_path, budget);
+        assert_ne!(bad.status, 0, "{tag}");
+        for path in [out, obs, err] {
+            assert!(
+                !std::path::Path::new(&path).exists(),
+                "{tag} created {path}"
+            );
+        }
+    }
+}

@@ -22,6 +22,7 @@ mod diagnostics;
 mod help;
 mod input;
 mod io_plan;
+mod ledger;
 mod sample_dem;
 mod streaming;
 
@@ -36,6 +37,7 @@ use diagnostics::{CliError, ErrorFormatArg, probe_error_format, write_cli_error}
 use help::{HelpArgs, run_help};
 use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo, StandardStreams, StreamUse};
+use ledger::{MemoryLedger, StageBudget};
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_analysis::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
@@ -57,11 +59,14 @@ use stab_records::{
 
 /// Stab-native admission budget shared by every command that reads, compiles, executes, or
 /// materializes work. It bounds memory, not running time.
+///
+/// One budget covers the whole command: a [`MemoryLedger`] gives each stage the budget less what
+/// earlier stages still hold, and releases a stage's bytes as soon as its storage is dropped.
 #[derive(Clone, Copy, Debug, Args)]
 pub(crate) struct MemoryBudgetArg {
-    /// Memory budget in bytes, with an optional KiB, MiB, or GiB suffix. Inputs, parsed models,
-    /// compiled plans, sessions, and materialized outputs are each admitted against it before
-    /// allocation.
+    /// Memory budget in bytes, with an optional KiB, MiB, or GiB suffix, for the whole command.
+    /// Each stage (input text, parsed model, compiled plan, session, materialized output) is
+    /// admitted before allocation against the budget less what earlier stages still hold.
     #[arg(
         long = "memory-budget",
         value_name = "SIZE",
@@ -88,15 +93,10 @@ impl MemoryBudgetArg {
         ParseLimits::default().with_memory_budget(self.memory_budget)
     }
 
-    /// The input byte cap: one past this is refused before the input is retained.
+    /// The input byte cap of a single-stage command: one past this is refused before the input
+    /// is retained.
     pub(crate) const fn input_bytes(self) -> u64 {
         self.memory_budget.bytes()
-    }
-
-    /// The per-record text cap of streamed record inputs. A record's buffer doubles while it is
-    /// framed, so half the budget keeps the buffer itself within the budget.
-    pub(crate) fn record_bytes(self) -> usize {
-        self.memory_budget.bytes_usize() / 2
     }
 }
 
@@ -765,32 +765,36 @@ where
             writes_stdout: args.output.is_none(),
         },
     )?;
+    let mut ledger = MemoryLedger::new(args.memory);
+    let input_cap = ledger.stage().input_bytes();
     let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
-        read_limited_input_file(
-            &mut input_file,
-            args.memory.input_bytes(),
-            "sample circuit input",
-        )?
+        read_limited_input_file(&mut input_file, input_cap, "sample circuit input")?
     } else {
-        read_limited_stdin(input, args.memory.input_bytes(), "sample circuit input")?
+        read_limited_stdin(input, input_cap, "sample circuit input")?
     };
-    let circuit = parse_circuit_bytes(&input_bytes, args.memory)?;
+    let (circuit, circuit_hold) = ledger.parse_circuit(input_bytes)?;
     let reference_sample_loop_policy = if args.skip_loop_folding {
         ReferenceSampleLoopPolicy::Iterate
     } else {
         ReferenceSampleLoopPolicy::Fold
     };
+    // The plan keeps this budget for its sessions and reference sample.
+    let compile = ledger.stage();
     let plan = SamplingCompiler::new()
-        .memory_budget(args.memory.get())
+        .memory_budget(compile.get())
         .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
-        .map_err(CliError::from)?;
+        .map_err(|error| compile.refusal(error))?;
     let skip_reference_sample = args.skip_reference_sample;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
-        one_shot_visible_measurements(&circuit, args.memory.get())?
+        one_shot_visible_measurements(&circuit, ledger.stage())?
     } else {
         None
     };
+    // Execution needs only the plan, so the circuit is released before the session computes
+    // its reference sample and allocates its frame.
+    drop(circuit);
+    ledger.release(circuit_hold);
     let random_policy = args.seed.map_or(RandomPolicy::Entropy, |seed| {
         RandomPolicy::Seeded(Seed::new(seed))
     });
@@ -806,12 +810,12 @@ where
     let run = if !streams_one_partial_batch(shots, lane_width) {
         SampleRun::Session(
             plan.session_with_lane_width(random_policy, reference_mode, lane_width)
-                .map_err(CliError::from)?,
+                .map_err(|error| compile.refusal(error))?,
         )
     } else {
         SampleRun::Streaming(
             plan.streaming_run(random_policy, reference_mode, lane_width, shots)
-                .map_err(CliError::from)?,
+                .map_err(|error| compile.refusal(error))?,
         )
     };
     let output_width = visible_measurements
@@ -834,16 +838,6 @@ where
     }
     write_sample_output(run, shots, visible_measurements.as_deref(), encoder, stdout)
         .map_err(CliError::SampleOutput)
-}
-
-pub(crate) fn parse_circuit_bytes(
-    input: &[u8],
-    memory: MemoryBudgetArg,
-) -> Result<Circuit, CliError> {
-    Ok(Circuit::from_stim_bytes_with_limits(
-        input,
-        memory.parse_limits(),
-    )?)
 }
 
 /// Whether a `sample` or `detect` request runs as one streaming run.
@@ -976,19 +970,21 @@ fn sample_write_io(error: stab_records::RecordWriteError) -> std::io::Error {
 
 fn one_shot_visible_measurements(
     circuit: &Circuit,
-    budget: MemoryBudget,
+    stage: StageBudget,
 ) -> Result<Option<Vec<usize>>, CliError> {
+    let budget = stage.get();
     // Stim v1.16's one-shot tableau CLI path records heralds for feedback but does not write them.
     let Some(visible_count) = one_shot_visible_measurement_count(circuit)? else {
         return Ok(None);
     };
     let required = (visible_count as u128).saturating_mul(size_of::<usize>() as u128);
     if !budget.admits(required) {
-        return Err(stab_engine::SamplingExecutionError::SessionStorageLimit {
-            estimated_bytes: required,
-            limit_bytes: budget.bytes(),
-        }
-        .into());
+        return Err(
+            stage.refusal(stab_engine::SamplingExecutionError::SessionStorageLimit {
+                estimated_bytes: required,
+                limit_bytes: budget.bytes(),
+            }),
+        );
     }
     let mut visible = Vec::new();
     visible.try_reserve_exact(visible_count).map_err(|error| {

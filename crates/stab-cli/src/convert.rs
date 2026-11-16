@@ -10,11 +10,10 @@ use stab_records::{
 };
 
 use crate::{
-    CliError, MemoryBudgetArg, RecordFormatArg,
+    CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg,
     batch_output::record_write_io,
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
-    parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink},
 };
 
@@ -244,14 +243,24 @@ where
     )?;
     io.reject_standard_stream_aliases(streams, stream_use)?;
 
-    let layout = resolve_convert_layout(&args, &mut io)?;
+    let mut ledger = MemoryLedger::new(args.memory);
+    let layout = resolve_convert_layout(&args, &mut io, &mut ledger)?;
     let input_file = io.take_input(FileRole::Input);
     let input_path = input_file.as_ref().map(|input| input.path().to_path_buf());
     let input: Box<dyn Read + '_> = match input_file {
         Some(input_file) => Box::new(input_file),
         None => Box::new(stdin),
     };
-    stream_convert_records(input, input_path.as_deref(), layout, &args, io, stdout)
+    let record_bytes = ledger.stage().record_bytes();
+    stream_convert_records(
+        input,
+        input_path.as_deref(),
+        layout,
+        &args,
+        record_bytes,
+        io,
+        stdout,
+    )
 }
 
 fn run_convert_stim<R, W>(
@@ -264,14 +273,19 @@ where
     R: Read,
     W: Write,
 {
+    let mut ledger = MemoryLedger::new(memory);
+    let input_cap = ledger.stage().input_bytes();
     let input = if let Some(mut input_file) = io.take_input(FileRole::Input) {
-        read_limited_input_file(&mut input_file, memory.input_bytes(), "convert input")?
+        read_limited_input_file(&mut input_file, input_cap, "convert input")?
     } else {
-        read_limited_stdin(stdin, memory.input_bytes(), "convert input")?
+        read_limited_stdin(stdin, input_cap, "convert input")?
     };
-    let circuit = parse_circuit_bytes(&input, memory)?;
-    let output = circuit.to_stim_bytes();
-    write_convert_outputs(io, stdout, &output)
+    let (circuit, _circuit_hold) = ledger.parse_circuit(input)?;
+    // Canonical text streams to the output instead of materializing a second copy.
+    let mut outputs = io.activate()?;
+    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    primary_output.write_with(|mut writer| circuit.write_stim_io(&mut writer))?;
+    primary_output.flush()
 }
 
 fn validate_stim_conversion_options(args: &ConvertArgs) -> Result<(), CliError> {
@@ -300,25 +314,30 @@ fn validate_stim_conversion_options(args: &ConvertArgs) -> Result<(), CliError> 
     Ok(())
 }
 
+/// Reads each side input's counts and releases it before the next one or the records stream.
 fn resolve_convert_layout(
     args: &ConvertArgs,
     io: &mut PendingIo,
+    ledger: &mut MemoryLedger,
 ) -> Result<ConvertLayout, CliError> {
     let mut layout = ConvertLayout::from_explicit_counts(args);
     if args.dem.is_some() {
-        let dem_bytes = read_side_input(io, FileRole::Dem, "convert dem input", args.memory)?;
-        let dem =
-            DetectorErrorModel::from_dem_bytes_with_limits(&dem_bytes, args.memory.parse_limits())?;
+        let dem_bytes = read_side_input(io, FileRole::Dem, "convert dem input", ledger)?;
+        let (dem, dem_hold) = ledger.parse_dem(dem_bytes)?;
         layout.overwrite_dem_counts(&dem)?;
+        drop(dem);
+        ledger.release(dem_hold);
     }
     if args.circuit.is_some() {
         let Some(types) = args.types.as_deref() else {
             return Err(CliError::MissingConvertTypes);
         };
         let circuit_bytes =
-            read_side_input(io, FileRole::Circuit, "convert circuit input", args.memory)?;
-        let circuit = parse_circuit_bytes(&circuit_bytes, args.memory)?;
+            read_side_input(io, FileRole::Circuit, "convert circuit input", ledger)?;
+        let (circuit, circuit_hold) = ledger.parse_circuit(circuit_bytes)?;
         layout.overwrite_circuit_counts(&circuit, types)?;
+        drop(circuit);
+        ledger.release(circuit_hold);
     }
     if !layout.has_included_bits() {
         if args.out_format == RecordFormatArg::Dets {
@@ -363,14 +382,14 @@ fn stream_convert_records<W>(
     input_path: Option<&Path>,
     layout: ConvertLayout,
     args: &ConvertArgs,
+    record_bytes: usize,
     io: PendingIo,
     stdout: &mut W,
 ) -> Result<(), CliError>
 where
     W: Write,
 {
-    let mut reader =
-        convert_record_reader(input, args.in_format, layout, args.memory.record_bytes())?;
+    let mut reader = convert_record_reader(input, args.in_format, layout, record_bytes)?;
     let split_observables = args.obs_output.is_some();
     let mut primary = RecordEncoder::try_new(
         args.out_format.required_record_format()?,
@@ -570,22 +589,12 @@ fn read_side_input(
     io: &mut PendingIo,
     role: FileRole,
     kind: &'static str,
-    memory: MemoryBudgetArg,
+    ledger: &MemoryLedger,
 ) -> Result<Vec<u8>, CliError> {
     let mut input = io.take_input(role).ok_or(CliError::IoPlanInvariant {
         message: "convert preflight omitted a requested side input",
     })?;
-    read_limited_input_file(&mut input, memory.input_bytes(), kind)
-}
-
-fn write_convert_outputs<W>(io: PendingIo, stdout: &mut W, primary: &[u8]) -> Result<(), CliError>
-where
-    W: Write,
-{
-    let mut outputs = io.activate()?;
-    let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
-    primary_output.write_with(|writer| writer.write_all(primary))?;
-    primary_output.flush()
+    read_limited_input_file(&mut input, ledger.stage().input_bytes(), kind)
 }
 
 fn usize_from_u64(value: u64, kind: &'static str) -> Result<usize, CliError> {

@@ -15,11 +15,10 @@ use stab_records::{
 };
 
 use crate::{
-    CliError, MemoryBudgetArg, RecordFormatArg, SampleOutFormatArg,
+    CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
-    parse_circuit_bytes,
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
     streams_one_partial_batch,
 };
@@ -159,21 +158,23 @@ where
         }
         return Ok(());
     }
+    let mut ledger = MemoryLedger::new(args.memory);
+    let input_cap = ledger.stage().input_bytes();
     let input_bytes = if let Some(mut input_file) = io.take_input(FileRole::Input) {
-        read_limited_input_file(
-            &mut input_file,
-            args.memory.input_bytes(),
-            "detect circuit input",
-        )?
+        read_limited_input_file(&mut input_file, input_cap, "detect circuit input")?
     } else {
-        read_limited_stdin(input, args.memory.input_bytes(), "detect circuit input")?
+        read_limited_stdin(input, input_cap, "detect circuit input")?
     };
-    let circuit = parse_circuit_bytes(&input_bytes, args.memory)?;
+    let (circuit, circuit_hold) = ledger.parse_circuit(input_bytes)?;
     let observable_mode = detect_observable_output_mode(&args);
+    // The plan keeps this budget for its sessions.
+    let compile = ledger.stage();
     let plan = DetectionSamplingCompiler::new()
-        .limits(DetectionConversionLimits::new(args.memory.get()))
+        .limits(DetectionConversionLimits::new(compile.get()))
         .compile(&circuit)
-        .map_err(CliError::from)?;
+        .map_err(|error| compile.refusal(error))?;
+    drop(circuit);
+    ledger.release(circuit_hold);
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
@@ -195,14 +196,14 @@ where
     if !streams_one_partial_batch(shots, lane_width) {
         let mut session = plan
             .session_with_lane_width(random_policy(args.seed), lane_width)
-            .map_err(CliError::from)?;
+            .map_err(|error| compile.refusal(error))?;
         return session
             .run(shots, &mut sink)
             .map(|_| ())
             .map_err(map_detection_run_error);
     }
     plan.streaming_run(random_policy(args.seed), lane_width, shots)
-        .map_err(CliError::from)?
+        .map_err(|error| compile.refusal(error))?
         .run(&mut sink)
         .map(|_| ())
         .map_err(map_detection_run_error)
@@ -242,29 +243,41 @@ where
         .ok_or(CliError::IoPlanInvariant {
             message: "m2d preflight omitted its required circuit input",
         })?;
+    let mut ledger = MemoryLedger::new(args.memory);
     let circuit_bytes = read_limited_input_file(
         &mut circuit_file,
-        args.memory.input_bytes(),
+        ledger.stage().input_bytes(),
         "m2d circuit input",
     )?;
-    let circuit = parse_circuit_bytes(&circuit_bytes, args.memory)?;
+    let (circuit, circuit_hold) = ledger.parse_circuit(circuit_bytes)?;
     let circuit = if args.ran_without_feedback {
-        circuit_with_inlined_feedback_with_limits(
+        // Inlining admits its output against the remaining budget but reports no size, so the
+        // parsed circuit's hold stands in for the inlined circuit that replaces it.
+        let inlining = ledger.stage();
+        let inlined = circuit_with_inlined_feedback_with_limits(
             &circuit,
-            FeedbackInliningLimits::new(args.memory.get()),
-        )?
+            FeedbackInliningLimits::new(inlining.get()),
+        )
+        .map_err(|error| inlining.refusal(error))?;
+        drop(circuit);
+        inlined
     } else {
         circuit
     };
     let measurement_input = io.take_input(FileRole::Input);
     let observable_mode = observable_output_mode(args.append_observables);
     let sweep_input = io.take_input(FileRole::Sweep);
+    // The plan keeps this budget for its session.
+    let compile = ledger.stage();
     let plan = MeasurementToDetectionCompiler::new()
-        .limits(DetectionConversionLimits::new(args.memory.get()))
+        .limits(DetectionConversionLimits::new(compile.get()))
         .reference_sample_mode(reference_sample_mode(args.skip_reference_sample))
         .compile(&circuit)
-        .map_err(CliError::from)?;
-    let mut session = plan.session().map_err(CliError::from)?;
+        .map_err(|error| compile.refusal(error))?;
+    drop(circuit);
+    ledger.release(circuit_hold);
+    let mut session = plan.session().map_err(|error| compile.refusal(error))?;
+    let record_bytes = ledger.stage().record_bytes();
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
@@ -280,13 +293,13 @@ where
             file,
             args.in_format,
             plan.measurement_width().get(),
-            args.memory.record_bytes(),
+            record_bytes,
         ),
         None => M2dInput::new(
             Box::new(input),
             None,
             args.in_format,
-            (plan.measurement_width().get(), args.memory.record_bytes()),
+            (plan.measurement_width().get(), record_bytes),
             M2D_MEASUREMENT_KIND,
         ),
     };
@@ -295,7 +308,7 @@ where
             file,
             args.sweep_format,
             plan.sweep_width().get(),
-            args.memory.record_bytes(),
+            record_bytes,
         )
         .into_sweep()
     });

@@ -131,6 +131,12 @@ Strict `01`, `b8`, `r8`, HITS, DETS, and PTB64 codecs live in Stable `stab-recor
 
 Materialized and streaming readers apply HITS and DETS token events directly, so duplicate-heavy input cannot make their scratch grow beyond the declared width. `MeasurementCodecSink`, `DetectionCodecSink`, and `DemSampleCodecSink` are explicitly in-memory sinks over `RecordEncoder`, so their encoded output grows with requested output bytes while their additional scratch stays bounded by one active batch or PTB64 group.
 
+DEM sampled-error replay in `stab-engine` takes batches of at most 64 records and replays each batch along whichever of two paths a cost model estimates to be cheaper; both produce identical records.
+Error-major replay transposes the batch into one 64-record word per unrolled error and walks the compiled program once, XORing each nonzero word into the words of its detectors and observables, skipping repeat iterations whose words are all zero, and iterating a flat repeat body without descending into it per iteration, so its cost per batch follows the unrolled error count and not how many errors each record sets.
+Per-record replay scans each record for set bits and locates each set error through the per-block error spans: the ordinals of one record arrive in increasing order, so each repeat depth gallops forward from the span of the previous error and falls back to a binary search when that span no longer precedes the ordinal, and an error inside a `repeat` resolves its iteration and offset by division by the body's error count, so a record costs its scanned words plus a lookup per set error that is constant within one segment and logarithmic otherwise.
+The cost model weighs the unrolled error count against the record count, the record width, and the set errors of the batch's first record, so dense records and narrow models replay error-major and sparse records of wide models replay per record.
+A caller that validates a whole replay input before writing any output can keep the validated records, already transposed, in a `DemReplayRecordStore` budgeted at what a replay session leaves of the same memory budget, and replay them without decoding the input again; the store holds nothing, and the caller decodes again, when the records would not fit or the first batch is too sparse for error-major replay.
+
 `stab-kernels-simd` has no Stab dependency and accepts only raw word slices.
 
 Product crates must compile on the pinned Stable toolchain without enabling unstable features.
@@ -152,11 +158,14 @@ It does not mean bounded CPU time, which belongs to the caller.
 
 Every materializing or executing operation admits its conservative retained storage against one typed `MemoryBudget` before allocating, advancing randomness, or writing output, and reserves fallibly after admission.
 The budget defaults to one gibibyte, is caller-selectable through each operation's limits type, and is exposed on the CLI as the one Stab-native `--memory-budget` option.
+On the CLI the budget covers the whole command: each stage admits against it less the bytes earlier stages still hold, and the CLI drops input text, parsed models, and side inputs as soon as no later stage reads them and returns their bytes to the budget, as the [resource policy inventory](resource-policy-inventory.md#command-level-cli-budget) details.
 
 Format and representation invariants and the shared 256-level repeat-nesting envelope are not configurable resources.
 Explicit search budgets with budget-exhausted results remain separate caller policy.
 Count caps that only proxy memory and fixed work caps are not used; a compact input that fits the budget runs for as long as its work takes unless the caller cancels it.
-Long-running library operations accept one `stab_model::Cancellation` signal on their limits or options value, poll it at bounded work intervals inside repeat interpretation and between batches, and stop with a typed `Cancelled` outcome.
+Long-running library operations accept one `stab_model::Cancellation` signal on their limits or options value, or for circuit passes on the pass context, poll it at bounded work intervals inside repeat interpretation, search, and between batches, and stop with a typed `Cancelled` outcome; decoder sessions observe the same signal type between records.
+Frame batches, detector conversion, streaming window hand-overs, and the reference simulator space their polls by estimated lane-word or tableau work rather than by instruction count, walking wide target lists in charged chunks, so one instruction of any width stays cancellable within about a millisecond on the development host without reading a clock.
+A circuit-sampling or detection-sampling session delivers a batch only once it is complete and rewinds its random stream when cancellation interrupts a batch, so cancellation, wherever it is observed, returns the resumable `Cancelled` status and a resumed session continues the uninterrupted seeded output byte for byte; only a sink failure or an internal invariant violation poisons a session.
 
 The [resource policy inventory](resource-policy-inventory.md) classifies every remaining limit constant and records each removed one.
 

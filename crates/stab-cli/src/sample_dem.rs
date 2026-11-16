@@ -3,10 +3,9 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use stab_engine::{
-    DemReplaySession, DemSamplerLimits, DemSamplingCompiler, DemSamplingRunError,
-    DemSamplingSession, RandomPolicy, Seed, ShotCount,
+    DemReplayRecordStore, DemReplaySession, DemSamplerLimits, DemSamplingCompiler,
+    DemSamplingRunError, DemSamplingSession, RandomPolicy, Seed, ShotCount,
 };
-use stab_model::{DetectorErrorModel, ParseLimits};
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
     HitsDuplicates, RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader,
@@ -14,7 +13,7 @@ use stab_records::{
 };
 
 use super::{
-    CliError, MemoryBudgetArg, RecordFormatArg, SampleOutFormatArg,
+    CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg, SampleOutFormatArg,
     batch_output::{DemSampleBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
@@ -140,26 +139,38 @@ where
         }
         return Ok(());
     }
+    let mut ledger = MemoryLedger::new(args.memory);
+    let input_cap = ledger.stage().input_bytes();
     let input_bytes = if let Some(input_file) = io.input_mut(FileRole::Input) {
-        read_limited_input_file(input_file, args.memory.input_bytes(), "sample_dem input")?
+        read_limited_input_file(input_file, input_cap, "sample_dem input")?
     } else {
-        read_limited_stdin(input, args.memory.input_bytes(), "sample_dem input")?
+        read_limited_stdin(input, input_cap, "sample_dem input")?
     };
-    let dem = parse_dem_bytes(&input_bytes, args.memory.parse_limits())?;
-    let limits = DemSamplerLimits::new(args.memory.get());
+    let (dem, dem_hold) = ledger.parse_dem(input_bytes)?;
+    // DEM compilation admits nothing and reports no size, so the plan holds no ledger bytes.
     let plan = DemSamplingCompiler::new()
         .compile(&dem)
         .map_err(CliError::from)?;
+    drop(dem);
+    ledger.release(dem_hold);
+    let session_stage = ledger.stage();
+    let limits = DemSamplerLimits::new(session_stage.get());
+    let record_bytes = session_stage.record_bytes();
     let shots = dem_shot_count(args.shots)?;
+    // Records the validation pass keeps, so a replay that fits the budget is decoded once.
+    let mut retained = None;
     if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
         plan.validate_replay(shots).map_err(CliError::from)?;
+        let mut store = plan.replay_record_store(&limits, shots);
         validate_replay_input(
             replay_input,
             args.replay_err_in_format,
             plan.error_count(),
             args.shots,
-            args.memory.record_bytes(),
+            record_bytes,
+            &mut store,
         )?;
+        retained = Some(store).filter(DemReplayRecordStore::is_retaining);
     }
     let encoder = DemSampleBatchEncoder::try_new(
         plan.detector_count(),
@@ -213,22 +224,28 @@ where
     };
     let result = match &mut execution {
         SampleDemExecution::Replay { input, session } => (|| {
-            let mut replay = ReplayInput::new(
-                input,
-                args.replay_err_in_format,
-                plan.error_count(),
-                args.shots,
-                args.memory.record_bytes(),
-            )?;
             let mut transaction = session
                 .start_transaction(&mut sink)
                 .map_err(map_dem_run_error)?;
-            replay.for_each_batch(|batch| {
+            if let Some(retained) = &retained {
                 transaction
-                    .write_packed_batch(batch)
-                    .map(|_| ())
-                    .map_err(map_dem_run_error)
-            })?;
+                    .write_retained(retained)
+                    .map_err(map_dem_run_error)?;
+            } else {
+                ReplayInput::new(
+                    input,
+                    args.replay_err_in_format,
+                    plan.error_count(),
+                    args.shots,
+                    record_bytes,
+                )?
+                .for_each_batch(|batch| {
+                    transaction
+                        .write_packed_batch(batch)
+                        .map(|_| ())
+                        .map_err(map_dem_run_error)
+                })?;
+            }
             transaction.finish().map(|_| ()).map_err(map_dem_run_error)
         })(),
         SampleDemExecution::Sample(session) if args.error_output.is_some() => session
@@ -313,12 +330,6 @@ fn dem_random_policy(seed: Option<u64>) -> RandomPolicy {
     }
 }
 
-fn parse_dem_bytes(input: &[u8], limits: ParseLimits) -> Result<DetectorErrorModel, CliError> {
-    Ok(DetectorErrorModel::from_dem_bytes_with_limits(
-        input, limits,
-    )?)
-}
-
 fn invalid_result_format(message: impl Into<String>) -> CliError {
     CliError::Record(FormatError::new(
         RecordFormatErrorCode::InvalidData,
@@ -348,14 +359,17 @@ fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
 /// Checks that the replay file holds `expected_shots` well-formed records before any output
 /// file is activated, so a malformed replay produces no partial output, then rewinds it.
 ///
-/// This pass decodes into the reader's reusable batch and discards the records: keeping them
-/// for delivery would need storage proportional to the whole replay instead of one batch.
+/// This pass decodes into the reader's reusable batch and hands each batch to `retained`, which
+/// keeps the records while the whole replay fits the budget the session leaves and they are
+/// dense enough to be worth keeping; once it releases, the remaining records are decoded and
+/// discarded, and the replay is decoded again for delivery.
 fn validate_replay_input(
     input: &mut InputFile,
     format: RecordFormatArg,
     error_count: usize,
     expected_shots: usize,
     max_record_bytes: usize,
+    retained: &mut DemReplayRecordStore,
 ) -> Result<(), CliError> {
     {
         let mut replay = ReplayInput::new(
@@ -365,7 +379,7 @@ fn validate_replay_input(
             expected_shots,
             max_record_bytes,
         )?;
-        replay.skip_all()?;
+        replay.retain_or_skip_all(retained)?;
     }
     input.rewind()
 }
@@ -428,14 +442,27 @@ impl<'a> ReplayInput<'a> {
         Ok(())
     }
 
-    /// Decodes and discards every expected record.
-    fn skip_all(&mut self) -> Result<(), CliError> {
+    /// Decodes every expected record, keeping them in `retained` while it admits them and
+    /// discarding the rest once it releases.
+    fn retain_or_skip_all(&mut self, retained: &mut DemReplayRecordStore) -> Result<(), CliError> {
+        let mut decoded = 0_usize;
+        while decoded < self.expected_shots && retained.is_retaining() {
+            let wanted = (self.expected_shots - decoded).min(REPLAY_BATCH_SHOTS);
+            match self.reader.read_batch(wanted) {
+                Ok(Some(batch)) => {
+                    decoded += batch.shot_count();
+                    retained.try_retain(batch).map_err(CliError::from)?;
+                }
+                Ok(None) => return Err(self.shortfall_error(decoded)),
+                Err(error) => return Err(self.read_error(error)),
+            }
+        }
         let skipped = self
             .reader
-            .skip_records(self.expected_shots)
+            .skip_records(self.expected_shots - decoded)
             .map_err(|error| self.read_error(error))?;
-        if skipped < self.expected_shots {
-            return Err(self.shortfall_error(skipped));
+        if decoded + skipped < self.expected_shots {
+            return Err(self.shortfall_error(decoded + skipped));
         }
         Ok(())
     }

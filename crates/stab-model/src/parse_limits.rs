@@ -141,6 +141,7 @@ pub(crate) struct ParseAdmission {
     limits: ParseLimits,
     /// Source bytes plus the retained bytes charged so far; never above the budget.
     charged_bytes: u64,
+    source_bytes: u64,
 }
 
 impl ParseAdmission {
@@ -154,6 +155,7 @@ impl ParseAdmission {
             dialect,
             limits,
             charged_bytes: input_len as u64,
+            source_bytes: input_len as u64,
         })
     }
 
@@ -176,6 +178,11 @@ impl ParseAdmission {
             .into());
         }
         Ok(())
+    }
+
+    /// The retained model bytes charged so far, excluding the source bytes.
+    pub(crate) const fn retained_model_bytes(&self) -> u64 {
+        self.charged_bytes.saturating_sub(self.source_bytes)
     }
 
     fn charge(&mut self, bytes: u128, source_line: usize, span: ByteSpan) -> ModelResult<()> {

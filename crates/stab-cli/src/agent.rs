@@ -17,9 +17,9 @@ use stab_records::{
 };
 
 use crate::{
-    Cli, CliError, FileRole, MemoryBudgetArg, PendingIo, SampleOutFormatArg, StandardStreams,
-    StreamUse, one_shot_visible_measurement_count, parse_stim_u64, parse_stim_usize,
-    read_limited_input_file, read_limited_stdin,
+    Cli, CliError, FileRole, MemoryBudgetArg, MemoryLedger, PendingIo, SampleOutFormatArg,
+    StandardStreams, StreamUse, one_shot_visible_measurement_count, parse_stim_u64,
+    parse_stim_usize, read_limited_input_file, read_limited_stdin,
 };
 
 const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 6;
@@ -182,14 +182,17 @@ where
         validate_ptb64_shot_count(args.shots)?;
     }
 
+    let mut ledger = MemoryLedger::new(args.memory);
     let input = read_agent_input(
         args.input.as_deref(),
         stdin,
         streams,
         "plan sample circuit input",
-        args.memory.input_bytes(),
+        ledger.stage().input_bytes(),
     )?;
-    let circuit = Circuit::from_stim_bytes_with_limits(&input, args.memory.parse_limits())?;
+    let source = SourceReport::new(&input);
+    // Validation admits the same command-level stages `stab sample` would.
+    let (circuit, _circuit_hold) = ledger.parse_circuit(input)?;
     let reference_sample_loop_policy = if args.skip_loop_folding {
         ReferenceSampleLoopPolicy::Iterate
     } else {
@@ -197,11 +200,12 @@ where
     };
 
     // Compilation is intentionally performed for validation. No sampling method is called.
+    let compile = ledger.stage();
     let plan = SamplingCompiler::new()
-        .memory_budget(args.memory.get())
+        .memory_budget(compile.get())
         .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
-        .map_err(CliError::from)?;
+        .map_err(|error| compile.refusal(error))?;
     let request_fingerprint = plan.request_fingerprint();
     let (normalized_loop_policy, loop_policy_effect) =
         reference_loop_policy_report(plan.reference_sample_loop_policy())?;
@@ -229,7 +233,7 @@ where
         schema_version: PLAN_OUTPUT_SCHEMA_VERSION,
         operation: "sample",
         executes: false,
-        source: SourceReport::new(&input),
+        source,
         model: ModelIdentityReport::from(circuit.fingerprint()),
         compilation: CompilationReport {
             request_fingerprint: CompilationFingerprintReport::from(request_fingerprint),

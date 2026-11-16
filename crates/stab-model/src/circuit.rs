@@ -111,19 +111,27 @@ impl Circuit {
     }
 
     pub fn from_stim_bytes_with_limits(input: &[u8], limits: ParseLimits) -> ModelResult<Self> {
+        Self::from_stim_bytes_admitted(input, limits).map(|(circuit, _)| circuit)
+    }
+
+    /// Parses like [`Self::from_stim_bytes_with_limits`] and also returns the retained model
+    /// bytes the parse admitted against `limits`, excluding the `input` bytes it also charged.
+    ///
+    /// A caller that drops `input` after parsing holds about this many bytes for the model.
+    pub fn from_stim_bytes_admitted(input: &[u8], limits: ParseLimits) -> ModelResult<(Self, u64)> {
         let prepared = PreparedModelText::new(input, ModelDialect::StimCircuit, limits)?;
-        let parsed = if prepared.requires_tag_restore() {
-            parser::parse_circuit_unfused(prepared.text(), limits)
-        } else {
-            parser::parse_circuit(prepared.text(), limits)
-        };
-        let parsed = prepared.resolve(parsed);
-        let mut circuit = parsed?;
+        let fuse = !prepared.requires_tag_restore();
+        let parsed = prepared.resolve(parser::parse_circuit_admitted(
+            prepared.text(),
+            limits,
+            fuse,
+        ));
+        let (mut circuit, model_bytes) = parsed?;
         if let Some(tags) = prepared.into_tags() {
             circuit.restore_byte_tags(tags)?;
             circuit.fuse_adjacent_instructions();
         }
-        Ok(circuit)
+        Ok((circuit, model_bytes))
     }
 
     pub fn from_stim_str_with_limits(input: &str, limits: ParseLimits) -> ModelResult<Self> {

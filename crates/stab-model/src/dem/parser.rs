@@ -23,6 +23,16 @@ pub(super) fn parse_dem(input: &str, limits: ParseLimits) -> ModelResult<Detecto
     DemParser::new(input, limits)?.parse()
 }
 
+/// Parses `input` and returns the retained model bytes its admission charged, excluding `input`.
+pub(super) fn parse_dem_admitted(
+    input: &str,
+    limits: ParseLimits,
+) -> ModelResult<(DetectorErrorModel, u64)> {
+    let mut parser = DemParser::new(input, limits)?;
+    let model = parser.parse_block(Vec::new(), 0)?;
+    Ok((model, parser.admission.retained_model_bytes()))
+}
+
 struct DemParser<'a> {
     commands: SourceCommands<'a>,
     input_len: usize,

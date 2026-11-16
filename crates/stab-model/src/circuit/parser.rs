@@ -21,8 +21,15 @@ pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> ModelResult<Cir
     Parser::new(input, limits, true)?.parse()
 }
 
-pub(super) fn parse_circuit_unfused(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
-    Parser::new(input, limits, false)?.parse()
+/// Parses `input` and returns the retained model bytes its admission charged, excluding `input`.
+pub(super) fn parse_circuit_admitted(
+    input: &str,
+    limits: ParseLimits,
+    fuse_instructions: bool,
+) -> ModelResult<(Circuit, u64)> {
+    let mut parser = Parser::new(input, limits, fuse_instructions)?;
+    let circuit = parser.parse_block(false, 0)?;
+    Ok((circuit, parser.admission.retained_model_bytes()))
 }
 
 struct Parser<'a> {
