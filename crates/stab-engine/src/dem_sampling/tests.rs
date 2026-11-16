@@ -429,7 +429,7 @@ fn replay_packed(
 }
 
 #[test]
-fn retained_replay_records_replay_like_packed_deliveries() {
+fn retained_and_bit_plane_replay_records_replay_like_packed_deliveries() {
     let mut rng = SmallRng::seed_from_u64(0x0057_04E5);
     let mut retained_runs = 0_usize;
     for _ in 0..60 {
@@ -446,16 +446,64 @@ fn retained_replay_records_replay_like_packed_deliveries() {
             let (packed, _) = replay_packed(&plan, &records, &limits, false);
             let (stored, retained) = replay_packed(&plan, &records, &limits, true);
             retained_runs += usize::from(retained);
-            for sink in [&packed, &stored] {
+
+            let width = plan.error_count();
+            let shot_count = ShotCount::new(records.len() as u64);
+            let mut plane_store = plan.replay_record_store(&limits, shot_count);
+            let mut plane_session = plan
+                .replay_session_with_limits(shot_count, limits.clone())
+                .expect("plane replay session");
+            let mut plane_direct = CollectingSink::default();
+            let mut tx = plane_session
+                .start_transaction(&mut plane_direct)
+                .expect("plane tx");
+            for chunk in records.chunks(64) {
+                let packed_chunk =
+                    stab_records::PackedShotBatch::from_records(chunk, width).expect("pack");
+                let mut words = vec![u64::MAX; width];
+                packed_chunk
+                    .view()
+                    .copy_rows_into_bit_plane_words(0, chunk.len(), &mut words)
+                    .expect("transpose chunk");
+                // Set inactive lanes in raw storage to verify bit-plane replay masks them out.
+                if chunk.len() < 64 {
+                    let inactive_mask = !((1_u64 << chunk.len()) - 1);
+                    for word in &mut words {
+                        *word |= inactive_mask;
+                    }
+                }
+                let planes =
+                    stab_records::BitPlaneBatchView::try_from_words(&words, 1, chunk.len(), width)
+                        .expect("planes");
+                assert_eq!(
+                    plane_store
+                        .try_retain_bit_planes(planes)
+                        .expect("retain planes"),
+                    DemReplayRetention::Retained
+                );
+                tx.write_bit_plane_batch(planes).expect("write planes");
+            }
+            tx.finish().expect("finish plane tx");
+
+            plane_session.reset().expect("reset plane session");
+            let mut plane_stored = CollectingSink::default();
+            let mut tx2 = plane_session
+                .start_transaction(&mut plane_stored)
+                .expect("plane stored tx");
+            tx2.write_retained(&plane_store)
+                .expect("write retained planes");
+            tx2.finish().expect("finish retained plane tx");
+
+            for sink in [&packed, &stored, &plane_direct, &plane_stored] {
                 assert_eq!(sink.records, expected, "{shots} records for\n{text}");
                 assert_eq!(sink.error_records, records, "{shots} records for\n{text}");
+                assert_eq!(sink.finishes, packed.finishes);
             }
-            assert_eq!(stored.finishes, packed.finishes);
         }
     }
     assert!(
-        retained_runs > 100,
-        "fixture must replay many retained stores"
+        retained_runs >= 300,
+        "every dense and sparse fixture within the default budget must stay retained, got {retained_runs}"
     );
 }
 
@@ -467,11 +515,8 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
         .compile(&model)
         .expect("compile DEM");
     let shots = ShotCount::new(200);
-    let generous = DemSamplerLimits::default();
-    let mut store = plan.replay_record_store(&generous, shots);
-    assert!(store.is_retaining());
-    // Find the smallest budget whose store admits all records: below it, a store is released
-    // from the start and never holds records the session's budget cannot afford.
+    // Find the smallest budget whose store admits at least empty sparse records: below it, a
+    // store is released from the start and never holds records the session's budget cannot afford.
     let fits = |bytes: u64| {
         plan.replay_record_store(
             &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
@@ -479,39 +524,96 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
         )
         .is_retaining()
     };
-    let (mut low, mut high) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
-    while low + 1 < high {
-        let middle = low + (high - low) / 2;
+    let (mut low, mut sparse_min_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
+    while low + 1 < sparse_min_budget {
+        let middle = low + (sparse_min_budget - low) / 2;
         if fits(middle) {
-            high = middle
+            sparse_min_budget = middle;
         } else {
-            low = middle
+            low = middle;
         }
     }
-    assert!(fits(high) && !fits(high - 1));
-    let session_only = DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(high - 1));
+    assert!(fits(sparse_min_budget) && !fits(sparse_min_budget - 1));
+    let session_only =
+        DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget - 1));
     plan.replay_session_with_limits(shots, session_only)
         .expect("a budget one byte short of the store still admits the session");
-    let records = random_records(
+
+    let empty_records = vec![vec![false; plan.error_count()]; 200];
+    let empty_batch =
+        stab_records::PackedShotBatch::from_records(&empty_records, plan.error_count())
+            .expect("pack empty");
+    let mut sparse_store = plan.replay_record_store(
+        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget)),
+        shots,
+    );
+    assert_eq!(
+        sparse_store
+            .try_retain(empty_batch.view())
+            .expect("retain empty sparse"),
+        DemReplayRetention::Retained
+    );
+    assert_eq!(sparse_store.shot_count(), 200);
+
+    let dense_records = random_records(
         &mut SmallRng::seed_from_u64(9),
         200,
         plan.error_count(),
         0.5,
     );
-    let batch =
-        stab_records::PackedShotBatch::from_records(&records, plan.error_count()).expect("pack");
+    let dense_batch =
+        stab_records::PackedShotBatch::from_records(&dense_records, plan.error_count())
+            .expect("pack dense");
+    // At sparse_min_budget (201 * 8 = 1608 free bytes), dense error-major retention (4 * 808 =
+    // 3232 bytes) does not fit and releases on the first batch.
+    let mut dense_too_tight = plan.replay_record_store(
+        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget)),
+        shots,
+    );
     assert_eq!(
-        store.try_retain(batch.view()).expect("retain"),
+        dense_too_tight
+            .try_retain(dense_batch.view())
+            .expect("offer dense to sparse-only budget"),
+        DemReplayRetention::Released
+    );
+
+    let fits_dense = |bytes: u64| {
+        let mut store = plan.replay_record_store(
+            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            shots,
+        );
+        store.try_retain(dense_batch.view()).expect("try dense") == DemReplayRetention::Retained
+    };
+    let (mut dense_low, mut dense_budget) =
+        (sparse_min_budget, stab_model::MemoryBudget::DEFAULT.bytes());
+    while dense_low + 1 < dense_budget {
+        let middle = dense_low + (dense_budget - dense_low) / 2;
+        if fits_dense(middle) {
+            dense_budget = middle;
+        } else {
+            dense_low = middle;
+        }
+    }
+    assert!(fits_dense(dense_budget) && !fits_dense(dense_budget - 1));
+    let mut dense_store = plan.replay_record_store(
+        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(dense_budget)),
+        shots,
+    );
+    assert_eq!(
+        dense_store
+            .try_retain(dense_batch.view())
+            .expect("retain dense at exact error-major budget"),
         DemReplayRetention::Retained
     );
-    assert_eq!(store.shot_count(), 200);
+    assert_eq!(dense_store.shot_count(), 200);
+
     let mut released = plan.replay_record_store(
-        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(high - 1)),
+        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(sparse_min_budget - 1)),
         shots,
     );
     assert_eq!(
         released
-            .try_retain(batch.view())
+            .try_retain(dense_batch.view())
             .expect("offer to released store"),
         DemReplayRetention::Released
     );

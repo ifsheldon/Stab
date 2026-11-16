@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use stab_records::PackedShotBatchView;
+use stab_records::{BitPlaneBatchView, PackedShotBatchView};
 
 use super::{DemSamplingExecutionError, DemSamplingSession, internal_format_error};
 use crate::dem_sampling::program::DemPoll;
@@ -13,6 +13,8 @@ use crate::sampling::session_cancellation;
 pub(super) enum ErrorMajorRecords<'a> {
     /// Records `range` of a shot-major batch, transposed before replay.
     Packed(PackedShotBatchView<'a>, Range<usize>),
+    /// Up to 64 records already represented as bit planes, copied directly without transpose.
+    BitPlanes(BitPlaneBatchView<'a>),
     /// One word per error, already transposed, as a record store retains them.
     Words(&'a [u64]),
 }
@@ -39,6 +41,13 @@ impl DemSamplingSession {
             ErrorMajorRecords::Packed(records, range) => records
                 .copy_rows_into_bit_plane_words(range.start, range.len(), error_planes)
                 .map_err(internal_format_error)?,
+            ErrorMajorRecords::BitPlanes(planes) => {
+                if !error_planes.is_empty() && planes.shot_count() > 0 {
+                    planes
+                        .copy_word_column_into(0, error_planes)
+                        .map_err(internal_format_error)?;
+                }
+            }
             ErrorMajorRecords::Words(words) => {
                 if words.len() != error_planes.len() {
                     return Err(DemSamplingExecutionError::InternalInvariant {

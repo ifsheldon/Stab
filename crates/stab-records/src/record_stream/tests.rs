@@ -344,6 +344,84 @@ fn skipping_and_probing_records_consume_exactly_what_they_report() {
 }
 
 #[test]
+fn ptb64_group_reads_and_packed_skips_avoid_transposed_row_allocations() {
+    let width = 70_usize;
+    let records = (0..192_usize)
+        .map(|shot| {
+            (0..width)
+                .map(|bit| (shot * 5 + bit * 13) % 11 == 0)
+                .collect::<Vec<bool>>()
+        })
+        .collect::<Vec<_>>();
+    let encoded = write_records(&records, RecordFormat::Ptb64).expect("encode ptb64");
+    let mut reader = RecordStreamReader::measurements(
+        Trickle::new(&encoded, 17),
+        RecordFormat::Ptb64,
+        width,
+        TEST_TEXT_LIMIT,
+    );
+    let mut unpacked = Vec::new();
+    while let Some(planes) = reader.read_ptb64_group().expect("read ptb64 group") {
+        assert_eq!(planes.shot_count(), 64);
+        assert_eq!(planes.bits_per_shot(), width);
+        for shot in 0..64 {
+            unpacked.push(
+                (0..width)
+                    .map(|bit| planes.get(bit, shot).unwrap())
+                    .collect::<Vec<bool>>(),
+            );
+        }
+    }
+    assert_eq!(unpacked, records);
+    assert!(reader.batch.is_none());
+    assert!(matches!(
+        &reader.decoder,
+        StreamDecoder::Ptb64(group) if group.rows.is_none()
+    ));
+
+    // Skipping whole PTB64 groups and B8 records also leaves batch and transposed rows unallocated.
+    let mut skip_ptb64 =
+        RecordStreamReader::measurements(&encoded[..], RecordFormat::Ptb64, width, TEST_TEXT_LIMIT);
+    assert_eq!(skip_ptb64.skip_records(128).expect("skip two groups"), 128);
+    assert!(skip_ptb64.batch.is_none());
+    assert!(matches!(
+        &skip_ptb64.decoder,
+        StreamDecoder::Ptb64(group) if group.rows.is_none()
+    ));
+    let tail = skip_ptb64
+        .read_ptb64_group()
+        .expect("third group")
+        .expect("group exists");
+    assert_eq!(tail.get(0, 0), Some(records[128][0]));
+
+    let b8 = write_records(&records, RecordFormat::B8).expect("encode b8");
+    let mut skip_b8 =
+        RecordStreamReader::measurements(&b8[..], RecordFormat::B8, width, TEST_TEXT_LIMIT);
+    assert_eq!(skip_b8.skip_records(190).expect("skip b8"), 190);
+    assert!(skip_b8.batch.is_none());
+    let rest = skip_b8.read_batch(10).expect("tail b8").expect("two left");
+    assert_eq!(rest.shot_count(), 2);
+
+    // Mid-group and non-PTB64 group reads are rejected cleanly.
+    let mut partial =
+        RecordStreamReader::measurements(&encoded[..], RecordFormat::Ptb64, width, TEST_TEXT_LIMIT);
+    let _ = partial.read_batch(10).expect("10 rows");
+    assert!(partial.read_ptb64_group().is_err());
+    assert_eq!(partial.skip_records(54).expect("finish buffered group"), 54);
+    assert!(partial.read_ptb64_group().expect("aligned again").is_some());
+
+    let mut non_ptb64 = RecordStreamReader::measurements(&b8[..], RecordFormat::B8, width, 8);
+    assert!(non_ptb64.read_ptb64_group().is_err());
+
+    let mut zero_width = RecordStreamReader::measurements(&[][..], RecordFormat::Ptb64, 0, 8)
+        .with_framing(RecordFraming::Records);
+    assert_matches!(
+        zero_width.read_ptb64_group(),
+        Err(RecordStreamReadError::ZeroWidthRecords)
+    );
+}
+
+#[test]
 fn transport_failures_surface_as_io_errors() {
     struct FailingTransport;
     impl Read for FailingTransport {

@@ -336,13 +336,15 @@ fn sample_dem_record_format_options_reject_the_stim_circuit_format() {
     }
 }
 
-/// Replay retention under a generous budget, upfront release when the budget fits only the
-/// session, and mid-stream release after a sparse first batch must emit identical outputs and
-/// still reject a malformed trailing record before creating any output file.
+/// Replay retention under a generous budget, sparse retention under a minimal budget, upfront
+/// release when the budget fits only the session, and mid-stream release when later sparse hits
+/// outgrow the budget must emit identical outputs and reject a malformed trailing record before
+/// creating any output file.
 #[test]
 fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
-    use stab_engine::{DemSamplerLimits, DemSamplingCompiler, ShotCount};
+    use stab_engine::{DemReplayRetention, DemSamplerLimits, DemSamplingCompiler, ShotCount};
     use stab_model::{DetectorErrorModel, MemoryBudget, ParseLimits};
+    use stab_records::PackedShotBatch;
 
     const DEM: &[u8] = b"repeat 64 {\n    error(0.5) D0 L0\n    shift_detectors 1\n}\n";
     const SHOTS: usize = 130;
@@ -359,22 +361,42 @@ fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
         )
         .is_retaining()
     };
-    let (mut refused, mut retained_budget) = (0_u64, MemoryBudget::DEFAULT.bytes());
-    while refused + 1 < retained_budget {
-        let mid = refused + (retained_budget - refused) / 2;
+    let (mut refused, mut sparse_budget) = (0_u64, MemoryBudget::DEFAULT.bytes());
+    while refused + 1 < sparse_budget {
+        let mid = refused + (sparse_budget - refused) / 2;
         if fits_store(mid) {
-            retained_budget = mid;
+            sparse_budget = mid;
         } else {
             refused = mid;
         }
     }
-    let released_budget = retained_budget - 1;
+    let released_budget = sparse_budget - 1;
 
-    let dense_records: String = (0..SHOTS)
-        .map(|shot| {
-            let mut bits: String = (0..64)
-                .map(|bit| if (shot + bit) % 2 == 0 { '1' } else { '0' })
-                .collect();
+    let dense_vecs: Vec<Vec<bool>> = (0..SHOTS)
+        .map(|shot| (0..64).map(|bit| (shot + bit) % 2 == 0).collect())
+        .collect();
+    let dense_batch = PackedShotBatch::from_records(&dense_vecs, 64).expect("pack dense");
+    let fits_dense = |bytes: u64| {
+        let mut store = plan.replay_record_store(
+            &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
+            ShotCount::new(SHOTS as u64),
+        );
+        store.try_retain(dense_batch.view()).expect("try dense") == DemReplayRetention::Retained
+    };
+    let (mut dense_refused, mut dense_budget) = (sparse_budget, MemoryBudget::DEFAULT.bytes());
+    while dense_refused + 1 < dense_budget {
+        let mid = dense_refused + (dense_budget - dense_refused) / 2;
+        if fits_dense(mid) {
+            dense_budget = mid;
+        } else {
+            dense_refused = mid;
+        }
+    }
+
+    let dense_records: String = dense_vecs
+        .iter()
+        .map(|row| {
+            let mut bits: String = row.iter().map(|&bit| if bit { '1' } else { '0' }).collect();
             bits.push('\n');
             bits
         })
@@ -408,10 +430,10 @@ fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
     };
 
     let (kept, kept_out, kept_obs, kept_err) =
-        run_with_budget("kept", &dense_path, retained_budget);
+        run_with_budget("kept_dense", &dense_path, dense_budget);
     kept.assert_ok(b"");
     let (rewound, rewound_out, rewound_obs, rewound_err) =
-        run_with_budget("rewound", &dense_path, released_budget);
+        run_with_budget("rewound_dense", &dense_path, released_budget);
     rewound.assert_ok(b"");
     assert_eq!(
         std::fs::read(&rewound_out).expect("out"),
@@ -426,13 +448,46 @@ fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
         std::fs::read(&kept_err).expect("err")
     );
 
-    // A sparse first batch releases mid-stream during validation; a malformed final record in
-    // the skipped suffix must still abort before activating any output path.
-    let mut sparse_then_bad: String = format!("{}\n", "0".repeat(64)).repeat(SHOTS - 1);
-    sparse_then_bad.push_str("bad\n");
-    let bad_path = scratch.file("sparse_bad.01", &sparse_then_bad);
+    let sparse_records: String = (0..SHOTS)
+        .map(|shot| {
+            let mut bits = vec![b'0'; 64];
+            if shot % 3 == 0 {
+                *bits.get_mut(shot % 64).expect("64 bits") = b'1';
+            }
+            bits.push(b'\n');
+            String::from_utf8(bits).expect("ascii")
+        })
+        .collect();
+    let sparse_path = scratch.file("sparse.01", &sparse_records);
+    let (sparse_kept, sparse_kept_out, sparse_kept_obs, sparse_kept_err) =
+        run_with_budget("kept_sparse", &sparse_path, MemoryBudget::DEFAULT.bytes());
+    sparse_kept.assert_ok(b"");
+    let (sparse_rewound, sparse_rewound_out, sparse_rewound_obs, sparse_rewound_err) =
+        run_with_budget("rewound_sparse", &sparse_path, released_budget);
+    sparse_rewound.assert_ok(b"");
+    assert_eq!(
+        std::fs::read(&sparse_rewound_out).expect("out"),
+        std::fs::read(&sparse_kept_out).expect("out")
+    );
+    assert_eq!(
+        std::fs::read(&sparse_rewound_obs).expect("obs"),
+        std::fs::read(&sparse_kept_obs).expect("obs")
+    );
+    assert_eq!(
+        std::fs::read(&sparse_rewound_err).expect("err"),
+        std::fs::read(&sparse_kept_err).expect("err")
+    );
+
+    // At sparse_budget (zero-hit sparse retention only), an empty first batch selects Sparse, a
+    // hit-heavy second batch releases mid-stream, and a malformed final record in the skipped
+    // suffix must still abort before activating any output path.
+    let mut midstream_then_bad = format!("{}\n", "0".repeat(64)).repeat(64);
+    midstream_then_bad.push_str(&format!("{}\n", "1".repeat(64)).repeat(SHOTS - 65));
+    midstream_then_bad.push_str("bad\n");
+    let bad_path = scratch.file("sparse_bad.01", &midstream_then_bad);
     for (tag, budget) in [
-        ("bad_sparse_midstream", retained_budget),
+        ("bad_retained_until_tail", MemoryBudget::DEFAULT.bytes()),
+        ("bad_sparse_midstream", sparse_budget),
         ("bad_released_upfront", released_budget),
     ] {
         let (bad, out, obs, err) = run_with_budget(tag, &bad_path, budget);

@@ -211,24 +211,31 @@ fn pack_zero_one_bytes(bits: &[u8], words: &mut [u64]) -> bool {
     valid
 }
 
-/// Reads one PTB64 group and transposes it into 64 shot-major rows.
-pub(super) fn ptb64_group(frame: &[u8], width: usize, group: &mut Ptb64Group) -> RecordResult<()> {
-    group.plane_words.clear();
-    group
-        .plane_words
-        .try_reserve_exact(width)
-        .map_err(|error| {
-            FormatError::invalid_data(format!(
-                "ptb64 reader could not reserve {width} result planes: {error}"
-            ))
-        })?;
-    group.plane_words.extend(
+/// Reads one PTB64 group into one 64-shot word per result bit without transposing rows.
+pub(super) fn ptb64_plane_words(
+    frame: &[u8],
+    width: usize,
+    plane_words: &mut Vec<u64>,
+) -> RecordResult<()> {
+    plane_words.clear();
+    plane_words.try_reserve_exact(width).map_err(|error| {
+        FormatError::invalid_data(format!(
+            "ptb64 reader could not reserve {width} result planes: {error}"
+        ))
+    })?;
+    plane_words.extend(
         frame
             .as_chunks::<WORD_BYTES>()
             .0
             .iter()
             .map(|word_bytes| u64::from_le_bytes(*word_bytes)),
     );
+    Ok(())
+}
+
+/// Reads one PTB64 group and transposes it into 64 shot-major rows.
+pub(super) fn ptb64_group(frame: &[u8], width: usize, group: &mut Ptb64Group) -> RecordResult<()> {
+    ptb64_plane_words(frame, width, &mut group.plane_words)?;
     if group.rows.is_none() {
         group.rows = Some(PackedShotBatch::zeros(WORD_BITS, width)?);
     }

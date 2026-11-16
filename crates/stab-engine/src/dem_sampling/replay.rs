@@ -124,6 +124,72 @@ impl ErrorRecordBits for BitSlice<'_> {
     }
 }
 
+/// One replayed sampled-error record represented as strictly increasing set-error ordinals.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct SparseErrorRecord<'a> {
+    error_count: usize,
+    hits: &'a [usize],
+}
+
+impl<'a> SparseErrorRecord<'a> {
+    pub(super) const fn new(error_count: usize, hits: &'a [usize]) -> Self {
+        Self { error_count, hits }
+    }
+
+    pub(super) const fn hits(self) -> &'a [usize] {
+        self.hits
+    }
+}
+
+impl ErrorRecordBits for SparseErrorRecord<'_> {
+    fn bit_len(&self) -> usize {
+        self.error_count
+    }
+
+    fn try_for_each_word(
+        &self,
+        limit: usize,
+        poll: &mut DemPoll<'_>,
+        mut visit: impl FnMut(&mut DemPoll<'_>, usize, u64) -> DemResult<()>,
+    ) -> DemResult<()> {
+        if limit > self.error_count {
+            return Err(record_scan_error());
+        }
+        poll.tick()?;
+        let mut index = 0_usize;
+        let mut words_emitted = 0_usize;
+        while let Some(&first_hit) = self.hits.get(index) {
+            if first_hit >= limit {
+                break;
+            }
+            let word_index = first_hit / RECORD_WORD_BITS;
+            let word_start = word_index
+                .checked_mul(RECORD_WORD_BITS)
+                .ok_or_else(error_record_cursor_overflow_error)?;
+            let mut word = 1_u64 << (first_hit % RECORD_WORD_BITS);
+            index += 1;
+            while let Some(&hit) = self.hits.get(index) {
+                if hit >= limit || hit / RECORD_WORD_BITS != word_index {
+                    break;
+                }
+                word |= 1_u64 << (hit % RECORD_WORD_BITS);
+                index += 1;
+            }
+            words_emitted += 1;
+            if words_emitted.is_multiple_of(WORDS_PER_TICK) {
+                poll.tick()?;
+            }
+            visit(poll, word_start, word)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn bit(&self, index: usize) -> Option<bool> {
+        (index < self.error_count).then(|| self.hits.binary_search(&index).is_ok())
+    }
+}
+
 /// Applies every error set in `error_record` to `record`, visiting only the set bits.
 ///
 /// Returns the number of record bits consumed, which is the block's error count. Errors are

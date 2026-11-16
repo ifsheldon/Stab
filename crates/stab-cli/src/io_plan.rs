@@ -97,6 +97,18 @@ impl InputFile {
             })
     }
 
+    pub(crate) fn regular_file_len(&self) -> Result<Option<u64>, CliError> {
+        let metadata = self
+            .identity
+            .as_file()
+            .metadata()
+            .map_err(|source| CliError::ReadPath {
+                path: self.path.clone(),
+                source,
+            })?;
+        Ok(metadata.file_type().is_file().then_some(metadata.len()))
+    }
+
     /// The opened file itself, whose reads fill uninitialized buffer capacity directly.
     pub(crate) fn file_mut(&mut self) -> &mut File {
         self.identity.as_file_mut()

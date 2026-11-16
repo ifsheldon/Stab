@@ -134,9 +134,9 @@ fn replay_block(
                 let start_shift = detector_shift
                     .checked_add(repeat.start_detector_shift)
                     .ok_or_else(detector_shift_overflow_error)?;
-                if let Some(errors) = flat_errors(&repeat.body) {
+                if is_flat_error_block(&repeat.body) {
                     replay_flat_repeat(
-                        &errors,
+                        &repeat.body.operations,
                         repeat.body.detector_shift,
                         start_shift,
                         repeat_words,
@@ -168,38 +168,35 @@ fn replay_block(
     }
 }
 
-/// The errors of a block made only of errors, in order, or `None` when it holds a repeat.
-fn flat_errors(block: &DemSampleBlock) -> Option<Vec<&DemSampleError>> {
-    if block.operations.len() != block.error_count {
-        return None;
-    }
-    block
-        .operations
-        .iter()
-        .map(|operation| match operation {
-            DemSampleOperation::Error(error) => Some(error),
-            DemSampleOperation::Repeat(_) => None,
-        })
-        .collect()
+/// Whether `block` contains only flat error operations and no nested repeats.
+fn is_flat_error_block(block: &DemSampleBlock) -> bool {
+    block.operations.len() == block.error_count
+        && block
+            .operations
+            .iter()
+            .all(|operation| matches!(operation, DemSampleOperation::Error(_)))
 }
 
-/// Replays every iteration of a repeat whose body is the flat error list `errors`, without
-/// descending into the body block once per iteration.
+/// Replays every iteration of a repeat whose body holds only flat error operations, without
+/// descending into the body block once per iteration or allocating a scratch slice.
 fn replay_flat_repeat(
-    errors: &[&DemSampleError],
+    operations: &[DemSampleOperation],
     body_detector_shift: u64,
     start_shift: u64,
     repeat_words: &[u64],
     targets: &mut Targets<'_>,
     poll: &mut DemPoll<'_>,
 ) -> DemResult<()> {
-    for (iteration, iteration_words) in (0_u64..).zip(repeat_words.chunks_exact(errors.len())) {
+    for (iteration, iteration_words) in (0_u64..).zip(repeat_words.chunks_exact(operations.len())) {
         poll.tick()?;
         let mut shift = None;
-        for (error, word) in errors.iter().zip(iteration_words) {
+        for (operation, word) in operations.iter().zip(iteration_words) {
             if *word == 0 {
                 continue;
             }
+            let DemSampleOperation::Error(error) = operation else {
+                return Err(error_words_escape_error());
+            };
             let shift = match shift {
                 Some(shift) => shift,
                 None => *shift.insert(

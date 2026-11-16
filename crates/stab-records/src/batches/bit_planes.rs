@@ -305,6 +305,12 @@ impl<'a> BitPlaneBatchView<'a> {
         match self.storage {
             PlaneStorage::Words {
                 words,
+                words_per_plane: 1,
+            } if word_index == 0 && mask == u64::MAX => {
+                target.copy_from_slice(words);
+            }
+            PlaneStorage::Words {
+                words,
                 words_per_plane,
             } => {
                 let planes = words.chunks_exact(words_per_plane);

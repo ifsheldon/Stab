@@ -75,10 +75,30 @@ impl SessionBatch {
             }
         })?;
         match error_record {
-            ReplayRecord::Dense(bits) => sampled_errors.copy_shot_from_bools(shot_index, bits),
-            ReplayRecord::Packed(bits) => sampled_errors.copy_shot_from_bits(shot_index, bits),
+            ReplayRecord::Dense(bits) => sampled_errors
+                .copy_shot_from_bools(shot_index, bits)
+                .map_err(internal_format_error),
+            ReplayRecord::Packed(bits) => sampled_errors
+                .copy_shot_from_bits(shot_index, bits)
+                .map_err(internal_format_error),
+            ReplayRecord::Sparse(sparse) => {
+                let mut words = sampled_errors
+                    .shot_words_mut(shot_index)
+                    .map_err(internal_format_error)?;
+                words.fill(0);
+                for &hit in sparse.hits() {
+                    let word = words.get_mut(hit / (u64::BITS as usize)).ok_or_else(|| {
+                        DemSamplingExecutionError::InternalInvariant {
+                            message: format!(
+                                "sparse replay hit {hit} escaped its sampled-error row"
+                            ),
+                        }
+                    })?;
+                    *word |= 1_u64 << (hit % (u64::BITS as usize));
+                }
+                Ok(())
+            }
         }
-        .map_err(internal_format_error)
     }
 
     pub(super) fn view(
