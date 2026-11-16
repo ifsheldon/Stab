@@ -257,3 +257,36 @@ fn appender_identity_matches_the_tableau_identity_and_its_admission() {
         }
     }
 }
+
+#[test]
+fn appender_entry_and_sign_queries_match_tableau_outputs() {
+    let mut rng = SmallRng::seed_from_u64(23);
+    for width in [0, 1, 31, 32, 33, 64, 65, 130] {
+        let tableau = Tableau::random(width, &mut rng).unwrap();
+        let appender = TableauAppender::new(tableau.clone()).unwrap();
+        for input in 0..width {
+            let x_out = tableau.x_output(input).unwrap();
+            let z_out = tableau.z_output(input).unwrap();
+            assert_eq!(appender.x_output_sign(input).unwrap(), x_out.sign());
+            assert_eq!(appender.z_output_sign(input).unwrap(), z_out.sign());
+            for output in 0..width {
+                assert_eq!(
+                    appender.x_output_basis(input, output).unwrap(),
+                    x_out.get(output).unwrap(),
+                );
+                assert_eq!(
+                    appender.z_output_basis(input, output).unwrap(),
+                    z_out.get(output).unwrap(),
+                );
+            }
+        }
+        let oob = Some(StabilizerError::TableauIndexOutOfRange {
+            index: width,
+            len: width,
+        });
+        assert_eq!(appender.x_output_sign(width).err(), oob);
+        assert_eq!(appender.z_output_sign(width).err(), oob);
+        assert_eq!(appender.x_output_basis(width, 0).err(), oob);
+        assert_eq!(appender.z_output_basis(0, width).err(), oob);
+    }
+}

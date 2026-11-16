@@ -1,7 +1,135 @@
-use stab_algebra::{PauliBasis, PauliSign, Tableau};
-use stab_model::{Circuit, GateKind, QubitId, Target};
+use stab_algebra::{PauliBasis, PauliSign, Tableau, TableauAppender};
+use stab_model::{Circuit, Gate, GateKind, QubitId, Target};
 
 use crate::{AnalysisError, AnalysisResult, gate_tableau};
+
+struct SynthesisContext {
+    remaining: TableauAppender,
+    circuit: Circuit,
+    pending_gate: Option<Gate>,
+    pending_targets: Vec<Target>,
+    qubit_targets: Vec<Target>,
+    h_gate: Gate,
+    h_tableau: Tableau,
+    s_gate: Gate,
+    s_tableau: Tableau,
+    cx_gate: Gate,
+    cx_tableau: Tableau,
+}
+
+impl SynthesisContext {
+    fn new(tableau: &Tableau) -> AnalysisResult<Self> {
+        let inverse = tableau.inverse().map_err(map_tableau_error)?;
+        let num_qubits = inverse.len();
+        let remaining = TableauAppender::new(inverse).map_err(map_tableau_error)?;
+        let qubit_targets = (0..num_qubits)
+            .map(qubit_target)
+            .collect::<AnalysisResult<Vec<_>>>()?;
+        let h_gate = GateKind::H.gate();
+        let s_gate = GateKind::S.gate();
+        let cx_gate = GateKind::CX.gate();
+        Ok(Self {
+            remaining,
+            circuit: Circuit::new(),
+            pending_gate: None,
+            pending_targets: Vec::new(),
+            qubit_targets,
+            h_tableau: gate_tableau(h_gate)?,
+            h_gate,
+            s_tableau: gate_tableau(s_gate)?,
+            s_gate,
+            cx_tableau: gate_tableau(cx_gate)?,
+            cx_gate,
+        })
+    }
+
+    #[inline]
+    fn x_code(&self, input: usize, output: usize) -> AnalysisResult<u8> {
+        let basis = self
+            .remaining
+            .x_output_basis(input, output)
+            .map_err(map_tableau_error)?;
+        Ok(basis_code(basis))
+    }
+
+    #[inline]
+    fn z_code(&self, input: usize, output: usize) -> AnalysisResult<u8> {
+        let basis = self
+            .remaining
+            .z_output_basis(input, output)
+            .map_err(map_tableau_error)?;
+        Ok(basis_code(basis))
+    }
+
+    fn flush_pending(&mut self) -> AnalysisResult<()> {
+        let Some(gate) = self.pending_gate.take() else {
+            return Ok(());
+        };
+        let targets = std::mem::take(&mut self.pending_targets);
+        self.circuit
+            .append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
+                gate,
+                Vec::new(),
+                targets,
+                None,
+            )?);
+        Ok(())
+    }
+
+    fn push_gate_targets(&mut self, gate: Gate, targets: &[Target]) -> AnalysisResult<()> {
+        if self.pending_gate != Some(gate) {
+            self.flush_pending()?;
+            self.pending_gate = Some(gate);
+        }
+        self.pending_targets.extend_from_slice(targets);
+        Ok(())
+    }
+
+    fn apply_h(&mut self, qubit: usize) -> AnalysisResult<()> {
+        self.remaining
+            .append(&self.h_tableau, &[qubit])
+            .map_err(map_tableau_error)?;
+        let target = self.target(qubit)?;
+        self.push_gate_targets(self.h_gate, &[target])
+    }
+
+    fn apply_s(&mut self, qubit: usize) -> AnalysisResult<()> {
+        self.remaining
+            .append(&self.s_tableau, &[qubit])
+            .map_err(map_tableau_error)?;
+        let target = self.target(qubit)?;
+        self.push_gate_targets(self.s_gate, &[target])
+    }
+
+    fn apply_cx(&mut self, control: usize, target: usize) -> AnalysisResult<()> {
+        self.remaining
+            .append(&self.cx_tableau, &[control, target])
+            .map_err(map_tableau_error)?;
+        let first = self.target(control)?;
+        let second = self.target(target)?;
+        self.push_gate_targets(self.cx_gate, &[first, second])
+    }
+
+    #[inline]
+    fn target(&self, qubit: usize) -> AnalysisResult<Target> {
+        self.qubit_targets.get(qubit).cloned().ok_or_else(|| {
+            AnalysisError::invalid_tableau_conversion(format!(
+                "tableau synthesis qubit index {qubit} is outside width {}",
+                self.qubit_targets.len()
+            ))
+        })
+    }
+}
+
+#[inline]
+const fn basis_code(basis: PauliBasis) -> u8 {
+    match basis {
+        PauliBasis::I => 0,
+        PauliBasis::X => 1,
+        PauliBasis::Z => 2,
+        PauliBasis::Y => 3,
+    }
+}
 
 /// Synthesizes a Clifford circuit using only `H`, `S`, and `CX` instructions.
 ///
@@ -14,15 +142,14 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
         ));
     }
 
-    let mut remaining = tableau.inverse().map_err(map_tableau_error)?;
-    let mut circuit = Circuit::new();
-    let num_qubits = remaining.len();
+    let mut ctx = SynthesisContext::new(tableau)?;
+    let num_qubits = ctx.remaining.len();
 
     for column in 0..num_qubits {
         let pivot = (column..num_qubits)
             .find(|&row| {
-                let x = output_code(&remaining, PauliBasis::X, column, row);
-                let z = output_code(&remaining, PauliBasis::Z, column, row);
+                let x = ctx.x_code(column, row);
+                let z = ctx.z_code(column, row);
                 matches!((x, z), (Ok(x), Ok(z)) if x != 0 && z != 0 && x != z)
             })
             .ok_or_else(|| {
@@ -32,152 +159,104 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
             })?;
 
         if pivot != column {
-            apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[pivot, column])?;
-            apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[column, pivot])?;
-            apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[pivot, column])?;
+            ctx.apply_cx(pivot, column)?;
+            ctx.apply_cx(column, pivot)?;
+            ctx.apply_cx(pivot, column)?;
         }
 
-        if output_code(&remaining, PauliBasis::Z, column, column)? == 3 {
-            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
+        if ctx.z_code(column, column)? == 3 {
+            ctx.apply_s(column)?;
         }
-        if output_code(&remaining, PauliBasis::Z, column, column)? != 2 {
-            apply_gate(&mut remaining, &mut circuit, GateKind::H, &[column])?;
+        if ctx.z_code(column, column)? != 2 {
+            ctx.apply_h(column)?;
         }
-        if output_code(&remaining, PauliBasis::X, column, column)? != 1 {
-            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
-        }
-
-        for row in column + 1..num_qubits {
-            if output_code(&remaining, PauliBasis::X, column, row)? == 3 {
-                apply_gate(&mut remaining, &mut circuit, GateKind::S, &[row])?;
-            }
-        }
-        for row in column + 1..num_qubits {
-            if output_code(&remaining, PauliBasis::X, column, row)? == 2 {
-                apply_gate(&mut remaining, &mut circuit, GateKind::H, &[row])?;
-            }
-        }
-        for row in column + 1..num_qubits {
-            if output_code(&remaining, PauliBasis::X, column, row)? != 0 {
-                apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[column, row])?;
-            }
+        if ctx.x_code(column, column)? != 1 {
+            ctx.apply_s(column)?;
         }
 
         for row in column + 1..num_qubits {
-            if output_code(&remaining, PauliBasis::Z, column, row)? == 3 {
-                apply_gate(&mut remaining, &mut circuit, GateKind::S, &[row])?;
+            if ctx.x_code(column, row)? == 3 {
+                ctx.apply_s(row)?;
             }
         }
         for row in column + 1..num_qubits {
-            if output_code(&remaining, PauliBasis::Z, column, row)? == 1 {
-                apply_gate(&mut remaining, &mut circuit, GateKind::H, &[row])?;
+            if ctx.x_code(column, row)? == 2 {
+                ctx.apply_h(row)?;
             }
         }
         for row in column + 1..num_qubits {
-            if output_code(&remaining, PauliBasis::Z, column, row)? != 0 {
-                apply_gate(&mut remaining, &mut circuit, GateKind::CX, &[row, column])?;
+            if ctx.x_code(column, row)? != 0 {
+                ctx.apply_cx(column, row)?;
+            }
+        }
+
+        for row in column + 1..num_qubits {
+            if ctx.z_code(column, row)? == 3 {
+                ctx.apply_s(row)?;
+            }
+        }
+        for row in column + 1..num_qubits {
+            if ctx.z_code(column, row)? == 1 {
+                ctx.apply_h(row)?;
+            }
+        }
+        for row in column + 1..num_qubits {
+            if ctx.z_code(column, row)? != 0 {
+                ctx.apply_cx(row, column)?;
             }
         }
     }
 
     let negative_zs = (0..num_qubits)
         .map(|column| {
-            remaining
-                .z_output(column)
-                .map(|output| output.sign() == PauliSign::Minus)
+            ctx.remaining
+                .z_output_sign(column)
+                .map(|sign| sign == PauliSign::Minus)
                 .map_err(map_tableau_error)
         })
         .collect::<AnalysisResult<Vec<_>>>()?;
     for (column, negative) in negative_zs.iter().copied().enumerate() {
         if negative {
-            apply_gate(&mut remaining, &mut circuit, GateKind::H, &[column])?;
+            ctx.apply_h(column)?;
         }
     }
     for (column, negative) in negative_zs.iter().copied().enumerate() {
         if negative {
-            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
-            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
+            ctx.apply_s(column)?;
+            ctx.apply_s(column)?;
         }
     }
     for (column, negative) in negative_zs.into_iter().enumerate() {
         if negative {
-            apply_gate(&mut remaining, &mut circuit, GateKind::H, &[column])?;
+            ctx.apply_h(column)?;
         }
     }
     for column in 0..num_qubits {
-        if remaining
-            .x_output(column)
+        if ctx
+            .remaining
+            .x_output_sign(column)
             .map_err(map_tableau_error)?
-            .sign()
             == PauliSign::Minus
         {
-            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
-            apply_gate(&mut remaining, &mut circuit, GateKind::S, &[column])?;
+            ctx.apply_s(column)?;
+            ctx.apply_s(column)?;
         }
     }
 
-    if circuit.count_qubits() < num_qubits && num_qubits != 0 {
-        apply_gate(&mut remaining, &mut circuit, GateKind::H, &[num_qubits - 1])?;
-        apply_gate(&mut remaining, &mut circuit, GateKind::H, &[num_qubits - 1])?;
+    ctx.flush_pending()?;
+    if ctx.circuit.count_qubits() < num_qubits && num_qubits != 0 {
+        ctx.apply_h(num_qubits - 1)?;
+        ctx.apply_h(num_qubits - 1)?;
+        ctx.flush_pending()?;
     }
 
-    let identity = Tableau::identity(num_qubits).map_err(map_tableau_error)?;
-    if remaining != identity {
+    let final_tableau = ctx.remaining.finish().map_err(map_tableau_error)?;
+    if !final_tableau.is_identity() {
         return Err(AnalysisError::invalid_tableau_conversion(
             "tableau synthesis did not eliminate every generator",
         ));
     }
-    Ok(circuit)
-}
-
-fn output_code(
-    tableau: &Tableau,
-    input_basis: PauliBasis,
-    input: usize,
-    output: usize,
-) -> AnalysisResult<u8> {
-    let pauli = match input_basis {
-        PauliBasis::X => tableau.x_output(input).map_err(map_tableau_error)?,
-        PauliBasis::Z => tableau.z_output(input).map_err(map_tableau_error)?,
-        PauliBasis::I | PauliBasis::Y => {
-            return Err(AnalysisError::invalid_tableau_conversion(
-                "tableau synthesis requested a noncanonical generator basis",
-            ));
-        }
-    };
-    let basis = pauli.get(output).ok_or_else(|| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "tableau synthesis output index {output} is outside width {}",
-            tableau.len()
-        ))
-    })?;
-    Ok(u8::from(basis.x_bit()) + 2 * u8::from(basis.z_bit()))
-}
-
-fn apply_gate(
-    remaining: &mut Tableau,
-    circuit: &mut Circuit,
-    gate: GateKind,
-    targets: &[usize],
-) -> AnalysisResult<()> {
-    let gate = gate.gate();
-    let local = gate_tableau(gate)?;
-    remaining
-        .append(&local, targets)
-        .map_err(map_tableau_error)?;
-
-    let targets = targets
-        .iter()
-        .copied()
-        .map(qubit_target)
-        .collect::<AnalysisResult<Vec<_>>>()?;
-    circuit.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
-        gate,
-        Vec::new(),
-        targets,
-        None,
-    )?);
-    Ok(())
+    Ok(ctx.circuit)
 }
 
 fn qubit_target(index: usize) -> AnalysisResult<Target> {

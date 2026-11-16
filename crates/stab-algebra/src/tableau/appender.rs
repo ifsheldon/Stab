@@ -14,7 +14,7 @@ use crate::budget::{
     AlgebraMemoryBudget, StabilizerResource, tableau_bytes, try_filled, try_zeroed_words,
     words_for_bits,
 };
-use crate::{PauliPhase, StabilizerError, StabilizerResult};
+use crate::{PauliBasis, PauliPhase, PauliSign, StabilizerError, StabilizerResult};
 
 const WORD_BITS: usize = u64::BITS as usize;
 /// Compiled small gates remembered by an appender, in two-way sets indexed by a hash of the
@@ -132,6 +132,83 @@ impl TableauAppender {
 
     pub fn is_empty(&self) -> bool {
         self.num_qubits == 0
+    }
+
+    /// Returns the output Pauli basis on `output_qubit` of the `X` generator of `input_qubit`.
+    pub fn x_output_basis(
+        &self,
+        input_qubit: usize,
+        output_qubit: usize,
+    ) -> StabilizerResult<PauliBasis> {
+        self.check_qubit(input_qubit)?;
+        self.check_qubit(output_qubit)?;
+        self.row_basis(input_qubit, output_qubit)
+    }
+
+    /// Returns the output Pauli basis on `output_qubit` of the `Z` generator of `input_qubit`.
+    pub fn z_output_basis(
+        &self,
+        input_qubit: usize,
+        output_qubit: usize,
+    ) -> StabilizerResult<PauliBasis> {
+        self.check_qubit(input_qubit)?;
+        self.check_qubit(output_qubit)?;
+        self.row_basis(self.num_qubits + input_qubit, output_qubit)
+    }
+
+    /// Returns the sign of the `X` generator of `input_qubit`.
+    pub fn x_output_sign(&self, input_qubit: usize) -> StabilizerResult<PauliSign> {
+        self.check_qubit(input_qubit)?;
+        self.row_sign(input_qubit)
+    }
+
+    /// Returns the sign of the `Z` generator of `input_qubit`.
+    pub fn z_output_sign(&self, input_qubit: usize) -> StabilizerResult<PauliSign> {
+        self.check_qubit(input_qubit)?;
+        self.row_sign(self.num_qubits + input_qubit)
+    }
+
+    #[inline]
+    fn check_qubit(&self, qubit: usize) -> StabilizerResult<()> {
+        if qubit < self.num_qubits {
+            Ok(())
+        } else {
+            Err(out_of_range(qubit, self.num_qubits))
+        }
+    }
+
+    #[inline]
+    fn row_basis(&self, row: usize, output_qubit: usize) -> StabilizerResult<PauliBasis> {
+        let word = row / WORD_BITS;
+        let shift = row % WORD_BITS;
+        let base = 2 * output_qubit * self.plane_words + word;
+        let x_word = *self
+            .planes
+            .get(base)
+            .ok_or_else(|| out_of_range(base, self.planes.len()))?;
+        let z_index = base + self.plane_words;
+        let z_word = *self
+            .planes
+            .get(z_index)
+            .ok_or_else(|| out_of_range(z_index, self.planes.len()))?;
+        Ok(PauliBasis::from_xz(
+            (x_word >> shift) & 1 != 0,
+            (z_word >> shift) & 1 != 0,
+        ))
+    }
+
+    #[inline]
+    fn row_sign(&self, row: usize) -> StabilizerResult<PauliSign> {
+        let word_index = row / WORD_BITS;
+        let word = *self
+            .signs
+            .get(word_index)
+            .ok_or_else(|| out_of_range(word_index, self.signs.len()))?;
+        Ok(if (word >> (row % WORD_BITS)) & 1 != 0 {
+            PauliSign::Minus
+        } else {
+            PauliSign::Plus
+        })
     }
 
     /// Appends `gate` on `targets`, exactly as [`Tableau::append`] would.

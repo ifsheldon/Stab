@@ -43,7 +43,7 @@ fn algebra_circuit_conversions_match_stim() {
 
 #[test]
 fn tableau_synthesis_round_trips_representative_wide_cliffords() {
-    for width in [16, 64, 256] {
+    for width in [16, 64, 65, 130, 256] {
         let source = structured_clifford(width);
         let tableau = circuit_to_tableau(&source, false, false, false)
             .expect("structured source circuit tableau");

@@ -12,7 +12,7 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 - A random collapse in the reference simulator scans a strided pivot column per measurement; a batched collapse in a transposed layout was not built, and it is most of a single-shot reference run on a wide circuit with few rounds.
 - At about 10 percent density, reading HITS or DETS input costs about 2x (100-bit records) to 14x (1,000,000-bit records) reading the same records as `b8`, whose files are 2 to 6 times smaller, although every measured `convert` and `m2d` row is faster than Stim; at about 0.1 percent density it costs no more than `b8`.
 - Variable-width `sample_dem --replay_err_in` inputs (`01`, HITS, DETS, and `r8`) whose retained records do not fit what the replay session leaves of `--memory-budget` still decode their input twice, because validation runs before opening output files.
-- A single `Tableau::append` still visits every row, about 4 ns per row at 5000 qubits where the row stride makes it memory-bound, and `tableau_to_circuit` uses it because it reads the remaining Tableau between gates; `TableauAppender` and `Tableau::prepend` are the word-parallel routes.
+- A single `Tableau::append` still visits every row, about 4 ns per row at 5000 qubits where the row stride makes it memory-bound; batched callers including `tableau_to_circuit` use `TableauAppender`, and `Tableau::prepend` is the word-parallel left-action route.
 - `Tableau::prepend` carries about 40 ns of fixed cost per call, which is roughly three times Stim's specialized prepends below 500 qubits, and Pauli string multiplication is 1.05x to 1.23x Stim.
 - The x86-64 instruction-level kernel paths and the per-call level check have never been executed or measured on a controlled x86-64 host.
 
