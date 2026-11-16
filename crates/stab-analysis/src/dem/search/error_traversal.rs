@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ops::ControlFlow;
 
+use stab_model::advanced::CancellationCountdown;
 use stab_model::advanced::{
     DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
     FoldedDemVisitor,
@@ -15,7 +16,7 @@ pub(in crate::dem) fn search_graph_nonzero_error_targets(
     traversal: &FoldedDemTraversal<'_>,
     context: &'static str,
     policy: SearchGraphTargetPolicy,
-    limits: LogicalErrorSearchLimits,
+    limits: &LogicalErrorSearchLimits,
 ) -> AnalysisResult<BTreeSet<DemDetectorId>> {
     let mut counts = DemErrorTargetCounts::new(limits.max_effective_detector_nodes());
     visit_search_graph_errors_with_limits(
@@ -37,12 +38,13 @@ pub(in crate::dem) fn search_graph_nonzero_error_targets(
 pub(in crate::dem) fn visit_search_graph_errors_with_limits<F>(
     traversal: &FoldedDemTraversal<'_>,
     context: &'static str,
-    limits: LogicalErrorSearchLimits,
+    limits: &LogicalErrorSearchLimits,
     visit_error: F,
 ) -> AnalysisResult<()>
 where
     F: FnMut(&DemInstruction, u64) -> AnalysisResult<()>,
 {
+    limits.cancellation().check()?;
     traversal.validate_repeat_depth(context)?;
     let block_policies = SearchBlockPolicies::new(traversal.root());
     let mut visitor = SearchErrorVisitor {
@@ -52,21 +54,23 @@ where
         visited_target_occurrences: 0,
         block_policies,
         visit_error,
+        countdown: CancellationCountdown::new(),
     };
     let _ = traversal.try_visit(&mut visitor)?;
     Ok(())
 }
 
-struct SearchErrorVisitor<F> {
+struct SearchErrorVisitor<'a, F> {
     context: &'static str,
-    limits: LogicalErrorSearchLimits,
+    limits: &'a LogicalErrorSearchLimits,
     visited_error_mechanisms: u64,
     visited_target_occurrences: usize,
     block_policies: SearchBlockPolicies,
     visit_error: F,
+    countdown: CancellationCountdown,
 }
 
-impl<F> FoldedDemVisitor for SearchErrorVisitor<F>
+impl<F> FoldedDemVisitor for SearchErrorVisitor<'_, F>
 where
     F: FnMut(&DemInstruction, u64) -> AnalysisResult<()>,
 {
@@ -77,6 +81,7 @@ where
         instruction: &DemInstruction,
         state: &DemTraversalState,
     ) -> AnalysisResult<ControlFlow<()>> {
+        self.countdown.tick(self.limits.cancellation())?;
         if instruction.kind() == DemInstructionKind::Error
             && instruction.args().first().copied().unwrap_or(0.0) != 0.0
         {
@@ -156,6 +161,10 @@ where
             max_total_iterations: self.limits.max_repeat_iterations(),
             context: self.context,
         })
+    }
+
+    fn poll_cancellation(&mut self) -> AnalysisResult<()> {
+        Ok(self.countdown.tick(self.limits.cancellation())?)
     }
 
     fn repeat_expansion_limit_error(
@@ -525,10 +534,13 @@ mod tests {
             }
         };
         let forwarded = Cell::new(0);
+        let mechanism_limits =
+            LogicalErrorSearchLimits::default().with_max_expanded_error_mechanisms(u64::MAX);
+        let target_limits =
+            LogicalErrorSearchLimits::default().with_max_total_error_target_occurrences(usize::MAX);
         let mut mechanism_visitor = SearchErrorVisitor {
             context: "test search",
-            limits: LogicalErrorSearchLimits::default()
-                .with_max_expanded_error_mechanisms(u64::MAX),
+            limits: &mechanism_limits,
             visited_error_mechanisms: u64::MAX,
             visited_target_occurrences: 0,
             block_policies: SearchBlockPolicies::new(traversal.root()),
@@ -536,6 +548,7 @@ mod tests {
                 forwarded.set(forwarded.get() + 1);
                 Ok(())
             },
+            countdown: CancellationCountdown::new(),
         };
         let error = mechanism_visitor
             .visit_instruction(instruction, &DemTraversalState::default())
@@ -550,8 +563,7 @@ mod tests {
 
         let mut target_visitor = SearchErrorVisitor {
             context: "test search",
-            limits: LogicalErrorSearchLimits::default()
-                .with_max_total_error_target_occurrences(usize::MAX),
+            limits: &target_limits,
             visited_error_mechanisms: 0,
             visited_target_occurrences: usize::MAX,
             block_policies: SearchBlockPolicies::new(traversal.root()),
@@ -559,6 +571,7 @@ mod tests {
                 forwarded.set(forwarded.get() + 1);
                 Ok(())
             },
+            countdown: CancellationCountdown::new(),
         };
         let error = target_visitor
             .visit_instruction(instruction, &DemTraversalState::default())
@@ -586,7 +599,7 @@ mod tests {
         visit_search_graph_errors_with_limits(
             &traversal,
             "test search",
-            LogicalErrorSearchLimits::default(),
+            &LogicalErrorSearchLimits::default(),
             |_, _| {
                 visited += 1;
                 Ok(())
@@ -604,7 +617,7 @@ mod tests {
             LogicalErrorSearchLimits::default().with_max_error_target_occurrences_per_mechanism(2);
         let mut visited = 0;
         let error =
-            visit_search_graph_errors_with_limits(&traversal, "test search", limits, |_, _| {
+            visit_search_graph_errors_with_limits(&traversal, "test search", &limits, |_, _| {
                 visited += 1;
                 Ok(())
             })

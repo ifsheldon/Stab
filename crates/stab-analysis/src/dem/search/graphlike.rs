@@ -293,14 +293,14 @@ impl Graph {
         Self::from_dem_with_limits(
             model,
             ignore_ungraphlike_errors,
-            LogicalErrorSearchLimits::default(),
+            &LogicalErrorSearchLimits::default(),
         )
     }
 
     pub(super) fn from_dem_with_limits(
         model: &DetectorErrorModel,
         ignore_ungraphlike_errors: bool,
-        limits: LogicalErrorSearchLimits,
+        limits: &LogicalErrorSearchLimits,
     ) -> AnalysisResult<Self> {
         let traversal = FoldedDemTraversal::new(model)?;
         let full_detector_count = traversal.root().summary().detector_count()?;
@@ -320,7 +320,7 @@ impl Graph {
             effective_detectors,
             num_observables,
             full_detector_count > 0,
-            limits,
+            limits.clone(),
         )?;
         visit_search_graph_errors_with_limits(
             &traversal,

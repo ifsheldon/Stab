@@ -43,8 +43,8 @@ fn assert_first_excess(
         ("shortest", shortest as SatRunner),
         ("likeliest", likeliest as SatRunner),
     ] {
-        run(&model, accepted)?;
-        let error = run(&model, rejected).expect_err("first excess must be rejected");
+        run(&model, accepted.clone())?;
+        let error = run(&model, rejected.clone()).expect_err("first excess must be rejected");
         let resource = error
             .resource_limit_error()
             .expect("SAT rejection must retain typed resource context");
@@ -65,55 +65,55 @@ fn sat_materialization_limits_admit_exact_boundaries_and_preserve_source() -> An
     let defaults = SatMaterializationLimits::default();
     let ordinary = dem("error(0.1) D0 L0\nerror(0.2) D0\n");
     assert_eq!(
-        shortest_error_sat_problem_with_limits(&ordinary, defaults)?,
+        shortest_error_sat_problem_with_limits(&ordinary, defaults.clone())?,
         shortest_error_sat_problem(&ordinary)?
     );
     assert_eq!(
-        likeliest_error_sat_problem_with_limits(&ordinary, 100, defaults)?,
+        likeliest_error_sat_problem_with_limits(&ordinary, 100, defaults.clone())?,
         likeliest_error_sat_problem(&ordinary, 100)?
     );
 
     for (source, accepted, rejected, resource) in [
         (
             "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
-            defaults.with_max_repeat_iterations(6),
-            defaults.with_max_repeat_iterations(5),
+            defaults.clone().with_max_repeat_iterations(6),
+            defaults.clone().with_max_repeat_iterations(5),
             ResourceKind::RepeatIterations,
         ),
         (
             "error(0.1) D0 L0\nshift_detectors 1\n",
-            defaults.with_max_expanded_instructions(2),
-            defaults.with_max_expanded_instructions(1),
+            defaults.clone().with_max_expanded_instructions(2),
+            defaults.clone().with_max_expanded_instructions(1),
             ResourceKind::ExpandedOperations,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.with_max_error_mechanisms(2),
-            defaults.with_max_error_mechanisms(1),
+            defaults.clone().with_max_error_mechanisms(2),
+            defaults.clone().with_max_error_mechanisms(1),
             ResourceKind::ErrorMechanisms,
         ),
         (
             "error(0.1) D0 L0\n",
-            defaults.with_max_target_occurrences(2),
-            defaults.with_max_target_occurrences(1),
+            defaults.clone().with_max_target_occurrences(2),
+            defaults.clone().with_max_target_occurrences(1),
             ResourceKind::TargetOccurrences,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.with_max_variables(3),
-            defaults.with_max_variables(2),
+            defaults.clone().with_max_variables(3),
+            defaults.clone().with_max_variables(2),
             ResourceKind::Variables,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.with_max_clauses(8),
-            defaults.with_max_clauses(7),
+            defaults.clone().with_max_clauses(8),
+            defaults.clone().with_max_clauses(7),
             ResourceKind::Clauses,
         ),
         (
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.with_max_clause_literals(16),
-            defaults.with_max_clause_literals(15),
+            defaults.clone().with_max_clause_literals(16),
+            defaults.clone().with_max_clause_literals(15),
             ResourceKind::ClauseLiterals,
         ),
     ] {
@@ -128,14 +128,17 @@ fn sat_materialization_limits_admit_exact_boundaries_and_preserve_source() -> An
             dem("error(0) D1000001 L1000001\n"),
         ),
     ] {
-        let output = run(&model, defaults)?;
+        let output = run(&model, defaults.clone())?;
         assert_eq!(
-            run(&model, defaults.with_max_output_bytes(output.len()))?,
+            run(&model, defaults.clone().with_max_output_bytes(output.len()))?,
             output,
             "{name} exact output boundary"
         );
-        let error = run(&model, defaults.with_max_output_bytes(output.len() - 1))
-            .expect_err("first output byte beyond the limit must be rejected");
+        let error = run(
+            &model,
+            defaults.clone().with_max_output_bytes(output.len() - 1),
+        )
+        .expect_err("first output byte beyond the limit must be rejected");
         let resource = error
             .resource_limit_error()
             .expect("output rejection must retain typed resource context");
@@ -150,7 +153,7 @@ fn sat_materialization_limits_admit_exact_boundaries_and_preserve_source() -> An
     ] {
         let model = dem(source);
         let original = model.clone();
-        shortest(&model, defaults).expect_err("overflowing SAT input must be rejected");
+        shortest(&model, defaults.clone()).expect_err("overflowing SAT input must be rejected");
         assert_eq!(model, original);
     }
     Ok(())

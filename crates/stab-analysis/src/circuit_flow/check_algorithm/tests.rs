@@ -13,10 +13,15 @@ use stab_model::Circuit;
 
 use super::FlowCheckAlgorithm;
 use crate::circuit_flow::checker::{
-    UnsignedStabilizerFlowFailure, check_unsigned_flows_using, diagnose_unsigned_flows_using,
+    UnsignedFlowCheckOptions, UnsignedStabilizerFlowFailure, check_unsigned_flows_using,
+    diagnose_unsigned_flows_using,
 };
 use crate::circuit_inverse::{TimeReversedForFlowsOptions, time_reversed_for_flows_using};
-use crate::{AnalysisResult, circuit_to_tableau};
+use crate::{
+    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceOperation, circuit_to_tableau,
+    circuit_to_tableau_with_options,
+};
+use stab_model::{Cancellation, Cancelled, MemoryBudget};
 
 const ALGORITHMS: [FlowCheckAlgorithm; 2] = [
     FlowCheckAlgorithm::DenseTableau,
@@ -67,11 +72,25 @@ fn failing_unitary_flows_report_identical_output_mismatches_on_both_algorithms()
         flow("Z -> Z"),
         flow("_Z_ -> ZZZ"),
     ];
-    let [dense_checks, sparse_checks] =
-        ALGORITHMS.map(|algorithm| diagnose_unsigned_flows_using(algorithm, &circuit, &flows));
+    let [dense_checks, sparse_checks] = ALGORITHMS.map(|algorithm| {
+        diagnose_unsigned_flows_using(
+            algorithm,
+            &circuit,
+            &flows,
+            &UnsignedFlowCheckOptions::default(),
+        )
+        .expect("default options diagnose every flow")
+    });
     assert_eq!(dense_checks, sparse_checks);
-    let [dense_bools, sparse_bools] =
-        ALGORITHMS.map(|algorithm| check_unsigned_flows_using(algorithm, &circuit, &flows));
+    let [dense_bools, sparse_bools] = ALGORITHMS.map(|algorithm| {
+        check_unsigned_flows_using(
+            algorithm,
+            &circuit,
+            &flows,
+            &UnsignedFlowCheckOptions::default(),
+        )
+        .expect("default options check every flow")
+    });
     assert_eq!(dense_bools, vec![true, false, false, false]);
     assert_eq!(sparse_bools, dense_bools);
 
@@ -290,10 +309,12 @@ proptest! {
         let flows = random_flows(&circuit, qubit_count, &specs).expect("generated flows");
 
         let [dense_bools, sparse_bools] =
-            ALGORITHMS.map(|algorithm| check_unsigned_flows_using(algorithm, &circuit, &flows));
+            ALGORITHMS.map(|algorithm| check_unsigned_flows_using(algorithm, &circuit, &flows, &UnsignedFlowCheckOptions::default())
+                .expect("default options check every flow"));
         prop_assert_eq!(&dense_bools, &sparse_bools);
         let [dense_checks, sparse_checks] =
-            ALGORITHMS.map(|algorithm| diagnose_unsigned_flows_using(algorithm, &circuit, &flows));
+            ALGORITHMS.map(|algorithm| diagnose_unsigned_flows_using(algorithm, &circuit, &flows, &UnsignedFlowCheckOptions::default())
+                .expect("default options diagnose every flow"));
         prop_assert_eq!(&dense_checks, &sparse_checks);
         for (check, has_flow) in dense_checks.iter().zip(&dense_bools) {
             prop_assert_eq!(check.has_flow(), *has_flow);
@@ -310,6 +331,80 @@ proptest! {
         prop_assert_eq!(
             time_reversed(&circuit, &flows, dense),
             time_reversed(&circuit, &flows, sparse)
+        );
+    }
+}
+
+#[test]
+fn a_refused_tableau_falls_back_to_the_sparse_tracker_but_cancellation_does_not() {
+    // 71 qubits: the Tableau needs 4568 bytes, while no extracted region needs more than 103.
+    let circuit = Circuit::from_stim_str("H 0\nCX 0 1\nS 1\nSWAP 1 70\n").unwrap();
+    let flows = [
+        flow("X_ -> Z_"),
+        flow("_Z -> Z"),
+        flow("_Z -> ZZ"),
+        flow("Y -> Y"),
+    ];
+    let small = UnsignedFlowCheckOptions {
+        memory_budget: MemoryBudget::from_bytes(1024),
+        ..UnsignedFlowCheckOptions::default()
+    };
+    let refusal = circuit_to_tableau_with_options(
+        &circuit,
+        &CircuitToTableauOptions {
+            ignore_noise: true,
+            memory_budget: small.memory_budget,
+            ..CircuitToTableauOptions::default()
+        },
+    )
+    .expect_err("the budget refuses the dense Tableau");
+    assert_eq!(
+        refusal
+            .resource_limit_error()
+            .map(|error| error.operation()),
+        Some(ResourceOperation::TableauConversion)
+    );
+
+    let defaults = UnsignedFlowCheckOptions::default();
+    let dense_bools = check_unsigned_flows_using(
+        FlowCheckAlgorithm::DenseTableau,
+        &circuit,
+        &flows,
+        &defaults,
+    )
+    .unwrap();
+    let dense_checks = diagnose_unsigned_flows_using(
+        FlowCheckAlgorithm::DenseTableau,
+        &circuit,
+        &flows,
+        &defaults,
+    )
+    .unwrap();
+    assert!(dense_bools.iter().any(|has_flow| *has_flow));
+    assert!(dense_bools.iter().any(|has_flow| !*has_flow));
+    let cancelled = Cancellation::new();
+    cancelled.cancel();
+    let set = UnsignedFlowCheckOptions {
+        cancellation: cancelled,
+        ..UnsignedFlowCheckOptions::default()
+    };
+    for algorithm in ALGORITHMS {
+        assert_eq!(
+            check_unsigned_flows_using(algorithm, &circuit, &flows, &small).unwrap(),
+            dense_bools
+        );
+        assert_eq!(
+            diagnose_unsigned_flows_using(algorithm, &circuit, &flows, &small).unwrap(),
+            dense_checks
+        );
+        // A set signal is reported, never answered with flows that failed closed.
+        assert_eq!(
+            check_unsigned_flows_using(algorithm, &circuit, &flows, &set),
+            Err(AnalysisError::Cancelled(Cancelled))
+        );
+        assert_eq!(
+            diagnose_unsigned_flows_using(algorithm, &circuit, &flows, &set),
+            Err(AnalysisError::Cancelled(Cancelled))
         );
     }
 }

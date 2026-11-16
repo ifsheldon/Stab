@@ -5,7 +5,10 @@ use stab_model::{
 
 use crate::{
     AnalysisError, AnalysisResult,
-    circuit_flow::{FlowCheckAlgorithm, FlowCheckCost, check_unsigned_flows_with_sparse_tracker},
+    circuit_flow::{
+        FlowCheckAlgorithm, FlowCheckCost, UnsignedFlowCheckOptions,
+        check_unsigned_flows_with_sparse_tracker, stops_flow_check,
+    },
     sparse_rev_frame_tracker::folds_unitary_repeat_body,
 };
 
@@ -32,8 +35,19 @@ pub struct TimeReversedForFlowsOptions {
     /// Budget for the retained copies of the expanded measurement-rich reversal, and for the
     /// dense Tableau that validates the input flows of a unitary circuit.
     pub memory_budget: MemoryBudget,
-    /// Signal polled once per reversed instruction of the expanded measurement-rich reversal.
+    /// Signal polled once per reversed instruction of the expanded measurement-rich reversal, and
+    /// by the flow checks that validate the input and reversed flows.
     pub cancellation: Cancellation,
+}
+
+impl TimeReversedForFlowsOptions {
+    /// The budget and signal of the flow checks that validate the reversal.
+    pub(crate) fn flow_check_options(&self) -> UnsignedFlowCheckOptions {
+        UnsignedFlowCheckOptions {
+            memory_budget: self.memory_budget,
+            cancellation: self.cancellation.clone(),
+        }
+    }
 }
 
 /// Returns the strict inverse of a unitary circuit and its invertible annotations.
@@ -205,7 +219,7 @@ pub(crate) fn time_reversed_for_flows_using(
     let validation = FlowValidation::build(select(circuit, flows), circuit, &options)?;
     for (index, (flow, satisfied)) in flows
         .iter()
-        .zip(validation.check_all(circuit, flows, &options.cancellation)?)
+        .zip(validation.check_all(circuit, flows, &options)?)
         .enumerate()
     {
         if !satisfied {
@@ -218,12 +232,19 @@ pub(crate) fn time_reversed_for_flows_using(
         .iter()
         .map(reversed_pauli_only_flow)
         .collect::<Vec<_>>();
-    let reversed_checks = check_unsigned_flows_with_sparse_tracker(&inverse, &reversed_flows)
-        .map_err(|error| {
-            AnalysisError::invalid_tableau_conversion(format!(
-                "time_reversed_for_flows could not validate reversed unitary flows: {error}"
-            ))
-        })?;
+    let reversed_checks = check_unsigned_flows_with_sparse_tracker(
+        &inverse,
+        &reversed_flows,
+        &options.flow_check_options(),
+    )
+    .map_err(|error| {
+        if stops_flow_check(&error) {
+            return error;
+        }
+        AnalysisError::invalid_tableau_conversion(format!(
+            "time_reversed_for_flows could not validate reversed unitary flows: {error}"
+        ))
+    })?;
     for (index, (flow, satisfied)) in reversed_flows.iter().zip(reversed_checks).enumerate() {
         if !satisfied {
             return Err(AnalysisError::invalid_tableau_conversion(format!(
@@ -448,18 +469,28 @@ impl FlowValidation {
         &self,
         circuit: &Circuit,
         flows: &[Flow],
-        cancellation: &Cancellation,
+        reversal: &TimeReversedForFlowsOptions,
     ) -> AnalysisResult<Vec<bool>> {
         match self {
             Self::Tableau(tableau) => flows
                 .iter()
                 .map(|flow| {
-                    cancellation.check()?;
+                    reversal.cancellation.check()?;
                     unitary_flow_is_satisfied_by_tableau(tableau, flow)
                 })
                 .collect(),
-            Self::SparseFolded => check_unsigned_flows_with_sparse_tracker(circuit, flows)
-                .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string())),
+            Self::SparseFolded => check_unsigned_flows_with_sparse_tracker(
+                circuit,
+                flows,
+                &reversal.flow_check_options(),
+            )
+            .map_err(|error| {
+                if stops_flow_check(&error) {
+                    error
+                } else {
+                    AnalysisError::invalid_tableau_conversion(error.to_string())
+                }
+            }),
         }
     }
 }

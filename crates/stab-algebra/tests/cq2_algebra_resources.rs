@@ -97,6 +97,12 @@ fn pauli_widths_are_admitted_in_bytes() {
         StabilizerResource::PauliString,
         default,
     );
+    // Nor can a flow's sparse term, which reports the refusal rather than malformed flow text.
+    refused_bytes(
+        Flow::from_str("X1000000000000 -> Z0"),
+        StabilizerResource::PauliString,
+        default,
+    );
     let mut actual_rng = StdRng::seed_from_u64(0x5eed_0001);
     let mut expected_rng = StdRng::seed_from_u64(0x5eed_0001);
     refused_bytes(
@@ -276,6 +282,19 @@ fn caller_budgets_govern_requested_string_widths() {
     assert_eq!(
         assert_exact_boundary(StabilizerResource::PauliString, |budget| {
             FlexPauliString::from_str_with_budget("iX999", budget)
+        }),
+        pauli
+    );
+    // Each Pauli side of a flow is admitted on its own against the caller budget.
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::PauliString, |budget| {
+            Flow::from_str_with_budget("X999 -> Z999 xor rec[-1]", budget)
+        }),
+        pauli
+    );
+    assert_eq!(
+        assert_exact_boundary(StabilizerResource::PauliString, |budget| {
+            Flow::from_str_with_budget("1 -> -Y999", budget)
         }),
         pauli
     );

@@ -710,6 +710,11 @@ impl FlexPauliString {
         &self.value
     }
 
+    /// Moves the signed Pauli string out, dropping the imaginary flag.
+    pub(crate) fn into_value(self) -> PauliString {
+        self.value
+    }
+
     pub fn phase(&self) -> PauliPhase {
         PauliPhase::from_sign_and_imaginary(self.value.sign(), self.imaginary)
     }

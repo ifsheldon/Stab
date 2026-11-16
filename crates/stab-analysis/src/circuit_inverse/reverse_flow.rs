@@ -8,7 +8,10 @@ use stab_model::{
 
 use crate::{
     AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
-    circuit_flow::{check_unsigned_flows_with_sparse_tracker, transitions::ReverseFlowTransition},
+    circuit_flow::{
+        UnsignedFlowCheckOptions, check_unsigned_flows_with_sparse_tracker, stops_flow_check,
+        transitions::ReverseFlowTransition,
+    },
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
@@ -60,8 +63,9 @@ pub(super) fn reverse_flows(
     engine.seed_flow_inputs(&flow_states)?;
     engine.verify_closed_targets(&flow_states)?;
     let output_flows = engine.build_output_flows(&flow_states)?;
+    let flow_check_options = engine.options.flow_check_options();
     let output_circuit = engine.finish();
-    validate_output_flows(&output_circuit, &output_flows)?;
+    validate_output_flows(&output_circuit, &output_flows, &flow_check_options)?;
     Ok((output_circuit, output_flows))
 }
 
@@ -1051,9 +1055,19 @@ fn add_coordinate_shift(shift: &mut Vec<f64>, delta: &[f64]) {
     }
 }
 
-fn validate_output_flows(circuit: &Circuit, flows: &[Flow]) -> AnalysisResult<()> {
-    let checks = check_unsigned_flows_with_sparse_tracker(circuit, flows)
-        .map_err(|error| reverse_error(format!("failed to validate reversed flows: {error}")))?;
+fn validate_output_flows(
+    circuit: &Circuit,
+    flows: &[Flow],
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<()> {
+    let checks =
+        check_unsigned_flows_with_sparse_tracker(circuit, flows, options).map_err(|error| {
+            if stops_flow_check(&error) {
+                error
+            } else {
+                reverse_error(format!("failed to validate reversed flows: {error}"))
+            }
+        })?;
     for (index, (flow, satisfied)) in flows.iter().zip(checks).enumerate() {
         if !satisfied {
             return Err(reverse_error(format!(

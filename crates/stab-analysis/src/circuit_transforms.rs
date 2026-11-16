@@ -147,7 +147,12 @@ fn validate_materialized_instruction_capacity(count: u64) -> AnalysisResult<usiz
 /// heralded noise instructions become deterministic zero `MPAD` results so measurement-record
 /// indexing stays unchanged.
 pub fn circuit_without_noise(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    circuit_without_noise_impl(circuit, &mut ())
+    let never = Cancellation::never();
+    let mut polls = PassPolls {
+        cancellation: &never,
+        countdown: CancellationCountdown::new(),
+    };
+    circuit_without_noise_impl(circuit, &mut (), &mut polls)
 }
 
 /// Built-in pass that removes noisy behavior while preserving measurement records.
@@ -240,23 +245,35 @@ impl CircuitPass for WithoutNoisePass {
         _options: &Self::Options,
     ) -> Result<CircuitPassOutput<Self::Report>, Self::Diagnostic> {
         let mut report = WithoutNoiseReport::default();
-        let circuit = circuit_without_noise_impl(input.circuit(), &mut report)?;
+        let mut polls = PassPolls {
+            cancellation: input.context().cancellation(),
+            countdown: CancellationCountdown::new(),
+        };
+        let circuit = circuit_without_noise_impl(input.circuit(), &mut report, &mut polls)?;
         Ok(CircuitPassOutput::new(circuit, report))
     }
+}
+
+/// The pass context's signal, polled once per folded item.
+struct PassPolls<'a> {
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
 }
 
 fn circuit_without_noise_impl<R: WithoutNoiseRecorder>(
     circuit: &Circuit,
     recorder: &mut R,
+    polls: &mut PassPolls<'_>,
 ) -> AnalysisResult<Circuit> {
     let mut result = Circuit::new();
     for item in circuit.items() {
+        polls.countdown.tick(polls.cancellation)?;
         match item {
             CircuitItem::Instruction(instruction) => {
                 append_noiseless_instruction(&mut result, instruction, recorder)?
             }
             CircuitItem::RepeatBlock(repeat) => {
-                let body = circuit_without_noise_impl(repeat.body(), recorder)?;
+                let body = circuit_without_noise_impl(repeat.body(), recorder, polls)?;
                 result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
                     repeat.repeat_count(),
                     body,

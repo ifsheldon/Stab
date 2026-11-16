@@ -7,13 +7,18 @@
 //! Operations that used to admit against the default budget refuse under a smaller caller budget,
 //! naming the operation and that budget, and admit the same request at its exact requirement.
 
-use stab_algebra::Flow;
+use stab_algebra::{Flow, PauliString};
 use stab_analysis::{
-    AnalysisError, FlowGeneratorOptions, InverseQecOptions, MissingDetectorOptions, ResourceKind,
-    ResourceOperation, TimeReversedForFlowsOptions, all_detecting_region_targets_with_budget,
-    all_detecting_region_ticks_with_budget, circuit_flow_generators_with_options,
-    circuit_inverse_qec_with_options, circuit_time_reversed_for_flows_with_options,
-    missing_detectors,
+    AnalysisError, FlowGeneratorOptions, InverseQecOptions, MissingDetectorOptions,
+    PauliConjugationOptions, ResourceKind, ResourceOperation, TimeReversedForFlowsOptions,
+    UnsignedFlowCheckOptions, all_detecting_region_targets_with_budget,
+    all_detecting_region_ticks_with_budget, check_if_circuit_has_unsigned_stabilizer_flows,
+    check_if_circuit_has_unsigned_stabilizer_flows_with_options,
+    check_unsigned_stabilizer_flows_with_diagnostics,
+    check_unsigned_stabilizer_flows_with_diagnostics_with_options,
+    circuit_flow_generators_with_options, circuit_inverse_qec_with_options,
+    circuit_time_reversed_for_flows_with_options, missing_detectors, pauli_after_circuit,
+    pauli_after_circuit_with_options, pauli_before_circuit, pauli_before_circuit_with_options,
 };
 use stab_model::{Circuit, CircuitItem, CircuitTick, DemTarget, MemoryBudget, Target};
 
@@ -193,5 +198,123 @@ fn detecting_region_helpers_take_the_caller_budget() {
             .expect("exact target budget")
             .len(),
         2
+    );
+}
+
+/// Bytes of a Pauli string collected from `qubits` bases: two packed planes plus one byte per
+/// collected basis.
+fn collected_pauli_bytes(qubits: u64) -> u64 {
+    2 * 8 * qubits.div_ceil(64) + qubits
+}
+
+#[test]
+fn sparse_flow_checking_takes_the_caller_budget() {
+    // The measurement keeps the query on the sparse tracker, which extracts each flow's region
+    // only as wide as its support: qubits 0 through 129.
+    let source = circuit("M 0\nH 129\n");
+    let flows = ["X129 -> Z129".parse::<Flow>().expect("flow")];
+    let required = collected_pauli_bytes(130);
+    let options = |bytes| UnsignedFlowCheckOptions {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..UnsignedFlowCheckOptions::default()
+    };
+    let short = MemoryBudget::from_bytes(required - 1);
+    assert_refused(
+        check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+            &source,
+            &flows,
+            &options(required - 1),
+        )
+        .expect_err("one byte short"),
+        ResourceOperation::FlowCheck,
+        ResourceKind::MaterializedBytes,
+        required,
+        short,
+    );
+    assert_refused(
+        check_unsigned_stabilizer_flows_with_diagnostics_with_options(
+            &source,
+            &flows,
+            &options(required - 1),
+        )
+        .expect_err("diagnostics one byte short"),
+        ResourceOperation::FlowCheck,
+        ResourceKind::MaterializedBytes,
+        required,
+        short,
+    );
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+            &source,
+            &flows,
+            &options(required)
+        ),
+        Ok(vec![true])
+    );
+    assert_eq!(
+        check_unsigned_stabilizer_flows_with_diagnostics_with_options(
+            &source,
+            &flows,
+            &options(required),
+        ),
+        Ok(check_unsigned_stabilizer_flows_with_diagnostics(
+            &source, &flows
+        ))
+    );
+    // The unbudgeted check keeps failing the flow closed rather than reporting the refusal.
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&source, &flows),
+        vec![true]
+    );
+}
+
+#[test]
+fn pauli_conjugation_takes_the_caller_budget() {
+    // A one-qubit Tableau conjugates a 6400-qubit observable, so the conjugated string is the
+    // largest admission.
+    let source = circuit("H 0\n");
+    let mut text = String::from("X");
+    text.push_str(&"_".repeat(6399));
+    let pauli: PauliString = text.parse().expect("Pauli fixture");
+    let required = collected_pauli_bytes(6400);
+    let options = |bytes| PauliConjugationOptions {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..PauliConjugationOptions::default()
+    };
+    for (conjugate, unbudgeted) in [
+        (
+            pauli_after_circuit_with_options as fn(&_, &_, &_) -> _,
+            pauli_after_circuit as fn(&_, &_) -> _,
+        ),
+        (pauli_before_circuit_with_options, pauli_before_circuit),
+    ] {
+        assert_refused(
+            conjugate(&pauli, &source, &options(required - 1)).expect_err("one byte short"),
+            ResourceOperation::PauliConjugation,
+            ResourceKind::MaterializedBytes,
+            required,
+            MemoryBudget::from_bytes(required - 1),
+        );
+        assert_eq!(
+            conjugate(&pauli, &source, &options(required)),
+            unbudgeted(&pauli, &source)
+        );
+    }
+
+    // A Tableau the budget refuses is not an error: conjugation walks the instructions instead.
+    let wide = circuit("H 0\nCX 0 99\nS 99\n");
+    let mut text = String::from("X");
+    text.push_str(&"_".repeat(98));
+    text.push('Z');
+    let pauli: PauliString = text.parse().expect("Pauli fixture");
+    let walked = options(1024);
+    let after = pauli_after_circuit(&pauli, &wide).expect("conjugate after");
+    assert_eq!(
+        pauli_after_circuit_with_options(&pauli, &wide, &walked),
+        Ok(after.clone())
+    );
+    assert_eq!(
+        pauli_before_circuit_with_options(&after, &wide, &walked),
+        Ok(pauli)
     );
 }

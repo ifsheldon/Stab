@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase};
+use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, StabilizerError};
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, Pauli, QubitId, Target,
@@ -17,7 +17,7 @@ mod unitary_repeat;
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::controlled_pauli::{ControlSlot, ControlledPauliForm, controlled_pauli_form};
 use crate::target_xor_set::{TargetXorSet, xor_merge_into};
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
 pub(crate) use budget::{ReverseTrackerBudget, ReverseTrackerWorkBudget};
 use clifford_action::{single_qubit_action, two_qubit_action};
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
@@ -418,12 +418,20 @@ impl SparseReverseFrameTracker {
         target: DemTarget,
         budget: AlgebraMemoryBudget,
     ) -> AnalysisResult<FlexPauliString> {
-        self.region_for_target_with_len(target, self.qubit_count, budget)
+        self.region_for_target_with_len(
+            target,
+            self.qubit_count,
+            budget,
+            ResourceOperation::DetectingRegions,
+        )
     }
 
+    /// Returns the region of `target` only as wide as its support, admitted against `budget` and
+    /// refused as flow checking.
     pub(crate) fn compact_region_for_target(
         &self,
         target: DemTarget,
+        budget: AlgebraMemoryBudget,
     ) -> AnalysisResult<FlexPauliString> {
         let len = self
             .xs
@@ -434,7 +442,7 @@ impl SparseReverseFrameTracker {
             .map(|max_qubit| qubit_index(QubitId::new(max_qubit)?).map(|index| index + 1))
             .transpose()?
             .unwrap_or(0);
-        self.region_for_target_with_len(target, len, AlgebraMemoryBudget::DEFAULT)
+        self.region_for_target_with_len(target, len, budget, ResourceOperation::FlowCheck)
     }
 
     fn region_for_target_with_len(
@@ -442,6 +450,7 @@ impl SparseReverseFrameTracker {
         target: DemTarget,
         len: usize,
         budget: AlgebraMemoryBudget,
+        operation: ResourceOperation,
     ) -> AnalysisResult<FlexPauliString> {
         let mut bases = vec![PauliBasis::I; len];
         for (qubit, xs) in &self.xs {
@@ -478,10 +487,21 @@ impl SparseReverseFrameTracker {
             }
         }
         FlexPauliString::from_phase_and_bases_with_budget(PauliPhase::Plus, bases, budget).map_err(
-            |error| {
-                AnalysisError::invalid_detector_error_model(format!(
+            |error| match error {
+                StabilizerError::MemoryBudgetExceeded {
+                    requested_bytes,
+                    budget_bytes,
+                    ..
+                } => ResourceLimitError::memory_budget(
+                    operation,
+                    ResourceKind::MaterializedBytes,
+                    u64::try_from(requested_bytes).unwrap_or(u64::MAX),
+                    budget_bytes,
+                )
+                .into(),
+                error => AnalysisError::invalid_detector_error_model(format!(
                     "failed to build detecting region for {target}: {error}"
-                ))
+                )),
             },
         )
     }

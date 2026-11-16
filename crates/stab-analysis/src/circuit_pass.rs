@@ -1,6 +1,10 @@
 use std::error::Error;
 
-use stab_model::{Circuit, CircuitItem, MemoryBudget, ParseLimits, RepeatNestingLimit, Target};
+use stab_model::advanced::CancellationCountdown;
+use stab_model::{
+    Cancellation, Cancelled, Circuit, CircuitItem, MemoryBudget, ParseLimits, RepeatNestingLimit,
+    Target,
+};
 use thiserror::Error;
 
 use crate::resources::CircuitPassStage;
@@ -66,18 +70,43 @@ impl Default for CircuitPassLimits {
 }
 
 /// Immutable context shared by circuit-pass implementations.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+///
+/// The context carries the resource limits and the cancellation signal of one pass execution.
+/// [`run_circuit_pass`] polls the signal once per folded item while it admits the input and the
+/// returned circuit, and before and after the pass runs. A pass whose work is not bounded by a
+/// small multiple of its admitted input should poll [`Self::cancellation`] at bounded intervals,
+/// for example with `stab_model::advanced::CancellationCountdown`, and return any diagnostic once
+/// it observes the signal: the executor reports [`CircuitPassError::Cancelled`] for every failure
+/// returned while the signal is set.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CircuitPassContext {
     limits: CircuitPassLimits,
+    cancellation: Cancellation,
 }
 
 impl CircuitPassContext {
+    /// A context with `limits` and a signal that is never set.
     pub const fn new(limits: CircuitPassLimits) -> Self {
-        Self { limits }
+        Self {
+            limits,
+            cancellation: Cancellation::never(),
+        }
     }
 
-    pub const fn limits(self) -> CircuitPassLimits {
+    pub const fn limits(&self) -> CircuitPassLimits {
         self.limits
+    }
+
+    /// The signal the executor and pass implementations poll.
+    pub const fn cancellation(&self) -> &Cancellation {
+        &self.cancellation
+    }
+
+    /// Replaces the cancellation signal.
+    #[must_use]
+    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = cancellation;
+        self
     }
 }
 
@@ -292,19 +321,26 @@ pub enum CircuitPassError<D: Error + 'static> {
         projected: u64,
         actual: u64,
     },
+    /// The context's cancellation signal was observed; no output is returned.
+    #[error(transparent)]
+    Cancelled(#[from] Cancelled),
 }
 
 impl<D: Error + 'static> CircuitPassError<D> {
     pub const fn diagnostic(&self) -> Option<&D> {
         match self {
             Self::Diagnostic(diagnostic) => Some(diagnostic),
-            Self::ResourceLimit(_) | Self::ProjectionUnderestimated { .. } => None,
+            Self::ResourceLimit(_) | Self::ProjectionUnderestimated { .. } | Self::Cancelled(_) => {
+                None
+            }
         }
     }
 
     pub const fn resource_limit_error(&self) -> Option<&ResourceLimitError> {
         match self {
-            Self::Diagnostic(_) | Self::ProjectionUnderestimated { .. } => None,
+            Self::Diagnostic(_) | Self::ProjectionUnderestimated { .. } | Self::Cancelled(_) => {
+                None
+            }
             Self::ResourceLimit(error) => Some(error),
         }
     }
@@ -313,7 +349,9 @@ impl<D: Error + 'static> CircuitPassError<D> {
     pub const fn resource_stage(&self) -> Option<CircuitPassStage> {
         match self {
             Self::ResourceLimit(error) => error.circuit_pass_stage(),
-            Self::Diagnostic(_) | Self::ProjectionUnderestimated { .. } => None,
+            Self::Diagnostic(_) | Self::ProjectionUnderestimated { .. } | Self::Cancelled(_) => {
+                None
+            }
         }
     }
 
@@ -324,19 +362,25 @@ impl<D: Error + 'static> CircuitPassError<D> {
                 projected,
                 actual,
             } => Some((*resource, *projected, *actual)),
-            Self::Diagnostic(_) | Self::ResourceLimit(_) => None,
+            Self::Diagnostic(_) | Self::ResourceLimit(_) | Self::Cancelled(_) => None,
         }
     }
 }
 
 /// Executes a pass with common input admission and output validation.
+///
+/// The context's cancellation signal is polled once per folded item of the input and of the
+/// returned circuit, and before and after each pass method; a failure the pass returns while the
+/// signal is set is reported as [`CircuitPassError::Cancelled`].
 pub fn run_circuit_pass<P: CircuitPass + ?Sized>(
     pass: &P,
     circuit: &Circuit,
     options: &P::Options,
     context: &CircuitPassContext,
 ) -> Result<CircuitPassOutput<P::Report>, CircuitPassError<P::Diagnostic>> {
-    let resources = validate_circuit(circuit, context.limits(), CircuitPassStage::Input)?;
+    let cancellation = context.cancellation();
+    cancellation.check()?;
+    let resources = validate_circuit(circuit, context, CircuitPassStage::Input)?;
     let input = CircuitPassInput {
         circuit,
         context,
@@ -344,25 +388,80 @@ pub fn run_circuit_pass<P: CircuitPass + ?Sized>(
     };
     let projected = pass
         .project_output_resources(input, options)
-        .map_err(CircuitPassError::Diagnostic)?;
+        .map_err(|diagnostic| pass_failure(diagnostic, cancellation))?;
     admit_resources(
         projected,
         context.limits(),
         CircuitPassStage::OutputProjection,
     )?;
+    cancellation.check()?;
     let output = pass
         .run(input, options)
-        .map_err(CircuitPassError::Diagnostic)?;
-    let actual = validate_circuit(output.circuit(), context.limits(), CircuitPassStage::Output)?;
+        .map_err(|diagnostic| pass_failure(diagnostic, cancellation))?;
+    let actual = validate_circuit(output.circuit(), context, CircuitPassStage::Output)?;
     ensure_projection_covers(projected, actual)?;
     Ok(output)
 }
 
-fn validate_circuit(
-    circuit: &Circuit,
+/// Reports a pass failure as cancellation when the signal is set, since a pass that observes the
+/// signal stops through its own diagnostic type.
+fn pass_failure<D: Error + 'static>(
+    diagnostic: D,
+    cancellation: &Cancellation,
+) -> CircuitPassError<D> {
+    match cancellation.check() {
+        Ok(()) => CircuitPassError::Diagnostic(diagnostic),
+        Err(cancelled) => CircuitPassError::Cancelled(cancelled),
+    }
+}
+
+/// Failure while admitting a circuit: a resource limit or the context's signal.
+enum ValidationFailure {
+    ResourceLimit(ResourceLimitError),
+    Cancelled(Cancelled),
+}
+
+impl From<ResourceLimitError> for ValidationFailure {
+    fn from(error: ResourceLimitError) -> Self {
+        Self::ResourceLimit(error)
+    }
+}
+
+impl From<Cancelled> for ValidationFailure {
+    fn from(cancelled: Cancelled) -> Self {
+        Self::Cancelled(cancelled)
+    }
+}
+
+impl<D: Error + 'static> From<ValidationFailure> for CircuitPassError<D> {
+    fn from(failure: ValidationFailure) -> Self {
+        match failure {
+            ValidationFailure::ResourceLimit(error) => Self::ResourceLimit(error),
+            ValidationFailure::Cancelled(cancelled) => Self::Cancelled(cancelled),
+        }
+    }
+}
+
+/// The context's limits and signal, with the countdown that spaces polls across folded items.
+struct ValidationScope<'a> {
     limits: CircuitPassLimits,
     stage: CircuitPassStage,
-) -> Result<CircuitPassResources, ResourceLimitError> {
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
+}
+
+fn validate_circuit(
+    circuit: &Circuit,
+    context: &CircuitPassContext,
+    stage: CircuitPassStage,
+) -> Result<CircuitPassResources, ValidationFailure> {
+    let limits = context.limits();
+    let mut scope = ValidationScope {
+        limits,
+        stage,
+        cancellation: context.cancellation(),
+        countdown: CancellationCountdown::new(),
+    };
     let mut represented_items = 0;
     let mut target_occurrences = 0;
     let mut argument_values = 0;
@@ -371,8 +470,7 @@ fn validate_circuit(
     validate_block(
         circuit,
         0,
-        limits,
-        stage,
+        &mut scope,
         &mut represented_items,
         &mut target_occurrences,
         &mut argument_values,
@@ -405,15 +503,16 @@ fn validate_circuit(
 fn validate_block(
     circuit: &Circuit,
     depth: usize,
-    limits: CircuitPassLimits,
-    stage: CircuitPassStage,
+    scope: &mut ValidationScope<'_>,
     represented_items: &mut u64,
     target_occurrences: &mut u64,
     argument_values: &mut u64,
     tag_bytes: &mut u64,
     repeat_nesting: &mut usize,
-) -> Result<(), ResourceLimitError> {
+) -> Result<(), ValidationFailure> {
+    let (limits, stage) = (scope.limits, scope.stage);
     for item in circuit.items() {
+        scope.countdown.tick(scope.cancellation)?;
         add_unbounded(represented_items, 1);
         match item {
             CircuitItem::Instruction(instruction) => {
@@ -432,13 +531,13 @@ fn validate_block(
                         ResourceKind::RepeatNesting,
                         next_depth as u64,
                         limit as u64,
-                    ));
+                    )
+                    .into());
                 }
                 validate_block(
                     repeat.body(),
                     next_depth,
-                    limits,
-                    stage,
+                    scope,
                     represented_items,
                     target_occurrences,
                     argument_values,

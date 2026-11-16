@@ -3,8 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use super::{
-    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
-    StabilizerResult,
+    AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
+    StabilizerError, StabilizerResult,
 };
 
 /// Measurement-record term inside a stabilizer flow.
@@ -200,8 +200,25 @@ impl FromStr for Flow {
     type Err = StabilizerError;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
+        Self::from_str_with_budget(text, AlgebraMemoryBudget::DEFAULT)
+    }
+}
+
+impl Flow {
+    /// Parses flow text like [`FromStr`], admitting each parsed Pauli string's two packed planes
+    /// against `budget` instead of [`AlgebraMemoryBudget::DEFAULT`].
+    ///
+    /// A sparse term such as `X1000000000` requests a wide string from short text, so the budget is
+    /// checked before that storage is allocated.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StabilizerError::MemoryBudgetExceeded`] or [`StabilizerError::AllocationFailed`]
+    /// when a Pauli string does not fit, and [`StabilizerError::InvalidFlowText`] or
+    /// [`StabilizerError::AntiHermitianFlow`] when the text is not a valid flow.
+    pub fn from_str_with_budget(text: &str, budget: AlgebraMemoryBudget) -> StabilizerResult<Self> {
         let (input_text, output_text) = split_flow_arrow(text)?;
-        let (input, input_is_imaginary) = parse_flow_pauli(input_text, text)?;
+        let (input, input_is_imaginary) = parse_flow_pauli(input_text, text, budget)?;
         let mut tokens = output_text.split_whitespace();
         let first_output = tokens.next().ok_or_else(|| invalid_flow_text(text))?;
 
@@ -218,6 +235,7 @@ impl FromStr for Flow {
         parse_first_output_term(
             first_token,
             text,
+            budget,
             &mut output,
             &mut output_is_imaginary,
             &mut measurements,
@@ -277,6 +295,7 @@ fn split_flow_arrow(text: &str) -> StabilizerResult<(&str, &str)> {
 fn parse_first_output_term(
     token: &str,
     original_text: &str,
+    budget: AlgebraMemoryBudget,
     output: &mut PauliString,
     output_is_imaginary: &mut bool,
     measurements: &mut Vec<i32>,
@@ -285,7 +304,7 @@ fn parse_first_output_term(
     if token.starts_with('r') || token.starts_with('o') {
         parse_classical_output_term(token, original_text, measurements, observables)
     } else {
-        let (parsed_output, is_imaginary) = parse_flow_pauli(token, original_text)?;
+        let (parsed_output, is_imaginary) = parse_flow_pauli(token, original_text, budget)?;
         *output = parsed_output;
         *output_is_imaginary = is_imaginary;
         Ok(())
@@ -351,7 +370,11 @@ fn xor_merge<T: Copy + Ord>(left: &[T], right: &[T]) -> StabilizerResult<Vec<T>>
     Ok(result)
 }
 
-fn parse_flow_pauli(text: &str, original_text: &str) -> StabilizerResult<(PauliString, bool)> {
+fn parse_flow_pauli(
+    text: &str,
+    original_text: &str,
+    budget: AlgebraMemoryBudget,
+) -> StabilizerResult<(PauliString, bool)> {
     match text {
         "1" | "+1" => Ok((PauliString::identity_unchecked(0), false)),
         "-1" => Ok((
@@ -365,10 +388,16 @@ fn parse_flow_pauli(text: &str, original_text: &str) -> StabilizerResult<(PauliS
         )),
         "" => Err(invalid_flow_text(original_text)),
         _ => {
-            let flex = text
-                .parse::<FlexPauliString>()
-                .map_err(|_| invalid_flow_text(original_text))?;
-            Ok((flex.value().clone(), flex.phase().is_imaginary()))
+            let flex = FlexPauliString::from_str_with_budget(text, budget).map_err(|error| {
+                // Storage refusals keep their type; every other failure is malformed flow text.
+                match error {
+                    StabilizerError::MemoryBudgetExceeded { .. }
+                    | StabilizerError::AllocationFailed { .. } => error,
+                    _ => invalid_flow_text(original_text),
+                }
+            })?;
+            let is_imaginary = flex.phase().is_imaginary();
+            Ok((flex.into_value(), is_imaginary))
         }
     }
 }

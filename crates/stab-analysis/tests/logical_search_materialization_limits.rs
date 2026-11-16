@@ -87,49 +87,54 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
     let defaults = LogicalErrorSearchLimits::default();
     let ordinary = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n")?;
     assert_eq!(
-        graphlike(&ordinary, defaults)?,
+        graphlike(&ordinary, defaults.clone())?,
         shortest_graphlike_undetectable_logical_error(&ordinary, false)?
     );
     assert_eq!(
-        hypergraph(&ordinary, defaults)?,
+        hypergraph(&ordinary, defaults.clone())?,
         find_undetectable_logical_error(&ordinary, usize::MAX, usize::MAX, false)?
     );
 
     let annotations = DetectorErrorModel::from_dem_str(
         "repeat 10001 {\ndetector D0\nlogical_observable L0\nshift_detectors 0\n}\nerror(0.1) L0\n",
     )?;
-    graphlike(&annotations, defaults.with_max_expanded_error_mechanisms(1))?;
+    graphlike(
+        &annotations,
+        defaults.clone().with_max_expanded_error_mechanisms(1),
+    )?;
 
     for (name, run, source, limits) in [
         (
             "graphlike repeat count",
             graphlike as SearchRunner,
             "repeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n",
-            defaults.with_max_repeat_unroll(2),
+            defaults.clone().with_max_repeat_unroll(2),
         ),
         (
             "hypergraph repeat iterations",
             hypergraph as SearchRunner,
             "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
-            defaults.with_max_repeat_iterations(6),
+            defaults.clone().with_max_repeat_iterations(6),
         ),
         (
             "hypergraph targets per mechanism",
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\n",
-            defaults.with_max_error_target_occurrences_per_mechanism(3),
+            defaults
+                .clone()
+                .with_max_error_target_occurrences_per_mechanism(3),
         ),
         (
             "graphlike total targets",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.with_max_total_error_target_occurrences(4),
+            defaults.clone().with_max_total_error_target_occurrences(4),
         ),
         (
             "hypergraph detector nodes",
             hypergraph as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.with_max_effective_detector_nodes(2),
+            defaults.clone().with_max_effective_detector_nodes(2),
         ),
     ] {
         assert_search_boundary_admitted(name, run, source, limits);
@@ -141,63 +146,65 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
             "graphlike repeat count",
             graphlike as SearchRunner,
             "repeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n",
-            defaults.with_max_repeat_unroll(1),
+            defaults.clone().with_max_repeat_unroll(1),
             ResourceKind::RepeatCount,
         ),
         (
             "hypergraph repeat iterations",
             hypergraph as SearchRunner,
             "repeat 2 {\nrepeat 2 {\nerror(0.1) D0 L0\nshift_detectors 1\n}\n}\n",
-            defaults.with_max_repeat_iterations(5),
+            defaults.clone().with_max_repeat_iterations(5),
             ResourceKind::RepeatIterations,
         ),
         (
             "graphlike mechanisms",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.2) D0\n",
-            defaults.with_max_expanded_error_mechanisms(1),
+            defaults.clone().with_max_expanded_error_mechanisms(1),
             ResourceKind::ErrorMechanisms,
         ),
         (
             "hypergraph targets per mechanism",
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\n",
-            defaults.with_max_error_target_occurrences_per_mechanism(2),
+            defaults
+                .clone()
+                .with_max_error_target_occurrences_per_mechanism(2),
             ResourceKind::ErrorTargetOccurrencesPerMechanism,
         ),
         (
             "graphlike total targets",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.with_max_total_error_target_occurrences(3),
+            defaults.clone().with_max_total_error_target_occurrences(3),
             ResourceKind::TotalErrorTargetOccurrences,
         ),
         (
             "hypergraph detector nodes",
             hypergraph as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D1 L1\n",
-            defaults.with_max_effective_detector_nodes(1),
+            defaults.clone().with_max_effective_detector_nodes(1),
             ResourceKind::EffectiveDetectorNodes,
         ),
         (
             "graphlike unique edges",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
-            defaults.with_max_unique_graph_edges(1),
+            defaults.clone().with_max_unique_graph_edges(1),
             ResourceKind::UniqueGraphEdges,
         ),
         (
             "graphlike stored graph terms",
             graphlike as SearchRunner,
             "error(0.1) D0 L0 L1\n",
-            defaults.with_max_stored_graph_terms(2),
+            defaults.clone().with_max_stored_graph_terms(2),
             ResourceKind::StoredGraphTerms,
         ),
         (
             "hypergraph edge degree",
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\n",
-            defaults.with_max_hyperedge_degree(1),
+            defaults.clone().with_max_hyperedge_degree(1),
             ResourceKind::HyperedgeDegree,
         ),
         (
@@ -205,6 +212,7 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
             hypergraph as SearchRunner,
             "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
             defaults
+                .clone()
                 .with_max_hyperedge_degree(2)
                 .with_max_hyperedge_incidences(2),
             ResourceKind::HyperedgeIncidences,
@@ -213,21 +221,21 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
             "graphlike search states",
             graphlike as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D0 L1\nerror(0.1) D0 L2\n",
-            defaults.with_max_search_states(4),
+            defaults.clone().with_max_search_states(4),
             ResourceKind::SearchStates,
         ),
         (
             "hypergraph transitions",
             hypergraph as SearchRunner,
             "error(0.1) D0 L0\nerror(0.1) D0 L1\nerror(0.1) D0 L2\n",
-            defaults.with_max_search_transitions(0),
+            defaults.clone().with_max_search_transitions(0),
             ResourceKind::SearchTransitions,
         ),
         (
             "graphlike state terms",
             graphlike as SearchRunner,
             variable_payload.as_str(),
-            defaults.with_max_search_state_terms(8),
+            defaults.clone().with_max_search_state_terms(8),
             ResourceKind::SearchStateTerms,
         ),
         (
@@ -235,6 +243,7 @@ fn logical_search_limits_return_typed_failures_without_mutating_source() -> Anal
             hypergraph as SearchRunner,
             variable_payload.as_str(),
             defaults
+                .clone()
                 .with_max_search_state_terms(64)
                 .with_max_stored_search_state_terms(8),
             ResourceKind::StoredSearchStateTerms,

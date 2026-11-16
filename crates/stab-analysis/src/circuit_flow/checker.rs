@@ -1,27 +1,78 @@
 use stab_algebra::{
-    Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString, StabilizerResult, Tableau,
+    AlgebraMemoryBudget, Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString,
+    StabilizerError, Tableau,
 };
-use stab_model::{Circuit, CircuitItem, DemTarget, GateCategory, QubitId, Target};
+use stab_model::{
+    Cancellation, Circuit, CircuitItem, DemTarget, GateCategory, MemoryBudget, QubitId, Target,
+};
 
 use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
 use crate::{
-    AnalysisError, AnalysisResult, circuit_to_tableau,
+    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceLimitError,
+    ResourceOperation, circuit_to_tableau_with_options,
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
+
+/// Options for the unsigned stabilizer flow checks, such as
+/// [`check_if_circuit_has_unsigned_stabilizer_flows_with_options`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct UnsignedFlowCheckOptions {
+    /// Budget for the dense Tableau of the circuit and for each Pauli string the sparse tracker
+    /// extracts. A Tableau the budget refuses is not an error: the check falls back to the sparse
+    /// tracker, which is how circuits too wide for a Tableau are checked.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled once per instruction, Tableau composition, seeded flow term, and checked flow.
+    pub cancellation: Cancellation,
+}
+
+impl UnsignedFlowCheckOptions {
+    fn algebra_budget(&self) -> AlgebraMemoryBudget {
+        AlgebraMemoryBudget::from_bytes(self.memory_budget.bytes())
+    }
+}
+
+/// Checks unsigned stabilizer flows with the default memory budget, reporting `false` for a flow
+/// the checker cannot decide.
+///
+/// See [`check_if_circuit_has_unsigned_stabilizer_flows_with_options`].
+pub fn check_if_circuit_has_unsigned_stabilizer_flows(
+    circuit: &Circuit,
+    flows: &[Flow],
+) -> Vec<bool> {
+    check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+        circuit,
+        flows,
+        &UnsignedFlowCheckOptions::default(),
+    )
+    .unwrap_or_else(|_| vec![false; flows.len()])
+}
 
 /// Checks unsigned stabilizer flows against the supported unitary and sparse-tracker subsets.
 ///
 /// Pauli-only flows of a measurement-free circuit are checked either against one dense Tableau or
 /// with the sparse reverse tracker, whichever [`FlowCheckCost`] estimates to be cheaper; both
-/// return the same result.
-pub fn check_if_circuit_has_unsigned_stabilizer_flows(
+/// return the same result. A flow outside the supported subset is reported as `false`.
+///
+/// # Errors
+///
+/// Returns [`AnalysisError::Cancelled`] once the options' signal is observed, never a partial or
+/// `false` result, and [`AnalysisError::ResourceLimit`] when a Pauli string the sparse tracker
+/// extracts exceeds the options' memory budget.
+pub fn check_if_circuit_has_unsigned_stabilizer_flows_with_options(
     circuit: &Circuit,
     flows: &[Flow],
-) -> Vec<bool> {
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Vec<bool>> {
+    options.cancellation.check()?;
     if flows.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    check_unsigned_flows_using(select_flow_check_algorithm(circuit, flows), circuit, flows)
+    check_unsigned_flows_using(
+        select_flow_check_algorithm(circuit, flows),
+        circuit,
+        flows,
+        options,
+    )
 }
 
 /// Chooses the cheaper algorithm for a flow query, or the sparse tracker when only it applies.
@@ -83,60 +134,128 @@ pub(crate) fn check_unsigned_flows_using(
     algorithm: FlowCheckAlgorithm,
     circuit: &Circuit,
     flows: &[Flow],
-) -> Vec<bool> {
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Vec<bool>> {
     if algorithm == FlowCheckAlgorithm::DenseTableau
-        && let Some(tableau) = dense_flow_tableau(circuit, flows)
+        && let Some(tableau) = dense_flow_tableau(circuit, flows, options)?
     {
         return flows
             .iter()
             .map(|flow| {
-                dense_flow_image(&tableau, flow.input())
-                    .is_ok_and(|actual| paulis_match_unsigned(&actual, flow.output()))
+                options.cancellation.check()?;
+                Ok(dense_flow_image(&tableau, flow.input(), options)?
+                    .is_some_and(|actual| paulis_match_unsigned(&actual, flow.output())))
             })
             .collect();
     }
-    check_unsigned_flows_with_sparse_tracker(circuit, flows)
-        .unwrap_or_else(|_| vec![false; flows.len()])
+    match check_unsigned_flows_with_sparse_tracker(circuit, flows, options) {
+        Err(error) if !stops_flow_check(&error) => Ok(vec![false; flows.len()]),
+        result => result,
+    }
+}
+
+/// Reports whether a failure stops the whole check instead of failing the flows closed: the
+/// caller's signal or budget, as opposed to a query outside the supported subset.
+pub(crate) fn stops_flow_check(error: &AnalysisError) -> bool {
+    matches!(
+        error,
+        AnalysisError::Cancelled(_) | AnalysisError::ResourceLimit(_)
+    )
 }
 
 /// Builds the dense Tableau when it can check every flow. Noise is skipped because unsigned flow
-/// checking ignores it, exactly as the sparse tracker does.
-fn dense_flow_tableau(circuit: &Circuit, flows: &[Flow]) -> Option<Tableau> {
+/// checking ignores it, exactly as the sparse tracker does. A Tableau that cannot be built, for
+/// example because the budget refuses it, yields `None` so the caller falls back to the sparse
+/// tracker; only cancellation stops the check.
+fn dense_flow_tableau(
+    circuit: &Circuit,
+    flows: &[Flow],
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Option<Tableau>> {
     if !dense_tableau_can_check(circuit, flows) {
-        return None;
+        return Ok(None);
     }
-    circuit_to_tableau(circuit, true, false, false).ok()
+    let tableau_options = CircuitToTableauOptions {
+        ignore_noise: true,
+        memory_budget: options.memory_budget,
+        cancellation: options.cancellation.clone(),
+        ..CircuitToTableauOptions::default()
+    };
+    match circuit_to_tableau_with_options(circuit, &tableau_options) {
+        Ok(tableau) => Ok(Some(tableau)),
+        Err(AnalysisError::Cancelled(cancelled)) => Err(cancelled.into()),
+        Err(_) => Ok(None),
+    }
 }
 
 /// Applies the Tableau to a flow input no wider than it, padding the input with identities.
-fn dense_flow_image(tableau: &Tableau, input: &PauliString) -> StabilizerResult<PauliString> {
+///
+/// Returns `Ok(None)` when the Tableau cannot act on the input, and an error only for a padded
+/// input the budget refuses.
+fn dense_flow_image(
+    tableau: &Tableau,
+    input: &PauliString,
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Option<PauliString>> {
+    dense_flow_image_or_reason(tableau, input, options).map(Result::ok)
+}
+
+/// Like [`dense_flow_image`], keeping the reason the Tableau could not act on the input.
+fn dense_flow_image_or_reason(
+    tableau: &Tableau,
+    input: &PauliString,
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Result<PauliString, String>> {
     if input.len() == tableau.len() {
-        return tableau.apply(input);
+        return Ok(tableau.apply(input).map_err(|error| error.to_string()));
     }
-    let padded = PauliString::from_bases(
+    let padded = match PauliString::from_bases_with_budget(
         PauliSign::Plus,
         (0..tableau.len()).map(|index| input.get(index).unwrap_or(PauliBasis::I)),
-    )?;
-    tableau.apply(&padded)
+        options.algebra_budget(),
+    ) {
+        Ok(padded) => padded,
+        Err(StabilizerError::MemoryBudgetExceeded {
+            requested_bytes,
+            budget_bytes,
+            ..
+        }) => {
+            return Err(ResourceLimitError::memory_budget(
+                ResourceOperation::FlowCheck,
+                ResourceKind::MaterializedBytes,
+                u64::try_from(requested_bytes).unwrap_or(u64::MAX),
+                budget_bytes,
+            )
+            .into());
+        }
+        Err(error) => return Ok(Err(error.to_string())),
+    };
+    Ok(tableau.apply(&padded).map_err(|error| error.to_string()))
 }
 
 fn check_unsigned_flows_with_tableau(
     tableau: &Tableau,
     flows: &[Flow],
-) -> Vec<UnsignedStabilizerFlowCheck> {
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Vec<UnsignedStabilizerFlowCheck>> {
     flows
         .iter()
-        .map(|flow| match dense_flow_image(tableau, flow.input()) {
-            Ok(actual) if paulis_match_unsigned(&actual, flow.output()) => {
-                UnsignedStabilizerFlowCheck::passed()
-            }
-            Ok(actual) => {
-                UnsignedStabilizerFlowCheck::failed(UnsignedStabilizerFlowFailure::OutputMismatch {
-                    expected_output: unsigned_pauli(flow.output()),
-                    actual_output: unsigned_pauli(&actual),
-                })
-            }
-            Err(error) => UnsignedStabilizerFlowCheck::unsupported(error.to_string()),
+        .map(|flow| {
+            options.cancellation.check()?;
+            Ok(
+                match dense_flow_image_or_reason(tableau, flow.input(), options)? {
+                    Ok(actual) if paulis_match_unsigned(&actual, flow.output()) => {
+                        UnsignedStabilizerFlowCheck::passed()
+                    }
+                    Ok(actual) => UnsignedStabilizerFlowCheck::failed(
+                        UnsignedStabilizerFlowFailure::OutputMismatch {
+                            expected_output: unsigned_pauli(flow.output()),
+                            actual_output: unsigned_pauli(&actual),
+                        },
+                    ),
+                    Err(reason) => UnsignedStabilizerFlowCheck::unsupported(reason),
+                },
+            )
         })
         .collect()
 }
@@ -188,14 +307,48 @@ pub enum UnsignedStabilizerFlowFailure {
 /// [`UnsignedStabilizerFlowFailure::OutputMismatch`] with the circuit's image of the flow input,
 /// as wide as the widest of the circuit, the input, and the output. Every other Pauli mismatch
 /// reports [`UnsignedStabilizerFlowFailure::InputMismatch`].
+///
+/// The default memory budget applies, and a check the budget refuses reports every flow as
+/// [`UnsignedStabilizerFlowFailure::UnsupportedCircuit`] with the refusal as its reason; see
+/// [`check_unsigned_stabilizer_flows_with_diagnostics_with_options`].
 pub fn check_unsigned_stabilizer_flows_with_diagnostics(
     circuit: &Circuit,
     flows: &[Flow],
 ) -> Vec<UnsignedStabilizerFlowCheck> {
+    check_unsigned_stabilizer_flows_with_diagnostics_with_options(
+        circuit,
+        flows,
+        &UnsignedFlowCheckOptions::default(),
+    )
+    .unwrap_or_else(|error| {
+        vec![UnsignedStabilizerFlowCheck::unsupported(error.to_string()); flows.len()]
+    })
+}
+
+/// Checks unsigned stabilizer flows with diagnostics under the given options.
+///
+/// This is [`check_unsigned_stabilizer_flows_with_diagnostics`] with a caller budget and
+/// cancellation signal, as [`check_if_circuit_has_unsigned_stabilizer_flows_with_options`].
+///
+/// # Errors
+///
+/// Returns [`AnalysisError::Cancelled`] once the options' signal is observed and
+/// [`AnalysisError::ResourceLimit`] when a Pauli string the check extracts exceeds the budget.
+pub fn check_unsigned_stabilizer_flows_with_diagnostics_with_options(
+    circuit: &Circuit,
+    flows: &[Flow],
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Vec<UnsignedStabilizerFlowCheck>> {
+    options.cancellation.check()?;
     if flows.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    diagnose_unsigned_flows_using(select_flow_check_algorithm(circuit, flows), circuit, flows)
+    diagnose_unsigned_flows_using(
+        select_flow_check_algorithm(circuit, flows),
+        circuit,
+        flows,
+        options,
+    )
 }
 
 /// Diagnoses flows with the given algorithm; either algorithm returns the same diagnostics.
@@ -203,22 +356,29 @@ pub(crate) fn diagnose_unsigned_flows_using(
     algorithm: FlowCheckAlgorithm,
     circuit: &Circuit,
     flows: &[Flow],
-) -> Vec<UnsignedStabilizerFlowCheck> {
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Vec<UnsignedStabilizerFlowCheck>> {
     if algorithm == FlowCheckAlgorithm::DenseTableau
-        && let Some(tableau) = dense_flow_tableau(circuit, flows)
+        && let Some(tableau) = dense_flow_tableau(circuit, flows, options)?
     {
-        return check_unsigned_flows_with_tableau(&tableau, flows);
+        return check_unsigned_flows_with_tableau(&tableau, flows, options);
     }
-    let checks = match diagnose_unsigned_flows_with_sparse_tracker(circuit, flows) {
+    let checks = match diagnose_unsigned_flows_with_sparse_tracker(circuit, flows, options) {
         Ok(checks) => checks,
+        Err(error) if stops_flow_check(&error) => return Err(error),
         Err(error) => {
-            return vec![UnsignedStabilizerFlowCheck::unsupported(error.to_string()); flows.len()];
+            return Ok(vec![
+                UnsignedStabilizerFlowCheck::unsupported(
+                    error.to_string()
+                );
+                flows.len()
+            ]);
         }
     };
     if circuit_acts_unitarily_on_pauli_flows(circuit) {
-        report_unitary_mismatches_as_outputs(circuit, flows, checks)
+        report_unitary_mismatches_as_outputs(circuit, flows, checks, options)
     } else {
-        checks
+        Ok(checks)
     }
 }
 
@@ -230,7 +390,8 @@ fn report_unitary_mismatches_as_outputs(
     circuit: &Circuit,
     flows: &[Flow],
     mut checks: Vec<UnsignedStabilizerFlowCheck>,
-) -> Vec<UnsignedStabilizerFlowCheck> {
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<Vec<UnsignedStabilizerFlowCheck>> {
     let failing = flows
         .iter()
         .zip(&checks)
@@ -245,14 +406,19 @@ fn report_unitary_mismatches_as_outputs(
         .map(|(index, (flow, _))| (index, flow))
         .collect::<Vec<_>>();
     if failing.is_empty() {
-        return checks;
+        return Ok(checks);
     }
     let inputs = failing
         .iter()
         .map(|(_, flow)| flow.input().clone())
         .collect::<Vec<_>>();
     let images = crate::circuit_inverse::unitary_part_inverse(circuit)
-        .and_then(|inverse| pull_back_paulis_with_sparse_tracker(&inverse, &inputs));
+        .and_then(|inverse| pull_back_paulis_with_sparse_tracker(&inverse, &inputs, options));
+    if let Err(error) = &images
+        && stops_flow_check(error)
+    {
+        return Err(error.clone());
+    }
     let circuit_qubits = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     for (position, (index, flow)) in failing.into_iter().enumerate() {
         let failure = match &images {
@@ -283,7 +449,7 @@ fn report_unitary_mismatches_as_outputs(
             *check = UnsignedStabilizerFlowCheck::failed(failure);
         }
     }
-    checks
+    Ok(checks)
 }
 
 /// Tracks each Pauli string backwards through `circuit` and returns the Pauli strings it pulls
@@ -291,12 +457,14 @@ fn report_unitary_mismatches_as_outputs(
 fn pull_back_paulis_with_sparse_tracker(
     circuit: &Circuit,
     paulis: &[PauliString],
+    options: &UnsignedFlowCheckOptions,
 ) -> AnalysisResult<Vec<PauliString>> {
     let qubit_count = paulis.iter().map(PauliString::len).fold(
         stab_model::advanced::circuit_simulated_qubit_count(circuit),
         usize::max,
     );
     let mut tracker = SparseReverseFrameTracker::new(qubit_count, 0, 0, false);
+    tracker.set_cancellation(options.cancellation.clone());
     let targets = (0..paulis.len())
         .map(|index| {
             u64::try_from(index).map(DemTarget::numeric).map_err(|_| {
@@ -310,7 +478,13 @@ fn pull_back_paulis_with_sparse_tracker(
     tracker.undo_circuit(circuit)?;
     targets
         .into_iter()
-        .map(|target| Ok(tracker.compact_region_for_target(target)?.value().clone()))
+        .map(|target| {
+            tracker.check_cancelled()?;
+            Ok(tracker
+                .compact_region_for_target(target, options.algebra_budget())?
+                .value()
+                .clone())
+        })
         .collect()
 }
 
@@ -344,7 +518,10 @@ impl UnsignedStabilizerFlowCheck {
     }
 }
 
-/// Returns true when the circuit has the given unsigned stabilizer flow.
+/// Returns true when the circuit has the given unsigned stabilizer flow, under the default memory
+/// budget.
+///
+/// See [`circuit_has_unsigned_stabilizer_flow_with_options`].
 pub fn circuit_has_unsigned_stabilizer_flow(circuit: &Circuit, flow: &Flow) -> bool {
     check_if_circuit_has_unsigned_stabilizer_flows(circuit, std::slice::from_ref(flow))
         .into_iter()
@@ -352,30 +529,73 @@ pub fn circuit_has_unsigned_stabilizer_flow(circuit: &Circuit, flow: &Flow) -> b
         .unwrap_or(false)
 }
 
-/// Returns true when the circuit has every requested unsigned stabilizer flow.
+/// Returns true when the circuit has the given unsigned stabilizer flow.
+///
+/// # Errors
+///
+/// Fails like [`check_if_circuit_has_unsigned_stabilizer_flows_with_options`].
+pub fn circuit_has_unsigned_stabilizer_flow_with_options(
+    circuit: &Circuit,
+    flow: &Flow,
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<bool> {
+    Ok(check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+        circuit,
+        std::slice::from_ref(flow),
+        options,
+    )?
+    .into_iter()
+    .next()
+    .unwrap_or(false))
+}
+
+/// Returns true when the circuit has every requested unsigned stabilizer flow, under the default
+/// memory budget.
 ///
 /// This is the Rust unsigned counterpart of Stim's `has_all_flows` batch query for the supported
 /// Stab flow-checker subset. Signs are ignored, matching
-/// [`check_if_circuit_has_unsigned_stabilizer_flows`].
+/// [`check_if_circuit_has_unsigned_stabilizer_flows`]. See
+/// [`circuit_has_all_unsigned_stabilizer_flows_with_options`].
 pub fn circuit_has_all_unsigned_stabilizer_flows(circuit: &Circuit, flows: &[Flow]) -> bool {
     check_if_circuit_has_unsigned_stabilizer_flows(circuit, flows)
         .into_iter()
         .all(|has_flow| has_flow)
 }
 
+/// Returns true when the circuit has every requested unsigned stabilizer flow.
+///
+/// # Errors
+///
+/// Fails like [`check_if_circuit_has_unsigned_stabilizer_flows_with_options`].
+pub fn circuit_has_all_unsigned_stabilizer_flows_with_options(
+    circuit: &Circuit,
+    flows: &[Flow],
+    options: &UnsignedFlowCheckOptions,
+) -> AnalysisResult<bool> {
+    Ok(
+        check_if_circuit_has_unsigned_stabilizer_flows_with_options(circuit, flows, options)?
+            .into_iter()
+            .all(|has_flow| has_flow),
+    )
+}
+
 pub(crate) fn check_unsigned_flows_with_sparse_tracker(
     circuit: &Circuit,
     flows: &[Flow],
+    options: &UnsignedFlowCheckOptions,
 ) -> AnalysisResult<Vec<bool>> {
-    Ok(diagnose_unsigned_flows_with_sparse_tracker(circuit, flows)?
-        .into_iter()
-        .map(|check| check.has_flow)
-        .collect())
+    Ok(
+        diagnose_unsigned_flows_with_sparse_tracker(circuit, flows, options)?
+            .into_iter()
+            .map(|check| check.has_flow)
+            .collect(),
+    )
 }
 
 fn diagnose_unsigned_flows_with_sparse_tracker(
     circuit: &Circuit,
     flows: &[Flow],
+    options: &UnsignedFlowCheckOptions,
 ) -> AnalysisResult<Vec<UnsignedStabilizerFlowCheck>> {
     if flows.is_empty() {
         return Ok(Vec::new());
@@ -395,6 +615,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
         stab_model::advanced::circuit_simulated_qubit_count(circuit).max(flow_qubit_count);
     let mut tracker =
         SparseReverseFrameTracker::new(qubit_count, measurement_count, detector_count, false);
+    tracker.set_cancellation(options.cancellation.clone());
 
     let mut preliminary = Vec::with_capacity(flows.len());
     for (flow_index, flow) in flows.iter().enumerate() {
@@ -429,6 +650,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
             if let Some(failure) = preliminary.get(flow_index).cloned().flatten() {
                 return Ok(UnsignedStabilizerFlowCheck::failed(failure));
             }
+            tracker.check_cancelled()?;
             let tracked_target = DemTarget::numeric(u64::try_from(flow_index).map_err(|_| {
                 AnalysisError::invalid_detector_error_model("flow index does not fit u64")
             })?);
@@ -440,7 +662,9 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
             let mut bases = vec![PauliBasis::I; flow.input().len()];
             xor_region(
                 &mut bases,
-                tracker.compact_region_for_target(tracked_target)?.value(),
+                tracker
+                    .compact_region_for_target(tracked_target, options.algebra_budget())?
+                    .value(),
             );
             let actual = stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, bases);
             if paulis_match_unsigned(&actual, flow.input()) {
@@ -482,6 +706,7 @@ fn seed_flow_pauli_output(
                     "flow output qubit index {index} is outside the supported target range"
                 ))
             })?;
+        tracker.poll_cancellation()?;
         tracker.toggle_pauli_target(qubit, basis, target)?;
     }
     Ok(())

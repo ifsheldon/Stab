@@ -1,8 +1,12 @@
+use stab_model::Cancellation;
+
 /// Admission limits for DEM SAT traversal, CNF materialization, and WCNF serialization.
 ///
 /// These limits belong to the SAT-generation operation. They do not change DEM parsing,
-/// validation, or compact-model semantics.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// validation, or compact-model semantics. The cancellation signal is polled once per traversed
+/// instruction and repeat iteration, flattened error mechanism, emitted clause, and serialized
+/// clause.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SatMaterializationLimits {
     max_expanded_instructions: u64,
     max_repeat_iterations: u64,
@@ -12,6 +16,7 @@ pub struct SatMaterializationLimits {
     max_clauses: usize,
     max_clause_literals: usize,
     max_output_bytes: usize,
+    cancellation: Cancellation,
 }
 
 impl SatMaterializationLimits {
@@ -24,36 +29,48 @@ impl SatMaterializationLimits {
     pub const DEFAULT_MAX_CLAUSE_LITERALS: usize = 1_500_000;
     pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 128 * 1024 * 1024;
 
-    pub const fn max_expanded_instructions(self) -> u64 {
+    pub const fn max_expanded_instructions(&self) -> u64 {
         self.max_expanded_instructions
     }
 
-    pub const fn max_repeat_iterations(self) -> u64 {
+    pub const fn max_repeat_iterations(&self) -> u64 {
         self.max_repeat_iterations
     }
 
-    pub const fn max_error_mechanisms(self) -> usize {
+    pub const fn max_error_mechanisms(&self) -> usize {
         self.max_error_mechanisms
     }
 
-    pub const fn max_target_occurrences(self) -> usize {
+    pub const fn max_target_occurrences(&self) -> usize {
         self.max_target_occurrences
     }
 
-    pub const fn max_variables(self) -> usize {
+    pub const fn max_variables(&self) -> usize {
         self.max_variables
     }
 
-    pub const fn max_clauses(self) -> usize {
+    pub const fn max_clauses(&self) -> usize {
         self.max_clauses
     }
 
-    pub const fn max_clause_literals(self) -> usize {
+    pub const fn max_clause_literals(&self) -> usize {
         self.max_clause_literals
     }
 
-    pub const fn max_output_bytes(self) -> usize {
+    pub const fn max_output_bytes(&self) -> usize {
         self.max_output_bytes
+    }
+
+    /// Returns the cancellation signal polled while the problem is generated.
+    pub const fn cancellation(&self) -> &Cancellation {
+        &self.cancellation
+    }
+
+    /// Sets the cancellation signal polled while the problem is generated.
+    #[must_use]
+    pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.cancellation = cancellation;
+        self
     }
 
     #[must_use]
@@ -116,6 +133,7 @@ impl Default for SatMaterializationLimits {
             max_clauses: Self::DEFAULT_MAX_CLAUSES,
             max_clause_literals: Self::DEFAULT_MAX_CLAUSE_LITERALS,
             max_output_bytes: Self::DEFAULT_MAX_OUTPUT_BYTES,
+            cancellation: Cancellation::never(),
         }
     }
 }

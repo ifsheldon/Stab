@@ -1,46 +1,129 @@
-use stab_algebra::{PauliBasis, PauliString, Tableau};
+use stab_algebra::{AlgebraMemoryBudget, PauliBasis, PauliString, StabilizerError, Tableau};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, Pauli, QubitId, Target,
-    advanced::{ControlledPauliTargetPair, classify_controlled_pauli_target_pair},
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, MemoryBudget,
+    Pauli, QubitId, Target,
+    advanced::{
+        CancellationCountdown, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
+    },
 };
 
-use crate::{AnalysisError, AnalysisResult, circuit_to_tableau};
+use crate::{
+    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceLimitError,
+    ResourceOperation, circuit_to_tableau_with_options,
+};
+
+/// Options for [`pauli_after_circuit_with_options`] and [`pauli_before_circuit_with_options`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct PauliConjugationOptions {
+    /// Budget for the circuit's Tableau and the conjugated Pauli string. A Tableau the budget
+    /// refuses is not an error: conjugation then walks the expanded instructions instead.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled once per folded item, Tableau composition, and expanded instruction.
+    pub cancellation: Cancellation,
+}
+
+/// Returns the Pauli observable after the circuit under the default memory budget.
+///
+/// See [`pauli_after_circuit_with_options`].
+pub fn pauli_after_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisResult<PauliString> {
+    pauli_after_circuit_with_options(pauli, circuit, &PauliConjugationOptions::default())
+}
 
 /// Returns the Pauli observable after the circuit, when its value remains well defined.
 ///
 /// Pure Clifford circuits, including compact repeats, use one tableau action. Measurement and
-/// reset circuits follow Stim's conditional observable rules under an explicit expanded-work cap.
-pub fn pauli_after_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisResult<PauliString> {
-    validate_compact_pauli_circuit(pauli.len(), circuit)?;
-    if let Ok(tableau) = circuit_to_tableau(circuit, false, false, false) {
-        return apply_tableau_at_width(pauli, &tableau, false);
+/// reset circuits, and circuits whose Tableau the budget refuses, follow Stim's conditional
+/// observable rules over the expanded instructions, which can be as many as the repeat counts
+/// multiply to; the cancellation signal bounds that walk.
+///
+/// # Errors
+///
+/// Returns [`AnalysisError::Cancelled`] once the options' signal is observed,
+/// [`AnalysisError::ResourceLimit`] when the conjugated string exceeds the budget, and
+/// [`AnalysisError::InvalidTableauConversion`] when the observable is not well defined after the
+/// circuit.
+pub fn pauli_after_circuit_with_options(
+    pauli: &PauliString,
+    circuit: &Circuit,
+    options: &PauliConjugationOptions,
+) -> AnalysisResult<PauliString> {
+    if let Some(tableau) = conjugation_tableau(pauli, circuit, options)? {
+        return apply_tableau_at_width(pauli, &tableau, false, options);
     }
 
     let mut result = pauli.clone();
+    let mut countdown = CancellationCountdown::new();
     for instruction in circuit.iter_flattened_instructions() {
+        countdown.tick(&options.cancellation)?;
         apply_instruction_after(&mut result, instruction)?;
     }
     Ok(result)
 }
 
-/// Returns the Pauli observable before the circuit, when its value remains well defined.
+/// Returns the Pauli observable before the circuit under the default memory budget.
+///
+/// See [`pauli_before_circuit_with_options`].
 pub fn pauli_before_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisResult<PauliString> {
-    validate_compact_pauli_circuit(pauli.len(), circuit)?;
-    if let Ok(tableau) = circuit_to_tableau(circuit, false, false, false) {
-        return apply_tableau_at_width(pauli, &tableau, true);
+    pauli_before_circuit_with_options(pauli, circuit, &PauliConjugationOptions::default())
+}
+
+/// Returns the Pauli observable before the circuit, when its value remains well defined.
+///
+/// This walks the circuit backwards like [`pauli_after_circuit_with_options`] walks it forwards,
+/// and fails the same way.
+///
+/// # Errors
+///
+/// Fails like [`pauli_after_circuit_with_options`].
+pub fn pauli_before_circuit_with_options(
+    pauli: &PauliString,
+    circuit: &Circuit,
+    options: &PauliConjugationOptions,
+) -> AnalysisResult<PauliString> {
+    if let Some(tableau) = conjugation_tableau(pauli, circuit, options)? {
+        return apply_tableau_at_width(pauli, &tableau, true, options);
     }
 
     let mut result = pauli.clone();
+    let mut countdown = CancellationCountdown::new();
     for instruction in circuit.iter_flattened_instructions_reverse() {
+        countdown.tick(&options.cancellation)?;
         apply_instruction_before(&mut result, instruction)?;
     }
     Ok(result)
 }
 
-fn validate_compact_pauli_circuit(width: usize, circuit: &Circuit) -> AnalysisResult<()> {
+/// Validates the compact circuit and builds its Tableau when the circuit is unitary and the
+/// budget admits it; `None` selects the expanded walk, and only cancellation stops here.
+fn conjugation_tableau(
+    pauli: &PauliString,
+    circuit: &Circuit,
+    options: &PauliConjugationOptions,
+) -> AnalysisResult<Option<Tableau>> {
+    options.cancellation.check()?;
+    validate_compact_pauli_circuit(pauli.len(), circuit, &options.cancellation)?;
+    let tableau_options = CircuitToTableauOptions {
+        memory_budget: options.memory_budget,
+        cancellation: options.cancellation.clone(),
+        ..CircuitToTableauOptions::default()
+    };
+    match circuit_to_tableau_with_options(circuit, &tableau_options) {
+        Ok(tableau) => Ok(Some(tableau)),
+        Err(AnalysisError::Cancelled(cancelled)) => Err(cancelled.into()),
+        Err(_) => Ok(None),
+    }
+}
+
+fn validate_compact_pauli_circuit(
+    width: usize,
+    circuit: &Circuit,
+    cancellation: &Cancellation,
+) -> AnalysisResult<()> {
     let mut pending = Vec::new();
     let mut items = circuit.items().iter();
+    let mut countdown = CancellationCountdown::new();
     loop {
+        countdown.tick(cancellation)?;
         match items.next() {
             Some(CircuitItem::Instruction(instruction)) => {
                 if no_effect_on_pauli(instruction) {
@@ -472,20 +555,23 @@ fn apply_tableau_at_width(
     pauli: &PauliString,
     tableau: &Tableau,
     inverse: bool,
+    options: &PauliConjugationOptions,
 ) -> AnalysisResult<PauliString> {
+    let budget = AlgebraMemoryBudget::from_bytes(options.memory_budget.bytes());
     let tableau = if inverse {
         tableau.inverse().map_err(map_tableau_error)?
     } else {
         tableau.clone()
     };
     if tableau.len() <= pauli.len() {
-        let prefix = PauliString::from_bases(
+        let prefix = PauliString::from_bases_with_budget(
             pauli.sign(),
             (0..tableau.len()).map(|index| pauli.get(index).unwrap_or(PauliBasis::I)),
+            budget,
         )
         .map_err(map_tableau_error)?;
         let transformed = tableau.apply(&prefix).map_err(map_tableau_error)?;
-        return PauliString::from_bases(
+        return PauliString::from_bases_with_budget(
             transformed.sign(),
             (0..pauli.len()).map(|index| {
                 if index < transformed.len() {
@@ -494,13 +580,15 @@ fn apply_tableau_at_width(
                     pauli.get(index).unwrap_or(PauliBasis::I)
                 }
             }),
+            budget,
         )
         .map_err(map_tableau_error);
     }
 
-    let padded = PauliString::from_bases(
+    let padded = PauliString::from_bases_with_budget(
         pauli.sign(),
         (0..tableau.len()).map(|index| pauli.get(index).unwrap_or(PauliBasis::I)),
+        budget,
     )
     .map_err(map_tableau_error)?;
     let output = tableau.apply(&padded).map_err(map_tableau_error)?;
@@ -509,9 +597,10 @@ fn apply_tableau_at_width(
             "Pauli conjugation produced support outside the input width",
         ));
     }
-    PauliString::from_bases(
+    PauliString::from_bases_with_budget(
         output.sign(),
         (0..pauli.len()).map(|index| output.get(index).unwrap_or(PauliBasis::I)),
+        budget,
     )
     .map_err(map_tableau_error)
 }
@@ -647,6 +736,20 @@ fn unsupported_instruction(instruction: &CircuitInstruction, direction: &str) ->
     ))
 }
 
-fn map_tableau_error(error: stab_algebra::StabilizerError) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(error.to_string())
+/// Maps algebra failures, reporting a conjugated string the budget refuses as a resource error.
+fn map_tableau_error(error: StabilizerError) -> AnalysisError {
+    match error {
+        StabilizerError::MemoryBudgetExceeded {
+            requested_bytes,
+            budget_bytes,
+            ..
+        } => ResourceLimitError::memory_budget(
+            ResourceOperation::PauliConjugation,
+            ResourceKind::MaterializedBytes,
+            u64::try_from(requested_bytes).unwrap_or(u64::MAX),
+            budget_bytes,
+        )
+        .into(),
+        other => AnalysisError::invalid_tableau_conversion(other.to_string()),
+    }
 }

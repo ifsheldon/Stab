@@ -40,11 +40,14 @@ pub use circuit_feedback::{
     circuit_with_inlined_feedback_with_limits,
 };
 pub use circuit_flow::{
-    FlowGeneratorOptions, UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
-    check_if_circuit_has_unsigned_stabilizer_flows,
-    check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
+    FlowGeneratorOptions, UnsignedFlowCheckOptions, UnsignedStabilizerFlowCheck,
+    UnsignedStabilizerFlowFailure, check_if_circuit_has_unsigned_stabilizer_flows,
+    check_if_circuit_has_unsigned_stabilizer_flows_with_options,
+    check_unsigned_stabilizer_flows_with_diagnostics,
+    check_unsigned_stabilizer_flows_with_diagnostics_with_options, circuit_flow_generators,
     circuit_flow_generators_with_options, circuit_has_all_unsigned_stabilizer_flows,
-    circuit_has_unsigned_stabilizer_flow, solve_for_flow_measurements,
+    circuit_has_all_unsigned_stabilizer_flows_with_options, circuit_has_unsigned_stabilizer_flow,
+    circuit_has_unsigned_stabilizer_flow_with_options, solve_for_flow_measurements,
 };
 pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
@@ -61,7 +64,10 @@ pub use circuit_pass::{
     CircuitPass, CircuitPassContext, CircuitPassError, CircuitPassInput, CircuitPassLimits,
     CircuitPassOutput, CircuitPassProjectionError, CircuitPassResources, run_circuit_pass,
 };
-pub use circuit_pauli::{pauli_after_circuit, pauli_before_circuit};
+pub use circuit_pauli::{
+    PauliConjugationOptions, pauli_after_circuit, pauli_after_circuit_with_options,
+    pauli_before_circuit, pauli_before_circuit_with_options,
+};
 pub use circuit_simplify::decomposed_circuit;
 pub use circuit_tableau::{
     CircuitToTableauOptions, circuit_to_tableau, circuit_to_tableau_with_options,

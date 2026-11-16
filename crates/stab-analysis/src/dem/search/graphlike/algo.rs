@@ -17,12 +17,19 @@ pub fn shortest_graphlike_undetectable_logical_error(
     )
 }
 
+/// Finds a shortest graphlike undetectable logical error under explicit limits.
+///
+/// # Errors
+///
+/// Returns [`AnalysisError::Cancelled`] once the limits' cancellation signal is observed, while
+/// the graph is built or during the search, and [`AnalysisError::ResourceLimit`] when a limit is
+/// exceeded.
 pub fn shortest_graphlike_undetectable_logical_error_with_limits(
     model: &DetectorErrorModel,
     ignore_ungraphlike_errors: bool,
     limits: LogicalErrorSearchLimits,
 ) -> AnalysisResult<DetectorErrorModel> {
-    let graph = Graph::from_dem_with_limits(model, ignore_ungraphlike_errors, limits)?;
+    let graph = Graph::from_dem_with_limits(model, ignore_ungraphlike_errors, &limits)?;
     let empty = SearchState::new(None, None, ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
         let mut out = DetectorErrorModel::new();
@@ -33,13 +40,14 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
-    let mut budget = SearchBudget::new("graphlike search", limits);
+    let mut budget = SearchBudget::new("graphlike search", &limits);
     budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
     for (source_index, node) in graph.nodes.iter().enumerate() {
         let source = graph.detector_for_node_index(source_index)?;
         for edge in &node.edges {
+            budget.poll_cancellation()?;
             if !edge.observables.is_empty() && edge.detector.is_none_or(|target| source < target) {
                 let start_terms = edge
                     .observables

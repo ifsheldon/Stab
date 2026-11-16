@@ -321,13 +321,13 @@ impl Graph {
 
     #[cfg(test)]
     fn from_dem(model: &DetectorErrorModel, max_weight: usize) -> AnalysisResult<Self> {
-        Self::from_dem_with_limits(model, max_weight, LogicalErrorSearchLimits::default())
+        Self::from_dem_with_limits(model, max_weight, &LogicalErrorSearchLimits::default())
     }
 
     fn from_dem_with_limits(
         model: &DetectorErrorModel,
         max_weight: usize,
-        limits: LogicalErrorSearchLimits,
+        limits: &LogicalErrorSearchLimits,
     ) -> AnalysisResult<Self> {
         let traversal = FoldedDemTraversal::new(model)?;
         let full_detector_count = traversal.root().summary().detector_count()?;
@@ -347,7 +347,7 @@ impl Graph {
             effective_detectors,
             num_observables,
             full_detector_count > 0,
-            limits,
+            limits.clone(),
         )?;
         visit_search_graph_errors_with_limits(
             &traversal,
@@ -447,6 +447,13 @@ pub fn find_undetectable_logical_error(
     )
 }
 
+/// Searches the hypergraph of `model` for an undetectable logical error under explicit limits.
+///
+/// # Errors
+///
+/// Returns [`AnalysisError::Cancelled`] once the limits' cancellation signal is observed, while
+/// the graph is built or during the search, and [`AnalysisError::ResourceLimit`] when a limit is
+/// exceeded.
 pub fn find_undetectable_logical_error_with_limits(
     model: &DetectorErrorModel,
     dont_explore_detection_event_sets_with_size_above: usize,
@@ -462,7 +469,7 @@ pub fn find_undetectable_logical_error_with_limits(
         );
     }
 
-    let graph = Graph::from_dem_with_limits(model, dont_explore_edges_with_degree_above, limits)?;
+    let graph = Graph::from_dem_with_limits(model, dont_explore_edges_with_degree_above, &limits)?;
     let empty = SearchState::new(BTreeSet::new(), ObservableMask::new());
     if !graph.distance_1_error_mask.is_empty() {
         let mut out = DetectorErrorModel::new();
@@ -473,7 +480,7 @@ pub fn find_undetectable_logical_error_with_limits(
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
-    let mut budget = SearchBudget::new("hypergraph search", limits);
+    let mut budget = SearchBudget::new("hypergraph search", &limits);
     budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
@@ -696,7 +703,7 @@ mod limit_policy_tests {
             DemTarget::relative_detector(1).expect("D1"),
         ];
         let degree_exact = LogicalErrorSearchLimits::default().with_max_hyperedge_degree(2);
-        let mut exact_graph = Graph::new_with_limits(2, 0, degree_exact);
+        let mut exact_graph = Graph::new_with_limits(2, 0, degree_exact.clone());
         exact_graph
             .add_edge_from_dem_targets(&two_detector_edge, usize::MAX)
             .expect("the exact two-detector degree maximum is accepted");

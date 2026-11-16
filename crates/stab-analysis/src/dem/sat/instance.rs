@@ -1,3 +1,5 @@
+use stab_model::advanced::CancellationCountdown;
+
 use super::SatMaterializationLimits;
 use crate::resources::SatMaterializationResource;
 use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
@@ -109,7 +111,7 @@ pub(super) struct SatShape {
 }
 
 impl SatShape {
-    pub(super) fn validate(self, limits: SatMaterializationLimits) -> AnalysisResult<Self> {
+    pub(super) fn validate(self, limits: &SatMaterializationLimits) -> AnalysisResult<Self> {
         validate_limit(
             SatMaterializationResource::ErrorMechanisms,
             self.error_mechanisms,
@@ -146,12 +148,13 @@ pub(super) struct MaxSatInstance {
     max_weight: f64,
     clauses: Vec<Clause>,
     clause_literals: usize,
+    countdown: CancellationCountdown,
 }
 
 impl MaxSatInstance {
     pub(super) fn with_shape(
         shape: SatShape,
-        limits: SatMaterializationLimits,
+        limits: &SatMaterializationLimits,
     ) -> AnalysisResult<Self> {
         let shape = shape.validate(limits)?;
         let mut clauses = Vec::new();
@@ -162,7 +165,7 @@ impl MaxSatInstance {
             ))
         })?;
         Ok(Self {
-            limits,
+            limits: limits.clone(),
             clauses,
             ..Self::default()
         })
@@ -183,6 +186,7 @@ impl MaxSatInstance {
     }
 
     pub(super) fn add_clause(&mut self, clause: Clause) -> AnalysisResult<()> {
+        self.countdown.tick(self.limits.cancellation())?;
         if let ClauseWeight::Soft(weight) = clause.weight {
             if !weight.is_finite() || weight <= 0.0 {
                 return Err(AnalysisError::invalid_detector_error_model(
@@ -273,7 +277,9 @@ impl MaxSatInstance {
         out.push_str(&top.to_string());
         out.push('\n');
 
+        let mut countdown = CancellationCountdown::new();
         for clause in &self.clauses {
+            countdown.tick(self.limits.cancellation())?;
             let weight = self.quantized_weight(mode, top, &clause.weight)?;
             if weight == 0 {
                 continue;
@@ -299,7 +305,9 @@ impl MaxSatInstance {
         bytes = checked_output_add(bytes, decimal_digits(top))?;
         bytes = checked_output_add(bytes, 1)?;
 
+        let mut countdown = CancellationCountdown::new();
         for clause in &self.clauses {
+            countdown.tick(self.limits.cancellation())?;
             let weight = self.quantized_weight(mode, top, &clause.weight)?;
             if weight == 0 {
                 continue;
