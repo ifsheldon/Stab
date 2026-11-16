@@ -885,7 +885,7 @@ impl ReverseFoldAnalyzer {
         })?;
         let recurrence = match search {
             ShiftedRecurrenceSearch::Found { recurrence } => *recurrence,
-            ShiftedRecurrenceSearch::Exhausted { .. } => {
+            ShiftedRecurrenceSearch::Exhausted => {
                 return self.undo_loop_by_unrolling(body, iterations);
             }
         };

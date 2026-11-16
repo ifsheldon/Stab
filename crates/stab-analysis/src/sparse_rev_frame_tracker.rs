@@ -2,9 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, StabilizerError};
 use stab_model::advanced::CancellationCountdown;
-use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, Pauli, QubitId, Target,
-};
+use stab_model::{Cancellation, Circuit, CircuitInstruction, DemTarget, Pauli, QubitId, Target};
 
 mod budget;
 mod clifford_action;
@@ -226,32 +224,7 @@ impl SparseReverseFrameTracker {
         gauge_output: GaugeOutputPolicy,
         work_budget: &mut ReverseTrackerBudget<'_>,
     ) -> AnalysisResult<()> {
-        for item in circuit.items().iter().rev() {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    work_budget.admit_instruction(instruction)?;
-                    self.undo_instruction(instruction)?;
-                    if gauge_output == GaugeOutputPolicy::Discard {
-                        self.take_gauge_errors();
-                    }
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    if gauge_output == GaugeOutputPolicy::Preserve
-                        && unitary_repeat::try_undo_supported_unitary_repeat(self, repeat)?
-                    {
-                        continue;
-                    }
-                    shifted_repeat::undo_loop_with_gauge_output(
-                        self,
-                        repeat.body(),
-                        repeat.repeat_count().get(),
-                        gauge_output,
-                        work_budget,
-                    )?;
-                }
-            }
-        }
-        Ok(())
+        shifted_repeat::undo_circuit_with_gauge_output(self, circuit, gauge_output, work_budget)
     }
 
     pub(crate) fn toggle_pauli_target(

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
-    GateKind, MemoryBudget, QubitId, Target,
+    GateKind, MemoryBudget, QubitId, RepeatNestingLimit, Target,
 };
 
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
@@ -14,11 +14,6 @@ use crate::{
 
 /// Conservative retained bytes of one live tracker-state unit (one sparse map entry).
 const DETECTING_REGION_LIVE_STATE_UNIT_BYTES: u64 = 64;
-/// Region extraction recurses through the snapshot walk and the sparse tracker's recurrence
-/// probes at several frames per repeat level. The shared 256-level envelope overflows a 2 MiB
-/// test-thread stack in debug builds, so this traversal keeps its tighter 128-level bound until it
-/// is made iterative.
-const MAX_DETECTING_REGION_REPEAT_NESTING: usize = 128;
 const DETECTING_REGION_OUTPUT_ENTRY_OVERHEAD_BYTES: u64 = 64;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -207,6 +202,17 @@ struct SnapshotContext<'a> {
     qubit_count: usize,
 }
 
+enum SnapshotFrame<'a> {
+    Items(std::slice::Iter<'a, CircuitItem>),
+    Repeat {
+        body: &'a Circuit,
+        ticks_per_iteration: u64,
+        repeat_start: u64,
+        remaining: u64,
+        pending_iteration_start: Option<u64>,
+    },
+}
+
 fn undo_circuit_with_snapshots(
     circuit: &Circuit,
     tracker: &mut SparseReverseFrameTracker,
@@ -215,49 +221,132 @@ fn undo_circuit_with_snapshots(
     regions: &mut DetectingRegionTargetMap,
     budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
-    for item in circuit.items().iter().rev() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                undo_instruction_with_snapshots(
-                    instruction,
-                    tracker,
-                    context,
-                    current_tick,
-                    regions,
-                    budget,
-                )?;
+    let mut stack = vec![SnapshotFrame::Items(circuit.items().iter())];
+    while let Some(frame) = stack.last_mut() {
+        match frame {
+            SnapshotFrame::Items(items) => {
+                let Some(item) = items.next_back() else {
+                    stack.pop();
+                    continue;
+                };
+                match item {
+                    CircuitItem::Instruction(instruction) => {
+                        undo_instruction_with_snapshots(
+                            instruction,
+                            tracker,
+                            context,
+                            current_tick,
+                            regions,
+                            budget,
+                        )?;
+                    }
+                    CircuitItem::RepeatBlock(repeat) => {
+                        if let Some(next_frame) = prepare_repeat_with_snapshots(
+                            repeat.body(),
+                            repeat.repeat_count().get(),
+                            tracker,
+                            context,
+                            current_tick,
+                            budget,
+                        )? {
+                            stack.push(next_frame);
+                        }
+                    }
+                }
             }
-            CircuitItem::RepeatBlock(repeat) => {
-                undo_repeat_with_snapshots(
-                    repeat.body(),
-                    repeat.repeat_count().get(),
-                    tracker,
-                    context,
-                    current_tick,
-                    regions,
-                    budget,
+            SnapshotFrame::Repeat {
+                body,
+                ticks_per_iteration,
+                repeat_start,
+                remaining,
+                pending_iteration_start,
+            } => {
+                if let Some(iteration_start) = pending_iteration_start.take() {
+                    if *current_tick != iteration_start {
+                        return Err(AnalysisError::invalid_detector_error_model(
+                            "detecting-region repeat body tick count changed during traversal",
+                        ));
+                    }
+                    *remaining -= 1;
+                }
+                if *remaining == 0 {
+                    stack.pop();
+                    continue;
+                }
+                tracker.poll_cancellation()?;
+                let iteration_start =
+                    current_tick
+                        .checked_sub(*ticks_per_iteration)
+                        .ok_or_else(|| {
+                            AnalysisError::invalid_detector_error_model(
+                                "detecting-region repeat iteration tick span underflowed",
+                            )
+                        })?;
+                let selected_in_iteration = context
+                    .ticks
+                    .range(CircuitTick::new(iteration_start)..CircuitTick::new(*current_tick))
+                    .next()
+                    .is_some();
+                if selected_in_iteration {
+                    *pending_iteration_start = Some(iteration_start);
+                    let body = *body;
+                    stack.push(SnapshotFrame::Items(body.items().iter()));
+                    continue;
+                }
+                let Some(previous_selected_tick) = context
+                    .ticks
+                    .range(CircuitTick::new(*repeat_start)..CircuitTick::new(*current_tick))
+                    .next_back()
+                    .map(|tick| tick.get())
+                else {
+                    tracker.undo_repeated_circuit_with_budget(body, *remaining, budget)?;
+                    *current_tick = *repeat_start;
+                    stack.pop();
+                    continue;
+                };
+                let skipped = skipped_repeat_iterations(
+                    previous_selected_tick,
+                    *repeat_start,
+                    *ticks_per_iteration,
+                    *remaining,
                 )?;
+                tracker.undo_repeated_circuit_with_budget(body, skipped, budget)?;
+                let skipped_ticks = ticks_per_iteration.checked_mul(skipped).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model(
+                        "detecting-region skipped tick count overflowed",
+                    )
+                })?;
+                *current_tick = current_tick.checked_sub(skipped_ticks).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model(
+                        "detecting-region skipped tick span underflowed",
+                    )
+                })?;
+                *remaining = remaining.checked_sub(skipped).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model(
+                        "detecting-region skipped repeat count underflowed",
+                    )
+                })?;
             }
         }
     }
     Ok(())
 }
 
-fn undo_repeat_with_snapshots(
-    body: &Circuit,
+fn prepare_repeat_with_snapshots<'a>(
+    body: &'a Circuit,
     repetitions: u64,
     tracker: &mut SparseReverseFrameTracker,
     context: &SnapshotContext<'_>,
     current_tick: &mut u64,
-    regions: &mut DetectingRegionTargetMap,
     budget: &mut DetectingRegionBudget,
-) -> AnalysisResult<()> {
+) -> AnalysisResult<Option<SnapshotFrame<'a>>> {
     if repetitions == 0 {
-        return Ok(());
+        return Ok(None);
     }
     let ticks_per_iteration = body.count_ticks()?;
     if ticks_per_iteration == 0 {
-        return tracker.undo_repeated_circuit_with_budget(body, repetitions, budget);
+        tracker.undo_repeated_circuit_with_budget(body, repetitions, budget)?;
+        return Ok(None);
     }
     let repeated_ticks = ticks_per_iteration
         .checked_mul(repetitions)
@@ -279,87 +368,48 @@ fn undo_repeat_with_snapshots(
     {
         tracker.undo_repeated_circuit_with_budget(body, repetitions, budget)?;
         *current_tick = repeat_start;
-        return Ok(());
+        return Ok(None);
     }
+    Ok(Some(SnapshotFrame::Repeat {
+        body,
+        ticks_per_iteration,
+        repeat_start,
+        remaining: repetitions,
+        pending_iteration_start: None,
+    }))
+}
 
-    let mut remaining = repetitions;
-    while remaining > 0 {
-        tracker.poll_cancellation()?;
-        let iteration_start = current_tick
-            .checked_sub(ticks_per_iteration)
-            .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "detecting-region repeat iteration tick span underflowed",
-                )
-            })?;
-        let selected_in_iteration = context
-            .ticks
-            .range(CircuitTick::new(iteration_start)..CircuitTick::new(*current_tick))
-            .next()
-            .is_some();
-        if selected_in_iteration {
-            undo_circuit_with_snapshots(body, tracker, context, current_tick, regions, budget)?;
-            if *current_tick != iteration_start {
-                return Err(AnalysisError::invalid_detector_error_model(
-                    "detecting-region repeat body tick count changed during traversal",
-                ));
-            }
-            remaining -= 1;
-            continue;
-        }
-
-        let Some(previous_selected_tick) = context
-            .ticks
-            .range(CircuitTick::new(repeat_start)..CircuitTick::new(*current_tick))
-            .next_back()
-            .map(|tick| tick.get())
-        else {
-            tracker.undo_repeated_circuit_with_budget(body, remaining, budget)?;
-            *current_tick = repeat_start;
-            return Ok(());
-        };
-        let selected_iteration = previous_selected_tick
-            .checked_sub(repeat_start)
-            .map(|offset| offset / ticks_per_iteration)
-            .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "detecting-region selected tick preceded its repeat span",
-                )
-            })?;
-        let skipped = remaining
-            .checked_sub(selected_iteration.checked_add(1).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "detecting-region selected repeat iteration overflowed",
-                )
-            })?)
-            .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "detecting-region selected repeat iteration exceeded its remaining span",
-                )
-            })?;
-        if skipped == 0 {
-            return Err(AnalysisError::invalid_detector_error_model(
-                "detecting-region repeat skip made no progress",
-            ));
-        }
-        tracker.undo_repeated_circuit_with_budget(body, skipped, budget)?;
-        let skipped_ticks = ticks_per_iteration.checked_mul(skipped).ok_or_else(|| {
+fn skipped_repeat_iterations(
+    previous_selected_tick: u64,
+    repeat_start: u64,
+    ticks_per_iteration: u64,
+    remaining: u64,
+) -> AnalysisResult<u64> {
+    let selected_iteration = previous_selected_tick
+        .checked_sub(repeat_start)
+        .map(|offset| offset / ticks_per_iteration)
+        .ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
-                "detecting-region skipped tick count overflowed",
+                "detecting-region selected tick preceded its repeat span",
             )
         })?;
-        *current_tick = current_tick.checked_sub(skipped_ticks).ok_or_else(|| {
+    let skipped = remaining
+        .checked_sub(selected_iteration.checked_add(1).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
-                "detecting-region skipped tick span underflowed",
+                "detecting-region selected repeat iteration overflowed",
+            )
+        })?)
+        .ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "detecting-region selected repeat iteration exceeded its remaining span",
             )
         })?;
-        remaining = remaining.checked_sub(skipped).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "detecting-region skipped repeat count underflowed",
-            )
-        })?;
+    if skipped == 0 {
+        return Err(AnalysisError::invalid_detector_error_model(
+            "detecting-region repeat skip made no progress",
+        ));
     }
-    Ok(())
+    Ok(skipped)
 }
 
 fn undo_instruction_with_snapshots(
@@ -407,61 +457,61 @@ fn snapshot_regions(
 }
 
 fn validate_supported_subset(circuit: &Circuit) -> AnalysisResult<()> {
-    validate_supported_subset_inner(circuit, 0)
+    let mut stack = vec![(circuit.items().iter(), 0_usize)];
+    while let Some((items, depth)) = stack.last_mut() {
+        let Some(item) = items.next() else {
+            stack.pop();
+            continue;
+        };
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                validate_supported_instruction(instruction)?;
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                let next_depth = depth.saturating_add(1);
+                if next_depth > RepeatNestingLimit::HARD_MAX {
+                    return Err(detecting_region_resource_error(
+                        ResourceKind::RepeatNesting,
+                        next_depth as u64,
+                        RepeatNestingLimit::HARD_MAX as u64,
+                    ));
+                }
+                stack.push((repeat.body().items().iter(), next_depth));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn represented_qubit_ids(
     circuit: &Circuit,
     budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<BTreeSet<QubitId>> {
-    fn collect(
-        circuit: &Circuit,
-        qubits: &mut BTreeSet<QubitId>,
-        budget: &mut DetectingRegionBudget,
-    ) -> AnalysisResult<()> {
-        for item in circuit.items() {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    if instruction.gate().targets_are_pad_values() {
-                        continue;
-                    }
-                    for qubit in instruction.targets().iter().filter_map(Target::qubit_id) {
-                        if !qubits.contains(&qubit) {
-                            budget.reserve_live_state(1)?;
-                            qubits.insert(qubit);
-                        }
-                    }
-                }
-                CircuitItem::RepeatBlock(repeat) => collect(repeat.body(), qubits, budget)?,
-            }
-        }
-        Ok(())
-    }
-
     let mut qubits = BTreeSet::new();
-    collect(circuit, &mut qubits, budget)?;
-    Ok(qubits)
-}
-
-fn validate_supported_subset_inner(circuit: &Circuit, depth: usize) -> AnalysisResult<()> {
-    if depth > MAX_DETECTING_REGION_REPEAT_NESTING {
-        return Err(detecting_region_resource_error(
-            ResourceKind::RepeatNesting,
-            depth as u64,
-            MAX_DETECTING_REGION_REPEAT_NESTING as u64,
-        ));
-    }
-    for item in circuit.items() {
+    let mut stack = vec![circuit.items().iter()];
+    while let Some(items) = stack.last_mut() {
+        let Some(item) = items.next() else {
+            stack.pop();
+            continue;
+        };
         match item {
             CircuitItem::Instruction(instruction) => {
-                validate_supported_instruction(instruction)?;
+                if instruction.gate().targets_are_pad_values() {
+                    continue;
+                }
+                for qubit in instruction.targets().iter().filter_map(Target::qubit_id) {
+                    if !qubits.contains(&qubit) {
+                        budget.reserve_live_state(1)?;
+                        qubits.insert(qubit);
+                    }
+                }
             }
             CircuitItem::RepeatBlock(repeat) => {
-                validate_supported_subset_inner(repeat.body(), depth.saturating_add(1))?;
+                stack.push(repeat.body().items().iter());
             }
         }
     }
-    Ok(())
+    Ok(qubits)
 }
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> {

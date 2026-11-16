@@ -200,12 +200,12 @@ name = "dem_sampling::session::storage_tests::session_storage_admits_the_exact_b
 [[families]]
 id = "resource-safety.detecting-regions-limits"
 area = "resource-safety"
-contract = "Detecting-region extraction admits compact repeat counts independently of syntax, omits inactive outputs, charges live tracker state, output regions, and helper vectors against a one-gibibyte memory budget, and reports typed budget, materialized-width, and 128-level nesting excesses."
+contract = "Detecting-region extraction admits compact repeat counts independently of syntax, omits inactive outputs, charges live tracker state, output regions, and helper vectors against a caller-selectable memory budget, and reports typed budget, materialized-width, and 256-level nesting excesses."
 stim_refs = ["src/stim/util_top/circuit_to_detecting_regions.test.cc"]
 status = "divergence"
 owner = "stab-analysis"
 divergence_kind = "resource-limit"
-rationale = "Stab bounds hostile detecting-region requests and retained output by a memory budget while preserving folded repeat semantics and sparse inactive snapshots; its recursive traversal keeps a 128-level nesting bound because 256 levels overflow a 2 MiB thread stack in debug builds."
+rationale = "Stab bounds hostile detecting-region requests and retained output by a memory budget and the shared 256-level repeat-nesting envelope while preserving folded repeat semantics and sparse inactive snapshots."
 [families.evidence]
 status = "verified"
 [families.evidence.test]

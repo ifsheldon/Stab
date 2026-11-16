@@ -43,7 +43,7 @@ What the ledger does not yet account for:
 | Kind | Rule |
 | --- | --- |
 | Invariant | A format, representation, or Stim-semantic bound. Unchanged by the reset. |
-| Nesting | The shared 256-level repeat-nesting envelope, or a tighter bound a recursive traversal still needs. |
+| Nesting | The shared 256-level repeat-nesting envelope, which callers may tighten on operations that expose a nesting limit. |
 | Byte budget | A `MemoryBudget` or a value derived from one. |
 | Search budget | Explicit caller policy with a budget-exhausted result. Values unchanged by the reset. |
 | Threshold | An implementation choice that selects storage, batching, or an algorithm and never rejects otherwise valid work. |
@@ -65,8 +65,7 @@ What the ledger does not yet account for:
 | `RepeatNestingLimit::HARD_MAX` | `stab-model/src/parse_limits.rs` | Nesting | The shared 256-level envelope that callers may tighten but not raise. |
 | `MAX_DEM_REPEAT_NESTING` | `stab-model/src/dem.rs` | Nesting | Re-export of the shared envelope for DEM consumers. |
 | `ReferenceSampleTree::MAX_NESTING` | `stab-engine/src/reference_sample_tree.rs` | Nesting | The shared envelope. |
-| `ParseLimits::DEFAULT_REPEAT_NESTING` | `stab-model/src/parse_limits.rs` | Nesting | The shared envelope as a `RepeatNestingLimit`. The model's folded circuit walk (`stab_model::advanced::visit_folded_circuit` and `FoldedCircuitSummary`) enforces it for the analyzer, flattening, feedback inlining, flow generation, missing-detector discovery, measurement-rich time reversal, the CLI herald count, and the sampling request estimate, each reporting its own nesting error. |
-| `MAX_DETECTING_REGION_REPEAT_NESTING` | `stab-analysis/src/circuit_detecting_regions.rs` | Nesting | 128. Raising it to 256 overflowed a 2 MiB test-thread stack in a debug build, because the snapshot walk and the tracker's recurrence probes recurse several frames per level, so it stays until that traversal is iterative. |
+| `ParseLimits::DEFAULT_REPEAT_NESTING` | `stab-model/src/parse_limits.rs` | Nesting | The shared envelope as a `RepeatNestingLimit`. The model's folded circuit walk (`stab_model::advanced::visit_folded_circuit` and `FoldedCircuitSummary`) enforces it for the analyzer, flattening, feedback inlining, flow generation, missing-detector discovery, measurement-rich time reversal, the CLI herald count, and the sampling request estimate, and detecting-region validation enforces the same `RepeatNestingLimit::HARD_MAX`, each reporting its own nesting error. |
 | `ParseLimits::DEFAULT_MEMORY_BUDGET` | `stab-model/src/parse_limits.rs` | Byte budget | The parse budget for source bytes plus the conservative retained model. |
 | `MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES` | `stab-model/src/dem/api.rs` | Byte budget | The default budget divided by 48 conservative bytes per retained candidate; truncation beyond it reports a typed error naming the budget. |
 | `AlgebraMemoryBudget::DEFAULT` | `stab-algebra/src/budget.rs` | Byte budget | One gibibyte, the same default as `MemoryBudget`, used by the unbudgeted algebra constructors and parsers, each of which delegates to a `*_with_budget` sibling; `stab-analysis` maps its `MemoryBudget` onto it. |
@@ -200,7 +199,7 @@ A region extraction of the sparse flow checker, one search state's successor lis
 | `MAX_ERROR_MATCHER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work caps | Removed. |
 | `MAX_ERROR_MATCHER_FILTER_REPEAT_UNROLL`, `_EXPANDED_INSTRUCTIONS`, `_REPEAT_ITERATIONS` | Work and count caps | Removed; retained keys were first charged to a filter byte budget, which was then deleted with the deferred `explain_errors` surface. |
 | `ERROR_MATCHER_FILTER_MEMORY_BUDGET` | Byte budget | Removed with `ErrorMatcher`, because `explain_errors` is a deferred product surface. |
-| `MAX_FEEDBACK_REPEAT_NESTING`, `MAX_MISSING_DETECTOR_REPEAT_NESTING`, `MAX_FLOW_GENERATOR_REPEAT_NESTING` | Nesting | Removed; each was 256, and the shared folded walk now applies `ParseLimits::DEFAULT_REPEAT_NESTING` with the same value and the same reported depth. |
+| `MAX_FEEDBACK_REPEAT_NESTING`, `MAX_MISSING_DETECTOR_REPEAT_NESTING`, `MAX_FLOW_GENERATOR_REPEAT_NESTING`, `MAX_DETECTING_REGION_REPEAT_NESTING` | Nesting | Removed; the first three were 256 and now use `ParseLimits::DEFAULT_REPEAT_NESTING` in the shared folded walk, and detecting regions dropped their 128-level cap for `RepeatNestingLimit::HARD_MAX` once the snapshot walk and sparse reverse tracker loops became iterative. |
 | `MAX_DEM_COORDINATE_SCALAR_WORK` | Work cap | Removed; coordinate vectors are bounded by the represented model. |
 | `MAX_DEM_COORDINATE_MAP_DETECTORS` | Count cap | Converted to byte admission of the all-detector map. |
 | `MAX_GENERATED_PHYSICAL_QUBITS` | Generator cap | Converted to 2048 bytes per physical qubit against the parameters' budget, because generation is linear in its output. |

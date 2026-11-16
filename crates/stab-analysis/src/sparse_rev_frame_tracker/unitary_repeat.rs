@@ -12,7 +12,7 @@ pub(super) fn try_undo_supported_unitary_repeat(
     tracker: &mut SparseReverseFrameTracker,
     repeat: &RepeatBlock,
 ) -> AnalysisResult<bool> {
-    if !is_supported_unitary_circuit(repeat.body()) {
+    if repeat.repeat_count().get() <= 1 || !is_supported_unitary_circuit(repeat.body()) {
         return Ok(false);
     }
 
@@ -178,25 +178,26 @@ fn active_slot_error(basis: &str, qubit: usize) -> AnalysisError {
 }
 
 fn touched_qubits(circuit: &Circuit) -> Vec<usize> {
-    fn visit(circuit: &Circuit, qubits: &mut BTreeSet<usize>) {
-        for item in circuit.items() {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    qubits.extend(
-                        instruction
-                            .targets()
-                            .iter()
-                            .filter_map(Target::qubit_id)
-                            .map(|qubit| qubit.get() as usize),
-                    );
-                }
-                CircuitItem::RepeatBlock(repeat) => visit(repeat.body(), qubits),
+    let mut qubits = BTreeSet::new();
+    let mut stack = vec![circuit.items().iter()];
+    while let Some(items) = stack.last_mut() {
+        let Some(item) = items.next() else {
+            stack.pop();
+            continue;
+        };
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                qubits.extend(
+                    instruction
+                        .targets()
+                        .iter()
+                        .filter_map(Target::qubit_id)
+                        .map(|qubit| qubit.get() as usize),
+                );
             }
+            CircuitItem::RepeatBlock(repeat) => stack.push(repeat.body().items().iter()),
         }
     }
-
-    let mut qubits = BTreeSet::new();
-    visit(circuit, &mut qubits);
     qubits.into_iter().collect()
 }
 
@@ -270,10 +271,22 @@ fn remap_circuit_items(
 /// Reports whether a repeat body is folded as one qubit-slot transform raised to the repeat count
 /// instead of being undone once per iteration.
 pub(crate) fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
-    circuit.items().iter().all(|item| match item {
-        CircuitItem::Instruction(instruction) => is_supported_unitary_instruction(instruction),
-        CircuitItem::RepeatBlock(repeat) => is_supported_unitary_circuit(repeat.body()),
-    })
+    let mut stack = vec![circuit.items().iter()];
+    while let Some(items) = stack.last_mut() {
+        let Some(item) = items.next() else {
+            stack.pop();
+            continue;
+        };
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                if !is_supported_unitary_instruction(instruction) {
+                    return false;
+                }
+            }
+            CircuitItem::RepeatBlock(repeat) => stack.push(repeat.body().items().iter()),
+        }
+    }
+    true
 }
 
 fn is_supported_unitary_instruction(instruction: &CircuitInstruction) -> bool {

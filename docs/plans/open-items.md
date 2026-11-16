@@ -33,7 +33,6 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 ## Structure And Evidence
 
-- Detecting regions keep a 128-level repeat-nesting bound instead of the shared 256, because the traversal is recursive and overflowed a debug test stack at 256.
 - `Gate` is an 8-byte handle beside `GateKind`; making it the enum would shrink `CircuitItem` and change every byte-admission number derived from its size.
 - The engine's admission counting inside lowering, the detecting-region snapshot walk, and the reverse-tracker metering do not use `FoldedCircuitSummary`.
 - `stab plan` does not report the frame lane width that a shot count selects, and no pinned-Stim statistical fixture row runs at a shot count that selects 64 lanes.

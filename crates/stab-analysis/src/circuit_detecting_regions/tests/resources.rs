@@ -151,8 +151,8 @@ fn huge_repeat_reports_semantic_errors_promptly() {
 }
 
 fn repeat_nesting_boundary_is_exact() {
-    fn nested(depth: usize) -> Circuit {
-        let mut body = Circuit::from_stim_str("TICK\n").unwrap();
+    fn nested(depth: usize, inner_stim: &str) -> Circuit {
+        let mut body = Circuit::from_stim_str(inner_stim).unwrap();
         for _ in 0..depth {
             let mut outer = Circuit::new();
             outer.append_repeat_block(RepeatBlock::new(
@@ -164,25 +164,51 @@ fn repeat_nesting_boundary_is_exact() {
         }
         body
     }
-    let options = || DetectingRegionTargetOptions {
-        targets: vec![],
-        ticks: vec![],
-        ignore_anticommutation_errors: false,
-        memory_budget: stab_model::MemoryBudget::DEFAULT,
-        cancellation: stab_model::Cancellation::never(),
-    };
-    circuit_detecting_regions_for_targets(&nested(MAX_DETECTING_REGION_REPEAT_NESTING), options())
+
+    // Run on an explicit 2 MiB stack in debug builds, exercising both the skipped-span
+    // tracker walk and a tick-selected snapshot descent across all 256 repeat levels.
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            let max_depth = RepeatNestingLimit::HARD_MAX;
+            let empty_options = || DetectingRegionTargetOptions {
+                targets: vec![],
+                ticks: vec![],
+                ignore_anticommutation_errors: false,
+                memory_budget: stab_model::MemoryBudget::DEFAULT,
+                cancellation: stab_model::Cancellation::never(),
+            };
+            circuit_detecting_regions_for_targets(&nested(max_depth, "TICK\n"), empty_options())
+                .unwrap();
+
+            let active = nested(max_depth, "R 0\nTICK\nX 0\nM 0\nDETECTOR rec[-1]\n");
+            let regions = circuit_detecting_regions_for_targets(
+                &active,
+                DetectingRegionTargetOptions {
+                    targets: vec![DemTarget::relative_detector(0).unwrap()],
+                    ticks: vec![CircuitTick::new(0)],
+                    ignore_anticommutation_errors: false,
+                    memory_budget: stab_model::MemoryBudget::DEFAULT,
+                    cancellation: stab_model::Cancellation::never(),
+                },
+            )
+            .unwrap();
+            assert_eq!(regions.len(), 1);
+
+            assert_resource_error(
+                circuit_detecting_regions_for_targets(
+                    &nested(max_depth + 1, "TICK\n"),
+                    empty_options(),
+                )
+                .unwrap_err(),
+                ResourceKind::RepeatNesting,
+                (max_depth + 1) as u64,
+                max_depth as u64,
+            );
+        })
+        .unwrap()
+        .join()
         .unwrap();
-    assert_resource_error(
-        circuit_detecting_regions_for_targets(
-            &nested(MAX_DETECTING_REGION_REPEAT_NESTING + 1),
-            options(),
-        )
-        .unwrap_err(),
-        ResourceKind::RepeatNesting,
-        (MAX_DETECTING_REGION_REPEAT_NESTING + 1) as u64,
-        MAX_DETECTING_REGION_REPEAT_NESTING as u64,
-    );
 }
 
 fn budget_boundaries_are_typed_and_fail_closed() {

@@ -4,7 +4,6 @@ use super::SparseReverseFrameTracker;
 
 #[derive(Clone, Debug)]
 pub(crate) struct ShiftedRecurrence {
-    pub(crate) cycle_start_state: SparseReverseFrameTracker,
     pub(crate) cycle_end_state: SparseReverseFrameTracker,
     pub(crate) transient_iterations: u64,
     pub(crate) cycle_end_iterations: u64,
@@ -13,13 +12,8 @@ pub(crate) struct ShiftedRecurrence {
 
 #[derive(Clone, Debug)]
 pub(crate) enum ShiftedRecurrenceSearch {
-    Found {
-        recurrence: Box<ShiftedRecurrence>,
-    },
-    Exhausted {
-        state: Box<SparseReverseFrameTracker>,
-        iterations: u64,
-    },
+    Found { recurrence: Box<ShiftedRecurrence> },
+    Exhausted,
 }
 
 pub(crate) fn search_shifted_recurrence<F>(
@@ -42,7 +36,7 @@ where
             )
         })?;
         if hare.is_shifted_copy(&tortoise) {
-            return found(tortoise, hare, tortoise_iterations, hare_iterations);
+            return found(hare, tortoise_iterations, hare_iterations);
         }
 
         if hare_iterations.is_multiple_of(2) {
@@ -53,19 +47,15 @@ where
                 )
             })?;
             if hare.is_shifted_copy(&tortoise) {
-                return found(tortoise, hare, tortoise_iterations, hare_iterations);
+                return found(hare, tortoise_iterations, hare_iterations);
             }
         }
     }
 
-    Ok(ShiftedRecurrenceSearch::Exhausted {
-        state: Box::new(hare),
-        iterations: hare_iterations,
-    })
+    Ok(ShiftedRecurrenceSearch::Exhausted)
 }
 
 fn found(
-    cycle_start_state: SparseReverseFrameTracker,
     cycle_end_state: SparseReverseFrameTracker,
     transient_iterations: u64,
     cycle_end_iterations: u64,
@@ -82,7 +72,6 @@ fn found(
     }
     Ok(ShiftedRecurrenceSearch::Found {
         recurrence: Box::new(ShiftedRecurrence {
-            cycle_start_state,
             cycle_end_state,
             transient_iterations,
             cycle_end_iterations,

@@ -1,14 +1,53 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_model::{Circuit, DemTarget};
+use stab_model::{Circuit, CircuitItem, DemTarget};
 
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
 use super::{
-    GaugeOutputPolicy, ReverseTrackerBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
-    TargetSets, search_shifted_recurrence,
+    GaugeOutputPolicy, ReverseTrackerBudget, SparseReverseFrameTracker, TargetSets, unitary_repeat,
 };
+
+#[derive(Clone, Copy)]
+enum ProbeTarget {
+    Hare,
+    Tortoise,
+}
+
+#[derive(Clone, Copy)]
+enum ProbePhase {
+    StartHare,
+    FinishHare,
+    FinishTortoise,
+}
+
+struct RecurrenceProbe<'a> {
+    body: &'a Circuit,
+    repetitions: u64,
+    max_iterations: u64,
+    tortoise: SparseReverseFrameTracker,
+    hare: SparseReverseFrameTracker,
+    tortoise_iterations: u64,
+    hare_iterations: u64,
+    target: ProbeTarget,
+    phase: ProbePhase,
+}
+
+impl RecurrenceProbe<'_> {
+    fn active_mut(&mut self) -> &mut SparseReverseFrameTracker {
+        match self.target {
+            ProbeTarget::Hare => &mut self.hare,
+            ProbeTarget::Tortoise => &mut self.tortoise,
+        }
+    }
+}
+
+enum UndoFrame<'a> {
+    Items(std::slice::Iter<'a, CircuitItem>),
+    Unroll { body: &'a Circuit, remaining: u64 },
+    Probe(Box<RecurrenceProbe<'a>>),
+}
 
 #[cfg(test)]
 pub(super) fn undo_loop(
@@ -26,6 +65,20 @@ pub(super) fn undo_loop(
     )
 }
 
+pub(super) fn undo_circuit_with_gauge_output(
+    tracker: &mut SparseReverseFrameTracker,
+    circuit: &Circuit,
+    gauge_output: GaugeOutputPolicy,
+    work_budget: &mut ReverseTrackerBudget<'_>,
+) -> AnalysisResult<()> {
+    run_undo_stack(
+        tracker,
+        vec![UndoFrame::Items(circuit.items().iter())],
+        gauge_output,
+        work_budget,
+    )
+}
+
 pub(super) fn undo_loop_with_gauge_output(
     tracker: &mut SparseReverseFrameTracker,
     body: &Circuit,
@@ -33,60 +86,234 @@ pub(super) fn undo_loop_with_gauge_output(
     gauge_output: GaugeOutputPolicy,
     work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
-    if repetitions < 5 {
-        return undo_loop_by_unrolling_with_gauge_output(
-            tracker,
+    let initial = prepare_loop_frame(tracker, body, repetitions, work_budget)?;
+    run_undo_stack(tracker, vec![initial], gauge_output, work_budget)
+}
+
+#[cfg(test)]
+pub(super) fn undo_loop_by_unrolling(
+    tracker: &mut SparseReverseFrameTracker,
+    body: &Circuit,
+    repetitions: u64,
+) -> AnalysisResult<()> {
+    let mut work_budget = ReverseTrackerBudget::Unlimited;
+    run_undo_stack(
+        tracker,
+        vec![UndoFrame::Unroll {
             body,
-            repetitions,
-            gauge_output,
-            work_budget,
-        );
+            remaining: repetitions,
+        }],
+        GaugeOutputPolicy::Preserve,
+        &mut work_budget,
+    )
+}
+
+fn prepare_loop_frame<'a>(
+    active: &SparseReverseFrameTracker,
+    body: &'a Circuit,
+    repetitions: u64,
+    work_budget: &mut ReverseTrackerBudget<'_>,
+) -> AnalysisResult<UndoFrame<'a>> {
+    if repetitions < 5 {
+        return Ok(UndoFrame::Unroll {
+            body,
+            remaining: repetitions,
+        });
     }
-
     work_budget.admit_recurrence_search()?;
-    let probe_limit = repetitions / 2 + 1;
-    let search = search_shifted_recurrence(tracker, probe_limit, |probe| {
-        undo_probe_iteration(probe, body, gauge_output, work_budget)
-    })?;
-    let recurrence = match search {
-        ShiftedRecurrenceSearch::Found { recurrence } => *recurrence,
-        ShiftedRecurrenceSearch::Exhausted { state, iterations } => {
-            *tracker = *state;
-            return undo_loop_by_unrolling_with_gauge_output(
-                tracker,
-                body,
-                repetitions.checked_sub(iterations).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "sparse reverse repeat remainder underflowed",
-                    )
-                })?,
-                gauge_output,
-                work_budget,
-            );
-        }
-    };
+    Ok(UndoFrame::Probe(Box::new(RecurrenceProbe {
+        body,
+        repetitions,
+        max_iterations: repetitions / 2 + 1,
+        tortoise: active.clone(),
+        hare: active.clone(),
+        tortoise_iterations: 0,
+        hare_iterations: 0,
+        target: ProbeTarget::Hare,
+        phase: ProbePhase::StartHare,
+    })))
+}
 
-    let remaining_after_cycle = repetitions
-        .checked_sub(recurrence.cycle_end_iterations)
+fn active_tracker_mut<'t>(
+    root: &'t mut SparseReverseFrameTracker,
+    stack: &'t mut [UndoFrame<'_>],
+) -> &'t mut SparseReverseFrameTracker {
+    stack
+        .iter_mut()
+        .rev()
+        .find_map(|frame| match frame {
+            UndoFrame::Probe(probe) => Some(probe.active_mut()),
+            UndoFrame::Items(_) | UndoFrame::Unroll { .. } => None,
+        })
+        .unwrap_or(root)
+}
+
+fn run_undo_stack<'a>(
+    root: &mut SparseReverseFrameTracker,
+    mut stack: Vec<UndoFrame<'a>>,
+    gauge_output: GaugeOutputPolicy,
+    work_budget: &mut ReverseTrackerBudget<'_>,
+) -> AnalysisResult<()> {
+    while let Some(top_index) = stack.len().checked_sub(1) {
+        let (below, top_slice) = stack.split_at_mut(top_index);
+        let Some(top) = top_slice.first_mut() else {
+            break;
+        };
+        match top {
+            UndoFrame::Items(items) => {
+                let Some(item) = items.next_back() else {
+                    stack.pop();
+                    continue;
+                };
+                let active = active_tracker_mut(root, below);
+                match item {
+                    CircuitItem::Instruction(instruction) => {
+                        work_budget.admit_instruction(instruction)?;
+                        active.undo_instruction(instruction)?;
+                        if gauge_output == GaugeOutputPolicy::Discard {
+                            active.take_gauge_errors();
+                        }
+                    }
+                    CircuitItem::RepeatBlock(repeat) => {
+                        if gauge_output == GaugeOutputPolicy::Preserve
+                            && unitary_repeat::try_undo_supported_unitary_repeat(active, repeat)?
+                        {
+                            continue;
+                        }
+                        let next_frame = prepare_loop_frame(
+                            active,
+                            repeat.body(),
+                            repeat.repeat_count().get(),
+                            work_budget,
+                        )?;
+                        stack.push(next_frame);
+                    }
+                }
+            }
+            UndoFrame::Unroll { body, remaining } => {
+                if *remaining == 0 {
+                    stack.pop();
+                    continue;
+                }
+                *remaining -= 1;
+                let body = *body;
+                work_budget.admit_probe_iteration()?;
+                active_tracker_mut(root, below).poll_cancellation()?;
+                stack.push(UndoFrame::Items(body.items().iter()));
+            }
+            UndoFrame::Probe(probe) => match probe.phase {
+                ProbePhase::StartHare => {
+                    if probe.hare_iterations >= probe.max_iterations {
+                        let Some(UndoFrame::Probe(probe)) = stack.pop() else {
+                            break;
+                        };
+                        let probe = *probe;
+                        let remainder = probe
+                            .repetitions
+                            .checked_sub(probe.hare_iterations)
+                            .ok_or_else(|| {
+                                AnalysisError::invalid_detector_error_model(
+                                    "sparse reverse repeat remainder underflowed",
+                                )
+                            })?;
+                        *active_tracker_mut(root, &mut stack) = probe.hare;
+                        stack.push(UndoFrame::Unroll {
+                            body: probe.body,
+                            remaining: remainder,
+                        });
+                        continue;
+                    }
+                    probe.target = ProbeTarget::Hare;
+                    probe.phase = ProbePhase::FinishHare;
+                    let body = probe.body;
+                    stack.push(UndoFrame::Unroll { body, remaining: 1 });
+                }
+                ProbePhase::FinishHare => {
+                    probe.hare_iterations =
+                        probe.hare_iterations.checked_add(1).ok_or_else(|| {
+                            AnalysisError::invalid_detector_error_model(
+                                "shifted recurrence probe step count overflowed",
+                            )
+                        })?;
+                    if probe.hare.is_shifted_copy(&probe.tortoise) {
+                        let Some(UndoFrame::Probe(probe)) = stack.pop() else {
+                            break;
+                        };
+                        let next =
+                            finish_found_recurrence(active_tracker_mut(root, &mut stack), *probe)?;
+                        stack.push(next);
+                        continue;
+                    }
+                    if probe.hare_iterations.is_multiple_of(2) {
+                        probe.target = ProbeTarget::Tortoise;
+                        probe.phase = ProbePhase::FinishTortoise;
+                        let body = probe.body;
+                        stack.push(UndoFrame::Unroll { body, remaining: 1 });
+                    } else {
+                        probe.phase = ProbePhase::StartHare;
+                    }
+                }
+                ProbePhase::FinishTortoise => {
+                    probe.tortoise_iterations =
+                        probe.tortoise_iterations.checked_add(1).ok_or_else(|| {
+                            AnalysisError::invalid_detector_error_model(
+                                "shifted recurrence tortoise step count overflowed",
+                            )
+                        })?;
+                    if probe.hare.is_shifted_copy(&probe.tortoise) {
+                        let Some(UndoFrame::Probe(probe)) = stack.pop() else {
+                            break;
+                        };
+                        let next =
+                            finish_found_recurrence(active_tracker_mut(root, &mut stack), *probe)?;
+                        stack.push(next);
+                    } else {
+                        probe.phase = ProbePhase::StartHare;
+                    }
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+fn finish_found_recurrence<'a>(
+    target_tracker: &mut SparseReverseFrameTracker,
+    probe: RecurrenceProbe<'a>,
+) -> AnalysisResult<UndoFrame<'a>> {
+    let period = probe
+        .hare_iterations
+        .checked_sub(probe.tortoise_iterations)
+        .ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model("shifted recurrence period underflowed")
+        })?;
+    if period == 0 {
+        return Err(AnalysisError::invalid_detector_error_model(
+            "shifted recurrence period was zero",
+        ));
+    }
+    let remaining_after_cycle = probe
+        .repetitions
+        .checked_sub(probe.hare_iterations)
         .ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat cycle end exceeded its repeat count",
             )
         })?;
-    let skipped_iterations = remaining_after_cycle / recurrence.period;
-    let measurements_per_period = recurrence
-        .cycle_start_state
+    let skipped_iterations = remaining_after_cycle / period;
+    let measurements_per_period = probe
+        .tortoise
         .measurement_count
-        .checked_sub(recurrence.cycle_end_state.measurement_count)
+        .checked_sub(probe.hare.measurement_count)
         .ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat measurement period underflowed",
             )
         })?;
-    let detectors_per_period = recurrence
-        .cycle_start_state
+    let detectors_per_period = probe
+        .tortoise
         .detector_count
-        .checked_sub(recurrence.cycle_end_state.detector_count)
+        .checked_sub(probe.hare.detector_count)
         .ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat detector period underflowed",
@@ -97,78 +324,32 @@ pub(super) fn undo_loop_with_gauge_output(
         signed_product_usize(measurements_per_period, skipped_iterations, "measurement")?;
     let skipped_detectors =
         signed_product_u64(detectors_per_period, skipped_iterations, "detector")?;
-    *tracker = recurrence.cycle_end_state;
-    shift(tracker, -skipped_measurements, -skipped_detectors)?;
-    let completed_iterations = recurrence
-        .cycle_end_iterations
-        .checked_add(
-            skipped_iterations
-                .checked_mul(recurrence.period)
-                .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "sparse reverse repeat skipped step count overflowed",
-                    )
-                })?,
-        )
+    *target_tracker = probe.hare;
+    shift(target_tracker, -skipped_measurements, -skipped_detectors)?;
+    let completed_iterations = probe
+        .hare_iterations
+        .checked_add(skipped_iterations.checked_mul(period).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "sparse reverse repeat skipped step count overflowed",
+            )
+        })?)
         .ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "sparse reverse repeat step count overflowed",
             )
         })?;
-
-    undo_loop_by_unrolling_with_gauge_output(
-        tracker,
-        body,
-        repetitions
-            .checked_sub(completed_iterations)
-            .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "sparse reverse repeat remainder underflowed",
-                )
-            })?,
-        gauge_output,
-        work_budget,
-    )
-}
-
-#[cfg(test)]
-pub(super) fn undo_loop_by_unrolling(
-    tracker: &mut SparseReverseFrameTracker,
-    body: &Circuit,
-    repetitions: u64,
-) -> AnalysisResult<()> {
-    let mut work_budget = ReverseTrackerBudget::Unlimited;
-    undo_loop_by_unrolling_with_gauge_output(
-        tracker,
-        body,
-        repetitions,
-        GaugeOutputPolicy::Preserve,
-        &mut work_budget,
-    )
-}
-
-fn undo_loop_by_unrolling_with_gauge_output(
-    tracker: &mut SparseReverseFrameTracker,
-    body: &Circuit,
-    repetitions: u64,
-    gauge_output: GaugeOutputPolicy,
-    work_budget: &mut ReverseTrackerBudget<'_>,
-) -> AnalysisResult<()> {
-    for _ in 0..repetitions {
-        undo_probe_iteration(tracker, body, gauge_output, work_budget)?;
-    }
-    Ok(())
-}
-
-fn undo_probe_iteration(
-    tracker: &mut SparseReverseFrameTracker,
-    body: &Circuit,
-    gauge_output: GaugeOutputPolicy,
-    work_budget: &mut ReverseTrackerBudget<'_>,
-) -> AnalysisResult<()> {
-    work_budget.admit_probe_iteration()?;
-    tracker.poll_cancellation()?;
-    tracker.undo_circuit_with_gauge_output(body, gauge_output, work_budget)
+    let remainder = probe
+        .repetitions
+        .checked_sub(completed_iterations)
+        .ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "sparse reverse repeat remainder underflowed",
+            )
+        })?;
+    Ok(UndoFrame::Unroll {
+        body: probe.body,
+        remaining: remainder,
+    })
 }
 
 pub(super) fn is_shifted_copy(
