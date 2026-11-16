@@ -12,7 +12,7 @@ The stable byte contract for backend-neutral compiler inputs is defined by [comp
 
 The stable byte contract for backend-bearing executable identities is defined by [plan fingerprint schema version 1](plan-fingerprint-schema-v1.md).
 
-The current successful machine-output contracts are [capabilities schema version 6](agent-cli-capabilities-schema-v6.md), [plan schema version 4](agent-cli-plan-schema-v4.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Superseded schemas remain available in Git history and are not emitted as compatibility views.
+The current successful machine-output contracts are [capabilities schema version 6](agent-cli-capabilities-schema-v6.md), [plan schema version 5](agent-cli-plan-schema-v5.md), and inspect in [agent CLI schema version 2](agent-cli-schema-v2.md). Superseded schemas remain available in Git history and are not emitted as compatibility views.
 
 The classification of every resource limit, including each removed one, is recorded in [the resource policy inventory](resource-policy-inventory.md).
 

@@ -210,6 +210,7 @@ fn assert_sample_plan_schema(report: &Value) {
         pointer(report, "/run"),
         &[
             "shots",
+            "frame_lane_width",
             "random_policy",
             "seed",
             "reference_mode",
@@ -580,8 +581,45 @@ fn plan_sample_separates_compilation_identity_from_run_configuration() {
     let second = json_stdout(&second_stdout);
     assert_sample_plan_schema(&first);
     assert_sample_plan_schema(&second);
-    assert_eq!(pointer(&first, "/schema_version"), 4);
-    assert_eq!(pointer(&second, "/schema_version"), 4);
+    assert_eq!(pointer(&first, "/schema_version"), 5);
+    assert_eq!(pointer(&second, "/schema_version"), 5);
+    assert_eq!(pointer(&first, "/run/frame_lane_width"), 64);
+    assert_eq!(pointer(&second, "/run/frame_lane_width"), 64);
+
+    for (shots, expected_lanes) in [
+        (0_usize, 256_u64),
+        (1, 64),
+        (63, 64),
+        (64, 64),
+        (192, 64),
+        (193, 256),
+        (256, 256),
+        (257, 64),
+        (448, 64),
+        (449, 256),
+    ] {
+        let shots_arg = format!("--shots={shots}");
+        let (status, out, err) = run_parts(
+            ["stab", "plan", "sample", &shots_arg, "--format=json"],
+            circuit,
+        );
+        assert_eq!(status, 0);
+        assert_eq!(err, b"");
+        let parsed = json_stdout(&out);
+        assert_eq!(
+            pointer(&parsed, "/run/frame_lane_width"),
+            expected_lanes,
+            "shots={shots}"
+        );
+        assert_eq!(
+            pointer(&parsed, "/compilation/request_fingerprint/digest"),
+            pointer(&first, "/compilation/request_fingerprint/digest")
+        );
+        assert_eq!(
+            pointer(&parsed, "/compilation/plan_fingerprint/digest"),
+            pointer(&first, "/compilation/plan_fingerprint/digest")
+        );
+    }
 
     assert_eq!(
         pointer(&first, "/compilation/request_fingerprint/digest"),
@@ -741,7 +779,7 @@ fn agent_commands_have_structural_human_output_and_clap_rejects_unknown_plans() 
         (
             &["stab", "plan", "sample"][..],
             &b"M 0\n"[..],
-            "validated: yes",
+            "frame lane width: 64",
         ),
     ] {
         let (status, stdout, stderr) = run_parts(args.iter().copied(), input);

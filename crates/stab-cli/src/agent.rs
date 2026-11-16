@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use clap::{Args, CommandFactory, Subcommand, ValueEnum};
 use serde::Serialize;
 use stab_engine::{
-    COMPILATION_DESCRIPTORS, CompilationRequestFingerprint, PlanFingerprint,
-    ReferenceSampleLoopPolicy, SamplingCompiler, estimate_sampling_request,
+    COMPILATION_DESCRIPTORS, CompilationRequestFingerprint, LaneWidth, PlanFingerprint,
+    ReferenceSampleLoopPolicy, SamplingCompiler, ShotCount, estimate_sampling_request,
 };
 use stab_model::{
     Circuit, DetectorErrorModel, Estimate, Gate, GateArgumentRule, GateCategory,
@@ -24,7 +24,7 @@ use crate::{
 
 const CAPABILITIES_OUTPUT_SCHEMA_VERSION: u16 = 6;
 const INSPECT_OUTPUT_SCHEMA_VERSION: u16 = 2;
-const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 4;
+const PLAN_OUTPUT_SCHEMA_VERSION: u16 = 5;
 const STIM_COMPATIBILITY_VERSION: &str = "1.16.0";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -105,7 +105,7 @@ struct PlanSampleArgs {
     #[arg(long = "skip_loop_folding")]
     skip_loop_folding: bool,
 
-    /// Selects concise human text or schema-version-4 JSON.
+    /// Selects concise human text or schema-version-5 JSON.
     #[arg(long, value_enum, default_value_t = AgentOutputFormatArg::Human)]
     format: AgentOutputFormatArg,
 
@@ -229,6 +229,8 @@ where
         estimates.output_bytes = EstimateReport::from(output_bytes);
     }
 
+    let shot_count = ShotCount::try_from(args.shots).map_err(CliError::from)?;
+    let frame_lane_width = LaneWidth::for_total_shots(shot_count).shots_per_batch();
     let report = SamplePlanReport {
         schema_version: PLAN_OUTPUT_SCHEMA_VERSION,
         operation: "sample",
@@ -245,6 +247,7 @@ where
         },
         run: SampleRunReport {
             shots: args.shots,
+            frame_lane_width,
             random_policy: if args.seed.is_some() {
                 "seeded"
             } else {
@@ -713,6 +716,7 @@ impl From<PlanFingerprint> for PlanFingerprintReport {
 #[derive(Serialize)]
 struct SampleRunReport {
     shots: usize,
+    frame_lane_width: usize,
     random_policy: &'static str,
     seed: Option<u64>,
     reference_mode: &'static str,
@@ -850,12 +854,13 @@ fn render_inspect_human(report: &InspectReport) -> String {
 
 fn render_sample_plan_human(report: &SamplePlanReport) -> String {
     format!(
-        "sample plan\nmodel fingerprint: {}\nrequest fingerprint: {}\nplan fingerprint: {}\nbackend: {}\nvalidated: yes\nexecutes: no\nshots: {}\noutput format: {}\nreference mode: {}\noutput bytes: {}{}\n",
+        "sample plan\nmodel fingerprint: {}\nrequest fingerprint: {}\nplan fingerprint: {}\nbackend: {}\nvalidated: yes\nexecutes: no\nshots: {}\nframe lane width: {}\noutput format: {}\nreference mode: {}\noutput bytes: {}{}\n",
         report.model.digest,
         report.compilation.request_fingerprint.digest,
         report.compilation.plan_fingerprint.digest,
         report.compilation.plan_fingerprint.backend,
         report.run.shots,
+        report.run.frame_lane_width,
         report.run.output_format,
         report.run.reference_mode,
         report
