@@ -9,7 +9,7 @@ use stab_model::{
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
 use crate::{
     AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
-    sparse_rev_frame_tracker::{ReverseTrackerWorkBudget, SparseReverseFrameTracker},
+    sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
 /// Conservative retained bytes of one live tracker-state unit (one sparse map entry).
@@ -97,6 +97,12 @@ pub fn circuit_detecting_regions_for_targets(
         fail_on_anticommute,
     );
     tracker.set_cancellation(options.cancellation);
+    tracker.set_memory_budget(
+        ResourceOperation::DetectingRegions,
+        ResourceKind::LiveStateUnits,
+        options.memory_budget,
+    );
+    tracker.set_base_bytes(budget.held_bytes());
     let mut current_tick = tick_count;
     let snapshot_context = SnapshotContext {
         targets: &targets,
@@ -247,7 +253,6 @@ fn undo_circuit_with_snapshots(
                             tracker,
                             context,
                             current_tick,
-                            budget,
                         )? {
                             stack.push(next_frame);
                         }
@@ -299,7 +304,7 @@ fn undo_circuit_with_snapshots(
                     .next_back()
                     .map(|tick| tick.get())
                 else {
-                    tracker.undo_repeated_circuit_with_budget(body, *remaining, budget)?;
+                    tracker.undo_repeated_circuit(body, *remaining)?;
                     *current_tick = *repeat_start;
                     stack.pop();
                     continue;
@@ -310,7 +315,7 @@ fn undo_circuit_with_snapshots(
                     *ticks_per_iteration,
                     *remaining,
                 )?;
-                tracker.undo_repeated_circuit_with_budget(body, skipped, budget)?;
+                tracker.undo_repeated_circuit(body, skipped)?;
                 let skipped_ticks = ticks_per_iteration.checked_mul(skipped).ok_or_else(|| {
                     AnalysisError::invalid_detector_error_model(
                         "detecting-region skipped tick count overflowed",
@@ -338,14 +343,13 @@ fn prepare_repeat_with_snapshots<'a>(
     tracker: &mut SparseReverseFrameTracker,
     context: &SnapshotContext<'_>,
     current_tick: &mut u64,
-    budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<Option<SnapshotFrame<'a>>> {
     if repetitions == 0 {
         return Ok(None);
     }
     let ticks_per_iteration = body.count_ticks()?;
     if ticks_per_iteration == 0 {
-        tracker.undo_repeated_circuit_with_budget(body, repetitions, budget)?;
+        tracker.undo_repeated_circuit(body, repetitions)?;
         return Ok(None);
     }
     let repeated_ticks = ticks_per_iteration
@@ -366,7 +370,7 @@ fn prepare_repeat_with_snapshots<'a>(
         .next()
         .is_none()
     {
-        tracker.undo_repeated_circuit_with_budget(body, repetitions, budget)?;
+        tracker.undo_repeated_circuit(body, repetitions)?;
         *current_tick = repeat_start;
         return Ok(None);
     }
@@ -420,7 +424,6 @@ fn undo_instruction_with_snapshots(
     regions: &mut DetectingRegionTargetMap,
     budget: &mut DetectingRegionBudget,
 ) -> AnalysisResult<()> {
-    budget.admit_tracker_instruction(instruction)?;
     if instruction.gate().kind() == GateKind::TICK {
         *current_tick = current_tick.checked_sub(1).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
@@ -437,7 +440,7 @@ fn undo_instruction_with_snapshots(
 
 fn snapshot_regions(
     tick: CircuitTick,
-    tracker: &SparseReverseFrameTracker,
+    tracker: &mut SparseReverseFrameTracker,
     context: &SnapshotContext<'_>,
     regions: &mut DetectingRegionTargetMap,
     budget: &mut DetectingRegionBudget,
@@ -447,10 +450,13 @@ fn snapshot_regions(
         let qubit_targets = tracker.pauli_targets_at(*qubit)?;
         active_targets.extend(qubit_targets.intersection(context.targets).copied());
     }
+    let tracker_live_bytes = tracker.live_bytes();
     for target in active_targets {
-        let output_bytes = budget.admit_output_candidate(context.qubit_count)?;
+        let output_bytes =
+            budget.admit_output_candidate(context.qubit_count, tracker_live_bytes)?;
         let region = tracker.region_for_target(target, budget.algebra_budget())?;
-        budget.commit_output_region(output_bytes)?;
+        budget.commit_output_region(output_bytes, tracker_live_bytes)?;
+        tracker.set_base_bytes(budget.held_bytes());
         regions.entry(target).or_default().insert(tick, region);
     }
     Ok(())
@@ -891,8 +897,6 @@ fn validate_ticks(ticks: &BTreeSet<CircuitTick>, tick_count: u64) -> AnalysisRes
 struct DetectingRegionBudget {
     memory: MemoryBudget,
     live_state_units: u64,
-    tracker_state_units: u64,
-    tracked_target_upper_bound: u64,
     output_bytes: u64,
 }
 
@@ -907,8 +911,6 @@ impl DetectingRegionBudget {
         let mut result = Self {
             memory,
             live_state_units: 0,
-            tracker_state_units: 0,
-            tracked_target_upper_bound: 0,
             output_bytes: 0,
         };
         result.reserve_live_state(request_units)?;
@@ -922,130 +924,34 @@ impl DetectingRegionBudget {
         Ok(())
     }
 
-    fn admit_transient_live_state(&self, count: u64) -> AnalysisResult<()> {
-        admit_live_state_units(self.memory, self.live_state_units.saturating_add(count))
+    fn held_bytes(&self) -> u64 {
+        self.live_state_units
+            .saturating_mul(DETECTING_REGION_LIVE_STATE_UNIT_BYTES)
+            .saturating_add(self.output_bytes)
     }
 
-    fn reserve_tracker_state(&mut self, count: u64) -> AnalysisResult<()> {
-        let next_tracker = self.tracker_state_units.saturating_add(count);
-        self.reserve_live_state(count)?;
-        self.tracker_state_units = next_tracker;
-        Ok(())
-    }
-
-    fn admit_tracker_instruction(
-        &mut self,
-        instruction: &CircuitInstruction,
-    ) -> AnalysisResult<()> {
-        let target_slots = usize_to_u64(instruction.targets().len(), "traversed target count")?;
-        let state_growth = match instruction.gate().kind() {
-            GateKind::TICK | GateKind::QUBIT_COORDS | GateKind::SHIFT_COORDS => 0,
-            GateKind::DETECTOR | GateKind::OBSERVABLE_INCLUDE => {
-                self.tracked_target_upper_bound = self.tracked_target_upper_bound.saturating_add(1);
-                target_slots.max(1)
-            }
-            GateKind::DEPOLARIZE1
-            | GateKind::DEPOLARIZE2
-            | GateKind::X_ERROR
-            | GateKind::Y_ERROR
-            | GateKind::Z_ERROR
-            | GateKind::I_ERROR
-            | GateKind::II_ERROR
-            | GateKind::PAULI_CHANNEL_1
-            | GateKind::PAULI_CHANNEL_2
-            | GateKind::E
-            | GateKind::ELSE_CORRELATED_ERROR => 0,
-            GateKind::REPEAT
-            | GateKind::MPAD
-            | GateKind::MX
-            | GateKind::MY
-            | GateKind::M
-            | GateKind::MRX
-            | GateKind::MRY
-            | GateKind::MR
-            | GateKind::RX
-            | GateKind::RY
-            | GateKind::R
-            | GateKind::XCX
-            | GateKind::XCY
-            | GateKind::XCZ
-            | GateKind::YCX
-            | GateKind::YCY
-            | GateKind::YCZ
-            | GateKind::CX
-            | GateKind::CY
-            | GateKind::CZ
-            | GateKind::H
-            | GateKind::H_XY
-            | GateKind::H_YZ
-            | GateKind::H_NXY
-            | GateKind::H_NXZ
-            | GateKind::H_NYZ
-            | GateKind::HERALDED_ERASE
-            | GateKind::HERALDED_PAULI_CHANNEL_1
-            | GateKind::I
-            | GateKind::X
-            | GateKind::Y
-            | GateKind::Z
-            | GateKind::C_XYZ
-            | GateKind::C_ZYX
-            | GateKind::C_NXYZ
-            | GateKind::C_XNYZ
-            | GateKind::C_XYNZ
-            | GateKind::C_NZYX
-            | GateKind::C_ZNYX
-            | GateKind::C_ZYNX
-            | GateKind::SQRT_X
-            | GateKind::SQRT_X_DAG
-            | GateKind::SQRT_Y
-            | GateKind::SQRT_Y_DAG
-            | GateKind::S
-            | GateKind::S_DAG
-            | GateKind::II
-            | GateKind::SQRT_XX
-            | GateKind::SQRT_XX_DAG
-            | GateKind::SQRT_YY
-            | GateKind::SQRT_YY_DAG
-            | GateKind::SQRT_ZZ
-            | GateKind::SQRT_ZZ_DAG
-            | GateKind::MPP
-            | GateKind::SPP
-            | GateKind::SPP_DAG
-            | GateKind::SWAP
-            | GateKind::ISWAP
-            | GateKind::CXSWAP
-            | GateKind::SWAPCX
-            | GateKind::CZSWAP
-            | GateKind::ISWAP_DAG
-            | GateKind::MXX
-            | GateKind::MYY
-            | GateKind::MZZ => self.tracked_target_upper_bound.saturating_mul(target_slots),
-        };
-        self.reserve_tracker_state(state_growth)
-    }
-
-    fn admit_recurrence_probe(&mut self) -> AnalysisResult<()> {
-        let cloned_tracker_state = self.tracker_state_units.saturating_mul(2);
-        self.admit_transient_live_state(cloned_tracker_state)
-    }
-
-    fn admit_output_candidate(&self, qubit_count: usize) -> AnalysisResult<u64> {
+    fn admit_output_candidate(
+        &self,
+        qubit_count: usize,
+        tracker_live_bytes: u64,
+    ) -> AnalysisResult<u64> {
         let candidate_bytes = output_region_bytes(qubit_count)?;
-        self.next_output_bytes(candidate_bytes)?;
+        self.next_output_bytes(candidate_bytes, tracker_live_bytes)?;
         Ok(candidate_bytes)
     }
 
-    fn commit_output_region(&mut self, bytes: u64) -> AnalysisResult<()> {
-        self.output_bytes = self.next_output_bytes(bytes)?;
+    fn commit_output_region(&mut self, bytes: u64, tracker_live_bytes: u64) -> AnalysisResult<()> {
+        self.output_bytes = self.next_output_bytes(bytes, tracker_live_bytes)?;
         Ok(())
     }
 
-    /// Live tracker state and the output map share the operation's one budget.
-    fn next_output_bytes(&self, bytes: u64) -> AnalysisResult<u64> {
+    /// Request state, live tracker state, and the output map share the operation's one budget.
+    fn next_output_bytes(&self, bytes: u64, tracker_live_bytes: u64) -> AnalysisResult<u64> {
         let next_output_bytes = self.output_bytes.saturating_add(bytes);
         let live_bytes = self
             .live_state_units
-            .saturating_mul(DETECTING_REGION_LIVE_STATE_UNIT_BYTES);
+            .saturating_mul(DETECTING_REGION_LIVE_STATE_UNIT_BYTES)
+            .saturating_add(tracker_live_bytes);
         admit_region_bytes(
             self.memory,
             ResourceKind::OutputBytes,
@@ -1083,20 +989,6 @@ fn admit_region_bytes(
         budget.bytes(),
     )
     .into())
-}
-
-impl ReverseTrackerWorkBudget for DetectingRegionBudget {
-    fn admit_probe_iteration(&mut self) -> AnalysisResult<()> {
-        Ok(())
-    }
-
-    fn admit_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        self.admit_tracker_instruction(instruction)
-    }
-
-    fn admit_recurrence_search(&mut self) -> AnalysisResult<()> {
-        self.admit_recurrence_probe()
-    }
 }
 
 fn output_region_bytes(qubit_count: usize) -> AnalysisResult<u64> {

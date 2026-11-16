@@ -42,6 +42,11 @@ pub(super) fn reverse_flows(
     let mut tracker =
         SparseReverseFrameTracker::new(qubit_count, measurement_count, detector_count, true);
     tracker.set_cancellation(options.cancellation.clone());
+    tracker.set_memory_budget(
+        ResourceOperation::TimeReversal,
+        ResourceKind::MaterializedBytes,
+        options.memory_budget,
+    );
     let mut engine = ReverseFlowEngine {
         tracker,
         inverted: Circuit::new(),
@@ -56,6 +61,7 @@ pub(super) fn reverse_flows(
     };
 
     engine.seed_flow_outputs(&flow_states)?;
+    engine.tracker.check_live_budget()?;
     for instruction in circuit.iter_flattened_instructions_reverse() {
         engine.tracker.poll_cancellation()?;
         engine.reverse_instruction(instruction)?;

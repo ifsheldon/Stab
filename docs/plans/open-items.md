@@ -19,12 +19,11 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 ## Memory
 
 - The CLI's command-level `--memory-budget` ledger cannot hold a compiled sampling, detection, or measurement-to-detection plan while its session is admitted, because the plans expose neither their retained bytes nor their session estimates; the session is admitted against the plan's compile-time budget, so a command can still peak near the plan plus that budget.
-- `sample_dem` plans are not budget-admitted, feedback inlining reports no output size, and `analyze_errors` grows its error accumulator before its materialized-bytes check: the 147 MB flattened circuit reaches 2.6 GB of resident memory under the 1 GiB default (4.8 GB under 2 GiB) before `circuit_to_detector_error_model` refuses it.
+- `sample_dem` plans are not budget-admitted, and feedback inlining reports no output size.
 - Parse admission charges two target slots per target, so a parsed circuit's hold (859 MB for the 147 MB flattened circuit) is about 1.75 times its resident size, and commands on that circuit are refused under the 1 GiB default although they peak below 1 GiB when admitted.
 - `sample` and `detect` stream only requests of 1 to 63 shots: one shot of a 5,000,000-round repetition code (10,000,000 measurements) peaks at about 7 MB against Stim's 6 MB. From 64 shots on they still keep one plane per measurement (and detector) for every lane plus about 16 bytes per record bit of encoder transpose scratch, 240 MB at 64 shots and 475 MB at 256 to 1000 shots on that circuit (786 MB for `detect --shots 1000`), below Stim's 268 MB to 2.36 GB but proportional to the lane width; the streaming run that would keep only the delivered records measured 5 to 15 percent slower once it fills whole batches.
 - `m2d` converts whole 256-record batches of input records through full measurement and detector planes, 1.2 GB for one record of that circuit against Stim's 6.9 GB, and PTB64 output always materializes its planes.
 - Sampled flows (`sample_if_circuit_has_stabilizer_flows_with_options`) charge neither the noiseless copy of the input circuit nor each flow's augmented witness circuit against `SampledFlowOptions::memory_budget`; both grow with the input circuit, which the caller already holds.
-- The sparse reverse tracker's own sensitivity sets are not admitted against a budget; only the Pauli strings it extracts are, so flow checking and detecting regions bound their output rather than their live tracker state.
 
 ## Cancellation
 

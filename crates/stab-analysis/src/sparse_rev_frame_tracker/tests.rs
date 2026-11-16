@@ -6,7 +6,7 @@
 )]
 
 use super::*;
-use stab_algebra::{PauliSign, SingleQubitClifford};
+use stab_algebra::{AlgebraMemoryBudget, PauliSign, SingleQubitClifford};
 use stab_model::{CircuitItem, Gate, MeasureRecordOffset};
 
 use crate::{circuit_to_tableau, decomposed_circuit};
@@ -750,4 +750,66 @@ fn sparse_rev_frame_tracker_accepts_mpad_and_discards_record_sensitivity() {
     let mut expected = tracker_from_pauli_text("IIZ");
     expected.measurement_count = 1;
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn live_bytes_matches_recomputed_state_across_instruction_kinds() {
+    let sample = circuit(
+        "
+        R 0 1 2
+        H 0
+        CX 0 1
+        S 1
+        SPP X0*Z1
+        M 0
+        CX rec[-1] 2
+        MR 1 2
+        MPAD 0
+        DETECTOR rec[-4]
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        ",
+    );
+    let mut tracker = SparseReverseFrameTracker::new_for_error_analysis(
+        sample.count_qubits(),
+        measurement_record_count(&sample).unwrap(),
+        sample.count_detectors().unwrap(),
+        true,
+    );
+    for item in sample.items().iter().rev() {
+        let CircuitItem::Instruction(inst) = item else {
+            panic!("flat fixture");
+        };
+        tracker.undo_instruction(inst).unwrap();
+        assert_eq!(
+            tracker.live_bytes(),
+            budget::recompute_live_bytes(&tracker),
+            "after undoing {inst:?}"
+        );
+    }
+    tracker.undo_implicit_rz_at_start_of_circuit().unwrap();
+    assert!(!tracker.take_gauge_errors().is_empty());
+    assert_eq!(tracker.live_bytes(), budget::recompute_live_bytes(&tracker));
+
+    // Also exercise recorded anticommutations when fail_on_anticommute is false.
+    let anticommuting = circuit("R 0\nM 0\nR 0\nMX 0\nDETECTOR rec[-1]\n");
+    let mut non_failing = SparseReverseFrameTracker::new(
+        anticommuting.count_qubits(),
+        measurement_record_count(&anticommuting).unwrap(),
+        anticommuting.count_detectors().unwrap(),
+        false,
+    );
+    for item in anticommuting.items().iter().rev() {
+        let CircuitItem::Instruction(inst) = item else {
+            panic!("flat fixture");
+        };
+        non_failing.undo_instruction(inst).unwrap();
+        assert_eq!(
+            non_failing.live_bytes(),
+            budget::recompute_live_bytes(&non_failing),
+        );
+    }
+    assert!(
+        non_failing.target_anticommuted(DemTarget::relative_detector(0).unwrap()),
+        "expected recorded anticommutation"
+    );
 }

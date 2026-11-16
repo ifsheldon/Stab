@@ -25,7 +25,11 @@ impl SparseReverseFrameTracker {
 
     /// Returns gauge errors recorded since the last call; usually none.
     pub(crate) fn take_gauge_errors(&mut self) -> Vec<TargetXorSet> {
-        std::mem::take(&mut self.gauge_errors)
+        let taken = std::mem::take(&mut self.gauge_errors);
+        if !taken.is_empty() {
+            self.sync_live_bytes();
+        }
+        taken
     }
 
     pub(crate) fn has_gauge_errors(&self) -> bool {
@@ -97,6 +101,7 @@ impl SparseReverseFrameTracker {
         if self.eliminate_detector_gauges && !has_observables {
             self.eliminate_detector_gauge(&gauge);
             self.gauge_errors.push(gauge);
+            self.sync_live_bytes();
             return Ok(());
         }
         if self.fail_on_anticommute || self.eliminate_detector_gauges {
@@ -141,6 +146,7 @@ impl SparseReverseFrameTracker {
                 });
             }
         }
+        self.sync_live_bytes();
         Ok(())
     }
 

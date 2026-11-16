@@ -1,13 +1,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, StabilizerError};
+use stab_algebra::PauliBasis;
 use stab_model::advanced::CancellationCountdown;
-use stab_model::{Cancellation, Circuit, CircuitInstruction, DemTarget, Pauli, QubitId, Target};
+use stab_model::{
+    Cancellation, Circuit, CircuitInstruction, DemTarget, MemoryBudget, Pauli, QubitId, Target,
+};
 
 mod budget;
 mod clifford_action;
 mod error_analysis;
 mod pauli_product;
+mod regions;
 mod shifted_recurrence;
 mod shifted_repeat;
 mod unitary_repeat;
@@ -15,8 +18,8 @@ mod unitary_repeat;
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::controlled_pauli::{ControlSlot, ControlledPauliForm, controlled_pauli_form};
 use crate::target_xor_set::{TargetXorSet, xor_merge_into};
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
-pub(crate) use budget::{ReverseTrackerBudget, ReverseTrackerWorkBudget};
+use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceOperation};
+use budget::{TrackerMeter, recompute_live_bytes, set_entry_bytes};
 use clifford_action::{single_qubit_action, two_qubit_action};
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
 pub(crate) use shifted_recurrence::{ShiftedRecurrenceSearch, search_shifted_recurrence};
@@ -63,6 +66,7 @@ pub(crate) struct SparseReverseFrameTracker {
     gauge_errors: Vec<TargetXorSet>,
     anticommutations: BTreeSet<Anticommutation>,
     scratch: TrackerScratch,
+    meter: TrackerMeter,
     cancellation: TrackerCancellation,
 }
 
@@ -145,8 +149,46 @@ impl SparseReverseFrameTracker {
             gauge_errors: Vec::new(),
             anticommutations: BTreeSet::new(),
             scratch: TrackerScratch::default(),
+            meter: TrackerMeter::default(),
             cancellation: TrackerCancellation::default(),
         }
+    }
+
+    /// Bounds the tracker's live sensitivity sets against `budget`, reporting refusals as
+    /// `(operation, resource)`.
+    pub(crate) fn set_memory_budget(
+        &mut self,
+        operation: ResourceOperation,
+        resource: ResourceKind,
+        budget: MemoryBudget,
+    ) {
+        self.meter.set_policy(operation, resource, budget);
+    }
+
+    /// Records bytes concurrently retained outside this tracker by the owning operation.
+    pub(crate) fn set_base_bytes(&mut self, base_bytes: u64) {
+        self.meter.base_bytes = base_bytes;
+    }
+
+    /// Bytes currently retained across the tracker's sensitivity maps, gauge sets, and
+    /// anticommutation records.
+    pub(crate) fn live_bytes(&self) -> u64 {
+        self.meter.live_bytes
+    }
+
+    /// Fails when the tracker's live state exceeds its configured memory budget.
+    #[inline]
+    pub(crate) fn check_live_budget(&self) -> AnalysisResult<()> {
+        self.meter.admit(0)
+    }
+
+    /// Fails when the tracker's live state plus `extra_bytes` exceeds its configured budget.
+    pub(crate) fn check_live_budget_with_extra(&self, extra_bytes: u64) -> AnalysisResult<()> {
+        self.meter.admit(extra_bytes)
+    }
+
+    pub(super) fn sync_live_bytes(&mut self) {
+        self.meter.live_bytes = recompute_live_bytes(self);
     }
 
     /// Polls `cancellation` while this tracker undoes instructions and repeat iterations.
@@ -187,23 +229,19 @@ impl SparseReverseFrameTracker {
     }
 
     pub(crate) fn undo_circuit(&mut self, circuit: &Circuit) -> AnalysisResult<()> {
-        let mut budget = ReverseTrackerBudget::Unlimited;
-        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve, &mut budget)
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve)
     }
 
-    pub(crate) fn undo_repeated_circuit_with_budget(
+    pub(crate) fn undo_repeated_circuit(
         &mut self,
         body: &Circuit,
         repetitions: u64,
-        budget: &mut dyn ReverseTrackerWorkBudget,
     ) -> AnalysisResult<()> {
-        let mut budget = ReverseTrackerBudget::Metered(budget);
         shifted_repeat::undo_loop_with_gauge_output(
             self,
             body,
             repetitions,
             GaugeOutputPolicy::Preserve,
-            &mut budget,
         )
     }
 
@@ -211,20 +249,15 @@ impl SparseReverseFrameTracker {
         &mut self,
         circuit: &Circuit,
     ) -> AnalysisResult<()> {
-        self.undo_circuit_with_gauge_output(
-            circuit,
-            GaugeOutputPolicy::Discard,
-            &mut ReverseTrackerBudget::Unlimited,
-        )
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Discard)
     }
 
     fn undo_circuit_with_gauge_output(
         &mut self,
         circuit: &Circuit,
         gauge_output: GaugeOutputPolicy,
-        work_budget: &mut ReverseTrackerBudget<'_>,
     ) -> AnalysisResult<()> {
-        shifted_repeat::undo_circuit_with_gauge_output(self, circuit, gauge_output, work_budget)
+        shifted_repeat::undo_circuit_with_gauge_output(self, circuit, gauge_output)
     }
 
     pub(crate) fn toggle_pauli_target(
@@ -254,10 +287,12 @@ impl SparseReverseFrameTracker {
     }
 
     pub(crate) fn toggle_observable_effect(&mut self, observable: u32, target: DemTarget) {
-        self.observable_effects
-            .entry(u64::from(observable))
-            .or_default()
-            .xor_item(target);
+        let key = u64::from(observable);
+        let before = set_entry_bytes(self.observable_effects.get(&key));
+        let set = self.observable_effects.entry(key).or_default();
+        set.xor_item(target);
+        let after = set_entry_bytes(Some(set));
+        self.meter.adjust(before, after);
     }
 
     pub(crate) fn pauli_targets_at(&self, qubit: QubitId) -> AnalysisResult<BTreeSet<DemTarget>> {
@@ -309,7 +344,7 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<()> {
         self.poll_cancellation()?;
-        match reverse_flow_transition(instruction) {
+        let result = match reverse_flow_transition(instruction) {
             ReverseFlowTransition::Measurement(basis) => {
                 self.undo_measurements(instruction, tracker_basis(basis)?)
             }
@@ -351,6 +386,7 @@ impl SparseReverseFrameTracker {
                     let action = single_qubit_action(instruction.gate())?;
                     for qubit in qubits_reversed(instruction)? {
                         self.apply_single_qubit_action(action, qubit)?;
+                        self.check_live_budget()?;
                     }
                     Ok(())
                 }
@@ -364,7 +400,9 @@ impl SparseReverseFrameTracker {
                     instruction.gate().canonical_name()
                 )))
             }
-        }
+        };
+        result?;
+        self.check_live_budget()
     }
 
     pub(crate) fn feedback_sensitivity(
@@ -385,100 +423,6 @@ impl SparseReverseFrameTracker {
         self.record_index_from_offset(offset)
     }
 
-    /// Returns the full-width region of `target`, admitted against `budget`.
-    pub(crate) fn region_for_target(
-        &self,
-        target: DemTarget,
-        budget: AlgebraMemoryBudget,
-    ) -> AnalysisResult<FlexPauliString> {
-        self.region_for_target_with_len(
-            target,
-            self.qubit_count,
-            budget,
-            ResourceOperation::DetectingRegions,
-        )
-    }
-
-    /// Returns the region of `target` only as wide as its support, admitted against `budget` and
-    /// refused as flow checking.
-    pub(crate) fn compact_region_for_target(
-        &self,
-        target: DemTarget,
-        budget: AlgebraMemoryBudget,
-    ) -> AnalysisResult<FlexPauliString> {
-        let len = self
-            .xs
-            .iter()
-            .chain(&self.zs)
-            .filter_map(|(qubit, targets)| targets.contains(&target).then_some(qubit.get()))
-            .max()
-            .map(|max_qubit| qubit_index(QubitId::new(max_qubit)?).map(|index| index + 1))
-            .transpose()?
-            .unwrap_or(0);
-        self.region_for_target_with_len(target, len, budget, ResourceOperation::FlowCheck)
-    }
-
-    fn region_for_target_with_len(
-        &self,
-        target: DemTarget,
-        len: usize,
-        budget: AlgebraMemoryBudget,
-        operation: ResourceOperation,
-    ) -> AnalysisResult<FlexPauliString> {
-        let mut bases = vec![PauliBasis::I; len];
-        for (qubit, xs) in &self.xs {
-            if xs.contains(&target) {
-                let index = qubit_index(*qubit)?;
-                let basis = bases.get_mut(index).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "X-basis sensitivity qubit {} is outside its sparse region",
-                        qubit.get()
-                    ))
-                })?;
-                *basis = PauliBasis::X;
-            }
-        }
-        for (qubit, zs) in &self.zs {
-            if zs.contains(&target) {
-                let index = qubit_index(*qubit)?;
-                let basis = bases.get_mut(index).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "Z-basis sensitivity qubit {} is outside its sparse region",
-                        qubit.get()
-                    ))
-                })?;
-                *basis = match *basis {
-                    PauliBasis::I => PauliBasis::Z,
-                    PauliBasis::X => PauliBasis::Y,
-                    actual => {
-                        return Err(AnalysisError::invalid_detector_error_model(format!(
-                            "unexpected {actual:?} basis while building sparse region for qubit {}",
-                            qubit.get()
-                        )));
-                    }
-                };
-            }
-        }
-        FlexPauliString::from_phase_and_bases_with_budget(PauliPhase::Plus, bases, budget).map_err(
-            |error| match error {
-                StabilizerError::MemoryBudgetExceeded {
-                    requested_bytes,
-                    budget_bytes,
-                    ..
-                } => ResourceLimitError::memory_budget(
-                    operation,
-                    ResourceKind::MaterializedBytes,
-                    u64::try_from(requested_bytes).unwrap_or(u64::MAX),
-                    budget_bytes,
-                )
-                .into(),
-                error => AnalysisError::invalid_detector_error_model(format!(
-                    "failed to build detecting region for {target}: {error}"
-                )),
-            },
-        )
-    }
-
     pub(crate) fn undo_implicit_rz_at_start_of_circuit(&mut self) -> AnalysisResult<()> {
         let active_qubits = self
             .xs
@@ -489,7 +433,7 @@ impl SparseReverseFrameTracker {
         for qubit in active_qubits {
             self.check_reset_gauge(qubit, TrackerBasis::Z)?;
         }
-        Ok(())
+        self.check_live_budget()
     }
 
     fn undo_measure_resets(
@@ -505,6 +449,7 @@ impl SparseReverseFrameTracker {
         for qubit in qubits {
             self.clear_qubit(qubit)?;
             self.undo_measurement_target(qubit, basis)?;
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -521,6 +466,7 @@ impl SparseReverseFrameTracker {
         }
         for qubit in qubits {
             self.undo_measurement_target(qubit, basis)?;
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -539,6 +485,7 @@ impl SparseReverseFrameTracker {
             let sensitivity = self.pop_record_sensitivity()?;
             self.toggle_product_sensitivity(&term, sensitivity.as_slice())?;
             self.scratch.recycle(sensitivity);
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -556,6 +503,7 @@ impl SparseReverseFrameTracker {
             let sensitivity = self.pop_record_sensitivity()?;
             self.toggle_product_sensitivity(&term, sensitivity.as_slice())?;
             self.scratch.recycle(sensitivity);
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -567,6 +515,7 @@ impl SparseReverseFrameTracker {
             // stores unsigned detector and observable regions, so both gates share propagation.
             self.toggle_product_sensitivity(&terms, sensitivity.as_slice())?;
             self.scratch.recycle(sensitivity);
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -612,10 +561,9 @@ impl SparseReverseFrameTracker {
                 "measurement count underflowed during sparse reverse tracking",
             )
         })?;
-        Ok(self
-            .rec_bits
-            .remove(&self.measurement_count)
-            .unwrap_or_default())
+        let removed = self.rec_bits.remove(&self.measurement_count);
+        self.meter.adjust(set_entry_bytes(removed.as_ref()), 0);
+        Ok(removed.unwrap_or_default())
     }
 
     fn undo_resets(
@@ -675,6 +623,7 @@ impl SparseReverseFrameTracker {
             } else {
                 self.undo_classical_pauli(instruction, control, target)?;
             }
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -781,6 +730,7 @@ impl SparseReverseFrameTracker {
                 ))
             })?;
             self.apply_two_qubit_action(action, left, right)?;
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -799,7 +749,12 @@ impl SparseReverseFrameTracker {
                 ))
             })?;
             let index = self.record_index_from_offset(offset.get())?;
-            self.declared_record_targets(index).xor_item(detector);
+            let before = set_entry_bytes(self.rec_bits.get(&index));
+            let set = self.rec_bits.entry(index).or_default();
+            set.xor_item(detector);
+            let after = set_entry_bytes(Some(set));
+            self.meter.adjust(before, after);
+            self.check_live_budget()?;
         }
         Ok(())
     }
@@ -819,10 +774,11 @@ impl SparseReverseFrameTracker {
             match target {
                 Target::MeasurementRecord { offset } => {
                     let index = self.record_index_from_offset(offset.get())?;
-                    self.rec_bits
-                        .entry(index)
-                        .or_default()
-                        .xor_sorted(&sensitivity, &mut self.scratch.merge);
+                    let before = set_entry_bytes(self.rec_bits.get(&index));
+                    let set = self.rec_bits.entry(index).or_default();
+                    set.xor_sorted(&sensitivity, &mut self.scratch.merge);
+                    let after = set_entry_bytes(Some(set));
+                    self.meter.adjust(before, after);
                 }
                 Target::Pauli { pauli, id, .. } => {
                     self.toggle_product_sensitivity(
@@ -836,6 +792,7 @@ impl SparseReverseFrameTracker {
                     )));
                 }
             }
+            self.check_live_budget()?;
         }
         self.scratch.operand = sensitivity;
         Ok(())
@@ -902,6 +859,7 @@ impl SparseReverseFrameTracker {
         if sensitivity.is_empty() {
             return;
         }
+        let before = set_entry_bytes(self.rec_bits.get(&index));
         let targets = self.rec_bits.entry(index).or_default();
         targets.xor_sorted(sensitivity, &mut self.scratch.merge);
         if targets.is_empty()
@@ -909,16 +867,8 @@ impl SparseReverseFrameTracker {
         {
             self.scratch.recycle(removed);
         }
-    }
-
-    /// Record sensitivity touched by a `DETECTOR` or `OBSERVABLE_INCLUDE` declaration.
-    ///
-    /// Like pinned Stim's `rec_bits[index].xor_item(...)` (sparse_rev_frame_tracker.cc:837/850),
-    /// the entry stays present even when duplicate record targets cancel it to empty; only undoing
-    /// the measurement removes it. Entry presence is part of the shifted-copy comparison that picks
-    /// the folded loop period, so dropping cancelled entries folds different iterations than Stim.
-    fn declared_record_targets(&mut self, index: usize) -> &mut TargetXorSet {
-        self.rec_bits.entry(index).or_default()
+        let after = set_entry_bytes(self.rec_bits.get(&index));
+        self.meter.adjust(before, after);
     }
 
     fn toggle_record_target(&mut self, index: usize, target: DemTarget) {
@@ -931,6 +881,7 @@ impl SparseReverseFrameTracker {
             .into_iter()
             .flatten()
         {
+            self.meter.adjust(set_entry_bytes(Some(&removed)), 0);
             self.scratch.recycle(removed);
         }
         Ok(())
@@ -948,13 +899,25 @@ impl SparseReverseFrameTracker {
 
     fn toggle_xs(&mut self, qubit: QubitId, targets: &[DemTarget]) -> AnalysisResult<()> {
         self.validate_qubit(qubit)?;
-        toggle_qubit_set(&mut self.xs, qubit, targets, &mut self.scratch);
+        toggle_qubit_set(
+            &mut self.xs,
+            qubit,
+            targets,
+            &mut self.scratch,
+            &mut self.meter,
+        );
         Ok(())
     }
 
     fn toggle_zs(&mut self, qubit: QubitId, targets: &[DemTarget]) -> AnalysisResult<()> {
         self.validate_qubit(qubit)?;
-        toggle_qubit_set(&mut self.zs, qubit, targets, &mut self.scratch);
+        toggle_qubit_set(
+            &mut self.zs,
+            qubit,
+            targets,
+            &mut self.scratch,
+            &mut self.meter,
+        );
         Ok(())
     }
 
@@ -1120,10 +1083,12 @@ fn toggle_qubit_set(
     qubit: QubitId,
     targets: &[DemTarget],
     scratch: &mut TrackerScratch,
+    meter: &mut TrackerMeter,
 ) {
     if targets.is_empty() {
         return;
     }
+    let before = set_entry_bytes(sets.get(&qubit));
     let set = sets.entry(qubit).or_insert_with(|| scratch.take_set());
     set.xor_sorted(targets, &mut scratch.merge);
     if set.is_empty()
@@ -1131,6 +1096,8 @@ fn toggle_qubit_set(
     {
         scratch.recycle(removed);
     }
+    let after = set_entry_bytes(sets.get(&qubit));
+    meter.adjust(before, after);
 }
 
 /// Stores one qubit's recomputed set, recycling whichever buffer it displaces.
@@ -1139,7 +1106,9 @@ fn replace_qubit_set(
     qubit: QubitId,
     value: TargetXorSet,
     scratch: &mut TrackerScratch,
+    meter: &mut TrackerMeter,
 ) {
+    let before = set_entry_bytes(sets.get(&qubit));
     if value.is_empty() {
         if let Some(removed) = sets.remove(&qubit) {
             scratch.recycle(removed);
@@ -1148,6 +1117,8 @@ fn replace_qubit_set(
     } else if let Some(replaced) = sets.insert(qubit, value) {
         scratch.recycle(replaced);
     }
+    let after = set_entry_bytes(sets.get(&qubit));
+    meter.adjust(before, after);
 }
 
 #[cfg(test)]

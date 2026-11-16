@@ -14,6 +14,7 @@ pub(super) fn assert_resource_contract() {
     repeat_nesting_boundary_is_exact();
     budget_boundaries_are_typed_and_fail_closed();
     caller_budget_governs_region_requests();
+    live_tracker_sensitivity_is_metered_without_reset_round_overcounting();
 }
 
 fn assert_resource_error(
@@ -223,30 +224,69 @@ fn budget_boundaries_are_typed_and_fail_closed() {
         budget_bytes,
     );
 
-    let mut clone_boundary =
-        DetectingRegionBudget::for_request(MemoryBudget::DEFAULT, 0, 0).unwrap();
-    clone_boundary.reserve_tracker_state(max_units / 3).unwrap();
-    clone_boundary.admit_recurrence_probe().unwrap();
-    let mut clone_excess = DetectingRegionBudget::for_request(MemoryBudget::DEFAULT, 0, 0).unwrap();
-    clone_excess
-        .reserve_tracker_state(max_units / 3 + 1)
-        .unwrap();
-    let error = clone_excess.admit_recurrence_probe().unwrap_err();
-    let AnalysisError::ResourceLimit(resource) = error else {
-        panic!("expected typed live-state rejection, got {error}");
-    };
-    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
-    assert_eq!(resource.resource(), ResourceKind::LiveStateUnits);
-    assert!(resource.actual() > resource.limit());
-
     let mut bytes = DetectingRegionBudget::for_request(MemoryBudget::DEFAULT, 0, 0).unwrap();
-    bytes.commit_output_region(budget_bytes).unwrap();
+    bytes.commit_output_region(budget_bytes, 0).unwrap();
     assert_resource_error(
-        bytes.commit_output_region(1).unwrap_err(),
+        bytes.commit_output_region(1, 0).unwrap_err(),
         ResourceKind::OutputBytes,
         budget_bytes + 1,
         budget_bytes,
     );
+}
+
+fn live_tracker_sensitivity_is_metered_without_reset_round_overcounting() {
+    // Unfolded reset-bounded rounds clear qubit sensitivity every round, so live tracker state
+    // stays O(1) instead of growing quadratically with detector count.
+    let mut rounds = String::new();
+    for _ in 0..400 {
+        rounds.push_str("R 0\nTICK\nM 0\nDETECTOR rec[-1]\n");
+    }
+    let reset_bounded = Circuit::from_stim_str(&rounds).unwrap();
+    let tight = MemoryBudget::from_bytes(4096);
+    let extracted = circuit_detecting_regions(
+        &reset_bounded,
+        DetectingRegionOptions {
+            detectors: vec![detector(0)],
+            ticks: ticks(&[0]),
+            ignore_anticommutation_errors: false,
+            memory_budget: tight,
+            cancellation: stab_model::Cancellation::never(),
+        },
+    )
+    .unwrap();
+    assert_eq!(extracted[&detector(0)][&tick(0)].to_string(), "+Z");
+
+    // Conversely, a detector whose live sensitivity fans out across 128 qubits simultaneously
+    // exceeds a budget that admits the 128 represented qubits alone.
+    let mut fanout = String::from("R 0\nTICK\n");
+    for target in 1..128 {
+        fanout.push_str(&format!("CX 0 {target}\n"));
+    }
+    fanout.push_str("H 0\n");
+    for target in 1..128 {
+        fanout.push_str(&format!("CX 0 {target}\n"));
+    }
+    fanout.push_str("H 0\nM 0\nDETECTOR rec[-1]\n");
+    let wide_live = Circuit::from_stim_str(&fanout).unwrap();
+    let represented_only = MemoryBudget::from_bytes(132 * DETECTING_REGION_LIVE_STATE_UNIT_BYTES);
+    let error = circuit_detecting_regions(
+        &wide_live,
+        DetectingRegionOptions {
+            detectors: vec![detector(0)],
+            ticks: ticks(&[0]),
+            ignore_anticommutation_errors: false,
+            memory_budget: represented_only,
+            cancellation: stab_model::Cancellation::never(),
+        },
+    )
+    .unwrap_err();
+    let AnalysisError::ResourceLimit(resource) = error else {
+        panic!("expected live sensitivity budget refusal, got {error}");
+    };
+    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
+    assert_eq!(resource.resource(), ResourceKind::LiveStateUnits);
+    assert_eq!(resource.limit(), represented_only.bytes());
+    assert!(resource.actual() > resource.limit());
 }
 
 fn caller_budget_governs_region_requests() {

@@ -266,6 +266,40 @@ fn sparse_flow_checking_takes_the_caller_budget() {
         check_if_circuit_has_unsigned_stabilizer_flows(&source, &flows),
         vec![true]
     );
+
+    // An intermediate Clifford fan-out and fan-in leaves a 2-qubit final region, so only live
+    // sensitivity-set metering catches the transient 128-qubit spread.
+    let mut fanout_then_cancel = String::from("M 0\nH 1\n");
+    for target in 2..=128 {
+        fanout_then_cancel.push_str(&format!("CX 1 {target}\n"));
+    }
+    for target in (2..=128).rev() {
+        fanout_then_cancel.push_str(&format!("CX 1 {target}\n"));
+    }
+    fanout_then_cancel.push_str("H 1\n");
+    let transient_wide = circuit(&fanout_then_cancel);
+    let flow = ["Z1 -> Z1".parse::<Flow>().expect("flow")];
+    let error = check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+        &transient_wide,
+        &flow,
+        &options(1024),
+    )
+    .expect_err("transient 128-qubit live sensitivity exceeds 1 KiB");
+    let resource = error
+        .resource_limit_error()
+        .expect("typed live-state refusal");
+    assert_eq!(resource.operation(), ResourceOperation::FlowCheck);
+    assert_eq!(resource.resource(), ResourceKind::LiveStateUnits);
+    assert_eq!(resource.limit(), 1024);
+    assert!(resource.actual() > 1024);
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+            &transient_wide,
+            &flow,
+            &options(16_384),
+        ),
+        Ok(vec![true])
+    );
 }
 
 #[test]

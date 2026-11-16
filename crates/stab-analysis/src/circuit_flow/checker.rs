@@ -17,9 +17,10 @@ use crate::{
 /// [`check_if_circuit_has_unsigned_stabilizer_flows_with_options`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct UnsignedFlowCheckOptions {
-    /// Budget for the dense Tableau of the circuit and for each Pauli string the sparse tracker
-    /// extracts. A Tableau the budget refuses is not an error: the check falls back to the sparse
-    /// tracker, which is how circuits too wide for a Tableau are checked.
+    /// Budget for the dense Tableau of the circuit, the sparse tracker's live sensitivity sets,
+    /// and each Pauli string the sparse tracker extracts. A Tableau the budget refuses is not an
+    /// error: the check falls back to the sparse tracker, which is how circuits too wide for a
+    /// Tableau are checked.
     pub memory_budget: MemoryBudget,
     /// Signal polled once per instruction, Tableau composition, seeded flow term, and checked flow.
     pub cancellation: Cancellation,
@@ -56,8 +57,8 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
 /// # Errors
 ///
 /// Returns [`AnalysisError::Cancelled`] once the options' signal is observed, never a partial or
-/// `false` result, and [`AnalysisError::ResourceLimit`] when a Pauli string the sparse tracker
-/// extracts exceeds the options' memory budget.
+/// `false` result, and [`AnalysisError::ResourceLimit`] when the sparse tracker's live sensitivity
+/// sets or an extracted Pauli string exceed the options' memory budget.
 pub fn check_if_circuit_has_unsigned_stabilizer_flows_with_options(
     circuit: &Circuit,
     flows: &[Flow],
@@ -333,7 +334,8 @@ pub fn check_unsigned_stabilizer_flows_with_diagnostics(
 /// # Errors
 ///
 /// Returns [`AnalysisError::Cancelled`] once the options' signal is observed and
-/// [`AnalysisError::ResourceLimit`] when a Pauli string the check extracts exceeds the budget.
+/// [`AnalysisError::ResourceLimit`] when live sensitivity sets or an extracted Pauli string exceed
+/// the budget.
 pub fn check_unsigned_stabilizer_flows_with_diagnostics_with_options(
     circuit: &Circuit,
     flows: &[Flow],
@@ -465,6 +467,11 @@ fn pull_back_paulis_with_sparse_tracker(
     );
     let mut tracker = SparseReverseFrameTracker::new(qubit_count, 0, 0, false);
     tracker.set_cancellation(options.cancellation.clone());
+    tracker.set_memory_budget(
+        ResourceOperation::FlowCheck,
+        ResourceKind::LiveStateUnits,
+        options.memory_budget,
+    );
     let targets = (0..paulis.len())
         .map(|index| {
             u64::try_from(index).map(DemTarget::numeric).map_err(|_| {
@@ -474,6 +481,7 @@ fn pull_back_paulis_with_sparse_tracker(
         .collect::<AnalysisResult<Vec<_>>>()?;
     for (pauli, target) in paulis.iter().zip(&targets) {
         seed_flow_pauli_output(&mut tracker, pauli, *target)?;
+        tracker.check_live_budget()?;
     }
     tracker.undo_circuit(circuit)?;
     targets
@@ -616,6 +624,11 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
     let mut tracker =
         SparseReverseFrameTracker::new(qubit_count, measurement_count, detector_count, false);
     tracker.set_cancellation(options.cancellation.clone());
+    tracker.set_memory_budget(
+        ResourceOperation::FlowCheck,
+        ResourceKind::LiveStateUnits,
+        options.memory_budget,
+    );
 
     let mut preliminary = Vec::with_capacity(flows.len());
     for (flow_index, flow) in flows.iter().enumerate() {
@@ -631,6 +644,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                 for observable in flow.observables() {
                     tracker.toggle_observable_effect(observable, tracked_target);
                 }
+                tracker.check_live_budget()?;
                 preliminary.push(None);
             }
             Err(record) => preliminary.push(Some(

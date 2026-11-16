@@ -24,12 +24,16 @@ pub(crate) fn search_shifted_recurrence<F>(
 where
     F: FnMut(&mut SparseReverseFrameTracker) -> AnalysisResult<()>,
 {
+    initial.check_live_budget_with_extra(initial.live_bytes().saturating_mul(2))?;
     let mut tortoise = initial.clone();
     let mut hare = initial.clone();
     let mut hare_iterations = 0_u64;
     let mut tortoise_iterations = 0_u64;
     while hare_iterations < max_iterations {
         step(&mut hare)?;
+        initial.check_live_budget_with_extra(
+            tortoise.live_bytes().saturating_add(hare.live_bytes()),
+        )?;
         hare_iterations = hare_iterations.checked_add(1).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "shifted recurrence probe step count overflowed",
@@ -41,6 +45,9 @@ where
 
         if hare_iterations.is_multiple_of(2) {
             step(&mut tortoise)?;
+            initial.check_live_budget_with_extra(
+                tortoise.live_bytes().saturating_add(hare.live_bytes()),
+            )?;
             tortoise_iterations = tortoise_iterations.checked_add(1).ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model(
                     "shifted recurrence tortoise step count overflowed",

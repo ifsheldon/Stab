@@ -16,7 +16,7 @@ pub(super) fn try_undo_supported_unitary_repeat(
         return Ok(false);
     }
 
-    let transform = SlotTransform::for_body(repeat.body(), tracker.qubit_count)?;
+    let transform = SlotTransform::for_body(repeat.body(), tracker)?;
     transform
         .pow(repeat.repeat_count().get())?
         .apply_to(tracker)?;
@@ -39,9 +39,9 @@ impl SlotTransform {
         }
     }
 
-    fn for_body(body: &Circuit, tracker_qubit_count: usize) -> AnalysisResult<Self> {
+    fn for_body(body: &Circuit, parent: &SparseReverseFrameTracker) -> AnalysisResult<Self> {
         let qubits = touched_qubits(body);
-        if let Some(&qubit) = qubits.iter().find(|&&qubit| qubit >= tracker_qubit_count) {
+        if let Some(&qubit) = qubits.iter().find(|&&qubit| qubit >= parent.qubit_count) {
             return Err(AnalysisError::invalid_detector_error_model(format!(
                 "unitary repeat touches qubit {qubit} outside the sparse reverse tracker"
             )));
@@ -54,12 +54,20 @@ impl SlotTransform {
             )
         })?;
         let mut destinations = Vec::with_capacity(slot_count);
+        let mut retained_slots = 0_u64;
         for slot in 0..slot_count {
+            parent.check_cancelled()?;
             let target = slot_target(slot)?;
             let mut basis_tracker = SparseReverseFrameTracker::new(dense_qubit_count, 0, 0, true);
+            basis_tracker.cancellation = parent.cancellation.clone();
+            basis_tracker.meter.policy = parent.meter.policy;
             seed_slot(&mut basis_tracker, dense_qubit_count, slot, target)?;
             basis_tracker.undo_circuit(&dense_body)?;
-            destinations.push(collect_target_slots(&basis_tracker, target)?);
+            let mapped = collect_target_slots(&basis_tracker, target)?;
+            retained_slots = retained_slots
+                .saturating_add((mapped.len() as u64).saturating_mul(size_of::<usize>() as u64));
+            parent.check_live_budget_with_extra(retained_slots)?;
+            destinations.push(mapped);
         }
         Ok(Self {
             qubits,
@@ -153,6 +161,7 @@ impl SlotTransform {
                 qubit_id_from_index(qubit)?,
                 value,
                 &mut tracker.scratch,
+                &mut tracker.meter,
             );
         }
         for (local, &qubit) in self.qubits.iter().enumerate() {
@@ -165,9 +174,10 @@ impl SlotTransform {
                 qubit_id_from_index(qubit)?,
                 value,
                 &mut tracker.scratch,
+                &mut tracker.meter,
             );
         }
-        Ok(())
+        tracker.check_live_budget()
     }
 }
 

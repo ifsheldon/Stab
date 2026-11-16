@@ -10,10 +10,14 @@ use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
 
 use hashbrown::HashTable;
-use stab_model::{DemTarget, Probability};
+use stab_model::{DemTarget, MemoryBudget, Probability};
 
 use super::probabilities::xor_probability;
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+
+/// Conservative factor covering geometric `Vec` growth and `HashTable` load-factor slack while
+/// keeping admission strictly monotonic in the caller's memory budget.
+const ARENA_SLACK_FACTOR: u64 = 2;
 
 /// Interned error tag; the untagged class uses [`TagId::UNTAGGED`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -46,10 +50,18 @@ pub(super) struct ErrorAccumulator {
     /// Tag bytes for `TagId(n)` at position `n - 1`.
     tags: Vec<Box<[u8]>>,
     tag_ids: HashMap<Box<[u8]>, TagId>,
+    interned_tag_bytes: u64,
+    base_bytes: u64,
+    budget: MemoryBudget,
 }
 
 impl ErrorAccumulator {
+    #[cfg(test)]
     pub(super) fn new() -> Self {
+        Self::with_budget(MemoryBudget::from_bytes(u64::MAX))
+    }
+
+    pub(super) fn with_budget(budget: MemoryBudget) -> Self {
         Self {
             targets: Vec::new(),
             classes: Vec::new(),
@@ -57,7 +69,47 @@ impl ErrorAccumulator {
             hash_builder: RandomState::new(),
             tags: Vec::new(),
             tag_ids: HashMap::new(),
+            interned_tag_bytes: 0,
+            base_bytes: 0,
+            budget,
         }
+    }
+
+    /// Updates the bytes concurrently held by the analyzer's emitted model and reverse tracker.
+    pub(super) fn set_base_bytes(&mut self, base_bytes: u64) {
+        self.base_bytes = base_bytes;
+    }
+
+    /// Deterministic conservative retained bytes of the accumulator's live arena, classes, hash
+    /// index, and interned tags.
+    pub(super) fn admitted_bytes(&self) -> u64 {
+        Self::arena_bytes(self.targets.len(), self.classes.len())
+            .saturating_add(self.interned_tag_bytes)
+    }
+
+    fn arena_bytes(target_len: usize, class_len: usize) -> u64 {
+        let target_bytes = (target_len as u64)
+            .saturating_mul(size_of::<DemTarget>() as u64)
+            .saturating_mul(ARENA_SLACK_FACTOR);
+        let per_class_bytes = (size_of::<ErrorClass>() + size_of::<usize>() + 1) as u64;
+        let class_bytes = (class_len as u64)
+            .saturating_mul(per_class_bytes)
+            .saturating_mul(ARENA_SLACK_FACTOR);
+        target_bytes.saturating_add(class_bytes)
+    }
+
+    fn admit_accumulator_bytes(&self, accumulator_bytes: u64) -> AnalysisResult<()> {
+        let total = self.base_bytes.saturating_add(accumulator_bytes);
+        if self.budget.admits(u128::from(total)) {
+            return Ok(());
+        }
+        Err(ResourceLimitError::memory_budget(
+            ResourceOperation::CircuitToDetectorErrorModel,
+            ResourceKind::MaterializedBytes,
+            total,
+            self.budget.bytes(),
+        )
+        .into())
     }
 
     pub(super) fn intern_tag(&mut self, tag: Option<&[u8]>) -> AnalysisResult<TagId> {
@@ -76,8 +128,18 @@ impl ErrorAccumulator {
                     "error analysis interned more distinct tags than fit u32",
                 )
             })?;
+        let entry_overhead = (size_of::<Box<[u8]>>() + size_of::<(Box<[u8]>, TagId)>()) as u64;
+        let added_tag_bytes = (tag.len() as u64)
+            .saturating_mul(2)
+            .saturating_add(entry_overhead);
+        let next_tag_bytes = self.interned_tag_bytes.saturating_add(added_tag_bytes);
+        self.admit_accumulator_bytes(
+            Self::arena_bytes(self.targets.len(), self.classes.len())
+                .saturating_add(next_tag_bytes),
+        )?;
         self.tags.push(Box::from(tag));
         self.tag_ids.insert(Box::from(tag), id);
+        self.interned_tag_bytes = next_tag_bytes;
         Ok(id)
     }
 
@@ -143,6 +205,11 @@ impl ErrorAccumulator {
             entry.live = true;
             return Ok(());
         }
+        let next_targets = self.targets.len().saturating_add(targets.len());
+        let next_classes = self.classes.len().saturating_add(1);
+        self.admit_accumulator_bytes(
+            Self::arena_bytes(next_targets, next_classes).saturating_add(self.interned_tag_bytes),
+        )?;
         let start = self.targets.len();
         self.targets.extend_from_slice(targets);
         let class = self.classes.len();
@@ -180,7 +247,12 @@ impl ErrorAccumulator {
 
     /// Live classes in ascending `(targets, tag)` order.
     pub(super) fn sorted_classes(&self) -> AnalysisResult<Vec<ClassId>> {
-        let mut keyed = Vec::with_capacity(self.classes.len());
+        let live_count = self.classes.iter().filter(|entry| entry.live).count();
+        let sort_bytes =
+            (live_count as u64)
+                .saturating_mul(size_of::<(&[DemTarget], Option<&[u8]>, ClassId)>() as u64);
+        self.admit_accumulator_bytes(self.admitted_bytes().saturating_add(sort_bytes))?;
+        let mut keyed = Vec::with_capacity(live_count);
         for (class, entry) in self.classes.iter().enumerate() {
             if entry.live {
                 keyed.push((
@@ -195,11 +267,27 @@ impl ErrorAccumulator {
         Ok(keyed.into_iter().map(|(_, _, class)| class).collect())
     }
 
-    /// Forgets every class while keeping allocations and interned tags.
-    pub(super) fn clear(&mut self) {
+    /// Forgets every class while releasing arena allocations that would push resident memory
+    /// alongside `base_bytes` past the budget.
+    pub(super) fn clear(&mut self, base_bytes: u64) {
         self.targets.clear();
         self.classes.clear();
         self.index.clear();
+        self.base_bytes = base_bytes;
+        let resident_capacity_bytes = (self.targets.capacity() as u64)
+            .saturating_mul(size_of::<DemTarget>() as u64)
+            .saturating_add(
+                (self.classes.capacity() as u64).saturating_mul(size_of::<ErrorClass>() as u64),
+            )
+            .saturating_add(self.index.allocation_size() as u64)
+            .saturating_add(self.interned_tag_bytes);
+        if !self.budget.admits(u128::from(
+            base_bytes.saturating_add(resident_capacity_bytes),
+        )) {
+            self.targets = Vec::new();
+            self.classes = Vec::new();
+            self.index = HashTable::new();
+        }
     }
 
     fn hash_key(&self, targets: &[DemTarget], tag: TagId) -> u64 {

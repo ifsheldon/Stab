@@ -84,22 +84,38 @@ impl ReverseFoldAnalyzer {
             options.allow_gauge_detectors,
         );
         tracker.set_cancellation(options.cancellation.clone());
+        tracker.set_memory_budget(
+            ResourceOperation::CircuitToDetectorErrorModel,
+            ResourceKind::MaterializedBytes,
+            options.memory_budget,
+        );
+        let errors = ErrorAccumulator::with_budget(options.memory_budget);
         Ok(Self {
             options,
             tracker,
             ticks_left: circuit.count_ticks()?,
             reversed_model: DetectorErrorModel::new(),
-            errors: ErrorAccumulator::new(),
+            errors,
             scratch: AnalyzerScratch::default(),
             output_bytes: 0,
             stacked_else_correlated: Vec::new(),
         })
     }
 
+    fn sync_error_budget_base(&mut self) {
+        self.errors
+            .set_base_bytes(self.output_bytes.saturating_add(self.tracker.live_bytes()));
+    }
+
     /// Charges `bytes` of retained output against the caller's budget before retaining them.
     fn charge_output(&mut self, bytes: u64) -> AnalysisResult<()> {
         let budget = self.options.memory_budget;
-        let total = self.output_bytes.saturating_add(bytes);
+        let next_output = self.output_bytes.saturating_add(bytes);
+        let live = self
+            .tracker
+            .live_bytes()
+            .saturating_add(self.errors.admitted_bytes());
+        let total = next_output.saturating_add(live);
         if !budget.admits(u128::from(total)) {
             return Err(ResourceLimitError::memory_budget(
                 ResourceOperation::CircuitToDetectorErrorModel,
@@ -109,7 +125,8 @@ impl ReverseFoldAnalyzer {
             )
             .into());
         }
-        self.output_bytes = total;
+        self.output_bytes = next_output;
+        self.sync_error_budget_base();
         Ok(())
     }
 
@@ -129,6 +146,7 @@ impl ReverseFoldAnalyzer {
         self.undo_circuit(circuit)?;
         self.tracker.undo_implicit_rz_at_start_of_circuit()?;
         self.collect_gauge_errors()?;
+        self.charge_output(0)?;
         self.flush()?;
         let mut model = std::mem::take(&mut self.reversed_model);
         let mut base_detector_id = 0_u64;
@@ -158,6 +176,7 @@ impl ReverseFoldAnalyzer {
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         self.tracker.poll_cancellation()?;
+        self.sync_error_budget_base();
         let kind = instruction.gate().kind();
         if !matches!(kind, GateKind::ELSE_CORRELATED_ERROR | GateKind::E) {
             self.require_no_pending_else_chain()?;
@@ -294,7 +313,8 @@ impl ReverseFoldAnalyzer {
             | GateKind::CZSWAP
             | GateKind::ISWAP_DAG => self.tracker.undo_instruction(instruction)?,
         }
-        self.collect_gauge_errors()
+        self.collect_gauge_errors()?;
+        self.charge_output(0)
     }
 
     fn record_measurement_errors(
@@ -841,6 +861,7 @@ impl ReverseFoldAnalyzer {
     }
 
     fn flush(&mut self) -> AnalysisResult<()> {
+        self.sync_error_budget_base();
         if self.options.decompose_errors {
             decompose_accumulated_errors(
                 &mut self.errors,
@@ -862,7 +883,8 @@ impl ReverseFoldAnalyzer {
                 )?;
             }
         }
-        self.errors.clear();
+        self.errors
+            .clear(self.output_bytes.saturating_add(self.tracker.live_bytes()));
         Ok(())
     }
 

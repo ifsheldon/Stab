@@ -212,8 +212,8 @@ impl SparseReverseFrameTracker {
         let mut outputs = self.scratch.take_sets::<2>();
         action.compute(inputs, &mut outputs, &mut self.scratch.merge);
         let [x, z] = outputs;
-        replace_qubit_set(&mut self.xs, qubit, x, &mut self.scratch);
-        replace_qubit_set(&mut self.zs, qubit, z, &mut self.scratch);
+        replace_qubit_set(&mut self.xs, qubit, x, &mut self.scratch, &mut self.meter);
+        replace_qubit_set(&mut self.zs, qubit, z, &mut self.scratch, &mut self.meter);
         Ok(())
     }
 
@@ -237,10 +237,34 @@ impl SparseReverseFrameTracker {
         let mut outputs = self.scratch.take_sets::<4>();
         action.compute(inputs, &mut outputs, &mut self.scratch.merge);
         let [left_x, left_z, right_x, right_z] = outputs;
-        replace_qubit_set(&mut self.xs, left, left_x, &mut self.scratch);
-        replace_qubit_set(&mut self.zs, left, left_z, &mut self.scratch);
-        replace_qubit_set(&mut self.xs, right, right_x, &mut self.scratch);
-        replace_qubit_set(&mut self.zs, right, right_z, &mut self.scratch);
+        replace_qubit_set(
+            &mut self.xs,
+            left,
+            left_x,
+            &mut self.scratch,
+            &mut self.meter,
+        );
+        replace_qubit_set(
+            &mut self.zs,
+            left,
+            left_z,
+            &mut self.scratch,
+            &mut self.meter,
+        );
+        replace_qubit_set(
+            &mut self.xs,
+            right,
+            right_x,
+            &mut self.scratch,
+            &mut self.meter,
+        );
+        replace_qubit_set(
+            &mut self.zs,
+            right,
+            right_z,
+            &mut self.scratch,
+            &mut self.meter,
+        );
         Ok(())
     }
 }

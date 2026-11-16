@@ -5,9 +5,7 @@ use stab_model::{Circuit, CircuitItem, DemTarget};
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
-use super::{
-    GaugeOutputPolicy, ReverseTrackerBudget, SparseReverseFrameTracker, TargetSets, unitary_repeat,
-};
+use super::{GaugeOutputPolicy, SparseReverseFrameTracker, TargetSets, unitary_repeat};
 
 #[derive(Clone, Copy)]
 enum ProbeTarget {
@@ -55,27 +53,18 @@ pub(super) fn undo_loop(
     body: &Circuit,
     repetitions: u64,
 ) -> AnalysisResult<()> {
-    let mut work_budget = ReverseTrackerBudget::Unlimited;
-    undo_loop_with_gauge_output(
-        tracker,
-        body,
-        repetitions,
-        GaugeOutputPolicy::Preserve,
-        &mut work_budget,
-    )
+    undo_loop_with_gauge_output(tracker, body, repetitions, GaugeOutputPolicy::Preserve)
 }
 
 pub(super) fn undo_circuit_with_gauge_output(
     tracker: &mut SparseReverseFrameTracker,
     circuit: &Circuit,
     gauge_output: GaugeOutputPolicy,
-    work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
     run_undo_stack(
         tracker,
         vec![UndoFrame::Items(circuit.items().iter())],
         gauge_output,
-        work_budget,
     )
 }
 
@@ -84,10 +73,10 @@ pub(super) fn undo_loop_with_gauge_output(
     body: &Circuit,
     repetitions: u64,
     gauge_output: GaugeOutputPolicy,
-    work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
-    let initial = prepare_loop_frame(tracker, body, repetitions, work_budget)?;
-    run_undo_stack(tracker, vec![initial], gauge_output, work_budget)
+    tracker.meter.sibling_tracker_bytes = 0;
+    let initial = prepare_loop_frame(tracker, body, repetitions)?;
+    run_undo_stack(tracker, vec![initial], gauge_output)
 }
 
 #[cfg(test)]
@@ -96,7 +85,6 @@ pub(super) fn undo_loop_by_unrolling(
     body: &Circuit,
     repetitions: u64,
 ) -> AnalysisResult<()> {
-    let mut work_budget = ReverseTrackerBudget::Unlimited;
     run_undo_stack(
         tracker,
         vec![UndoFrame::Unroll {
@@ -104,7 +92,6 @@ pub(super) fn undo_loop_by_unrolling(
             remaining: repetitions,
         }],
         GaugeOutputPolicy::Preserve,
-        &mut work_budget,
     )
 }
 
@@ -112,7 +99,6 @@ fn prepare_loop_frame<'a>(
     active: &SparseReverseFrameTracker,
     body: &'a Circuit,
     repetitions: u64,
-    work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<UndoFrame<'a>> {
     if repetitions < 5 {
         return Ok(UndoFrame::Unroll {
@@ -120,7 +106,7 @@ fn prepare_loop_frame<'a>(
             remaining: repetitions,
         });
     }
-    work_budget.admit_recurrence_search()?;
+    active.check_live_budget_with_extra(active.live_bytes().saturating_mul(2))?;
     Ok(UndoFrame::Probe(Box::new(RecurrenceProbe {
         body,
         repetitions,
@@ -138,21 +124,42 @@ fn active_tracker_mut<'t>(
     root: &'t mut SparseReverseFrameTracker,
     stack: &'t mut [UndoFrame<'_>],
 ) -> &'t mut SparseReverseFrameTracker {
-    stack
+    let total_bytes = stack
+        .iter()
+        .fold(root.live_bytes(), |acc, frame| match frame {
+            UndoFrame::Probe(probe) => acc
+                .saturating_add(probe.tortoise.live_bytes())
+                .saturating_add(probe.hare.live_bytes()),
+            UndoFrame::Items(_) | UndoFrame::Unroll { .. } => acc,
+        });
+    let active = stack
         .iter_mut()
         .rev()
         .find_map(|frame| match frame {
             UndoFrame::Probe(probe) => Some(probe.active_mut()),
             UndoFrame::Items(_) | UndoFrame::Unroll { .. } => None,
         })
-        .unwrap_or(root)
+        .unwrap_or(root);
+    active.meter.sibling_tracker_bytes = total_bytes.saturating_sub(active.live_bytes());
+    active
+}
+
+fn replace_active_tracker<'t>(
+    root: &'t mut SparseReverseFrameTracker,
+    stack: &'t mut [UndoFrame<'_>],
+    replacement: SparseReverseFrameTracker,
+) -> &'t mut SparseReverseFrameTracker {
+    let target = active_tracker_mut(root, stack);
+    let sibling_bytes = target.meter.sibling_tracker_bytes;
+    *target = replacement;
+    target.meter.sibling_tracker_bytes = sibling_bytes;
+    target
 }
 
 fn run_undo_stack<'a>(
     root: &mut SparseReverseFrameTracker,
     mut stack: Vec<UndoFrame<'a>>,
     gauge_output: GaugeOutputPolicy,
-    work_budget: &mut ReverseTrackerBudget<'_>,
 ) -> AnalysisResult<()> {
     while let Some(top_index) = stack.len().checked_sub(1) {
         let (below, top_slice) = stack.split_at_mut(top_index);
@@ -168,7 +175,6 @@ fn run_undo_stack<'a>(
                 let active = active_tracker_mut(root, below);
                 match item {
                     CircuitItem::Instruction(instruction) => {
-                        work_budget.admit_instruction(instruction)?;
                         active.undo_instruction(instruction)?;
                         if gauge_output == GaugeOutputPolicy::Discard {
                             active.take_gauge_errors();
@@ -180,12 +186,8 @@ fn run_undo_stack<'a>(
                         {
                             continue;
                         }
-                        let next_frame = prepare_loop_frame(
-                            active,
-                            repeat.body(),
-                            repeat.repeat_count().get(),
-                            work_budget,
-                        )?;
+                        let next_frame =
+                            prepare_loop_frame(active, repeat.body(), repeat.repeat_count().get())?;
                         stack.push(next_frame);
                     }
                 }
@@ -197,7 +199,6 @@ fn run_undo_stack<'a>(
                 }
                 *remaining -= 1;
                 let body = *body;
-                work_budget.admit_probe_iteration()?;
                 active_tracker_mut(root, below).poll_cancellation()?;
                 stack.push(UndoFrame::Items(body.items().iter()));
             }
@@ -216,7 +217,7 @@ fn run_undo_stack<'a>(
                                     "sparse reverse repeat remainder underflowed",
                                 )
                             })?;
-                        *active_tracker_mut(root, &mut stack) = probe.hare;
+                        replace_active_tracker(root, &mut stack, probe.hare);
                         stack.push(UndoFrame::Unroll {
                             body: probe.body,
                             remaining: remainder,
@@ -239,8 +240,7 @@ fn run_undo_stack<'a>(
                         let Some(UndoFrame::Probe(probe)) = stack.pop() else {
                             break;
                         };
-                        let next =
-                            finish_found_recurrence(active_tracker_mut(root, &mut stack), *probe)?;
+                        let next = finish_found_recurrence(root, &mut stack, *probe)?;
                         stack.push(next);
                         continue;
                     }
@@ -264,8 +264,7 @@ fn run_undo_stack<'a>(
                         let Some(UndoFrame::Probe(probe)) = stack.pop() else {
                             break;
                         };
-                        let next =
-                            finish_found_recurrence(active_tracker_mut(root, &mut stack), *probe)?;
+                        let next = finish_found_recurrence(root, &mut stack, *probe)?;
                         stack.push(next);
                     } else {
                         probe.phase = ProbePhase::StartHare;
@@ -274,11 +273,13 @@ fn run_undo_stack<'a>(
             },
         }
     }
+    root.meter.sibling_tracker_bytes = 0;
     Ok(())
 }
 
 fn finish_found_recurrence<'a>(
-    target_tracker: &mut SparseReverseFrameTracker,
+    root: &mut SparseReverseFrameTracker,
+    stack: &mut [UndoFrame<'_>],
     probe: RecurrenceProbe<'a>,
 ) -> AnalysisResult<UndoFrame<'a>> {
     let period = probe
@@ -324,7 +325,7 @@ fn finish_found_recurrence<'a>(
         signed_product_usize(measurements_per_period, skipped_iterations, "measurement")?;
     let skipped_detectors =
         signed_product_u64(detectors_per_period, skipped_iterations, "detector")?;
-    *target_tracker = probe.hare;
+    let target_tracker = replace_active_tracker(root, stack, probe.hare);
     shift(target_tracker, -skipped_measurements, -skipped_detectors)?;
     let completed_iterations = probe
         .hare_iterations

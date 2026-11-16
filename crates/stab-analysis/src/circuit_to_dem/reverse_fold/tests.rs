@@ -56,3 +56,43 @@ fn analyzer_output_is_admitted_against_the_memory_budget_for_folded_and_unrolled
     .expect("expanded work is not capped");
     assert_eq!(dem.count_detectors(), Ok(400_002));
 }
+
+#[test]
+fn error_accumulator_admits_live_classes_before_flushing_to_dem() {
+    // An anti-Hermitian MPP sits at the start of the circuit (visited last in reverse). Under the
+    // default budget, reverse traversal reaches MPP and reports the semantic error; under a tight
+    // budget, accumulating distinct tagged error classes fails closed mid-circuit before flush.
+    let mut stim = String::from("MPP X0*Z0\nR 0\n");
+    for tag_id in 0..256 {
+        stim.push_str(&format!("X_ERROR[t{tag_id}](0.01) 0\n"));
+    }
+    stim.push_str("M 0\nDETECTOR rec[-1]\n");
+    let circuit = Circuit::from_stim_str(&stim).expect("valid circuit syntax");
+
+    let semantic = try_analyze(&circuit, ErrorAnalyzerOptions::default())
+        .expect_err("default budget reaches start-of-circuit anti-Hermitian MPP");
+    assert!(
+        semantic.to_string().contains("anti-Hermitian"),
+        "{semantic}"
+    );
+
+    let tight = MemoryBudget::from_bytes(4096);
+    let refused = try_analyze(
+        &circuit,
+        ErrorAnalyzerOptions {
+            memory_budget: tight,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("tight budget refuses live ErrorAccumulator growth before MPP or flush");
+    let resource = refused
+        .resource_limit_error()
+        .expect("typed accumulator budget refusal");
+    assert_eq!(
+        resource.operation(),
+        crate::ResourceOperation::CircuitToDetectorErrorModel
+    );
+    assert_eq!(resource.resource(), crate::ResourceKind::MaterializedBytes);
+    assert_eq!(resource.limit(), tight.bytes());
+    assert!(resource.actual() > resource.limit());
+}

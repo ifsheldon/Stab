@@ -83,6 +83,11 @@ pub fn circuit_with_inlined_feedback_with_limits(
         false,
     );
     tracker.set_cancellation(limits.cancellation().clone());
+    tracker.set_memory_budget(
+        ResourceOperation::FeedbackInlining,
+        ResourceKind::MaterializedBytes,
+        limits.memory_budget(),
+    );
     let mut helper = WithoutFeedbackHelper {
         reversed_output: Vec::new(),
         tracker,
