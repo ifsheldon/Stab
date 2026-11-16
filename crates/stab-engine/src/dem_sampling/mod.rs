@@ -5,11 +5,14 @@ mod limits;
 mod plan;
 mod program;
 mod replay;
+mod replay_planes;
+mod replay_store;
 mod session;
 
 pub use error::{DemError, DemResourceKind, DemResourceLimitError};
 pub use limits::DemSamplerLimits;
 pub use plan::{DemSamplingCompiler, DemSamplingPlan};
+pub use replay_store::{DemReplayRecordStore, DemReplayRetention};
 pub use session::{
     DemReplayBatchStatus, DemReplaySession, DemReplayTransaction, DemSamplingExecutionError,
     DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,

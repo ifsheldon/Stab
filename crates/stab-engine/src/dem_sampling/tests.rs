@@ -313,3 +313,213 @@ fn error_locator_replay_matches_the_sequential_walk() {
     assert!(replayed_errors > 10_000, "fixture must replay many errors");
     assert!(failures > 100, "fixture must compare failure diagnostics");
 }
+
+/// Random records of exactly `width` bits at `density`, as the reference walk reads them.
+fn random_records(rng: &mut SmallRng, shots: usize, width: usize, density: f64) -> Vec<Vec<bool>> {
+    (0..shots)
+        .map(|_| (0..width).map(|_| rng.random_bool(density)).collect())
+        .collect()
+}
+
+/// The reference walk's detection record for every record, or its first failure.
+fn reference_records(plan: &DemSamplingPlan, records: &[Vec<bool>]) -> Vec<DetectionRecordBuffer> {
+    records
+        .iter()
+        .map(|record| {
+            replay_with(plan, record.as_slice(), plan.detector_count(), false)
+                .expect("reference walk replays a full-width record")
+                .1
+        })
+        .collect()
+}
+
+#[test]
+fn error_major_replay_matches_the_sequential_walk() {
+    let mut rng = SmallRng::seed_from_u64(0xE77_0A10);
+    let mut replayed_errors = 0_usize;
+    for _ in 0..300 {
+        let mut text = String::new();
+        write_random_dem_block(&mut rng, 0, &mut text);
+        let model = DetectorErrorModel::from_dem_str(&text).expect("parse random DEM");
+        let plan = DemSamplingCompiler::new()
+            .compile(&model)
+            .expect("compile random DEM");
+        let width = plan.error_count();
+        for shots in [1, 37, 64] {
+            for density in [0.0, 0.02, 0.4, 1.0] {
+                let records = random_records(&mut rng, shots, width, density);
+                let expected = reference_records(&plan, &records);
+                let packed =
+                    stab_records::PackedShotBatch::from_records(&records, width).expect("pack");
+                let mut error_words = vec![u64::MAX; width];
+                packed
+                    .view()
+                    .copy_into_bit_plane_words(&mut error_words)
+                    .expect("transpose records");
+                // Reused target words hold garbage, which the replay must overwrite.
+                let mut detector_words = vec![u64::MAX; plan.detector_count()];
+                let mut observable_words = vec![u64::MAX; plan.observable_count()];
+                let cancellation = stab_model::Cancellation::new();
+                replay_planes::replay_error_words(
+                    &plan.inner.operations,
+                    &error_words,
+                    &mut detector_words,
+                    &mut observable_words,
+                    &mut program::DemPoll::new(&cancellation),
+                )
+                .expect("error-major replay");
+                for (shot, expected) in expected.iter().enumerate() {
+                    let lane = |words: &[u64], index: usize| words[index] >> shot & 1 == 1;
+                    let detectors: Vec<bool> = (0..plan.detector_count())
+                        .map(|index| lane(&detector_words, index))
+                        .collect();
+                    let observables: Vec<bool> = (0..plan.observable_count())
+                        .map(|index| lane(&observable_words, index))
+                        .collect();
+                    assert_eq!(
+                        (&detectors, &observables),
+                        (&expected.detectors, &expected.observables),
+                        "shot {shot} of {shots} at density {density} for\n{text}"
+                    );
+                }
+                replayed_errors += records.iter().flatten().filter(|bit| **bit).count();
+            }
+        }
+    }
+    assert!(replayed_errors > 10_000, "fixture must replay many errors");
+}
+
+/// Replays `records` through packed deliveries, or through a record store when `retain` is set
+/// and the store keeps them, returning the sink and whether the store kept them.
+fn replay_packed(
+    plan: &DemSamplingPlan,
+    records: &[Vec<bool>],
+    limits: &DemSamplerLimits,
+    retain: bool,
+) -> (CollectingSink, bool) {
+    let width = plan.error_count();
+    let shots = ShotCount::new(records.len() as u64);
+    let batches: Vec<_> = records
+        .chunks(64)
+        .map(|chunk| stab_records::PackedShotBatch::from_records(chunk, width).expect("pack"))
+        .collect();
+    let mut store = plan.replay_record_store(limits, shots);
+    if retain {
+        for batch in &batches {
+            store.try_retain(batch.view()).expect("retain batch");
+        }
+    }
+    let mut session = plan
+        .replay_session_with_limits(shots, limits.clone())
+        .expect("replay session");
+    let mut sink = CollectingSink::default();
+    let mut transaction = session.start_transaction(&mut sink).expect("transaction");
+    let retained = retain && store.is_retaining();
+    if retained {
+        transaction.write_retained(&store).expect("replay retained");
+    } else {
+        for batch in &batches {
+            transaction
+                .write_packed_batch(batch.view())
+                .expect("replay packed");
+        }
+    }
+    transaction.finish().expect("finish replay");
+    (sink, retained)
+}
+
+#[test]
+fn retained_replay_records_replay_like_packed_deliveries() {
+    let mut rng = SmallRng::seed_from_u64(0x0057_04E5);
+    let mut retained_runs = 0_usize;
+    for _ in 0..60 {
+        let mut text = String::new();
+        write_random_dem_block(&mut rng, 0, &mut text);
+        let model = DetectorErrorModel::from_dem_str(&text).expect("parse random DEM");
+        let plan = DemSamplingCompiler::new()
+            .compile(&model)
+            .expect("compile random DEM");
+        for (shots, density) in [(0, 0.5), (1, 1.0), (64, 0.4), (130, 0.02), (130, 0.0)] {
+            let records = random_records(&mut rng, shots, plan.error_count(), density);
+            let expected = reference_records(&plan, &records);
+            let limits = DemSamplerLimits::default();
+            let (packed, _) = replay_packed(&plan, &records, &limits, false);
+            let (stored, retained) = replay_packed(&plan, &records, &limits, true);
+            retained_runs += usize::from(retained);
+            for sink in [&packed, &stored] {
+                assert_eq!(sink.records, expected, "{shots} records for\n{text}");
+                assert_eq!(sink.error_records, records, "{shots} records for\n{text}");
+            }
+            assert_eq!(stored.finishes, packed.finishes);
+        }
+    }
+    assert!(
+        retained_runs > 100,
+        "fixture must replay many retained stores"
+    );
+}
+
+#[test]
+fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
+    let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
+        .expect("parse DEM");
+    let plan = DemSamplingCompiler::new()
+        .compile(&model)
+        .expect("compile DEM");
+    let shots = ShotCount::new(200);
+    let generous = DemSamplerLimits::default();
+    let mut store = plan.replay_record_store(&generous, shots);
+    assert!(store.is_retaining());
+    // Find the smallest budget whose store admits all records: below it, a store is released
+    // from the start and never holds records the session's budget cannot afford.
+    let fits = |bytes: u64| {
+        plan.replay_record_store(
+            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            shots,
+        )
+        .is_retaining()
+    };
+    let (mut low, mut high) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
+    while low + 1 < high {
+        let middle = low + (high - low) / 2;
+        if fits(middle) {
+            high = middle
+        } else {
+            low = middle
+        }
+    }
+    assert!(fits(high) && !fits(high - 1));
+    let session_only = DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(high - 1));
+    plan.replay_session_with_limits(shots, session_only)
+        .expect("a budget one byte short of the store still admits the session");
+    let records = random_records(
+        &mut SmallRng::seed_from_u64(9),
+        200,
+        plan.error_count(),
+        0.5,
+    );
+    let batch =
+        stab_records::PackedShotBatch::from_records(&records, plan.error_count()).expect("pack");
+    assert_eq!(
+        store.try_retain(batch.view()).expect("retain"),
+        DemReplayRetention::Retained
+    );
+    assert_eq!(store.shot_count(), 200);
+    let mut released = plan.replay_record_store(
+        &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(high - 1)),
+        shots,
+    );
+    assert_eq!(
+        released
+            .try_retain(batch.view())
+            .expect("offer to released store"),
+        DemReplayRetention::Released
+    );
+    let mut session = plan.replay_session(shots).expect("replay session");
+    let mut sink = CollectingSink::default();
+    let mut transaction = session.start_transaction(&mut sink).expect("transaction");
+    assert!(
+        transaction.write_retained(&released).is_err(),
+        "a released store must not replay as if it were empty"
+    );
+}

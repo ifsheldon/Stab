@@ -14,10 +14,11 @@ mod sampling;
 mod sampling_estimate;
 
 pub use dem_sampling::{
-    DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayBatchStatus, DemReplaySession,
-    DemReplayTransaction, DemResourceKind, DemResourceLimitError, DemSamplerLimits,
-    DemSamplingCompiler, DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError,
-    DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession,
+    DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayBatchStatus, DemReplayRecordStore,
+    DemReplayRetention, DemReplaySession, DemReplayTransaction, DemResourceKind,
+    DemResourceLimitError, DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError,
+    DemSamplingPlan, DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus,
+    DemSamplingRunSummary, DemSamplingSession,
 };
 pub use descriptor::CompilationDescriptor;
 pub(crate) use detection::DetectionRecordBuffer;

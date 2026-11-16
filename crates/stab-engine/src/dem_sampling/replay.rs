@@ -1,14 +1,17 @@
-//! Replay of recorded sampled errors into detection records.
+//! Per-record replay of recorded sampled errors into detection records.
 //!
-//! A replayed record is scanned for its set bits only, and each set error ordinal is located in
-//! the compiled program through the per-block [`ErrorSpan`] index, so the work per record is
-//! proportional to its scanned words and set errors rather than to the unrolled error count.
+//! A replayed record is scanned for its set bits only, and the set error ordinals, which arrive
+//! in increasing order, are located in the compiled program by a forward search over the
+//! per-block [`ErrorSpan`] index (see [`ErrorLocator`]), so the work per record is proportional
+//! to its scanned words and set errors rather than to the unrolled error count. Records dense
+//! enough that per-error work dominates are replayed error-major instead (see
+//! [`super::replay_planes`]).
 
 use stab_bits::BitSlice;
 
 use super::program::{
-    DemPoll, DemSampleBlock, DemSampleError, DemSampleOperation, detector_index_overflow_error,
-    detector_shift_overflow_error, usize_from_u64,
+    DemPoll, DemSampleBlock, DemSampleError, DemSampleOperation, ErrorSpan,
+    detector_index_overflow_error, detector_shift_overflow_error, usize_from_u64,
 };
 use super::{DemError, DemResult};
 use crate::DetectionRecordBuffer;
@@ -133,6 +136,7 @@ pub(super) fn apply_error_record<B: ErrorRecordBits + ?Sized>(
 ) -> DemResult<usize> {
     let scanned_bits = error_record.bit_len().min(block.error_count);
     let mut pending = PendingErrors::new();
+    let mut locator = ErrorLocator::new();
     error_record.try_for_each_word(scanned_bits, poll, |poll, word_start, mut bits| {
         while bits != 0 {
             let ordinal = word_start
@@ -140,12 +144,12 @@ pub(super) fn apply_error_record<B: ErrorRecordBits + ?Sized>(
                 .ok_or_else(error_record_cursor_overflow_error)?;
             bits &= bits - 1;
             if pending.push(ordinal)? {
-                pending.apply(block, record, poll)?;
+                pending.apply(block, &mut locator, record, poll)?;
             }
         }
         Ok(())
     })?;
-    pending.apply(block, record, poll)?;
+    pending.apply(block, &mut locator, record, poll)?;
     if scanned_bits < block.error_count {
         return Err(DemError::invalid_result_format(
             "DEM error record ended early",
@@ -188,6 +192,7 @@ impl PendingErrors {
     fn apply(
         &mut self,
         block: &DemSampleBlock,
+        locator: &mut ErrorLocator,
         record: &mut DetectionRecordBuffer,
         poll: &mut DemPoll<'_>,
     ) -> DemResult<()> {
@@ -199,7 +204,7 @@ impl PendingErrors {
         let mut located: [Option<(&DemSampleError, u64)>; Self::CAPACITY] = [None; Self::CAPACITY];
         let mut locate_failure = None;
         for (slot, ordinal) in located.iter_mut().zip(ordinals) {
-            match locate_error(block, *ordinal) {
+            match locator.locate(block, *ordinal) {
                 Ok(error) => *slot = Some(error),
                 Err(failure) => {
                     locate_failure = Some(failure);
@@ -215,67 +220,124 @@ impl PendingErrors {
     }
 }
 
-/// Finds the error with unrolled ordinal `ordinal` and its detector shift, descending through
-/// at most the repeat nesting depth of compiled blocks.
-fn locate_error(block: &DemSampleBlock, ordinal: usize) -> DemResult<(&DemSampleError, u64)> {
-    let mut block = block;
-    let mut ordinal = ordinal;
-    let mut detector_shift = 0_u64;
-    loop {
-        if ordinal >= block.error_count {
-            return Err(error_locator_error());
-        }
-        // Spans are nonempty and strictly increasing, so as many spans as errors means every
-        // span holds exactly one error and the ordinal is its index; when every operation is
-        // such a span too, the ordinal indexes the operations directly.
-        let (operation_index, local) = if block.error_spans.len() == block.error_count {
-            if block.operations.len() == block.error_count {
-                (ordinal, 0)
-            } else {
-                let span = block
-                    .error_spans
-                    .get(ordinal)
-                    .ok_or_else(error_locator_error)?;
-                (span.operation, 0)
-            }
-        } else {
-            let span_index = block
-                .error_spans
-                .partition_point(|span| span.first_error <= ordinal)
-                .checked_sub(1)
-                .ok_or_else(error_locator_error)?;
-            let span = block
-                .error_spans
-                .get(span_index)
-                .ok_or_else(error_locator_error)?;
-            let local = ordinal
-                .checked_sub(span.first_error)
-                .ok_or_else(error_locator_error)?;
-            (span.operation, local)
-        };
-        match block.operations.get(operation_index) {
-            Some(DemSampleOperation::Error(error)) if local == 0 => {
-                return Ok((error, detector_shift));
-            }
-            Some(DemSampleOperation::Repeat(repeat)) if repeat.body.error_count > 0 => {
-                let iteration = u64::try_from(local / repeat.body.error_count)
-                    .map_err(|_| error_locator_error())?;
-                if iteration >= repeat.repeat_count {
-                    return Err(error_locator_error());
-                }
-                let iteration_shift = iteration
-                    .checked_mul(repeat.body.detector_shift)
-                    .ok_or_else(detector_shift_overflow_error)?;
-                detector_shift = detector_shift
-                    .checked_add(repeat.start_detector_shift)
-                    .and_then(|shift| shift.checked_add(iteration_shift))
-                    .ok_or_else(detector_shift_overflow_error)?;
-                ordinal = local % repeat.body.error_count;
-                block = &repeat.body;
-            }
-            _ => return Err(error_locator_error()),
+/// Locates the set errors of one record, which arrive in increasing ordinal order.
+///
+/// Each located error leaves, per repeat nesting depth, the span it was found in. The next
+/// ordinal at that depth is at or after that span whenever it lies in the same block iteration,
+/// so the search gallops forward from it: consecutive errors in one segment cost O(1), and a
+/// distant one costs O(log distance). A hint that no longer precedes the ordinal, because the
+/// error lies in a later iteration or another block, falls back to a binary search over the
+/// block's spans, so no lookup costs more than O(log spans) per depth. An error inside a
+/// `repeat` resolves its iteration and offset by division by the body's error count, never by
+/// walking iterations.
+struct ErrorLocator {
+    span_hints: [usize; Self::HINTED_DEPTH],
+}
+
+impl ErrorLocator {
+    /// Repeat nesting depths that keep a forward hint; deeper blocks binary-search each time.
+    const HINTED_DEPTH: usize = 8;
+
+    const fn new() -> Self {
+        Self {
+            span_hints: [0; Self::HINTED_DEPTH],
         }
     }
+
+    /// Finds the error with unrolled ordinal `ordinal` and its detector shift, descending
+    /// through at most the repeat nesting depth of compiled blocks.
+    fn locate<'block>(
+        &mut self,
+        block: &'block DemSampleBlock,
+        ordinal: usize,
+    ) -> DemResult<(&'block DemSampleError, u64)> {
+        let mut block = block;
+        let mut ordinal = ordinal;
+        let mut detector_shift = 0_u64;
+        let mut depth = 0_usize;
+        loop {
+            if ordinal >= block.error_count {
+                return Err(error_locator_error());
+            }
+            // Spans are nonempty and strictly increasing, so as many spans as errors means
+            // every span holds exactly one error and the ordinal is its index; when every
+            // operation is such a span too, the ordinal indexes the operations directly.
+            let (operation_index, local) = if block.error_spans.len() == block.error_count {
+                if block.operations.len() == block.error_count {
+                    (ordinal, 0)
+                } else {
+                    let span = block
+                        .error_spans
+                        .get(ordinal)
+                        .ok_or_else(error_locator_error)?;
+                    (span.operation, 0)
+                }
+            } else {
+                let hint = self.span_hints.get_mut(depth);
+                let span_index = find_span(&block.error_spans, hint.as_deref().copied(), ordinal)?;
+                if let Some(hint) = hint {
+                    *hint = span_index;
+                }
+                let span = block
+                    .error_spans
+                    .get(span_index)
+                    .ok_or_else(error_locator_error)?;
+                let local = ordinal
+                    .checked_sub(span.first_error)
+                    .ok_or_else(error_locator_error)?;
+                (span.operation, local)
+            };
+            match block.operations.get(operation_index) {
+                Some(DemSampleOperation::Error(error)) if local == 0 => {
+                    return Ok((error, detector_shift));
+                }
+                Some(DemSampleOperation::Repeat(repeat)) if repeat.body.error_count > 0 => {
+                    let iteration = u64::try_from(local / repeat.body.error_count)
+                        .map_err(|_| error_locator_error())?;
+                    if iteration >= repeat.repeat_count {
+                        return Err(error_locator_error());
+                    }
+                    let iteration_shift = iteration
+                        .checked_mul(repeat.body.detector_shift)
+                        .ok_or_else(detector_shift_overflow_error)?;
+                    detector_shift = detector_shift
+                        .checked_add(repeat.start_detector_shift)
+                        .and_then(|shift| shift.checked_add(iteration_shift))
+                        .ok_or_else(detector_shift_overflow_error)?;
+                    ordinal = local % repeat.body.error_count;
+                    block = &repeat.body;
+                    depth += 1;
+                }
+                _ => return Err(error_locator_error()),
+            }
+        }
+    }
+}
+
+/// Index of the last span starting at or before `ordinal`, galloping forward from `hint` when
+/// that span starts at or before `ordinal` and binary-searching every span otherwise.
+fn find_span(spans: &[ErrorSpan], hint: Option<usize>, ordinal: usize) -> DemResult<usize> {
+    let starts_by = |index: usize| {
+        spans
+            .get(index)
+            .is_some_and(|span| span.first_error <= ordinal)
+    };
+    let Some(mut low) = hint.filter(|hint| starts_by(*hint)) else {
+        return spans
+            .partition_point(|span| span.first_error <= ordinal)
+            .checked_sub(1)
+            .ok_or_else(error_locator_error);
+    };
+    // Invariant: span `low` starts by `ordinal`; double the step until a span does not.
+    let mut step = 1_usize;
+    while low.checked_add(step).is_some_and(starts_by) {
+        low += step;
+        step = step.saturating_mul(2);
+    }
+    let high = low.saturating_add(step).min(spans.len());
+    // `low` names a span, so `low + 1 <= high <= spans.len()`.
+    let tail = spans.get(low + 1..high).ok_or_else(error_locator_error)?;
+    Ok(low + tail.partition_point(|span| span.first_error <= ordinal))
 }
 
 /// Reference replay: walks every compiled error in order and reads its record bit.

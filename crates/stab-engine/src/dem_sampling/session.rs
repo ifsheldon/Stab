@@ -3,7 +3,6 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::sync::OnceLock;
 
-use stab_bits::BitSlice;
 use stab_model::Cancellation;
 use stab_records::{DemSampleSink, FormatError as RecordsFormatError, PackedShotBatchView};
 use thiserror::Error;
@@ -20,9 +19,16 @@ const MAX_REPLAY_BATCH_SHOTS: usize = 64;
 const FRAME_BATCH_SHOTS: usize = crate::MAX_BATCH_SHOTS;
 
 mod batch;
+mod replay_planes;
+mod replay_records;
+mod retained;
 mod window;
 
 use batch::{SessionBatch, initial_capacities, validate_session_storage};
+use replay_planes::ErrorMajorRecords;
+use replay_records::{ReplayRecord, ReplayRecords};
+
+use super::replay_planes::prefers_error_major;
 
 /// Engine-side DEM sampling execution failure.
 #[derive(Debug, Error)]
@@ -553,59 +559,6 @@ impl DemSamplingSession {
     }
 }
 
-/// Replay records supplied as dense caller records or as one packed shot-major batch.
-#[derive(Clone, Copy)]
-enum ReplayRecords<'a> {
-    Dense(&'a [Vec<bool>]),
-    Packed(PackedShotBatchView<'a>),
-}
-
-/// One replay record borrowed from [`ReplayRecords`].
-#[derive(Clone, Copy)]
-pub(super) enum ReplayRecord<'a> {
-    Dense(&'a [bool]),
-    Packed(BitSlice<'a>),
-}
-
-impl<'a> ReplayRecords<'a> {
-    fn len(self) -> usize {
-        match self {
-            Self::Dense(records) => records.len(),
-            Self::Packed(records) => records.shot_count(),
-        }
-    }
-
-    fn record(self, index: usize) -> Result<ReplayRecord<'a>, RecordsFormatError> {
-        match self {
-            Self::Dense(records) => records
-                .get(index)
-                .map(|record| ReplayRecord::Dense(record))
-                .ok_or_else(|| {
-                    RecordsFormatError::new(
-                        stab_records::FormatErrorCode::InvalidData,
-                        format!("replay record {index} is out of range"),
-                        None,
-                    )
-                }),
-            Self::Packed(records) => records.shot(index).map(ReplayRecord::Packed),
-        }
-    }
-
-    fn validate_width(
-        self,
-        plan: &DemSamplingPlan,
-        index: usize,
-        shot_index: usize,
-    ) -> Result<(), DemSamplingExecutionError> {
-        let record = self.record(index).map_err(internal_format_error)?;
-        match record {
-            ReplayRecord::Dense(bits) => plan.validate_error_record_width(bits, Some(shot_index)),
-            ReplayRecord::Packed(bits) => plan.validate_error_record_width(&bits, Some(shot_index)),
-        }
-        .map_err(DemSamplingExecutionError::InvalidRequest)
-    }
-}
-
 /// Outcome of one incremental replay delivery call.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DemReplayBatchStatus {
@@ -831,7 +784,15 @@ impl DemReplaySession {
                     error_records.len() as u64,
                 ),
             })?;
-        for local_index in 0..error_records.len() {
+        // Every record of a packed or error-major batch shares the batch's width, so its first
+        // record decides; dense caller records are checked one by one.
+        let validated_records = match error_records {
+            ReplayRecords::Dense(records) => records.len(),
+            ReplayRecords::Packed(_) | ReplayRecords::ErrorMajor { .. } => {
+                error_records.len().min(1)
+            }
+        };
+        for local_index in 0..validated_records {
             let shot_index =
                 first_shot
                     .checked_add(local_index)
@@ -853,7 +814,13 @@ impl DemReplaySession {
                 })?;
         }
 
-        let chunk_shots = self.session.batch.capacity().max(1);
+        // An error-major batch replays its whole word per error at once; shot-major records
+        // are delivered in chunks the packed output batch holds.
+        let chunk_shots = match error_records {
+            ReplayRecords::ErrorMajor { .. } => error_records.len(),
+            _ => self.session.batch.capacity(),
+        }
+        .max(1);
         let mut chunk_start = 0_usize;
         while chunk_start < error_records.len() {
             let chunk_end = chunk_start
@@ -866,7 +833,20 @@ impl DemReplaySession {
                 return Ok(DemReplayBatchStatus::Cancelled);
             }
             let batch_shots = records.len();
-            if let Err(source) = self.session.fill_replay_batch(error_records, records) {
+            let error_major = match error_records {
+                ReplayRecords::Packed(packed) => {
+                    prefers_error_major(&self.session.plan, packed, records.start, batch_shots)
+                        .then(|| ErrorMajorRecords::Packed(packed, records.clone()))
+                }
+                ReplayRecords::ErrorMajor { words, .. } => Some(ErrorMajorRecords::Words(words)),
+                ReplayRecords::Dense(_) => None,
+            };
+            let replays_error_major = error_major.is_some();
+            let filled = match error_major {
+                Some(error_major) => self.session.fill_replay_planes(error_major),
+                None => self.session.fill_replay_batch(error_records, records),
+            };
+            if let Err(source) = filled {
                 if matches!(
                     source,
                     DemSamplingExecutionError::InvalidRequest(DemError::Cancelled(_))
@@ -881,10 +861,20 @@ impl DemReplaySession {
                     progress: DemSamplingRunProgress::new(self.committed_shots, batch_shots as u64),
                 });
             }
-            if let Err(error) =
+            let written = if replays_error_major {
+                self.session.write_sample_window(
+                    batch_shots,
+                    0,
+                    batch_shots,
+                    true,
+                    sink,
+                    self.committed_shots,
+                )
+            } else {
                 self.session
                     .write_active_batch(batch_shots, true, sink, self.committed_shots)
-            {
+            };
+            if let Err(error) = written {
                 self.finished = true;
                 return Err(error);
             }
