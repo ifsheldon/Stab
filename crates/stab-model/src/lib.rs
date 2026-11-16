@@ -80,6 +80,20 @@ pub mod advanced {
     /// Stim's exclusive upper bound for encoded target values.
     pub const STIM_TARGET_VALUE_LIMIT: u32 = crate::ids::STIM_TARGET_VALUE_LIMIT;
 
+    /// Conservative retained bytes of one circuit declaration under [`crate::ParseLimits`].
+    pub const fn circuit_declaration_admitted_bytes(
+        target_count: usize,
+        argument_count: usize,
+        tag_bytes: usize,
+    ) -> u64 {
+        crate::parse_limits::model_declaration_admitted_bytes(
+            ModelDialect::StimCircuit,
+            target_count,
+            argument_count,
+            tag_bytes,
+        )
+    }
+
     /// Fallible circuit builder used by analysis and execution lowering.
     ///
     /// This boundary preserves parser-style instruction fusion while keeping model storage private.

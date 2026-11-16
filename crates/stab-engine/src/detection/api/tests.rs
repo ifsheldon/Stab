@@ -15,7 +15,6 @@ use super::super::test_support::convert_measurements_to_detection_events_with_sw
 use super::*;
 use crate::detection::DetectionRecordBuffer;
 use crate::{DetectionResourceKind, Seed};
-use stab_model::MemoryBudget;
 
 fn budget(bytes: impl TryInto<u64>) -> DetectionConversionLimits {
     DetectionConversionLimits::default().with_memory_budget(MemoryBudget::from_bytes(

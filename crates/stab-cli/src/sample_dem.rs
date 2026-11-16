@@ -147,12 +147,14 @@ where
         read_limited_stdin(input, input_cap, "sample_dem input")?
     };
     let (dem, dem_hold) = ledger.parse_dem(input_bytes)?;
-    // DEM compilation admits nothing and reports no size, so the plan holds no ledger bytes.
+    let compile = ledger.stage();
     let plan = DemSamplingCompiler::new()
+        .limits(DemSamplerLimits::new(compile.get()))
         .compile(&dem)
-        .map_err(CliError::from)?;
+        .map_err(|error| compile.refusal(error))?;
     drop(dem);
     ledger.release(dem_hold);
+    let _plan_hold = ledger.hold(plan.retained_bytes());
     let session_stage = ledger.stage();
     let limits = DemSamplerLimits::new(session_stage.get());
     let record_bytes = session_stage.record_bytes();
@@ -209,12 +211,12 @@ where
             input,
             session: plan
                 .replay_session_with_limits(shots, limits)
-                .map_err(CliError::from)?,
+                .map_err(|error| session_stage.refusal(error))?,
         }
     } else {
         SampleDemExecution::Sample(
             plan.session_with_limits(dem_random_policy(args.seed), limits)
-                .map_err(CliError::from)?,
+                .map_err(|error| session_stage.refusal(error))?,
         )
     };
     let mut outputs = io.activate()?;

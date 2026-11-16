@@ -88,6 +88,43 @@ impl DetectorErrorModel {
         parse_dem(input, limits)
     }
 
+    /// Conservative retained bytes of this model under [`ParseLimits`] item, target, argument, and
+    /// tag accounting.
+    pub fn admitted_bytes(&self) -> u64 {
+        let mut total = 0_u64;
+        let mut stack = vec![self.items.iter()];
+        while let Some(items) = stack.last_mut() {
+            let Some(item) = items.next() else {
+                stack.pop();
+                continue;
+            };
+            match item {
+                DemItem::Instruction(instruction) => {
+                    total = total.saturating_add(
+                        crate::parse_limits::model_declaration_admitted_bytes(
+                            ModelDialect::DetectorErrorModel,
+                            instruction.targets().len(),
+                            instruction.args().len(),
+                            instruction.tag_bytes().map_or(0, <[u8]>::len),
+                        ),
+                    );
+                }
+                DemItem::RepeatBlock(repeat) => {
+                    total = total.saturating_add(
+                        crate::parse_limits::model_declaration_admitted_bytes(
+                            ModelDialect::DetectorErrorModel,
+                            0,
+                            0,
+                            repeat.tag_bytes().map_or(0, <[u8]>::len),
+                        ),
+                    );
+                    stack.push(repeat.body().items().iter());
+                }
+            }
+        }
+        total
+    }
+
     /// Returns the schema-versioned structural identity of this detector error model.
     ///
     /// The fingerprint is independent of accepted textual spelling and printer precision. It

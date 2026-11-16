@@ -106,6 +106,7 @@ fn replay_admission_does_not_cap_the_shot_count() {
                 error_count: 1,
                 ..DemSampleBlock::default()
             },
+            retained_bytes: 0,
         }),
     };
     plan.validate_replay(ShotCount::new(u64::MAX))
@@ -177,6 +178,7 @@ fn execution_failure_preserves_first_error_progress_and_poisons_session() {
                 direct_sample_work_count: 1,
                 ..DemSampleBlock::default()
             },
+            retained_bytes: 0,
         }),
     };
     let mut session = plan
@@ -624,4 +626,45 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
         transaction.write_retained(&released).is_err(),
         "a released store must not replay as if it were empty"
     );
+}
+
+#[test]
+fn compiler_admits_retained_bytes_and_honors_cancellation() {
+    let model = DetectorErrorModel::from_dem_str(
+        "error(0.2) D0 D1 L0\nrepeat 6 {\n    error(0.1) D2\n}\nrepeat 3 {\n    error(0.05) D0\n    shift_detectors 1\n}\n",
+    )
+    .expect("parse DEM");
+    let plan = DemSamplingCompiler::new().compile(&model).expect("compile");
+    let exact = plan.retained_bytes();
+    assert!(exact > 0);
+
+    let admitted = DemSamplingCompiler::new()
+        .memory_budget(stab_model::MemoryBudget::from_bytes(exact))
+        .compile(&model)
+        .expect("exact retained-bytes budget admits compilation");
+    assert_eq!(admitted, plan);
+
+    let refused = DemSamplingCompiler::new()
+        .memory_budget(stab_model::MemoryBudget::from_bytes(exact - 1))
+        .compile(&model)
+        .expect_err("one byte below retained_bytes is refused");
+    assert!(
+        matches!(
+            &refused,
+            super::DemError::ResourceLimit(limit)
+                if limit.kind() == crate::DemResourceKind::CompiledBytes
+                    && limit.limit() == exact - 1
+                    && limit.actual() > limit.limit()
+                    && limit.actual() <= exact
+        ),
+        "unexpected {refused}"
+    );
+
+    let cancelled = stab_model::Cancellation::new();
+    cancelled.cancel();
+    let err = DemSamplingCompiler::new()
+        .cancellation(cancelled)
+        .compile(&model)
+        .expect_err("cancelled compile");
+    assert!(matches!(err, super::DemError::Cancelled(_)));
 }

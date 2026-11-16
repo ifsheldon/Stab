@@ -778,13 +778,13 @@ where
     } else {
         ReferenceSampleLoopPolicy::Fold
     };
-    // The plan keeps this budget for its sessions and reference sample.
     let compile = ledger.stage();
     let plan = SamplingCompiler::new()
         .memory_budget(compile.get())
         .reference_sample_loop_policy(reference_sample_loop_policy)
         .compile(&circuit)
         .map_err(|error| compile.refusal(error))?;
+    let _plan_hold = ledger.hold(plan.retained_bytes());
     let skip_reference_sample = args.skip_reference_sample;
     let visible_measurements = if args.shots == 1 && !skip_reference_sample {
         one_shot_visible_measurements(&circuit, ledger.stage())?
@@ -795,6 +795,9 @@ where
     // its reference sample and allocates its frame.
     drop(circuit);
     ledger.release(circuit_hold);
+    let _visible_hold = ledger.hold(visible_measurements.as_ref().map_or(0, |indices| {
+        (indices.capacity() as u64).saturating_mul(size_of::<usize>() as u64)
+    }));
     let random_policy = args.seed.map_or(RandomPolicy::Entropy, |seed| {
         RandomPolicy::Seeded(Seed::new(seed))
     });
@@ -807,15 +810,27 @@ where
     // The CLI knows the whole request up front, so a small request samples narrow batches; the
     // seeded stream is therefore a function of the seed and the total shot count.
     let lane_width = LaneWidth::for_total_shots(shots);
+    let session_stage = ledger.stage();
     let run = if !streams_one_partial_batch(shots, lane_width) {
         SampleRun::Session(
-            plan.session_with_lane_width(random_policy, reference_mode, lane_width)
-                .map_err(|error| compile.refusal(error))?,
+            plan.session_with_budget(
+                random_policy,
+                reference_mode,
+                lane_width,
+                session_stage.get(),
+            )
+            .map_err(|error| session_stage.refusal(error))?,
         )
     } else {
         SampleRun::Streaming(
-            plan.streaming_run(random_policy, reference_mode, lane_width, shots)
-                .map_err(|error| compile.refusal(error))?,
+            plan.streaming_run_with_budget(
+                random_policy,
+                reference_mode,
+                lane_width,
+                shots,
+                session_stage.get(),
+            )
+            .map_err(|error| session_stage.refusal(error))?,
         )
     };
     let output_width = visible_measurements

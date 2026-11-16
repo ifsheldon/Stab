@@ -456,3 +456,25 @@ fn pf1_circuit_detector_coords_reject_missing_detector_id() {
 
     assert!(error.to_string().contains("Detector index 1 is too big"));
 }
+
+#[test]
+fn model_admitted_bytes_matches_parse_admission_for_unfused_models() {
+    let stim = b"H[tag1] 0\nX_ERROR(0.125) 0 1\nREPEAT[rep] 3 {\n    M[m] 0\n    DETECTOR(1, 2) rec[-1]\n}\n";
+    let (circuit, parsed_circuit_bytes) =
+        Circuit::from_stim_bytes_admitted(stim, stab_model::ParseLimits::default())
+            .expect("parse circuit");
+    assert_eq!(circuit.admitted_bytes(), parsed_circuit_bytes);
+
+    let (fused, fused_parse_bytes) =
+        Circuit::from_stim_bytes_admitted(b"H 0\nH 1\n", stab_model::ParseLimits::default())
+            .expect("parse fused circuit");
+    assert!(fused.admitted_bytes() < fused_parse_bytes);
+
+    let dem_bytes = b"error[etag](0.125) D0 L0\nrepeat[rtag] 4 {\n    error(0.05) D1\n    shift_detectors(1) 1\n}\n";
+    let (dem, parsed_dem_bytes) = stab_model::DetectorErrorModel::from_dem_bytes_admitted(
+        dem_bytes,
+        stab_model::ParseLimits::default(),
+    )
+    .expect("parse DEM");
+    assert_eq!(dem.admitted_bytes(), parsed_dem_bytes);
+}

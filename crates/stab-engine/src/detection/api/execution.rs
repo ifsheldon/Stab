@@ -161,11 +161,9 @@ where
 
 pub(super) fn validate_conversion_session_storage(
     plan: &MeasurementToDetectionPlan,
+    memory_budget: stab_model::MemoryBudget,
 ) -> Result<(), DetectionExecutionError> {
-    validate_session_storage(
-        conversion_session_storage_bytes(plan),
-        plan.inner.converter.plan.limits.memory_budget(),
-    )
+    validate_session_storage(conversion_session_storage_bytes(plan), memory_budget)
 }
 
 /// Conservative reusable storage of a measurement-to-detection session: the reference sample
@@ -193,10 +191,11 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
 pub(super) fn validate_direct_session_storage(
     plan: &DirectDetectorFramePlan,
     lane_width: LaneWidth,
+    memory_budget: stab_model::MemoryBudget,
 ) -> Result<(), DetectionExecutionError> {
     validate_session_storage(
         direct_session_storage_bytes(plan, lane_width),
-        plan.memory_budget(),
+        memory_budget,
     )
 }
 

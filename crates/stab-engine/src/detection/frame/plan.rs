@@ -165,6 +165,10 @@ impl SweepCorrectionPlan {
         )
     }
 
+    pub(in crate::detection) const fn retained_bytes(&self) -> u64 {
+        self.executable.retained_bytes()
+    }
+
     pub(in crate::detection) fn state_storage_bytes(&self) -> u128 {
         frame_state_storage_bytes(
             LaneWidth::Lanes256,

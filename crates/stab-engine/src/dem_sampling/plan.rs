@@ -2,27 +2,48 @@ use std::fmt;
 use std::sync::Arc;
 
 use stab_model::advanced::{FoldedDemTraversal, MAX_DEM_REPEAT_NESTING};
-use stab_model::{Cancellation, DetectorErrorModel};
+use stab_model::{Cancellation, DetectorErrorModel, MemoryBudget};
 use stab_records::{DetectorWidth, ObservableWidth, SampledErrorWidth};
 
 use super::bit_plane::{SampledErrorPlanes, sample_into_planes};
 use super::buffers::try_false_vec;
-use super::program::{DemPoll, DemSampleBlock, compile_block, usize_from_u64};
+use super::program::{DemCompileMeter, DemPoll, DemSampleBlock, compile_block, usize_from_u64};
 use super::replay::{ErrorRecordBits, apply_error_record, reset_detection_record};
 use super::session::{DemReplaySession, DemSamplingExecutionError, DemSamplingSession};
 use super::{DemError, DemResult, DemSamplerLimits};
 use crate::{DetectionRecordBuffer, RandomPolicy, ShotCount};
 
 /// Compiler for immutable detector-error-model sampling plans.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct DemSamplingCompiler;
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DemSamplingCompiler {
+    limits: DemSamplerLimits,
+}
 
 impl DemSamplingCompiler {
-    pub const fn new() -> Self {
-        Self
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn compile(self, model: &DetectorErrorModel) -> DemResult<DemSamplingPlan> {
+    #[must_use]
+    pub fn limits(mut self, limits: DemSamplerLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    #[must_use]
+    pub fn memory_budget(mut self, memory_budget: MemoryBudget) -> Self {
+        self.limits = self.limits.with_memory_budget(memory_budget);
+        self
+    }
+
+    #[must_use]
+    pub fn cancellation(mut self, cancellation: Cancellation) -> Self {
+        self.limits = self.limits.with_cancellation(cancellation);
+        self
+    }
+
+    pub fn compile(&self, model: &DetectorErrorModel) -> DemResult<DemSamplingPlan> {
+        self.limits.cancellation().check()?;
         let traversal = FoldedDemTraversal::new(model)?;
         let repeat_depth = traversal.root().summary().max_repeat_depth();
         if repeat_depth > MAX_DEM_REPEAT_NESTING {
@@ -30,7 +51,9 @@ impl DemSamplingCompiler {
                 "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}, got {repeat_depth}"
             )));
         }
-        let operations = compile_block(traversal.root())?;
+        let mut meter =
+            DemCompileMeter::new(self.limits.memory_budget(), self.limits.cancellation());
+        let operations = compile_block(traversal.root(), &mut meter)?;
         let detector_count = usize_from_u64(
             traversal.root().summary().detector_count()?,
             "detector count",
@@ -44,6 +67,7 @@ impl DemSamplingCompiler {
                 detector_count,
                 observable_count,
                 operations,
+                retained_bytes: meter.retained_bytes(),
             }),
         })
     }
@@ -89,6 +113,11 @@ impl DemSamplingPlan {
 
     pub fn error_count(&self) -> usize {
         self.inner.operations.error_count
+    }
+
+    /// Conservative heap bytes retained by this compiled plan.
+    pub fn retained_bytes(&self) -> u64 {
+        self.inner.retained_bytes
     }
 
     pub fn session(
@@ -258,4 +287,5 @@ pub(super) struct DemSamplingPlanInner {
     pub(super) detector_count: usize,
     pub(super) observable_count: usize,
     pub(super) operations: DemSampleBlock,
+    pub(super) retained_bytes: u64,
 }

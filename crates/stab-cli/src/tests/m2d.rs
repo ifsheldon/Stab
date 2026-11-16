@@ -200,7 +200,14 @@ fn m2d_ignores_pauli_target_observable_annotations() {
 #[test]
 fn m2d_rejects_oversized_text_records() {
     let scratch = Scratch::new();
-    let mut oversized = vec![b'0'; 1_048_577];
+    let parsed = stab_model::Circuit::from_stim_str(SWEEP_CX).expect("parse SWEEP_CX");
+    let plan = stab_engine::MeasurementToDetectionCompiler::new()
+        .compile(&parsed)
+        .expect("compile SWEEP_CX");
+    let session = plan.session().expect("session");
+    let active_holds = plan.retained_bytes() + session.retained_bytes();
+    let record_cap = usize::try_from((2 * 1024 * 1024 - active_holds) / 2).expect("fits usize");
+    let mut oversized = vec![b'0'; record_cap + 1];
     oversized.push(b'\n');
     m2d(
         &scratch,
@@ -209,7 +216,9 @@ fn m2d_rejects_oversized_text_records() {
         &oversized,
     )
     .assert_err(&[
-        "m2d measurement input has more than 1048576 bytes, exceeding the memory budget",
+        &format!(
+            "m2d measurement input has more than {record_cap} bytes, exceeding the memory budget"
+        ),
         "--memory-budget",
     ]);
 
@@ -226,7 +235,9 @@ fn m2d_rejects_oversized_text_records() {
         ],
         b"0\n",
     )
-    .assert_err(&["m2d sweep input has more than 1048576 bytes, exceeding the memory budget"]);
+    .assert_err(&[&format!(
+        "m2d sweep input has more than {record_cap} bytes, exceeding the memory budget"
+    )]);
 }
 
 #[test]

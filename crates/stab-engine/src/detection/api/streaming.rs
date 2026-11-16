@@ -4,7 +4,7 @@ use std::fmt;
 use std::sync::OnceLock;
 
 use rand::rngs::SmallRng;
-use stab_model::Cancellation;
+use stab_model::{Cancellation, MemoryBudget};
 use stab_records::{DetectionBatchView, DetectionSink};
 
 use super::execution::{detection_rng, invariant_error, validate_session_storage};
@@ -61,15 +61,29 @@ impl DetectionSamplingPlan {
         lane_width: LaneWidth,
         shots: ShotCount,
     ) -> Result<StreamingDetectionRun, DetectionExecutionError> {
+        self.streaming_run_with_budget(
+            random_policy,
+            lane_width,
+            shots,
+            self.inner.direct.memory_budget(),
+        )
+    }
+
+    /// Prepares one streaming run like [`Self::streaming_run`], admitting its storage against
+    /// `memory_budget` instead of the compiler's memory budget.
+    pub fn streaming_run_with_budget(
+        &self,
+        random_policy: RandomPolicy,
+        lane_width: LaneWidth,
+        shots: ShotCount,
+        memory_budget: MemoryBudget,
+    ) -> Result<StreamingDetectionRun, DetectionExecutionError> {
         let direct = &self.inner.direct;
         let lanes = usize::try_from(shots.get()).map_or(lane_width.shots_per_batch(), |shots| {
             shots.min(lane_width.shots_per_batch())
         });
         let shape = StreamingDetectionShape::new(direct, lane_width, lanes);
-        validate_session_storage(
-            shape.storage_bytes(direct, lane_width),
-            direct.memory_budget(),
-        )?;
+        validate_session_storage(shape.storage_bytes(direct, lane_width), memory_budget)?;
         let frame = match lane_width {
             LaneWidth::Lanes64 => {
                 StreamingFrame::Lanes64(StreamingDetectionFrame::try_new(direct, shape)?)

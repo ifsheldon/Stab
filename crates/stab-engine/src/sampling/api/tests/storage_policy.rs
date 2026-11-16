@@ -74,8 +74,13 @@ fn pauli_frame_session_storage_admits_the_exact_budget_and_rejects_the_first_exc
         let exact = session_storage_bytes(&pauli_frame_plan(text).inner, mode, lane_width);
         let exact_u64 = u64::try_from(exact).expect("small session");
         let at_limit = budgeted_plan(text, MemoryBudget::from_bytes(exact_u64));
-        validate_session_storage(&at_limit.inner, mode, lane_width)
-            .expect("admit the exact boundary without allocating its state");
+        validate_session_storage(
+            &at_limit.inner,
+            mode,
+            lane_width,
+            at_limit.inner.memory_budget,
+        )
+        .expect("admit the exact boundary without allocating its state");
         at_limit
             .session_with_lane_width(seeded, mode, lane_width)
             .expect("construct the session at the exact budget");

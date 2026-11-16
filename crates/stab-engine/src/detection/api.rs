@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 
-use stab_model::{Cancellation, Circuit};
+use stab_model::{Cancellation, Circuit, MemoryBudget};
 use stab_records::{
     DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView, MeasurementWidth,
     ObservableWidth,
@@ -32,8 +32,8 @@ pub use contracts::{
 };
 pub use delivery::MeasurementToDetectionTransaction;
 use execution::{
-    detection_rng, invariant_error, run_direct, validate_conversion_session_storage,
-    validate_direct_session_storage,
+    conversion_session_storage_bytes, detection_rng, invariant_error, run_direct,
+    validate_conversion_session_storage, validate_direct_session_storage,
 };
 pub use streaming::StreamingDetectionRun;
 
@@ -75,7 +75,11 @@ impl MeasurementToDetectionCompiler {
             self.reference_mode,
             self.limits.clone(),
         )?;
-        Ok(MeasurementToDetectionPlan::from_converter(converter))
+        let retained_bytes = converter.compiled_bytes()?;
+        Ok(MeasurementToDetectionPlan::from_converter(
+            converter,
+            retained_bytes,
+        ))
     }
 }
 
@@ -94,6 +98,7 @@ pub struct MeasurementToDetectionPlan {
 #[derive(Clone)]
 struct MeasurementToDetectionPlanInner {
     converter: PreparedMeasurementToDetection,
+    retained_bytes: u64,
 }
 
 impl fmt::Debug for MeasurementToDetectionPlan {
@@ -109,10 +114,19 @@ impl fmt::Debug for MeasurementToDetectionPlan {
 }
 
 impl MeasurementToDetectionPlan {
-    fn from_converter(converter: PreparedMeasurementToDetection) -> Self {
+    fn from_converter(converter: PreparedMeasurementToDetection, retained_bytes: u64) -> Self {
         Self {
-            inner: Arc::new(MeasurementToDetectionPlanInner { converter }),
+            inner: Arc::new(MeasurementToDetectionPlanInner {
+                converter,
+                retained_bytes,
+            }),
         }
+    }
+
+    /// Conservative bytes retained by this compiled conversion plan and any sweep-correction
+    /// program it keeps.
+    pub fn retained_bytes(&self) -> u64 {
+        self.inner.retained_bytes
     }
 
     pub fn measurement_width(&self) -> MeasurementWidth {
@@ -132,7 +146,16 @@ impl MeasurementToDetectionPlan {
     }
 
     pub fn session(&self) -> Result<MeasurementToDetectionSession, DetectionExecutionError> {
-        MeasurementToDetectionSession::new(self.clone())
+        self.session_with_budget(self.inner.converter.plan.limits.memory_budget())
+    }
+
+    /// Creates a conversion session, admitting its reusable storage against `memory_budget`
+    /// instead of the plan's compile budget.
+    pub fn session_with_budget(
+        &self,
+        memory_budget: MemoryBudget,
+    ) -> Result<MeasurementToDetectionSession, DetectionExecutionError> {
+        MeasurementToDetectionSession::new(self.clone(), memory_budget)
     }
 }
 
@@ -184,8 +207,11 @@ impl fmt::Debug for MeasurementToDetectionSession {
 }
 
 impl MeasurementToDetectionSession {
-    fn new(plan: MeasurementToDetectionPlan) -> Result<Self, DetectionExecutionError> {
-        validate_conversion_session_storage(&plan)?;
+    fn new(
+        plan: MeasurementToDetectionPlan,
+        memory_budget: MemoryBudget,
+    ) -> Result<Self, DetectionExecutionError> {
+        validate_conversion_session_storage(&plan, memory_budget)?;
         let converter = &plan.inner.converter;
         let mut reference_sample = converter
             .try_reusable_reference_sample()
@@ -239,6 +265,11 @@ impl MeasurementToDetectionSession {
     /// session stays resumable.
     pub fn cancellation(&self) -> Cancellation {
         self.cancellation.get_or_init(Cancellation::new).clone()
+    }
+
+    /// Conservative bytes of reusable storage held by this conversion session.
+    pub fn retained_bytes(&self) -> u64 {
+        u64::try_from(conversion_session_storage_bytes(&self.plan)).unwrap_or(u64::MAX)
     }
 
     pub const fn is_poisoned(&self) -> bool {
@@ -583,8 +614,12 @@ impl DetectionSamplingCompiler {
             .check()
             .map_err(DetectionError::from)?;
         let direct = DirectDetectorFramePlan::compile(circuit, self.limits.clone())?;
+        let retained_bytes = direct.compiled_bytes()?;
         Ok(DetectionSamplingPlan {
-            inner: Arc::new(DetectionSamplingPlanInner { direct }),
+            inner: Arc::new(DetectionSamplingPlanInner {
+                direct,
+                retained_bytes,
+            }),
         })
     }
 }
@@ -603,6 +638,7 @@ pub struct DetectionSamplingPlan {
 
 struct DetectionSamplingPlanInner {
     direct: DirectDetectorFramePlan,
+    retained_bytes: u64,
 }
 
 impl fmt::Debug for DetectionSamplingPlan {
@@ -617,6 +653,11 @@ impl fmt::Debug for DetectionSamplingPlan {
 }
 
 impl DetectionSamplingPlan {
+    /// Conservative bytes retained by this compiled detection-sampling plan.
+    pub fn retained_bytes(&self) -> u64 {
+        self.inner.retained_bytes
+    }
+
     pub fn measurement_width(&self) -> MeasurementWidth {
         MeasurementWidth::new(self.inner.direct.measurement_count())
     }
@@ -646,7 +687,18 @@ impl DetectionSamplingPlan {
         random_policy: RandomPolicy,
         lane_width: LaneWidth,
     ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
-        DetectionSamplingSession::new(self.clone(), random_policy, lane_width)
+        self.session_with_budget(random_policy, lane_width, self.inner.direct.memory_budget())
+    }
+
+    /// Creates a session like [`Self::session_with_lane_width`], admitting its storage against
+    /// `memory_budget` instead of the compiler's memory budget.
+    pub fn session_with_budget(
+        &self,
+        random_policy: RandomPolicy,
+        lane_width: LaneWidth,
+        memory_budget: MemoryBudget,
+    ) -> Result<DetectionSamplingSession, DetectionExecutionError> {
+        DetectionSamplingSession::new(self.clone(), random_policy, lane_width, memory_budget)
     }
 }
 
@@ -682,8 +734,9 @@ impl DetectionSamplingSession {
         plan: DetectionSamplingPlan,
         random_policy: RandomPolicy,
         lane_width: LaneWidth,
+        memory_budget: MemoryBudget,
     ) -> Result<Self, DetectionExecutionError> {
-        validate_direct_session_storage(&plan.inner.direct, lane_width)?;
+        validate_direct_session_storage(&plan.inner.direct, lane_width, memory_budget)?;
         let state = DirectDetectionState {
             rng: detection_rng(random_policy),
             frame: LaneFrameBatch::for_detection(&plan.inner.direct, lane_width)

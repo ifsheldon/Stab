@@ -340,6 +340,45 @@ fn sampled_flow_reports_cancellation_instead_of_a_verdict() {
     );
 }
 
+#[test]
+fn sampled_flow_charges_augmented_witness_circuit_without_retaining_dropped_noise() {
+    let mut unitary_heavy = "S 0\nZ 0\n".repeat(500);
+    unitary_heavy.push_str("M 0\n");
+    let tight = SampledFlowOptions {
+        memory_budget: MemoryBudget::from_bytes(16_384),
+        ..SampledFlowOptions::default()
+    };
+    let refused = sample_if_circuit_has_stabilizer_flows_with_options(
+        &circuit(&unitary_heavy),
+        &[flow("Z0 -> rec[-1]")],
+        ShotCount::new(256),
+        RandomPolicy::Seeded(Seed::new(47)),
+        tight.clone(),
+    )
+    .expect_err("1,000-gate augmented witness circuit exceeds 16 KiB");
+    assert_matches!(
+        refused,
+        SampledFlowError::SamplingCompile(SamplingCompileError::CompiledBytesLimit {
+            budget: 16_384,
+            ..
+        })
+    );
+
+    let mut noisy_heavy = "X_ERROR(0.1) 0\nY_ERROR(0.1) 0\n".repeat(2000);
+    noisy_heavy.push_str("H 0\nM 0\n");
+    assert_eq!(
+        sample_if_circuit_has_stabilizer_flows_with_options(
+            &circuit(&noisy_heavy),
+            &[flow("X0 -> rec[-1]")],
+            ShotCount::new(256),
+            RandomPolicy::Seeded(Seed::new(47)),
+            tight,
+        )
+        .expect("dropped noise instructions do not inflate the witness circuit"),
+        vec![true]
+    );
+}
+
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
 }

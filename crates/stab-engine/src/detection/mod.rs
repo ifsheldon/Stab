@@ -212,6 +212,21 @@ impl PreparedMeasurementToDetection {
             .map_or(0, SweepCorrectionPlan::state_storage_bytes)
     }
 
+    fn compiled_bytes(&self) -> DetectionResult<u64> {
+        self.plan
+            .compiled_storage_bytes()?
+            .checked_add(
+                self.sweep_correction
+                    .as_ref()
+                    .map_or(0, SweepCorrectionPlan::retained_bytes),
+            )
+            .ok_or_else(|| {
+                DetectionError::invalid_sampler_compilation(
+                    "compiled measurement-to-detection plan storage byte count overflowed",
+                )
+            })
+    }
+
     #[allow(
         clippy::too_many_arguments,
         reason = "the reusable input, output, and correction buffers are independent bounded resources"

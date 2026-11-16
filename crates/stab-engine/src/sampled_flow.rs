@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
-use stab_analysis::{advanced::flow_record_index, circuit_without_noise};
+use stab_analysis::advanced::flow_record_index;
+use stab_model::advanced::{CancellationCountdown, circuit_declaration_admitted_bytes};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind,
     MeasureRecordOffset, MemoryBudget, QubitId, Target,
@@ -10,8 +11,8 @@ use stab_records::{MeasurementBatchView, MeasurementSink};
 use thiserror::Error;
 
 use crate::{
-    RandomPolicy, RunError, SamplingCompiler, SamplingExecutionError, SamplingRunStatus, Seed,
-    ShotCount,
+    LaneWidth, RandomPolicy, ReferenceSampleMode, RunError, SamplingCompiler,
+    SamplingExecutionError, SamplingRunStatus, Seed, ShotCount,
 };
 
 const SAMPLED_FLOW_SAMPLE_WORD_WIDTH: u64 = 256;
@@ -50,11 +51,13 @@ type SampledFlowResult<T> = Result<T, SampledFlowError>;
 /// Resource and cancellation policy of [`sample_if_circuit_has_stabilizer_flows_with_options`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SampledFlowOptions {
-    /// Budget that admits, for each queried flow, the simulator storage of its augmented
-    /// witness circuit, the sampling plan compiled from it, and the session that samples it.
-    /// The flows are checked one after another, so each check is admitted on its own.
+    /// Budget that admits, for each queried flow, its augmented noiseless witness circuit, the
+    /// sampling plan compiled from it, and the simulator and session storage held alongside the
+    /// compiled plan. The flows are checked one after another, so each check is admitted on its
+    /// own.
     pub memory_budget: MemoryBudget,
-    /// Signal polled before each flow and by each flow's sampling compilation and session.
+    /// Signal polled before each flow and while building, compiling, and sampling each witness
+    /// circuit.
     pub cancellation: Cancellation,
 }
 
@@ -88,10 +91,10 @@ pub fn sample_if_circuit_has_stabilizer_flows(
 /// [`sample_if_circuit_has_stabilizer_flows`] under a caller's memory budget and cancellation.
 ///
 /// A check that the budget cannot admit fails with the typed admission error of the stage that
-/// refused it: [`SamplingExecutionError::SessionStorageLimit`] for the witness simulator or the
-/// sampling session, or [`crate::SamplingCompileError::CompiledBytesLimit`] for the compiled
-/// plan. Observed cancellation fails with [`SampledFlowError::Cancelled`] rather than returning
-/// a verdict from partial samples.
+/// refused it: [`crate::SamplingCompileError::CompiledBytesLimit`] for the augmented witness
+/// circuit or its compiled plan, or [`SamplingExecutionError::SessionStorageLimit`] for the
+/// witness simulator or the sampling session. Observed cancellation fails with
+/// [`SampledFlowError::Cancelled`] rather than returning a verdict from partial samples.
 pub fn sample_if_circuit_has_stabilizer_flows_with_options(
     circuit: &Circuit,
     flows: &[Flow],
@@ -100,8 +103,7 @@ pub fn sample_if_circuit_has_stabilizer_flows_with_options(
     options: SampledFlowOptions,
 ) -> SampledFlowResult<Vec<bool>> {
     options.cancellation.check()?;
-    let noiseless = circuit_without_noise(circuit)?;
-    let measurement_count = usize::try_from(noiseless.count_measurements()?).map_err(|_| {
+    let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         SampledFlowError::invalid_flow(
             "circuit measurement count does not fit usize during sampled flow checking",
         )
@@ -113,7 +115,7 @@ pub fn sample_if_circuit_has_stabilizer_flows_with_options(
         .map(|(flow_index, flow)| {
             options.cancellation.check()?;
             sample_if_noiseless_circuit_has_stabilizer_flow(
-                &noiseless,
+                circuit,
                 flow,
                 measurement_count,
                 sample_count,
@@ -148,16 +150,62 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
     random_policy: RandomPolicy,
     options: &SampledFlowOptions,
 ) -> SampledFlowResult<bool> {
-    let augmented =
-        augmented_flow_test_circuit(circuit, flow, measurement_count, options.memory_budget)?;
-    // The plan admits its program against the caller's budget, and its session admits the
-    // session storage against the same budget and polls the same signal.
+    let (augmented, simulator_qubits, augmented_measurements) =
+        augmented_flow_test_circuit(circuit, flow, measurement_count, options)?;
+    let augmented_bytes = augmented.admitted_bytes();
+    let compile_budget = MemoryBudget::from_bytes(
+        options
+            .memory_budget
+            .bytes()
+            .saturating_sub(augmented_bytes),
+    );
     let plan = SamplingCompiler::new()
-        .memory_budget(options.memory_budget)
+        .memory_budget(compile_budget)
         .cancellation(options.cancellation.clone())
-        .compile(&augmented)?;
+        .compile(&augmented)
+        .map_err(|error| match error {
+            crate::SamplingCompileError::CompiledBytesLimit { required, .. } => {
+                crate::SamplingCompileError::CompiledBytesLimit {
+                    required: augmented_bytes.saturating_add(required),
+                    budget: options.memory_budget.bytes(),
+                }
+                .into()
+            }
+            other => SampledFlowError::from(other),
+        })?;
+    drop(augmented);
+
+    let plan_bytes = plan.retained_bytes();
+    let session_budget =
+        MemoryBudget::from_bytes(options.memory_budget.bytes().saturating_sub(plan_bytes));
+    let map_session_refusal = |error: SamplingExecutionError| -> SampledFlowError {
+        match error {
+            SamplingExecutionError::SessionStorageLimit {
+                estimated_bytes, ..
+            } => SamplingExecutionError::SessionStorageLimit {
+                estimated_bytes: u128::from(plan_bytes).saturating_add(estimated_bytes),
+                limit_bytes: options.memory_budget.bytes(),
+            }
+            .into(),
+            other => other.into(),
+        }
+    };
+    crate::sampling::validate_simulator_work_storage(
+        simulator_qubits,
+        augmented_measurements,
+        true,
+        session_budget,
+    )
+    .map_err(map_session_refusal)?;
     let witness_index = measurement_count;
-    let mut session = plan.session(random_policy)?;
+    let mut session = plan
+        .session_with_budget(
+            random_policy,
+            ReferenceSampleMode::UseReferenceSample,
+            LaneWidth::default(),
+            session_budget,
+        )
+        .map_err(map_session_refusal)?;
     let mut sink = SampledFlowWitnessSink {
         witness_index,
         passed: true,
@@ -207,34 +255,89 @@ fn sampled_flow_run_error(error: RunError<SamplingExecutionError>) -> SampledFlo
     }
 }
 
+struct AugmentedAdmission<'a> {
+    charged_bytes: u64,
+    budget: MemoryBudget,
+    cancellation: &'a Cancellation,
+    countdown: CancellationCountdown,
+}
+
+impl<'a> AugmentedAdmission<'a> {
+    const fn new(budget: MemoryBudget, cancellation: &'a Cancellation) -> Self {
+        Self {
+            charged_bytes: 0,
+            budget,
+            cancellation,
+            countdown: CancellationCountdown::new(),
+        }
+    }
+
+    fn admit_declaration(
+        &mut self,
+        target_count: usize,
+        argument_count: usize,
+        tag_bytes: usize,
+    ) -> SampledFlowResult<()> {
+        self.countdown.tick(self.cancellation)?;
+        let added = circuit_declaration_admitted_bytes(target_count, argument_count, tag_bytes);
+        let required = self.charged_bytes.saturating_add(added);
+        if self.budget.admits(u128::from(required)) {
+            self.charged_bytes = required;
+            return Ok(());
+        }
+        Err(crate::SamplingCompileError::CompiledBytesLimit {
+            required,
+            budget: self.budget.bytes(),
+        }
+        .into())
+    }
+}
+
+fn append_admitted_instruction(
+    circuit: &mut Circuit,
+    admission: &mut AugmentedAdmission<'_>,
+    instruction: CircuitInstruction,
+) -> SampledFlowResult<()> {
+    admission.admit_declaration(
+        instruction.targets().len(),
+        instruction.args().len(),
+        instruction.tag_bytes().map_or(0, <[u8]>::len),
+    )?;
+    circuit.append_instruction(instruction);
+    Ok(())
+}
+
 fn augmented_flow_test_circuit(
     circuit: &Circuit,
     flow: &Flow,
     measurement_count: usize,
-    memory_budget: MemoryBudget,
-) -> SampledFlowResult<Circuit> {
+    options: &SampledFlowOptions,
+) -> SampledFlowResult<(Circuit, usize, usize)> {
     let observables = flow.observables().collect::<BTreeSet<_>>();
     let qubits = DenseQubitMap::for_flow(circuit, flow, &observables)?;
     let qubit_count = qubits.len();
+    let simulator_qubits = qubit_count.checked_add(1).ok_or_else(|| {
+        SampledFlowError::invalid_flow("sampled flow ancilla qubit count overflowed")
+    })?;
     let augmented_measurements = measurement_count.checked_add(1).ok_or_else(|| {
         SampledFlowError::invalid_flow(
             "sampled flow witness measurement count overflowed during admission",
         )
     })?;
     crate::sampling::validate_simulator_work_storage(
-        qubit_count.checked_add(1).ok_or_else(|| {
-            SampledFlowError::invalid_flow("sampled flow ancilla qubit count overflowed")
-        })?,
+        simulator_qubits,
         augmented_measurements,
         true,
-        memory_budget,
+        options.memory_budget,
     )?;
     let ancilla = qubit_id_from_index(qubit_count, "sampled flow ancilla qubit")?;
     let mut augmented = Circuit::new();
+    let mut admission = AugmentedAdmission::new(options.memory_budget, &options.cancellation);
 
     for qubit in 0..qubit_count {
         append_one_target_instruction(
             &mut augmented,
+            &mut admission,
             GateKind::X_ERROR,
             vec![0.5],
             Target::qubit(
@@ -247,6 +350,7 @@ fn augmented_flow_test_circuit(
     for qubit in 0..qubit_count {
         append_one_target_instruction(
             &mut augmented,
+            &mut admission,
             GateKind::Z_ERROR,
             vec![0.5],
             Target::qubit(
@@ -257,28 +361,51 @@ fn augmented_flow_test_circuit(
         )?;
     }
 
-    append_pauli_controlled_not(&mut augmented, flow.input(), ancilla, &qubits, None)?;
-    append_flow_test_block_for_circuit(&mut augmented, circuit, ancilla, &observables, &qubits)?;
+    append_pauli_controlled_not(
+        &mut augmented,
+        &mut admission,
+        flow.input(),
+        ancilla,
+        &qubits,
+        None,
+    )?;
+    append_flow_test_block_for_circuit(
+        &mut augmented,
+        &mut admission,
+        circuit,
+        ancilla,
+        &observables,
+        &qubits,
+    )?;
     for measurement in flow.measurements() {
         let record = sampled_flow_measurement_target(measurement, measurement_count)?;
         append_two_target_instruction(
             &mut augmented,
+            &mut admission,
             GateKind::CX,
             record,
             Target::qubit(ancilla, false),
             None,
         )?;
     }
-    append_pauli_controlled_not(&mut augmented, flow.output(), ancilla, &qubits, None)?;
+    append_pauli_controlled_not(
+        &mut augmented,
+        &mut admission,
+        flow.output(),
+        ancilla,
+        &qubits,
+        None,
+    )?;
     append_one_target_instruction(
         &mut augmented,
+        &mut admission,
         GateKind::M,
         Vec::new(),
         Target::qubit(ancilla, false),
         None,
     )?;
 
-    Ok(augmented)
+    Ok((augmented, simulator_qubits, augmented_measurements))
 }
 
 struct DenseQubitMap {
@@ -354,13 +481,16 @@ fn collect_circuit_qubits(
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                let selected_observable = instruction.gate().kind() == GateKind::OBSERVABLE_INCLUDE
+                let gate = instruction.gate();
+                let selected_observable = gate.kind() == GateKind::OBSERVABLE_INCLUDE
                     && observable_is_selected(instruction, observables)?;
-                if instruction.gate().category() == GateCategory::Annotation && !selected_observable
-                {
+                if gate.category() == GateCategory::Annotation && !selected_observable {
                     continue;
                 }
-                if instruction.gate().targets_are_pad_values() {
+                if gate.targets_are_pad_values() || gate.produces_heralded_results() {
+                    continue;
+                }
+                if !gate.produces_measurements() && gate.is_noisy() {
                     continue;
                 }
                 qubits.extend(
@@ -381,38 +511,81 @@ fn collect_circuit_qubits(
 
 fn append_flow_test_block_for_circuit(
     output: &mut Circuit,
+    admission: &mut AugmentedAdmission<'_>,
     circuit: &Circuit,
     ancilla: QubitId,
     observables: &BTreeSet<u32>,
     qubits: &DenseQubitMap,
 ) -> SampledFlowResult<()> {
     for item in circuit.items() {
+        admission.countdown.tick(admission.cancellation)?;
         match item {
             CircuitItem::Instruction(instruction)
                 if instruction.gate().kind() == GateKind::OBSERVABLE_INCLUDE
                     && observable_is_selected(instruction, observables)? =>
             {
-                append_selected_observable_feedback(output, instruction, ancilla, qubits)?;
+                append_selected_observable_feedback(
+                    output,
+                    admission,
+                    instruction,
+                    ancilla,
+                    qubits,
+                )?;
             }
             CircuitItem::Instruction(instruction)
                 if instruction.gate().category() == GateCategory::Annotation => {}
             CircuitItem::Instruction(instruction) => {
-                output.append_instruction(remap_instruction(instruction, qubits)?);
+                let gate = instruction.gate();
+                if gate.produces_heralded_results() {
+                    let target_count = instruction.targets().len();
+                    let tag = instruction.tag_bytes();
+                    admission.admit_declaration(target_count, 0, tag.map_or(0, <[u8]>::len))?;
+                    let mut pad_targets = Vec::new();
+                    pad_targets
+                        .try_reserve_exact(target_count)
+                        .map_err(|error| {
+                            SampledFlowError::invalid_flow(format!(
+                                "unable to reserve {target_count} heralded pad targets: {error}"
+                            ))
+                        })?;
+                    pad_targets.resize(target_count, Target::qubit(QubitId::new(0)?, false));
+                    output.append_instruction(
+                        stab_model::advanced::circuit_instruction_with_tag_bytes(
+                            GateKind::MPAD.gate(),
+                            Vec::new(),
+                            pad_targets,
+                            tag,
+                        )?,
+                    );
+                } else if gate.produces_measurements() {
+                    let remapped = remap_instruction_with_args(instruction, Vec::new(), qubits)?;
+                    append_admitted_instruction(output, admission, remapped)?;
+                } else if !gate.is_noisy() {
+                    let remapped = remap_instruction_with_args(
+                        instruction,
+                        instruction.args().to_vec(),
+                        qubits,
+                    )?;
+                    append_admitted_instruction(output, admission, remapped)?;
+                }
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let mut body = Circuit::new();
                 append_flow_test_block_for_circuit(
                     &mut body,
+                    admission,
                     repeat.body(),
                     ancilla,
                     observables,
                     qubits,
                 )?;
                 if !body.is_empty() {
+                    let tag = repeat.tag_bytes();
+                    admission.admit_declaration(0, 0, tag.map_or(0, <[u8]>::len))?;
                     output.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
                         repeat.repeat_count(),
                         body,
-                        repeat.tag_bytes(),
+                        tag,
                     ));
                 }
             }
@@ -421,8 +594,9 @@ fn append_flow_test_block_for_circuit(
     Ok(())
 }
 
-fn remap_instruction(
+fn remap_instruction_with_args(
     instruction: &CircuitInstruction,
+    args: Vec<f64>,
     qubits: &DenseQubitMap,
 ) -> SampledFlowResult<CircuitInstruction> {
     let targets = if instruction.gate().targets_are_pad_values() {
@@ -446,7 +620,7 @@ fn remap_instruction(
     };
     Ok(stab_model::advanced::circuit_instruction_with_tag_bytes(
         instruction.gate(),
-        instruction.args().to_vec(),
+        args,
         targets,
         instruction.tag_bytes(),
     )?)
@@ -454,6 +628,7 @@ fn remap_instruction(
 
 fn append_selected_observable_feedback(
     output: &mut Circuit,
+    admission: &mut AugmentedAdmission<'_>,
     instruction: &CircuitInstruction,
     ancilla: QubitId,
     qubits: &DenseQubitMap,
@@ -462,6 +637,7 @@ fn append_selected_observable_feedback(
         if target.is_inverted_result_target() {
             append_one_target_instruction(
                 output,
+                admission,
                 GateKind::X,
                 Vec::new(),
                 Target::qubit(ancilla, false),
@@ -471,6 +647,7 @@ fn append_selected_observable_feedback(
         if target.is_measurement_record_target() {
             append_two_target_instruction(
                 output,
+                admission,
                 GateKind::CX,
                 target.clone(),
                 Target::qubit(ancilla, false),
@@ -479,6 +656,7 @@ fn append_selected_observable_feedback(
         } else if target.is_x_target() {
             append_pauli_observable_feedback(
                 output,
+                admission,
                 GateKind::XCX,
                 target,
                 ancilla,
@@ -488,6 +666,7 @@ fn append_selected_observable_feedback(
         } else if target.is_y_target() {
             append_pauli_observable_feedback(
                 output,
+                admission,
                 GateKind::YCX,
                 target,
                 ancilla,
@@ -497,6 +676,7 @@ fn append_selected_observable_feedback(
         } else if target.is_z_target() {
             append_pauli_observable_feedback(
                 output,
+                admission,
                 GateKind::CX,
                 target,
                 ancilla,
@@ -514,6 +694,7 @@ fn append_selected_observable_feedback(
 
 fn append_pauli_observable_feedback(
     output: &mut Circuit,
+    admission: &mut AugmentedAdmission<'_>,
     gate: GateKind,
     target: &Target,
     ancilla: QubitId,
@@ -527,6 +708,7 @@ fn append_pauli_observable_feedback(
     })?;
     append_two_target_instruction(
         output,
+        admission,
         gate,
         Target::qubit(qubits.get(qubit)?, false),
         Target::qubit(ancilla, false),
@@ -536,6 +718,7 @@ fn append_pauli_observable_feedback(
 
 fn append_pauli_controlled_not(
     circuit: &mut Circuit,
+    admission: &mut AugmentedAdmission<'_>,
     pauli: &PauliString,
     ancilla: QubitId,
     qubits: &DenseQubitMap,
@@ -550,6 +733,7 @@ fn append_pauli_controlled_not(
         };
         append_two_target_instruction(
             circuit,
+            admission,
             gate,
             Target::qubit(qubits.get_index(index)?, false),
             Target::qubit(ancilla, false),
@@ -559,6 +743,7 @@ fn append_pauli_controlled_not(
     if pauli.sign() == PauliSign::Minus {
         append_one_target_instruction(
             circuit,
+            admission,
             GateKind::X,
             Vec::new(),
             Target::qubit(ancilla, false),
@@ -636,34 +821,36 @@ fn sampled_flow_measurement_target(
 
 fn append_one_target_instruction(
     circuit: &mut Circuit,
+    admission: &mut AugmentedAdmission<'_>,
     gate: GateKind,
     args: Vec<f64>,
     target: Target,
     tag: Option<&[u8]>,
 ) -> SampledFlowResult<()> {
-    circuit.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
+    let instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
         gate.gate(),
         args,
         vec![target],
         tag,
-    )?);
-    Ok(())
+    )?;
+    append_admitted_instruction(circuit, admission, instruction)
 }
 
 fn append_two_target_instruction(
     circuit: &mut Circuit,
+    admission: &mut AugmentedAdmission<'_>,
     gate: GateKind,
     first: Target,
     second: Target,
     tag: Option<&[u8]>,
 ) -> SampledFlowResult<()> {
-    circuit.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
+    let instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
         gate.gate(),
         Vec::new(),
         vec![first, second],
         tag,
-    )?);
-    Ok(())
+    )?;
+    append_admitted_instruction(circuit, admission, instruction)
 }
 
 fn qubit_id_from_index(index: usize, context: &'static str) -> SampledFlowResult<QubitId> {

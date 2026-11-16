@@ -1,9 +1,9 @@
 use stab_model::advanced::{
     CancellationCountdown, FoldedDemBlock, FoldedDemItem, dem_instruction_detector_shift,
 };
-use stab_model::{Cancellation, DemInstruction, DemInstructionKind, DemTarget};
+use stab_model::{Cancellation, DemInstruction, DemInstructionKind, DemTarget, MemoryBudget};
 
-use super::{DemError, DemResult};
+use super::{DemError, DemResourceLimitError, DemResult};
 use crate::bernoulli::SparseBernoulli;
 
 /// The compiled operation holding error ordinals `first_error..` of its block.
@@ -73,13 +73,89 @@ pub(super) struct DemSampleRepeat {
     pub(super) folded_zero_shift_errors: Option<Vec<DemSampleError>>,
 }
 
-pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleBlock> {
-    let mut block = DemSampleBlock::default();
-    let mut current_shift = 0;
+pub(super) struct DemCompileMeter<'a> {
+    budget: MemoryBudget,
+    retained_bytes: u64,
+    poll: DemPoll<'a>,
+}
+
+impl<'a> DemCompileMeter<'a> {
+    pub(super) const fn new(budget: MemoryBudget, cancellation: &'a Cancellation) -> Self {
+        Self {
+            budget,
+            retained_bytes: 0,
+            poll: DemPoll::new(cancellation),
+        }
+    }
+
+    pub(super) const fn retained_bytes(&self) -> u64 {
+        self.retained_bytes
+    }
+
+    fn admit_transient(&self, transient_bytes: u64) -> DemResult<()> {
+        let required = self.retained_bytes.saturating_add(transient_bytes);
+        if self.budget.admits(u128::from(required)) {
+            return Ok(());
+        }
+        Err(DemResourceLimitError::compiled_bytes(required, self.budget.bytes()).into())
+    }
+
+    fn commit(&mut self, bytes: u64) -> DemResult<()> {
+        self.admit_transient(bytes)?;
+        self.retained_bytes = self.retained_bytes.saturating_add(bytes);
+        Ok(())
+    }
+}
+
+fn reserve_exact_dem<T>(vec: &mut Vec<T>, additional: usize, kind: &'static str) -> DemResult<()> {
+    vec.try_reserve_exact(additional).map_err(|error| {
+        DemError::invalid_sampler_compilation(format!(
+            "unable to reserve {additional} {kind}: {error}"
+        ))
+    })
+}
+
+fn sample_error_heap_bytes(detector_len: usize, observable_len: usize) -> u64 {
+    (detector_len as u64)
+        .saturating_mul(size_of::<u64>() as u64)
+        .saturating_add((observable_len as u64).saturating_mul(size_of::<usize>() as u64))
+}
+
+pub(super) fn compile_block(
+    source: &FoldedDemBlock<'_>,
+    meter: &mut DemCompileMeter<'_>,
+) -> DemResult<DemSampleBlock> {
+    let mut operation_cap = 0_usize;
     for item in source.items() {
         match item {
+            FoldedDemItem::Instruction(instruction)
+                if instruction.kind() == DemInstructionKind::Error =>
+            {
+                operation_cap = operation_cap.saturating_add(1);
+            }
+            FoldedDemItem::Repeat { repeat, .. } if repeat.repeat_count().get() > 0 => {
+                operation_cap = operation_cap.saturating_add(1);
+            }
+            FoldedDemItem::Instruction(_) | FoldedDemItem::Repeat { .. } => {}
+        }
+    }
+    let block_header_bytes = (operation_cap as u64)
+        .saturating_mul(size_of::<DemSampleOperation>() as u64)
+        .saturating_add((operation_cap as u64).saturating_mul(size_of::<ErrorSpan>() as u64));
+    meter.commit(block_header_bytes)?;
+    let mut block = DemSampleBlock::default();
+    reserve_exact_dem(
+        &mut block.operations,
+        operation_cap,
+        "DEM compiled operations",
+    )?;
+    reserve_exact_dem(&mut block.error_spans, operation_cap, "DEM error spans")?;
+    let mut current_shift = 0;
+    for item in source.items() {
+        meter.poll.tick()?;
+        match item {
             FoldedDemItem::Instruction(instruction) => {
-                compile_instruction(instruction, current_shift, &mut block)?;
+                compile_instruction(instruction, current_shift, &mut block, meter)?;
                 if instruction.kind() == DemInstructionKind::ShiftDetectors {
                     current_shift = current_shift
                         .checked_add(dem_instruction_detector_shift(instruction)?)
@@ -95,7 +171,7 @@ pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleB
                 if repeat_count == 0 {
                     continue;
                 }
-                let body = compile_block(body)?;
+                let body = compile_block(body, meter)?;
                 let repeat_start_shift = current_shift;
                 let repeated_shift =
                     body.detector_shift
@@ -123,7 +199,7 @@ pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleB
                 )?;
                 block.direct_sample_has_stochastic_error |= body.direct_sample_has_stochastic_error;
                 let folded_zero_shift_errors =
-                    folded_zero_shift_repeat_errors(&body, repeat_count)?;
+                    folded_zero_shift_repeat_errors(&body, repeat_count, meter)?;
                 let repeated_work = folded_direct_sample_repeat_work_count(
                     &body,
                     repeat_count,
@@ -142,6 +218,11 @@ pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleB
                         first_error,
                         operation: block.operations.len(),
                     });
+                } else {
+                    // Release the unused ErrorSpan slot charged in `block_header_bytes`.
+                    meter.retained_bytes = meter
+                        .retained_bytes
+                        .saturating_sub(size_of::<ErrorSpan>() as u64);
                 }
                 block
                     .operations
@@ -154,6 +235,9 @@ pub(super) fn compile_block(source: &FoldedDemBlock<'_>) -> DemResult<DemSampleB
             }
         }
     }
+    if block.error_spans.capacity() > block.error_spans.len() {
+        block.error_spans.shrink_to_fit();
+    }
     block.detector_shift = current_shift;
     Ok(block)
 }
@@ -162,6 +246,7 @@ fn compile_instruction(
     instruction: &DemInstruction,
     detector_shift: u64,
     block: &mut DemSampleBlock,
+    meter: &mut DemCompileMeter<'_>,
 ) -> DemResult<()> {
     if instruction.kind() != DemInstructionKind::Error {
         return Ok(());
@@ -171,19 +256,30 @@ fn compile_instruction(
         .first()
         .copied()
         .ok_or_else(|| DemError::invalid_sampler_compilation("error is missing probability"))?;
-    let mut operation = DemSampleError::new(probability, Vec::new(), Vec::new());
+    let mut detector_cap = 0_usize;
+    let mut observable_cap = 0_usize;
+    for target in instruction.targets() {
+        match target {
+            DemTarget::RelativeDetector(_) => detector_cap = detector_cap.saturating_add(1),
+            DemTarget::LogicalObservable(_) => observable_cap = observable_cap.saturating_add(1),
+            DemTarget::Separator | DemTarget::Numeric(_) => {}
+        }
+    }
+    meter.commit(sample_error_heap_bytes(detector_cap, observable_cap))?;
+    let mut detectors = Vec::new();
+    let mut observables = Vec::new();
+    reserve_exact_dem(&mut detectors, detector_cap, "DEM error detectors")?;
+    reserve_exact_dem(&mut observables, observable_cap, "DEM error observables")?;
     for target in instruction.targets() {
         match target {
             DemTarget::RelativeDetector(detector) => {
                 let shifted = detector_shift
                     .checked_add(detector.get())
                     .ok_or_else(|| detector_index_overflow_error("detector"))?;
-                operation.detectors.push(shifted);
+                detectors.push(shifted);
             }
             DemTarget::LogicalObservable(observable) => {
-                operation
-                    .observables
-                    .push(usize_from_u64(observable.get(), "observable index")?);
+                observables.push(usize_from_u64(observable.get(), "observable index")?);
             }
             DemTarget::Separator => {}
             DemTarget::Numeric(_) => {
@@ -193,6 +289,7 @@ fn compile_instruction(
             }
         }
     }
+    let operation = DemSampleError::new(probability, detectors, observables);
     block.error_spans.push(ErrorSpan {
         first_error: block.error_count,
         operation: block.operations.len(),
@@ -302,24 +399,44 @@ fn flat_zero_shift_error_block(block: &DemSampleBlock) -> bool {
 fn folded_zero_shift_repeat_errors(
     block: &DemSampleBlock,
     repeat_count: u64,
+    meter: &mut DemCompileMeter<'_>,
 ) -> DemResult<Option<Vec<DemSampleError>>> {
     if !block.direct_sample_has_stochastic_error {
         return Ok(None);
     }
     let mut one_pass_errors = Vec::new();
-    if !collect_zero_shift_effect_errors(block, 0, &mut one_pass_errors)? {
+    let mut scratch_bytes = 0_u64;
+    if !collect_zero_shift_effect_errors(block, 0, &mut one_pass_errors, &mut scratch_bytes, meter)?
+    {
         return Ok(None);
     }
-    let mut folded_errors = Vec::with_capacity(one_pass_errors.len());
+    let mut folded_errors = Vec::new();
+    reserve_exact_dem(
+        &mut folded_errors,
+        one_pass_errors.len(),
+        "DEM folded zero-shift errors",
+    )?;
+    let mut kept_heap_bytes = 0_u64;
     for mut folded_error in one_pass_errors {
         folded_error.set_probability(odd_parity_probability(
             folded_error.probability,
             repeat_count,
         ));
         if folded_error.probability > 0.0 {
+            kept_heap_bytes = kept_heap_bytes.saturating_add(sample_error_heap_bytes(
+                folded_error.detectors.len(),
+                folded_error.observables.len(),
+            ));
             folded_errors.push(folded_error);
         }
     }
+    if folded_errors.capacity() > folded_errors.len() {
+        folded_errors.shrink_to_fit();
+    }
+    let committed_bytes = (folded_errors.capacity() as u64)
+        .saturating_mul(size_of::<DemSampleError>() as u64)
+        .saturating_add(kept_heap_bytes);
+    meter.commit(committed_bytes)?;
     Ok(Some(folded_errors))
 }
 
@@ -327,13 +444,23 @@ fn collect_zero_shift_effect_errors(
     block: &DemSampleBlock,
     detector_offset: u64,
     errors: &mut Vec<DemSampleError>,
+    scratch_bytes: &mut u64,
+    meter: &mut DemCompileMeter<'_>,
 ) -> DemResult<bool> {
     if block.detector_shift != 0 {
         return Ok(false);
     }
     for operation in &block.operations {
+        meter.poll.tick()?;
         match operation {
             DemSampleOperation::Error(error) => {
+                *scratch_bytes = scratch_bytes
+                    .saturating_add(size_of::<DemSampleError>() as u64)
+                    .saturating_add(sample_error_heap_bytes(
+                        error.detectors.len(),
+                        error.observables.len(),
+                    ));
+                meter.admit_transient(*scratch_bytes)?;
                 errors.push(shifted_sample_error(error, detector_offset)?);
             }
             DemSampleOperation::Repeat(repeat) => {
@@ -344,16 +471,28 @@ fn collect_zero_shift_effect_errors(
                     .checked_add(repeat.start_detector_shift)
                     .ok_or_else(detector_shift_overflow_error)?;
                 if repeat.body.direct_sample_has_stochastic_error {
-                    let Some(nested_errors) =
-                        folded_zero_shift_repeat_errors(&repeat.body, repeat.repeat_count)?
-                    else {
+                    let Some(nested_errors) = repeat.folded_zero_shift_errors.as_deref() else {
                         return Ok(false);
                     };
                     for nested_error in nested_errors {
-                        errors.push(shifted_sample_error(&nested_error, nested_offset)?);
+                        meter.poll.tick()?;
+                        *scratch_bytes = scratch_bytes
+                            .saturating_add(size_of::<DemSampleError>() as u64)
+                            .saturating_add(sample_error_heap_bytes(
+                                nested_error.detectors.len(),
+                                nested_error.observables.len(),
+                            ));
+                        meter.admit_transient(*scratch_bytes)?;
+                        errors.push(shifted_sample_error(nested_error, nested_offset)?);
                     }
                 } else if !repeat.repeat_count.is_multiple_of(2)
-                    && !collect_zero_shift_effect_errors(&repeat.body, nested_offset, errors)?
+                    && !collect_zero_shift_effect_errors(
+                        &repeat.body,
+                        nested_offset,
+                        errors,
+                        scratch_bytes,
+                        meter,
+                    )?
                 {
                     return Ok(false);
                 }

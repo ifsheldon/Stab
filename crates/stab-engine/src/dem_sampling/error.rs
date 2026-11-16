@@ -8,6 +8,7 @@ pub(crate) type DemResult<T> = Result<T, DemError>;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DemResourceKind {
     ActiveBatchBytes,
+    CompiledBytes,
 }
 
 /// Typed resource-admission failure owned by the DEM sampling engine.
@@ -21,6 +22,10 @@ pub struct DemResourceLimitError {
 impl DemResourceLimitError {
     pub(crate) const fn active_batch_bytes(actual: u64, limit: u64) -> Self {
         Self::new(DemResourceKind::ActiveBatchBytes, actual, limit)
+    }
+
+    pub(crate) const fn compiled_bytes(actual: u64, limit: u64) -> Self {
+        Self::new(DemResourceKind::CompiledBytes, actual, limit)
     }
 
     const fn new(kind: DemResourceKind, actual: u64, limit: u64) -> Self {
@@ -50,6 +55,11 @@ impl Display for DemResourceLimitError {
             DemResourceKind::ActiveBatchBytes => write!(
                 formatter,
                 "cannot compile DEM sampler: the sampling session would require at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+                self.actual, self.limit
+            ),
+            DemResourceKind::CompiledBytes => write!(
+                formatter,
+                "cannot compile DEM sampler: compiled DEM program requires {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
                 self.actual, self.limit
             ),
         }

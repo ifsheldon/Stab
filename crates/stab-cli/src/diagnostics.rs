@@ -1038,6 +1038,7 @@ fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
 fn dem_resource_context(error: &DemResourceLimitError) -> Value {
     let resource = match error.kind() {
         DemResourceKind::ActiveBatchBytes => "active-batch-bytes",
+        DemResourceKind::CompiledBytes => "materialized-bytes",
     };
     json!({
         "operation": "detector-error-model-sampling",

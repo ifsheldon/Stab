@@ -136,6 +136,19 @@ const fn target_bytes(dialect: ModelDialect) -> u64 {
     bytes as u64 * TARGET_SLOTS_PER_TARGET
 }
 
+/// Conservative retained bytes of one declaration in `dialect` under [`ParseLimits`] accounting.
+pub(crate) const fn model_declaration_admitted_bytes(
+    dialect: ModelDialect,
+    target_count: usize,
+    argument_count: usize,
+    tag_bytes: usize,
+) -> u64 {
+    declaration_bytes(dialect)
+        .saturating_add((target_count as u64).saturating_mul(target_bytes(dialect)))
+        .saturating_add((argument_count as u64).saturating_mul(ARGUMENT_BYTES))
+        .saturating_add((tag_bytes as u64).saturating_mul(TAG_COPIES))
+}
+
 pub(crate) struct ParseAdmission {
     dialect: ModelDialect,
     limits: ParseLimits,

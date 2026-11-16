@@ -395,6 +395,11 @@ impl SamplingPlan {
         self.inner.qubit_count
     }
 
+    /// Conservative heap bytes retained by this compiled plan's lowered program.
+    pub fn retained_bytes(&self) -> u64 {
+        self.inner.program.retained_bytes()
+    }
+
     #[inline]
     pub fn session(
         &self,
@@ -423,12 +428,30 @@ impl SamplingPlan {
         reference_mode: ReferenceSampleMode,
         lane_width: LaneWidth,
     ) -> Result<SamplingSession, SamplingExecutionError> {
+        self.session_with_budget(
+            random_policy,
+            reference_mode,
+            lane_width,
+            self.inner.memory_budget,
+        )
+    }
+
+    /// Creates a session like [`Self::session_with_lane_width`], admitting its frame and
+    /// reference-sample storage against `memory_budget` instead of the plan's compile budget.
+    pub fn session_with_budget(
+        &self,
+        random_policy: RandomPolicy,
+        reference_mode: ReferenceSampleMode,
+        lane_width: LaneWidth,
+        memory_budget: MemoryBudget,
+    ) -> Result<SamplingSession, SamplingExecutionError> {
         SamplingSession::new(
             self.clone(),
             random_policy,
             reference_mode,
             lane_width,
             None,
+            memory_budget,
         )
     }
 
@@ -447,12 +470,32 @@ impl SamplingPlan {
         lane_width: LaneWidth,
         shots: ShotCount,
     ) -> Result<StreamingSamplingRun, SamplingExecutionError> {
+        self.streaming_run_with_budget(
+            random_policy,
+            reference_mode,
+            lane_width,
+            shots,
+            self.inner.memory_budget,
+        )
+    }
+
+    /// Prepares one streaming run like [`Self::streaming_run`], admitting its storage against
+    /// `memory_budget` instead of the plan's compile budget.
+    pub fn streaming_run_with_budget(
+        &self,
+        random_policy: RandomPolicy,
+        reference_mode: ReferenceSampleMode,
+        lane_width: LaneWidth,
+        shots: ShotCount,
+        memory_budget: MemoryBudget,
+    ) -> Result<StreamingSamplingRun, SamplingExecutionError> {
         let session = SamplingSession::new(
             self.clone(),
             random_policy,
             reference_mode,
             lane_width,
             Some(shots),
+            memory_budget,
         )?;
         Ok(StreamingSamplingRun { session, shots })
     }
@@ -517,10 +560,17 @@ impl SamplingPlanInner {
     ///
     /// Failures are returned to the caller and not cached, so a later call retries.
     pub(super) fn cached_reference_sample(&self) -> Result<&ReferenceBits, SamplingExecutionError> {
+        self.cached_reference_sample_with_budget(self.memory_budget)
+    }
+
+    pub(super) fn cached_reference_sample_with_budget(
+        &self,
+        memory_budget: MemoryBudget,
+    ) -> Result<&ReferenceBits, SamplingExecutionError> {
         if let Some(sample) = self.reference_sample.get() {
             return Ok(sample);
         }
-        let sample = compute_reference_sample(self)?;
+        let sample = compute_reference_sample(self, memory_budget)?;
         Ok(self.reference_sample.get_or_init(|| sample))
     }
 
@@ -529,12 +579,20 @@ impl SamplingPlanInner {
             && super::reference_run::has_reference_fold_candidate(&self.program, self.qubit_count)
     }
 
+    #[cfg(test)]
     pub(super) fn uses_reference_state_snapshot(&self) -> bool {
+        self.uses_reference_state_snapshot_with_budget(self.memory_budget)
+    }
+
+    pub(super) fn uses_reference_state_snapshot_with_budget(
+        &self,
+        memory_budget: MemoryBudget,
+    ) -> bool {
         self.has_reference_state_snapshot_candidate()
             && super::reference_state_snapshot_fits(
                 self.qubit_count,
                 self.measurement_count,
-                self.memory_budget,
+                memory_budget,
             )
     }
 }
@@ -802,11 +860,20 @@ impl SamplingSession {
         reference_mode: ReferenceSampleMode,
         lane_width: LaneWidth,
         streaming_shots: Option<ShotCount>,
+        memory_budget: MemoryBudget,
     ) -> Result<Self, SamplingExecutionError> {
         match streaming_shots {
-            None => validate_session_storage(&plan.inner, reference_mode, lane_width)?,
+            None => {
+                validate_session_storage(&plan.inner, reference_mode, lane_width, memory_budget)?
+            }
             Some(shots) => {
-                validate_streaming_storage(&plan.inner, reference_mode, lane_width, shots)?;
+                validate_streaming_storage(
+                    &plan.inner,
+                    reference_mode,
+                    lane_width,
+                    shots,
+                    memory_budget,
+                )?;
             }
         }
         let rng = match random_policy {
@@ -815,7 +882,8 @@ impl SamplingSession {
         };
         let uses_reference_sample = reference_mode == ReferenceSampleMode::UseReferenceSample;
         if uses_reference_sample {
-            plan.inner.cached_reference_sample()?;
+            plan.inner
+                .cached_reference_sample_with_budget(memory_budget)?;
         }
         let frame = if plan.inner.measurement_count == 0 {
             SessionFrame::Empty(lane_width)

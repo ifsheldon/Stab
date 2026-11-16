@@ -252,15 +252,25 @@ fn sample_dem_replays_stim_compatible_crlf_text_records() {
 #[test]
 fn sample_dem_rejects_malformed_or_short_replay_input() {
     let scratch = Scratch::new();
-    let mut blank_prefix = vec![b'\n'; 1_048_577];
+    let one_error_dem =
+        stab_model::DetectorErrorModel::from_dem_str("error(1) D0\n").expect("parse DEM");
+    let one_error_plan = stab_engine::DemSamplingCompiler::new()
+        .compile(&one_error_dem)
+        .expect("compile DEM");
+    let record_cap =
+        usize::try_from((2 * 1024 * 1024 - one_error_plan.retained_bytes()) / 2).expect("usize");
+    let mut blank_prefix = vec![b'\n'; record_cap + 1];
     blank_prefix.extend_from_slice(b"shot M0\n");
+    let oversized_msg = format!(
+        "sample_dem replay text record has more than {record_cap} bytes, exceeding the memory budget"
+    );
     for (format, replay_bytes, shots, dem, expected) in [
         (
             "dets",
             blank_prefix,
             "1",
             &b"error(1) D0\n"[..],
-            "sample_dem replay text record has more than 1048576 bytes, exceeding the memory budget",
+            oversized_msg.as_str(),
         ),
         (
             "ptb64",

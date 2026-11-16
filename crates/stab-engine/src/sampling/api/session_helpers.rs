@@ -1,3 +1,5 @@
+use stab_model::MemoryBudget;
+
 use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner, ShotCount};
 use crate::LaneWidth;
 use crate::detection::frame::{ShotRecordTransposer, WindowShape, frame_state_storage_bytes};
@@ -8,12 +10,13 @@ pub(super) fn validate_session_storage(
     plan: &SamplingPlanInner,
     reference_mode: ReferenceSampleMode,
     lane_width: LaneWidth,
+    memory_budget: MemoryBudget,
 ) -> Result<(), SamplingExecutionError> {
     let estimated_bytes = session_storage_bytes(plan, reference_mode, lane_width);
-    if !plan.memory_budget.admits(estimated_bytes) {
+    if !memory_budget.admits(estimated_bytes) {
         return Err(SamplingExecutionError::SessionStorageLimit {
             estimated_bytes,
-            limit_bytes: plan.memory_budget.bytes(),
+            limit_bytes: memory_budget.bytes(),
         });
     }
     Ok(())
@@ -44,12 +47,13 @@ pub(super) fn validate_streaming_storage(
     reference_mode: ReferenceSampleMode,
     lane_width: LaneWidth,
     shots: ShotCount,
+    memory_budget: MemoryBudget,
 ) -> Result<(), SamplingExecutionError> {
     let estimated_bytes = streaming_storage_bytes(plan, reference_mode, lane_width, shots);
-    if !plan.memory_budget.admits(estimated_bytes) {
+    if !memory_budget.admits(estimated_bytes) {
         return Err(SamplingExecutionError::SessionStorageLimit {
             estimated_bytes,
-            limit_bytes: plan.memory_budget.bytes(),
+            limit_bytes: memory_budget.bytes(),
         });
     }
     Ok(())
@@ -108,16 +112,17 @@ pub(in crate::sampling) fn try_bool_buffer(
 
 pub(in crate::sampling) fn compute_reference_sample(
     plan: &SamplingPlanInner,
+    memory_budget: MemoryBudget,
 ) -> Result<ReferenceBits, SamplingExecutionError> {
     if plan.measurement_count == 0 {
         return Ok(ReferenceBits::default());
     }
-    let needs_snapshot = plan.uses_reference_state_snapshot();
+    let needs_snapshot = plan.uses_reference_state_snapshot_with_budget(memory_budget);
     crate::sampling::validate_simulator_work_storage(
         plan.qubit_count,
         plan.measurement_count,
         needs_snapshot,
-        plan.memory_budget,
+        memory_budget,
     )?;
     let mut output =
         ReferenceBits::try_with_capacity(plan.measurement_count, "reference measurement output")?;
