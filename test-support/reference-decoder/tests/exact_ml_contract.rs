@@ -7,10 +7,11 @@
 use std::assert_matches;
 
 use stab_decoder::{
-    DecodeBatchError, DecodeBatchStatus, DecodeCancellation, DecodePreflightError,
-    DecoderInputBatchView, decode_batch,
+    DecodeBatchError, DecodeBatchStatus, DecodePreflightError, DecoderInputBatchView, decode_batch,
 };
-use stab_model::{DemDetectorId, DemInstruction, DemTarget, DetectorErrorModel, Probability};
+use stab_model::{
+    Cancellation, DemDetectorId, DemInstruction, DemTarget, DetectorErrorModel, Probability,
+};
 use stab_records::{CorrectionWidth, DetectorWidth, ObservablePredictionBatch, PackedShotBatch};
 use stab_reference_decoder::{ExactMlCompileError, ExactMlDecodeError, ExactMlDecoderSession};
 
@@ -102,7 +103,7 @@ fn exact_predictions_cover_certain_tied_duplicate_and_zero_observable_models() {
         &mut session,
         DecoderInputBatchView::from_detectors(detector_records.view()),
         &mut output,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect("decode without observables");
     assert_eq!(summary.status(), DecodeBatchStatus::Completed);
@@ -130,7 +131,7 @@ fn impossible_batch_syndrome_fails_before_any_prediction_mutation() {
         &mut session,
         DecoderInputBatchView::from_detectors(detector_records.view()),
         &mut output,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("second syndrome is impossible");
 
@@ -166,7 +167,7 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
         &mut session,
         DecoderInputBatchView::from_detectors(wrong_width.view()),
         &mut output,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("detector width mismatch");
     assert_matches!(
@@ -186,7 +187,7 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
         &mut session,
         DecoderInputBatchView::from_detectors(records.view()),
         &mut wrong_correction,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("correction width mismatch");
     assert_matches!(
@@ -209,7 +210,7 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
         &mut session,
         DecoderInputBatchView::from_detectors(records.view()),
         &mut too_short,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("prediction capacity mismatch");
     assert_matches!(
@@ -230,7 +231,7 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
             .expect("cancelled sentinel");
     }
     let before = cancelled_output.clone();
-    let cancellation = DecodeCancellation::new();
+    let cancellation = Cancellation::new();
     cancellation.cancel();
     let summary = decode_batch(
         &mut session,
@@ -260,7 +261,7 @@ fn reused_decode_is_allocation_free_and_partition_equivalent() {
     ]);
     let mut whole_output =
         ObservablePredictionBatch::zeros(4, CorrectionWidth::new(1)).expect("predictions");
-    let cancellation = DecodeCancellation::new();
+    let cancellation = Cancellation::new();
 
     decode_batch(
         &mut whole_session,
@@ -293,14 +294,14 @@ fn reused_decode_is_allocation_free_and_partition_equivalent() {
         &mut partitioned_session,
         DecoderInputBatchView::from_detectors(left_records.view()),
         &mut left_output,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect("left decode");
     decode_batch(
         &mut partitioned_session,
         DecoderInputBatchView::from_detectors(right_records.view()),
         &mut right_output,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect("right decode");
     let mut partitioned = predictions(&left_output);

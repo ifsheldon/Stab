@@ -22,7 +22,6 @@ stab_records::CorrectionWidth
 stab_decoder::DecodeBatchError
 stab_decoder::DecodeBatchStatus
 stab_decoder::DecodeBatchSummary
-stab_decoder::DecodeCancellation
 stab_decoder::DecodeContractError
 stab_decoder::DecodePreflightError
 stab_decoder::DecodeSessionFailure

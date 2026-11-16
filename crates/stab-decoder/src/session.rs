@@ -1,10 +1,11 @@
 use std::error::Error;
 
+use stab_model::Cancellation;
 use stab_records::ObservablePredictionBatch;
 
 use crate::{
-    DecodeBatchError, DecodeCancellation, DecodeContractError, DecodePreflightError,
-    DecodeSessionFailure, DecoderInputBatchView, DecoderLayout, ValidatedDecodeBatch,
+    DecodeBatchError, DecodeContractError, DecodePreflightError, DecodeSessionFailure,
+    DecoderInputBatchView, DecoderLayout, ValidatedDecodeBatch,
 };
 
 /// Completion state of one decoder call.
@@ -65,20 +66,20 @@ pub trait DecoderSession: Sized {
     fn decode_validated_batch(
         &mut self,
         batch: ValidatedDecodeBatch<'_, '_>,
-        cancellation: &DecodeCancellation,
+        cancellation: &Cancellation,
     ) -> Result<DecodeBatchSummary, DecodeSessionFailure<Self::Error>>;
 }
 
 /// Validates and executes one batch through a statically dispatched decoder session.
 ///
 /// Detector width, correction width, and prediction capacity are checked before implementation
-/// code receives mutable output. A token cancelled before the call returns a zero-progress summary
+/// code receives mutable output. A signal set before the call returns a zero-progress summary
 /// without dispatching to the implementation.
 pub fn decode_batch<S: DecoderSession>(
     session: &mut S,
     input: DecoderInputBatchView<'_>,
     predictions: &mut ObservablePredictionBatch,
-    cancellation: &DecodeCancellation,
+    cancellation: &Cancellation,
 ) -> Result<DecodeBatchSummary, DecodeBatchError<S::Error>> {
     let layout = session.layout();
     validate_preflight(layout, input, predictions)?;

@@ -5,13 +5,11 @@
 //! every input and prediction dimension before implementation code receives a mutable output view.
 
 mod batch;
-mod cancellation;
 mod error;
 mod layout;
 mod session;
 
 pub use batch::{DecoderInputBatchView, ValidatedDecodeBatch};
-pub use cancellation::DecodeCancellation;
 pub use error::{
     DecodeBatchError, DecodeContractError, DecodePreflightError, DecodeSessionFailure,
 };

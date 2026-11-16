@@ -7,13 +7,11 @@ use stab_analysis::{
     CodeDistance, ErrorAnalyzerOptions, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
     circuit_to_detector_error_model, generate_repetition_code_circuit,
 };
-use stab_decoder::{
-    DecodeBatchError, DecodeBatchStatus, DecodeCancellation, DecoderInputBatchView, decode_batch,
-};
+use stab_decoder::{DecodeBatchError, DecodeBatchStatus, DecoderInputBatchView, decode_batch};
 use stab_engine::{
     MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, Seed, ShotCount,
 };
-use stab_model::Probability;
+use stab_model::{Cancellation, Probability};
 use stab_records::{CorrectionWidth, DetectionBatchView, DetectionSink, ObservablePredictionBatch};
 use stab_reference_decoder::{ExactMlDecodeError, ExactMlDecoderSession};
 use thiserror::Error;
@@ -111,7 +109,7 @@ struct LogicalFailureSink<'a> {
     decoder: &'a mut ExactMlDecoderSession,
     report: &'a mut ExperimentReport,
     predictions: ObservablePredictionBatch,
-    cancellation: DecodeCancellation,
+    cancellation: Cancellation,
     finished: bool,
 }
 
@@ -126,7 +124,7 @@ impl<'a> LogicalFailureSink<'a> {
                 correction_width,
             )
             .expect("bounded prediction batch"),
-            cancellation: DecodeCancellation::new(),
+            cancellation: Cancellation::new(),
             finished: false,
         }
     }

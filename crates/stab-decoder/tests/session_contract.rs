@@ -9,11 +9,11 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use stab_decoder::{
-    DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeCancellation,
-    DecodeContractError, DecodePreflightError, DecodeSessionFailure, DecoderInputBatchView,
-    DecoderLayout, DecoderModelView, DecoderSession, ValidatedDecodeBatch, decode_batch,
+    DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeContractError,
+    DecodePreflightError, DecodeSessionFailure, DecoderInputBatchView, DecoderLayout,
+    DecoderModelView, DecoderSession, ValidatedDecodeBatch, decode_batch,
 };
-use stab_model::DetectorErrorModel;
+use stab_model::{Cancellation, DetectorErrorModel};
 use stab_records::{
     CorrectionWidth, DetectionBatchView, DetectorWidth, ObservablePredictionBatch, ObservableWidth,
     PackedShotBatch,
@@ -65,7 +65,7 @@ impl DecoderSession for FixtureSession {
     fn decode_validated_batch(
         &mut self,
         mut batch: ValidatedDecodeBatch<'_, '_>,
-        cancellation: &DecodeCancellation,
+        cancellation: &Cancellation,
     ) -> Result<DecodeBatchSummary, DecodeSessionFailure<Self::Error>> {
         self.calls += 1;
         let requested = batch.shot_count();
@@ -144,7 +144,7 @@ fn decode_fixture(session: &mut FixtureSession, records: &[Vec<bool>]) -> Vec<Ve
         session,
         DecoderInputBatchView::from_detectors(detectors.view()),
         &mut predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect("fixture decode");
     prediction_bits(&predictions)
@@ -194,7 +194,7 @@ fn decoder_session_preflight_is_atomic() {
         &mut preflight_session,
         DecoderInputBatchView::from_detectors(two_detectors.view()),
         &mut predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("detector width mismatch");
     assert_matches!(
@@ -212,7 +212,7 @@ fn decoder_session_preflight_is_atomic() {
         &mut preflight_session,
         DecoderInputBatchView::from_detectors(one_detector.view()),
         &mut wrong_correction_width,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("correction width mismatch");
     assert_matches!(
@@ -230,7 +230,7 @@ fn decoder_session_preflight_is_atomic() {
         &mut preflight_session,
         DecoderInputBatchView::from_detectors(one_detector.view()),
         &mut too_short,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("prediction capacity mismatch");
     assert_matches!(
@@ -248,7 +248,7 @@ fn decoder_session_preflight_is_atomic() {
 fn decoder_session_cancellation_and_failure_preserve_progress() {
     let one_detector = detector_records(&[vec![true], vec![false]]);
     let mut pre_cancelled_session = FixtureSession::new(layout(1, 1));
-    let cancellation = DecodeCancellation::new();
+    let cancellation = Cancellation::new();
     cancellation.cancel();
     let mut pre_cancelled_predictions = filled_predictions(2, 1, true);
     let before = pre_cancelled_predictions.clone();
@@ -274,7 +274,7 @@ fn decoder_session_cancellation_and_failure_preserve_progress() {
         &mut cancellation_session,
         DecoderInputBatchView::from_detectors(cancellation_records.view()),
         &mut cancellation_predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect("mid-batch cancellation");
     assert_eq!(summary.status(), DecodeBatchStatus::Cancelled);
@@ -300,7 +300,7 @@ fn decoder_session_cancellation_and_failure_preserve_progress() {
         &mut failure_session,
         DecoderInputBatchView::from_detectors(failure_records.view()),
         &mut failure_predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("session failure");
     assert_matches!(&error, DecodeBatchError::Session(_));
@@ -324,7 +324,7 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &mut invalid_failure_session,
         DecoderInputBatchView::from_detectors(failure_records.view()),
         &mut failure_predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("failure progress beyond request");
     assert_matches!(
@@ -343,7 +343,7 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &mut invalid_summary_session,
         DecoderInputBatchView::from_detectors(one_detector.view()),
         &mut two_predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("wrong requested shot count");
     assert_matches!(
@@ -360,7 +360,7 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &mut overflow_summary_session,
         DecoderInputBatchView::from_detectors(one_detector.view()),
         &mut two_predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("completed progress beyond request");
     assert_matches!(
@@ -377,7 +377,7 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &mut changing_layout_session,
         DecoderInputBatchView::from_detectors(one_detector.view()),
         &mut two_predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect_err("layout changed during dispatch");
     assert_matches!(
@@ -393,7 +393,7 @@ fn decoder_session_protocol_and_zero_shot_contracts() {
         &mut empty_session,
         DecoderInputBatchView::from_detectors(empty_detectors.view()),
         &mut reusable_predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )
     .expect("zero-shot batch");
     assert_eq!(summary.status(), DecodeBatchStatus::Completed);

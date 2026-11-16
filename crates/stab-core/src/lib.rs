@@ -13,9 +13,9 @@ pub use stab_algebra::{
     StabilizerResult, Tableau,
 };
 pub use stab_decoder::{
-    DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeCancellation,
-    DecodeContractError, DecodePreflightError, DecodeSessionFailure, DecoderInputBatchView,
-    DecoderLayout, DecoderModelView, DecoderModelViewError, DecoderSession, ValidatedDecodeBatch,
+    DecodeBatchError, DecodeBatchStatus, DecodeBatchSummary, DecodeContractError,
+    DecodePreflightError, DecodeSessionFailure, DecoderInputBatchView, DecoderLayout,
+    DecoderModelView, DecoderModelViewError, DecoderSession, ValidatedDecodeBatch,
 };
 pub use stab_model::{
     AbsoluteTolerance, ByteSpan, Cancellation, Cancelled, Circuit, CircuitDetectorId,

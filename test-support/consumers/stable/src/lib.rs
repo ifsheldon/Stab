@@ -6,11 +6,11 @@ use stab_algebra::{CliffordString, SingleQubitClifford};
 use stab_analysis::circuit_without_tags;
 use stab_bits::BitVec;
 use stab_decoder::{
-    DecodeBatchSummary, DecodeCancellation, DecodeSessionFailure, DecoderInputBatchView,
-    DecoderLayout, DecoderModelView, DecoderSession, ValidatedDecodeBatch, decode_batch,
+    DecodeBatchSummary, DecodeSessionFailure, DecoderInputBatchView, DecoderLayout,
+    DecoderModelView, DecoderSession, ValidatedDecodeBatch, decode_batch,
 };
 use stab_engine::SamplingCompiler;
-use stab_model::{Circuit, DetectorErrorModel};
+use stab_model::{Cancellation, Circuit, DetectorErrorModel};
 use stab_records::{
     BitPlaneBatch, MeasurementBatchView, MeasurementCodecSink, MeasurementSink, MeasurementWidth,
     ObservablePredictionBatch, PackedShotBatch, RecordFormat, read_measurement_records,
@@ -58,7 +58,7 @@ pub fn exercise_stable_components(
         &mut decoder,
         DecoderInputBatchView::from_detectors(shot_major.view()),
         &mut predictions,
-        &DecodeCancellation::new(),
+        &Cancellation::new(),
     )?;
     let predictions = predictions.records().to_records()?;
 
@@ -80,7 +80,7 @@ impl DecoderSession for FirstDetectorSession {
     fn decode_validated_batch(
         &mut self,
         mut batch: ValidatedDecodeBatch<'_, '_>,
-        cancellation: &DecodeCancellation,
+        cancellation: &Cancellation,
     ) -> Result<DecodeBatchSummary, DecodeSessionFailure<Self::Error>> {
         let requested = batch.shot_count();
         let mut completed = 0;
@@ -118,10 +118,7 @@ mod tests {
         assert_eq!(bit_len, 257);
         assert_eq!(shot_count, 3);
         assert_eq!(encoded, [0x25, 0x1a, 0x07]);
-        assert_eq!(
-            predictions,
-            vec![vec![true], vec![false], vec![true]]
-        );
+        assert_eq!(predictions, vec![vec![true], vec![false], vec![true]]);
 
         let unterminated = &STRICT_ZERO_ONE_FIXTURE[..STRICT_ZERO_ONE_FIXTURE.len() - 1];
         assert!(

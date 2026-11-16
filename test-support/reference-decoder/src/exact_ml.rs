@@ -1,12 +1,13 @@
 use std::ops::ControlFlow;
 
 use stab_decoder::{
-    DecodeBatchSummary, DecodeCancellation, DecodeSessionFailure, DecoderLayout, DecoderModelView,
+    DecodeBatchSummary, DecodeSessionFailure, DecoderLayout, DecoderModelView,
     DecoderModelViewError, DecoderSession, ValidatedDecodeBatch,
 };
 use stab_model::{
-    DemErrorMechanismTraversalLimits, DemErrorMechanismView, DemErrorMechanismVisitError,
-    DemErrorMechanismVisitor, DemErrorTarget, ModelError, ModelFingerprint,
+    Cancellation, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
+    DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, ModelError,
+    ModelFingerprint,
 };
 use stab_records::FormatError;
 use thiserror::Error;
@@ -166,7 +167,7 @@ impl DecoderSession for ExactMlDecoderSession {
     fn decode_validated_batch(
         &mut self,
         mut batch: ValidatedDecodeBatch<'_, '_>,
-        cancellation: &DecodeCancellation,
+        cancellation: &Cancellation,
     ) -> Result<DecodeBatchSummary, DecodeSessionFailure<Self::Error>> {
         let requested = batch.shot_count();
 
