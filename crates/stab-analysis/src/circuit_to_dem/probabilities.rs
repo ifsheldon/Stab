@@ -1,21 +1,6 @@
-use std::collections::BTreeMap;
-
 use stab_model::Probability;
 
 use crate::AnalysisResult;
-
-pub(super) fn merge_disjoint_probability<K: Ord>(
-    probabilities: &mut BTreeMap<K, Probability>,
-    key: K,
-    probability: Probability,
-) -> AnalysisResult<()> {
-    if let Some(existing) = probabilities.get_mut(&key) {
-        *existing = Probability::try_new(existing.get() + probability.get())?;
-    } else {
-        probabilities.insert(key, probability);
-    }
-    Ok(())
-}
 
 pub(super) fn xor_probability(
     left: Probability,

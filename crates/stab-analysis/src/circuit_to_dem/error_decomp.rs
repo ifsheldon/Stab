@@ -2,8 +2,6 @@ use stab_model::Probability;
 
 use crate::{AnalysisError, AnalysisResult};
 
-use super::AnalyzerPauli;
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IndependentPauliProbabilities {
     pub(super) x: Probability,
@@ -133,14 +131,20 @@ fn solve_disjoint_to_independent_xyz(
         });
     }
 
-    // Solve analytically if an exact solution exists.
+    // Solve analytically if an exact solution exists. The AArch64 Release
+    // build of pinned Stim contracts `1 - 2 * x` into one `fmsub` and shares it
+    // across `s_xz` and `s_xy` (`try_disjoint_to_independent_xyz_errors_approx`).
     if x + z < 0.5 && x + y < 0.5 && y + z < 0.5 {
-        let s_xz = (1.0 - 2.0 * x - 2.0 * z).sqrt();
-        let s_xy = (1.0 - 2.0 * x - 2.0 * y).sqrt();
-        let s_yz = (1.0 - 2.0 * y - 2.0 * z).sqrt();
-        let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
-        let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
-        let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
+        let two_z = z + z;
+        let one_minus_two_x = (-2.0_f64).mul_add(x, 1.0);
+        let s_xz = (one_minus_two_x - two_z).sqrt();
+        let two_y = y + y;
+        let s_xy = (one_minus_two_x - two_y).sqrt();
+        let s_yz = ((1.0 - two_y) - two_z).sqrt();
+        let half_s_xz = 0.5 * s_xz;
+        let a = 0.5 - (half_s_xz * s_xy) / s_yz;
+        let b = 0.5 - ((0.5 * s_xy) * s_yz) / s_xz;
+        let c = 0.5 - (half_s_xz * s_yz) / s_xy;
         if a >= 0.0 && b >= 0.0 && c >= 0.0 {
             debug_assert!(a <= 1.0 && b <= 1.0 && c <= 1.0);
             return Some(XyzSolution {
@@ -150,7 +154,9 @@ fn solve_disjoint_to_independent_xyz(
         }
     }
 
-    // If no exact solution exists, resort to approximations.
+    // If no exact solution exists, resort to approximations. Pinned Stim's
+    // AArch64 Release build contracts each `a * bc_i + a_i * bc` residual into
+    // one `fmadd`.
     let mut a = x;
     let mut b = y;
     let mut c = z;
@@ -164,9 +170,9 @@ fn solve_disjoint_to_independent_xyz(
         let ab_i = a_i * b_i;
         let ac_i = a_i * c_i;
         let bc_i = b_i * c_i;
-        let x2 = a * bc_i + a_i * bc;
-        let y2 = b * ac_i + b_i * ac;
-        let z2 = c * ab_i + c_i * ab;
+        let x2 = a.mul_add(bc_i, a_i * bc);
+        let y2 = b.mul_add(ac_i, b_i * ac);
+        let z2 = c.mul_add(ab_i, c_i * ab);
         let dx = x2 - x;
         let dy = y2 - y;
         let dz = z2 - z;
@@ -215,9 +221,8 @@ pub(super) fn depolarize1_independent_channel_probability(
             "cannot analyze over-mixing DEPOLARIZE1 probability above 3/4",
         ));
     }
-    Ok(Probability::try_new(
-        0.5 - 0.5 * (1.0 - (4.0 * probability.get()) / 3.0).sqrt(),
-    )?)
+    let root = (1.0 - (4.0 * probability.get()) / 3.0).sqrt();
+    Ok(Probability::try_new((-0.5_f64).mul_add(root, 0.5))?)
 }
 
 pub(super) fn depolarize2_independent_channel_probability(
@@ -228,35 +233,8 @@ pub(super) fn depolarize2_independent_channel_probability(
             "cannot analyze over-mixing DEPOLARIZE2 probability above 15/16",
         ));
     }
-    Ok(Probability::try_new(
-        0.5 - 0.5 * (1.0 - (16.0 * probability.get()) / 15.0).powf(0.125),
-    )?)
-}
-
-pub(super) fn pauli_channel2_components(
-    probabilities: [Probability; 15],
-) -> impl Iterator<Item = (Probability, Option<AnalyzerPauli>, Option<AnalyzerPauli>)> {
-    const COMPONENTS: [(Option<AnalyzerPauli>, Option<AnalyzerPauli>); 15] = [
-        (None, Some(AnalyzerPauli::X)),
-        (None, Some(AnalyzerPauli::Y)),
-        (None, Some(AnalyzerPauli::Z)),
-        (Some(AnalyzerPauli::X), None),
-        (Some(AnalyzerPauli::X), Some(AnalyzerPauli::X)),
-        (Some(AnalyzerPauli::X), Some(AnalyzerPauli::Y)),
-        (Some(AnalyzerPauli::X), Some(AnalyzerPauli::Z)),
-        (Some(AnalyzerPauli::Y), None),
-        (Some(AnalyzerPauli::Y), Some(AnalyzerPauli::X)),
-        (Some(AnalyzerPauli::Y), Some(AnalyzerPauli::Y)),
-        (Some(AnalyzerPauli::Y), Some(AnalyzerPauli::Z)),
-        (Some(AnalyzerPauli::Z), None),
-        (Some(AnalyzerPauli::Z), Some(AnalyzerPauli::X)),
-        (Some(AnalyzerPauli::Z), Some(AnalyzerPauli::Y)),
-        (Some(AnalyzerPauli::Z), Some(AnalyzerPauli::Z)),
-    ];
-    probabilities
-        .into_iter()
-        .zip(COMPONENTS)
-        .map(|(probability, (left, right))| (probability, left, right))
+    let root = (1.0 - (16.0 * probability.get()) / 15.0).powf(0.125);
+    Ok(Probability::try_new((-0.5_f64).mul_add(root, 0.5))?)
 }
 
 #[cfg(test)]

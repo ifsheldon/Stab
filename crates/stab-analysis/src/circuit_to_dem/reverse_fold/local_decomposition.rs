@@ -231,19 +231,27 @@ pub(super) fn merge_indistinguishable_disjoint_probabilities(
         for destination in 0..targets.len() {
             let source = destination ^ mask;
             if source > destination {
-                let destination_probability = *indexed(
-                    probabilities,
-                    destination,
-                    "disjoint destination probability",
-                )?;
                 let source_probability =
                     *indexed(probabilities, source, "disjoint source probability")?;
-                *indexed_mut(
-                    probabilities,
-                    destination,
-                    "disjoint destination probability",
-                )? =
-                    Probability::try_new(destination_probability.get() + source_probability.get())?;
+                if destination != 0 {
+                    let destination_probability = *indexed(
+                        probabilities,
+                        destination,
+                        "disjoint destination probability",
+                    )?;
+                    // Re-associating validated disjoint terms can overshoot 1.0 by a few ULPs.
+                    let sum = destination_probability.get() + source_probability.get();
+                    let clamped = if sum > 1.0 && sum - 1.0 <= 16.0 * f64::EPSILON {
+                        1.0
+                    } else {
+                        sum
+                    };
+                    *indexed_mut(
+                        probabilities,
+                        destination,
+                        "disjoint destination probability",
+                    )? = Probability::try_new(clamped)?;
+                }
                 *indexed_mut(probabilities, source, "disjoint source probability")? =
                     Probability::try_new(0.0)?;
             }

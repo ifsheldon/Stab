@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, DemInstruction, DemInstructionKind, DemItem,
     DemRepeatCount, DemTarget, DetectorErrorModel, GateKind, Pauli, Probability, QubitId,
@@ -9,13 +7,10 @@ use stab_model::{
 use super::{
     ErrorAnalyzerOptions,
     decompose::decompose_accumulated_errors,
-    effects::AnalyzerPauli,
     error_accumulator::{ErrorAccumulator, TagId},
     error_decomp::{
         depolarize1_independent_channel_probability, depolarize2_independent_channel_probability,
-        pauli_channel2_components,
     },
-    probabilities::merge_disjoint_probability,
     try_disjoint_to_independent_xyz_errors,
 };
 use crate::sparse_rev_frame_tracker::{
@@ -584,6 +579,10 @@ impl ReverseFoldAnalyzer {
         Ok(())
     }
 
+    /// Port of pinned Stim's `undo_PAULI_CHANNEL_1`
+    /// (`error_analyzer.cc:901-929`), loading `{zs, xs}` (`X` then `Z` Pauli
+    /// sensitivities) with slot order `{0, ix, iz, iy}` so local decomposition
+    /// and fused probability merges follow the vendor order.
     fn record_pauli_channel1(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let Some(probabilities) = instruction.probability_arguments()? else {
             return Ok(());
@@ -593,57 +592,32 @@ impl ReverseFoldAnalyzer {
                 "PAULI_CHANNEL_1 expected three probabilities",
             ));
         };
-        if instruction.targets().is_empty() {
-            return Ok(());
-        }
         let independent = try_disjoint_to_independent_xyz_errors(*x, *y, *z)?;
-        if independent.is_none() {
+        let (ix, iy, iz, is_disjoint) = if let Some(independent) = independent {
+            (independent.x, independent.y, independent.z, false)
+        } else {
             self.validate_disjoint_threshold("PAULI_CHANNEL_1", &probabilities)?;
-        }
+            (*x, *y, *z, true)
+        };
+        let zero = Probability::try_new(0.0)?;
         for target in instruction.targets() {
             let qubit = target.qubit_id().ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model("PAULI_CHANNEL_1 target is not a qubit")
             })?;
-            let components = if let Some(independent) = independent {
-                [
-                    (independent.x, Pauli::X),
-                    (independent.y, Pauli::Y),
-                    (independent.z, Pauli::Z),
-                ]
-            } else {
-                [(*x, Pauli::X), (*y, Pauli::Y), (*z, Pauli::Z)]
-            };
-            if independent.is_some() {
-                let tag = self.errors.intern_tag(instruction.tag_bytes())?;
-                for (probability, pauli) in components {
-                    self.tracker.error_sensitivity_into(
-                        qubit,
-                        pauli,
-                        &mut self.scratch.sensitivity,
-                    )?;
-                    add_independent_error(
-                        &mut self.errors,
-                        probability,
-                        &self.scratch.sensitivity,
-                        tag,
-                    )?;
-                }
-            } else {
-                let disjoint = components
-                    .into_iter()
-                    .map(|(probability, pauli)| {
-                        let mut targets = Vec::new();
-                        self.tracker
-                            .error_sensitivity_into(qubit, pauli, &mut targets)?;
-                        Ok((probability, targets))
-                    })
-                    .collect::<AnalysisResult<Vec<_>>>()?;
-                self.add_disjoint_components(disjoint, instruction.tag_bytes())?;
-            }
+            self.load_bases(&[(qubit, Pauli::X), (qubit, Pauli::Z)])?;
+            self.record_error_combinations(
+                &mut [zero, ix, iz, iy],
+                2,
+                is_disjoint,
+                instruction.tag_bytes(),
+            )?;
         }
         Ok(())
     }
 
+    /// Port of pinned Stim's `undo_PAULI_CHANNEL_2`
+    /// (`error_analyzer.cc:931-956`), mapping the 15 `IX..ZZ` arguments onto
+    /// the `{zs[b], xs[b], zs[a], xs[a]}` basis masks via `pauli_xyz_to_xz`.
     fn record_pauli_channel2(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let Some(probabilities) = instruction.probability_arguments()? else {
             return Ok(());
@@ -659,6 +633,15 @@ impl ReverseFoldAnalyzer {
                     values.len()
                 ))
             })?;
+        let zero = Probability::try_new(0.0)?;
+        let mut table = [zero; 16];
+        for (index, probability) in probabilities.into_iter().enumerate() {
+            let k = index + 1;
+            let mask = pauli_xyz_to_xz(k & 3) | (pauli_xyz_to_xz((k >> 2) & 3) << 2);
+            if let Some(slot) = table.get_mut(mask) {
+                *slot = probability;
+            }
+        }
         for group in instruction.target_groups() {
             let [left, right] = group else {
                 return Err(AnalysisError::invalid_detector_error_model(
@@ -675,18 +658,19 @@ impl ReverseFoldAnalyzer {
                     "PAULI_CHANNEL_2 right target is not a qubit",
                 )
             })?;
-            let disjoint = pauli_channel2_components(probabilities)
-                .map(|(probability, left_pauli, right_pauli)| {
-                    Ok((
-                        probability,
-                        self.paired_error_targets(
-                            left_pauli.map(|pauli| (left, analyzer_pauli(pauli))),
-                            right_pauli.map(|pauli| (right, analyzer_pauli(pauli))),
-                        )?,
-                    ))
-                })
-                .collect::<AnalysisResult<Vec<_>>>()?;
-            self.add_disjoint_components(disjoint, instruction.tag_bytes())?;
+            let mut slot_probabilities = table;
+            self.load_bases(&[
+                (right, Pauli::X),
+                (right, Pauli::Z),
+                (left, Pauli::X),
+                (left, Pauli::Z),
+            ])?;
+            self.record_error_combinations(
+                &mut slot_probabilities,
+                4,
+                true,
+                instruction.tag_bytes(),
+            )?;
         }
         Ok(())
     }
@@ -710,25 +694,6 @@ impl ReverseFoldAnalyzer {
                 probability.get(),
                 threshold.get()
             )));
-        }
-        Ok(())
-    }
-
-    fn add_disjoint_components(
-        &mut self,
-        components: impl IntoIterator<Item = (Probability, Vec<DemTarget>)>,
-        tag: Option<&[u8]>,
-    ) -> AnalysisResult<()> {
-        let mut disjoint = BTreeMap::new();
-        for (probability, targets) in components {
-            if probability.get() == 0.0 || targets.is_empty() {
-                continue;
-            }
-            merge_disjoint_probability(&mut disjoint, targets, probability)?;
-        }
-        let tag = self.errors.intern_tag(tag)?;
-        for (targets, probability) in disjoint {
-            add_independent_error(&mut self.errors, probability, &targets, tag)?;
         }
         Ok(())
     }
@@ -858,20 +823,6 @@ impl ReverseFoldAnalyzer {
                 .xor_sorted(&self.scratch.sensitivity, &mut self.scratch.merge);
         }
         Ok(())
-    }
-
-    fn paired_error_targets(
-        &mut self,
-        left: Option<(QubitId, Pauli)>,
-        right: Option<(QubitId, Pauli)>,
-    ) -> AnalysisResult<Vec<DemTarget>> {
-        let mut result = TargetXorSet::new();
-        for (qubit, pauli) in left.into_iter().chain(right) {
-            self.tracker
-                .error_sensitivity_into(qubit, pauli, &mut self.scratch.sensitivity)?;
-            result.xor_sorted(&self.scratch.sensitivity, &mut self.scratch.merge);
-        }
-        Ok(result.as_slice().to_vec())
     }
 
     fn collect_gauge_errors(&mut self) -> AnalysisResult<()> {
@@ -1078,12 +1029,8 @@ impl ReverseFoldAnalyzer {
     }
 }
 
-fn analyzer_pauli(pauli: AnalyzerPauli) -> Pauli {
-    match pauli {
-        AnalyzerPauli::X => Pauli::X,
-        AnalyzerPauli::Y => Pauli::Y,
-        AnalyzerPauli::Z => Pauli::Z,
-    }
+const fn pauli_xyz_to_xz(xyz: usize) -> usize {
+    xyz ^ (xyz >> 1)
 }
 
 fn add_independent_error(

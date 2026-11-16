@@ -1,6 +1,5 @@
 mod budget;
 mod decompose;
-mod effects;
 mod error_accumulator;
 mod error_decomp;
 mod options;
@@ -10,7 +9,6 @@ mod reverse_fold;
 use stab_model::{Circuit, DetectorErrorModel};
 
 use crate::AnalysisResult;
-use effects::AnalyzerPauli;
 pub use error_decomp::{
     DisjointPauliProbabilities, IndependentPauliProbabilities, independent_to_disjoint_xyz_errors,
     try_disjoint_to_independent_xyz_errors,

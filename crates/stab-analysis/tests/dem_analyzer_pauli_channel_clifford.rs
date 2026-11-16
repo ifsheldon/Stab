@@ -99,3 +99,50 @@ fn disjoint_to_independent_pauli_channel1_newton_edge_case_fails_like_pinned_sti
 
     assert!(actual.is_none());
 }
+
+#[test]
+fn pauli_channels_match_pinned_stim_combination_order_and_local_decomposition() {
+    // Against MX, Z and Y share symptom D0; pinned Stim merges slot `iz` before `iy`
+    // (`{0, ix, iz, iy}`), fixing the final printed digit.
+    let mx_merge = Circuit::from_stim_str(
+        "RX 0\nPAULI_CHANNEL_1(0.13669, 0.05589, 0.14773) 0\nMX 0\nDETECTOR rec[-1]\n",
+    )
+    .expect("circuit");
+    let merged = circuit_to_detector_error_model(&mx_merge, ErrorAnalyzerOptions::default())
+        .expect("analyze")
+        .to_dem_string();
+    assert_eq!(merged, "error(0.2036199999999999954436447069383576) D0\n");
+
+    let decompose_options = ErrorAnalyzerOptions {
+        decompose_errors: true,
+        approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+        ..ErrorAnalyzerOptions::default()
+    };
+    let pc1_bell = Circuit::from_stim_str(
+        "R 0 1\nH 0\nCX 0 1\nPAULI_CHANNEL_1(0.13669, 0.05589, 0.14773) 0\nCX 0 1\nH 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .expect("circuit");
+    assert_eq!(
+        circuit_to_detector_error_model(&pc1_bell, decompose_options.clone())
+            .expect("analyze")
+            .to_dem_string(),
+        "error(0.1776351926371489420297677952476079) D0\n\
+         error(0.1656272721523460722536924549785908) D1\n\
+         error(0.04030341831576356170785402355249971) D1 ^ D0\n",
+    );
+
+    let pc2_bell = Circuit::from_stim_str(
+        "R 0 1\nH 0\nCX 0 1\n\
+         PAULI_CHANNEL_2(0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019, 0.020, 0.021, 0.022, 0.023, 0.024, 0.025) 0 1\n\
+         CX 0 1\nH 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .expect("circuit");
+    assert_eq!(
+        circuit_to_detector_error_model(&pc2_bell, decompose_options)
+            .expect("analyze")
+            .to_dem_string(),
+        "error(0.06999999999999999278355033993648249) D0\n\
+         error(0.07000000000000000666133814775093924) D1\n\
+         error(0.06999999999999999278355033993648249) D1 ^ D0\n",
+    );
+}
