@@ -73,44 +73,27 @@ pub(crate) fn clifford_right_multiply_words(
     Ok(CliffordNonIdentityCounts { before, after })
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct PauliWordProduct {
-    pub(crate) count_bit_1: u64,
-    pub(crate) count_bit_2: u64,
+    pub(crate) log_i: u8,
     pub(crate) has_terms: bool,
 }
 
+#[inline]
 pub(crate) fn pauli_right_multiply_words(
     left_x: &mut [u64],
     left_z: &mut [u64],
     right_x: &[u64],
     right_z: &[u64],
-) -> PauliWordProduct {
-    debug_assert_eq!(left_x.len(), left_z.len());
-    debug_assert_eq!(left_x.len(), right_x.len());
-    debug_assert_eq!(left_x.len(), right_z.len());
-
-    let mut count_bit_1 = 0_u64;
-    let mut count_bit_2 = 0_u64;
-    let mut has_terms = false;
-    for (((left_x, left_z), right_x), right_z) in
-        left_x.iter_mut().zip(left_z).zip(right_x).zip(right_z)
-    {
-        let old_left_x = *left_x;
-        let old_left_z = *left_z;
-        *left_x ^= *right_x;
-        *left_z ^= *right_z;
-
-        let old_x_new_z = old_left_x & *right_z;
-        let anti_commutes = (*right_x & old_left_z) ^ old_x_new_z;
-        count_bit_2 ^= (count_bit_1 ^ *left_x ^ *left_z ^ old_x_new_z) & anti_commutes;
-        count_bit_1 ^= anti_commutes;
-        has_terms |= (*left_x | *left_z) != 0;
-    }
-    PauliWordProduct {
-        count_bit_1,
-        count_bit_2,
-        has_terms,
-    }
+) -> StabilizerResult<PauliWordProduct> {
+    let stab_kernels_simd::PauliWordProduct { log_i, has_terms } =
+        stab_kernels_simd::pauli_right_multiply_words(left_x, left_z, right_x, right_z).map_err(
+            |mismatch| StabilizerError::LengthMismatch {
+                left: mismatch.expected,
+                right: mismatch.actual,
+            },
+        )?;
+    Ok(PauliWordProduct { log_i, has_terms })
 }
 
 /// XORs one generator row `(x, z)` into the accumulated product `(acc_x, acc_z)` and returns the
@@ -298,6 +281,50 @@ mod tests {
 
             assert_eq!(simd, scalar, "word_count={word_count}");
             assert_eq!(simd_counts, scalar_counts, "word_count={word_count}");
+        }
+    }
+
+    fn scalar_pauli_right_multiply_words(
+        left_x: &mut [u64],
+        left_z: &mut [u64],
+        right_x: &[u64],
+        right_z: &[u64],
+    ) -> PauliWordProduct {
+        let mut count_bit_1 = 0_u64;
+        let mut count_bit_2 = 0_u64;
+        let mut has_terms = false;
+        for (((left_x, left_z), right_x), right_z) in
+            left_x.iter_mut().zip(left_z).zip(right_x).zip(right_z)
+        {
+            let old_left_x = *left_x;
+            let old_left_z = *left_z;
+            *left_x ^= *right_x;
+            *left_z ^= *right_z;
+
+            let old_x_new_z = old_left_x & *right_z;
+            let anti_commutes = (*right_x & old_left_z) ^ old_x_new_z;
+            count_bit_2 ^= (count_bit_1 ^ *left_x ^ *left_z ^ old_x_new_z) & anti_commutes;
+            count_bit_1 ^= anti_commutes;
+            has_terms |= (*left_x | *left_z) != 0;
+        }
+        let log_i = ((count_bit_1.count_ones() ^ (count_bit_2.count_ones() << 1)) & 3) as u8;
+        PauliWordProduct { log_i, has_terms }
+    }
+
+    #[test]
+    fn simd_pauli_kernel_matches_scalar_across_blocks_and_tails() {
+        for word_count in [0_usize, 1, 2, 3, 4, 5, 8, 9, 17] {
+            let [lx, lz, rx, rz, _, _] = raw_planes(word_count, 11);
+            let mut scalar_x = lx.clone();
+            let mut scalar_z = lz.clone();
+            let mut simd_x = lx;
+            let mut simd_z = lz;
+            let scalar_prod =
+                scalar_pauli_right_multiply_words(&mut scalar_x, &mut scalar_z, &rx, &rz);
+            let simd_prod = pauli_right_multiply_words(&mut simd_x, &mut simd_z, &rx, &rz).unwrap();
+            assert_eq!(simd_x, scalar_x, "word_count={word_count}");
+            assert_eq!(simd_z, scalar_z, "word_count={word_count}");
+            assert_eq!(simd_prod, scalar_prod, "word_count={word_count}");
         }
     }
 

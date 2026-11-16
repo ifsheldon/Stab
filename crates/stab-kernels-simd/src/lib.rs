@@ -3,9 +3,9 @@
 //! Each public kernel checks its slice lengths once, selects the instruction set once with
 //! [`Level::new`], and then runs a body that is generic over [`Simd`], so one source serves
 //! 128-bit, 256-bit, and 512-bit hardware. Main loops use a fixed minimum block (`u64x8` for XOR,
-//! `u64x4` for Clifford products on 128-bit levels) so a block's loads are issued before its stores;
-//! remainders go through the native-width `S::u64s` vector and then scalar words. The kernels own
-//! chunking, scalar tails, and non-identity counting.
+//! `u64x4` for Pauli and Clifford products on 128-bit levels) so a block's loads are issued before
+//! its stores; remainders go through the native-width `S::u64s` vector and then scalar words. The
+//! kernels own chunking, scalar tails, and phase/non-identity counting.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -123,6 +123,60 @@ pub fn clifford_right_multiply_words(
     ];
     let level = Level::new();
     Ok(dispatch!(level, simd => clifford_right_multiply_words_simd(simd, left, right)))
+}
+
+/// Phase exponent and non-identity status of an in-place Pauli word product.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PauliWordProduct {
+    pub log_i: u8,
+    pub has_terms: bool,
+}
+
+/// Right-multiplies `(right_x, right_z)` into `(left_x, left_z)` qubit by qubit.
+///
+/// # Errors
+///
+/// Returns [`WordLengthMismatch`] without modifying `left_x` or `left_z` when any of the four
+/// planes differs in length from `left_x`.
+#[inline]
+pub fn pauli_right_multiply_words(
+    left_x: &mut [u64],
+    left_z: &mut [u64],
+    right_x: &[u64],
+    right_z: &[u64],
+) -> Result<PauliWordProduct, WordLengthMismatch> {
+    let expected = left_x.len();
+    for actual in [left_z.len(), right_x.len(), right_z.len()] {
+        ensure_len(expected, actual)?;
+    }
+    if expected == 0 {
+        return Ok(PauliWordProduct {
+            log_i: 0,
+            has_terms: false,
+        });
+    }
+    if let ([lx], [lz], [rx], [rz]) = (&mut *left_x, &mut *left_z, right_x, right_z) {
+        let old_lx = *lx;
+        let old_lz = *lz;
+        let rx_w = *rx;
+        let rz_w = *rz;
+        let new_lx = old_lx ^ rx_w;
+        let new_lz = old_lz ^ rz_w;
+        *lx = new_lx;
+        *lz = new_lz;
+        let old_x_new_z = old_lx & rz_w;
+        let anti_commutes = (rx_w & old_lz) ^ old_x_new_z;
+        let count_bit_2 = (new_lx ^ new_lz ^ old_x_new_z) & anti_commutes;
+        return Ok(PauliWordProduct {
+            log_i: mod4_from_counters(anti_commutes, count_bit_2),
+            has_terms: (new_lx | new_lz) != 0,
+        });
+    }
+    let level = Level::new();
+    Ok(dispatch!(
+        level,
+        simd => pauli_right_multiply_words_simd(simd, left_x, left_z, right_x, right_z)
+    ))
 }
 
 fn ensure_len(expected: usize, actual: usize) -> Result<(), WordLengthMismatch> {
@@ -313,6 +367,160 @@ where
 #[inline(always)]
 fn count_ones(words: &[u64]) -> usize {
     words.iter().map(|word| word.count_ones() as usize).sum()
+}
+
+/// The vectorized body of [`pauli_right_multiply_words`]; callers guarantee equal lengths.
+///
+/// On 128-bit levels the main loop uses `u64x4` (two native registers per plane); wider levels use
+/// the native vector directly. The remainder goes through native vectors and then scalar words.
+#[simd]
+fn pauli_right_multiply_words_simd<S: Simd>(
+    simd: S,
+    left_x: &mut [u64],
+    left_z: &mut [u64],
+    right_x: &[u64],
+    right_z: &[u64],
+) -> PauliWordProduct {
+    let mut count_bit_1 = 0_u64;
+    let mut count_bit_2 = 0_u64;
+    let mut nonzero_or = 0_u64;
+    let (left_x, left_z, right_x, right_z) = if S::u64s::LEN < u64x4::<S>::LEN {
+        let (left_x, left_z, right_x, right_z) = pauli_vectors::<S, u64x4<S>>(
+            simd,
+            left_x,
+            left_z,
+            right_x,
+            right_z,
+            &mut count_bit_1,
+            &mut count_bit_2,
+            &mut nonzero_or,
+        );
+        pauli_vectors::<S, S::u64s>(
+            simd,
+            left_x,
+            left_z,
+            right_x,
+            right_z,
+            &mut count_bit_1,
+            &mut count_bit_2,
+            &mut nonzero_or,
+        )
+    } else {
+        pauli_vectors::<S, S::u64s>(
+            simd,
+            left_x,
+            left_z,
+            right_x,
+            right_z,
+            &mut count_bit_1,
+            &mut count_bit_2,
+            &mut nonzero_or,
+        )
+    };
+
+    if !left_x.is_empty() {
+        for (((lx, lz), rx), rz) in left_x.iter_mut().zip(left_z).zip(right_x).zip(right_z) {
+            let old_lx = *lx;
+            let old_lz = *lz;
+            let rx_w = *rx;
+            let rz_w = *rz;
+            let new_lx = old_lx ^ rx_w;
+            let new_lz = old_lz ^ rz_w;
+            *lx = new_lx;
+            *lz = new_lz;
+
+            let old_x_new_z = old_lx & rz_w;
+            let anti_commutes = (rx_w & old_lz) ^ old_x_new_z;
+            count_bit_2 ^= (count_bit_1 ^ new_lx ^ new_lz ^ old_x_new_z) & anti_commutes;
+            count_bit_1 ^= anti_commutes;
+            nonzero_or |= new_lx | new_lz;
+        }
+    }
+
+    PauliWordProduct {
+        log_i: mod4_from_counters(count_bit_1, count_bit_2),
+        has_terms: nonzero_or != 0,
+    }
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "borrows the four Pauli planes and three scalar accumulators without wrapper structs"
+)]
+#[inline(always)]
+fn pauli_vectors<'lx, 'lz, 'rx, 'rz, S, V>(
+    simd: S,
+    left_x: &'lx mut [u64],
+    left_z: &'lz mut [u64],
+    right_x: &'rx [u64],
+    right_z: &'rz [u64],
+    count_bit_1: &mut u64,
+    count_bit_2: &mut u64,
+    nonzero_or: &mut u64,
+) -> (&'lx mut [u64], &'lz mut [u64], &'rx [u64], &'rz [u64])
+where
+    S: Simd,
+    V: SimdBase<S, Element = u64> + BitAnd<Output = V> + BitOr<Output = V> + BitXor<Output = V>,
+{
+    if left_x.len() < V::LEN {
+        return (left_x, left_z, right_x, right_z);
+    }
+    let mut cnt1 = V::splat(simd, 0);
+    let mut cnt2 = V::splat(simd, 0);
+    let mut nonzero = V::splat(simd, 0);
+    for (((lx, lz), rx), rz) in left_x
+        .chunks_exact_mut(V::LEN)
+        .zip(left_z.chunks_exact_mut(V::LEN))
+        .zip(right_x.chunks_exact(V::LEN))
+        .zip(right_z.chunks_exact(V::LEN))
+    {
+        let old_lx = V::from_slice(simd, lx);
+        let old_lz = V::from_slice(simd, lz);
+        let rx_v = V::from_slice(simd, rx);
+        let rz_v = V::from_slice(simd, rz);
+        let new_lx = old_lx ^ rx_v;
+        let new_lz = old_lz ^ rz_v;
+        new_lx.store_slice(lx);
+        new_lz.store_slice(lz);
+
+        let old_x_new_z = old_lx & rz_v;
+        let anti_commutes = (rx_v & old_lz) ^ old_x_new_z;
+        cnt2 = cnt2 ^ ((cnt1 ^ new_lx ^ new_lz ^ old_x_new_z) & anti_commutes);
+        cnt1 = cnt1 ^ anti_commutes;
+        nonzero = nonzero | new_lx | new_lz;
+    }
+    for ((&lane1, &lane2), &nz) in cnt1
+        .as_slice()
+        .iter()
+        .zip(cnt2.as_slice())
+        .zip(nonzero.as_slice())
+    {
+        add_mod4_counters(count_bit_1, count_bit_2, lane1, lane2);
+        *nonzero_or |= nz;
+    }
+    (
+        left_x.chunks_exact_mut(V::LEN).into_remainder(),
+        left_z.chunks_exact_mut(V::LEN).into_remainder(),
+        right_x.chunks_exact(V::LEN).remainder(),
+        right_z.chunks_exact(V::LEN).remainder(),
+    )
+}
+
+#[inline(always)]
+fn add_mod4_counters(c1: &mut u64, c2: &mut u64, rhs1: u64, rhs2: u64) {
+    let carry = *c1 & rhs1;
+    *c1 ^= rhs1;
+    *c2 ^= rhs2 ^ carry;
+}
+
+#[inline(always)]
+const fn mod4_from_counters(count_bit_1: u64, count_bit_2: u64) -> u8 {
+    match (count_bit_1.count_ones() ^ (count_bit_2.count_ones() << 1)) & 3 {
+        0 => 0,
+        1 => 1,
+        2 => 2,
+        _ => 3,
+    }
 }
 
 #[cfg(test)]

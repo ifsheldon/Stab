@@ -65,22 +65,27 @@ impl PauliRows {
         }
     }
 
+    #[inline]
     pub(crate) const fn num_qubits(&self) -> usize {
         self.num_qubits
     }
 
+    #[inline]
     pub(crate) const fn half_words(&self) -> usize {
         self.half_words
     }
 
+    #[inline]
     pub(crate) const fn row_count(&self) -> usize {
         self.row_count
     }
 
+    #[inline]
     pub(crate) const fn row_words(&self) -> usize {
         2 * self.half_words
     }
 
+    #[inline]
     fn range(&self, row: usize) -> StabilizerResult<std::ops::Range<usize>> {
         if row >= self.row_count {
             return Err(StabilizerError::TableauIndexOutOfRange {
@@ -93,6 +98,7 @@ impl PauliRows {
     }
 
     /// The packed `[x | z]` words of `row`.
+    #[inline]
     pub(crate) fn row(&self, row: usize) -> StabilizerResult<&[u64]> {
         let range = self.range(row)?;
         self.words
@@ -103,6 +109,7 @@ impl PauliRows {
             })
     }
 
+    #[inline]
     pub(crate) fn row_mut(&mut self, row: usize) -> StabilizerResult<&mut [u64]> {
         let range = self.range(row)?;
         let len = self.row_count;
@@ -136,6 +143,7 @@ impl PauliRows {
     }
 
     /// Borrows two distinct rows mutably, in argument order.
+    #[inline]
     pub(crate) fn two_rows_mut(
         &mut self,
         first: usize,
@@ -168,6 +176,7 @@ impl PauliRows {
     }
 
     /// Borrows `target` mutably and `source` shared; the rows must differ.
+    #[inline]
     pub(crate) fn row_pair_mut(
         &mut self,
         target: usize,
@@ -191,6 +200,7 @@ impl PauliRows {
         self.set_sign(right, left_sign)
     }
 
+    #[inline]
     pub(crate) fn sign(&self, row: usize) -> StabilizerResult<bool> {
         let word = self
             .signs
@@ -200,6 +210,7 @@ impl PauliRows {
         Ok(word >> (row % WORD_BITS) & 1 != 0)
     }
 
+    #[inline]
     pub(crate) fn set_sign(&mut self, row: usize, value: bool) -> StabilizerResult<()> {
         let len = self.row_count;
         let word = self
@@ -227,6 +238,7 @@ impl PauliRows {
     }
 
     /// Every packed row word in row order, then the packed sign plane.
+    #[inline]
     pub(crate) fn words_and_signs(&self) -> (&[u64], &[u64]) {
         (&self.words, &self.signs)
     }
@@ -331,14 +343,31 @@ impl PauliRows {
 
 /// Right-multiplies the packed row `source` into `target` and returns the base-`i` exponent of
 /// the scalar the product needs on top of the two rows' real signs.
-pub(crate) fn multiply_row_into(target: &mut [u64], source: &[u64], half_words: usize) -> u8 {
-    let (target_x, target_z) = target.split_at_mut(half_words);
-    let (source_x, source_z) = source.split_at(half_words);
+#[inline]
+pub(crate) fn multiply_row_into(
+    target: &mut [u64],
+    source: &[u64],
+    half_words: usize,
+) -> StabilizerResult<u8> {
+    let target_len = target.len();
+    let source_len = source.len();
+    let (target_x, target_z) =
+        target
+            .split_at_mut_checked(half_words)
+            .ok_or(StabilizerError::LengthMismatch {
+                left: target_len,
+                right: 2 * half_words,
+            })?;
+    let (source_x, source_z) =
+        source
+            .split_at_checked(half_words)
+            .ok_or(StabilizerError::LengthMismatch {
+                left: source_len,
+                right: 2 * half_words,
+            })?;
     let product =
-        crate::kernels::pauli_right_multiply_words(target_x, target_z, source_x, source_z);
-    let mut log_i = popcount_mod_4(product.count_bit_1);
-    log_i ^= popcount_mod_4(product.count_bit_2) << 1;
-    log_i & 3
+        crate::kernels::pauli_right_multiply_words(target_x, target_z, source_x, source_z)?;
+    Ok(product.log_i)
 }
 
 /// The parity of the symplectic inner product of two packed rows.
@@ -359,10 +388,6 @@ pub(crate) fn y_count_mod_4(row: &[u64], half_words: usize) -> u8 {
         count.wrapping_add((x & z).count_ones())
     });
     (count & 3) as u8
-}
-
-fn popcount_mod_4(word: u64) -> u8 {
-    (word.count_ones() & 3) as u8
 }
 
 fn out_of_range(index: usize) -> StabilizerError {

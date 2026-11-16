@@ -415,6 +415,7 @@ impl PauliString {
             .sum()
     }
 
+    #[inline]
     pub fn has_no_pauli_terms(&self) -> bool {
         !self.has_terms
     }
@@ -487,7 +488,16 @@ impl PauliString {
     }
 
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<FlexPauliString> {
-        let mut value = self.clone();
+        let mut value = if self.len() >= rhs.len() {
+            self.clone()
+        } else {
+            Self {
+                sign: self.sign,
+                xs: BitVec::from_words_truncated(rhs.len(), self.xs.words().to_vec()),
+                zs: BitVec::from_words_truncated(rhs.len(), self.zs.words().to_vec()),
+                has_terms: self.has_terms,
+            }
+        };
         let log_i = value.right_multiply_in_place_returning_log_i_scalar(rhs)?;
         let imaginary = log_i & 1 != 0;
         if log_i & 2 != 0 {
@@ -507,6 +517,7 @@ impl PauliString {
     /// returned base-`i` exponent still needs to be applied by the caller. For example, a return
     /// value of `1` means the in-place result must still be multiplied by `i`, and a return value
     /// of `2` means the caller should apply an additional `-1` scalar.
+    #[inline]
     pub fn right_multiply_in_place_returning_log_i_scalar(
         &mut self,
         rhs: &Self,
@@ -517,13 +528,15 @@ impl PauliString {
         }
 
         let rhs_word_count = rhs.xs.word_count();
-        let trailing_has_terms = self
-            .xs
-            .words()
-            .iter()
-            .zip(self.zs.words())
-            .skip(rhs_word_count)
-            .any(|(x_word, z_word)| (x_word | z_word) != 0);
+        let left_word_count = self.xs.word_count();
+        let trailing_has_terms = left_word_count > rhs_word_count
+            && self
+                .xs
+                .words()
+                .iter()
+                .zip(self.zs.words())
+                .skip(rhs_word_count)
+                .any(|(x_word, z_word)| (x_word | z_word) != 0);
         let left_len = self.len();
         let right_len = rhs.len();
         let mut left_x_words = self.xs.words_mut();
@@ -542,12 +555,10 @@ impl PauliString {
                     left: left_len,
                     right: right_len,
                 })?;
-        let product = pauli_right_multiply_words(left_x, left_z, rhs.xs.words(), rhs.zs.words());
+        let product = pauli_right_multiply_words(left_x, left_z, rhs.xs.words(), rhs.zs.words())?;
         self.has_terms = trailing_has_terms || product.has_terms;
 
-        let mut log_i = popcount_mod_4(product.count_bit_1);
-        log_i ^= popcount_mod_4(product.count_bit_2) << 1;
-        log_i ^= u8::from(rhs.sign.is_negative()) << 1;
+        let log_i = product.log_i ^ (u8::from(rhs.sign.is_negative()) << 1);
         Ok(log_i & 3)
     }
 
@@ -631,10 +642,16 @@ impl PauliString {
         })
     }
 
+    #[inline]
     fn ensure_len(&mut self, len: usize) {
         if len <= self.len() {
             return;
         }
+        self.grow_len(len);
+    }
+
+    #[cold]
+    fn grow_len(&mut self, len: usize) {
         self.xs = BitVec::from_words_truncated(len, self.xs.words().to_vec());
         self.zs = BitVec::from_words_truncated(len, self.zs.words().to_vec());
     }
@@ -999,15 +1016,6 @@ where
     (0..bit_len.div_ceil(WORD_BITS))
         .map(|_| rng.random::<u64>())
         .collect()
-}
-
-fn popcount_mod_4(word: u64) -> u8 {
-    match word.count_ones() & 3 {
-        0 => 0,
-        1 => 1,
-        2 => 2,
-        _ => 3,
-    }
 }
 
 #[cfg(test)]

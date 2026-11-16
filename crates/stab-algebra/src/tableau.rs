@@ -348,6 +348,7 @@ impl Tableau {
     /// with the same target errors as [`Self::append`]. Only the `2k` generator rows of the `k`
     /// targets change, each becoming a signed product of those rows, so a one- or two-qubit gate
     /// costs `O(n / 64)` word operations and a `k`-qubit gate `O(k^2 n / 64)`.
+    #[inline]
     pub fn prepend(&mut self, gate: &Self, targets: &[usize]) -> StabilizerResult<()> {
         validate_tableau_targets(gate.len(), self.len(), targets)?;
         prepend::prepend(&mut self.rows, gate, targets)
@@ -678,6 +679,7 @@ fn or_shifted(target: &mut [u64], source: &[u64], offset: usize) {
     }
 }
 
+#[inline]
 fn validate_tableau_targets(
     tableau_qubits: usize,
     num_qubits: usize,
@@ -688,6 +690,39 @@ fn validate_tableau_targets(
             tableau_qubits,
             target_count: targets.len(),
         });
+    }
+    match targets {
+        [] => return Ok(()),
+        &[t0] => {
+            return if t0 < num_qubits {
+                Ok(())
+            } else {
+                Err(StabilizerError::TableauTargetOutOfRange {
+                    target: t0,
+                    num_qubits,
+                })
+            };
+        }
+        &[t0, t1] => {
+            if t0 >= num_qubits {
+                return Err(StabilizerError::TableauTargetOutOfRange {
+                    target: t0,
+                    num_qubits,
+                });
+            }
+            if t1 >= num_qubits {
+                return Err(StabilizerError::TableauTargetOutOfRange {
+                    target: t1,
+                    num_qubits,
+                });
+            }
+            return if t0 != t1 {
+                Ok(())
+            } else {
+                Err(StabilizerError::DuplicateTableauTarget { target: t1 })
+            };
+        }
+        _ => {}
     }
     for (index, target) in targets.iter().copied().enumerate() {
         if target >= num_qubits {

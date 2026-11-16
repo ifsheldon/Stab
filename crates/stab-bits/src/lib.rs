@@ -261,18 +261,21 @@ pub struct BitWordsMut<'a> {
 impl Deref for BitWordsMut<'_> {
     type Target = [u64];
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.words
     }
 }
 
 impl DerefMut for BitWordsMut<'_> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.words
     }
 }
 
 impl Drop for BitWordsMut<'_> {
+    #[inline]
     fn drop(&mut self) {
         mask_unused_tail_bits(self.words, self.bit_len);
     }
@@ -314,22 +317,27 @@ impl BitVec {
         Self { words, bit_len }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.bit_len.get()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     pub fn word_count(&self) -> usize {
         self.words.len()
     }
 
+    #[inline]
     pub fn words(&self) -> &[u64] {
         &self.words
     }
 
+    #[inline]
     pub fn words_mut(&mut self) -> BitWordsMut<'_> {
         BitWordsMut {
             words: &mut self.words,
@@ -951,9 +959,13 @@ fn low_bits_mask(bit_count: usize) -> u64 {
     }
 }
 
+#[inline]
 fn mask_unused_tail_bits(words: &mut [u64], bit_len: BitLen) {
-    if let Some(last) = words.last_mut() {
-        *last &= bit_len.last_word_mask();
+    let tail = bit_len.get() % WORD_BITS;
+    if tail != 0
+        && let Some(last) = words.last_mut()
+    {
+        *last &= (1_u64 << tail) - 1;
     }
 }
 

@@ -425,7 +425,7 @@ fn multiply_signed_row_into(
     let half_words = rows.half_words();
     let source_sign = rows.sign(source)?;
     let (target_words, source_words) = rows.row_pair_mut(target, source)?;
-    let log_i = multiply_row_into(target_words, source_words, half_words);
+    let log_i = multiply_row_into(target_words, source_words, half_words)?;
     if log_i & 1 != 0 {
         return Err(StabilizerError::ImaginaryProduct {
             phase: PauliPhase::from_exponent(log_i),

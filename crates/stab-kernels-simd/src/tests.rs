@@ -17,6 +17,7 @@ fn check_level<S: Simd>(simd: S) {
     for word_count in 0..=MAX_WORDS {
         check_xor(simd, word_count);
         check_clifford(simd, word_count);
+        check_pauli_multiply(simd, word_count);
     }
 }
 
@@ -46,6 +47,77 @@ fn check_clifford<S: Simd>(simd: S, word_count: usize) {
     let context = format!("level={:?} words={word_count}", simd.level());
     assert_eq!(actual, expected, "{context}");
     assert_eq!(counts, expected_counts, "{context}");
+}
+
+fn check_pauli_multiply<S: Simd>(simd: S, word_count: usize) {
+    let left_x = words(word_count, 17);
+    let left_z = words(word_count, 29);
+    let right_x = words(word_count, 53);
+    let right_z = words(word_count, 71);
+    assert_pauli_case(simd, &left_x, &left_z, &right_x, &right_z);
+    // Cancelling equal operands produces all-zero output (`has_terms == false`, `log_i == 0`).
+    assert_pauli_case(simd, &left_x, &left_z, &left_x, &left_z);
+    if word_count > 0 {
+        let mut sparse_rx = left_x.clone();
+        sparse_rx[word_count - 1] ^= 1_u64 << 63;
+        assert_pauli_case(simd, &left_x, &left_z, &sparse_rx, &left_z);
+    }
+}
+
+fn assert_pauli_case<S: Simd>(
+    simd: S,
+    left_x: &[u64],
+    left_z: &[u64],
+    right_x: &[u64],
+    right_z: &[u64],
+) {
+    let (expected_x, expected_z, expected_product) =
+        reference_pauli_multiply(left_x, left_z, right_x, right_z);
+    let mut actual_x = left_x.to_vec();
+    let mut actual_z = left_z.to_vec();
+    let product =
+        pauli_right_multiply_words_simd(simd, &mut actual_x, &mut actual_z, right_x, right_z);
+    let context = format!("level={:?} words={}", simd.level(), left_x.len());
+    assert_eq!(actual_x, expected_x, "{context}");
+    assert_eq!(actual_z, expected_z, "{context}");
+    assert_eq!(product, expected_product, "{context}");
+}
+
+/// Independent bit-by-bit Pauli multiplication reference using the 4x4 single-qubit product table.
+fn reference_pauli_multiply(
+    left_x: &[u64],
+    left_z: &[u64],
+    right_x: &[u64],
+    right_z: &[u64],
+) -> (Vec<u64>, Vec<u64>, PauliWordProduct) {
+    let word_count = left_x.len();
+    let mut out_x = vec![0_u64; word_count];
+    let mut out_z = vec![0_u64; word_count];
+    let mut log_i = 0_u8;
+    let mut has_terms = false;
+    for word in 0..word_count {
+        for bit in 0..64 {
+            let lx = (left_x[word] >> bit) & 1;
+            let lz = (left_z[word] >> bit) & 1;
+            let rx = (right_x[word] >> bit) & 1;
+            let rz = (right_z[word] >> bit) & 1;
+            let nx = lx ^ rx;
+            let nz = lz ^ rz;
+            out_x[word] |= nx << bit;
+            out_z[word] |= nz << bit;
+            has_terms |= (nx | nz) != 0;
+            // Encode I=0, X=1, Z=2, Y=3.
+            let l_code = lx | (lz << 1);
+            let r_code = rx | (rz << 1);
+            let delta = match (l_code, r_code) {
+                (1, 3) | (3, 2) | (2, 1) => 1, // X*Y=+iZ, Y*Z=+iX, Z*X=+iY
+                (3, 1) | (2, 3) | (1, 2) => 3, // Y*X=-iZ, Z*Y=-iX, X*Z=-iY
+                _ => 0,
+            };
+            log_i = (log_i + delta) & 3;
+        }
+    }
+    (out_x, out_z, PauliWordProduct { log_i, has_terms })
 }
 
 /// An independent reference: a separately written copy of the plane formula applied one `u64`
@@ -153,6 +225,44 @@ fn public_kernels_match_reference_at_the_detected_level() {
             clifford_right_multiply_words(public_mut(&mut actual), public_ref(&right)).unwrap();
         assert_eq!(actual, expected, "words={word_count}");
         assert_eq!(counts, expected_counts, "words={word_count}");
+
+        let lx = words(word_count, 19);
+        let lz = words(word_count, 37);
+        let rx = words(word_count, 61);
+        let rz = words(word_count, 83);
+        let (exp_x, exp_z, exp_prod) = reference_pauli_multiply(&lx, &lz, &rx, &rz);
+        let mut act_x = lx;
+        let mut act_z = lz;
+        let prod = pauli_right_multiply_words(&mut act_x, &mut act_z, &rx, &rz).unwrap();
+        assert_eq!(act_x, exp_x, "words={word_count}");
+        assert_eq!(act_z, exp_z, "words={word_count}");
+        assert_eq!(prod, exp_prod, "words={word_count}");
+    }
+}
+
+#[test]
+fn pauli_length_mismatch_in_any_plane_is_rejected_without_writing() {
+    for short_plane in 0..4 {
+        let mut planes = [words(5, 1), words(5, 2), words(5, 3), words(5, 4)];
+        planes[short_plane].pop();
+        let [mut lx, mut lz, rx, rz] = planes;
+        let orig_x = lx.clone();
+        let orig_z = lz.clone();
+        let error = pauli_right_multiply_words(&mut lx, &mut lz, &rx, &rz).unwrap_err();
+        let expected = if short_plane == 0 {
+            WordLengthMismatch {
+                expected: 4,
+                actual: 5,
+            }
+        } else {
+            WordLengthMismatch {
+                expected: 5,
+                actual: 4,
+            }
+        };
+        assert_eq!(error, expected, "plane={short_plane}");
+        assert_eq!(lx, orig_x, "plane={short_plane}");
+        assert_eq!(lz, orig_z, "plane={short_plane}");
     }
 }
 
