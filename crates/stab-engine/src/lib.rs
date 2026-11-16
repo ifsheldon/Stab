@@ -12,6 +12,7 @@ mod resource_amount;
 mod sampled_flow;
 mod sampling;
 mod sampling_estimate;
+mod work_poll;
 
 pub use dem_sampling::{
     DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayBatchStatus, DemReplayRecordStore,
@@ -40,7 +41,10 @@ pub use lane_width::LaneWidth;
 pub use probability::biased_randomize_bits;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
 pub use resource_amount::ResourceAmount;
-pub use sampled_flow::{SampledFlowError, sample_if_circuit_has_stabilizer_flows};
+pub use sampled_flow::{
+    SampledFlowError, SampledFlowOptions, sample_if_circuit_has_stabilizer_flows,
+    sample_if_circuit_has_stabilizer_flows_with_options,
+};
 pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{
     CircuitReferenceSampleError, CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy,

@@ -1106,3 +1106,36 @@ fn direct_frame_rejects_anti_hermitian_spp_during_compilation() {
     assert_matches!(error, DetectionCompileError::InvalidCircuit(_));
     assert!(error.to_string().contains("anti-Hermitian"));
 }
+
+/// Detectors and observables wider than the short-parity charge, and wider than one charged
+/// chunk of terms, convert to the parity of all their terms.
+#[test]
+fn wide_detectors_and_observables_convert_to_the_parity_of_every_term() {
+    let repeat = |term: &str, count: usize| vec![term; count].join(" ");
+    let text = format!(
+        "M 0 1 2\nDETECTOR {} {} rec[-3]\nDETECTOR {} rec[-2]\nOBSERVABLE_INCLUDE(0) {} rec[-3]\n",
+        repeat("rec[-1]", 4099),
+        repeat("rec[-2]", 100),
+        repeat("rec[-1]", 64),
+        repeat("rec[-2]", 5001),
+    );
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit(&text))
+        .expect("compile wide conversion");
+    let mut session = plan.session().expect("create conversion session");
+    let records: Vec<Vec<bool>> = (0..8_u8)
+        .map(|bits| (0..3).map(|bit| bits >> bit & 1 == 1).collect())
+        .collect();
+    let input = packed(&records, 3);
+    let mut sink = CollectSink::default();
+    let summary = session
+        .run(MeasurementBatchView::new(input.view()), None, &mut sink)
+        .expect("convert wide parities");
+    assert_eq!(summary.status(), DetectionRunStatus::Completed);
+    for (record, converted) in records.iter().zip(&sink.records) {
+        let [m0, m1, m2] = <[bool; 3]>::try_from(record.as_slice()).expect("three measurements");
+        assert_eq!(converted.detectors, vec![m2 ^ m0, m1]);
+        assert_eq!(converted.observables, vec![m1 ^ m0]);
+    }
+    assert_eq!(sink.records.len(), records.len());
+}

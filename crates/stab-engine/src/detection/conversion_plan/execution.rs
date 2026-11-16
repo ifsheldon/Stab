@@ -1,8 +1,15 @@
-use stab_model::advanced::CancellationCountdown;
 use stab_model::{Cancellation, MeasureRecordOffset, RepeatNestingLimit};
 use std::ops::{BitXor, BitXorAssign};
 
 use crate::detection::{DetectionError, DetectionResult};
+use crate::work_poll::{STEP_UNITS, WORD_OP_UNITS, WorkCountdown};
+
+/// Detectors and observables with at most this many terms are charged as if they had exactly
+/// this many, one constant charge as cheap as a step count in the hot loop.
+pub(super) const SHORT_PARITY_TERMS: usize = 64;
+
+/// Detectors and observables with more terms than this sum their parity in polled chunks.
+const LONG_PARITY_TERMS: usize = 1 << 12;
 
 use super::{
     ConversionOperation, compilation_overflow, compilation_shape_mismatch,
@@ -68,7 +75,7 @@ pub(crate) struct ConversionRunner {
     repeat_stack: [RepeatExecutionFrame; RepeatNestingLimit::HARD_MAX],
     repeat_depth: usize,
     pub(super) cursor: ConversionCursor,
-    countdown: CancellationCountdown,
+    countdown: WorkCountdown,
 }
 
 impl Default for ConversionRunner {
@@ -78,7 +85,7 @@ impl Default for ConversionRunner {
             repeat_stack: [RepeatExecutionFrame::EMPTY; RepeatNestingLimit::HARD_MAX],
             repeat_depth: 0,
             cursor: ConversionCursor::default(),
-            countdown: CancellationCountdown::new(),
+            countdown: WorkCountdown::new(),
         }
     }
 }
@@ -111,7 +118,8 @@ impl ConversionRunner {
                             .ok_or_else(compilation_overflow)?;
                         program_counter = next_program_counter(program_counter)?;
                     }
-                    ConversionOperation::Detector(terms) => {
+                    ConversionOperation::Detector(terms)
+                    | ConversionOperation::WideDetector(terms) => {
                         if cursor.measurement > io.available_measurements {
                             return Ok(ConversionStop::NeedsMeasurements);
                         }
@@ -127,13 +135,14 @@ impl ConversionRunner {
                         let Some(detector) = io.detectors.get_mut(slot) else {
                             return Ok(ConversionStop::DetectorWindowFull);
                         };
-                        countdown.tick(cancellation)?;
-                        *detector = parity_of_terms(
+                        *detector = charged_parity(
                             terms,
                             cursor.measurement,
                             io.measurements,
                             io.measurement_base,
                             io.reference_sample,
+                            &mut countdown,
+                            cancellation,
                         )?;
                         cursor.detector = cursor
                             .detector
@@ -145,13 +154,14 @@ impl ConversionRunner {
                         if cursor.measurement > io.available_measurements {
                             return Ok(ConversionStop::NeedsMeasurements);
                         }
-                        countdown.tick(cancellation)?;
-                        let value = parity_of_terms(
+                        let value = charged_parity(
                             terms,
                             cursor.measurement,
                             io.measurements,
                             io.measurement_base,
                             io.reference_sample,
+                            &mut countdown,
+                            cancellation,
                         )?;
                         let observable = io.observables.get_mut(*id).ok_or_else(|| {
                             DetectionError::invalid_sampler_compilation(format!(
@@ -223,7 +233,7 @@ impl ConversionRunner {
                             program_counter = next_program_counter(program_counter)?;
                         } else {
                             program_counter = frame.body_start;
-                            countdown.tick(cancellation)?;
+                            countdown.charge(STEP_UNITS, cancellation)?;
                         }
                     }
                 }
@@ -258,7 +268,7 @@ pub(super) fn execute_program<Value>(
 where
     Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
 {
-    let mut countdown = CancellationCountdown::new();
+    let mut countdown = WorkCountdown::new();
     let mut repeat_stack = [RepeatExecutionFrame::EMPTY; RepeatNestingLimit::HARD_MAX];
     let mut repeat_depth = 0_usize;
     let mut program_counter = 0_usize;
@@ -272,7 +282,7 @@ where
                 program_counter = next_program_counter(program_counter)?;
             }
             ConversionOperation::Detector(terms) => {
-                countdown.tick(cancellation)?;
+                countdown.charge(short_parity_units::<Value>(), cancellation)?;
                 let value =
                     parity_of_terms(terms, cursor.measurement, measurements, 0, reference_sample)?;
                 let detector = detectors.get_mut(cursor.detector).ok_or_else(|| {
@@ -288,10 +298,39 @@ where
                     .ok_or_else(compilation_overflow)?;
                 program_counter = next_program_counter(program_counter)?;
             }
+            ConversionOperation::WideDetector(terms) => {
+                let value = long_parity(
+                    terms,
+                    cursor.measurement,
+                    measurements,
+                    0,
+                    reference_sample,
+                    &mut countdown,
+                    cancellation,
+                )?;
+                let detector = detectors.get_mut(cursor.detector).ok_or_else(|| {
+                    DetectionError::invalid_sampler_compilation(format!(
+                        "compact conversion detector index {} is out of range",
+                        cursor.detector
+                    ))
+                })?;
+                *detector = value;
+                cursor.detector = cursor
+                    .detector
+                    .checked_add(1)
+                    .ok_or_else(compilation_overflow)?;
+                program_counter = next_program_counter(program_counter)?;
+            }
             ConversionOperation::Observable { id, terms } => {
-                countdown.tick(cancellation)?;
-                let value =
-                    parity_of_terms(terms, cursor.measurement, measurements, 0, reference_sample)?;
+                let value = charged_parity(
+                    terms,
+                    cursor.measurement,
+                    measurements,
+                    0,
+                    reference_sample,
+                    &mut countdown,
+                    cancellation,
+                )?;
                 let observable = observables.get_mut(*id).ok_or_else(|| {
                     DetectionError::invalid_sampler_compilation(format!(
                         "compact conversion observable index {id} is out of range"
@@ -362,7 +401,7 @@ where
                     program_counter = next_program_counter(program_counter)?;
                 } else {
                     program_counter = frame.body_start;
-                    countdown.tick(cancellation)?;
+                    countdown.charge(STEP_UNITS, cancellation)?;
                 }
             }
         }
@@ -390,6 +429,83 @@ fn next_program_counter(program_counter: usize) -> DetectionResult<usize> {
     program_counter
         .checked_add(1)
         .ok_or_else(compilation_overflow)
+}
+
+/// The parity of `terms`, charged to `countdown` first: a constant charge for at most
+/// [`SHORT_PARITY_TERMS`] terms, and [`long_parity`] for more.
+#[inline(always)]
+fn charged_parity<Value>(
+    terms: &[MeasureRecordOffset],
+    measurement_cursor: usize,
+    measurements: RecordValues<'_, Value>,
+    measurement_base: usize,
+    reference_sample: RecordValues<'_, Value>,
+    countdown: &mut WorkCountdown,
+    cancellation: &Cancellation,
+) -> DetectionResult<Value>
+where
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+{
+    if terms.len() > SHORT_PARITY_TERMS {
+        return long_parity(
+            terms,
+            measurement_cursor,
+            measurements,
+            measurement_base,
+            reference_sample,
+            countdown,
+            cancellation,
+        );
+    }
+    countdown.charge(short_parity_units::<Value>(), cancellation)?;
+    parity_of_terms(
+        terms,
+        measurement_cursor,
+        measurements,
+        measurement_base,
+        reference_sample,
+    )
+}
+
+/// The parity of more than [`SHORT_PARITY_TERMS`] terms, summed in chunks of at most
+/// [`LONG_PARITY_TERMS`] terms each charged before it is read.
+#[cold]
+#[inline(never)]
+fn long_parity<Value>(
+    terms: &[MeasureRecordOffset],
+    measurement_cursor: usize,
+    measurements: RecordValues<'_, Value>,
+    measurement_base: usize,
+    reference_sample: RecordValues<'_, Value>,
+    countdown: &mut WorkCountdown,
+    cancellation: &Cancellation,
+) -> DetectionResult<Value>
+where
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+{
+    let units = term_units::<Value>();
+    let mut parity = Value::default();
+    for chunk in terms.chunks(LONG_PARITY_TERMS) {
+        countdown.charge(chunk.len() * units, cancellation)?;
+        parity ^= parity_of_terms(
+            chunk,
+            measurement_cursor,
+            measurements,
+            measurement_base,
+            reference_sample,
+        )?;
+    }
+    Ok(parity)
+}
+
+/// The constant charge of one parity of at most [`SHORT_PARITY_TERMS`] terms.
+const fn short_parity_units<Value>() -> usize {
+    STEP_UNITS + SHORT_PARITY_TERMS * term_units::<Value>()
+}
+
+/// Work units of reading one term of a `Value` record: one unit per 64-bit word it spans.
+const fn term_units<Value>() -> usize {
+    WORD_OP_UNITS * size_of::<Value>().div_ceil(size_of::<u64>())
 }
 
 fn parity_of_terms<Value>(

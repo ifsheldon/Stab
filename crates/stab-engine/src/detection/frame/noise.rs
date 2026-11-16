@@ -2,6 +2,7 @@ use rand::{Rng, RngExt as _};
 
 use super::word::FrameWord;
 use crate::detection::error::{DetectionError, DetectionResult};
+use crate::work_poll::{NOISE_EVENT_UNITS, WorkPoll};
 
 #[derive(Clone, Copy)]
 pub(super) enum FrameExecutionMode<'a, W> {
@@ -88,7 +89,8 @@ pub(super) fn visit_sparse_categorical_events<W: FrameWord, const N: usize>(
     item_count: usize,
     lanes: W,
     rng: &mut impl Rng,
-    mut visitor: impl FnMut(usize, usize, W) -> DetectionResult<()>,
+    poll: &mut WorkPoll<'_>,
+    visitor: impl FnMut(usize, usize, W) -> DetectionResult<()>,
 ) -> DetectionResult<bool> {
     let total = probabilities.iter().copied().sum::<f64>();
     let Some(lane_count) = lanes.prefix_len() else {
@@ -105,9 +107,85 @@ pub(super) fn visit_sparse_categorical_events<W: FrameWord, const N: usize>(
             "categorical detector-frame event space overflowed",
         )
     })?;
+    if position_count <= UNPOLLED_POSITIONS {
+        // At most 2^20 positions at a rate of at most 1/8 expect at most 2^17 events; they are
+        // charged up front, which keeps the common channel's event loop free of polls.
+        let expected_events = (position_count as f64 * total).ceil() as usize + 1;
+        poll.charge(expected_events.saturating_mul(NOISE_EVENT_UNITS))?;
+        sparse_event_loop::<W, N, false>(
+            probabilities,
+            total,
+            position_count,
+            lane_count,
+            rng,
+            poll,
+            visitor,
+        )
+    } else {
+        polled_sparse_event_loop(
+            probabilities,
+            total,
+            position_count,
+            lane_count,
+            rng,
+            poll,
+            visitor,
+        )
+    }
+}
+
+/// The polled walk of a channel with more than [`UNPOLLED_POSITIONS`] positions, out of line so
+/// the common unpolled walk compiles alone into its caller.
+#[inline(never)]
+fn polled_sparse_event_loop<W: FrameWord, const N: usize>(
+    probabilities: [f64; N],
+    total: f64,
+    position_count: usize,
+    lane_count: usize,
+    rng: &mut impl Rng,
+    poll: &mut WorkPoll<'_>,
+    visitor: impl FnMut(usize, usize, W) -> DetectionResult<()>,
+) -> DetectionResult<bool> {
+    sparse_event_loop::<W, N, true>(
+        probabilities,
+        total,
+        position_count,
+        lane_count,
+        rng,
+        poll,
+        visitor,
+    )
+}
+
+/// Visits the events of `position_count` positions; when `POLLED`, it charges `poll` once per
+/// [`EVENTS_PER_CHARGE`] events.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the finite nonnegative geometric gap is bounded by the remaining event positions before conversion"
+)]
+#[inline(always)]
+fn sparse_event_loop<W: FrameWord, const N: usize, const POLLED: bool>(
+    probabilities: [f64; N],
+    total: f64,
+    position_count: usize,
+    lane_count: usize,
+    rng: &mut impl Rng,
+    poll: &mut WorkPoll<'_>,
+    mut visitor: impl FnMut(usize, usize, W) -> DetectionResult<()>,
+) -> DetectionResult<bool> {
     let log_failure = (-total).ln_1p();
     let mut position = 0_usize;
+    let mut charged_until = 0_usize;
+    let mut events = 0_usize;
     while position < position_count {
+        if POLLED {
+            if events == charged_until {
+                poll.charge(EVENTS_PER_CHARGE * NOISE_EVENT_UNITS)?;
+                charged_until = events + EVENTS_PER_CHARGE;
+            }
+            events += 1;
+        }
         let uniform = 1.0 - rng.random::<f64>();
         let gap = (uniform.ln() / log_failure).floor();
         if !gap.is_finite() || gap >= position_count.saturating_sub(position) as f64 {
@@ -133,6 +211,13 @@ pub(super) fn visit_sparse_categorical_events<W: FrameWord, const N: usize>(
     }
     Ok(true)
 }
+
+/// Event positions (items times lanes) up to which a sparse channel is charged up front and
+/// runs without polls.
+const UNPOLLED_POSITIONS: usize = 1 << 20;
+
+/// Sparse noise events charged to the work poll at once.
+const EVENTS_PER_CHARGE: usize = 256;
 
 pub(super) fn for_each_set_lane<W: FrameWord>(mut lanes: W, mut visitor: impl FnMut(W)) {
     while let Some(lane) = lanes.isolate_lowest_one() {

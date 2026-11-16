@@ -12,7 +12,7 @@ use super::{
     DetectionExecutionError, DetectionRunError, DetectionRunProgress, DetectionRunStatus,
     DetectionRunSummary, DetectionSamplingPlan,
 };
-use crate::detection::frame::{FrameLanes, FrameWord};
+use crate::detection::frame::{FrameLanes, FrameWord, sample_or_rewind};
 use crate::detection::streaming::{StreamingDetectionFrame, StreamingDetectionShape};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
 use crate::{LaneWidth, RandomPolicy, ShotCount, SinkFailurePhase};
@@ -108,9 +108,11 @@ impl StreamingDetectionRun {
         self.shots
     }
 
-    /// Executes the run with the sink lifecycle of
-    /// [`super::DetectionSamplingSession::run`]; cooperative cancellation before a batch ends
-    /// the run with [`DetectionRunStatus::Cancelled`] and the sink finalized.
+    /// Executes the run with the sink lifecycle of [`super::DetectionSamplingSession::run`].
+    ///
+    /// Cooperative cancellation, observed before or inside a batch, ends the run with
+    /// [`DetectionRunStatus::Cancelled`], the complete batches delivered, and the sink finalized.
+    /// The run consumed itself, so nothing can resume it; a fresh run restarts the seeded stream.
     pub fn run<Sink>(
         mut self,
         sink: &mut Sink,
@@ -185,9 +187,13 @@ where
         let progress = DetectionRunProgress::new(committed, lanes as u64);
         let engine =
             |source: DetectionExecutionError| DetectionRunError::Engine { source, progress };
-        frame
-            .sample_batch(&plan.inner.direct, lanes, rng, cancellation)
-            .map_err(|error| engine(error.into()))?;
+        let sampled = sample_or_rewind(rng, |rng| {
+            frame.sample_batch(&plan.inner.direct, lanes, rng, cancellation)
+        })
+        .map_err(|error| engine(error.into()))?;
+        if sampled.is_none() {
+            break;
+        }
         let detectors = frame
             .detectors()
             .view()

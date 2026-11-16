@@ -9,7 +9,6 @@
 
 use arrayvec::ArrayVec;
 use stab_algebra::PauliBasis;
-use stab_model::advanced::CancellationCountdown;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, MeasureRecordOffset, RepeatNestingLimit,
 };
@@ -19,6 +18,7 @@ use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
 use crate::sampling::LocalTableauTransform;
+use crate::work_poll::{STEP_UNITS, WorkPoll};
 
 mod lower;
 #[cfg(test)]
@@ -375,16 +375,16 @@ impl CircuitProgram {
 
 /// Executes the flat tape, expanding every repeat iteration.
 ///
-/// The cursor ticks a cancellation countdown once per returned instruction and once per repeat
-/// iteration, so a caller walking an astronomically repeated body observes cancellation within
-/// [`CancellationCountdown::INTERVAL`] bounded steps and receives [`DetectionError::Cancelled`].
+/// The cursor charges its [`WorkPoll`] for every returned instruction and repeat iteration, and
+/// the executor charges the same poll for the targets of each instruction, so a caller walking
+/// an astronomically repeated body or one very wide instruction observes cancellation within a
+/// bounded amount of work and receives [`DetectionError::Cancelled`].
 pub(crate) struct ProgramCursor<'a> {
     entries: &'a [ProgramEntry],
     index: usize,
     end: usize,
     repeats: ArrayVec<RepeatExecutionFrame, { RepeatNestingLimit::HARD_MAX }>,
-    cancellation: &'a Cancellation,
-    countdown: CancellationCountdown,
+    poll: WorkPoll<'a>,
 }
 
 #[derive(Clone, Copy)]
@@ -406,9 +406,13 @@ impl<'a> ProgramCursor<'a> {
             index: start,
             end: end.min(entries.len()),
             repeats: ArrayVec::new(),
-            cancellation,
-            countdown: CancellationCountdown::new(),
+            poll: WorkPoll::new(cancellation),
         }
+    }
+
+    /// The poll the executor charges for the work of each returned instruction.
+    pub(crate) const fn poll(&mut self) -> &mut WorkPoll<'a> {
+        &mut self.poll
     }
 
     #[inline]
@@ -426,7 +430,7 @@ impl<'a> ProgramCursor<'a> {
                 .ok_or_else(program_shape_error)?;
             match entry {
                 ProgramEntry::Instruction(instruction) => {
-                    self.countdown.tick(self.cancellation)?;
+                    self.poll.charge(STEP_UNITS)?;
                     self.index += 1;
                     return Ok(Some(instruction));
                 }
@@ -456,7 +460,7 @@ impl<'a> ProgramCursor<'a> {
                     if frame.remaining > 1 {
                         frame.remaining -= 1;
                         self.index = frame.body_start;
-                        self.countdown.tick(self.cancellation)?;
+                        self.poll.charge(STEP_UNITS)?;
                     } else {
                         self.repeats.pop();
                         self.index += 1;

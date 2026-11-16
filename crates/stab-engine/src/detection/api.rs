@@ -704,10 +704,10 @@ impl DetectionSamplingSession {
     ///
     /// It is the signal of the compiler's [`DetectionConversionLimits`] when that one is
     /// cancellable, and otherwise a session-local signal created by the first call.
-    /// Cancellation observed before a batch starts returns [`DetectionRunStatus::Cancelled`] and
-    /// leaves the session resumable; cancellation observed while a batch is sampled returns
-    /// [`DetectionExecutionError::Cancelled`], finalizes nothing, and poisons the session because
-    /// the random stream has advanced into the discarded batch.
+    /// Cancellation, observed before or inside a batch, returns [`DetectionRunStatus::Cancelled`]
+    /// with the sink finalized and leaves the session resumable: a batch it interrupts is
+    /// discarded with the random stream rewound, so a later run continues the seeded stream
+    /// exactly where the delivered shots end.
     pub fn cancellation(&self) -> Cancellation {
         self.state
             .cancellation
@@ -715,6 +715,8 @@ impl DetectionSamplingSession {
             .clone()
     }
 
+    /// Whether a sink failure or an internal invariant violation stopped an earlier run partway
+    /// through a batch; cancellation never poisons a detection-sampling session.
     pub fn is_poisoned(&self) -> bool {
         self.poisoned
     }

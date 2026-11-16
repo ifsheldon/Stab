@@ -1,8 +1,7 @@
 //! Drives the inverse-tableau reference simulator over the resolved circuit program.
 
 use stab_algebra::PauliBasis;
-use stab_model::advanced::CancellationCountdown;
-use stab_model::{Cancellation, RepeatNestingLimit};
+use stab_model::{Cancellation, Cancelled, RepeatNestingLimit};
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
 use super::reference_bits::ReferenceBits;
@@ -15,7 +14,43 @@ use crate::detection::frame::{
     ReferenceClifford,
 };
 
+use crate::work_poll::{STEP_UNITS, WorkPoll};
+
 pub(super) use super::reference_fold::has_reference_fold_candidate;
+
+/// Unitary target groups applied between two charges of simulator work. A group of the largest
+/// admissible tableau costs a few thousand work units, so a chunk stays far below a poll interval.
+const CLIFFORD_GROUPS_PER_CHARGE: usize = 64;
+
+/// The simulator work already charged to a [`WorkPoll`].
+///
+/// Every simulator primitive adds its [`WorkModel`] estimate, about one unit per copied word, to
+/// the simulator's work counter. The run charges the counter's growth after each target or
+/// small chunk of targets, so a wide instruction or a large tableau polls within a bounded
+/// amount of tableau work.
+struct SimulatorWork {
+    seen: u64,
+}
+
+impl SimulatorWork {
+    fn new(simulator: &InverseTableauSimulator) -> Self {
+        Self {
+            seen: simulator.work(),
+        }
+    }
+
+    #[inline]
+    fn charge(
+        &mut self,
+        simulator: &InverseTableauSimulator,
+        poll: &mut WorkPoll<'_>,
+    ) -> Result<(), Cancelled> {
+        let work = simulator.work();
+        let done = work.saturating_sub(self.seen);
+        self.seen = work;
+        poll.charge(usize::try_from(done).unwrap_or(usize::MAX))
+    }
+}
 
 /// Reusable simulator storage for computing reference samples of one program.
 #[derive(Debug)]
@@ -97,7 +132,8 @@ fn run_entries(
 ) -> Result<(), SamplingExecutionError> {
     let entries = program.entries();
     let mut repeats = arrayvec::ArrayVec::<RepeatFrame, { RepeatNestingLimit::HARD_MAX }>::new();
-    let mut countdown = CancellationCountdown::new();
+    let mut poll = WorkPoll::new(cancellation);
+    let mut work = SimulatorWork::new(simulator);
     let mut index = 0;
     while index < entries.len() {
         let entry = entries
@@ -105,8 +141,15 @@ fn run_entries(
             .ok_or_else(|| run_invariant("reference sampling moved beyond retained operations"))?;
         match entry {
             ProgramEntry::Instruction(instruction) => {
-                countdown.tick(cancellation)?;
-                apply_instruction(program, instruction, simulator, sweep_record, output)?;
+                poll.charge(STEP_UNITS)?;
+                apply_instruction(
+                    program,
+                    instruction,
+                    simulator,
+                    sweep_record,
+                    output,
+                    (&mut poll, &mut work),
+                )?;
                 index += 1;
             }
             ProgramEntry::Repeat { count, body_end } => {
@@ -121,7 +164,7 @@ fn run_entries(
                 let body_start = index + 1;
                 let probe = match snapshot.as_deref_mut() {
                     Some(slot) => {
-                        countdown.tick(cancellation)?;
+                        work.charge(simulator, &mut poll)?;
                         FoldProbe::begin(
                             program,
                             body_start,
@@ -158,7 +201,9 @@ fn run_entries(
                 if let (Some(probe), Some(slot)) = (frame.probe.as_mut(), snapshot.as_deref_mut()) {
                     // A probe step compares whole tableaux, so it polls cancellation directly.
                     cancellation.check()?;
-                    match probe.end_iteration(simulator, slot, output.len())? {
+                    let step = probe.end_iteration(simulator, slot, output.len())?;
+                    work.charge(simulator, &mut poll)?;
+                    match step {
                         ProbeStep::Continue => {}
                         ProbeStep::GiveUp => frame.probe = None,
                         ProbeStep::Fold {
@@ -197,7 +242,7 @@ fn run_entries(
                 if frame.remaining > 1 {
                     frame.remaining -= 1;
                     index = frame.body_start;
-                    countdown.tick(cancellation)?;
+                    poll.charge(STEP_UNITS)?;
                 } else {
                     repeats.pop();
                     index += 1;
@@ -360,28 +405,37 @@ pub(super) fn clifford_group_work(clifford: &ReferenceClifford, model: WorkModel
     }
 }
 
+/// The run's poll and the simulator work it has charged.
+type RunPoll<'p, 'a> = (&'p mut WorkPoll<'a>, &'p mut SimulatorWork);
+
 fn apply_instruction(
     program: &CircuitProgram,
     instruction: &ProgramInstruction,
     simulator: &mut InverseTableauSimulator,
     sweep_record: &[bool],
     output: &mut ReferenceBits,
+    (poll, work): RunPoll<'_, '_>,
 ) -> Result<(), SamplingExecutionError> {
     match instruction {
         ProgramInstruction::Clifford {
             reference, targets, ..
-        } => apply_clifford(
-            program
+        } => {
+            let clifford = program
                 .reference_clifford(*reference)
-                .map_err(program_error)?,
-            targets,
-            simulator,
-        )
-        .map_err(simulator_error),
-        ProgramInstruction::Reset { basis, targets } => targets
-            .iter()
-            .try_for_each(|&qubit| simulator.reset(qubit, *basis))
-            .map_err(simulator_error),
+                .map_err(program_error)?;
+            for chunk in targets.chunks(clifford_arity(clifford) * CLIFFORD_GROUPS_PER_CHARGE) {
+                apply_clifford(clifford, chunk, simulator).map_err(simulator_error)?;
+                work.charge(simulator, poll)?;
+            }
+            Ok(())
+        }
+        ProgramInstruction::Reset { basis, targets } => {
+            for &qubit in targets {
+                simulator.reset(qubit, *basis).map_err(simulator_error)?;
+                work.charge(simulator, poll)?;
+            }
+            Ok(())
+        }
         ProgramInstruction::Measure {
             basis,
             reset,
@@ -398,6 +452,7 @@ fn apply_instruction(
                         .apply_pauli(qubit, reset_correction(*basis))
                         .map_err(simulator_error)?;
                 }
+                work.charge(simulator, poll)?;
             }
             Ok(())
         }
@@ -417,6 +472,7 @@ fn apply_instruction(
                 let flip = inverted.get(2 * index).copied().unwrap_or(false)
                     ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
                 output.push(measured ^ flip);
+                work.charge(simulator, poll)?;
             }
             Ok(())
         }
@@ -425,6 +481,7 @@ fn apply_instruction(
                 let (terms, inverted) = product.map_err(program_error)?;
                 let measured = simulator.measure_product(terms).map_err(simulator_error)?;
                 output.push(measured ^ inverted);
+                work.charge(simulator, poll)?;
             }
             Ok(())
         }
@@ -476,9 +533,19 @@ fn apply_instruction(
                     }
                 }
                 .map_err(simulator_error)?;
+                work.charge(simulator, poll)?;
             }
             Ok(())
         }
+    }
+}
+
+/// Targets of one application of `clifford`.
+fn clifford_arity(clifford: &ReferenceClifford) -> usize {
+    match clifford {
+        ReferenceClifford::Hadamard => 1,
+        ReferenceClifford::ControlledX => 2,
+        ReferenceClifford::Tableau { transform, .. } => transform.target_count().max(1),
     }
 }
 
@@ -513,6 +580,7 @@ pub(super) fn count_determined_measurements(
     let mut record = ReferenceBits::default();
     let mut count = 0_u64;
     let mut cursor = program.cursor(cancellation);
+    let mut work = SimulatorWork::new(&simulator);
     while let Some(instruction) = cursor.next_instruction().map_err(program_error)? {
         match instruction {
             ProgramInstruction::Measure {
@@ -536,6 +604,7 @@ pub(super) fn count_determined_measurements(
                             .apply_pauli(qubit, reset_correction(*basis))
                             .map_err(simulator_error)?;
                     }
+                    work.charge(&simulator, cursor.poll())?;
                 }
             }
             ProgramInstruction::MeasurePairs {
@@ -558,6 +627,7 @@ pub(super) fn count_determined_measurements(
                     let flip = inverted.get(2 * index).copied().unwrap_or(false)
                         ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
                     record.push(measured ^ flip);
+                    work.charge(&simulator, cursor.poll())?;
                 }
             }
             ProgramInstruction::PauliProducts(measurement) => {
@@ -566,6 +636,7 @@ pub(super) fn count_determined_measurements(
                     count += u64::from(simulator.is_deterministic(terms).map_err(simulator_error)?);
                     let measured = simulator.measure_product(terms).map_err(simulator_error)?;
                     record.push(measured ^ inverted);
+                    work.charge(&simulator, cursor.poll())?;
                 }
             }
             ProgramInstruction::MeasurePads { .. } => {
@@ -601,9 +672,17 @@ pub(super) fn count_determined_measurements(
                         ControlledPair::Record { .. } | ControlledPair::Sweep { .. } => Ok(()),
                     }
                     .map_err(simulator_error)?;
+                    work.charge(&simulator, cursor.poll())?;
                 }
             }
-            other => apply_instruction(program, other, &mut simulator, &[], &mut record)?,
+            other => apply_instruction(
+                program,
+                other,
+                &mut simulator,
+                &[],
+                &mut record,
+                (cursor.poll(), &mut work),
+            )?,
         }
     }
     Ok(count)

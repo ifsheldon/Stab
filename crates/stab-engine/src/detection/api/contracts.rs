@@ -51,7 +51,8 @@ pub enum DetectionExecutionError {
     #[error("detection execution violated an internal batch invariant: {message}")]
     InternalInvariant { message: String },
 
-    /// Cancellation was observed while a detection-sampling batch was being sampled.
+    /// Cancellation was observed by an engine step. Sessions report cooperative cancellation
+    /// as [`DetectionRunStatus::Cancelled`] instead, so a run does not return this variant.
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
 }

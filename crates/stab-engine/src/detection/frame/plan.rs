@@ -11,6 +11,7 @@ use crate::detection::error::{
 };
 use crate::detection::{ConversionPlan, DetectionConversionLimits};
 use crate::sampling::ReferenceBits;
+use crate::work_poll::WorkPoll;
 
 /// Shots in one frame batch of the widest lane word, [`FrameLanes`]: the default for circuit
 /// sampling and detection sampling, and the only width of measurement-to-detection conversion and
@@ -353,7 +354,8 @@ impl<W: FrameWord> FrameBatchState<W> {
         cancellation: &Cancellation,
         window: Option<&mut PlaneWindow<'_, W>>,
     ) -> DetectionResult<()> {
-        self.frame.reset(rng, mode);
+        self.frame
+            .reset(rng, mode, &mut WorkPoll::new(cancellation))?;
         match window {
             None => self
                 .frame

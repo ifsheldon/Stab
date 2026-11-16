@@ -320,6 +320,7 @@ fn warmed_session_allocation_does_not_scale_with_shot_count() {
     }
 }
 
+mod resume;
 mod storage_policy;
 
 /// Circuits whose only work is one Z measurement, optionally after one single-qubit Pauli

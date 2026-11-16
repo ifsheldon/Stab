@@ -10,7 +10,7 @@ use super::{
 };
 use crate::detection::frame::{
     DeliveryFailure, DeliveryOutcome, FrameBatchSource, FrameBatchState, FrameLanes, FrameWord,
-    LaneFrameBatch, PendingLanes,
+    LaneFrameBatch, PendingLanes, Refill, sample_or_rewind,
 };
 use crate::sampling::session_cancellation;
 use crate::{LaneWidth, RandomPolicy, ShotCount, SinkFailurePhase};
@@ -133,10 +133,16 @@ where
         self.cancellation.is_cancelled()
     }
 
-    fn refill(&mut self) -> Result<(), Self::Error> {
-        self.direct
-            .sample_batch(self.frame, self.rng, W::LANE_COUNT, self.cancellation)
-            .map_err(|source| DetectionDeliveryError::Engine(source.into()))
+    fn refill(&mut self) -> Result<Refill, Self::Error> {
+        let (direct, frame, cancellation) = (self.direct, &mut *self.frame, self.cancellation);
+        let sampled = sample_or_rewind(self.rng, |rng| {
+            direct.sample_batch(frame, rng, W::LANE_COUNT, cancellation)
+        })
+        .map_err(|source| DetectionDeliveryError::Engine(source.into()))?;
+        Ok(match sampled {
+            Some(()) => Refill::Sampled,
+            None => Refill::Cancelled,
+        })
     }
 
     fn deliver(&mut self, lanes: usize) -> Result<(), Self::Error> {

@@ -3,7 +3,8 @@
 //! A materializing session keeps every measurement plane of a batch and delivers lane prefixes
 //! through the shared [`PendingLanes`] loop, so undelivered lanes survive for the next run. A
 //! streaming run hands the planes over in bounded windows and keeps shot-major records of only
-//! the lanes it delivers.
+//! the lanes it delivers. Either way a batch reaches the sink only once it is complete, and a
+//! batch that observes cancellation is discarded with the random stream rewound.
 
 use rand::rngs::SmallRng;
 use stab_model::Cancellation;
@@ -13,7 +14,8 @@ use super::{SamplingExecutionError, ShotCount};
 use crate::detection::DetectionError;
 use crate::detection::frame::{
     CircuitProgram, DeliveryFailure, DeliveryOutcome, FrameBatchSource, FrameBatchState, FrameWord,
-    PendingLanes, PlaneWindow, SampledRecords, ShotRecordTransposer, WindowShape,
+    PendingLanes, PlaneWindow, Refill, SampledRecords, ShotRecordTransposer, WindowShape,
+    sample_or_rewind,
 };
 use crate::sampling::ReferenceBits;
 
@@ -88,13 +90,18 @@ where
         self.cancellation.is_cancelled()
     }
 
-    fn refill(&mut self) -> Result<(), Self::Error> {
+    fn refill(&mut self) -> Result<Refill, Self::Error> {
         let Some(state) = self.frame.as_deref_mut() else {
-            return Ok(());
+            return Ok(Refill::Sampled);
         };
-        state
-            .sample_measurements(self.program, self.rng, self.cancellation)
-            .map_err(|error| SamplingDeliveryError::Engine(frame_error(error)))?;
+        let (program, cancellation) = (self.program, self.cancellation);
+        let sampled = sample_or_rewind(self.rng, |rng| {
+            state.sample_measurements(program, rng, cancellation)
+        })
+        .map_err(|error| SamplingDeliveryError::Engine(frame_error(error)))?;
+        if sampled.is_none() {
+            return Ok(Refill::Cancelled);
+        }
         if let Some(reference) = self.reference {
             state.xor_reference(reference).map_err(|error| {
                 SamplingDeliveryError::Engine(SamplingExecutionError::InternalInvariant {
@@ -102,7 +109,7 @@ where
                 })
             })?;
         }
-        Ok(())
+        Ok(Refill::Sampled)
     }
 
     fn deliver(&mut self, lanes: usize) -> Result<(), Self::Error> {
@@ -153,7 +160,8 @@ where
     /// Delivers `shots` shots in fresh batches, each keeping only the lanes it delivers.
     ///
     /// Every batch samples all `W::LANE_COUNT` lanes, so the random stream and the delivered
-    /// records equal those of a materializing session's first run of `shots` shots.
+    /// records equal those of a materializing session's first run of `shots` shots. A batch that
+    /// observes cancellation ends the loop as if it had been observed before that batch.
     pub(super) fn deliver(
         self,
         shots: ShotCount,
@@ -182,10 +190,16 @@ where
                 reference: flips,
             };
             let mut window = PlaneWindow::new(frame.shape, &mut consumer);
-            frame
-                .state
-                .sample_measurement_window(self.program, self.rng, self.cancellation, &mut window)
-                .map_err(|error| failure(SamplingDeliveryError::Engine(frame_error(error))))?;
+            let (program, cancellation) = (self.program, self.cancellation);
+            let sampled = sample_or_rewind(self.rng, |rng| {
+                frame
+                    .state
+                    .sample_measurement_window(program, rng, cancellation, &mut window)
+            })
+            .map_err(|error| failure(SamplingDeliveryError::Engine(frame_error(error))))?;
+            if sampled.is_none() {
+                break;
+            }
             let view = frame
                 .records
                 .view()

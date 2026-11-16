@@ -6,8 +6,8 @@
 
 //! Cooperative cancellation and sink-failure contracts of every engine session.
 //!
-//! Each workload repeats its body 10^12 times inside the memory budget, so it can only return by
-//! observing its cancellation signal. The worker reports when it is about to start the call; the
+//! Each endless workload repeats its body 10^12 times inside the memory budget, so it can only
+//! return by observing its cancellation signal. The worker reports when it is about to start the call; the
 //! test cancels shortly after, and the deadline only guards against a hang.
 
 use std::assert_matches;
@@ -19,8 +19,8 @@ use stab_engine::{
     DemReplayBatchStatus, DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError,
     DemSamplingRunError, DetectionCompileError, DetectionConversionLimits, DetectionError,
     DetectionExecutionError, DetectionRunError, DetectionRunStatus, DetectionSamplingCompiler,
-    LaneWidth, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, RunError,
-    SamplingCompiler, SamplingExecutionError, Seed, ShotCount, SinkFailurePhase,
+    LaneWidth, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode, SamplingCompiler,
+    SamplingExecutionError, SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
 };
 use stab_model::{Cancellation, Cancelled, Circuit, DetectorErrorModel};
 use stab_records::{
@@ -166,11 +166,11 @@ fn reference_sample_computation_stops_when_cancelled() {
 }
 
 #[test]
-fn sampling_batch_stops_without_delivering_a_partial_batch() {
+fn sampling_batch_cancellation_delivers_no_partial_batch_and_stays_resumable() {
     for &lane_width in LaneWidth::ALL {
         let cancellation = Cancellation::new();
         let signal = cancellation.clone();
-        let (result, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
+        let (summary, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
             let plan = SamplingCompiler::new()
                 .cancellation(signal)
                 .compile(&circuit(ENDLESS_SAMPLING))
@@ -184,30 +184,24 @@ fn sampling_batch_stops_without_delivering_a_partial_batch() {
                 .expect("skip-reference session needs no reference simulation");
             let mut sink = CountingSink::default();
             started();
-            let result = session.run(ShotCount::new(1), &mut sink);
-            (result, sink, session.is_poisoned())
+            let summary = session
+                .run(ShotCount::new(1), &mut sink)
+                .expect("an in-batch sampling cancellation is not a failure");
+            (summary, sink, session.is_poisoned())
         });
-        match result {
-            Err(RunError::Engine {
-                source: SamplingExecutionError::Cancelled(Cancelled),
-                progress,
-            }) => assert_eq!(progress.committed_shots(), ShotCount::new(0)),
-            other => panic!("expected an in-batch cancellation at {lane_width:?}, got {other:?}"),
-        }
-        assert_eq!((sink.writes, sink.finishes), (0, 0));
-        assert!(
-            poisoned,
-            "the random stream advanced into the discarded batch"
-        );
+        assert_eq!(summary.status(), SamplingRunStatus::Cancelled);
+        assert_eq!(summary.committed_shots(), ShotCount::new(0));
+        assert_eq!((sink.writes, sink.finishes), (0, 1));
+        assert!(!poisoned, "the interrupted batch rewinds its random stream");
     }
 }
 
 #[test]
-fn detection_sampling_batch_stops_without_delivering_a_partial_batch() {
+fn detection_sampling_batch_cancellation_delivers_no_partial_batch_and_stays_resumable() {
     for &lane_width in LaneWidth::ALL {
         let cancellation = Cancellation::new();
         let signal = cancellation.clone();
-        let (result, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
+        let (summary, sink, poisoned) = cancel_while_running(&cancellation, move |started| {
             let plan = DetectionSamplingCompiler::new()
                 .limits(DetectionConversionLimits::default().with_cancellation(signal))
                 .compile(&circuit(ENDLESS_SAMPLING))
@@ -217,18 +211,154 @@ fn detection_sampling_batch_stops_without_delivering_a_partial_batch() {
                 .expect("create detection session");
             let mut sink = CountingSink::default();
             started();
-            let result = session.run(ShotCount::new(1), &mut sink);
-            (result, sink, session.is_poisoned())
+            let summary = session
+                .run(ShotCount::new(1), &mut sink)
+                .expect("an in-batch detection cancellation is not a failure");
+            (summary, sink, session.is_poisoned())
         });
-        match result {
-            Err(DetectionRunError::Engine {
-                source: DetectionExecutionError::Cancelled(Cancelled),
-                progress,
-            }) => assert_eq!(progress.committed_shots(), ShotCount::new(0)),
-            other => panic!("expected an in-batch cancellation at {lane_width:?}, got {other:?}"),
+        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert_eq!(summary.committed_shots(), ShotCount::new(0));
+        assert_eq!((sink.writes, sink.finishes), (0, 1));
+        assert!(!poisoned, "the interrupted batch rewinds its random stream");
+    }
+}
+
+#[test]
+fn streaming_runs_stop_inside_a_batch_with_the_sink_finalized() {
+    for &lane_width in LaneWidth::ALL {
+        let cancellation = Cancellation::new();
+        let signal = cancellation.clone();
+        let (summary, sink) = cancel_while_running(&cancellation, move |started| {
+            let run = SamplingCompiler::new()
+                .cancellation(signal)
+                .compile(&circuit(ENDLESS_SAMPLING))
+                .expect("compile endless sampler")
+                .streaming_run(
+                    RandomPolicy::Seeded(Seed::new(3)),
+                    ReferenceSampleMode::SkipReferenceSample,
+                    lane_width,
+                    ShotCount::new(1),
+                )
+                .expect("prepare streaming run");
+            let mut sink = CountingSink::default();
+            started();
+            let summary = run
+                .run(&mut sink)
+                .expect("an in-batch streaming cancellation is not a failure");
+            (summary, sink)
+        });
+        assert_eq!(summary.status(), SamplingRunStatus::Cancelled);
+        assert_eq!((sink.writes, sink.finishes), (0, 1));
+
+        let cancellation = Cancellation::new();
+        let signal = cancellation.clone();
+        let (summary, sink) = cancel_while_running(&cancellation, move |started| {
+            let run = DetectionSamplingCompiler::new()
+                .limits(DetectionConversionLimits::default().with_cancellation(signal))
+                .compile(&circuit(ENDLESS_SAMPLING))
+                .expect("compile endless detection sampler")
+                .streaming_run(
+                    RandomPolicy::Seeded(Seed::new(5)),
+                    lane_width,
+                    ShotCount::new(1),
+                )
+                .expect("prepare streaming detection run");
+            let mut sink = CountingSink::default();
+            started();
+            let summary = run
+                .run(&mut sink)
+                .expect("an in-batch streaming cancellation is not a failure");
+            (summary, sink)
+        });
+        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert_eq!((sink.writes, sink.finishes), (0, 1));
+    }
+}
+
+/// A session cancelled from another thread at an arbitrary point, between or inside batches, and
+/// resumed after a reset delivers exactly the uninterrupted seeded stream.
+#[test]
+fn a_session_cancelled_from_another_thread_resumes_byte_identically() {
+    const SHOTS: u64 = 1500;
+    let noisy = circuit(
+        "REPEAT 400 {\n    DEPOLARIZE1(0.3) 0 1 2 3 4 5 6 7\n    CX 0 1 2 3 4 5 6 7\n    \
+         M(0.1) 0 1 2 3\n}\n",
+    );
+    for &lane_width in LaneWidth::ALL {
+        let reference = RecordingSink::run_to_end(&noisy, None, lane_width, SHOTS);
+        let cancellation = Cancellation::new();
+        let signal = cancellation.clone();
+        let fixture = noisy.clone();
+        let resumed = cancel_while_running(&cancellation, move |started| {
+            RecordingSink::run_to_end(&fixture, Some((signal, started)), lane_width, SHOTS)
+        });
+        assert!(
+            resumed == reference,
+            "resumed output diverged at {lane_width:?}"
+        );
+    }
+}
+
+/// Collects every delivered measurement record.
+#[derive(Debug, Default, PartialEq)]
+struct RecordingSink(Vec<Vec<bool>>);
+
+impl MeasurementSink for RecordingSink {
+    type Error = SinkFailed;
+
+    fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
+        for shot in 0..batch.shot_count() {
+            self.0.push(
+                (0..batch.width().get())
+                    .map(|bit| batch.get(shot, bit).expect("measurement bit"))
+                    .collect(),
+            );
         }
-        assert_eq!((sink.writes, sink.finishes), (0, 0));
-        assert!(poisoned);
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+impl RecordingSink {
+    /// Samples `shots` shots of `fixture`; with a signal, the first run is cancellable, and once
+    /// it stops the signal is reset and the session resumed for the remaining shots.
+    fn run_to_end(
+        fixture: &Circuit,
+        cancellable: Option<(Cancellation, &dyn Fn())>,
+        lane_width: LaneWidth,
+        shots: u64,
+    ) -> Vec<Vec<bool>> {
+        let mut compiler = SamplingCompiler::new();
+        if let Some((signal, _)) = &cancellable {
+            compiler = compiler.cancellation(signal.clone());
+        }
+        let plan = compiler.compile(fixture).expect("compile noisy fixture");
+        let mut session = plan
+            .session_with_lane_width(
+                RandomPolicy::Seeded(Seed::new(17)),
+                ReferenceSampleMode::UseReferenceSample,
+                lane_width,
+            )
+            .expect("create session");
+        let mut sink = Self::default();
+        let mut remaining = shots;
+        if let Some((signal, started)) = &cancellable {
+            started();
+            let summary = session
+                .run(ShotCount::new(shots), &mut sink)
+                .expect("a cancelled run is not a failure");
+            assert!(!session.is_poisoned());
+            remaining -= summary.committed_shots().get();
+            signal.reset();
+        }
+        let summary = session
+            .run(ShotCount::new(remaining), &mut sink)
+            .expect("resume the session");
+        assert_eq!(summary.status(), SamplingRunStatus::Completed);
+        sink.0
     }
 }
 

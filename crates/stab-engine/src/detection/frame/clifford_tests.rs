@@ -24,6 +24,7 @@ use super::BitPlaneDetectionFrame;
 use super::noise::FrameExecutionMode;
 use super::program::{CircuitProgram, ProgramOptions};
 use super::word::FrameWord;
+use crate::work_poll::WorkPoll;
 
 const FRAME_QUBITS: usize = 300;
 const SINGLE_QUBIT_TARGETS: [usize; 10] = [0, 63, 64, 65, 127, 128, 255, 256, 299, 64];
@@ -225,13 +226,18 @@ fn assert_warmed_execution_does_not_allocate<W: FrameWord>(program: &CircuitProg
     };
     let mut frame = BitPlaneDetectionFrame::<W>::try_reusable(program.frame_qubit_count(), 16, 0)
         .expect("frame fixture");
-    frame.reset(&mut rng, mode);
+    let never = stab_model::Cancellation::never();
+    frame
+        .reset(&mut rng, mode, &mut WorkPoll::new(&never))
+        .expect("reset frame");
     frame
         .execute_program(program, &mut rng, mode, &stab_model::Cancellation::never())
         .expect("warm Pauli product execution");
     let measured = allocation_counter::measure(|| {
         for _ in 0..64 {
-            frame.reset(&mut rng, mode);
+            frame
+                .reset(&mut rng, mode, &mut WorkPoll::new(&never))
+                .expect("reset frame");
             frame
                 .execute_program(program, &mut rng, mode, &stab_model::Cancellation::never())
                 .expect("execute warmed Pauli products");

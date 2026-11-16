@@ -8,10 +8,11 @@ use std::str::FromStr;
 
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_engine::{
-    RandomPolicy, SampledFlowError, SamplingExecutionError, Seed, ShotCount,
-    sample_if_circuit_has_stabilizer_flows,
+    RandomPolicy, SampledFlowError, SampledFlowOptions, SamplingCompileError,
+    SamplingExecutionError, Seed, ShotCount, sample_if_circuit_has_stabilizer_flows,
+    sample_if_circuit_has_stabilizer_flows_with_options,
 };
-use stab_model::Circuit;
+use stab_model::{Cancellation, Circuit, MemoryBudget};
 
 #[test]
 fn sampled_signed_flow_semantics_match_stim() {
@@ -246,6 +247,96 @@ fn sampled_flow_compacts_sparse_qubits_and_ignores_coordinate_only_width() {
         )
         .expect("sample sparse high flows"),
         vec![true, false]
+    );
+}
+
+/// Bytes a typed admission refusal says its stage needs, or `None` for any other failure.
+fn refused_bytes(error: &SampledFlowError) -> Option<u64> {
+    match error {
+        SampledFlowError::SamplingExecution(SamplingExecutionError::SessionStorageLimit {
+            estimated_bytes,
+            ..
+        }) => u64::try_from(*estimated_bytes).ok(),
+        SampledFlowError::SamplingCompile(SamplingCompileError::CompiledBytesLimit {
+            required,
+            ..
+        }) => Some(*required),
+        _ => None,
+    }
+}
+
+#[test]
+fn sampled_flow_admits_every_stage_against_one_caller_budget() {
+    // Many measurements make the sampling session larger than the witness simulator, so the
+    // compiled plan's session must be admitted against the caller's budget for the walk below
+    // to need more than the simulator's figure.
+    let checked = circuit("R 2 3\nX 1 3\nREPEAT 4000 {\n    M 0 1\n}\n");
+    let flows = [flow("Z0 -> Z0"), flow("1 -> -Z3"), flow("Z1 -> Z1")];
+    let run = |bytes: u64| {
+        sample_if_circuit_has_stabilizer_flows_with_options(
+            &checked,
+            &flows,
+            ShotCount::new(256),
+            RandomPolicy::Seeded(Seed::new(41)),
+            SampledFlowOptions {
+                memory_budget: MemoryBudget::from_bytes(bytes),
+                ..SampledFlowOptions::default()
+            },
+        )
+    };
+    // Each refusal reports what its stage needs; raising the budget to it reaches the next
+    // stage, so the walk ends at the smallest budget every stage of every flow admits.
+    let mut required = 0_u64;
+    let mut refusals = 0_usize;
+    let verdicts = loop {
+        match run(required) {
+            Ok(verdicts) => break verdicts,
+            Err(error) => {
+                let needed = refused_bytes(&error).expect("a typed admission refusal");
+                assert!(needed > required, "{error}");
+                required = needed;
+                refusals += 1;
+            }
+        }
+    };
+    assert_eq!(
+        verdicts,
+        sample_if_circuit_has_stabilizer_flows(
+            &checked,
+            &flows,
+            ShotCount::new(256),
+            RandomPolicy::Seeded(Seed::new(41)),
+        )
+        .expect("default budget")
+    );
+    assert_eq!(verdicts, vec![true, true, false]);
+    assert!(
+        refusals >= 2,
+        "the session stage must refuse after the simulator stage admits"
+    );
+    let short = run(required - 1).expect_err("one byte short of the requirement");
+    assert!(
+        refused_bytes(&short).is_some(),
+        "a budget one byte short must fail admission, got {short}"
+    );
+}
+
+#[test]
+fn sampled_flow_reports_cancellation_instead_of_a_verdict() {
+    let cancellation = Cancellation::new();
+    cancellation.cancel();
+    assert_matches!(
+        sample_if_circuit_has_stabilizer_flows_with_options(
+            &circuit("H 0\nM 0\n"),
+            &[flow("X0 -> rec[-1]")],
+            ShotCount::new(256),
+            RandomPolicy::Seeded(Seed::new(43)),
+            SampledFlowOptions {
+                cancellation,
+                ..SampledFlowOptions::default()
+            },
+        ),
+        Err(SampledFlowError::Cancelled(_))
     );
 }
 

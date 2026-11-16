@@ -484,8 +484,9 @@ impl StreamingSamplingRun {
 
     /// Executes the run with the sink lifecycle of [`SamplingSession::run`].
     ///
-    /// Cooperative cancellation before a batch ends the run with
-    /// [`SamplingRunStatus::Cancelled`] and the sink finalized; nothing can resume it.
+    /// Cooperative cancellation, observed before or inside a batch, ends the run with
+    /// [`SamplingRunStatus::Cancelled`], the complete batches delivered, and the sink finalized.
+    /// The run consumed itself, so nothing can resume it; a fresh run restarts the seeded stream.
     pub fn run<Sink>(mut self, sink: &mut Sink) -> Result<SamplingRunSummary, RunError<Sink::Error>>
     where
         Sink: MeasurementSink,
@@ -628,7 +629,8 @@ pub enum SamplingExecutionError {
     #[error("sampling execution violated an internal batch invariant: {message}")]
     InternalInvariant { message: String },
 
-    /// Cancellation was observed inside a batch or while computing the reference sample.
+    /// Cancellation was observed while computing the reference sample, which creating a session
+    /// that uses it does first; the plan caches nothing, so a later call starts it again.
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
 }
@@ -850,6 +852,9 @@ impl SamplingSession {
         self.cancellation.get_or_init(Cancellation::new).clone()
     }
 
+    /// Whether a sink failure or an internal invariant violation stopped an earlier run partway
+    /// through a batch, after which every run fails with [`SamplingExecutionError::SessionPoisoned`].
+    /// Cancellation never poisons a session.
     pub const fn is_poisoned(&self) -> bool {
         self.poisoned
     }
@@ -882,11 +887,12 @@ impl SamplingSession {
     /// engine failure stops immediately without finalization because the sink may already contain
     /// an unknown partial prefix.
     ///
-    /// Cancellation observed before a batch starts returns [`SamplingRunStatus::Cancelled`] and
-    /// leaves the session resumable with an unchanged seeded stream. Cancellation observed while a
-    /// batch is being sampled discards that batch, returns
-    /// [`SamplingExecutionError::Cancelled`] without finalizing the sink, and poisons the session,
-    /// because the random stream has already advanced into the discarded batch.
+    /// Cancellation returns [`SamplingRunStatus::Cancelled`] with the shots delivered so far and
+    /// the sink finalized, and leaves the session resumable: wherever it is observed, before or
+    /// inside a batch, the sink holds only complete batches, and a batch it interrupts is
+    /// discarded with the random stream rewound to where that batch began. A later run on the
+    /// same session (after [`Cancellation::reset`]) therefore continues the seeded stream exactly
+    /// where the delivered shots end, as if the cancelled run had asked for only those shots.
     ///
     /// A zero-shot request neither calls nor finalizes the sink.
     pub fn run<Sink>(

@@ -12,6 +12,7 @@ use stab_records::{PackedShotBatch, PackedShotBatchView};
 use super::program::CircuitProgram;
 use super::word::FrameWord;
 use crate::detection::error::{DetectionError, DetectionResult};
+use crate::work_poll::{WORD_OP_UNITS, WorkPoll};
 
 /// Bytes of planes one window holds before it is handed over, independent of the circuit.
 pub(crate) const WINDOW_TARGET_BYTES: usize = 1 << 20;
@@ -104,8 +105,15 @@ pub(crate) trait PlaneConsumer<W> {
     /// `planes` holds the planes with absolute indices `base..base + planes.len()`; `last` marks
     /// the final hand-over of the batch, after which every plane must have been consumed.
     ///
-    /// Returns the absolute index before which the consumer will never read a plane again.
-    fn consume(&mut self, base: usize, planes: &[W], last: bool) -> DetectionResult<usize>;
+    /// Returns the absolute index before which the consumer will never read a plane again. The
+    /// consumer charges `poll` for its work, so a hand-over of a wide window stays cancellable.
+    fn consume(
+        &mut self,
+        base: usize,
+        planes: &[W],
+        last: bool,
+        poll: &mut WorkPoll<'_>,
+    ) -> DetectionResult<usize>;
 }
 
 /// A frame's view of its consumer while one streaming batch executes.
@@ -131,8 +139,9 @@ impl<'a, W> PlaneWindow<'a, W> {
         base: usize,
         planes: &mut Vec<W>,
         last: bool,
+        poll: &mut WorkPoll<'_>,
     ) -> DetectionResult<usize> {
-        let released = self.consumer.consume(base, planes, last)?;
+        let released = self.consumer.consume(base, planes, last, poll)?;
         if last {
             return Ok(base);
         }
@@ -218,12 +227,14 @@ impl ShotRecordTransposer {
 
     /// Transposes the planes from the last transposed one up to `upto` (a multiple of 64 unless
     /// it is the record's end), XOR-ing `flips` (packed, one bit per plane) into every record.
+    /// Each scratch group of planes is charged to `poll` before it is transposed.
     pub(crate) fn transpose_until<W: FrameWord>(
         &mut self,
         base: usize,
         planes: &[W],
         upto: usize,
         flips: &[u64],
+        poll: &mut WorkPoll<'_>,
     ) -> DetectionResult<()> {
         if self.done < base || upto < self.done || upto > base + planes.len() {
             return Err(DetectionError::invalid_sampler_compilation(format!(
@@ -233,8 +244,10 @@ impl ShotRecordTransposer {
             )));
         }
         let mut start = self.done;
+        let blocks = self.lanes.div_ceil(WORD_BITS);
         while start < upto {
             let group_end = upto.min(start + GROUP_PLANES);
+            poll.charge((group_end - start) * blocks * WORD_OP_UNITS)?;
             self.transpose_group(base, planes, start, group_end, flips)?;
             start = group_end;
         }
@@ -294,11 +307,17 @@ pub(crate) struct SampledRecords<'a> {
 }
 
 impl<W: FrameWord> PlaneConsumer<W> for SampledRecords<'_> {
-    fn consume(&mut self, base: usize, planes: &[W], last: bool) -> DetectionResult<usize> {
+    fn consume(
+        &mut self,
+        base: usize,
+        planes: &[W],
+        last: bool,
+        poll: &mut WorkPoll<'_>,
+    ) -> DetectionResult<usize> {
         let end = base + planes.len();
         let upto = if last { end } else { end - end % WORD_BITS };
         self.records
-            .transpose_until(base, planes, upto, self.reference)?;
+            .transpose_until(base, planes, upto, self.reference, poll)?;
         Ok(upto)
     }
 }

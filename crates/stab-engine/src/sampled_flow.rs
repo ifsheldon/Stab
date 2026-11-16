@@ -3,13 +3,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_analysis::{advanced::flow_record_index, circuit_without_noise};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, MeasureRecordOffset, QubitId,
-    Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind,
+    MeasureRecordOffset, MemoryBudget, QubitId, Target,
 };
 use stab_records::{MeasurementBatchView, MeasurementSink};
 use thiserror::Error;
 
-use crate::{RandomPolicy, RunError, SamplingCompiler, SamplingExecutionError, Seed, ShotCount};
+use crate::{
+    RandomPolicy, RunError, SamplingCompiler, SamplingExecutionError, SamplingRunStatus, Seed,
+    ShotCount,
+};
 
 const SAMPLED_FLOW_SAMPLE_WORD_WIDTH: u64 = 256;
 
@@ -29,6 +32,9 @@ pub enum SampledFlowError {
 
     #[error("{message}")]
     InvalidFlow { message: String },
+
+    #[error(transparent)]
+    Cancelled(#[from] stab_model::Cancelled),
 }
 
 impl SampledFlowError {
@@ -41,6 +47,17 @@ impl SampledFlowError {
 
 type SampledFlowResult<T> = Result<T, SampledFlowError>;
 
+/// Resource and cancellation policy of [`sample_if_circuit_has_stabilizer_flows_with_options`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SampledFlowOptions {
+    /// Budget that admits, for each queried flow, the simulator storage of its augmented
+    /// witness circuit, the sampling plan compiled from it, and the session that samples it.
+    /// The flows are checked one after another, so each check is admitted on its own.
+    pub memory_budget: MemoryBudget,
+    /// Signal polled before each flow and by each flow's sampling compilation and session.
+    pub cancellation: Cancellation,
+}
+
 /// Probabilistically checks signed stabilizer flows by sampling augmented noiseless circuits.
 ///
 /// This is the scoped Rust counterpart to Stim's `sample_if_circuit_has_stabilizer_flows`.
@@ -50,12 +67,39 @@ type SampledFlowResult<T> = Result<T, SampledFlowError>;
 /// callers should use enough samples for their desired confidence. The effective sample count is
 /// rounded up to 256 to match Stim's `MAX_BITWORD_WIDTH` confidence behavior on the public Python
 /// path.
+///
+/// Admits its storage against [`MemoryBudget::DEFAULT`] and is not cancellable; see
+/// [`sample_if_circuit_has_stabilizer_flows_with_options`].
 pub fn sample_if_circuit_has_stabilizer_flows(
     circuit: &Circuit,
     flows: &[Flow],
     sample_count: ShotCount,
     random_policy: RandomPolicy,
 ) -> SampledFlowResult<Vec<bool>> {
+    sample_if_circuit_has_stabilizer_flows_with_options(
+        circuit,
+        flows,
+        sample_count,
+        random_policy,
+        SampledFlowOptions::default(),
+    )
+}
+
+/// [`sample_if_circuit_has_stabilizer_flows`] under a caller's memory budget and cancellation.
+///
+/// A check that the budget cannot admit fails with the typed admission error of the stage that
+/// refused it: [`SamplingExecutionError::SessionStorageLimit`] for the witness simulator or the
+/// sampling session, or [`crate::SamplingCompileError::CompiledBytesLimit`] for the compiled
+/// plan. Observed cancellation fails with [`SampledFlowError::Cancelled`] rather than returning
+/// a verdict from partial samples.
+pub fn sample_if_circuit_has_stabilizer_flows_with_options(
+    circuit: &Circuit,
+    flows: &[Flow],
+    sample_count: ShotCount,
+    random_policy: RandomPolicy,
+    options: SampledFlowOptions,
+) -> SampledFlowResult<Vec<bool>> {
+    options.cancellation.check()?;
     let noiseless = circuit_without_noise(circuit)?;
     let measurement_count = usize::try_from(noiseless.count_measurements()?).map_err(|_| {
         SampledFlowError::invalid_flow(
@@ -67,12 +111,14 @@ pub fn sample_if_circuit_has_stabilizer_flows(
         .iter()
         .enumerate()
         .map(|(flow_index, flow)| {
+            options.cancellation.check()?;
             sample_if_noiseless_circuit_has_stabilizer_flow(
                 &noiseless,
                 flow,
                 measurement_count,
                 sample_count,
                 sampled_flow_random_policy(random_policy, flow_index),
+                &options,
             )
         })
         .collect()
@@ -100,18 +146,32 @@ fn sample_if_noiseless_circuit_has_stabilizer_flow(
     measurement_count: usize,
     sample_count: ShotCount,
     random_policy: RandomPolicy,
+    options: &SampledFlowOptions,
 ) -> SampledFlowResult<bool> {
-    let augmented = augmented_flow_test_circuit(circuit, flow, measurement_count)?;
-    let plan = SamplingCompiler::new().compile(&augmented)?;
+    let augmented =
+        augmented_flow_test_circuit(circuit, flow, measurement_count, options.memory_budget)?;
+    // The plan admits its program against the caller's budget, and its session admits the
+    // session storage against the same budget and polls the same signal.
+    let plan = SamplingCompiler::new()
+        .memory_budget(options.memory_budget)
+        .cancellation(options.cancellation.clone())
+        .compile(&augmented)?;
     let witness_index = measurement_count;
     let mut session = plan.session(random_policy)?;
     let mut sink = SampledFlowWitnessSink {
         witness_index,
         passed: true,
     };
-    session
+    let summary = session
         .run(sample_count, &mut sink)
         .map_err(sampled_flow_run_error)?;
+    if summary.status() == SamplingRunStatus::Cancelled {
+        // A cancelled run saw only some samples, so its verdict could pass a false flow.
+        options.cancellation.check()?;
+        return Err(SampledFlowError::invalid_flow(
+            "sampled flow session reported cancellation that its signal does not show",
+        ));
+    }
     Ok(sink.passed)
 }
 
@@ -151,6 +211,7 @@ fn augmented_flow_test_circuit(
     circuit: &Circuit,
     flow: &Flow,
     measurement_count: usize,
+    memory_budget: MemoryBudget,
 ) -> SampledFlowResult<Circuit> {
     let observables = flow.observables().collect::<BTreeSet<_>>();
     let qubits = DenseQubitMap::for_flow(circuit, flow, &observables)?;
@@ -166,7 +227,7 @@ fn augmented_flow_test_circuit(
         })?,
         augmented_measurements,
         true,
-        stab_model::MemoryBudget::DEFAULT,
+        memory_budget,
     )?;
     let ancilla = qubit_id_from_index(qubit_count, "sampled flow ancilla qubit")?;
     let mut augmented = Circuit::new();

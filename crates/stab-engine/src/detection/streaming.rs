@@ -16,6 +16,7 @@ use super::frame::{
 };
 use super::try_vec_with_capacity;
 use crate::LaneWidth;
+use crate::work_poll::WorkPoll;
 
 /// Reusable storage of one streaming detection run at one lane word.
 #[derive(Debug)]
@@ -132,8 +133,13 @@ impl<W: FrameWord> StreamingDetectionFrame<W> {
             *plane ^= *frame_observable;
         }
         let observable_count = self.observable_planes.len();
-        self.observables
-            .transpose_until(0, &self.observable_planes, observable_count, &[])
+        self.observables.transpose_until(
+            0,
+            &self.observable_planes,
+            observable_count,
+            &[],
+            &mut WorkPoll::new(cancellation),
+        )
     }
 
     pub(super) const fn detectors(&self) -> &ShotRecordTransposer {
@@ -160,7 +166,13 @@ struct DetectionWindow<'a, W> {
 }
 
 impl<W: FrameWord> PlaneConsumer<W> for DetectionWindow<'_, W> {
-    fn consume(&mut self, base: usize, planes: &[W], last: bool) -> DetectionResult<usize> {
+    fn consume(
+        &mut self,
+        base: usize,
+        planes: &[W],
+        last: bool,
+        poll: &mut WorkPoll<'_>,
+    ) -> DetectionResult<usize> {
         let available = base + planes.len();
         loop {
             let stop = self.conversion.convert_window(
@@ -180,6 +192,7 @@ impl<W: FrameWord> PlaneConsumer<W> for DetectionWindow<'_, W> {
                         self.detector_window,
                         end,
                         &[],
+                        poll,
                     )?;
                     self.detector_base = end;
                 }
@@ -194,8 +207,13 @@ impl<W: FrameWord> PlaneConsumer<W> for DetectionWindow<'_, W> {
         if last {
             self.conversion.check_finished(&self.runner)?;
             let end = self.conversion.detector_count;
-            self.detectors
-                .transpose_until(self.detector_base, self.detector_window, end, &[])?;
+            self.detectors.transpose_until(
+                self.detector_base,
+                self.detector_window,
+                end,
+                &[],
+                poll,
+            )?;
             return Ok(available);
         }
         Ok(available.saturating_sub(self.lookback))

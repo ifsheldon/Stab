@@ -22,7 +22,12 @@ pub(super) use self::execution::{ConversionRunner, ConversionStop};
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ConversionOperation {
     AdvanceMeasurements(usize),
+    /// A detector of at most [`execution::SHORT_PARITY_TERMS`] terms, charged to the work poll
+    /// as one constant step.
     Detector(Vec<MeasureRecordOffset>),
+    /// A detector with more terms, charged in proportion to them; lowering picks the variant so
+    /// the common detector's hot loop never compares its length.
+    WideDetector(Vec<MeasureRecordOffset>),
     Observable {
         id: usize,
         terms: Vec<MeasureRecordOffset>,
@@ -430,7 +435,12 @@ impl ConversionPlan {
         }
         self.add_root_operation(true)?;
         if self.collect_program {
-            self.try_push_operation(ConversionOperation::Detector(terms))?;
+            let operation = if terms.len() > execution::SHORT_PARITY_TERMS {
+                ConversionOperation::WideDetector(terms)
+            } else {
+                ConversionOperation::Detector(terms)
+            };
+            self.try_push_operation(operation)?;
         }
         Ok(())
     }
@@ -727,6 +737,7 @@ impl ConversionPlan {
         for (index, operation) in self.program.iter().enumerate() {
             let terms = match operation {
                 ConversionOperation::Detector(terms)
+                | ConversionOperation::WideDetector(terms)
                 | ConversionOperation::Observable { terms, .. } => Some(terms),
                 ConversionOperation::Repeat { body_end, .. } => {
                     validate_repeat_marker(&self.program, index, *body_end)?;
@@ -938,6 +949,7 @@ impl ConversionPlan {
             .iter()
             .flat_map(|operation| match operation {
                 ConversionOperation::Detector(terms)
+                | ConversionOperation::WideDetector(terms)
                 | ConversionOperation::Observable { terms, .. } => terms.as_slice(),
                 ConversionOperation::AdvanceMeasurements(_)
                 | ConversionOperation::Repeat { .. }
