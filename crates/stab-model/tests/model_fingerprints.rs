@@ -415,4 +415,24 @@ fn product_fingerprints_match_independent_schema_v1_encodings() {
         nested_dem.fingerprint().digest(),
         schema_digest(DEM_DIALECT, &expected)
     );
+
+    // Exercise multiple 4 KiB encoder buffer flushes and oversized tag blocks (> 4 KiB).
+    let large_tag = vec![b'a'; 5_000];
+    let mut source = Vec::with_capacity(24_000);
+    source.extend_from_slice(b"H[");
+    source.extend_from_slice(&large_tag);
+    source.extend_from_slice(b"]");
+    let mut expected_targets = Vec::with_capacity(2_000);
+    for q in 0..2_000_u32 {
+        source.extend_from_slice(format!(" {q}").as_bytes());
+        expected_targets.push(qubit(q, false));
+    }
+    source.push(b'\n');
+    let multi_block_circuit =
+        Circuit::from_stim_bytes(&source).expect("multi-block tagged circuit");
+    let expected_multi = [gate("H", vec![], expected_targets, Some(&large_tag))];
+    assert_eq!(
+        multi_block_circuit.fingerprint().digest(),
+        schema_digest(CIRCUIT_DIALECT, &expected_multi)
+    );
 }

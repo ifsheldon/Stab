@@ -97,9 +97,19 @@ impl StructuralEncoder {
                 CircuitItem::Instruction(instruction) => {
                     self.byte(1);
                     self.text(instruction.gate().canonical_name());
-                    self.floats(instruction.args());
-                    self.len(instruction.targets().len());
-                    for target in instruction.targets() {
+                    let args = instruction.args();
+                    let targets = instruction.targets();
+                    if args.is_empty() {
+                        let mut counts = [0_u8; 32];
+                        let (_, tail) = counts.split_at_mut(16);
+                        let target_len = u128::try_from(targets.len()).unwrap_or(u128::MAX);
+                        tail.copy_from_slice(&target_len.to_be_bytes());
+                        self.hasher.update(counts);
+                    } else {
+                        self.floats(args);
+                        self.len(targets.len());
+                    }
+                    for target in targets {
                         self.circuit_target(target);
                     }
                     self.optional_bytes(instruction.tag_bytes());
@@ -115,35 +125,35 @@ impl StructuralEncoder {
         }
     }
 
+    #[inline(always)]
     fn circuit_target(&mut self, target: &Target) {
         match target {
             Target::Qubit { id, inverted } => {
-                self.byte(1);
-                self.u32(id.get());
-                self.boolean(*inverted);
+                let [b0, b1, b2, b3] = id.get().to_be_bytes();
+                self.hasher.update([1, b0, b1, b2, b3, u8::from(*inverted)]);
             }
             Target::MeasurementRecord { offset } => {
-                self.byte(2);
-                self.i32(offset.get());
-                self.boolean(offset.is_negative_zero());
+                let [b0, b1, b2, b3] = offset.get().to_be_bytes();
+                self.hasher
+                    .update([2, b0, b1, b2, b3, u8::from(offset.is_negative_zero())]);
             }
             Target::SweepBit { id } => {
-                self.byte(3);
-                self.u32(*id);
+                let [b0, b1, b2, b3] = id.to_be_bytes();
+                self.hasher.update([3, b0, b1, b2, b3]);
             }
             Target::Pauli {
                 pauli,
                 id,
                 inverted,
             } => {
-                self.byte(4);
-                self.byte(match pauli {
+                let disc = match pauli {
                     Pauli::X => 1,
                     Pauli::Y => 2,
                     Pauli::Z => 3,
-                });
-                self.u32(id.get());
-                self.boolean(*inverted);
+                };
+                let [b0, b1, b2, b3] = id.get().to_be_bytes();
+                self.hasher
+                    .update([4, disc, b0, b1, b2, b3, u8::from(*inverted)]);
             }
             Target::Combiner => self.byte(5),
         }
@@ -155,13 +165,13 @@ impl StructuralEncoder {
         while let Some(item) = stack.next() {
             match item {
                 DemItem::Instruction(instruction) => {
-                    self.byte(1);
-                    self.byte(match instruction.kind() {
+                    let kind = match instruction.kind() {
                         DemInstructionKind::Error => 1,
                         DemInstructionKind::Detector => 2,
                         DemInstructionKind::LogicalObservable => 3,
                         DemInstructionKind::ShiftDetectors => 4,
-                    });
+                    };
+                    self.hasher.update([1, kind]);
                     self.floats(instruction.args());
                     self.len(instruction.targets().len());
                     for target in instruction.targets() {
@@ -180,24 +190,26 @@ impl StructuralEncoder {
         }
     }
 
+    #[inline(always)]
     fn dem_target(&mut self, target: &DemTarget) {
         match target {
             DemTarget::RelativeDetector(id) => {
-                self.byte(1);
-                self.u64(id.get());
+                let [b0, b1, b2, b3, b4, b5, b6, b7] = id.get().to_be_bytes();
+                self.hasher.update([1, b0, b1, b2, b3, b4, b5, b6, b7]);
             }
             DemTarget::LogicalObservable(id) => {
-                self.byte(2);
-                self.u64(id.get());
+                let [b0, b1, b2, b3, b4, b5, b6, b7] = id.get().to_be_bytes();
+                self.hasher.update([2, b0, b1, b2, b3, b4, b5, b6, b7]);
             }
             DemTarget::Separator => self.byte(3),
             DemTarget::Numeric(value) => {
-                self.byte(4);
-                self.u64(*value);
+                let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
+                self.hasher.update([4, b0, b1, b2, b3, b4, b5, b6, b7]);
             }
         }
     }
 
+    #[inline]
     fn optional_bytes(&mut self, bytes: Option<&[u8]>) {
         match bytes {
             Some(bytes) => {
@@ -209,11 +221,13 @@ impl StructuralEncoder {
         }
     }
 
+    #[inline(always)]
     fn text(&mut self, text: &str) {
         self.len(text.len());
         self.hasher.update(text.as_bytes());
     }
 
+    #[inline]
     fn floats(&mut self, values: &[f64]) {
         self.len(values.len());
         for value in values {
@@ -222,31 +236,18 @@ impl StructuralEncoder {
         }
     }
 
+    #[inline(always)]
     fn len(&mut self, value: usize) {
-        let bytes = value.to_be_bytes();
-        let mut encoded = [0; size_of::<u128>()];
-        for (output, input) in encoded.iter_mut().rev().zip(bytes.iter().rev()) {
-            *output = *input;
-        }
-        self.hasher.update(encoded);
+        let wide = u128::try_from(value).unwrap_or(u128::MAX);
+        self.hasher.update(wide.to_be_bytes());
     }
 
-    fn boolean(&mut self, value: bool) {
-        self.byte(u8::from(value));
-    }
-
+    #[inline(always)]
     fn byte(&mut self, value: u8) {
         self.hasher.update([value]);
     }
 
-    fn i32(&mut self, value: i32) {
-        self.hasher.update(value.to_be_bytes());
-    }
-
-    fn u32(&mut self, value: u32) {
-        self.hasher.update(value.to_be_bytes());
-    }
-
+    #[inline(always)]
     fn u64(&mut self, value: u64) {
         self.hasher.update(value.to_be_bytes());
     }
