@@ -4,9 +4,10 @@ use std::path::PathBuf;
 use clap::Args;
 use stab_analysis::{FeedbackInliningLimits, circuit_with_inlined_feedback_with_limits};
 use stab_engine::{
-    DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler, LaneWidth,
-    MeasurementToDetectionCompiler, MeasurementToDetectionTransaction, RandomPolicy,
-    ReferenceSampleMode, Seed, ShotCount,
+    DetectionConversionLimits, DetectionRunError, DetectionSamplingCompiler,
+    DetectionSamplingSession, LaneWidth, MeasurementToDetectionCompiler,
+    MeasurementToDetectionTransaction, RandomPolicy, ReferenceSampleMode, Seed, ShotCount,
+    StreamingDetectionRun,
 };
 use stab_records::{
     ByteSpan, DetectionBatchView, DetectionSink, FormatError, FormatErrorCode,
@@ -19,6 +20,7 @@ use crate::{
     batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
+    output_storage::{EncodedBatches, OutputStorage, admit_output_then_session},
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
     streams_records,
 };
@@ -208,53 +210,79 @@ where
     drop(circuit);
     ledger.release(circuit_hold);
     let _plan_hold = ledger.hold(plan.retained_bytes());
+    let observable_format = args
+        .obs_output
+        .as_ref()
+        .map(|_| detection_record_format(args.obs_out_format))
+        .transpose()?;
+    let shots = shot_count(args.shots)?;
+    // The CLI knows the whole request up front, so a small request samples narrow batches; the
+    // seeded stream is therefore a function of the seed and the total shot count.
+    let lane_width = LaneWidth::for_total_shots(shots);
+    let output_planes = plan
+        .measurement_width()
+        .get()
+        .saturating_add(plan.detector_width().get());
+    let streams = streams_records(
+        shots,
+        lane_width,
+        args.out_format.record_format(),
+        output_planes,
+    );
+    let batches = if streams {
+        EncodedBatches::ShotMajor
+    } else {
+        EncodedBatches::BitPlanes
+    };
+    let output = DetectionBatchEncoder::add_storage(
+        OutputStorage::new("detect", batches, Some(shots.get())),
+        plan.detector_width().get(),
+        plan.observable_width().get(),
+        observable_mode,
+        args.out_format.record_format(),
+        observable_format,
+    )
+    .file_buffer(args.output.is_some())
+    .file_buffer(args.obs_output.is_some());
+    let (_output_hold, run) = admit_output_then_session(output, &mut ledger, |budget| {
+        let run = if streams {
+            DetectRun::Streaming(Box::new(plan.streaming_run_with_budget(
+                random_policy(args.seed),
+                lane_width,
+                shots,
+                budget,
+            )?))
+        } else {
+            DetectRun::Session(Box::new(plan.session_with_budget(
+                random_policy(args.seed),
+                lane_width,
+                budget,
+            )?))
+        };
+        Ok(run)
+    })?;
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
         observable_mode,
         args.out_format.record_format(),
-        args.obs_output
-            .as_ref()
-            .map(|_| detection_record_format(args.obs_out_format))
-            .transpose()?,
+        observable_format,
     )?;
     let mut sink = DeferredDetectionBatchSink {
         outputs: DeferredDetectOutputs::new(io, stdout),
         encoder,
     };
-    let shots = shot_count(args.shots)?;
-    // The CLI knows the whole request up front, so a small request samples narrow batches; the
-    // seeded stream is therefore a function of the seed and the total shot count.
-    let lane_width = LaneWidth::for_total_shots(shots);
-    let session_stage = ledger.stage();
-    let output_planes = plan
-        .measurement_width()
-        .get()
-        .saturating_add(plan.detector_width().get());
-    if !streams_records(
-        shots,
-        lane_width,
-        args.out_format.record_format(),
-        output_planes,
-    ) {
-        let mut session = plan
-            .session_with_budget(random_policy(args.seed), lane_width, session_stage.get())
-            .map_err(|error| session_stage.refusal(error))?;
-        return session
-            .run(shots, &mut sink)
-            .map(|_| ())
-            .map_err(map_detection_run_error);
+    match run {
+        DetectRun::Session(mut session) => session.run(shots, &mut sink).map(|_| ()),
+        DetectRun::Streaming(run) => run.run(&mut sink).map(|_| ()),
     }
-    plan.streaming_run_with_budget(
-        random_policy(args.seed),
-        lane_width,
-        shots,
-        session_stage.get(),
-    )
-    .map_err(|error| session_stage.refusal(error))?
-    .run(&mut sink)
-    .map(|_| ())
     .map_err(map_detection_run_error)
+}
+
+/// The one run a `detect` command executes.
+enum DetectRun {
+    Session(Box<DetectionSamplingSession>),
+    Streaming(Box<StreamingDetectionRun>),
 }
 
 pub(crate) fn run_m2d<R, W>(
@@ -329,16 +357,33 @@ where
         .session_with_budget(session_stage.get())
         .map_err(|error| session_stage.refusal(error))?;
     let _session_hold = ledger.hold(session.retained_bytes());
+    // The text record cap predates the output storage hold and keeps its value, so record
+    // diagnostics are unchanged; see the resource-policy inventory.
     let record_bytes = ledger.stage().record_bytes();
+    let primary_format = detection_record_format(args.out_format)?;
+    let observable_format = args
+        .obs_output
+        .as_ref()
+        .map(|_| detection_record_format(args.obs_out_format))
+        .transpose()?;
+    // The session delivers shot-major records, which it transposes in its own admitted scratch.
+    let _output_hold = DetectionBatchEncoder::add_storage(
+        OutputStorage::new("m2d", EncodedBatches::ShotMajor, None),
+        plan.detector_width().get(),
+        plan.observable_width().get(),
+        observable_mode,
+        primary_format,
+        observable_format,
+    )
+    .file_buffer(args.output.is_some())
+    .file_buffer(args.obs_output.is_some())
+    .admit(&mut ledger)?;
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
         observable_mode,
-        detection_record_format(args.out_format)?,
-        args.obs_output
-            .as_ref()
-            .map(|_| detection_record_format(args.obs_out_format))
-            .transpose()?,
+        primary_format,
+        observable_format,
     )?;
     let mut measurements = match measurement_input {
         Some(file) => M2dInput::from_file(

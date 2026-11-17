@@ -29,6 +29,9 @@ const SEGMENT_DRAIN_BYTES: usize = 1 << 20;
 
 const WORD_BITS: usize = u64::BITS as usize;
 
+/// The smallest capacity a growing byte vector allocates.
+const MIN_PENDING_ALLOCATION_BYTES: u128 = 8;
+
 /// One contiguous run of a record's bits together with its DETS namespace.
 ///
 /// Non-DETS formats concatenate parts in order and ignore their namespaces. DETS writes each
@@ -163,6 +166,30 @@ impl RecordEncoder {
     /// well, so the bound charges three times it. Bit-plane batches add one transposed 64-shot
     /// block per part, which this bound excludes.
     pub fn shot_major_scratch_bytes(format: RecordFormat, width: usize) -> u128 {
+        Self::scratch_bytes_with_pending(format, width, u128::MAX)
+    }
+
+    /// [`Self::shot_major_scratch_bytes`] for an encoder that writes at most `records` records.
+    ///
+    /// The pending buffer never holds more than the whole output, so a short run is charged for
+    /// at most its encoded size (a vector's smallest allocation of 8 bytes at least) instead of
+    /// the drain threshold; long runs get the same bound as [`Self::shot_major_scratch_bytes`].
+    pub fn shot_major_scratch_bytes_for_records(
+        format: RecordFormat,
+        width: usize,
+        records: u64,
+    ) -> u128 {
+        let output = if format == RecordFormat::Ptb64 {
+            u128::from(records.div_ceil(WORD_BITS as u64))
+                .saturating_mul((width as u128).saturating_mul(size_of::<u64>() as u128))
+        } else {
+            u128::from(records).saturating_mul(record_encoded_bytes(format, width))
+        };
+        Self::scratch_bytes_with_pending(format, width, output.max(MIN_PENDING_ALLOCATION_BYTES))
+    }
+
+    /// The scratch bound when the pending buffer never holds more than `max_pending` bytes.
+    fn scratch_bytes_with_pending(format: RecordFormat, width: usize, max_pending: u128) -> u128 {
         let width_bytes = width as u128;
         let (threshold, unit, planes) = if format == RecordFormat::Ptb64 {
             let group = width_bytes.saturating_mul(size_of::<u64>() as u128);
@@ -177,8 +204,40 @@ impl RecordEncoder {
         };
         (threshold as u128)
             .saturating_add(unit)
+            .min(max_pending)
             .saturating_mul(3)
             .saturating_add(planes)
+    }
+
+    /// Upper bound on the bytes an encoder of `format` additionally retains while it encodes
+    /// bit-plane batches whose parts have `part_widths` bits, beyond
+    /// [`Self::shot_major_scratch_bytes`]: one transposed 64-shot block per part, the column of
+    /// plane words being transposed, and the list holding the blocks.
+    ///
+    /// The column grows to the widest part with amortized growth and briefly holds its old
+    /// allocation as well, so the bound charges three times it, and a block replaced for a part
+    /// of a new width briefly coexists with its replacement, so the widest block is charged
+    /// twice. PTB64 output copies whole plane words of 64-shot aligned groups into the group
+    /// planes the shot-major bound already covers, so it adds nothing here.
+    pub fn bit_plane_scratch_bytes(format: RecordFormat, part_widths: &[usize]) -> u128 {
+        if format == RecordFormat::Ptb64 || part_widths.is_empty() {
+            return 0;
+        }
+        let blocks = part_widths
+            .iter()
+            .map(|width| PackedShotBatch::storage_bytes(WORD_BITS, *width))
+            .fold(0_u128, u128::saturating_add);
+        let widest = part_widths.iter().copied().max().unwrap_or(0);
+        let column = (widest as u128)
+            .saturating_mul(size_of::<u64>() as u128)
+            .saturating_mul(3);
+        // A vector of up to four entries is reserved on the first push.
+        let list =
+            (part_widths.len().max(4) as u128).saturating_mul(size_of::<PackedShotBatch>() as u128);
+        blocks
+            .saturating_add(PackedShotBatch::storage_bytes(WORD_BITS, widest))
+            .saturating_add(column)
+            .saturating_add(list)
     }
 
     pub const fn format(&self) -> RecordFormat {
@@ -644,7 +703,17 @@ impl RecordEncoder {
 /// `format`, including the record's framing and, for `r8`, every run byte the record's zero gaps
 /// can emit at once.
 fn segment_encoded_bytes(format: RecordFormat, width: usize) -> u128 {
-    let segment = width.min(SEGMENT_BITS) as u128;
+    part_encoded_bytes(format, width, width.min(SEGMENT_BITS))
+}
+
+/// Upper bound on the encoded bytes of one whole record of `width` bits.
+fn record_encoded_bytes(format: RecordFormat, width: usize) -> u128 {
+    part_encoded_bytes(format, width, width)
+}
+
+/// Upper bound on the encoded bytes of `bits` bits of a record of `width` bits, plus framing.
+fn part_encoded_bytes(format: RecordFormat, width: usize, bits: usize) -> u128 {
+    let segment = bits as u128;
     let digits = decimal_digits(width) as u128;
     let framing = b"shot\n".len() as u128;
     let encoded = match format {

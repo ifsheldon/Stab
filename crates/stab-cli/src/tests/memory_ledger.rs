@@ -1,8 +1,9 @@
 //! One `--memory-budget` covers a whole command: each stage admits against the budget less what
 //! earlier stages still hold, and dead storage returns its bytes before the next stage.
 
-use stab_engine::SamplingCompiler;
+use stab_engine::{DetectionSamplingCompiler, SamplingCompiler};
 use stab_model::{Circuit, MemoryBudget, ParseLimits};
+use stab_records::{RecordEncoder, RecordFormat};
 
 use super::support::run;
 
@@ -141,12 +142,15 @@ fn held_plans_and_inlined_feedback_reduce_the_budget_of_later_stages() {
     let plan_bytes = sample_plan.retained_bytes();
     // 64 shots uses a 64-lane materializing session (`8 * (2 * 1 + 20000) = 160,016` bytes).
     let session_bytes = 8 * (2 + 20_000);
+    // The session is admitted beside the plan and the 64-shot output encoder.
+    let output_bytes = encoder_bytes(RecordFormat::ZeroOne, &[20_000], true, 64);
     let session_refusal_budget = (u64::try_from(wide_session_circuit.len()).expect("len")
         + parsed_bytes)
         .max(parsed_bytes + plan_bytes)
-        .max(session_bytes);
+        .max(session_bytes)
+        .max(plan_bytes + output_bytes);
     assert!(
-        plan_bytes + session_bytes > session_refusal_budget
+        plan_bytes + output_bytes + session_bytes > session_refusal_budget
             && parsed_bytes + plan_bytes <= session_refusal_budget,
         "plan={plan_bytes}, session={session_bytes}, parsed={parsed_bytes}, budget={session_refusal_budget}"
     );
@@ -167,7 +171,7 @@ fn held_plans_and_inlined_feedback_reduce_the_budget_of_later_stages() {
     assert_eq!(
         diag.pointer("/context/command_memory_budget/held_bytes")
             .cloned(),
-        Some(plan_bytes.into())
+        Some((plan_bytes + output_bytes).into())
     );
 
     // 2. `sample_dem` admits its plan against `budget - dem_hold` and holds the plan for session.
@@ -249,5 +253,80 @@ fn held_plans_and_inlined_feedback_reduce_the_budget_of_later_stages() {
             .pointer("/context/command_memory_budget/held_bytes")
             .cloned(),
         Some(inlined_bytes.into())
+    );
+}
+
+/// Scratch the CLI admits for one output encoder of `records` records joining `parts`,
+/// transposing bit-plane batches when `bit_planes`.
+fn encoder_bytes(format: RecordFormat, parts: &[usize], bit_planes: bool, records: u64) -> u64 {
+    let mut bytes =
+        RecordEncoder::shot_major_scratch_bytes_for_records(format, parts.iter().sum(), records);
+    if bit_planes {
+        bytes += RecordEncoder::bit_plane_scratch_bytes(format, parts);
+    }
+    u64::try_from(bytes).expect("fits u64")
+}
+
+#[test]
+fn detect_admits_its_output_encoders_and_file_buffers_before_its_session() {
+    let scratch = super::support::Scratch::new();
+    // Resetting qubit 999 gives a short circuit a session of 1000 frame qubits.
+    let text = "R 0 1 999\nX_ERROR(0.25) 0 1\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n\
+                OBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let circuit = Circuit::from_stim_str(text).expect("parse");
+    let plan_bytes = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile")
+        .retained_bytes();
+    // 256 narrow shots materialize, so both encoders transpose bit-plane batches, and the named
+    // output and `--obs_out` files each add one write buffer.
+    let output_bytes = encoder_bytes(RecordFormat::B8, &[2], true, 256)
+        + encoder_bytes(RecordFormat::ZeroOne, &[1], true, 256)
+        + 2 * crate::io_plan::OUTPUT_BUFFER_BYTES as u64;
+    let out = scratch.path("dets.b8");
+    let obs = scratch.path("obs.01");
+    let detect = |budget: Option<u64>| {
+        let mut args = vec![
+            "stab".to_owned(),
+            "detect".to_owned(),
+            "--shots=256".to_owned(),
+            "--seed=5".to_owned(),
+            "--out_format=b8".to_owned(),
+            format!("--out={out}"),
+            format!("--obs_out={obs}"),
+        ];
+        args.extend(budget.map(|budget| format!("--memory-budget={budget}")));
+        let args = args.iter().map(String::as_str).collect::<Vec<_>>();
+        run(&args, text.as_bytes())
+    };
+
+    // A session that fits nowhere beside the plan reports its own refusal, as it did before the
+    // output storage was admitted.
+    detect(Some(plan_bytes + 4096)).assert_err(&[
+        "detection session needs an estimated",
+        "exceeding the 4096-byte memory budget",
+        &format!("earlier stages of this command hold {plan_bytes} bytes"),
+    ]);
+    // The plan fits, but its encoders and buffers do not fit beside it.
+    detect(Some(plan_bytes + output_bytes - 1)).assert_err(&[
+        &format!(
+            "detect needs at least {output_bytes} bytes to encode its output records, exceeding \
+             the {}-byte memory budget",
+            output_bytes - 1
+        ),
+        &format!("earlier stages of this command hold {plan_bytes} bytes"),
+    ]);
+    // The encoders fit, and the session is then refused with them held.
+    detect(Some(plan_bytes + output_bytes)).assert_stderr_contains(&[&format!(
+        "earlier stages of this command hold {} bytes",
+        plan_bytes + output_bytes
+    )]);
+
+    detect(None).assert_ok("");
+    let unbudgeted = (scratch.read("dets.b8"), scratch.read("obs.01"));
+    detect(Some(plan_bytes + output_bytes + (1 << 20))).assert_ok("");
+    assert_eq!(
+        (scratch.read("dets.b8"), scratch.read("obs.01")),
+        unbudgeted
     );
 }

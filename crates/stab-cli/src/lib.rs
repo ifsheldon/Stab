@@ -23,6 +23,7 @@ mod help;
 mod input;
 mod io_plan;
 mod ledger;
+mod output_storage;
 mod sample_dem;
 mod streaming;
 
@@ -38,6 +39,7 @@ use help::{HelpArgs, run_help};
 use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo, StandardStreams, StreamUse};
 use ledger::{MemoryLedger, StageBudget};
+use output_storage::{EncodedBatches, OutputStorage, admit_output_then_session};
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_analysis::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
@@ -810,38 +812,47 @@ where
     // The CLI knows the whole request up front, so a small request samples narrow batches; the
     // seeded stream is therefore a function of the seed and the total shot count.
     let lane_width = LaneWidth::for_total_shots(shots);
-    let session_stage = ledger.stage();
     let streams = streams_records(
         shots,
         lane_width,
         args.out_format.record_format(),
         plan.measurement_width().get(),
     );
-    let run = if !streams {
-        SampleRun::Session(
-            plan.session_with_budget(
-                random_policy,
-                reference_mode,
-                lane_width,
-                session_stage.get(),
-            )
-            .map_err(|error| session_stage.refusal(error))?,
-        )
-    } else {
-        SampleRun::Streaming(
-            plan.streaming_run_with_budget(
+    let output_width = visible_measurements
+        .as_ref()
+        .map_or(plan.measurement_width().get(), Vec::len);
+    // A one-shot herald filter encodes one assembled record at a time from a reused record.
+    let (batches, filtered_record_bytes) = match &visible_measurements {
+        Some(indices) => (
+            EncodedBatches::ShotMajor,
+            (indices.len().div_ceil(64) as u128).saturating_mul(size_of::<u64>() as u128),
+        ),
+        None if streams => (EncodedBatches::ShotMajor, 0),
+        None => (EncodedBatches::BitPlanes, 0),
+    };
+    let output = OutputStorage::new("sample", batches, Some(shots.get()))
+        .encoder(args.out_format.record_format(), &[output_width])
+        .scratch(filtered_record_bytes)
+        .file_buffer(args.output.is_some());
+    let (_output_hold, run) = admit_output_then_session(output, &mut ledger, |budget| {
+        let run = if streams {
+            SampleRun::Streaming(plan.streaming_run_with_budget(
                 random_policy,
                 reference_mode,
                 lane_width,
                 shots,
-                session_stage.get(),
-            )
-            .map_err(|error| session_stage.refusal(error))?,
-        )
-    };
-    let output_width = visible_measurements
-        .as_ref()
-        .map_or(plan.measurement_width().get(), Vec::len);
+                budget,
+            )?)
+        } else {
+            SampleRun::Session(plan.session_with_budget(
+                random_policy,
+                reference_mode,
+                lane_width,
+                budget,
+            )?)
+        };
+        Ok(run)
+    })?;
     let encoder = RecordEncoder::try_new(args.out_format.record_format(), output_width)?;
     let mut outputs = io.activate()?;
     if let Some(mut output) = outputs.take(FileRole::Output) {

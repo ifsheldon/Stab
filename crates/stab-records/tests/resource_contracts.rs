@@ -8,9 +8,9 @@ use std::assert_matches;
 use std::hint::black_box;
 
 use stab_records::{
-    DetsLayout, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder, RecordFormat,
-    RecordFraming, RecordResult, RecordStreamReadError, RecordStreamReader, RecordStreamStorage,
-    write_ptb64_records_checked, write_records,
+    BitPlaneBatch, DetsLayout, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder,
+    RecordFormat, RecordFraming, RecordResult, RecordStreamReadError, RecordStreamReader,
+    RecordStreamStorage, write_ptb64_records_checked, write_records,
 };
 
 /// The packed reader's initial transport buffer.
@@ -248,6 +248,65 @@ fn reader_and_encoder_storage_bounds_cover_peak_allocation() {
         }
     }
     assert_eq!(PackedShotBatch::storage_bytes(3, 65), 48);
+}
+
+/// The CLI admits an output encoder's shot-major scratch for its known record count and its
+/// bit-plane scratch before sampling into it, so encoding detection-shaped bit-plane batches
+/// (detectors then observables, in parts of differing widths) must peak within those two
+/// bounds whatever the format, including runs whose whole output is below the drain threshold.
+#[test]
+fn bit_plane_encoding_stays_within_admitted_encoder_scratch() {
+    const SHOTS: usize = 256;
+    for (detectors, observables) in [(1, 1), (9, 3), (257, 64), (5_003, 2), (70_001, 1)] {
+        let records = |width: usize, salt: usize| {
+            let rows = (0..SHOTS)
+                .map(|shot| {
+                    (0..width)
+                        .map(|bit| (shot * 17 + bit * 31 + salt).is_multiple_of(43))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            let packed = PackedShotBatch::from_records(&rows, width).expect("pack records");
+            BitPlaneBatch::from_shot_major(packed.view()).expect("transpose")
+        };
+        let detector_planes = records(detectors, 0);
+        let observable_planes = records(observables, 7);
+        let parts = [
+            RecordBatchPart::new(DetsResultType::Detector, detector_planes.view()),
+            RecordBatchPart::new(DetsResultType::Observable, observable_planes.view()),
+        ];
+        let width = detectors + observables;
+        for format in [
+            RecordFormat::ZeroOne,
+            RecordFormat::B8,
+            RecordFormat::R8,
+            RecordFormat::Hits,
+            RecordFormat::Dets,
+            RecordFormat::Ptb64,
+        ] {
+            let measured = allocation_counter::measure(|| {
+                let mut encoder = RecordEncoder::try_new(format, width).expect("encoder");
+                let mut sink = std::io::sink();
+                for _ in 0..2 {
+                    encoder.write_batch(&parts, &mut sink).expect("encode");
+                }
+            });
+            let records = 2 * SHOTS as u64;
+            let bound = RecordEncoder::shot_major_scratch_bytes_for_records(format, width, records)
+                + RecordEncoder::bit_plane_scratch_bytes(format, &[detectors, observables]);
+            assert!(
+                bound
+                    <= RecordEncoder::shot_major_scratch_bytes(format, width)
+                        + RecordEncoder::bit_plane_scratch_bytes(format, &[detectors, observables])
+            );
+            assert!(
+                u128::from(measured.bytes_max) <= bound,
+                "{format:?} at {detectors}+{observables} bits peaked at {} bytes above the \
+                 {bound}-byte bound: {measured:?}",
+                measured.bytes_max
+            );
+        }
+    }
 }
 
 /// `r8` records decode as their bytes arrive, so a record frame many times the transport buffer

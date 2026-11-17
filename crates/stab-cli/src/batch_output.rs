@@ -13,6 +13,7 @@ use stab_records::{
 
 use crate::{
     CliError,
+    output_storage::OutputStorage,
     streaming::{FileOutputSink, OutputSink},
 };
 
@@ -56,6 +57,27 @@ impl DetectionBatchEncoder {
                 .map(|format| RecordEncoder::try_new(format, observable_width))
                 .transpose()?,
         })
+    }
+
+    /// Adds the scratch of the encoders [`Self::try_new`] builds for the same arguments.
+    pub(crate) fn add_storage(
+        storage: OutputStorage,
+        detector_width: usize,
+        observable_width: usize,
+        observable_mode: DetectionObservableOutputMode,
+        primary_format: RecordFormat,
+        observable_format: Option<RecordFormat>,
+    ) -> OutputStorage {
+        let primary_parts = match observable_mode {
+            DetectionObservableOutputMode::DetectorsOnly => &[detector_width][..],
+            DetectionObservableOutputMode::Append => &[detector_width, observable_width],
+            DetectionObservableOutputMode::Prepend => &[observable_width, detector_width],
+        };
+        let storage = storage.encoder(primary_format, primary_parts);
+        match observable_format {
+            Some(format) => storage.encoder(format, &[observable_width]),
+            None => storage,
+        }
     }
 
     pub(crate) fn write_batch<W>(
