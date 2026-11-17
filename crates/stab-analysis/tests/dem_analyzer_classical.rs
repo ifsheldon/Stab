@@ -4,7 +4,7 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{AnalysisError, ErrorAnalyzerOptions, circuit_to_detector_error_model};
 use stab_model::Circuit;
 
 fn analyze(text: &str) -> String {
@@ -271,5 +271,76 @@ fn dem_analyzer_measurement_record_feedback_matches_upstream_subset() {
         ",
     ] {
         assert_eq!(analyze(circuit), "error(0.125) D0\n");
+    }
+}
+
+/// Deliberate divergence `analysis.circuit-to-dem-feedback-record-lookback`: pinned Stim v1.16.0
+/// `analyze_errors` silently accepts a classically controlled Pauli whose `rec[...]` control looks
+/// back before the first measurement, while its `sample`, `detect`, and `m2d` abort on the same
+/// circuit. Stab rejects the lookback in every fold mode, and each row's boundary twin, whose
+/// lookback reaches an earlier measurement, still analyzes to pinned Stim's model.
+#[test]
+fn dem_analyzer_rejects_feedback_record_lookback_before_first_measurement() {
+    let in_range_loop_folded =
+        "repeat 2 {\n    detector D0\n    shift_detectors 1\n}\ndetector D0\n";
+    for (rejected, offset, accepted, unfolded, folded) in [
+        (
+            "CX sweep[0] 1 rec[-1] 2\n",
+            "rec[-1]",
+            "M 0\nCX sweep[0] 1 rec[-1] 2\nM 2\nDETECTOR rec[-1]\n",
+            "detector D0\n",
+            "detector D0\n",
+        ),
+        (
+            "CZ rec[-1] 0\n",
+            "rec[-1]",
+            "X_ERROR(0.25) 0\nM 0\nRX 1\nCZ rec[-1] 1\nMX 1\nDETECTOR rec[-1]\n",
+            "error(0.25) D0\n",
+            "error(0.25) D0\n",
+        ),
+        (
+            "M 0\nCX rec[-2] 1\n",
+            "rec[-2]",
+            "X_ERROR(0.25) 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1]\n",
+            "error(0.25) D0\n",
+            "error(0.25) D0\n",
+        ),
+        (
+            // Only the first iteration looks back before the first measurement.
+            "REPEAT 3 {\n    X_ERROR(0.1) 0\n    CX rec[-1] 1\n    M 0 1\n    DETECTOR rec[-1]\n}\n",
+            "rec[-1]",
+            "X_ERROR(0.25) 1\nM 1\nREPEAT 3 {\n    X_ERROR(0.1) 0\n    CX rec[-1] 1\n    M 0 1\n    DETECTOR rec[-1]\n}\n",
+            "detector D0\ndetector D1\ndetector D2\n",
+            in_range_loop_folded,
+        ),
+    ] {
+        for (fold_loops, expected) in [(false, unfolded), (true, folded)] {
+            let options = ErrorAnalyzerOptions {
+                fold_loops,
+                ..ErrorAnalyzerOptions::default()
+            };
+            let circuit = Circuit::from_stim_str(rejected).expect("rejected circuit");
+            let error = circuit_to_detector_error_model(&circuit, options.clone())
+                .expect_err("lookback before the first measurement must be rejected");
+            assert!(
+                matches!(error, AnalysisError::InvalidDetectorErrorModel { .. }),
+                "{rejected:?} (fold_loops={fold_loops}): {error:?}"
+            );
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "invalid detector error model: measurement record offset {offset} is out of range"
+                ),
+                "{rejected:?} (fold_loops={fold_loops})"
+            );
+            let circuit = Circuit::from_stim_str(accepted).expect("accepted circuit");
+            let model = circuit_to_detector_error_model(&circuit, options)
+                .expect("in-range feedback lookback must be accepted");
+            assert_eq!(
+                model.to_dem_string(),
+                expected,
+                "{accepted:?} (fold_loops={fold_loops})"
+            );
+        }
     }
 }

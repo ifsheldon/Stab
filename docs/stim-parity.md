@@ -13,13 +13,13 @@ Supporting pinned-Stim fixtures live in [the fixture corpus](../oracle/fixtures/
 | done | 88 |
 | missing | 0 |
 | deferred | 13 |
-| divergence | 55 |
+| divergence | 56 |
 
 Status describes implementation only. A `done` row may still need a lean canonical owner before it is qualification-ready; `missing` means the behavior contract itself is incomplete. A `deferred` or `divergence` row states why it is outside exact parity.
 
 | Evidence | Families |
 | --- | ---: |
-| verified | 143 |
+| verified | 144 |
 | needs-owner | 0 |
 | not-applicable | 13 |
 
@@ -73,6 +73,7 @@ Status describes implementation only. A `done` row may still need a lean canonic
 | --- | --- | --- | --- | --- | --- | --- |
 | `analysis.circuit-to-dem-common-generated-qec` | done | verified | `stab-analysis` | Circuit-to-DEM analysis matches pinned Stim semantics for the generated rotated-surface-code regression workload. | `cargo test -p stab-analysis --test consolidation_matrix -- circuit_to_dem_selected_gate_surface_semantic_matrix_matches_stim --exact --include-ignored` | [`src/stim/util_top/circuit_to_dem.test.cc`](../vendor/stim/src/stim/util_top/circuit_to_dem.test.cc), [`src/stim/simulators/error_analyzer.test.cc`](../vendor/stim/src/stim/simulators/error_analyzer.test.cc) |
 | `analysis.circuit-to-dem-error-decomposition` | done | verified | `stab-analysis` | Circuit-to-DEM graphlike decomposition matches selected exact, greedy-remnant, and blocked-remnant Stim behavior. | `cargo test -p stab-analysis --test consolidation_matrix -- circuit_to_dem_error_decomposition_contract_matches_stim --exact --include-ignored` | [`src/stim/simulators/error_analyzer.test.cc`](../vendor/stim/src/stim/simulators/error_analyzer.test.cc), [`src/stim/util_top/circuit_to_dem.test.cc`](../vendor/stim/src/stim/util_top/circuit_to_dem.test.cc) |
+| `analysis.circuit-to-dem-feedback-record-lookback` | divergence | verified | `stab-analysis` | Circuit-to-DEM analysis rejects a classically controlled Pauli whose measurement-record control looks back before the first measurement, in both fold modes, while accepting lookbacks that reach an earlier measurement. | Stab extension: Pinned Stim analyze_errors adds the negative record offset to its unsigned measurement count without a bounds check and prints a model, while its sample, detect, and m2d abort on the same circuit and its analyzer rejects such lookbacks from DETECTOR and OBSERVABLE_INCLUDE; Stab rejects the lookback as invalid in every command. `cargo test -p stab-analysis --test dem_analyzer_classical -- dem_analyzer_rejects_feedback_record_lookback_before_first_measurement --exact --include-ignored`. | [`src/stim/simulators/sparse_rev_frame_tracker.cc`](../vendor/stim/src/stim/simulators/sparse_rev_frame_tracker.cc), [`src/stim/io/measure_record.cc`](../vendor/stim/src/stim/io/measure_record.cc) |
 | `analysis.circuit-to-dem-selected-gate-surface` | done | verified | `stab-analysis` | Circuit-to-DEM analysis implements every declared legal in-scope Pauli, Clifford, noise, measurement, product, heralded, feedback, gauge, coordinate, and annotation gate shape. | `cargo test -p stab-oracle --bin stab-oracle -- parity::tests::catalog_semantics::p5_catalog_circuit_to_dem_matches_pinned_stim --exact --include-ignored` | [`src/stim/simulators/error_analyzer.test.cc`](../vendor/stim/src/stim/simulators/error_analyzer.test.cc), [`src/stim/util_top/circuit_to_dem.test.cc`](../vendor/stim/src/stim/util_top/circuit_to_dem.test.cc) |
 | `analysis.circuit-to-tableau-conversion-common` | done | verified | `stab-analysis` | Circuit-to-tableau conversion preserves the implemented unitary circuit semantics while rejecting nonunitary instructions. | `cargo test -p stab-analysis --test circuit_tableau -- circuit_to_tableau_common_semantic_matrix_matches_stim --exact --include-ignored` | [`src/stim/util_top/circuit_vs_tableau.test.cc`](../vendor/stim/src/stim/util_top/circuit_vs_tableau.test.cc) |
 | `analysis.detecting-regions-common` | done | verified | `stab-analysis` | Detecting-region analysis handles every fixed one- and two-qubit Clifford tableau gate, product measurement, annotation, noise, legal classical control, target filter, anticommutation mode, and compact repeat while skipping unrequested tick spans without expansion. | `cargo test -p stab-oracle --bin stab-oracle -- parity::tests::catalog_semantics::p5_catalog_detecting_regions_match_pinned_stim --exact --include-ignored` | [`src/stim/util_top/circuit_to_detecting_regions.test.cc`](../vendor/stim/src/stim/util_top/circuit_to_detecting_regions.test.cc) |

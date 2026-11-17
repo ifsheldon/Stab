@@ -135,6 +135,23 @@ target = "consolidation_matrix"
 name = "circuit_to_dem_error_decomposition_contract_matches_stim"
 
 [[families]]
+id = "analysis.circuit-to-dem-feedback-record-lookback"
+area = "analysis"
+contract = "Circuit-to-DEM analysis rejects a classically controlled Pauli whose measurement-record control looks back before the first measurement, in both fold modes, while accepting lookbacks that reach an earlier measurement."
+stim_refs = ["src/stim/simulators/sparse_rev_frame_tracker.cc", "src/stim/io/measure_record.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim analyze_errors adds the negative record offset to its unsigned measurement count without a bounds check and prints a model, while its sample, detect, and m2d abort on the same circuit and its analyzer rejects such lookbacks from DETECTOR and OBSERVABLE_INCLUDE; Stab rejects the lookback as invalid in every command."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_analyzer_classical"
+name = "dem_analyzer_rejects_feedback_record_lookback_before_first_measurement"
+
+[[families]]
 id = "analysis.circuit-to-dem-selected-gate-surface"
 area = "analysis"
 contract = "Circuit-to-DEM analysis implements every declared legal in-scope Pauli, Clifford, noise, measurement, product, heralded, feedback, gauge, coordinate, and annotation gate shape."
