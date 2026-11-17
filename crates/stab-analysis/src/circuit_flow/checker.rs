@@ -51,7 +51,7 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
 /// Checks unsigned stabilizer flows against the supported unitary and sparse-tracker subsets.
 ///
 /// Pauli-only flows of a measurement-free circuit are checked either against one dense Tableau or
-/// with the sparse reverse tracker, whichever [`FlowCheckCost`] estimates to be cheaper; both
+/// with the sparse reverse tracker, whichever an internal cost model estimates to be cheaper; both
 /// return the same result. A flow outside the supported subset is reported as `false`.
 ///
 /// # Errors
