@@ -1,15 +1,57 @@
 use std::borrow::Cow;
-use std::ops::Range;
 
 use crate::{
-    ModelDialect, ModelError, ModelResult, ParseError, ParseLimits,
+    ByteSpan, ModelDialect, ModelError, ModelResult, ParseError, ParseLimits,
     advanced::invalid_utf8_parse_error, parse_limits::ParseAdmission,
 };
 
 pub(crate) struct PreparedModelText<'a> {
     text: Cow<'a, str>,
-    tags: Option<Vec<Vec<u8>>>,
+    admission: ParseAdmission,
+    tags: Option<RecoveredTags>,
     invalid_utf8: Option<ParseError>,
+}
+
+/// Unescaped tag bytes recovered from non-UTF-8 input, in source order, stored in one arena.
+#[derive(Default)]
+pub(crate) struct RecoveredTags {
+    bytes: Vec<u8>,
+    ends: Vec<usize>,
+}
+
+impl RecoveredTags {
+    pub(crate) fn len(&self) -> usize {
+        self.ends.len()
+    }
+
+    /// Each recovered tag as an owned byte vector, in source order.
+    pub(crate) fn into_owned_tags(self) -> impl Iterator<Item = Vec<u8>> {
+        let bytes = self.bytes;
+        let mut start = 0usize;
+        self.ends.into_iter().map(move |end| {
+            let tag = bytes
+                .get(start..end)
+                .map(<[u8]>::to_vec)
+                .unwrap_or_default();
+            start = end;
+            tag
+        })
+    }
+
+    /// Appends the unescaped form of non-empty `raw`, which `admission` has already charged.
+    fn push_unescaped(&mut self, raw: &[u8]) -> ModelResult<()> {
+        let reserve_error = |error: std::collections::TryReserveError| {
+            ModelError::invalid_domain_value(
+                "model byte input",
+                format!("unable to reserve recovered tag storage: {error}"),
+            )
+        };
+        self.bytes.try_reserve(raw.len()).map_err(reserve_error)?;
+        self.ends.try_reserve(1).map_err(reserve_error)?;
+        unescape_tag_into(raw, &mut self.bytes);
+        self.ends.push(self.bytes.len());
+        Ok(())
+    }
 }
 
 impl<'a> PreparedModelText<'a> {
@@ -18,69 +60,64 @@ impl<'a> PreparedModelText<'a> {
         dialect: ModelDialect,
         limits: ParseLimits,
     ) -> ModelResult<Self> {
-        ParseAdmission::admit_source_bytes(dialect, input.len(), limits)?;
-        if let Ok(text) = std::str::from_utf8(input) {
-            return Ok(Self {
-                text: Cow::Borrowed(text),
-                tags: None,
-                invalid_utf8: None,
-            });
-        }
-
-        let (metadata_ranges, tags) = scan_metadata(input);
-        let mut sanitized = input.to_vec();
-        let mut invalid_utf8 = None;
-        let mut cursor = 0usize;
-        let mut metadata_range_index = 0usize;
-
-        while cursor < sanitized.len() {
-            let remaining = sanitized.get(cursor..).ok_or_else(|| {
-                ModelError::invalid_domain_value(
-                    "model byte input",
-                    "UTF-8 scan cursor escaped input",
-                )
-            })?;
-            let error = match std::str::from_utf8(remaining) {
-                Ok(_) => break,
-                Err(error) => error,
-            };
-            let byte_start = cursor.checked_add(error.valid_up_to()).ok_or_else(|| {
-                ModelError::invalid_domain_value("model byte input", "UTF-8 error offset overflow")
-            })?;
-            let byte_length = error
-                .error_len()
-                .unwrap_or_else(|| sanitized.len().saturating_sub(byte_start))
-                .max(1);
-            let byte_end = byte_start.checked_add(byte_length).ok_or_else(|| {
-                ModelError::invalid_domain_value("model byte input", "UTF-8 error span overflow")
-            })?;
-            let is_opaque_metadata = byte_range_is_opaque_metadata(
-                &metadata_ranges,
-                &mut metadata_range_index,
-                byte_start,
-                byte_end,
-            );
-            if !is_opaque_metadata && invalid_utf8.is_none() {
-                invalid_utf8 = Some(invalid_utf8_parse_error(
-                    dialect,
-                    byte_start,
-                    byte_length,
-                    error.error_len(),
-                ));
+        let mut admission = ParseAdmission::new(dialect, input.len(), limits)?;
+        let first_error = match std::str::from_utf8(input) {
+            Ok(text) => {
+                return Ok(Self {
+                    text: Cow::Borrowed(text),
+                    admission,
+                    tags: None,
+                    invalid_utf8: None,
+                });
             }
-            let Some(region) = sanitized.get_mut(byte_start..byte_end) else {
-                return Err(ModelError::invalid_domain_value(
-                    "model byte input",
-                    "UTF-8 error span escaped input",
-                ));
-            };
-            region.fill(b'?');
-            cursor = byte_end;
-        }
+            Err(error) => error,
+        };
 
-        let text = ParseError::decode_utf8(dialect, &sanitized)?.to_owned();
+        // The sanitized copy and the recovered tags live beside `input` while the model is
+        // parsed, so each is admitted before it is allocated.
+        let first_invalid = first_error.valid_up_to();
+        let first_invalid_line = input
+            .get(..first_invalid)
+            .map_or(0, |prefix| {
+                prefix.iter().filter(|byte| **byte == b'\n').count()
+            })
+            .saturating_add(1);
+        admission.admit_sanitized_copy(
+            input.len(),
+            first_invalid_line,
+            ByteSpan::from_valid_range(first_invalid, first_error.error_len().unwrap_or(1)),
+        )?;
+        let mut sanitized = Vec::new();
+        sanitized.try_reserve_exact(input.len()).map_err(|error| {
+            ModelError::invalid_domain_value(
+                "model byte input",
+                format!("unable to reserve the sanitized text copy: {error}"),
+            )
+        })?;
+        sanitized.extend_from_slice(input);
+
+        // Invalid UTF-8 inside comments and tags is opaque metadata: the scan replaces it in
+        // place while recovering the raw tags, so every invalid sequence left afterwards lies
+        // outside metadata. Metadata ranges start at or after an ASCII delimiter and end
+        // before one, so no invalid sequence straddles a range boundary and replacing a range
+        // does not change how the surrounding bytes decode.
+        let tags = scan_metadata(input, &mut sanitized, &mut admission)?;
+        let mut invalid_utf8 = None;
+        replace_invalid_utf8(&mut sanitized, 0, |byte_start, byte_length, error_len| {
+            invalid_utf8.get_or_insert_with(|| {
+                invalid_utf8_parse_error(dialect, byte_start, byte_length, error_len)
+            });
+        })?;
+
+        let text = String::from_utf8(sanitized).map_err(|_| {
+            ModelError::invalid_domain_value(
+                "model byte input",
+                "sanitized text is not valid UTF-8",
+            )
+        })?;
         Ok(Self {
             text: Cow::Owned(text),
+            admission,
             tags: Some(tags),
             invalid_utf8,
         })
@@ -90,11 +127,16 @@ impl<'a> PreparedModelText<'a> {
         &self.text
     }
 
+    /// The parse admission, which has charged the source bytes and the preparation storage.
+    pub(crate) fn admission(&self) -> ParseAdmission {
+        self.admission
+    }
+
     pub(crate) fn requires_tag_restore(&self) -> bool {
         self.tags.is_some()
     }
 
-    pub(crate) fn into_tags(self) -> Option<Vec<Vec<u8>>> {
+    pub(crate) fn into_tags(self) -> Option<RecoveredTags> {
         self.tags
     }
 
@@ -109,20 +151,47 @@ impl<'a> PreparedModelText<'a> {
     }
 }
 
-fn byte_range_is_opaque_metadata(
-    metadata_ranges: &[Range<usize>],
-    range_index: &mut usize,
-    byte_start: usize,
-    byte_end: usize,
-) -> bool {
-    while let Some(range) = metadata_ranges.get(*range_index) {
-        if range.end <= byte_start {
-            *range_index = range_index.saturating_add(1);
-            continue;
-        }
-        return range.start <= byte_start && byte_end <= range.end;
+/// Replaces every invalid UTF-8 sequence of `bytes`, which starts at absolute offset `base`,
+/// with `?` bytes, reporting each sequence's absolute start, length, and UTF-8 error length in
+/// order.
+fn replace_invalid_utf8(
+    bytes: &mut [u8],
+    base: usize,
+    mut on_invalid: impl FnMut(usize, usize, Option<usize>),
+) -> ModelResult<()> {
+    let mut cursor = 0usize;
+    while cursor < bytes.len() {
+        let remaining = bytes.get(cursor..).ok_or_else(|| {
+            ModelError::invalid_domain_value("model byte input", "UTF-8 scan cursor escaped input")
+        })?;
+        let error = match std::str::from_utf8(remaining) {
+            Ok(_) => break,
+            Err(error) => error,
+        };
+        let byte_start = cursor.checked_add(error.valid_up_to()).ok_or_else(|| {
+            ModelError::invalid_domain_value("model byte input", "UTF-8 error offset overflow")
+        })?;
+        let byte_length = error
+            .error_len()
+            .unwrap_or_else(|| bytes.len().saturating_sub(byte_start))
+            .max(1);
+        let byte_end = byte_start.checked_add(byte_length).ok_or_else(|| {
+            ModelError::invalid_domain_value("model byte input", "UTF-8 error span overflow")
+        })?;
+        let absolute_start = base.checked_add(byte_start).ok_or_else(|| {
+            ModelError::invalid_domain_value("model byte input", "UTF-8 error offset overflow")
+        })?;
+        on_invalid(absolute_start, byte_length, error.error_len());
+        let Some(region) = bytes.get_mut(byte_start..byte_end) else {
+            return Err(ModelError::invalid_domain_value(
+                "model byte input",
+                "UTF-8 error span escaped input",
+            ));
+        };
+        region.fill(b'?');
+        cursor = byte_end;
     }
-    false
+    Ok(())
 }
 
 fn error_precedes_invalid_utf8(error: &ModelError, invalid_utf8: &ParseError) -> bool {
@@ -135,9 +204,20 @@ fn error_precedes_invalid_utf8(error: &ModelError, invalid_utf8: &ParseError) ->
         .is_some_and(|resource_error| resource_error.span().byte_start() <= invalid_start)
 }
 
-fn scan_metadata(input: &[u8]) -> (Vec<Range<usize>>, Vec<Vec<u8>>) {
-    let mut ranges = Vec::new();
-    let mut tags = Vec::new();
+/// Walks the comments and tags of `input`, replacing invalid UTF-8 inside them in `sanitized`
+/// and recovering each non-empty tag, admitted against `admission` before it is stored.
+fn scan_metadata(
+    input: &[u8],
+    sanitized: &mut [u8],
+    admission: &mut ParseAdmission,
+) -> ModelResult<RecoveredTags> {
+    let mut scan = MetadataScan {
+        input,
+        sanitized,
+        admission,
+        tags: RecoveredTags::default(),
+        line_number: 0,
+    };
     let mut line_start = 0usize;
     while line_start < input.len() {
         let Some(remaining) = input.get(line_start..) else {
@@ -148,101 +228,128 @@ fn scan_metadata(input: &[u8]) -> (Vec<Range<usize>>, Vec<Vec<u8>>) {
             .position(|byte| *byte == b'\n')
             .unwrap_or(input.len() - line_start);
         let line_end = line_start + relative_end;
-        scan_line(input, line_start, line_end, &mut ranges, &mut tags);
+        scan.line_number = scan.line_number.saturating_add(1);
+        scan.scan_line(line_start, line_end)?;
         line_start = line_end.saturating_add(usize::from(line_end < input.len()));
     }
-    (ranges, tags)
+    Ok(scan.tags)
 }
 
-fn scan_line(
-    input: &[u8],
-    line_start: usize,
-    line_end: usize,
-    ranges: &mut Vec<Range<usize>>,
-    tags: &mut Vec<Vec<u8>>,
-) {
-    let mut cursor = line_start;
-    while cursor < line_end {
-        while cursor < line_end && matches!(input.get(cursor), Some(b' ' | b'\t' | b'\r')) {
-            cursor += 1;
+struct MetadataScan<'a> {
+    input: &'a [u8],
+    sanitized: &'a mut [u8],
+    admission: &'a mut ParseAdmission,
+    tags: RecoveredTags,
+    line_number: usize,
+}
+
+impl MetadataScan<'_> {
+    /// Marks `start..end` of the input as opaque metadata.
+    fn metadata(&mut self, start: usize, end: usize) -> ModelResult<()> {
+        let Some(region) = self.sanitized.get_mut(start..end) else {
+            return Err(ModelError::invalid_domain_value(
+                "model byte input",
+                "metadata range escaped input",
+            ));
+        };
+        replace_invalid_utf8(region, start, |_, _, _| {})
+    }
+
+    fn tag(&mut self, start: usize, end: usize) -> ModelResult<()> {
+        self.metadata(start, end)?;
+        let Some(raw_tag) = self.input.get(start..end) else {
+            return Err(ModelError::invalid_domain_value(
+                "model byte input",
+                "tag range escaped input",
+            ));
+        };
+        if raw_tag.is_empty() {
+            return Ok(());
         }
-        if cursor >= line_end {
-            break;
-        }
-        match input.get(cursor) {
-            Some(b'#') => {
-                ranges.push(cursor..line_end);
+        self.admission.admit_recovered_tag(
+            raw_tag.len(),
+            self.line_number,
+            ByteSpan::from_valid_range(start, raw_tag.len()),
+        )?;
+        self.tags.push_unescaped(raw_tag)
+    }
+
+    fn scan_line(&mut self, line_start: usize, line_end: usize) -> ModelResult<()> {
+        let input = self.input;
+        let mut cursor = line_start;
+        while cursor < line_end {
+            while cursor < line_end && matches!(input.get(cursor), Some(b' ' | b'\t' | b'\r')) {
+                cursor += 1;
+            }
+            if cursor >= line_end {
                 break;
             }
-            Some(b'{' | b'}') => {
-                cursor += 1;
-                continue;
-            }
-            _ => {}
-        }
-
-        while cursor < line_end
-            && input
-                .get(cursor)
-                .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
-        {
-            cursor += 1;
-        }
-        if cursor < line_end && input.get(cursor) == Some(&b'[') {
-            let content_start = cursor + 1;
-            cursor = content_start;
-            let mut escaped = false;
-            let mut terminated = false;
-            while cursor < line_end {
-                let Some(byte) = input.get(cursor).copied() else {
-                    break;
-                };
-                if escaped {
-                    escaped = false;
-                } else if byte == b'\\' {
-                    escaped = true;
-                } else if byte == b']' {
-                    ranges.push(content_start..cursor);
-                    let Some(raw_tag) = input.get(content_start..cursor) else {
-                        break;
-                    };
-                    let tag = unescape_tag(raw_tag);
-                    if !tag.is_empty() {
-                        tags.push(tag);
-                    }
-                    cursor += 1;
-                    terminated = true;
-                    break;
-                }
-                cursor += 1;
-            }
-            if !terminated {
-                ranges.push(content_start..line_end);
-            }
-        }
-
-        let mut in_arguments = false;
-        while cursor < line_end {
             match input.get(cursor) {
                 Some(b'#') => {
-                    ranges.push(cursor..line_end);
-                    return;
+                    return self.metadata(cursor, line_end);
                 }
-                Some(b'(') => in_arguments = true,
-                Some(b')') => in_arguments = false,
-                Some(b'{' | b'}') if !in_arguments => {
+                Some(b'{' | b'}') => {
                     cursor += 1;
-                    break;
+                    continue;
                 }
                 _ => {}
             }
-            cursor += 1;
+
+            while cursor < line_end
+                && input
+                    .get(cursor)
+                    .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+            {
+                cursor += 1;
+            }
+            if cursor < line_end && input.get(cursor) == Some(&b'[') {
+                let content_start = cursor + 1;
+                cursor = content_start;
+                let mut escaped = false;
+                let mut terminated = false;
+                while cursor < line_end {
+                    let Some(byte) = input.get(cursor).copied() else {
+                        break;
+                    };
+                    if escaped {
+                        escaped = false;
+                    } else if byte == b'\\' {
+                        escaped = true;
+                    } else if byte == b']' {
+                        self.tag(content_start, cursor)?;
+                        cursor += 1;
+                        terminated = true;
+                        break;
+                    }
+                    cursor += 1;
+                }
+                if !terminated {
+                    self.metadata(content_start, line_end)?;
+                }
+            }
+
+            let mut in_arguments = false;
+            while cursor < line_end {
+                match input.get(cursor) {
+                    Some(b'#') => {
+                        return self.metadata(cursor, line_end);
+                    }
+                    Some(b'(') => in_arguments = true,
+                    Some(b')') => in_arguments = false,
+                    Some(b'{' | b'}') if !in_arguments => {
+                        cursor += 1;
+                        break;
+                    }
+                    _ => {}
+                }
+                cursor += 1;
+            }
         }
+        Ok(())
     }
 }
 
-fn unescape_tag(raw: &[u8]) -> Vec<u8> {
-    let mut tag = Vec::with_capacity(raw.len());
+fn unescape_tag_into(raw: &[u8], tag: &mut Vec<u8>) {
     let mut cursor = 0usize;
     while cursor < raw.len() {
         let Some(byte) = raw.get(cursor).copied() else {
@@ -266,69 +373,38 @@ fn unescape_tag(raw: &[u8]) -> Vec<u8> {
             cursor += 1;
         }
     }
-    tag
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    reason = "the scanner fixture is well-formed and fits the default budget"
+)]
 mod tests {
-    use std::ops::Range;
-
-    use super::{byte_range_is_opaque_metadata, scan_metadata};
+    use super::scan_metadata;
+    use crate::parse_limits::ParseAdmission;
+    use crate::{ModelDialect, ParseLimits};
 
     #[test]
     fn metadata_scanner_distinguishes_tags_comments_and_target_brackets() {
-        let input = b"REPEAT[x] 2 { H[y] 0 # z\n} M rec[-1]\n";
-        let (ranges, tags) = scan_metadata(input);
-        assert_eq!(tags, [b"x".to_vec(), b"y".to_vec()]);
-        assert!(
-            ranges
-                .iter()
-                .any(|range| input.get(range.clone()) == Some(b"x".as_slice()))
+        let input = b"REPEAT[x\xff] 2 { H[y\\B\xfe] 0 # z\xfd\n} M rec[-1\xfc]\n";
+        let mut sanitized = input.to_vec();
+        let mut admission = ParseAdmission::new(
+            ModelDialect::StimCircuit,
+            input.len(),
+            ParseLimits::default(),
+        )
+        .expect("default admission");
+        let tags = scan_metadata(input, &mut sanitized, &mut admission).expect("scan");
+        assert_eq!(
+            tags.into_owned_tags().collect::<Vec<_>>(),
+            [b"x\xff".to_vec(), b"y\\\xfe".to_vec()]
         );
-        assert!(
-            ranges
-                .iter()
-                .any(|range| input.get(range.clone()) == Some(b"y".as_slice()))
+        // Invalid bytes inside tags and comments are opaque metadata, replaced in place, while
+        // the measurement-record brackets are code and keep their invalid byte for diagnosis.
+        assert_eq!(
+            sanitized,
+            b"REPEAT[x?] 2 { H[y\\B?] 0 # z?\n} M rec[-1\xfc]\n".to_vec()
         );
-        assert!(ranges.iter().any(|range| {
-            input
-                .get(range.clone())
-                .is_some_and(|bytes| bytes.starts_with(b"#"))
-        }));
-        assert!(
-            !ranges
-                .iter()
-                .any(|range| input.get(range.clone()) == Some(b"-1".as_slice()))
-        );
-    }
-
-    #[test]
-    fn opaque_metadata_classification_advances_monotonically() {
-        let ranges = (0..100_000usize)
-            .map(|index| {
-                let start = index.saturating_mul(2);
-                Range {
-                    start,
-                    end: start.saturating_add(1),
-                }
-            })
-            .collect::<Vec<_>>();
-        let mut range_index = 0usize;
-        for (expected_index, range) in ranges.iter().enumerate() {
-            assert!(byte_range_is_opaque_metadata(
-                &ranges,
-                &mut range_index,
-                range.start,
-                range.end,
-            ));
-            assert_eq!(range_index, expected_index);
-        }
-        assert!(!byte_range_is_opaque_metadata(
-            &ranges,
-            &mut range_index,
-            ranges.len().saturating_mul(2),
-            ranges.len().saturating_mul(2).saturating_add(1),
-        ));
-        assert_eq!(range_index, ranges.len());
     }
 }

@@ -35,7 +35,7 @@ pub(crate) mod advanced {
 use traversal::FoldedDemTraversal;
 
 use crate::circuit::printing::DemFloatCache;
-use crate::model_bytes::PreparedModelText;
+use crate::model_bytes::{PreparedModelText, RecoveredTags};
 use crate::{
     AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
     ParseLimits, Probability, RepeatNestingLimit,
@@ -76,7 +76,7 @@ impl DetectorErrorModel {
     /// A caller that drops `input` after parsing holds about this many bytes for the model.
     pub fn from_dem_bytes_admitted(input: &[u8], limits: ParseLimits) -> ModelResult<(Self, u64)> {
         let prepared = PreparedModelText::new(input, ModelDialect::DetectorErrorModel, limits)?;
-        let parsed = prepared.resolve(parse_dem_admitted(prepared.text(), limits));
+        let parsed = prepared.resolve(parse_dem_admitted(prepared.text(), prepared.admission()));
         let (mut model, model_bytes) = parsed?;
         if let Some(tags) = prepared.into_tags() {
             model.restore_byte_tags(tags)?;
@@ -239,7 +239,7 @@ impl DetectorErrorModel {
         Ok(())
     }
 
-    fn restore_byte_tags(&mut self, tags: Vec<Vec<u8>>) -> ModelResult<()> {
+    fn restore_byte_tags(&mut self, tags: RecoveredTags) -> ModelResult<()> {
         let expected = self.non_empty_tag_count();
         if expected != tags.len() {
             return Err(ModelError::invalid_domain_value(
@@ -250,7 +250,7 @@ impl DetectorErrorModel {
                 ),
             ));
         }
-        let mut tags = tags.into_iter();
+        let mut tags = tags.into_owned_tags();
         self.restore_byte_tags_from(&mut tags);
         let exhausted = tags.next().is_none();
         debug_assert!(exhausted);

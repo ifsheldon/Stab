@@ -18,16 +18,18 @@ const MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE: u64 = 1_u64 << 63;
 mod fast;
 
 pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
-    Parser::new(input, limits, true)?.parse()
+    let admission = ParseAdmission::new(ModelDialect::StimCircuit, input.len(), limits)?;
+    Parser::new(input, admission, true).parse()
 }
 
-/// Parses `input` and returns the retained model bytes its admission charged, excluding `input`.
+/// Parses `input` under `admission`, which has already charged `input` and any preparation
+/// storage, and returns the retained model bytes it charged, excluding both.
 pub(super) fn parse_circuit_admitted(
     input: &str,
-    limits: ParseLimits,
+    admission: ParseAdmission,
     fuse_instructions: bool,
 ) -> ModelResult<(Circuit, u64)> {
-    let mut parser = Parser::new(input, limits, fuse_instructions)?;
+    let mut parser = Parser::new(input, admission, fuse_instructions);
     let circuit = parser.parse_block(false, 0)?;
     Ok((circuit, parser.admission.retained_model_bytes()))
 }
@@ -44,9 +46,8 @@ struct Parser<'a> {
 ///
 /// Every line is parsed here first and then moved into its instruction with one exact-size
 /// allocation (none when the values fit inline), so a line with many targets never walks a
-/// reallocation chain per instruction. Each target is admitted before it is pushed, and the
-/// arguments are bounded by the already-admitted line length, so the scratch never holds more
-/// than the largest line admission accepted.
+/// reallocation chain per instruction. Each argument and target is admitted before it is pushed,
+/// so the scratch never holds more than the largest line admission accepted.
 #[derive(Default)]
 struct ParseScratch {
     args: Vec<f64>,
@@ -54,15 +55,14 @@ struct ParseScratch {
 }
 
 impl<'a> Parser<'a> {
-    fn new(input: &'a str, limits: ParseLimits, fuse_instructions: bool) -> ModelResult<Self> {
-        let admission = ParseAdmission::new(ModelDialect::StimCircuit, input.len(), limits)?;
-        Ok(Self {
+    fn new(input: &'a str, admission: ParseAdmission, fuse_instructions: bool) -> Self {
+        Self {
             commands: SourceCommands::new(input),
             input_len: input.len(),
             admission,
             scratch: ParseScratch::default(),
             fuse_instructions,
-        })
+        }
     }
 
     fn parse(mut self) -> ModelResult<Circuit> {
@@ -117,8 +117,10 @@ impl<'a> Parser<'a> {
                     &mut self.admission,
                     &mut self.scratch,
                 )?;
+                // The generic parser admitted each argument before retaining it, and the fast
+                // paths accept no arguments, so only the tag remains to charge.
                 self.admission.admit_payload(
-                    instruction.args().len(),
+                    0,
                     instruction.tag_bytes().map_or(0, <[u8]>::len),
                     line_number,
                     semantic_line.span(),
@@ -167,13 +169,16 @@ impl<'a> Parser<'a> {
         // Pinned Stim lexes parenthesized arguments for every gate before the
         // block brace check and then drops them for block gates, so REPEAT
         // headers accept and discard well-formed arguments while malformed
-        // ones keep the shared argument diagnostics (circuit.cc:213-218).
+        // ones keep the shared argument diagnostics (circuit.cc:213-218). The
+        // discarded arguments are checked against the budget but never charged.
+        let admission = &self.admission;
         let (_args, rest) = parse_optional_args(
             line_number,
             name.text(),
             rest,
             end_error_span,
             &mut self.scratch.args,
+            |count, span| admission.admit_transient_arguments(count, line_number, span),
         )?;
         if !rest
             .text()
@@ -348,6 +353,7 @@ fn parse_instruction_fully_generic_from_parts(
         rest,
         end_error_span,
         &mut scratch.args,
+        |_, span| admission.admit_argument(line_number, span),
     )?;
     let targets = parse_targets(
         line_number,
@@ -539,12 +545,16 @@ struct ParsedArguments {
 }
 
 /// Parses an optional parenthesized argument list into `values`, which is cleared first.
+///
+/// `admit` receives the argument count including the next argument and that argument's span,
+/// and must accept it before the argument is pushed.
 fn parse_optional_args<'a>(
     line_number: usize,
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
     values: &mut Vec<f64>,
+    mut admit: impl FnMut(usize, ByteSpan) -> ModelResult<()>,
 ) -> ModelResult<(ParsedArguments, SourceSlice<'a>)> {
     values.clear();
     let Some(body) = rest.strip_prefix("(") else {
@@ -602,6 +612,13 @@ fn parse_optional_args<'a>(
         if !value.is_finite() {
             first_non_finite.get_or_insert(token);
         }
+        admit(values.len().saturating_add(1), token.span())?;
+        values.try_reserve(1).map_err(|error| {
+            ModelError::invalid_domain_value(
+                "circuit argument allocation",
+                format!("unable to reserve an argument slot: {error}"),
+            )
+        })?;
         values.push(value);
         if token_end == raw_args.text().len() {
             break;

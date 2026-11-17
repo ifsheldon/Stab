@@ -473,3 +473,105 @@ fn parser_allocation_depends_only_on_admitted_model_storage() {
         }
     }
 }
+
+#[test]
+fn parser_admits_each_argument_before_retaining_it() {
+    // An empty argument token parses as 0.0 as in pinned Stim, so a short line of commas would
+    // otherwise grow an argument vector eight times its length before any charge.
+    fn rejected_allocations(input: &str, parse: ParseStr) -> allocation_counter::AllocationInfo {
+        allocation_counter::measure(|| {
+            let error = parse(input, budget(input.len() + 4_096)).expect_err("budget refuses");
+            let resource = error.resource_limit_error().expect("typed rejection");
+            assert_eq!(resource.resource(), ResourceKind::RetainedBytes);
+            assert_eq!(resource.source_line(), Some(1));
+            std::hint::black_box(error);
+        })
+    }
+
+    for (name, prefix, suffix, parse) in [
+        (
+            "circuit instruction",
+            "QUBIT_COORDS(",
+            ") 0\n",
+            parse_circuit_str as ParseStr,
+        ),
+        (
+            "discarded circuit repeat arguments",
+            "REPEAT(",
+            ") 2 {\nH 0\n}\n",
+            parse_circuit_str,
+        ),
+        ("DEM instruction", "detector(", ") D0\n", parse_dem_str),
+    ] {
+        let short = format!("{prefix}{}{suffix}", ",".repeat(1 << 10));
+        let long = format!("{prefix}{}{suffix}", ",".repeat(1 << 20));
+        let short = rejected_allocations(&short, parse);
+        let long = rejected_allocations(&long, parse);
+        assert_eq!(long.count_total, short.count_total, "{name}: {long:?}");
+        assert_eq!(long.bytes_total, short.bytes_total, "{name}: {long:?}");
+        assert_eq!(long.bytes_max, short.bytes_max, "{name}: {long:?}");
+    }
+}
+
+#[test]
+fn non_utf8_preparation_admits_its_copy_and_recovered_tags_before_allocating() {
+    let comments = |count: usize| {
+        let mut input = b"#\xff\n".to_vec();
+        input.extend(b"#\n".repeat(count));
+        input
+    };
+    let tags = |count: usize, line: &[u8]| {
+        let mut input = b"#\xff\n".to_vec();
+        input.extend(line.repeat(count));
+        input
+    };
+
+    // A budget that admits the source but not its sanitized copy refuses before allocating.
+    for (name, input, parse) in [
+        (
+            "circuit",
+            comments(1 << 16),
+            parse_circuit_bytes as ParseBytes,
+        ),
+        ("DEM", comments(1 << 16), parse_dem_bytes),
+    ] {
+        let measured = allocation_counter::measure(|| {
+            let error = parse(&input, budget(input.len())).expect_err("copy is refused");
+            let resource = error.resource_limit_error().expect("typed rejection");
+            assert_eq!(resource.resource(), ResourceKind::RetainedBytes, "{name}");
+            assert_eq!(resource.source_line(), Some(1), "{name}");
+            assert_eq!(resource.actual(), 2 * input.len() as u64, "{name}");
+        });
+        assert_eq!(measured.count_total, 0, "{name}: {measured:?}");
+        assert_eq!(measured.bytes_total, 0, "{name}: {measured:?}");
+    }
+
+    // A budget that admits the copy and a few recovered tags refuses the next tag before
+    // storing it, so beyond the copy itself the allocation does not grow with the input.
+    for (name, line, parse) in [
+        (
+            "circuit",
+            b"TICK[a]\n".as_slice(),
+            parse_circuit_bytes as ParseBytes,
+        ),
+        ("DEM", b"detector[a] D0\n".as_slice(), parse_dem_bytes),
+    ] {
+        let beyond_copy = |input: &[u8]| {
+            let measured = allocation_counter::measure(|| {
+                let error = parse(input, budget(2 * input.len() + 256)).expect_err("tags refused");
+                let resource = error.resource_limit_error().expect("typed rejection");
+                assert_eq!(resource.resource(), ResourceKind::RetainedBytes, "{name}");
+                assert!(resource.source_line() > Some(1), "{name}: {resource}");
+            });
+            (
+                measured.count_total,
+                measured.bytes_total - input.len() as u64,
+            )
+        };
+        assert_eq!(
+            beyond_copy(&tags(1 << 16, line)),
+            beyond_copy(&tags(1 << 10, line)),
+            "{name}"
+        );
+    }
+}

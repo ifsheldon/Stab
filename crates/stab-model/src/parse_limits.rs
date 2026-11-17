@@ -149,11 +149,19 @@ pub(crate) const fn model_declaration_admitted_bytes(
         .saturating_add((tag_bytes as u64).saturating_mul(TAG_COPIES))
 }
 
+/// Conservative bytes of one tag byte recovered from non-UTF-8 input, whose arena grows by
+/// doubling.
+const RECOVERED_TAG_BYTE_BYTES: u64 = TARGET_SLOTS_PER_TARGET;
+/// Conservative bytes of one recovered tag's arena end offset, whose vector grows by doubling.
+const RECOVERED_TAG_BYTES: u64 = size_of::<usize>() as u64 * TARGET_SLOTS_PER_TARGET;
+
+#[derive(Clone, Copy)]
 pub(crate) struct ParseAdmission {
     dialect: ModelDialect,
     limits: ParseLimits,
     /// Source bytes plus the retained bytes charged so far; never above the budget.
     charged_bytes: u64,
+    /// Source bytes plus the transient preparation bytes, both excluded from the model bytes.
     source_bytes: u64,
 }
 
@@ -199,6 +207,12 @@ impl ParseAdmission {
     }
 
     fn charge(&mut self, bytes: u128, source_line: usize, span: ByteSpan) -> ModelResult<()> {
+        self.charged_bytes = self.admitted_total(bytes, source_line, span)?;
+        Ok(())
+    }
+
+    /// The charged total after `bytes` more, or the typed refusal when it exceeds the budget.
+    fn admitted_total(&self, bytes: u128, source_line: usize, span: ByteSpan) -> ModelResult<u64> {
         let required = u128::from(self.charged_bytes).saturating_add(bytes);
         let budget = self.limits.memory_budget();
         if !budget.admits(required) {
@@ -213,10 +227,48 @@ impl ParseAdmission {
             .into());
         }
         // `required` fits the u64 budget, so the conversion cannot fail after admission.
-        self.charged_bytes = u64::try_from(required).map_err(|_| {
+        u64::try_from(required).map_err(|_| {
             ModelError::invalid_domain_value("parse admission", "charged bytes overflow")
-        })?;
+        })
+    }
+
+    /// Charges transient storage that byte-input preparation holds while the model is parsed,
+    /// such as the sanitized text copy, without counting it as retained model bytes.
+    fn admit_preparation(
+        &mut self,
+        bytes: u128,
+        source_line: usize,
+        span: ByteSpan,
+    ) -> ModelResult<()> {
+        let charged = self.admitted_total(bytes, source_line, span)?;
+        let added = charged.saturating_sub(self.charged_bytes);
+        self.charged_bytes = charged;
+        self.source_bytes = self.source_bytes.saturating_add(added);
         Ok(())
+    }
+
+    /// Charges the sanitized copy of `byte_count` non-UTF-8 input bytes before it is allocated.
+    pub(crate) fn admit_sanitized_copy(
+        &mut self,
+        byte_count: usize,
+        source_line: usize,
+        span: ByteSpan,
+    ) -> ModelResult<()> {
+        self.admit_preparation(byte_count as u128, source_line, span)
+    }
+
+    /// Charges one tag of at most `raw_bytes` bytes recovered from non-UTF-8 input before its
+    /// arena storage is reserved.
+    pub(crate) fn admit_recovered_tag(
+        &mut self,
+        raw_bytes: usize,
+        source_line: usize,
+        span: ByteSpan,
+    ) -> ModelResult<()> {
+        let bytes = (raw_bytes as u128)
+            .saturating_mul(u128::from(RECOVERED_TAG_BYTE_BYTES))
+            .saturating_add(u128::from(RECOVERED_TAG_BYTES));
+        self.admit_preparation(bytes, source_line, span)
     }
 
     pub(crate) fn admit_instruction(
@@ -243,6 +295,23 @@ impl ParseAdmission {
     ) -> ModelResult<()> {
         let bytes = (count as u128).saturating_mul(u128::from(target_bytes(self.dialect)));
         self.charge(bytes, source_line, span)
+    }
+
+    /// Charges one parenthesized argument before it is retained.
+    pub(crate) fn admit_argument(&mut self, source_line: usize, span: ByteSpan) -> ModelResult<()> {
+        self.charge(u128::from(ARGUMENT_BYTES), source_line, span)
+    }
+
+    /// Checks that `count` parsed arguments fit beside the charged bytes without retaining
+    /// them, for argument lists that are parsed and then discarded.
+    pub(crate) fn admit_transient_arguments(
+        &self,
+        count: usize,
+        source_line: usize,
+        span: ByteSpan,
+    ) -> ModelResult<()> {
+        let bytes = (count as u128).saturating_mul(u128::from(ARGUMENT_BYTES));
+        self.admitted_total(bytes, source_line, span).map(|_| ())
     }
 
     /// Charges a declaration's parenthesized arguments and its tag.

@@ -20,15 +20,17 @@ const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
 
 pub(super) fn parse_dem(input: &str, limits: ParseLimits) -> ModelResult<DetectorErrorModel> {
-    DemParser::new(input, limits)?.parse()
+    let admission = ParseAdmission::new(ModelDialect::DetectorErrorModel, input.len(), limits)?;
+    DemParser::new(input, admission).parse()
 }
 
-/// Parses `input` and returns the retained model bytes its admission charged, excluding `input`.
+/// Parses `input` under `admission`, which has already charged `input` and any preparation
+/// storage, and returns the retained model bytes it charged, excluding both.
 pub(super) fn parse_dem_admitted(
     input: &str,
-    limits: ParseLimits,
+    admission: ParseAdmission,
 ) -> ModelResult<(DetectorErrorModel, u64)> {
-    let mut parser = DemParser::new(input, limits)?;
+    let mut parser = DemParser::new(input, admission);
     let model = parser.parse_block(Vec::new(), 0)?;
     Ok((model, parser.admission.retained_model_bytes()))
 }
@@ -40,13 +42,12 @@ struct DemParser<'a> {
 }
 
 impl<'a> DemParser<'a> {
-    fn new(input: &'a str, limits: ParseLimits) -> ModelResult<Self> {
-        let admission = ParseAdmission::new(ModelDialect::DetectorErrorModel, input.len(), limits)?;
-        Ok(Self {
+    fn new(input: &'a str, admission: ParseAdmission) -> Self {
+        Self {
             commands: SourceCommands::new(input),
             input_len: input.len(),
             admission,
-        })
+        }
     }
 
     fn parse(mut self) -> ModelResult<DetectorErrorModel> {
@@ -106,7 +107,10 @@ impl<'a> DemParser<'a> {
                 )?;
                 items.push_item(super::DemItem::RepeatBlock(repeat));
             } else {
-                let instruction = if self
+                // The fast path retains its arguments within the line-length bound it checked
+                // and charges them with the tag; the diagnostic parser admits each argument
+                // before retaining it.
+                let (instruction, unadmitted_arguments) = if self
                     .admission
                     .target_budget_allows_upper_bound(line.text().len())
                     && let Some(instruction) = fast::parse_canonical_instruction(line.text())
@@ -116,17 +120,19 @@ impl<'a> DemParser<'a> {
                         line_number,
                         line.span(),
                     )?;
-                    instruction
+                    let arguments = instruction.args().len();
+                    (instruction, arguments)
                 } else {
-                    parse_dem_instruction(
+                    let instruction = parse_dem_instruction(
                         line_number,
                         line,
                         command.end_error_span(),
                         &mut self.admission,
-                    )?
+                    )?;
+                    (instruction, 0)
                 };
                 self.admission.admit_payload(
-                    instruction.args().len(),
+                    unadmitted_arguments,
                     instruction.tag_bytes().map_or(0, <[u8]>::len),
                     line_number,
                     semantic_line.span(),
@@ -258,7 +264,8 @@ fn parse_dem_instruction(
         )
     })?;
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
-    let (args, rest) = parse_optional_args(line_number, name.text(), rest, end_error_span)?;
+    let (args, rest) =
+        parse_optional_args(line_number, name.text(), rest, end_error_span, admission)?;
     let targets = parse_dem_targets(line_number, name.text(), rest, end_error_span, admission)?;
     if let Err(error) = super::validate_dem_instruction(kind, &args.values, &targets.values) {
         let (code, span, context) = dem_validation_location(kind, name.text(), &args, &targets);
@@ -465,11 +472,13 @@ struct ParsedDemArguments<'a> {
     region: ByteSpan,
 }
 
+/// Parses an optional parenthesized argument list, admitting each argument before it is retained.
 fn parse_optional_args<'a>(
     line_number: usize,
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
+    admission: &mut ParseAdmission,
 ) -> ModelResult<(ParsedDemArguments<'a>, SourceSlice<'a>)> {
     let Some(body) = rest.strip_prefix("(") else {
         return Ok((
@@ -524,6 +533,10 @@ fn parse_optional_args<'a>(
         if !value.is_finite() {
             return Err(invalid_number_error(line_number, instruction, token));
         }
+        admission.admit_argument(line_number, token.span())?;
+        values.try_reserve(1).map_err(|_| {
+            ModelError::invalid_detector_error_model("DEM argument allocation failed")
+        })?;
         values.push(value);
         if token_end == raw_args.text().len() {
             break;

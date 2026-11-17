@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use std::ops::RangeBounds;
 
 use crate::gate::GateTargetGroupKind;
-use crate::model_bytes::PreparedModelText;
+use crate::model_bytes::{PreparedModelText, RecoveredTags};
 use crate::model_tag::ModelTag;
 use crate::target::TargetVec;
 use crate::{
@@ -123,7 +123,7 @@ impl Circuit {
         let fuse = !prepared.requires_tag_restore();
         let parsed = prepared.resolve(parser::parse_circuit_admitted(
             prepared.text(),
-            limits,
+            prepared.admission(),
             fuse,
         ));
         let (mut circuit, model_bytes) = parsed?;
@@ -351,7 +351,7 @@ impl Circuit {
         Ok(())
     }
 
-    fn restore_byte_tags(&mut self, tags: Vec<Vec<u8>>) -> ModelResult<()> {
+    fn restore_byte_tags(&mut self, tags: RecoveredTags) -> ModelResult<()> {
         let expected = self.non_empty_tag_count();
         if expected != tags.len() {
             return Err(ModelError::invalid_domain_value(
@@ -362,7 +362,7 @@ impl Circuit {
                 ),
             ));
         }
-        let mut tags = tags.into_iter();
+        let mut tags = tags.into_owned_tags();
         self.restore_byte_tags_from(&mut tags);
         let exhausted = tags.next().is_none();
         debug_assert!(exhausted);
