@@ -252,6 +252,13 @@ A parsed circuit stores each target in four bytes, as Stim's `GateTarget` does, 
 
 Every `.stim` text, printed circuit, diagnostic, and fingerprint byte is unchanged.
 
+## Repeat Nesting And Record Output Storage
+
+Printing, counting, folded walking, and coordinate queries of a `Circuit`, and printing and counting of a `DetectorErrorModel`, no longer recurse per repeat level, so a model built through the API deeper than the parser's 256-level envelope can be printed and counted on a small stack.
+`FoldedDemTraversal::try_visit` and `try_visit_with_coordinates` still recurse, and now refuse a model nested deeper than 256 levels with a `RepeatNesting` error before the first callback instead of risking a stack overflow.
+Parsing a circuit from bytes that are not valid UTF-8 charges the display text and record of each opaque tag, so such an input needs a larger `ParseLimits` memory budget than before and `Circuit::admitted_bytes` reports the larger hold.
+The CLI's `sample`, `detect`, and `m2d` admit their record encoders' scratch and the buffers of named output files against `--memory-budget` before the session, and a request whose session fits but not beside that storage is refused with a new output-storage diagnostic.
+
 ## Extension APIs
 
 The typed circuit-pass seam is canonical in `stab-analysis`. It admits folded input, requires a conservative output-resource projection before proportional allocation, validates the returned closed-dialect circuit, and reports typed input, projection, or output failures. The separate Stable `stab-reference-noise-pass` crate proves this public boundary without depending on `stab-core`.
