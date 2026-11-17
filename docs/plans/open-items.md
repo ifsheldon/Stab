@@ -7,8 +7,8 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 ## Speed
 
-- Fixed parse-and-compile cost on large circuits is above Stim and outside the suite: a single-shot `sample` on a 147 MB flat circuit is about 1.3x Stim without the reference sample and 1.7x with it, and 1.5 million short instructions are about 3.2x.
-- That remaining cost is per-instruction memory in the parsed circuit and the lowered program, and the SHA-256 plan fingerprint, which is about 20 percent of compile; Stim also streams a single shot without building the circuit.
+- Fixed parse-and-compile cost on short instructions is above Stim and outside the suite: a single-shot `sample --skip_reference_sample` on 1.5 million short instructions takes 0.23 s against Stim's 0.13 s, while a 147 MB flat circuit takes 0.60 s against 0.70 s without the reference sample and matches Stim at 0.81 s with it.
+- That remaining cost is lowering, which allocates once per instruction (about 90 ms of the 0.23 s, plus about 20 ms freeing the plan), and peak memory is the parsed circuit and the lowered program together (384 MiB against Stim's 229 MiB on the flat circuit, 244 MiB against 122 MiB on the short instructions), because Stim streams a single shot without building the circuit.
 - At about 10 percent density, reading HITS or DETS input costs about 2x (100-bit records) to 14x (1,000,000-bit records) reading the same records as `b8`, whose files are 2 to 6 times smaller, although every measured `convert` and `m2d` row is faster than Stim; at about 0.1 percent density it costs no more than `b8`. The reader is within 5 percent of a bare digit loop at 1,000,000-bit records and carries about 15 ns of per-record overhead at 100-bit records; an 8-byte digit parser and a loop with fewer bounds checks both measured slower.
 - Variable-width `sample_dem --replay_err_in` inputs (`01`, HITS, DETS, and `r8`) whose retained records do not fit what the replay session leaves of `--memory-budget` still decode their input twice, which costs 10 to 17 percent on sparse HITS, DETS, and `r8` and about 90 percent on `01`; a budget that just misses retention is the worst case, because the store fills, is released, and the input is decoded again. No sound single decode was found: stdout and pipes cannot be staged, and a temporary file plus rename would replace symlinks, hard links, mode, and ownership that the in-place output plan preserves. Keeping the retained prefix and seeking to the first unretained record was not built.
 - A single `Tableau::append` still visits every row, about 4 ns per row at 5000 qubits where the row stride makes it memory-bound; batched callers including `tableau_to_circuit` use `TableauAppender`, and `Tableau::prepend` is the word-parallel left-action route.
@@ -17,11 +17,10 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 ## Memory
 
-- Parse admission charges two target slots per target, so a parsed circuit's hold (859 MB for the 147 MB flattened circuit) is about 1.75 times its resident size, and commands on that circuit are refused under the 1 GiB default although they peak below 1 GiB when admitted.
 - `sample` and `detect` stream 1 to 63 shots and larger non-PTB64 requests whose output planes fill at least 8 MiB per batch, so their floor is one lane width of complete records: 312 MiB from 256 shots on for a 5,000,000-round repetition code (10,000,000 measurements), against Stim's 1.03 to 2.31 GB. Going lower needs narrower lanes, which changes seeded output, or compressed records. PTB64 output still materializes its planes (462 MiB at 1024 shots) because streaming it measured 10 to 28 percent slower, and small records stay materialized because streaming them measured up to 4 percent slower.
 - `m2d` with sweep correction still converts whole batches through full measurement and detector planes; without it, 256 records of that circuit hold 563 MiB, one lane width of records.
 - The CLI does not admit the record encoder's scratch for `sample`, `detect`, and `m2d` output against `--memory-budget`; `convert` does.
-- Parsing still builds a tag string before charging it, keeps up to four bytes per recovered non-UTF-8 tag byte against the two it charges, and rebuilds the item list after tag restoration without a separate charge.
+- Parsing still builds a tag string before charging it, keeps up to four bytes per recovered non-UTF-8 tag byte against the two it charges, and re-fuses instructions after tag restoration with spare capacity it does not charge.
 
 ## Cancellation
 
@@ -30,10 +29,10 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 ## Compatibility
 
 - Seeded `sample_dem` detector output changes when `--err_out` is added, because recording errors assigns random streams by error ordinal while discarding them skips zero-effect repeats; Stim's output does not depend on the flag.
+- `analyze_errors` rejects a classically controlled gate whose `rec[-k]` looks back before the first measurement (`CX sweep[0] 1 rec[-1] 2`) with "measurement record offset rec[-1] is out of range", where Stim prints an empty model; `sample` and `detect` reject it in both programs.
 
 ## Structure And Evidence
 
-- `Gate` is an 8-byte handle beside `GateKind`; making it the enum would shrink `CircuitItem` and change every byte-admission number derived from its size.
 - The engine's admission counting inside lowering does not use `FoldedCircuitSummary`: it needs a running measurement count in source order to validate record lookbacks, the sweep-bit and simulated-qubit maxima, and counts that depend on the lowering itself, none of which the whole-circuit summary carries. The detecting-region snapshot walk takes its entry counts from the summary but still counts ticks per repeat body by hand.
 - `stab-model`'s folded counters, `FoldedWalk::visit`, the parser, and circuit printing still recurse once per repeat level, so the 256-level envelope needs about 1 MiB of stack in a debug build, and a circuit built through the API deeper than the parser allows can clone and compare but not print.
 - `registry.global-min-publish-age` is not configured, because a publish-age cooldown conflicts with the rule to add dependencies at their latest crates.io version; that policy choice is open.
