@@ -26,11 +26,6 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 
 - Sampling polls are spaced by estimated work rather than wall-clock time, and three stretches run without polls: zeroing the shot-major records at session creation (70 to 145 ms for 320 MB, which needs a chunked constructor in `stab-bits`), dropping session storage (22 to 40 ms), and the caller's sink.
 
-## Compatibility
-
-- Seeded `sample_dem` detector output changes when `--err_out` is added, because recording errors assigns random streams by error ordinal while discarding them skips zero-effect repeats; Stim's output does not depend on the flag.
-- `analyze_errors` rejects a classically controlled gate whose `rec[-k]` looks back before the first measurement (`CX sweep[0] 1 rec[-1] 2`) with "measurement record offset rec[-1] is out of range", where Stim prints an empty model; `sample` and `detect` reject it in both programs.
-
 ## Structure And Evidence
 
 - The engine's admission counting inside lowering does not use `FoldedCircuitSummary`: it needs a running measurement count in source order to validate record lookbacks, the sweep-bit and simulated-qubit maxima, and counts that depend on the lowering itself, none of which the whole-circuit summary carries. The detecting-region snapshot walk takes its entry counts from the summary but still counts ticks per repeat body by hand.
