@@ -298,3 +298,160 @@ fn dem_analyzer_noisy_multi_round_gauge_detectors_match_upstream_subset_semantic
         20
     );
 }
+
+fn analyze_folded_allowing_gauge_detectors(text: &str) -> String {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            allow_gauge_detectors: true,
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("analyze")
+    .to_dem_string()
+}
+
+/// Pinned Stim resolves the products and pairs of one instruction one at a time in reverse,
+/// so a later product's merged record anticommutes with an earlier product on a shared qubit.
+#[test]
+fn dem_analyzer_checks_each_measured_product_after_later_products_like_upstream() {
+    for (circuit, expected) in [
+        ("MPP X0 Z0\nDETECTOR rec[-1]\n", "error(0.5) D0\n"),
+        (
+            "MPP Z0 X0\nDETECTOR rec[-1]\nDETECTOR rec[-2]\n",
+            "error(0.5) D0\ndetector D1\n",
+        ),
+        (
+            "MXX 0 1 1 2 0 2\nDETECTOR rec[-1]\nDETECTOR rec[-2]\nDETECTOR rec[-3]\n",
+            "error(0.5) D0 D1\nerror(0.5) D0 D2\n",
+        ),
+    ] {
+        let error = analyze_error(circuit, ErrorAnalyzerOptions::default());
+        assert!(error.contains("non-deterministic detectors"), "{circuit}");
+        assert_eq!(
+            analyze_allowing_gauge_detectors(circuit),
+            expected,
+            "{circuit}"
+        );
+    }
+    assert_eq!(
+        analyze_allowing_gauge_detectors(
+            "
+            R 0 1
+            X_ERROR(0.125) 0
+            Z_ERROR(0.25) 1
+            MPP X0*X1 Z0*Z1 Y0*Y1 X0 Z1
+            DETECTOR rec[-1]
+            DETECTOR rec[-2]
+            DETECTOR rec[-3]
+            DETECTOR rec[-4]
+            DETECTOR rec[-5]
+            DETECTOR rec[-1] rec[-5]
+            ",
+        ),
+        "error(0.5) D0 D1 D5\nerror(0.5) D1\nerror(0.125) D2 D3\nerror(0.5) D2 D4 D5\n"
+    );
+}
+
+/// Pinned Stim's `remove_gauge` rewrites only qubit frames: pending record sensitivities keep
+/// the eliminated detector, which later records reintroduce, and per-target elimination order
+/// decides which later gauges are found.
+#[test]
+fn dem_analyzer_gauge_elimination_keeps_record_sensitivities_like_upstream() {
+    for (circuit, expected) in [
+        (
+            "
+            X_ERROR(0.125) 1
+            M 1
+            RX 0
+            M 0
+            DETECTOR rec[-1]
+            DETECTOR rec[-1] rec[-2]
+            ",
+            "error(0.5) D0 D1\nerror(0.125) D1\n",
+        ),
+        (
+            "
+            X_ERROR(0.1) 0 1
+            MX 0 1
+            M(0.05) 0 1
+            DETECTOR rec[-1] rec[-2]
+            DETECTOR rec[-2] rec[-3]
+            DETECTOR rec[-1] rec[-4]
+            ",
+            "error(0.5) D0\nerror(0.5) D0 D1\nerror(0.5) D0 D2\nerror(0.5) D2\n",
+        ),
+        (
+            "
+            R 0 1
+            X_ERROR(0.125) 0
+            Z_ERROR(0.25) 1
+            MPP[p] Z0*Z1 X1 Z0
+            DETECTOR rec[-2]
+            DETECTOR rec[-1] rec[-3]
+            OBSERVABLE_INCLUDE(0) rec[-1]
+            M 1
+            DETECTOR rec[-1] rec[-3]
+            OBSERVABLE_INCLUDE(1) rec[-4]
+            ",
+            "error[p](0.5) D0\nerror[p](0.5) D2\nerror(0.125) L0 L1\ndetector D1\n",
+        ),
+    ] {
+        assert_eq!(
+            analyze_allowing_gauge_detectors(circuit),
+            expected,
+            "{circuit}"
+        );
+    }
+}
+
+/// Pinned Stim passes the collapsing instruction's tag to each gauge error and leaves the
+/// implicit start-of-circuit reset untagged.
+#[test]
+fn dem_analyzer_gauge_errors_carry_collapsing_instruction_tag_like_upstream() {
+    for (circuit, expected) in [
+        (
+            "R[foo] 0\nH 0\nM 0\nDETECTOR rec[-1]\n",
+            "error[foo](0.5) D0\n",
+        ),
+        ("H[h] 0\nM[m] 0\nDETECTOR rec[-1]\n", "error(0.5) D0\n"),
+        (
+            "RY[y] 0\nM 0\nDETECTOR rec[-1]\nMRY[w] 0\nH 0\nM 0\nDETECTOR rec[-1]\n",
+            "error[y](0.5) D0\nerror[w](0.5) D1\n",
+        ),
+        (
+            "MX[a] 0 1\nM[b](0.25) 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\nDETECTOR rec[-3] rec[-1]\n",
+            "error(0.5) D0\nerror[a](0.5) D0 D2\nerror[b](0.25) D0 D2\nerror[a](0.5) D1\nerror[b](0.25) D1\n",
+        ),
+        (
+            "R 0 1 2\nMXX[q] 0 1 1 2\nMZZ[z] 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]\nDETECTOR rec[-3]\n",
+            "error[q](0.5) D0\nerror(0.5) D1\nerror(0.5) D2\n",
+        ),
+    ] {
+        assert_eq!(
+            analyze_allowing_gauge_detectors(circuit),
+            expected,
+            "{circuit}"
+        );
+    }
+    assert_eq!(
+        analyze_folded_allowing_gauge_detectors(
+            "
+            RX 0
+            REPEAT 30 {
+                Z_ERROR(0.02) 0
+                MPP[t] Z0 X0
+                DETECTOR rec[-1]
+                DETECTOR rec[-2]
+                DETECTOR rec[-1] rec[-2]
+                SHIFT_COORDS(1)
+            }
+            M 0
+            DETECTOR rec[-1]
+            ",
+        ),
+        "error(0.5) D0 D1\nrepeat 29 {\n    error[t](0.5) D0 D2\n    error[t](0.5) D3 D4\n    shift_detectors(1) 3\n}\nerror[t](0.5) D0 D2\nerror[t](0.5) D3\ndetector D1\nshift_detectors(1) 0\n"
+    );
+}

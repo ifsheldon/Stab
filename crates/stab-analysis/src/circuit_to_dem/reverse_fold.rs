@@ -145,7 +145,8 @@ impl ReverseFoldAnalyzer {
     fn analyze(mut self, circuit: &Circuit) -> AnalysisResult<DetectorErrorModel> {
         self.undo_circuit(circuit)?;
         self.tracker.undo_implicit_rz_at_start_of_circuit()?;
-        self.collect_gauge_errors()?;
+        // Vendor post_check_initialization reports start-of-circuit gauges untagged.
+        self.collect_gauge_errors(TagId::UNTAGGED)?;
         self.charge_output(0)?;
         self.flush()?;
         let mut model = std::mem::take(&mut self.reversed_model);
@@ -313,7 +314,12 @@ impl ReverseFoldAnalyzer {
             | GateKind::CZSWAP
             | GateKind::ISWAP_DAG => self.tracker.undo_instruction(instruction)?,
         }
-        self.collect_gauge_errors()?;
+        if self.tracker.has_gauge_errors() {
+            // Vendor check_for_gauge passes the collapsing instruction's tag to add_error for
+            // resets, measurements, demolition measurements, pair measurements, and MPP alike.
+            let tag = self.errors.intern_tag(instruction.tag_bytes())?;
+            self.collect_gauge_errors(tag)?;
+        }
         self.charge_output(0)
     }
 
@@ -845,7 +851,7 @@ impl ReverseFoldAnalyzer {
         Ok(())
     }
 
-    fn collect_gauge_errors(&mut self) -> AnalysisResult<()> {
+    fn collect_gauge_errors(&mut self, tag: TagId) -> AnalysisResult<()> {
         if !self.tracker.has_gauge_errors() {
             return Ok(());
         }
@@ -854,7 +860,7 @@ impl ReverseFoldAnalyzer {
                 &mut self.errors,
                 Probability::try_new(0.5)?,
                 targets.as_slice(),
-                TagId::UNTAGGED,
+                tag,
             )?;
         }
         Ok(())

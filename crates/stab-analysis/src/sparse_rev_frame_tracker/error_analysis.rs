@@ -164,22 +164,16 @@ impl SparseReverseFrameTracker {
         else {
             return;
         };
+        // Vendor ErrorAnalyzer::remove_gauge (error_analyzer.cc:226-242) rewrites only the
+        // qubit frames. Pending measurement-record sensitivities keep the eliminated pivot, so a
+        // record merged later reintroduces it exactly as pinned Stim does.
         let merge = &mut self.scratch.merge;
-        for targets in self
-            .xs
-            .values_mut()
-            .chain(self.zs.values_mut())
-            .chain(self.rec_bits.values_mut())
-            .chain(self.observable_effects.values_mut())
-        {
+        for targets in self.xs.values_mut().chain(self.zs.values_mut()) {
             if targets.contains(&pivot) {
                 targets.xor_sorted(gauge.as_slice(), merge);
             }
         }
         self.xs.retain(|_, targets| !targets.is_empty());
         self.zs.retain(|_, targets| !targets.is_empty());
-        self.rec_bits.retain(|_, targets| !targets.is_empty());
-        self.observable_effects
-            .retain(|_, targets| !targets.is_empty());
     }
 }
