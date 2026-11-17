@@ -137,6 +137,8 @@ An identical digest implies an identical request and executable identity under t
 
 Plan fingerprint generation hashes fixed-size identities after lowering selects an executable variant.
 
+`SamplingCompiler::plan_fingerprint` computes it on demand from the compiler and the source circuit, because the plan does not retain its source; compiling a plan computes no fingerprint, so its cost, which is that of the model fingerprint, is paid only by callers that ask for it.
+
 It allocates no model-sized buffer and does not execute a shot.
 
 Hexadecimal rendering allocates the returned string.

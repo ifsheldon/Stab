@@ -190,7 +190,12 @@ fn reference_loop_policy_reuses_only_proven_invariant_work() {
     assert_eq!(folded_stats.reused_iterations, 511);
     assert_eq!(folded_stats.reused_operation_dispatches, 1_533);
     assert_eq!(iterated_stats, ReferenceExecutionStats::default());
-    assert_ne!(folded.fingerprint(), iterated.fingerprint());
+    assert_ne!(
+        SamplingCompiler::new().plan_fingerprint(&invariant),
+        SamplingCompiler::new()
+            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
+            .plan_fingerprint(&invariant)
+    );
 
     for source in [
         "REPEAT 128 {\n    H 0\n}\nM 0\n",

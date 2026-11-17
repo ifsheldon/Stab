@@ -31,7 +31,9 @@ pub fn exercise_stable_components(
 
     let circuit = Circuit::from_stim_str("M 0\n")?;
     let stripped = circuit_without_tags(&circuit);
-    let _plan = SamplingCompiler::new().compile(&stripped)?;
+    let compiler = SamplingCompiler::new();
+    let _plan = compiler.compile(&stripped)?;
+    let _identity = compiler.plan_fingerprint(&stripped);
 
     let records = read_measurement_records(STRICT_ZERO_ONE_FIXTURE, RecordFormat::ZeroOne, 6)?;
     let shot_major = PackedShotBatch::from_records(&records, 6)?;

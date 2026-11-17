@@ -197,20 +197,11 @@ impl SamplingCompiler {
 
     pub fn compile(&self, circuit: &Circuit) -> Result<SamplingPlan, SamplingCompileError> {
         self.cancellation.check()?;
-        let backend = SamplingBackend::Scalar;
-        let request_fingerprint = CompilationRequestFingerprint::for_sampling(circuit);
         let program = compile_program(circuit, self.memory_budget)?;
         let counts = program.counts();
         // Admission already walked every instruction, so the simulated qubit count comes from
         // that walk instead of a second pass over the circuit.
         let qubit_count = counts.simulated_qubits;
-        let fingerprint = PlanFingerprint::for_sampling(
-            request_fingerprint,
-            backend,
-            PAULI_FRAME_EXECUTABLE_DISCRIMINATOR,
-            self.reference_sample_loop_policy,
-            SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION,
-        );
         Ok(SamplingPlan {
             inner: Arc::new(SamplingPlanInner {
                 qubit_count,
@@ -221,13 +212,39 @@ impl SamplingCompiler {
                 cancellation: self.cancellation.clone(),
                 reference_sample_loop_policy: self.reference_sample_loop_policy,
                 reference_sample: OnceLock::new(),
-                backend,
-                request_fingerprint,
-                fingerprint,
+                backend: SAMPLING_BACKEND,
             }),
         })
     }
+
+    /// Returns the backend-neutral identity of compiling `circuit` with this compiler.
+    ///
+    /// It hashes the circuit's [`stab_model::ModelFingerprint`], so its cost grows with the
+    /// circuit and nothing computes it unless a caller asks.
+    pub fn request_fingerprint(&self, circuit: &Circuit) -> CompilationRequestFingerprint {
+        CompilationRequestFingerprint::for_sampling(circuit)
+    }
+
+    /// Returns the identity of the plan that [`Self::compile`] returns for `circuit`.
+    ///
+    /// A plan does not retain its source circuit, so its identity is computed on demand from
+    /// the request it was compiled from: this compiler's options, its fixed backend selection,
+    /// and `circuit`. The value is the same whether it is computed before or after compiling,
+    /// and it identifies a plan only when compilation succeeds. It hashes the circuit's model
+    /// fingerprint, so nothing pays for it unless a caller asks.
+    pub fn plan_fingerprint(&self, circuit: &Circuit) -> PlanFingerprint {
+        PlanFingerprint::for_sampling(
+            self.request_fingerprint(circuit),
+            SAMPLING_BACKEND,
+            PAULI_FRAME_EXECUTABLE_DISCRIMINATOR,
+            self.reference_sample_loop_policy,
+            SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION,
+        )
+    }
 }
+
+/// The one backend every sampling plan selects.
+const SAMPLING_BACKEND: SamplingBackend = SamplingBackend::Scalar;
 
 /// The plan-cached reference sample a session XORs into its output, if it uses one.
 fn session_reference(
@@ -245,6 +262,9 @@ fn session_reference(
 }
 
 /// Backend-bearing identity of one immutable compiled plan.
+///
+/// [`SamplingCompiler::plan_fingerprint`] computes it on demand from the compiler and the
+/// source circuit, because a compiled plan does not retain its source.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct PlanFingerprint {
     schema_version: u16,
@@ -363,7 +383,10 @@ impl fmt::Debug for SamplingPlan {
             .field("backend", &self.backend())
             .field("qubit_count", &self.qubit_count())
             .field("measurement_width", &self.measurement_width())
-            .field("fingerprint", &self.fingerprint())
+            .field(
+                "reference_sample_loop_policy",
+                &self.reference_sample_loop_policy(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -377,14 +400,6 @@ impl SamplingPlan {
 
     pub fn reference_sample_loop_policy(&self) -> ReferenceSampleLoopPolicy {
         self.inner.reference_sample_loop_policy
-    }
-
-    pub fn request_fingerprint(&self) -> CompilationRequestFingerprint {
-        self.inner.request_fingerprint
-    }
-
-    pub fn fingerprint(&self) -> PlanFingerprint {
-        self.inner.fingerprint
     }
 
     pub fn measurement_width(&self) -> MeasurementWidth {
@@ -551,8 +566,6 @@ pub(super) struct SamplingPlanInner {
     /// once per successful plan.
     reference_sample: OnceLock<ReferenceBits>,
     backend: SamplingBackend,
-    request_fingerprint: CompilationRequestFingerprint,
-    fingerprint: PlanFingerprint,
 }
 
 impl SamplingPlanInner {

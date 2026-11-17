@@ -18,7 +18,8 @@ Each expensive execution family uses:
 compiler -> immutable plan -> mutable session -> typed sink
 ```
 
-Plans are immutable, shareable, nonserializable, and carry summaries and versioned fingerprints.
+Plans are immutable, shareable, nonserializable, and carry summaries.
+A plan's versioned fingerprint identifies the compilation request and the executable its compiler selects, and is computed on demand from the compiler and the source model, as `SamplingCompiler::plan_fingerprint` does, because a plan does not retain its source and hashing the whole model would otherwise be paid by every compilation.
 
 Sessions own RNG state, frames, scratch, buffers, and progress counters.
 

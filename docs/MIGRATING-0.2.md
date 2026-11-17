@@ -226,6 +226,18 @@ Circuit sampling and detection sampling can run one request of a known shot coun
 
 The CLI's `sample` and `detect` use a streaming run for 1 to 63 shots and for larger non-PTB64 requests whose output planes fill at least 8 MiB per batch, and their output is byte-identical to the previous build. On a 5,000,000-round distance-3 repetition code (10,000,000 measurements) `sample --shots 1` peaks at about 7 MB instead of 249 MB, and `detect --shots 1` at about 7 MB instead of 317 MB. Budget refusals of `sample` and `detect` report the new estimates. A `MeasurementToDetectionSession` whose plan has no sweep correction converts each batch through bounded windows and delivers shot-major detector and observable records instead of bit planes, so a sink that asks `RecordBatchView::bit_planes` for them gets `None` and reads them through `shot_major_records` or `get`; its `retained_bytes` and budget refusals report the windowed storage, and `m2d` of one record of the repetition code above peaks at about 30 MB instead of 1.2 GB.
 
+## On-Demand Plan Identity
+
+Compiling a sampling plan no longer hashes its circuit. A plan does not retain its source, and hashing every instruction and target cost about half of compilation on large circuits (166 ms of 313 ms on a 147 MB flat circuit) while only `stab plan sample` and callers that ask for an identity read it, so the identity is computed from the compiler and the circuit when it is asked for. Every fingerprint byte is unchanged.
+
+| Changed item | Migration |
+| --- | --- |
+| `SamplingPlan::fingerprint` and `SamplingPlan::request_fingerprint` | Removed. Call `SamplingCompiler::plan_fingerprint(&circuit)` on the compiler that compiled the plan; it returns the same `PlanFingerprint`, whose `request_fingerprint()` and its `model_fingerprint()` return the request and model identities, before or after compiling. |
+| `SamplingCompiler::request_fingerprint(&circuit)` | New. It returns `CompilationRequestFingerprint::for_sampling(&circuit)`, the backend-neutral identity of that compilation request. |
+| `Debug` for `SamplingPlan` | Prints the reference-sample loop policy instead of the fingerprint. |
+
+`stab sample` no longer pays for an identity it never prints, and `stab plan sample` hashes the circuit once instead of twice; its output is byte-identical to the previous build.
+
 ## Extension APIs
 
 The typed circuit-pass seam is canonical in `stab-analysis`. It admits folded input, requires a conservative output-resource projection before proportional allocation, validates the returned closed-dialect circuit, and reports typed input, projection, or output failures. The separate Stable `stab-reference-noise-pass` crate proves this public boundary without depending on `stab-core`.

@@ -201,12 +201,15 @@ where
 
     // Compilation is intentionally performed for validation. No sampling method is called.
     let compile = ledger.stage();
-    let plan = SamplingCompiler::new()
+    let compiler = SamplingCompiler::new()
         .memory_budget(compile.get())
-        .reference_sample_loop_policy(reference_sample_loop_policy)
+        .reference_sample_loop_policy(reference_sample_loop_policy);
+    let plan = compiler
         .compile(&circuit)
         .map_err(|error| compile.refusal(error))?;
-    let request_fingerprint = plan.request_fingerprint();
+    // The plan identity carries the request and model identities, so the circuit is hashed once.
+    let plan_fingerprint = compiler.plan_fingerprint(&circuit);
+    let request_fingerprint = plan_fingerprint.request_fingerprint();
     let (normalized_loop_policy, loop_policy_effect) =
         reference_loop_policy_report(plan.reference_sample_loop_policy())?;
     let mut estimates = ResourceEstimateReport::from(estimate_sampling_request(
@@ -236,10 +239,10 @@ where
         operation: "sample",
         executes: false,
         source,
-        model: ModelIdentityReport::from(circuit.fingerprint()),
+        model: ModelIdentityReport::from(request_fingerprint.model_fingerprint()),
         compilation: CompilationReport {
             request_fingerprint: CompilationFingerprintReport::from(request_fingerprint),
-            plan_fingerprint: PlanFingerprintReport::from(plan.fingerprint()),
+            plan_fingerprint: PlanFingerprintReport::from(plan_fingerprint),
             compiler_schema_version: request_fingerprint.compiler_schema_version(),
             normalized_options: vec![normalized_loop_policy],
             configurable_limits: Vec::new(),

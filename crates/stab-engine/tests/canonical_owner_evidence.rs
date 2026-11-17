@@ -210,10 +210,14 @@ fn expanded_detection_work_is_not_capped() {
 
 #[test]
 fn a4_sampling_plan_fingerprint_contract() {
-    let plan = SamplingCompiler::new()
-        .compile(&circuit("M 0\n"))
+    let compiler = SamplingCompiler::new();
+    let source = circuit("M 0\n");
+    let fingerprint = compiler.plan_fingerprint(&source);
+    let request = compiler.request_fingerprint(&source);
+    compiler
+        .compile(&source)
         .expect("compile frozen fingerprint fixture");
-    let fingerprint = plan.fingerprint();
+    assert_eq!(fingerprint.request_fingerprint(), request);
 
     let mut executable = Sha256::new();
     executable.update(b"stab:sampling-executable-contract\0");
@@ -225,15 +229,15 @@ fn a4_sampling_plan_fingerprint_contract() {
     let mut reconstructed = Sha256::new();
     reconstructed.update(b"stab:plan-fingerprint\0");
     reconstructed.update(PlanFingerprint::SCHEMA_VERSION.to_be_bytes());
-    reconstructed.update(plan.request_fingerprint().schema_version().to_be_bytes());
-    reconstructed.update(plan.request_fingerprint().digest());
+    reconstructed.update(request.schema_version().to_be_bytes());
+    reconstructed.update(request.digest());
     reconstructed.update([1_u8]);
     reconstructed.update(SamplingPlan::EXECUTABLE_CONTRACT_SCHEMA_VERSION.to_be_bytes());
     reconstructed.update(executable_digest);
     let reconstructed_digest: [u8; 32] = reconstructed.finalize().into();
 
     assert_eq!(
-        plan.request_fingerprint().digest_hex(),
+        request.digest_hex(),
         "3eed620c6e6811fe2808572d8cd39917731ceaf3a99a4c50cc60507ed77716af"
     );
     assert_eq!(fingerprint.executable_contract_digest(), executable_digest);
