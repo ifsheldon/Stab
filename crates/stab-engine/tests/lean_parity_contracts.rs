@@ -709,6 +709,85 @@ fn detection_sweep_feedback_and_folded_conversion_contract() {
         }
     }
 
+    // Stim's measurements-to-detection-events frame disables anticommutation randomization,
+    // so every collapse leaves the anticommuting frame component in place and a later basis
+    // change turns a sweep-controlled Pauli into a measured flip. Each row flips its last
+    // record exactly when the sweep bit is set, as pinned Stim v1.16.0 `m2d
+    // --skip_reference_sample --append_observables` prints for all-zero measurements.
+    let skip_reference = MeasurementToDetectionCompiler::new()
+        .reference_sample_mode(ReferenceSampleMode::SkipReferenceSample);
+    let collapse_sweeps =
+        PackedShotBatch::from_records(&[vec![false], vec![true]], 1).expect("pack collapse sweeps");
+    for (source, width) in [
+        ("CZ sweep[0] 0\nM 0\nH 0\nM 0\nDETECTOR rec[-1]\n", 2),
+        ("CX sweep[0] 0\nMX 0\nH 0\nMX 0\nDETECTOR rec[-1]\n", 2),
+        ("CZ sweep[0] 0\nMY 0\nH 0\nM 0\nDETECTOR rec[-1]\n", 2),
+        ("CZ sweep[0] 0\nR 0\nH 0\nM 0\nDETECTOR rec[-1]\n", 1),
+        ("CX sweep[0] 0\nRX 0\nM 0\nDETECTOR rec[-1]\n", 1),
+        ("CZ sweep[0] 0\nRY 0\nM 0\nDETECTOR rec[-1]\n", 1),
+        ("CZ sweep[0] 0\nMR 0\nH 0\nM 0\nDETECTOR rec[-1]\n", 2),
+        ("CX sweep[0] 0\nMRX 0\nM 0\nDETECTOR rec[-1]\n", 2),
+        ("CZ sweep[0] 0\nMRY 0\nM 0\nDETECTOR rec[-1]\n", 2),
+        ("CZ sweep[0] 0\nMPP Z0\nH 0\nM 0\nDETECTOR rec[-1]\n", 2),
+        (
+            "REPEAT 2 {\n    CZ sweep[0] 0\n    M 0\n    H 0\n}\nM 0\nDETECTOR rec[-1]\n",
+            3,
+        ),
+        ("CY sweep[0] 0\nM 0\nOBSERVABLE_INCLUDE(0) X0\n", 1),
+    ] {
+        let plan = skip_reference
+            .compile(&circuit(source))
+            .expect("compile collapse conversion");
+        let measurements = PackedShotBatch::from_records(&vec![vec![false; width]; 2], width)
+            .expect("pack collapse measurements");
+        let mut session = plan.session().expect("create collapse conversion session");
+        let mut output = DetectionCollector::default();
+        session
+            .run(
+                MeasurementBatchView::new(measurements.view()),
+                Some(MeasurementBatchView::new(collapse_sweeps.view())),
+                &mut output,
+            )
+            .expect("convert collapse measurements");
+        let flips = output
+            .detectors
+            .iter()
+            .zip(&output.observables)
+            .map(|(detectors, observables)| [detectors.as_slice(), observables].concat())
+            .collect::<Vec<_>>();
+        assert_eq!(flips, vec![vec![false], vec![true]], "{source}");
+    }
+
+    // The reported reproduction with the reference sample: pinned Stim prints 1, 0, 1, 0.
+    let reported = MeasurementToDetectionCompiler::new()
+        .compile(&circuit("CZ sweep[0] 0\nM 0\nH 0\nM 0\nDETECTOR rec[-1]\n"))
+        .expect("compile reported collapse conversion");
+    let measurements = PackedShotBatch::from_records(
+        &[
+            vec![false, false],
+            vec![false, true],
+            vec![true, false],
+            vec![true, true],
+        ],
+        2,
+    )
+    .expect("pack reported measurements");
+    let sweeps =
+        PackedShotBatch::from_records(&vec![vec![true]; 4], 1).expect("pack reported sweeps");
+    let mut session = reported.session().expect("create reported session");
+    let mut output = DetectionCollector::default();
+    session
+        .run(
+            MeasurementBatchView::new(measurements.view()),
+            Some(MeasurementBatchView::new(sweeps.view())),
+            &mut output,
+        )
+        .expect("convert reported measurements");
+    assert_eq!(
+        output.detectors,
+        vec![vec![true], vec![false], vec![true], vec![false]]
+    );
+
     let folded_feedback = circuit(
         "R 0 1\n\
          X 0\n\

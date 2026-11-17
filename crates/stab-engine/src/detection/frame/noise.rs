@@ -25,6 +25,20 @@ impl<W: FrameWord> FrameExecutionMode<'_, W> {
         }
     }
 
+    /// Returns the random frame component a collapse writes, or `None` when it must stay put.
+    ///
+    /// Sampling randomizes the component the collapsed state stabilizes, so later measurements
+    /// anticommuting with the collapse come out uniformly random. Sweep correction follows Stim's
+    /// measurements-to-detection-events frame, which disables that randomization and leaves
+    /// the component untouched: overwriting it with zero would discard a sweep-controlled
+    /// Pauli that a later basis change turns into a measured flip.
+    pub(super) fn collapse_mask(self, rng: &mut impl Rng) -> Option<W> {
+        match self {
+            Self::Sample { .. } => Some(self.random_mask(rng, 0.5)),
+            Self::SweepCorrection { .. } => None,
+        }
+    }
+
     pub(super) const fn samples_noise(self) -> bool {
         matches!(self, Self::Sample { .. })
     }

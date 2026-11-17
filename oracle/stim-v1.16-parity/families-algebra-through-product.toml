@@ -812,7 +812,7 @@ name = "gate::semantic_contract::tests::product_surfaces_execute_every_declared_
 [[families]]
 id = "detection.sweep-feedback-and-folded-conversion"
 area = "detection"
-contract = "Measurement conversion accepts omitted all-false and explicit sweep records, executes every legal sweep and measurement-record controlled Pauli orientation, preserves all-classical CZ no-ops, and keeps record offsets, detector order, record and Pauli observable parity, sweep correction in both reference modes, and reference correction across compact nested repeats."
+contract = "Measurement conversion accepts omitted all-false and explicit sweep records, executes every legal sweep and measurement-record controlled Pauli orientation, preserves all-classical CZ no-ops, and keeps record offsets, detector order, record and Pauli observable parity, sweep correction in both reference modes, sweep-controlled frame components that survive measurements, resets, and Pauli-product collapses because the conversion frame leaves the stabilized frame component untouched instead of randomizing or clearing it, and reference correction across compact nested repeats."
 stim_refs = ["src/stim/simulators/measurements_to_detection_events.test.cc", "src/stim/cmd/command_m2d.test.cc"]
 status = "done"
 owner = "stab-engine"

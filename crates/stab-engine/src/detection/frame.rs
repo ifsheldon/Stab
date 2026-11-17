@@ -203,7 +203,9 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             } => poll.for_chunks(targets, op, 1, |_, part| {
                 for &qubit in part {
                     self.set_x_word(qubit, W::default())?;
-                    self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
+                    if let Some(z) = mode.collapse_mask(rng) {
+                        self.set_z_word(qubit, z)?;
+                    }
                 }
                 Ok(())
             }),
@@ -328,7 +330,9 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 if reset {
                     self.set_x_word(qubit, W::default())?;
                 }
-                self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
+                if let Some(z) = mode.collapse_mask(rng) {
+                    self.set_z_word(qubit, z)?;
+                }
             }
             Ok::<_, DetectionError>(())
         })?;
@@ -822,16 +826,26 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             PauliBasis::I => {}
             PauliBasis::X => {
                 self.set_z_word(qubit, W::default())?;
-                self.set_x_word(qubit, mode.random_mask(rng, 0.5))?;
+                if let Some(x) = mode.collapse_mask(rng) {
+                    self.set_x_word(qubit, x)?;
+                }
             }
             PauliBasis::Y => {
-                let bit = mode.random_mask(rng, 0.5);
-                self.set_z_word(qubit, bit)?;
+                // Reset into a Y eigenstate leaves only a Y-proportional frame component.
+                let bit = match mode.collapse_mask(rng) {
+                    Some(bit) => {
+                        self.set_z_word(qubit, bit)?;
+                        bit
+                    }
+                    None => self.z_word(qubit)?,
+                };
                 self.set_x_word(qubit, bit)?;
             }
             PauliBasis::Z => {
                 self.set_x_word(qubit, W::default())?;
-                self.set_z_word(qubit, mode.random_mask(rng, 0.5))?;
+                if let Some(z) = mode.collapse_mask(rng) {
+                    self.set_z_word(qubit, z)?;
+                }
             }
         }
         Ok(())
@@ -867,14 +881,23 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     ) -> DetectionResult<()> {
         match basis {
             PauliBasis::I => {}
-            PauliBasis::X => self.set_x_word(qubit, mode.random_mask(rng, 0.5))?,
+            PauliBasis::X => {
+                if let Some(x) = mode.collapse_mask(rng) {
+                    self.set_x_word(qubit, x)?;
+                }
+            }
             PauliBasis::Y => {
                 let result = self.x_word(qubit)? ^ self.z_word(qubit)?;
-                let z = mode.random_mask(rng, 0.5);
-                self.set_z_word(qubit, z)?;
-                self.set_x_word(qubit, result ^ z)?;
+                if let Some(z) = mode.collapse_mask(rng) {
+                    self.set_z_word(qubit, z)?;
+                    self.set_x_word(qubit, result ^ z)?;
+                }
             }
-            PauliBasis::Z => self.set_z_word(qubit, mode.random_mask(rng, 0.5))?,
+            PauliBasis::Z => {
+                if let Some(z) = mode.collapse_mask(rng) {
+                    self.set_z_word(qubit, z)?;
+                }
+            }
         }
         Ok(())
     }
