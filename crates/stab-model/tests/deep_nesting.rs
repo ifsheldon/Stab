@@ -1,0 +1,205 @@
+#![allow(
+    clippy::expect_used,
+    reason = "hostile-nesting regressions use direct fixture assertions"
+)]
+
+//! Models built through the public API may nest repeat blocks far deeper than the parser's
+//! 256-level limit. Every whole-model operation must then either finish without recursing per
+//! nesting level or refuse the model before recursing, so a thread with a small stack survives.
+
+use stab_model::{
+    Cancellation, Circuit, DemInstruction, DemRepeatBlock, DemRepeatCount, DemTarget,
+    DetectorErrorModel, FoldedCircuitSummary, FoldedWalkError, Probability, RepeatBlock,
+    RepeatCount, RepeatNestingLimit,
+};
+
+/// Far deeper than any parsed model, so per-level recursion would need tens of MiB of stack.
+const DEEP: usize = 200_000;
+/// Printed text grows quadratically with depth through indentation, so printing is checked at a
+/// depth that still overflows a recursive printer on the small stack.
+const PRINT_DEPTH: usize = 2_000;
+const SMALL_STACK: usize = 64 * 1024;
+
+fn on_small_stack(work: impl FnOnce() + Send + 'static) {
+    std::thread::Builder::new()
+        .stack_size(SMALL_STACK)
+        .spawn(work)
+        .expect("spawn small-stack worker")
+        .join()
+        .expect("deep model operations stay within a small stack");
+}
+
+const LEAF: &str = "QUBIT_COORDS(1, 2) 3\nSHIFT_COORDS(0, 1)\nM 3\nDETECTOR(4, 5) rec[-1]\n";
+
+/// `depth` tagged repeat blocks around [`LEAF`]; the innermost `doubling` repeat twice and the
+/// rest once.
+fn nested_circuit(depth: usize, doubling: usize) -> Circuit {
+    let mut circuit = Circuit::from_stim_str(LEAF).expect("leaf circuit");
+    for level in 0..depth {
+        let mut outer = Circuit::new();
+        outer.append_repeat_block(RepeatBlock::new(
+            RepeatCount::try_new(if level < doubling { 2 } else { 1 }).expect("repeat count"),
+            circuit,
+            Some("t".to_owned()),
+        ));
+        circuit = outer;
+    }
+    circuit
+}
+
+/// Canonical text of [`nested_circuit`], written independently of the printer.
+fn nested_circuit_text(depth: usize, doubling: usize) -> String {
+    let mut text = String::new();
+    for level in 0..depth {
+        text.push_str(&" ".repeat(4 * level));
+        let count = if depth - level <= doubling { 2 } else { 1 };
+        text.push_str(&format!("REPEAT[t] {count} {{\n"));
+    }
+    for line in LEAF.lines() {
+        text.push_str(&" ".repeat(4 * depth));
+        text.push_str(line);
+        text.push('\n');
+    }
+    for level in (0..depth).rev() {
+        text.push_str(&" ".repeat(4 * level));
+        text.push_str("}\n");
+    }
+    text
+}
+
+#[test]
+fn deeply_nested_circuit_counts_fingerprints_clones_compares_and_drops_on_a_small_stack() {
+    on_small_stack(|| {
+        let circuit = nested_circuit(DEEP, DEEP);
+        let cloned = circuit.clone();
+        assert_eq!(cloned, circuit);
+        assert_eq!(cloned.fingerprint(), circuit.fingerprint());
+        assert_ne!(nested_circuit(DEEP, DEEP - 1), circuit);
+        assert_ne!(
+            nested_circuit(DEEP, DEEP - 1).fingerprint(),
+            circuit.fingerprint()
+        );
+
+        // 2^200000 executions overflow every expanded count.
+        assert!(circuit.count_measurements().is_err());
+        assert!(circuit.count_detectors().is_err());
+        assert_eq!(circuit.count_ticks().expect("no ticks"), 0);
+        assert_eq!(circuit.count_qubits(), 4);
+        assert_eq!(circuit.count_observables().expect("no observables"), 0);
+        assert_eq!(circuit.count_sweep_bits().expect("no sweep bits"), 0);
+        // Doubling the shift 200000 times overflows to infinity, which is refused.
+        assert!(circuit.final_coordinate_shift().is_err());
+        assert!(circuit.admitted_bytes() > 0);
+
+        let walked = FoldedCircuitSummary::of(
+            &circuit,
+            RepeatNestingLimit::try_new(RepeatNestingLimit::HARD_MAX).expect("limit"),
+            &Cancellation::never(),
+        );
+        assert_eq!(
+            walked,
+            Err(FoldedWalkError::RepeatNesting {
+                depth: RepeatNestingLimit::HARD_MAX + 1,
+                limit: RepeatNestingLimit::HARD_MAX,
+            })
+        );
+
+        drop(cloned);
+        drop(circuit);
+    });
+}
+
+#[test]
+fn deeply_nested_circuit_prints_on_a_small_stack() {
+    on_small_stack(|| {
+        let circuit = nested_circuit(PRINT_DEPTH, 3);
+        let expected = nested_circuit_text(PRINT_DEPTH, 3);
+        assert_eq!(circuit.to_stim_string(), expected);
+        assert_eq!(circuit.to_stim_bytes(), expected.into_bytes());
+    });
+}
+
+#[test]
+fn nested_circuit_finds_coordinates_on_a_small_stack() {
+    // Coordinate queries revisit repeat bodies, so their time grows with depth squared; a depth
+    // of 3000 still overflows a recursive walk on the small stack.
+    on_small_stack(|| {
+        let circuit = nested_circuit(3_000, 10);
+        assert_eq!(
+            circuit.final_coordinate_shift().expect("coordinate shift"),
+            [0.0, 1024.0]
+        );
+        let qubits = circuit
+            .final_qubit_coordinates()
+            .expect("qubit coordinates");
+        assert_eq!(qubits.values().next(), Some(&vec![1.0, 2.0 + 1023.0]));
+
+        let detectors = circuit
+            .detector_coordinates_for([
+                stab_model::CircuitDetectorId::new(3),
+                stab_model::CircuitDetectorId::new(1000),
+            ])
+            .expect("detector coordinates");
+        assert_eq!(
+            detectors.into_values().collect::<Vec<_>>(),
+            [vec![4.0, 5.0 + 4.0], vec![4.0, 5.0 + 1001.0]]
+        );
+        assert_eq!(circuit.count_detectors().expect("detectors"), 1024);
+    });
+}
+
+fn nested_dem(depth: usize) -> DetectorErrorModel {
+    let mut model = DetectorErrorModel::new();
+    model.push_instruction(
+        DemInstruction::error(
+            Probability::try_new(0.125).expect("probability"),
+            vec![DemTarget::relative_detector(0).expect("D0")],
+            None,
+        )
+        .expect("error instruction"),
+    );
+    for _ in 0..depth {
+        let mut outer = DetectorErrorModel::new();
+        outer.push_repeat_block(DemRepeatBlock::new(DemRepeatCount::new(1), model, None));
+        model = outer;
+    }
+    model
+}
+
+#[test]
+fn deeply_nested_dem_prints_fingerprints_and_refuses_visits_on_a_small_stack() {
+    on_small_stack(|| {
+        let deep = nested_dem(DEEP);
+        assert_eq!(deep.clone(), deep);
+        assert_eq!(deep.count_detectors().expect("detectors"), 1);
+        assert_eq!(deep.fingerprint(), deep.clone().fingerprint());
+        assert_eq!(
+            deep.final_coordinate_shift()
+                .expect("empty coordinate shift"),
+            Vec::<f64>::new()
+        );
+        // Visiting recurses once per level, so it is refused before any callback.
+        let refused = deep.detector_coordinates().expect_err("too deep");
+        assert!(
+            refused
+                .to_string()
+                .contains("repeat nesting exceeds current limit 256"),
+            "{refused}"
+        );
+
+        let printed = nested_dem(PRINT_DEPTH);
+        let mut expected = String::new();
+        for level in 0..PRINT_DEPTH {
+            expected.push_str(&" ".repeat(4 * level));
+            expected.push_str("repeat 1 {\n");
+        }
+        expected.push_str(&" ".repeat(4 * PRINT_DEPTH));
+        expected.push_str("error(0.125) D0\n");
+        for level in (0..PRINT_DEPTH).rev() {
+            expected.push_str(&" ".repeat(4 * level));
+            expected.push_str("}\n");
+        }
+        assert_eq!(printed.to_dem_string(), expected);
+        assert_eq!(printed.to_dem_bytes(), expected.into_bytes());
+    });
+}

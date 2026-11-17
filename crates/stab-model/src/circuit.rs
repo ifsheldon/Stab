@@ -3,8 +3,9 @@ use std::io::{self, Write};
 use std::ops::RangeBounds;
 
 use crate::gate::GateTargetGroupKind;
-use crate::model_bytes::{PreparedModelText, RecoveredTags};
+use crate::model_bytes::{PreparedModelText, RecoveredTags, locate_recovered_tag};
 use crate::model_tag::{ItemTag, ModelTag};
+use crate::parse_limits::ParseAdmission;
 use crate::target::TargetVec;
 use crate::{
     AbsoluteTolerance, Gate, GateArgumentRule, ModelDialect, ModelError, ModelFingerprint,
@@ -126,16 +127,20 @@ impl Circuit {
             prepared.admission(),
             fuse,
         ));
-        let (mut circuit, model_bytes) = parsed?;
-        if let Some(tags) = prepared.into_tags() {
-            circuit.restore_byte_tags(tags)?;
-            circuit.fuse_adjacent_instructions();
-            // Fusion only removes charged declarations, so the fused circuit's own count is
-            // the smaller, exact hold.
-            let fused_bytes = circuit.admitted_bytes().min(model_bytes);
-            return Ok((circuit, fused_bytes));
-        }
-        Ok((circuit, model_bytes))
+        let (mut circuit, mut admission) = parsed?;
+        let Some(tags) = prepared.into_tags() else {
+            return Ok((circuit, admission.retained_model_bytes()));
+        };
+        // Taking the tags freed the sanitized text copy.
+        admission.release_sanitized_copy(input.len());
+        circuit.restore_byte_tags(tags, &mut admission, input)?;
+        circuit.fuse_adjacent_instructions()?;
+        // Fusion only removes charged declarations, so the fused circuit's own count is the
+        // smaller, exact hold.
+        let fused_bytes = circuit
+            .admitted_bytes()
+            .min(admission.retained_model_bytes());
+        Ok((circuit, fused_bytes))
     }
 
     pub fn from_stim_str_with_limits(input: &str, limits: ParseLimits) -> ModelResult<Self> {
@@ -143,7 +148,7 @@ impl Circuit {
     }
 
     /// Conservative retained bytes of this circuit under [`ParseLimits`] item, target, argument,
-    /// and tag accounting.
+    /// and tag accounting, including the display text of tags restored from non-UTF-8 bytes.
     pub fn admitted_bytes(&self) -> u64 {
         let mut total = 0_u64;
         let mut stack = vec![self.items.iter()];
@@ -162,6 +167,7 @@ impl Circuit {
                             instruction.tag_bytes().map_or(0, <[u8]>::len),
                         ),
                     );
+                    total = total.saturating_add(opaque_overhead(&instruction.tag));
                 }
                 CircuitItem::RepeatBlock(repeat) => {
                     total = total.saturating_add(
@@ -172,6 +178,7 @@ impl Circuit {
                             repeat.tag_bytes().map_or(0, <[u8]>::len),
                         ),
                     );
+                    total = total.saturating_add(opaque_overhead(&repeat.tag));
                     stack.push(repeat.body().items().iter());
                 }
             }
@@ -305,8 +312,8 @@ impl Circuit {
     /// Opaque tag bytes are represented with the UTF-8 replacement character. Use
     /// [`Self::to_stim_bytes`] when exact metadata preservation matters.
     pub fn to_stim_string(&self) -> String {
-        let mut out = String::with_capacity(printing::stim_text_capacity(self, 0));
-        self.write_stim(&mut out, 0);
+        let mut out = String::with_capacity(printing::stim_text_capacity(self));
+        self.write_stim(&mut out);
         out
     }
 
@@ -315,7 +322,7 @@ impl Circuit {
     /// Use this method instead of [`Self::to_stim_string`] when the circuit came from a byte
     /// source whose tags may not be valid UTF-8.
     pub fn to_stim_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(printing::stim_text_capacity(self, 0));
+        let mut out = Vec::with_capacity(printing::stim_text_capacity(self));
         match self.write_stim_io(&mut out) {
             Ok(()) => out,
             Err(error) => unreachable!("writing a circuit into Vec<u8> failed: {error}"),
@@ -336,27 +343,50 @@ impl Circuit {
         self.items.push(CircuitItem::Instruction(instruction));
     }
 
-    fn write_stim(&self, out: &mut String, indent: usize) {
-        for item in &self.items {
-            item.write_stim(out, indent);
-        }
+    fn write_stim(&self, out: &mut String) {
+        printing::walk_text::<std::convert::Infallible>(self, |event| {
+            match event {
+                printing::TextEvent::Instruction(instruction, indent) => {
+                    instruction.write_stim(out, indent);
+                }
+                printing::TextEvent::RepeatOpen(repeat, indent) => {
+                    repeat.write_stim_open(out, indent)
+                }
+                printing::TextEvent::RepeatClose(repeat, indent) => {
+                    repeat.write_stim_close(out, indent);
+                }
+            }
+            Ok(())
+        })
+        .unwrap_or_else(|never| match never {});
     }
 
     /// Writes canonical Stim bytes to an existing output stream.
     ///
     /// This operation does not open, create, or truncate filesystem paths.
     pub fn write_stim_io(&self, out: &mut impl Write) -> io::Result<()> {
-        self.write_stim_io_indented(out, 0)
+        printing::walk_text(self, |event| match event {
+            printing::TextEvent::Instruction(instruction, indent) => {
+                instruction.write_stim_io(out, indent)
+            }
+            printing::TextEvent::RepeatOpen(repeat, indent) => {
+                repeat.write_stim_io_open(out, indent)
+            }
+            printing::TextEvent::RepeatClose(repeat, indent) => {
+                repeat.write_stim_io_close(out, indent)
+            }
+        })
     }
 
-    fn write_stim_io_indented(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
-        for item in &self.items {
-            item.write_stim_io(out, indent)?;
-        }
-        Ok(())
-    }
-
-    fn restore_byte_tags(&mut self, tags: RecoveredTags) -> ModelResult<()> {
+    /// Replaces the sanitized tags the parser produced with the exact recovered bytes, in
+    /// source order, charging what an opaque tag retains beyond its parsed text before it is
+    /// built.
+    fn restore_byte_tags(
+        &mut self,
+        tags: RecoveredTags,
+        admission: &mut ParseAdmission,
+        input: &[u8],
+    ) -> ModelResult<()> {
         let expected = self.non_empty_tag_count();
         if expected != tags.len() {
             return Err(ModelError::invalid_domain_value(
@@ -367,70 +397,74 @@ impl Circuit {
                 ),
             ));
         }
-        let mut tags = tags.into_owned_tags();
-        self.restore_byte_tags_from(&mut tags);
-        let exhausted = tags.next().is_none();
-        debug_assert!(exhausted);
+        let mut tags = tags.into_owned_tags().enumerate();
+        let mut restore = |tag: &mut ItemTag| -> ModelResult<()> {
+            if tag.is_none() {
+                return Ok(());
+            }
+            let Some((index, bytes)) = tags.next() else {
+                return Err(ModelError::invalid_domain_value(
+                    "Stim byte parser",
+                    "metadata scanner ran out of tags",
+                ));
+            };
+            let overhead = ModelTag::opaque_overhead_bytes_of(&bytes);
+            admission.admit_opaque_tag_overhead(overhead, || locate_recovered_tag(input, index))?;
+            *tag = ModelTag::from_bytes(bytes);
+            Ok(())
+        };
+        let mut pending = vec![self.items.iter_mut()];
+        while let Some(items) = pending.last_mut() {
+            let Some(item) = items.next() else {
+                pending.pop();
+                continue;
+            };
+            match item {
+                CircuitItem::Instruction(instruction) => restore(&mut instruction.tag)?,
+                CircuitItem::RepeatBlock(repeat) => {
+                    restore(&mut repeat.tag)?;
+                    pending.push(repeat.body.items.iter_mut());
+                }
+            }
+        }
         Ok(())
     }
 
-    fn restore_byte_tags_from(&mut self, tags: &mut impl Iterator<Item = Vec<u8>>) {
-        for item in &mut self.items {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    if instruction.tag.is_some() {
-                        instruction.tag = tags.next().and_then(ModelTag::from_bytes);
-                    }
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    if repeat.tag.is_some() {
-                        repeat.tag = tags.next().and_then(ModelTag::from_bytes);
-                    }
-                    repeat.body.restore_byte_tags_from(tags);
+    /// Fuses adjacent fusable instructions in every block, without recursing.
+    ///
+    /// Each fusion run's head reserves exactly the run's targets once, so no block holds spare
+    /// target capacity beyond what parse admission charged, and every vector ends at its exact
+    /// length.
+    fn fuse_adjacent_instructions(&mut self) -> ModelResult<()> {
+        let mut pending = vec![&mut self.items];
+        while let Some(items) = pending.pop() {
+            fuse_block(items)?;
+            for item in items {
+                if let CircuitItem::RepeatBlock(repeat) = item {
+                    pending.push(&mut repeat.body.items);
                 }
             }
         }
-    }
-
-    /// Fuses adjacent fusable instructions in place, leaving every vector at its exact length.
-    fn fuse_adjacent_instructions(&mut self) {
-        for item in &mut self.items {
-            if let CircuitItem::RepeatBlock(repeat) = item {
-                repeat.body.fuse_adjacent_instructions();
-            }
-        }
-        let mut fused = false;
-        self.items.dedup_by(|next, previous| {
-            if let (CircuitItem::Instruction(next), CircuitItem::Instruction(previous)) =
-                (next, previous)
-                && previous.can_fuse(next)
-            {
-                previous.targets.extend_from_slice(&next.targets);
-                fused = true;
-                return true;
-            }
-            false
-        });
-        if fused {
-            for item in &mut self.items {
-                if let CircuitItem::Instruction(instruction) = item {
-                    instruction.targets.shrink_to_fit();
-                }
-            }
-            self.items.shrink_to_fit();
-        }
+        Ok(())
     }
 
     fn non_empty_tag_count(&self) -> usize {
-        self.items
-            .iter()
-            .map(|item| match item {
-                CircuitItem::Instruction(instruction) => usize::from(instruction.tag.is_some()),
-                CircuitItem::RepeatBlock(repeat) => {
-                    usize::from(repeat.tag.is_some()) + repeat.body.non_empty_tag_count()
+        let mut count = 0_usize;
+        let mut pending = vec![self.items.as_slice()];
+        while let Some(items) = pending.pop() {
+            for item in items {
+                match item {
+                    CircuitItem::Instruction(instruction) => {
+                        count += usize::from(instruction.tag.is_some());
+                    }
+                    CircuitItem::RepeatBlock(repeat) => {
+                        count += usize::from(repeat.tag.is_some());
+                        pending.push(repeat.body.items.as_slice());
+                    }
                 }
-            })
-            .sum()
+            }
+        }
+        count
     }
 
     fn item_slice(&self, range: impl RangeBounds<usize>) -> ModelResult<&[CircuitItem]> {
@@ -459,20 +493,6 @@ impl CircuitItem {
         match self {
             Self::Instruction(_) => None,
             Self::RepeatBlock(repeat) => Some(repeat),
-        }
-    }
-
-    fn write_stim(&self, out: &mut String, indent: usize) {
-        match self {
-            Self::Instruction(instruction) => instruction.write_stim(out, indent),
-            Self::RepeatBlock(repeat) => repeat.write_stim(out, indent),
-        }
-    }
-
-    fn write_stim_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
-        match self {
-            Self::Instruction(instruction) => instruction.write_stim_io(out, indent),
-            Self::RepeatBlock(repeat) => repeat.write_stim_io(out, indent),
         }
     }
 }
@@ -844,7 +864,7 @@ impl RepeatBlock {
         self.tag.as_deref().map(ModelTag::as_bytes)
     }
 
-    fn write_stim(&self, out: &mut String, indent: usize) {
+    fn write_stim_open(&self, out: &mut String, indent: usize) {
         write_indent(out, indent);
         out.push_str("REPEAT");
         if let Some(tag) = &self.tag {
@@ -855,7 +875,9 @@ impl RepeatBlock {
         out.push(' ');
         printing::push_u64(out, self.repeat_count.get());
         out.push_str(" {\n");
-        self.body.write_stim(out, indent + 4);
+    }
+
+    fn write_stim_close(&self, out: &mut String, indent: usize) {
         if self.body.is_empty() {
             out.push('\n');
         }
@@ -863,7 +885,7 @@ impl RepeatBlock {
         out.push_str("}\n");
     }
 
-    fn write_stim_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+    fn write_stim_io_open(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
         write_indent_io(out, indent)?;
         out.write_all(b"REPEAT")?;
         if let Some(tag) = &self.tag {
@@ -871,8 +893,10 @@ impl RepeatBlock {
             tag.write_escaped_bytes(out)?;
             out.write_all(b"]")?;
         }
-        writeln!(out, " {} {{", self.repeat_count.get())?;
-        self.body.write_stim_io_indented(out, indent + 4)?;
+        writeln!(out, " {} {{", self.repeat_count.get())
+    }
+
+    fn write_stim_io_close(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
         if self.body.is_empty() {
             out.write_all(b"\n")?;
         }
@@ -891,6 +915,62 @@ pub(crate) mod printing;
 
 mod drop_impl;
 mod parser;
+
+/// Bytes an item's opaque tag retains beyond its tag charge.
+fn opaque_overhead(tag: &ItemTag) -> u64 {
+    tag.as_deref()
+        .map_or(0, |tag| tag.opaque_overhead_bytes() as u64)
+}
+
+/// Fuses the adjacent fusable instructions of one block in place.
+///
+/// Every run head reserves exactly the targets of its run before the run is merged, so merging
+/// never reallocates or leaves spare capacity.
+fn fuse_block(items: &mut Vec<CircuitItem>) -> ModelResult<()> {
+    let mut fused = false;
+    let mut head_index = 0;
+    while head_index < items.len() {
+        let mut run_end = head_index.saturating_add(1);
+        let mut run_targets = 0_usize;
+        if let Some(CircuitItem::Instruction(head)) = items.get(head_index) {
+            while let Some(CircuitItem::Instruction(next)) = items.get(run_end)
+                && head.can_fuse(next)
+            {
+                run_targets = run_targets.saturating_add(next.targets.len());
+                run_end += 1;
+            }
+        }
+        if run_targets > 0
+            && let Some(CircuitItem::Instruction(head)) = items.get_mut(head_index)
+        {
+            head.targets
+                .try_reserve_exact(run_targets)
+                .map_err(|error| {
+                    ModelError::invalid_domain_value(
+                        "circuit target allocation",
+                        format!("unable to reserve {run_targets} fused target slots: {error}"),
+                    )
+                })?;
+        }
+        fused |= run_end > head_index.saturating_add(1);
+        head_index = run_end;
+    }
+    if !fused {
+        return Ok(());
+    }
+    items.dedup_by(|next, previous| {
+        if let (CircuitItem::Instruction(next), CircuitItem::Instruction(previous)) =
+            (next, previous)
+            && previous.can_fuse(next)
+        {
+            previous.targets.extend_from_slice(&next.targets);
+            return true;
+        }
+        false
+    });
+    items.shrink_to_fit();
+    Ok(())
+}
 
 fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
     let mut groups = Vec::new();
@@ -933,8 +1013,12 @@ fn write_indent(out: &mut String, indent: usize) {
 }
 
 fn write_indent_io(out: &mut impl Write, indent: usize) -> io::Result<()> {
-    for _ in 0..indent {
-        out.write_all(b" ")?;
+    const SPACES: &[u8; 64] = &[b' '; 64];
+    let mut remaining = indent;
+    while remaining > 0 {
+        let chunk = remaining.min(SPACES.len());
+        out.write_all(SPACES.get(..chunk).unwrap_or_default())?;
+        remaining -= chunk;
     }
     Ok(())
 }

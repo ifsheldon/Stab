@@ -275,36 +275,69 @@ impl Circuit {
     }
 }
 
+/// Sums `count_instruction` over the expanded circuit without unrolling or recursing.
+///
+/// Each repeat body is summed once and multiplied by its count when the body ends, with the same
+/// checked arithmetic, in the same order, as a body-first recursion.
 fn flat_sum_operations(
     circuit: &Circuit,
     mut count_instruction: impl FnMut(&CircuitInstruction) -> ModelResult<u64>,
 ) -> ModelResult<u64> {
-    fn visit(
-        circuit: &Circuit,
-        count_instruction: &mut impl FnMut(&CircuitInstruction) -> ModelResult<u64>,
-    ) -> ModelResult<u64> {
-        let mut count = 0_u64;
-        for item in circuit.items() {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    count = count
-                        .checked_add(count_instruction(instruction)?)
-                        .ok_or_else(circuit_count_overflow)?;
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    let repeated_count = visit(repeat.body(), count_instruction)?
-                        .checked_mul(repeat.repeat_count().get())
-                        .ok_or_else(circuit_count_overflow)?;
-                    count = count
-                        .checked_add(repeated_count)
-                        .ok_or_else(circuit_count_overflow)?;
-                }
+    // Each frame holds the enclosing block's iterator, its partial sum, and the repeat count
+    // of the body being summed.
+    let mut enclosing: Vec<(std::slice::Iter<'_, CircuitItem>, u64, u64)> = Vec::new();
+    let mut items = circuit.items().iter();
+    let mut count = 0_u64;
+    loop {
+        match items.next() {
+            Some(CircuitItem::Instruction(instruction)) => {
+                count = count
+                    .checked_add(count_instruction(instruction)?)
+                    .ok_or_else(circuit_count_overflow)?;
+            }
+            Some(CircuitItem::RepeatBlock(repeat)) => {
+                let parent = std::mem::replace(&mut items, repeat.body().items().iter());
+                enclosing.push((parent, count, repeat.repeat_count().get()));
+                count = 0;
+            }
+            None => {
+                let Some((parent, parent_count, repeat_count)) = enclosing.pop() else {
+                    return Ok(count);
+                };
+                let repeated_count = count
+                    .checked_mul(repeat_count)
+                    .ok_or_else(circuit_count_overflow)?;
+                count = parent_count
+                    .checked_add(repeated_count)
+                    .ok_or_else(circuit_count_overflow)?;
+                items = parent;
             }
         }
-        Ok(count)
     }
+}
 
-    visit(circuit, &mut count_instruction)
+/// Visits every instruction of `circuit`, nested ones included, in source order without
+/// recursing.
+fn try_for_each_instruction<'a>(
+    circuit: &'a Circuit,
+    mut visit: impl FnMut(&'a CircuitInstruction) -> ModelResult<()>,
+) -> ModelResult<()> {
+    let mut enclosing = Vec::new();
+    let mut items = circuit.items().iter();
+    loop {
+        match items.next() {
+            Some(CircuitItem::Instruction(instruction)) => visit(instruction)?,
+            Some(CircuitItem::RepeatBlock(repeat)) => {
+                enclosing.push(std::mem::replace(&mut items, repeat.body().items().iter()));
+            }
+            None => {
+                let Some(parent) = enclosing.pop() else {
+                    return Ok(());
+                };
+                items = parent;
+            }
+        }
+    }
 }
 
 fn circuit_count_overflow() -> ModelError {
@@ -337,62 +370,65 @@ fn max_operation_property(
     circuit: &Circuit,
     mut instruction_property: impl FnMut(&CircuitInstruction) -> ModelResult<Option<u64>>,
 ) -> ModelResult<u64> {
-    fn visit(
-        circuit: &Circuit,
-        instruction_property: &mut impl FnMut(&CircuitInstruction) -> ModelResult<Option<u64>>,
-    ) -> ModelResult<u64> {
-        let mut max_value = 0_u64;
-        for item in circuit.items() {
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    if let Some(value) = instruction_property(instruction)? {
-                        max_value = max_value.max(value);
-                    }
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    max_value = max_value.max(visit(repeat.body(), instruction_property)?);
-                }
-            }
+    let mut max_value = 0_u64;
+    try_for_each_instruction(circuit, |instruction| {
+        if let Some(value) = instruction_property(instruction)? {
+            max_value = max_value.max(value);
         }
-        Ok(max_value)
-    }
-
-    visit(circuit, &mut instruction_property)
+        Ok(())
+    })?;
+    Ok(max_value)
 }
 
+/// Returns the coordinate shift `circuit` applies, without recursing.
+///
+/// Each repeat body's shift is accumulated from zero and added, times the repeat count, to its
+/// parent's shift when the body ends, so the floating-point operations and their order match a
+/// body-first recursion exactly.
 fn coordinate_shift_of(circuit: &Circuit) -> ModelResult<Vec<f64>> {
+    let mut enclosing: Vec<(std::slice::Iter<'_, CircuitItem>, Vec<f64>, u64)> = Vec::new();
+    let mut items = circuit.items().iter();
     let mut shift = Vec::new();
-    apply_coordinate_shift_of(circuit, &mut shift)?;
-    Ok(shift)
-}
-
-fn apply_coordinate_shift_of(circuit: &Circuit, shift: &mut Vec<f64>) -> ModelResult<()> {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
+    loop {
+        match items.next() {
+            Some(CircuitItem::Instruction(instruction)) => {
                 if instruction.gate() == Gate::SHIFT_COORDS
                     && let Some(args) = instruction.coordinate_arguments()
                 {
-                    add_coordinate_shift_mul(shift, args, 1.0)?;
+                    add_coordinate_shift_mul(&mut shift, args, 1.0)?;
                 }
             }
-            CircuitItem::RepeatBlock(repeat) => {
-                let body_shift = coordinate_shift_of(repeat.body())?;
-                add_coordinate_shift_mul(shift, &body_shift, repeat.repeat_count().get() as f64)?;
+            Some(CircuitItem::RepeatBlock(repeat)) => {
+                let parent = std::mem::replace(&mut items, repeat.body().items().iter());
+                let parent_shift = std::mem::take(&mut shift);
+                enclosing.push((parent, parent_shift, repeat.repeat_count().get()));
+            }
+            None => {
+                let Some((parent, parent_shift, repeat_count)) = enclosing.pop() else {
+                    return Ok(shift);
+                };
+                let body_shift = std::mem::replace(&mut shift, parent_shift);
+                add_coordinate_shift_mul(&mut shift, &body_shift, repeat_count as f64)?;
+                items = parent;
             }
         }
     }
-    Ok(())
 }
 
+/// Records the final coordinates of every `QUBIT_COORDS` target, without recursing.
+///
+/// Entering a repeat body first advances `shift` by all but one iteration of the body's shift and
+/// then visits the body once, as the recursive definition does.
 fn apply_final_qubit_coordinates(
     circuit: &Circuit,
     shift: &mut Vec<f64>,
     coordinates: &mut BTreeMap<QubitId, Vec<f64>>,
 ) -> ModelResult<()> {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
+    let mut enclosing = Vec::new();
+    let mut items = circuit.items().iter();
+    loop {
+        match items.next() {
+            Some(CircuitItem::Instruction(instruction)) => {
                 let gate = instruction.gate();
                 if gate == Gate::QUBIT_COORDS {
                     let args = instruction.coordinate_arguments().unwrap_or_default();
@@ -407,7 +443,7 @@ fn apply_final_qubit_coordinates(
                     add_coordinate_shift_mul(shift, args, 1.0)?;
                 }
             }
-            CircuitItem::RepeatBlock(repeat) => {
+            Some(CircuitItem::RepeatBlock(repeat)) => {
                 let repeat_count = repeat.repeat_count().get();
                 let body_shift = coordinate_shift_of(repeat.body())?;
                 if repeat_count > 1 {
@@ -417,11 +453,25 @@ fn apply_final_qubit_coordinates(
                         repeat_count.saturating_sub(1) as f64,
                     )?;
                 }
-                apply_final_qubit_coordinates(repeat.body(), shift, coordinates)?;
+                enclosing.push(std::mem::replace(&mut items, repeat.body().items().iter()));
+            }
+            None => {
+                let Some(parent) = enclosing.pop() else {
+                    return Ok(());
+                };
+                items = parent;
             }
         }
     }
-    Ok(())
+}
+
+/// Progress through one repeat block of a detector-coordinate scan.
+struct RepeatScan<'a> {
+    body: &'a Circuit,
+    body_detector_count: u64,
+    body_shift: Vec<f64>,
+    used_repetitions: u64,
+    repetitions: u64,
 }
 
 struct DetectorCoordinateScan {
@@ -445,64 +495,94 @@ impl DetectorCoordinateScan {
         self.desired.get(self.desired_cursor).copied()
     }
 
+    /// Scans `circuit` until every desired detector is resolved, without recursing.
+    ///
+    /// A repeat block skips whole iterations that cannot contain the next desired detector and
+    /// visits its body once per remaining iteration, each visit a stack frame instead of a
+    /// recursive call, with the same checked arithmetic in the same order.
     fn visit_circuit(&mut self, circuit: &Circuit, shift: &mut Vec<f64>) -> ModelResult<()> {
-        for item in circuit.items() {
+        let mut enclosing: Vec<(std::slice::Iter<'_, CircuitItem>, RepeatScan<'_>)> = Vec::new();
+        let mut items = circuit.items().iter();
+        loop {
             if self.next_unresolved_detector().is_none() {
+                // Nothing after this point can change the result or fail.
                 return Ok(());
             }
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    self.visit_instruction(instruction, shift)?
+            match items.next() {
+                Some(CircuitItem::Instruction(instruction)) => {
+                    self.visit_instruction(instruction, shift)?;
                 }
-                CircuitItem::RepeatBlock(repeat) => self.visit_repeat(repeat, shift)?,
+                Some(CircuitItem::RepeatBlock(repeat)) => {
+                    let body = repeat.body();
+                    let mut scan = RepeatScan {
+                        body,
+                        body_detector_count: body.count_detectors()?,
+                        body_shift: coordinate_shift_of(body)?,
+                        used_repetitions: 0,
+                        repetitions: repeat.repeat_count().get(),
+                    };
+                    if self.start_next_iteration(&mut scan, shift)? {
+                        enclosing.push((std::mem::replace(&mut items, body.items().iter()), scan));
+                    }
+                }
+                None => {
+                    let Some((parent, mut scan)) = enclosing.pop() else {
+                        return Ok(());
+                    };
+                    scan.used_repetitions = scan
+                        .used_repetitions
+                        .checked_add(1)
+                        .ok_or_else(detector_count_overflow)?;
+                    if self.start_next_iteration(&mut scan, shift)? {
+                        items = scan.body.items().iter();
+                        enclosing.push((parent, scan));
+                    } else {
+                        items = parent;
+                    }
+                }
             }
         }
-        Ok(())
     }
 
-    fn visit_repeat(&mut self, repeat: &RepeatBlock, shift: &mut Vec<f64>) -> ModelResult<()> {
-        let body = repeat.body();
-        let body_detector_count = body.count_detectors()?;
-        let body_shift = coordinate_shift_of(body)?;
-        let mut used_repetitions = 0_u64;
-        let repetitions = repeat.repeat_count().get();
-
-        while used_repetitions < repetitions {
-            let Some(next_desired) = self.next_unresolved_detector() else {
-                return Ok(());
-            };
-            let skip = if body_detector_count == 0 {
-                repetitions.saturating_sub(used_repetitions)
-            } else if next_desired.get() <= self.next_detector_index {
-                0
-            } else {
-                let remaining = repetitions.saturating_sub(used_repetitions);
-                let distance = next_desired.get().saturating_sub(self.next_detector_index);
-                remaining.min(distance / body_detector_count)
-            };
-
-            if skip > 0 {
-                let detector_skip = body_detector_count
-                    .checked_mul(skip)
-                    .ok_or_else(detector_count_overflow)?;
-                self.next_detector_index = self
-                    .next_detector_index
-                    .checked_add(detector_skip)
-                    .ok_or_else(detector_count_overflow)?;
-                add_coordinate_shift_mul(shift, &body_shift, skip as f64)?;
-                used_repetitions = used_repetitions
-                    .checked_add(skip)
-                    .ok_or_else(detector_count_overflow)?;
-            }
-
-            if used_repetitions < repetitions {
-                self.visit_circuit(body, shift)?;
-                used_repetitions = used_repetitions
-                    .checked_add(1)
-                    .ok_or_else(detector_count_overflow)?;
-            }
+    /// Skips the iterations of `scan` that cannot hold the next desired detector and reports
+    /// whether one iteration remains to be visited.
+    fn start_next_iteration(
+        &mut self,
+        scan: &mut RepeatScan<'_>,
+        shift: &mut Vec<f64>,
+    ) -> ModelResult<bool> {
+        if scan.used_repetitions >= scan.repetitions {
+            return Ok(false);
         }
-        Ok(())
+        let Some(next_desired) = self.next_unresolved_detector() else {
+            return Ok(false);
+        };
+        let skip = if scan.body_detector_count == 0 {
+            scan.repetitions.saturating_sub(scan.used_repetitions)
+        } else if next_desired.get() <= self.next_detector_index {
+            0
+        } else {
+            let remaining = scan.repetitions.saturating_sub(scan.used_repetitions);
+            let distance = next_desired.get().saturating_sub(self.next_detector_index);
+            remaining.min(distance / scan.body_detector_count)
+        };
+
+        if skip > 0 {
+            let detector_skip = scan
+                .body_detector_count
+                .checked_mul(skip)
+                .ok_or_else(detector_count_overflow)?;
+            self.next_detector_index = self
+                .next_detector_index
+                .checked_add(detector_skip)
+                .ok_or_else(detector_count_overflow)?;
+            add_coordinate_shift_mul(shift, &scan.body_shift, skip as f64)?;
+            scan.used_repetitions = scan
+                .used_repetitions
+                .checked_add(skip)
+                .ok_or_else(detector_count_overflow)?;
+        }
+        Ok(scan.used_repetitions < scan.repetitions)
     }
 
     fn visit_instruction(

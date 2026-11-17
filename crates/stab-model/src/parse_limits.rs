@@ -305,6 +305,39 @@ impl ParseAdmission {
         self.admit_preparation(bytes, source_line, span)
     }
 
+    /// Returns the charge of the sanitized copy admitted by [`Self::admit_sanitized_copy`] once
+    /// the copy is freed.
+    pub(crate) fn release_sanitized_copy(&mut self, byte_count: usize) {
+        let bytes = (byte_count as u64)
+            .min(self.source_bytes)
+            .min(self.charged_bytes);
+        self.charged_bytes -= bytes;
+        self.source_bytes -= bytes;
+    }
+
+    /// Charges, as retained model bytes, what an opaque tag restored from non-UTF-8 input keeps
+    /// beyond the tag charge its parsed declaration already paid, before it is allocated.
+    ///
+    /// `locate` finds the tag's source line and span and runs only to report a refusal.
+    pub(crate) fn admit_opaque_tag_overhead(
+        &mut self,
+        bytes: usize,
+        locate: impl FnOnce() -> ModelResult<(usize, ByteSpan)>,
+    ) -> ModelResult<()> {
+        if bytes == 0 {
+            return Ok(());
+        }
+        let required = u128::from(self.charged_bytes).saturating_add(bytes as u128);
+        if let Ok(charged) = u64::try_from(required)
+            && self.limits.memory_budget().admits(required)
+        {
+            self.charged_bytes = charged;
+            return Ok(());
+        }
+        let (source_line, span) = locate()?;
+        self.charge(bytes as u128, source_line, span)
+    }
+
     pub(crate) fn admit_instruction(
         &mut self,
         source_line: usize,

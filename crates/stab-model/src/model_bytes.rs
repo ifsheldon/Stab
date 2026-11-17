@@ -213,40 +213,94 @@ fn scan_metadata(
 ) -> ModelResult<RecoveredTags> {
     let mut scan = MetadataScan {
         input,
-        sanitized,
-        admission,
-        tags: RecoveredTags::default(),
+        mode: ScanMode::Recover {
+            sanitized,
+            admission,
+            tags: RecoveredTags::default(),
+        },
         line_number: 0,
     };
-    let mut line_start = 0usize;
-    while line_start < input.len() {
-        let Some(remaining) = input.get(line_start..) else {
-            break;
-        };
-        let relative_end = remaining
-            .iter()
-            .position(|byte| *byte == b'\n')
-            .unwrap_or(input.len() - line_start);
-        let line_end = line_start + relative_end;
-        scan.line_number = scan.line_number.saturating_add(1);
-        scan.scan_line(line_start, line_end)?;
-        line_start = line_end.saturating_add(usize::from(line_end < input.len()));
+    scan.run()?;
+    match scan.mode {
+        ScanMode::Recover { tags, .. } => Ok(tags),
+        ScanMode::Locate { .. } => Err(ModelError::invalid_domain_value(
+            "model byte input",
+            "metadata scan changed mode",
+        )),
     }
-    Ok(scan.tags)
+}
+
+/// Returns the source line and span of the recovered tag at `index` in source order, which
+/// [`scan_metadata`] recovered from the same `input`.
+///
+/// This rescans the input and is meant for diagnosing a refusal, not for hot paths.
+pub(crate) fn locate_recovered_tag(input: &[u8], index: usize) -> ModelResult<(usize, ByteSpan)> {
+    let mut scan = MetadataScan {
+        input,
+        mode: ScanMode::Locate {
+            remaining: index,
+            found: None,
+        },
+        line_number: 0,
+    };
+    scan.run()?;
+    match scan.mode {
+        ScanMode::Locate {
+            found: Some(found), ..
+        } => Ok(found),
+        _ => Err(ModelError::invalid_domain_value(
+            "model byte input",
+            format!("recovered tag {index} is missing from a rescan"),
+        )),
+    }
 }
 
 struct MetadataScan<'a> {
     input: &'a [u8],
-    sanitized: &'a mut [u8],
-    admission: &'a mut ParseAdmission,
-    tags: RecoveredTags,
+    mode: ScanMode<'a>,
     line_number: usize,
 }
 
+enum ScanMode<'a> {
+    /// Sanitizes metadata and recovers every non-empty tag.
+    Recover {
+        sanitized: &'a mut [u8],
+        admission: &'a mut ParseAdmission,
+        tags: RecoveredTags,
+    },
+    /// Finds the source position of one recovered tag without storing anything.
+    Locate {
+        remaining: usize,
+        found: Option<(usize, ByteSpan)>,
+    },
+}
+
 impl MetadataScan<'_> {
+    fn run(&mut self) -> ModelResult<()> {
+        let input = self.input;
+        let mut line_start = 0usize;
+        while line_start < input.len() {
+            let Some(remaining) = input.get(line_start..) else {
+                break;
+            };
+            let relative_end = remaining
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .unwrap_or(input.len() - line_start);
+            let line_end = line_start + relative_end;
+            self.line_number = self.line_number.saturating_add(1);
+            self.scan_line(line_start, line_end)?;
+            line_start = line_end.saturating_add(usize::from(line_end < input.len()));
+        }
+        Ok(())
+    }
+
     /// Marks `start..end` of the input as opaque metadata.
     fn metadata(&mut self, start: usize, end: usize) -> ModelResult<()> {
-        let Some(region) = self.sanitized.get_mut(start..end) else {
+        let ScanMode::Recover { sanitized, .. } = &mut self.mode else {
+            return Ok(());
+        };
+        let Some(region) = sanitized.get_mut(start..end) else {
             return Err(ModelError::invalid_domain_value(
                 "model byte input",
                 "metadata range escaped input",
@@ -266,12 +320,25 @@ impl MetadataScan<'_> {
         if raw_tag.is_empty() {
             return Ok(());
         }
-        self.admission.admit_recovered_tag(
-            raw_tag.len(),
-            self.line_number,
-            ByteSpan::from_valid_range(start, raw_tag.len()),
-        )?;
-        self.tags.push_unescaped(raw_tag)
+        let span = ByteSpan::from_valid_range(start, raw_tag.len());
+        match &mut self.mode {
+            ScanMode::Recover {
+                admission, tags, ..
+            } => {
+                admission.admit_recovered_tag(raw_tag.len(), self.line_number, span)?;
+                tags.push_unescaped(raw_tag)
+            }
+            ScanMode::Locate { remaining, found } => {
+                if found.is_none() {
+                    if *remaining == 0 {
+                        *found = Some((self.line_number, span));
+                    } else {
+                        *remaining -= 1;
+                    }
+                }
+                Ok(())
+            }
+        }
     }
 
     fn scan_line(&mut self, line_start: usize, line_end: usize) -> ModelResult<()> {

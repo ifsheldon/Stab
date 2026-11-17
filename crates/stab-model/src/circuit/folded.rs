@@ -3,8 +3,8 @@
 //! Analyses that admit work before unrolling repeat blocks need the same facts: how many times
 //! each instruction runs, how many repeat iterations execute, and how deep blocks nest. This walk
 //! visits every folded item once, multiplies repeat counts with overflow kept as a value instead
-//! of a panic, bounds recursion by a [`RepeatNestingLimit`], and polls one [`Cancellation`]. It
-//! never allocates in proportion to a repeat count.
+//! of a panic, bounds nesting by a [`RepeatNestingLimit`] with an explicit stack instead of
+//! recursion, and polls one [`Cancellation`]. It never allocates in proportion to a repeat count.
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 use crate::cancellation::CancellationCountdown;
@@ -109,70 +109,63 @@ pub enum FoldedVisitError<E> {
 /// Visits every folded item of `circuit` in source order with its expanded multiplicity.
 ///
 /// A repeat block is reported before its body; entering a body deeper than `nesting` stops the
-/// walk with [`FoldedWalkError::RepeatNesting`], so recursion is bounded by the limit, which is
-/// at most [`RepeatNestingLimit::HARD_MAX`]. The cancellation signal is polled once every
-/// 1024 visited items.
+/// walk with [`FoldedWalkError::RepeatNesting`]. The walk keeps an explicit stack of at most
+/// `nesting` frames instead of recursing. The cancellation signal is polled once every 1024
+/// visited items.
 pub fn visit_folded_circuit<E>(
     circuit: &Circuit,
     nesting: RepeatNestingLimit,
     cancellation: &Cancellation,
     mut visitor: impl FnMut(FoldedCircuitEvent<'_>) -> Result<(), E>,
 ) -> Result<(), FoldedVisitError<E>> {
-    let mut walk = FoldedWalk {
-        limit: nesting.get(),
-        cancellation,
-        countdown: CancellationCountdown::default(),
-    };
-    walk.visit(circuit, FoldedCount::ONE, 0, &mut visitor)
-}
-
-struct FoldedWalk<'a> {
-    limit: usize,
-    cancellation: &'a Cancellation,
-    countdown: CancellationCountdown,
-}
-
-impl FoldedWalk<'_> {
-    fn visit<E>(
-        &mut self,
-        circuit: &Circuit,
-        executions: FoldedCount,
-        depth: usize,
-        visitor: &mut impl FnMut(FoldedCircuitEvent<'_>) -> Result<(), E>,
-    ) -> Result<(), FoldedVisitError<E>> {
-        if depth > self.limit {
-            return Err(FoldedVisitError::Walk(FoldedWalkError::RepeatNesting {
-                depth,
-                limit: self.limit,
-            }));
-        }
-        for item in circuit.items() {
-            self.countdown
-                .tick(self.cancellation)
-                .map_err(|cancelled| {
-                    FoldedVisitError::Walk(FoldedWalkError::Cancelled(cancelled))
-                })?;
-            match item {
-                CircuitItem::Instruction(instruction) => visitor(FoldedCircuitEvent::Instruction {
-                    instruction,
-                    executions,
+    let limit = nesting.get();
+    let mut countdown = CancellationCountdown::default();
+    // One frame per enclosing repeat body; entering a body deeper than `limit` stops the walk
+    // before its frame is pushed, so the stack never exceeds the nesting limit.
+    let mut enclosing: Vec<(std::slice::Iter<'_, CircuitItem>, FoldedCount, usize)> = Vec::new();
+    let mut items = circuit.items().iter();
+    let mut executions = FoldedCount::ONE;
+    let mut depth = 0_usize;
+    loop {
+        let Some(item) = items.next() else {
+            let Some((parent, parent_executions, parent_depth)) = enclosing.pop() else {
+                return Ok(());
+            };
+            items = parent;
+            executions = parent_executions;
+            depth = parent_depth;
+            continue;
+        };
+        countdown
+            .tick(cancellation)
+            .map_err(|cancelled| FoldedVisitError::Walk(FoldedWalkError::Cancelled(cancelled)))?;
+        match item {
+            CircuitItem::Instruction(instruction) => visitor(FoldedCircuitEvent::Instruction {
+                instruction,
+                executions,
+            })
+            .map_err(FoldedVisitError::Visitor)?,
+            CircuitItem::RepeatBlock(repeat) => {
+                let iterations = executions.times(FoldedCount::new(repeat.repeat_count().get()));
+                let body_depth = depth.saturating_add(1);
+                visitor(FoldedCircuitEvent::Repeat {
+                    repeat,
+                    iterations,
+                    body_depth,
                 })
-                .map_err(FoldedVisitError::Visitor)?,
-                CircuitItem::RepeatBlock(repeat) => {
-                    let iterations =
-                        executions.times(FoldedCount::new(repeat.repeat_count().get()));
-                    let body_depth = depth.saturating_add(1);
-                    visitor(FoldedCircuitEvent::Repeat {
-                        repeat,
-                        iterations,
-                        body_depth,
-                    })
-                    .map_err(FoldedVisitError::Visitor)?;
-                    self.visit(repeat.body(), iterations, body_depth, visitor)?;
+                .map_err(FoldedVisitError::Visitor)?;
+                if body_depth > limit {
+                    return Err(FoldedVisitError::Walk(FoldedWalkError::RepeatNesting {
+                        depth: body_depth,
+                        limit,
+                    }));
                 }
+                let parent = std::mem::replace(&mut items, repeat.body().items().iter());
+                enclosing.push((parent, executions, depth));
+                executions = iterations;
+                depth = body_depth;
             }
         }
-        Ok(())
     }
 }
 

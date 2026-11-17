@@ -18,8 +18,10 @@ const MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE: u64 = 1_u64 << 63;
 
 mod fast;
 mod items;
+mod tag;
 
 use items::BlockItems;
+use tag::{DeferredTag, parse_optional_tag};
 
 pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
     let admission = ParseAdmission::new(ModelDialect::StimCircuit, input.len(), limits)?;
@@ -27,15 +29,15 @@ pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> ModelResult<Cir
 }
 
 /// Parses `input` under `admission`, which has already charged `input` and any preparation
-/// storage, and returns the retained model bytes it charged, excluding both.
+/// storage, and returns the admission with everything the parse charged.
 pub(super) fn parse_circuit_admitted(
     input: &str,
     admission: ParseAdmission,
     fuse_instructions: bool,
-) -> ModelResult<(Circuit, u64)> {
+) -> ModelResult<(Circuit, ParseAdmission)> {
     let mut parser = Parser::new(input, admission, fuse_instructions);
-    let circuit = parser.parse_block(false, 0)?;
-    Ok((circuit, parser.admission.retained_model_bytes()))
+    let circuit = parser.parse_block()?;
+    Ok((circuit, parser.admission))
 }
 
 struct Parser<'a> {
@@ -124,11 +126,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse(mut self) -> ModelResult<Circuit> {
-        self.parse_block(false, 0)
+        self.parse_block()
     }
 
-    fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> ModelResult<Circuit> {
+    /// Parses the whole input without recursing: each open `REPEAT` block is a frame holding
+    /// its enclosing block's items, and the repeat-nesting admission bounds the frame count.
+    fn parse_block(&mut self) -> ModelResult<Circuit> {
         let mut circuit = BlockItems::default();
+        let mut enclosing: Vec<OpenRepeat> = Vec::new();
         while let Some(command) = self.commands.next() {
             let line_number = command.line_number();
             let line = command.source().trim_command_space_start();
@@ -137,52 +142,29 @@ impl<'a> Parser<'a> {
                 continue;
             }
             if semantic_line.text() == "}" {
-                if stop_on_terminator {
-                    return Ok(circuit.finish(&mut self.admission));
-                }
-                return Err(crate::model_parse::unexpected_repeat_terminator(
-                    ModelDialect::StimCircuit,
-                    semantic_line.span(),
-                ));
+                self.close_repeat(&mut circuit, &mut enclosing, semantic_line.span())?;
+                continue;
             }
             self.admission
                 .admit_instruction(line_number, semantic_line.span())?;
             if let Some(header) = semantic_line.without_suffix('{') {
-                let repeat = self.parse_repeat_header(
+                self.open_repeat(
+                    &mut circuit,
+                    &mut enclosing,
                     line_number,
                     header,
                     semantic_line.span(),
                     command.end_error_span(),
-                    depth,
-                )?;
-                self.admission.admit_payload(
-                    0,
-                    repeat.tag.as_ref().map_or(0, String::len),
-                    line_number,
-                    semantic_line.span(),
-                )?;
-                let body = self.parse_block(true, depth + 1)?;
-                circuit.push(
-                    CircuitItem::RepeatBlock(RepeatBlock::new(repeat.count, body, repeat.tag)),
-                    &mut self.admission,
-                    line_number,
-                    semantic_line.span(),
                 )?;
             } else {
+                // Each path charges what its instruction retains, its tag included, before the
+                // instruction is built.
                 let instruction = parse_instruction(
                     line_number,
                     line,
                     command.end_error_span(),
                     &mut self.admission,
                     &mut self.scratch,
-                )?;
-                // The generic parser admitted each argument before retaining it, and the fast
-                // paths accept no arguments, so only the tag remains to charge.
-                self.admission.admit_payload(
-                    0,
-                    instruction.tag_bytes().map_or(0, <[u8]>::len),
-                    line_number,
-                    semantic_line.span(),
                 )?;
                 if self.fuse_instructions {
                     circuit.push_instruction(
@@ -201,14 +183,60 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        if stop_on_terminator {
+        if enclosing.is_empty() {
+            Ok(circuit.finish(&mut self.admission))
+        } else {
             Err(crate::model_parse::unterminated_repeat_block(
                 ModelDialect::StimCircuit,
                 self.input_len,
             ))
-        } else {
-            Ok(circuit.finish(&mut self.admission))
         }
+    }
+
+    /// Parses a `REPEAT` header and starts collecting its body, keeping the enclosing block's
+    /// items in a new frame.
+    fn open_repeat(
+        &mut self,
+        circuit: &mut BlockItems,
+        enclosing: &mut Vec<OpenRepeat>,
+        line_number: usize,
+        header: SourceSlice<'a>,
+        span: ByteSpan,
+        end_error_span: ByteSpan,
+    ) -> ModelResult<()> {
+        let repeat =
+            self.parse_repeat_header(line_number, header, span, end_error_span, enclosing.len())?;
+        let tag = admit_deferred_tag(&mut self.admission, repeat.tag, line_number, span)?;
+        enclosing.push(OpenRepeat {
+            parent: std::mem::take(circuit),
+            count: repeat.count,
+            tag,
+            line_number,
+            span,
+        });
+        Ok(())
+    }
+
+    /// Ends the innermost open `REPEAT` block and appends it to its enclosing block.
+    fn close_repeat(
+        &mut self,
+        circuit: &mut BlockItems,
+        enclosing: &mut Vec<OpenRepeat>,
+        span: ByteSpan,
+    ) -> ModelResult<()> {
+        let Some(open) = enclosing.pop() else {
+            return Err(crate::model_parse::unexpected_repeat_terminator(
+                ModelDialect::StimCircuit,
+                span,
+            ));
+        };
+        let body = std::mem::replace(circuit, open.parent).finish(&mut self.admission);
+        circuit.push(
+            CircuitItem::RepeatBlock(RepeatBlock::new(open.count, body, open.tag)),
+            &mut self.admission,
+            open.line_number,
+            open.span,
+        )
     }
 
     fn parse_repeat_header(
@@ -218,7 +246,7 @@ impl<'a> Parser<'a> {
         header_span: ByteSpan,
         end_error_span: ByteSpan,
         depth: usize,
-    ) -> ModelResult<ParsedRepeatHeader> {
+    ) -> ModelResult<ParsedRepeatHeader<'a>> {
         let (name, rest) = parse_name(line_number, header)?;
         if !name.text().eq_ignore_ascii_case("REPEAT") {
             return Err(line_error(
@@ -341,9 +369,33 @@ impl<'a> Parser<'a> {
     }
 }
 
-struct ParsedRepeatHeader {
+struct ParsedRepeatHeader<'a> {
+    count: RepeatCount,
+    tag: Option<DeferredTag<'a>>,
+}
+
+/// A `REPEAT` block whose body is being parsed.
+struct OpenRepeat {
+    /// Items of the enclosing block parsed so far.
+    parent: BlockItems,
     count: RepeatCount,
     tag: Option<String>,
+    line_number: usize,
+    span: ByteSpan,
+}
+
+/// Charges a declaration's tag, then builds its text in an exact-size allocation.
+fn admit_deferred_tag(
+    admission: &mut ParseAdmission,
+    tag: Option<DeferredTag<'_>>,
+    line_number: usize,
+    span: ByteSpan,
+) -> ModelResult<Option<String>> {
+    let Some(tag) = tag else {
+        return Ok(None);
+    };
+    admission.admit_payload(0, tag.len(), line_number, span)?;
+    tag.into_string().map(Some)
 }
 
 fn parse_instruction(
@@ -370,16 +422,20 @@ fn parse_instruction(
         name,
         rest,
         end_error_span,
+        line,
         admission,
         scratch,
     )
 }
 
+/// Parses an instruction with the diagnostic parser, charging its tag against the span of
+/// `line` without trailing whitespace.
 fn parse_instruction_fully_generic_from_parts(
     line_number: usize,
     name: SourceSlice<'_>,
     rest: SourceSlice<'_>,
     end_error_span: ByteSpan,
+    line: SourceSlice<'_>,
     admission: &mut ParseAdmission,
     scratch: &mut ParseScratch,
 ) -> ModelResult<CircuitInstruction> {
@@ -446,6 +502,15 @@ fn parse_instruction_fully_generic_from_parts(
         })?;
     let args = scratch.take_args(admission);
     let targets = scratch.take_targets(admission);
+    let tag = match tag {
+        None => None,
+        Some(tag) => admit_deferred_tag(
+            admission,
+            Some(tag),
+            line_number,
+            line.trim_ascii_end().span(),
+        )?,
+    };
     Ok(CircuitInstruction::from_validated_parts(
         gate, args, targets, tag,
     ))
@@ -468,6 +533,7 @@ fn parse_instruction_fully_generic(
         name,
         rest,
         line.end_span(),
+        line,
         &mut admission,
         &mut ParseScratch::default(),
     )
@@ -509,100 +575,6 @@ fn parse_name(
         .suffix(end)
         .ok_or_else(|| internal_parser_error(line_number, "missing instruction name"))?;
     Ok((name, rest))
-}
-
-fn parse_optional_tag<'a>(
-    line_number: usize,
-    instruction: &str,
-    rest: SourceSlice<'a>,
-    end_error_span: ByteSpan,
-) -> ModelResult<(Option<String>, SourceSlice<'a>)> {
-    let Some(mut body) = rest.strip_prefix("[") else {
-        return Ok((None, rest));
-    };
-    let mut tag = String::new();
-    loop {
-        let Some((character, character_len)) = body
-            .text()
-            .chars()
-            .next()
-            .map(|character| (character, character.len_utf8()))
-        else {
-            return Err(line_error(
-                ModelDialect::StimCircuit,
-                line_number,
-                ParseErrorCode::UnterminatedTag,
-                "unterminated tag",
-                "unterminated tag",
-                end_error_span,
-                instruction_context(instruction),
-            ));
-        };
-        let character_span = body
-            .subspan(0, character_len)
-            .unwrap_or_else(|| body.span());
-        body = body
-            .suffix(character_len)
-            .ok_or_else(|| internal_parser_error(line_number, "unterminated tag"))?;
-        match character {
-            ']' => return Ok((Some(tag), body)),
-            '\\' => {
-                let Some((escaped, escaped_len)) = body
-                    .text()
-                    .chars()
-                    .next()
-                    .map(|escaped| (escaped, escaped.len_utf8()))
-                else {
-                    return Err(line_error(
-                        ModelDialect::StimCircuit,
-                        line_number,
-                        ParseErrorCode::UnterminatedTagEscape,
-                        "unterminated tag escape",
-                        "unterminated tag escape",
-                        end_error_span,
-                        instruction_context(instruction),
-                    ));
-                };
-                let escape_span = ByteSpan::try_new(
-                    character_span.byte_start(),
-                    character_span.byte_length() + escaped_len,
-                )
-                .unwrap_or(character_span);
-                body = body
-                    .suffix(escaped_len)
-                    .ok_or_else(|| internal_parser_error(line_number, "unterminated tag escape"))?;
-                tag.push(match escaped {
-                    'C' => ']',
-                    'r' => '\r',
-                    'n' => '\n',
-                    'B' => '\\',
-                    _ => {
-                        return Err(line_error(
-                            ModelDialect::StimCircuit,
-                            line_number,
-                            ParseErrorCode::InvalidTagEscape,
-                            format!("invalid tag escape \\{escaped}"),
-                            format!("invalid tag escape \\{escaped}"),
-                            escape_span,
-                            instruction_context(instruction),
-                        ));
-                    }
-                });
-            }
-            '\r' | '\n' => {
-                return Err(line_error(
-                    ModelDialect::StimCircuit,
-                    line_number,
-                    ParseErrorCode::UnterminatedTag,
-                    "invalid tag newline",
-                    "invalid tag newline",
-                    character_span,
-                    instruction_context(instruction),
-                ));
-            }
-            _ => tag.push(character),
-        }
-    }
 }
 
 /// Source region of a parsed argument list, whose values live in the parse scratch.

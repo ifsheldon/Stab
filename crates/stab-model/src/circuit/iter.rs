@@ -123,11 +123,24 @@ impl<'a> Iterator for CircuitFlattenedInstructionRevIter<'a> {
     }
 }
 
+/// Whether `items` or any nested repeat body holds an instruction, checked without recursing.
 fn items_contain_instruction(items: &[CircuitItem]) -> bool {
-    items.iter().any(|item| match item {
-        CircuitItem::Instruction(_) => true,
-        CircuitItem::RepeatBlock(repeat) => items_contain_instruction(repeat.body().items()),
-    })
+    if items
+        .iter()
+        .any(|item| matches!(item, CircuitItem::Instruction(_)))
+    {
+        return true;
+    }
+    let mut pending = vec![items];
+    while let Some(items) = pending.pop() {
+        for item in items {
+            match item {
+                CircuitItem::Instruction(_) => return true,
+                CircuitItem::RepeatBlock(repeat) => pending.push(repeat.body().items()),
+            }
+        }
+    }
+    false
 }
 
 #[derive(Clone, Debug)]

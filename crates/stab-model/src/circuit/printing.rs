@@ -7,13 +7,68 @@ use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
 const FLOAT_BUFFER_BYTES: usize = 32;
 
-pub(super) fn stim_text_capacity(circuit: &Circuit, indent: usize) -> usize {
-    circuit.items.iter().fold(0usize, |capacity, item| {
-        capacity.saturating_add(match item {
-            CircuitItem::Instruction(instruction) => instruction_text_capacity(instruction, indent),
-            CircuitItem::RepeatBlock(repeat) => repeat_text_capacity(repeat, indent),
-        })
-    })
+/// One step of a canonical-text walk, with the indentation of the line it prints.
+pub(super) enum TextEvent<'a> {
+    Instruction(&'a CircuitInstruction, usize),
+    /// A `REPEAT` header, printed before its body.
+    RepeatOpen(&'a RepeatBlock, usize),
+    /// A `REPEAT` block's closing brace, printed after its body.
+    RepeatClose(&'a RepeatBlock, usize),
+}
+
+/// Visits `circuit` in printing order without recursion.
+///
+/// The explicit stack holds one frame per enclosing repeat block, so a circuit nested far
+/// deeper than the parser admits prints without exhausting the thread's stack.
+pub(super) fn walk_text<'a, E>(
+    circuit: &'a Circuit,
+    mut visit: impl FnMut(TextEvent<'a>) -> Result<(), E>,
+) -> Result<(), E> {
+    let mut enclosing: Vec<(std::slice::Iter<'a, CircuitItem>, &'a RepeatBlock, usize)> =
+        Vec::new();
+    let mut items = circuit.items.iter();
+    let mut indent = 0_usize;
+    loop {
+        match items.next() {
+            Some(CircuitItem::Instruction(instruction)) => {
+                visit(TextEvent::Instruction(instruction, indent))?;
+            }
+            Some(CircuitItem::RepeatBlock(repeat)) => {
+                visit(TextEvent::RepeatOpen(repeat, indent))?;
+                let parent = std::mem::replace(&mut items, repeat.body.items.iter());
+                enclosing.push((parent, repeat, indent));
+                indent = indent.saturating_add(4);
+            }
+            None => {
+                let Some((parent, repeat, parent_indent)) = enclosing.pop() else {
+                    return Ok(());
+                };
+                visit(TextEvent::RepeatClose(repeat, parent_indent))?;
+                items = parent;
+                indent = parent_indent;
+            }
+        }
+    }
+}
+
+pub(super) fn stim_text_capacity(circuit: &Circuit) -> usize {
+    let mut capacity = 0_usize;
+    let walked = walk_text::<std::convert::Infallible>(circuit, |event| {
+        capacity = capacity.saturating_add(match event {
+            TextEvent::Instruction(instruction, indent) => {
+                instruction_text_capacity(instruction, indent)
+            }
+            TextEvent::RepeatOpen(repeat, indent) => repeat_open_text_capacity(repeat, indent),
+            TextEvent::RepeatClose(repeat, indent) => usize::from(repeat.body.is_empty())
+                .saturating_add(indent)
+                .saturating_add("}\n".len()),
+        });
+        Ok(())
+    });
+    match walked {
+        Ok(()) => capacity,
+        Err(never) => match never {},
+    }
 }
 
 fn instruction_text_capacity(instruction: &CircuitInstruction, indent: usize) -> usize {
@@ -36,16 +91,12 @@ fn instruction_text_capacity(instruction: &CircuitInstruction, indent: usize) ->
     capacity.saturating_add(targets_text_len(&instruction.targets))
 }
 
-fn repeat_text_capacity(repeat: &RepeatBlock, indent: usize) -> usize {
+fn repeat_open_text_capacity(repeat: &RepeatBlock, indent: usize) -> usize {
     let mut capacity = indent
         .saturating_add("REPEAT".len())
         .saturating_add(1)
         .saturating_add(decimal_len_u64(repeat.repeat_count.get()))
-        .saturating_add(" {\n".len())
-        .saturating_add(stim_text_capacity(&repeat.body, indent.saturating_add(4)))
-        .saturating_add(usize::from(repeat.body.is_empty()))
-        .saturating_add(indent)
-        .saturating_add("}\n".len());
+        .saturating_add(" {\n".len());
     if let Some(tag) = &repeat.tag {
         capacity = capacity
             .saturating_add(2)

@@ -10,6 +10,7 @@ mod drop_impl;
 mod equality;
 mod error_mechanisms;
 mod parser;
+mod printing;
 mod tag;
 mod traversal;
 
@@ -172,7 +173,7 @@ impl DetectorErrorModel {
     /// [`Self::to_dem_bytes`] when exact metadata preservation matters.
     pub fn to_dem_string(&self) -> String {
         let mut out = String::new();
-        self.write_dem(&mut out, 0, &mut DemFloatCache::new());
+        self.write_dem(&mut out, &mut DemFloatCache::new());
         out
     }
 
@@ -197,7 +198,7 @@ impl DetectorErrorModel {
     ///
     /// Returns the first error reported by `out`.
     pub fn write_dem_bytes<W: Write>(&self, out: &mut W) -> io::Result<()> {
-        self.write_dem_io(out, 0, &mut DemFloatCache::new())
+        self.write_dem_io(out, &mut DemFloatCache::new())
     }
 
     pub fn total_detector_shift(&self) -> ModelResult<u64> {
@@ -221,22 +222,40 @@ impl DetectorErrorModel {
             .observable_count())
     }
 
-    fn write_dem(&self, out: &mut String, indent: usize, floats: &mut DemFloatCache) {
-        for item in &self.items {
-            item.write_dem(out, indent, floats);
+    fn write_dem(&self, out: &mut String, floats: &mut DemFloatCache) {
+        let walked = printing::walk_dem_text::<std::convert::Infallible>(self, |event| {
+            match event {
+                printing::DemTextEvent::Instruction(instruction, indent) => {
+                    instruction.write_dem(out, indent, floats);
+                }
+                printing::DemTextEvent::RepeatOpen(repeat, indent) => {
+                    repeat.write_dem_open(out, indent);
+                }
+                printing::DemTextEvent::RepeatClose(indent) => {
+                    write_indent(out, indent);
+                    out.push_str("}\n");
+                }
+            }
+            Ok(())
+        });
+        if let Err(never) = walked {
+            match never {}
         }
     }
 
-    fn write_dem_io<W: Write>(
-        &self,
-        out: &mut W,
-        indent: usize,
-        floats: &mut DemFloatCache,
-    ) -> io::Result<()> {
-        for item in &self.items {
-            item.write_dem_io(out, indent, floats)?;
-        }
-        Ok(())
+    fn write_dem_io<W: Write>(&self, out: &mut W, floats: &mut DemFloatCache) -> io::Result<()> {
+        printing::walk_dem_text(self, |event| match event {
+            printing::DemTextEvent::Instruction(instruction, indent) => {
+                instruction.write_dem_io(out, indent, floats)
+            }
+            printing::DemTextEvent::RepeatOpen(repeat, indent) => {
+                repeat.write_dem_io_open(out, indent)
+            }
+            printing::DemTextEvent::RepeatClose(indent) => {
+                write_indent_io(out, indent)?;
+                out.write_all(b"}\n")
+            }
+        })
     }
 
     fn restore_byte_tags(&mut self, tags: RecoveredTags) -> ModelResult<()> {
@@ -251,14 +270,12 @@ impl DetectorErrorModel {
             ));
         }
         let mut tags = tags.into_owned_tags();
-        self.restore_byte_tags_from(&mut tags);
-        let exhausted = tags.next().is_none();
-        debug_assert!(exhausted);
-        Ok(())
-    }
-
-    fn restore_byte_tags_from(&mut self, tags: &mut impl Iterator<Item = Vec<u8>>) {
-        for item in &mut self.items {
+        let mut pending = vec![self.items.iter_mut()];
+        while let Some(items) = pending.last_mut() {
+            let Some(item) = items.next() else {
+                pending.pop();
+                continue;
+            };
             match item {
                 DemItem::Instruction(instruction) => {
                     if instruction.tag.is_some() {
@@ -269,22 +286,32 @@ impl DetectorErrorModel {
                     if repeat.tag.is_some() {
                         repeat.tag = tags.next().and_then(DemTag::from_bytes);
                     }
-                    repeat.body.restore_byte_tags_from(tags);
+                    pending.push(repeat.body.items.iter_mut());
                 }
             }
         }
+        let exhausted = tags.next().is_none();
+        debug_assert!(exhausted);
+        Ok(())
     }
 
     fn non_empty_tag_count(&self) -> usize {
-        self.items
-            .iter()
-            .map(|item| match item {
-                DemItem::Instruction(instruction) => usize::from(instruction.tag.is_some()),
-                DemItem::RepeatBlock(repeat) => {
-                    usize::from(repeat.tag.is_some()) + repeat.body.non_empty_tag_count()
+        let mut count = 0_usize;
+        let mut pending = vec![self.items.as_slice()];
+        while let Some(items) = pending.pop() {
+            for item in items {
+                match item {
+                    DemItem::Instruction(instruction) => {
+                        count += usize::from(instruction.tag.is_some());
+                    }
+                    DemItem::RepeatBlock(repeat) => {
+                        count += usize::from(repeat.tag.is_some());
+                        pending.push(repeat.body.items.as_slice());
+                    }
                 }
-            })
-            .sum()
+            }
+        }
+        count
     }
 }
 
@@ -325,27 +352,6 @@ impl Drop for DetectorErrorModel {
 pub enum DemItem {
     Instruction(DemInstruction),
     RepeatBlock(DemRepeatBlock),
-}
-
-impl DemItem {
-    fn write_dem(&self, out: &mut String, indent: usize, floats: &mut DemFloatCache) {
-        match self {
-            Self::Instruction(instruction) => instruction.write_dem(out, indent, floats),
-            Self::RepeatBlock(repeat) => repeat.write_dem(out, indent, floats),
-        }
-    }
-
-    fn write_dem_io<W: Write>(
-        &self,
-        out: &mut W,
-        indent: usize,
-        floats: &mut DemFloatCache,
-    ) -> io::Result<()> {
-        match self {
-            Self::Instruction(instruction) => instruction.write_dem_io(out, indent, floats),
-            Self::RepeatBlock(repeat) => repeat.write_dem_io(out, indent, floats),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -405,7 +411,7 @@ impl DemRepeatBlock {
         self.tag.as_ref().map(DemTag::as_bytes)
     }
 
-    fn write_dem(&self, out: &mut String, indent: usize, floats: &mut DemFloatCache) {
+    fn write_dem_open(&self, out: &mut String, indent: usize) {
         write_indent(out, indent);
         out.push_str("repeat");
         write_optional_tag(out, self.tag.as_ref());
@@ -416,17 +422,9 @@ impl DemRepeatBlock {
         if self.body.items.is_empty() {
             out.push('\n');
         }
-        self.body.write_dem(out, indent + 4, floats);
-        write_indent(out, indent);
-        out.push_str("}\n");
     }
 
-    fn write_dem_io<W: Write>(
-        &self,
-        out: &mut W,
-        indent: usize,
-        floats: &mut DemFloatCache,
-    ) -> io::Result<()> {
+    fn write_dem_io_open<W: Write>(&self, out: &mut W, indent: usize) -> io::Result<()> {
         write_indent_io(out, indent)?;
         out.write_all(b"repeat")?;
         write_optional_tag_io(out, self.tag.as_ref())?;
@@ -434,9 +432,7 @@ impl DemRepeatBlock {
         if self.body.items.is_empty() {
             out.write_all(b"\n")?;
         }
-        self.body.write_dem_io(out, indent + 4, floats)?;
-        write_indent_io(out, indent)?;
-        out.write_all(b"}\n")
+        Ok(())
     }
 }
 

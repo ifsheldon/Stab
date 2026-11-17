@@ -104,13 +104,16 @@ impl<'a> FoldedDemTraversal<'a> {
 
     /// Traverses the model with coordinate-free state.
     ///
-    /// Visitor errors and [`ControlFlow::Break`] propagate immediately. Repeat expansion occurs
+    /// The visit recurses once per repeat level, so a model nested deeper than
+    /// [`MAX_DEM_REPEAT_NESTING`] is refused before any callback runs. Visitor errors and
+    /// [`ControlFlow::Break`] propagate immediately. Repeat expansion occurs
     /// only when the visitor explicitly returns [`DemRepeatSelection::Expand`], whose cumulative
     /// iteration limit is enforced by the traversal.
     pub fn try_visit<V>(&self, visitor: &mut V) -> Result<ControlFlow<()>, V::Error>
     where
         V: FoldedDemVisitor,
     {
+        self.validate_repeat_depth("traversal")?;
         let mut state = DemTraversalState::default();
         let mut expansion = ExpansionBudget::default();
         self.root.visit(visitor, &mut state, &mut expansion)
@@ -120,7 +123,7 @@ impl<'a> FoldedDemTraversal<'a> {
     ///
     /// Coordinate updates have a separate aggregate scalar-work limit. Consumers that do not need
     /// coordinates must use [`Self::try_visit`] so wide coordinate annotations cannot inflate
-    /// their retained state or work.
+    /// their retained state or work. Nesting is refused as in [`Self::try_visit`].
     pub fn try_visit_with_coordinates<V>(
         &self,
         visitor: &mut V,
@@ -128,6 +131,7 @@ impl<'a> FoldedDemTraversal<'a> {
     where
         V: FoldedDemVisitor,
     {
+        self.validate_repeat_depth("traversal")?;
         let mut state = DemTraversalState::with_coordinates();
         let mut expansion = ExpansionBudget::default();
         self.root.visit(visitor, &mut state, &mut expansion)
@@ -246,27 +250,38 @@ impl<'a> FoldedDemBlock<'a> {
         &self.summary
     }
 
+    /// Returns the coordinate shift this block applies, without recursing.
+    ///
+    /// Each repeat body's shift is accumulated from zero and added, times the repeat count, to
+    /// its parent's shift when the body ends, matching a body-first recursion exactly.
     pub(super) fn coordinate_shift(&self) -> ModelResult<Vec<f64>> {
+        let mut enclosing: Vec<(std::slice::Iter<'_, FoldedDemItem<'a>>, Vec<f64>, u64)> =
+            Vec::new();
+        let mut items = self.items.iter();
         let mut shift = Vec::new();
-        for item in &self.items {
-            match item {
-                FoldedDemItem::Instruction(instruction)
+        loop {
+            match items.next() {
+                Some(FoldedDemItem::Instruction(instruction))
                     if instruction.kind() == DemInstructionKind::ShiftDetectors =>
                 {
                     add_coordinate_shift_mul(&mut shift, instruction.args(), 1.0)?;
                 }
-                FoldedDemItem::Repeat { repeat, body } => {
-                    let body_shift = body.coordinate_shift()?;
-                    add_coordinate_shift_mul(
-                        &mut shift,
-                        &body_shift,
-                        repeat.repeat_count().get() as f64,
-                    )?;
+                Some(FoldedDemItem::Instruction(_)) => {}
+                Some(FoldedDemItem::Repeat { repeat, body }) => {
+                    let parent = std::mem::replace(&mut items, body.items.iter());
+                    let parent_shift = std::mem::take(&mut shift);
+                    enclosing.push((parent, parent_shift, repeat.repeat_count().get()));
                 }
-                FoldedDemItem::Instruction(_) => {}
+                None => {
+                    let Some((parent, parent_shift, repeat_count)) = enclosing.pop() else {
+                        return Ok(shift);
+                    };
+                    let body_shift = std::mem::replace(&mut shift, parent_shift);
+                    add_coordinate_shift_mul(&mut shift, &body_shift, repeat_count as f64)?;
+                    items = parent;
+                }
             }
         }
-        Ok(shift)
     }
 
     fn visit<V>(
