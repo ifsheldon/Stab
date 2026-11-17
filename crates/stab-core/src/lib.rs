@@ -28,7 +28,8 @@ pub use stab_model::{
     MemoryBudget, MemoryBudgetParseError, ModelDialect, ModelError, ModelFingerprint, ModelResult,
     ObservableId, ParseError, ParseErrorCode, ParseErrorContext, ParseLimits, Pauli, Probability,
     ProbabilityStimText, QubitId, RepeatBlock, RepeatCount, RepeatNestingLimit,
-    RepeatNestingLimitError, ResourceEstimate, Target, ValidationError, ValidationErrorCode,
+    RepeatNestingLimitError, ResourceEstimate, Target, TargetKind, ValidationError,
+    ValidationErrorCode,
 };
 pub use stab_records::{
     BitPlaneBatch, BitPlaneBatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,

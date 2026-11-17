@@ -3,7 +3,7 @@ use std::ops::ControlFlow;
 
 use stab_algebra::{SingleQubitClifford, StabilizerError};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateKind, Pauli, QubitId, Target,
+    Circuit, CircuitInstruction, CircuitItem, Gate, GateKind, Pauli, QubitId, Target, TargetKind,
 };
 
 use crate::{AnalysisError, AnalysisResult};
@@ -299,38 +299,28 @@ fn substitute_template_target(
     actual_targets: &[Target],
     preserves_inversion: bool,
 ) -> AnalysisResult<Target> {
-    match target {
-        Target::Qubit { id, .. } => {
-            let index = id.get() as usize;
-            let actual = actual_targets.get(index).ok_or_else(|| {
-                invalid_simplification(format!(
-                    "decomposition template referenced missing target {index}"
-                ))
-            })?;
-            Ok(match actual {
-                Target::Qubit {
-                    id,
-                    inverted: actual_inverted,
-                } => Target::qubit(*id, preserves_inversion && *actual_inverted),
-                Target::MeasurementRecord { offset } => Target::measurement_record(*offset),
-                Target::SweepBit { id } => Target::sweep_bit(*id),
-                Target::Pauli { id, .. } => Target::qubit(*id, false),
-                Target::Combiner => {
-                    return Err(invalid_simplification(
-                        "decomposition template cannot substitute a combiner target",
-                    ));
-                }
-            })
-        }
-        Target::MeasurementRecord { offset } => Ok(Target::measurement_record(*offset)),
-        Target::SweepBit { id } => Ok(Target::sweep_bit(*id)),
-        Target::Pauli {
-            pauli,
+    let TargetKind::Qubit { id, .. } = target.kind() else {
+        return Ok(*target);
+    };
+    let index = id.get() as usize;
+    let actual = actual_targets.get(index).ok_or_else(|| {
+        invalid_simplification(format!(
+            "decomposition template referenced missing target {index}"
+        ))
+    })?;
+    Ok(match actual.kind() {
+        TargetKind::Qubit {
             id,
-            inverted,
-        } => Ok(Target::pauli(*pauli, *id, *inverted)),
-        Target::Combiner => Ok(Target::combiner()),
-    }
+            inverted: actual_inverted,
+        } => Target::qubit(id, preserves_inversion && actual_inverted),
+        TargetKind::MeasurementRecord { .. } | TargetKind::SweepBit { .. } => *actual,
+        TargetKind::Pauli { id, .. } => Target::qubit(id, false),
+        TargetKind::Combiner => {
+            return Err(invalid_simplification(
+                "decomposition template cannot substitute a combiner target",
+            ));
+        }
+    })
 }
 
 fn append_single_target_sequence(
@@ -343,7 +333,7 @@ fn append_single_target_sequence(
         result.append_instruction(stab_model::advanced::circuit_instruction_with_tag_bytes(
             *gate,
             Vec::new(),
-            vec![target.clone()],
+            vec![target],
             tag,
         )?);
     }
@@ -546,7 +536,7 @@ fn visit_single_target_sequence<Break>(
     tag: Option<&[u8]>,
 ) -> AnalysisResult<ControlFlow<Break>> {
     for gate in sequence {
-        let completion = visit_gate_targets(visitor, *gate, vec![target.clone()], tag)?;
+        let completion = visit_gate_targets(visitor, *gate, vec![target], tag)?;
         if completion.is_break() {
             return Ok(completion);
         }
@@ -739,36 +729,36 @@ fn reduce_pauli_product_impl(
     let mut terms = Vec::<(QubitId, Option<Pauli>)>::new();
 
     for target in group {
-        match target {
-            Target::Pauli {
+        match target.kind() {
+            TargetKind::Pauli {
                 pauli,
                 id,
                 inverted,
             } => {
-                if *inverted {
+                if inverted {
                     phase = (phase + 2) % 4;
                 }
                 #[cfg(test)]
                 if let Some(work) = work.as_deref_mut() {
                     work.index_lookups += 1;
                 }
-                let index = if let Some(index) = term_indexes.get(id) {
+                let index = if let Some(index) = term_indexes.get(&id) {
                     *index
                 } else {
                     let index = terms.len();
-                    terms.push((*id, None));
-                    term_indexes.insert(*id, index);
+                    terms.push((id, None));
+                    term_indexes.insert(id, index);
                     index
                 };
                 let slot = terms.get_mut(index).ok_or_else(|| {
                     invalid_simplification("Pauli product index disagreed with retained terms")
                 })?;
                 let current = slot.1.take();
-                let (next_phase, next_pauli) = multiply_pauli(current, *pauli);
+                let (next_phase, next_pauli) = multiply_pauli(current, pauli);
                 phase = (phase + next_phase) % 4;
                 slot.1 = next_pauli;
             }
-            Target::Combiner => {}
+            TargetKind::Combiner => {}
             _ => {
                 return Err(invalid_simplification(format!(
                     "Pauli product decomposition expected Pauli targets, got {target}"

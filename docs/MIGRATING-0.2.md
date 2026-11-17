@@ -238,6 +238,20 @@ Compiling a sampling plan no longer hashes its circuit. A plan does not retain i
 
 `stab sample` no longer pays for an identity it never prints, and `stab plan sample` hashes the circuit once instead of twice; its output is byte-identical to the previous build.
 
+## Packed Targets And Exact Circuit Admission
+
+A parsed circuit stores each target in four bytes, as Stim's `GateTarget` does, and each item in 56 bytes instead of 96 on 64-bit targets, and parse admission charges what the circuit retains instead of two slots per target, so a parsed circuit's hold tracks its resident size. On a 147 MB flat surface-code circuit the parsed model's hold falls from 632 MB to 200 MB and its resident size from about 326 MB to about 188 MB.
+
+| Changed item | Migration |
+| --- | --- |
+| `stab_model::Target` | Now an opaque four-byte `Copy` value instead of an enum with public variants, and it also implements `Hash`. The constructors and accessors are unchanged; match on `target.kind()`, which returns the new `stab_model::TargetKind` (also `stab_core::TargetKind`) with the old variants and fields, so `match target { Target::Qubit { id, inverted } => .. }` becomes `match target.kind() { TargetKind::Qubit { id, inverted } => .. }` with `id` and `inverted` bound by value. `Debug` prints the `TargetKind`. |
+| `Target::sweep_bit(id)` | Returns `ModelResult<Target>` and refuses ids of `2^24` and above, which Stim cannot encode and the parser never produced. |
+| Clones of targets | `target.clone()` and `.cloned()` become copies; `CircuitInstruction::targets` still returns `&[Target]`. |
+| Circuit parse admission (`ParseLimits` memory budget) | A circuit item is charged its exact slot size, 56 bytes instead of 96 plus 32 bytes of heap bookkeeping; a target 4 bytes instead of 16 (two 8-byte slots); an argument 8 bytes instead of 16; a tag twice its bytes plus its 24-byte boxed record instead of twice its bytes. The spare capacity of a block's growing item list, of an instruction that later lines fuse into, and of the per-line scratch is charged as transient parse storage before it is reserved and returned when the block or fusion run ends, and a line that fuses into the previous instruction returns its item, argument, and tag charge after it is admitted, so `Circuit::from_stim_bytes_admitted` reports the same hold as `Circuit::admitted_bytes`. DEM parse admission is unchanged. Budget refusals quote smaller byte counts, and inputs that were refused by less than the difference now parse. |
+| Byte projections derived from model sizes | Projections that multiply by the size of a `CircuitItem`, `CircuitInstruction`, or `Target`, or that use `advanced::circuit_declaration_admitted_bytes`, shrink with them: circuit-pass payload projections, flattening, feedback inlining, measurement-rich time reversal, and sampled-flow witness circuits admit less for the same circuit. |
+
+Every `.stim` text, printed circuit, diagnostic, and fingerprint byte is unchanged.
+
 ## Extension APIs
 
 The typed circuit-pass seam is canonical in `stab-analysis`. It admits folded input, requires a conservative output-resource projection before proportional allocation, validates the returned closed-dialect circuit, and reports typed input, projection, or output failures. The separate Stable `stab-reference-noise-pass` crate proves this public boundary without depending on `stab-core`.

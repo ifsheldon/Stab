@@ -5,7 +5,7 @@ use stab_analysis::advanced::flow_record_index;
 use stab_model::advanced::{CancellationCountdown, circuit_declaration_admitted_bytes};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind,
-    MeasureRecordOffset, MemoryBudget, QubitId, Target,
+    MeasureRecordOffset, MemoryBudget, QubitId, Target, TargetKind,
 };
 use stab_records::{MeasurementBatchView, MeasurementSink};
 use thiserror::Error;
@@ -605,16 +605,16 @@ fn remap_instruction_with_args(
         instruction
             .targets()
             .iter()
-            .map(|target| match target {
-                Target::Qubit { id, inverted } => Ok(Target::qubit(qubits.get(*id)?, *inverted)),
-                Target::Pauli {
+            .map(|target| match target.kind() {
+                TargetKind::Qubit { id, inverted } => Ok(Target::qubit(qubits.get(id)?, inverted)),
+                TargetKind::Pauli {
                     pauli,
                     id,
                     inverted,
-                } => Ok(Target::pauli(*pauli, qubits.get(*id)?, *inverted)),
-                Target::MeasurementRecord { .. } | Target::SweepBit { .. } | Target::Combiner => {
-                    Ok(target.clone())
-                }
+                } => Ok(Target::pauli(pauli, qubits.get(id)?, inverted)),
+                TargetKind::MeasurementRecord { .. }
+                | TargetKind::SweepBit { .. }
+                | TargetKind::Combiner => Ok(*target),
             })
             .collect::<SampledFlowResult<Vec<_>>>()?
     };
@@ -649,7 +649,7 @@ fn append_selected_observable_feedback(
                 output,
                 admission,
                 GateKind::CX,
-                target.clone(),
+                *target,
                 Target::qubit(ancilla, false),
                 instruction.tag_bytes(),
             )?;

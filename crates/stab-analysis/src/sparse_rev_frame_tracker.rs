@@ -4,6 +4,7 @@ use stab_algebra::PauliBasis;
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, DemTarget, MemoryBudget, Pauli, QubitId, Target,
+    TargetKind,
 };
 
 mod budget;
@@ -814,8 +815,8 @@ impl SparseReverseFrameTracker {
         sensitivity: &[DemTarget],
     ) -> AnalysisResult<()> {
         for target in instruction.targets() {
-            match target {
-                Target::MeasurementRecord { offset } => {
+            match target.kind() {
+                TargetKind::MeasurementRecord { offset } => {
                     let index = self.record_index_from_offset(offset.get())?;
                     let existing = self.rec_bits.get(&index);
                     let growth = xor_growth_bytes(
@@ -831,13 +832,13 @@ impl SparseReverseFrameTracker {
                     let after = set_entry_bytes(Some(set));
                     self.meter.adjust(before, after);
                 }
-                Target::Pauli { pauli, id, .. } => {
+                TargetKind::Pauli { pauli, id, .. } => {
                     self.toggle_product_sensitivity(
-                        &[(*id, TrackerBasis::from_pauli(*pauli))],
+                        &[(id, TrackerBasis::from_pauli(pauli))],
                         sensitivity,
                     )?;
                 }
-                Target::Qubit { .. } | Target::SweepBit { .. } | Target::Combiner => {
+                TargetKind::Qubit { .. } | TargetKind::SweepBit { .. } | TargetKind::Combiner => {
                     return Err(AnalysisError::invalid_detector_error_model(format!(
                         "OBSERVABLE_INCLUDE target {target} is not a measurement record or Pauli target"
                     )));

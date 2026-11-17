@@ -195,7 +195,7 @@ fn circuit_mutation_and_value_lifecycle_preserves_semantics() {
     let observable = CircuitInstruction::new(
         Gate::from_name("OBSERVABLE_INCLUDE").expect("observable gate"),
         vec![f64::from_bits(0x43ef_ffff_ffff_ffff)],
-        vec![rec.clone()],
+        vec![rec],
         None,
     )
     .expect("largest exactly represented observable id");
@@ -309,7 +309,7 @@ fn circuit_target_grammar_and_gate_roles_are_enforced() {
         ("0", Target::qubit(qubit(0), false)),
         ("!1", Target::qubit(qubit(1), true)),
         ("rec[-7]", record(-7)),
-        ("sweep[5]", Target::sweep_bit(5)),
+        ("sweep[5]", Target::sweep_bit(5).expect("sweep target")),
         ("X2", Target::pauli(Pauli::X, qubit(2), false)),
         ("!Y3", Target::pauli(Pauli::Y, qubit(3), true)),
         ("Z4", Target::pauli(Pauli::Z, qubit(4), false)),
@@ -348,7 +348,11 @@ fn circuit_target_grammar_and_gate_roles_are_enforced() {
             .to_string(),
         "Z9"
     );
-    for noninvertible in [record(-1), Target::sweep_bit(0), Target::combiner()] {
+    for noninvertible in [
+        record(-1),
+        Target::sweep_bit(0).expect("sweep target"),
+        Target::combiner(),
+    ] {
         assert!(noninvertible.try_inverted().is_err());
     }
 

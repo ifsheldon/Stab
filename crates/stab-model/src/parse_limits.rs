@@ -107,36 +107,65 @@ impl Default for ParseLimits {
     }
 }
 
-/// Heap bookkeeping charged per declaration for its argument, target, and tag allocations.
-const DECLARATION_HEAP_OVERHEAD_BYTES: u64 = 32;
-/// Target vectors grow by doubling, including when adjacent instructions fuse, so each retained
-/// target is charged for up to two slots.
-const TARGET_SLOTS_PER_TARGET: u64 = 2;
+/// Heap bookkeeping charged per DEM declaration for its argument, target, and tag allocations.
+const DEM_DECLARATION_HEAP_OVERHEAD_BYTES: u64 = 32;
+/// DEM target vectors grow by doubling, so each retained DEM target and argument is charged for
+/// up to two slots.
+const DEM_SLOTS_PER_VALUE: u64 = 2;
 
-/// Conservative retained bytes of one parsed argument, charged for two slots like a target.
-const ARGUMENT_BYTES: u64 = size_of::<f64>() as u64 * TARGET_SLOTS_PER_TARGET;
 /// Tag bytes are charged twice, covering the parsed text and its retained copy.
 const TAG_COPIES: u64 = 2;
+/// The boxed tag record a tagged circuit item retains beside its tag bytes.
+const CIRCUIT_TAG_RECORD_BYTES: u64 = size_of::<crate::model_tag::ModelTag>() as u64;
 
-/// Conservative retained bytes of one parsed declaration, excluding its targets.
+/// Retained bytes of one parsed declaration, excluding its targets, arguments, and tag.
+///
+/// A circuit item is stored at exactly this size; its targets, arguments, and tag are exact-size
+/// allocations charged separately, so a circuit's charge is its retained payload, excluding
+/// allocator bookkeeping. A DEM declaration keeps the older conservative charge with heap
+/// bookkeeping.
 const fn declaration_bytes(dialect: ModelDialect) -> u64 {
-    let bytes = match dialect {
-        ModelDialect::StimCircuit => size_of::<CircuitItem>(),
-        ModelDialect::DetectorErrorModel => size_of::<DemItem>(),
-    };
-    bytes as u64 + DECLARATION_HEAP_OVERHEAD_BYTES
+    match dialect {
+        ModelDialect::StimCircuit => size_of::<CircuitItem>() as u64,
+        ModelDialect::DetectorErrorModel => {
+            size_of::<DemItem>() as u64 + DEM_DECLARATION_HEAP_OVERHEAD_BYTES
+        }
+    }
 }
 
-/// Conservative retained bytes of one parsed target.
+/// Retained bytes of one parsed target.
+///
+/// A circuit target is charged one slot whether it sits inline in its item or in exact-size heap
+/// storage, so a short instruction is charged up to four targets' bytes that its item already
+/// holds. A DEM target is charged two slots.
 const fn target_bytes(dialect: ModelDialect) -> u64 {
-    let bytes = match dialect {
-        ModelDialect::StimCircuit => size_of::<Target>(),
-        ModelDialect::DetectorErrorModel => size_of::<DemTarget>(),
-    };
-    bytes as u64 * TARGET_SLOTS_PER_TARGET
+    match dialect {
+        ModelDialect::StimCircuit => size_of::<Target>() as u64,
+        ModelDialect::DetectorErrorModel => size_of::<DemTarget>() as u64 * DEM_SLOTS_PER_VALUE,
+    }
 }
 
-/// Conservative retained bytes of one declaration in `dialect` under [`ParseLimits`] accounting.
+/// Retained bytes of one parenthesized argument.
+const fn argument_bytes(dialect: ModelDialect) -> u64 {
+    match dialect {
+        ModelDialect::StimCircuit => size_of::<f64>() as u64,
+        ModelDialect::DetectorErrorModel => size_of::<f64>() as u64 * DEM_SLOTS_PER_VALUE,
+    }
+}
+
+/// Retained bytes of a declaration's tag of `tag_bytes` unescaped bytes.
+const fn tag_charge(dialect: ModelDialect, tag_bytes: usize) -> u64 {
+    if tag_bytes == 0 {
+        return 0;
+    }
+    let bytes = (tag_bytes as u64).saturating_mul(TAG_COPIES);
+    match dialect {
+        ModelDialect::StimCircuit => bytes.saturating_add(CIRCUIT_TAG_RECORD_BYTES),
+        ModelDialect::DetectorErrorModel => bytes,
+    }
+}
+
+/// Retained bytes of one declaration in `dialect` under [`ParseLimits`] accounting.
 pub(crate) const fn model_declaration_admitted_bytes(
     dialect: ModelDialect,
     target_count: usize,
@@ -145,15 +174,15 @@ pub(crate) const fn model_declaration_admitted_bytes(
 ) -> u64 {
     declaration_bytes(dialect)
         .saturating_add((target_count as u64).saturating_mul(target_bytes(dialect)))
-        .saturating_add((argument_count as u64).saturating_mul(ARGUMENT_BYTES))
-        .saturating_add((tag_bytes as u64).saturating_mul(TAG_COPIES))
+        .saturating_add((argument_count as u64).saturating_mul(argument_bytes(dialect)))
+        .saturating_add(tag_charge(dialect, tag_bytes))
 }
 
 /// Conservative bytes of one tag byte recovered from non-UTF-8 input, whose arena grows by
 /// doubling.
-const RECOVERED_TAG_BYTE_BYTES: u64 = TARGET_SLOTS_PER_TARGET;
+const RECOVERED_TAG_BYTE_BYTES: u64 = 2;
 /// Conservative bytes of one recovered tag's arena end offset, whose vector grows by doubling.
-const RECOVERED_TAG_BYTES: u64 = size_of::<usize>() as u64 * TARGET_SLOTS_PER_TARGET;
+const RECOVERED_TAG_BYTES: u64 = size_of::<usize>() as u64 * 2;
 
 #[derive(Clone, Copy)]
 pub(crate) struct ParseAdmission {
@@ -163,6 +192,8 @@ pub(crate) struct ParseAdmission {
     charged_bytes: u64,
     /// Source bytes plus the transient preparation bytes, both excluded from the model bytes.
     source_bytes: u64,
+    /// Parse-time scratch and spare vector capacity, also excluded from the model bytes.
+    transient_bytes: u64,
 }
 
 impl ParseAdmission {
@@ -177,6 +208,7 @@ impl ParseAdmission {
             limits,
             charged_bytes: input_len as u64,
             source_bytes: input_len as u64,
+            transient_bytes: 0,
         })
     }
 
@@ -203,7 +235,9 @@ impl ParseAdmission {
 
     /// The retained model bytes charged so far, excluding the source bytes.
     pub(crate) const fn retained_model_bytes(&self) -> u64 {
-        self.charged_bytes.saturating_sub(self.source_bytes)
+        self.charged_bytes
+            .saturating_sub(self.source_bytes)
+            .saturating_sub(self.transient_bytes)
     }
 
     fn charge(&mut self, bytes: u128, source_line: usize, span: ByteSpan) -> ModelResult<()> {
@@ -299,7 +333,39 @@ impl ParseAdmission {
 
     /// Charges one parenthesized argument before it is retained.
     pub(crate) fn admit_argument(&mut self, source_line: usize, span: ByteSpan) -> ModelResult<()> {
-        self.charge(u128::from(ARGUMENT_BYTES), source_line, span)
+        self.charge(u128::from(argument_bytes(self.dialect)), source_line, span)
+    }
+
+    /// Charges `bytes` of parse-time storage, such as scratch buffers and the spare capacity of
+    /// growing item and target vectors, before it is reserved; the bytes count against the budget
+    /// until [`Self::release_transient`] returns them, but never as retained model bytes.
+    pub(crate) fn admit_transient(
+        &mut self,
+        bytes: usize,
+        source_line: usize,
+        span: ByteSpan,
+    ) -> ModelResult<()> {
+        let charged = self.admitted_total(bytes as u128, source_line, span)?;
+        let added = charged.saturating_sub(self.charged_bytes);
+        self.charged_bytes = charged;
+        self.transient_bytes = self.transient_bytes.saturating_add(added);
+        Ok(())
+    }
+
+    /// Returns transient bytes charged by [`Self::admit_transient`] once their storage is freed.
+    pub(crate) fn release_transient(&mut self, bytes: usize) {
+        let bytes = (bytes as u64).min(self.transient_bytes);
+        self.charged_bytes = self.charged_bytes.saturating_sub(bytes);
+        self.transient_bytes -= bytes;
+    }
+
+    /// Returns retained bytes charged for a declaration that fused into the previous
+    /// instruction: its item slot, its arguments, and its tag, which the fused instruction
+    /// already holds. Its targets stay charged.
+    pub(crate) fn refund_fused_declaration(&mut self, argument_count: usize, tag_bytes: usize) {
+        let bytes = model_declaration_admitted_bytes(self.dialect, 0, argument_count, tag_bytes);
+        let model = self.retained_model_bytes();
+        self.charged_bytes = self.charged_bytes.saturating_sub(bytes.min(model));
     }
 
     /// Checks that `count` parsed arguments fit beside the charged bytes without retaining
@@ -310,7 +376,7 @@ impl ParseAdmission {
         source_line: usize,
         span: ByteSpan,
     ) -> ModelResult<()> {
-        let bytes = (count as u128).saturating_mul(u128::from(ARGUMENT_BYTES));
+        let bytes = (count as u128).saturating_mul(u128::from(argument_bytes(self.dialect)));
         self.admitted_total(bytes, source_line, span).map(|_| ())
     }
 
@@ -323,8 +389,8 @@ impl ParseAdmission {
         span: ByteSpan,
     ) -> ModelResult<()> {
         let bytes = (argument_count as u128)
-            .saturating_mul(u128::from(ARGUMENT_BYTES))
-            .saturating_add((tag_bytes as u128).saturating_mul(u128::from(TAG_COPIES)));
+            .saturating_mul(u128::from(argument_bytes(self.dialect)))
+            .saturating_add(u128::from(tag_charge(self.dialect, tag_bytes)));
         if bytes == 0 {
             return Ok(());
         }

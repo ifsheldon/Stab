@@ -4,7 +4,7 @@ use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
     FoldedCircuitSummary, FoldedCount, FoldedWalkError, GateKind, MemoryBudget, ParseLimits,
-    QubitId, RepeatNestingLimit, Target,
+    QubitId, RepeatNestingLimit, Target, TargetKind,
 };
 
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
@@ -771,10 +771,10 @@ fn validate_pauli_product_targets(instruction: &CircuitInstruction) -> AnalysisR
 
 fn validate_measurement_pad_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     for target in instruction.targets() {
-        let Target::Qubit {
+        let TargetKind::Qubit {
             id,
             inverted: false,
-        } = target
+        } = target.kind()
         else {
             return Err(AnalysisError::invalid_detector_error_model(format!(
                 "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
@@ -795,7 +795,7 @@ fn validate_qubit_target(
     target: &Target,
     allow_inverted: bool,
 ) -> AnalysisResult<()> {
-    if let Target::Qubit { inverted, .. } = target
+    if let TargetKind::Qubit { inverted, .. } = target.kind()
         && (allow_inverted || !inverted)
     {
         return Ok(());

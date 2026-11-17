@@ -458,17 +458,29 @@ fn pf1_circuit_detector_coords_reject_missing_detector_id() {
 }
 
 #[test]
-fn model_admitted_bytes_matches_parse_admission_for_unfused_models() {
+fn model_admitted_bytes_matches_parse_admission_for_fused_and_unfused_models() {
     let stim = b"H[tag1] 0\nX_ERROR(0.125) 0 1\nREPEAT[rep] 3 {\n    M[m] 0\n    DETECTOR(1, 2) rec[-1]\n}\n";
     let (circuit, parsed_circuit_bytes) =
         Circuit::from_stim_bytes_admitted(stim, stab_model::ParseLimits::default())
             .expect("parse circuit");
     assert_eq!(circuit.admitted_bytes(), parsed_circuit_bytes);
 
-    let (fused, fused_parse_bytes) =
-        Circuit::from_stim_bytes_admitted(b"H 0\nH 1\n", stab_model::ParseLimits::default())
-            .expect("parse fused circuit");
-    assert!(fused.admitted_bytes() < fused_parse_bytes);
+    // A fused line returns its item slot, arguments, and tag, so the parse holds exactly what
+    // the fused circuit retains, on the text path and on the byte-tag path that fuses after
+    // restoring opaque tags.
+    for (source, items) in [
+        (
+            &b"H 0\nH 1\nX_ERROR[t](0.25) 0 1 2\nX_ERROR[t](0.25) 3 4 5\n"[..],
+            2,
+        ),
+        (&b"H[\xff] 0\nH[\xff] 1 2 3 4 5\nM 0\n"[..], 2),
+    ] {
+        let (fused, fused_parse_bytes) =
+            Circuit::from_stim_bytes_admitted(source, stab_model::ParseLimits::default())
+                .expect("parse fused circuit");
+        assert_eq!(fused.items().len(), items);
+        assert_eq!(fused.admitted_bytes(), fused_parse_bytes);
+    }
 
     let dem_bytes = b"error[etag](0.125) D0 L0\nrepeat[rtag] 4 {\n    error(0.05) D1\n    shift_detectors(1) 1\n}\n";
     let (dem, parsed_dem_bytes) = stab_model::DetectorErrorModel::from_dem_bytes_admitted(

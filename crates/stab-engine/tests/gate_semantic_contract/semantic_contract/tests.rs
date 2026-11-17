@@ -446,8 +446,8 @@ fn gate_surface_contract_classifies_mixed_classical_control_groups_in_order() {
         || Target::measurement_record(MeasureRecordOffset::try_new(-1).expect("record offset"));
     let rec2 =
         || Target::measurement_record(MeasureRecordOffset::try_new(-2).expect("record offset"));
-    let sweep0 = || Target::sweep_bit(0);
-    let sweep1 = || Target::sweep_bit(1);
+    let sweep0 = || Target::sweep_bit(0).expect("sweep target");
+    let sweep1 = || Target::sweep_bit(1).expect("sweep target");
     let targets = vec![
         q0(),
         q1(),
@@ -661,8 +661,8 @@ fn representative_targets(pattern: GateTargetPattern) -> Vec<Target> {
         || Target::measurement_record(MeasureRecordOffset::try_new(-1).expect("record offset"));
     let rec2 =
         || Target::measurement_record(MeasureRecordOffset::try_new(-2).expect("record offset"));
-    let sweep0 = || Target::sweep_bit(0);
-    let sweep1 = || Target::sweep_bit(1);
+    let sweep0 = || Target::sweep_bit(0).expect("sweep target");
+    let sweep1 = || Target::sweep_bit(1).expect("sweep target");
     let x0 = || Target::pauli(Pauli::X, QubitId::new(0).expect("q0"), false);
     let z0 = || Target::pauli(Pauli::Z, QubitId::new(0).expect("q0"), false);
     let y1 = || Target::pauli(Pauli::Y, QubitId::new(1).expect("q1"), false);

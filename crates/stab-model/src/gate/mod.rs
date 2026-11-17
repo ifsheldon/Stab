@@ -14,7 +14,7 @@ use table::GATES;
 pub use unitary::GateUnitaryRows;
 pub(crate) use unitary::gate_unitary_rows;
 
-use crate::{ModelResult, Pauli, Probability, Target, ValidationError};
+use crate::{ModelResult, Pauli, Probability, Target, TargetKind, ValidationError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GateCategory {
@@ -360,7 +360,10 @@ impl TargetRule {
                 // Pinned Stim's correlated-error handlers consult only the
                 // Pauli X/Z bits, so combiner targets and inversion bits are
                 // accepted as ignored decoration (frame_simulator.inl:767-775).
-                matches!(target, Target::Pauli { .. } | Target::Combiner)
+                matches!(
+                    target.kind(),
+                    TargetKind::Pauli { .. } | TargetKind::Combiner
+                )
             }),
         }
     }
@@ -385,8 +388,8 @@ impl TargetRule {
 
 fn is_plain_qubit_target(target: &Target) -> bool {
     matches!(
-        target,
-        Target::Qubit {
+        target.kind(),
+        TargetKind::Qubit {
             inverted: false,
             ..
         }
@@ -398,7 +401,7 @@ fn is_plain_qubit_or_classical_target(target: &Target) -> bool {
 }
 
 fn is_measurement_pad_target(target: &Target) -> bool {
-    matches!(target, Target::Qubit { id, inverted: false } if id.get() <= 1)
+    matches!(target.kind(), TargetKind::Qubit { id, inverted: false } if id.get() <= 1)
 }
 
 fn validate_pair_targets(

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemTarget, QubitId, RepeatBlock, Target,
+    Circuit, CircuitInstruction, CircuitItem, DemTarget, QubitId, RepeatBlock, Target, TargetKind,
 };
 
 use super::budget::slot_transform_bytes;
@@ -371,8 +371,8 @@ fn has_plain_qubit_groups(instruction: &CircuitInstruction, group_size: usize) -
 
 fn is_plain_qubit_target(target: &Target) -> bool {
     matches!(
-        target,
-        Target::Qubit {
+        target.kind(),
+        TargetKind::Qubit {
             inverted: false,
             ..
         }

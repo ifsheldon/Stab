@@ -177,21 +177,27 @@ mod tests {
             } if target.get() == 0
         );
         assert_matches!(
-            classify_controlled_pauli_target_pair(xcz, &[q(0), Target::sweep_bit(3)]),
+            classify_controlled_pauli_target_pair(xcz, &[q(0), Target::sweep_bit(3).expect("sweep target")]),
             ControlledPauliTargetPair::Classical {
                 control: ClassicalControl::Sweep(3),
                 target,
             } if target.get() == 0
         );
         assert_matches!(
-            classify_controlled_pauli_target_pair(cz, &[rec(-1), Target::sweep_bit(2)]),
+            classify_controlled_pauli_target_pair(
+                cz,
+                &[rec(-1), Target::sweep_bit(2).expect("sweep target")]
+            ),
             ControlledPauliTargetPair::ClassicalNoop {
                 first: ClassicalControl::Record(_),
                 second: ClassicalControl::Sweep(2),
             }
         );
         assert_eq!(
-            classify_controlled_pauli_target_pair(cx, &[q(0), Target::sweep_bit(0)]),
+            classify_controlled_pauli_target_pair(
+                cx,
+                &[q(0), Target::sweep_bit(0).expect("sweep target")]
+            ),
             ControlledPauliTargetPair::Unsupported
         );
     }

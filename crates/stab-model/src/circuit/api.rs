@@ -270,7 +270,8 @@ impl Circuit {
         let Some(CircuitItem::Instruction(left)) = self.items.get_mut(index) else {
             return false;
         };
-        left.try_fuse(&right)
+        left.targets.extend_from_slice(&right.targets);
+        true
     }
 }
 

@@ -451,7 +451,7 @@ impl ConversionPlan {
         let mut next_sweep_bit_count = self.sweep_bit_count;
         for target in instruction.targets() {
             if let Some(sweep_id) = target.sweep_bit_id() {
-                found_sweep = Some(target.clone());
+                found_sweep = Some(*target);
                 let next_count = usize::try_from(sweep_id)
                     .ok()
                     .and_then(|id| id.checked_add(1))

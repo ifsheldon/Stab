@@ -14,32 +14,38 @@ pub(crate) struct OpaqueModelTag {
     display: Box<str>,
 }
 
+/// A circuit item's optional tag, boxed so an untagged item spends one pointer on it.
+pub(crate) type ItemTag = Option<Box<ModelTag>>;
+
 impl ModelTag {
-    pub(crate) fn from_string(tag: String) -> Option<Self> {
+    pub(crate) fn from_string(tag: String) -> ItemTag {
         if tag.is_empty() {
             None
         } else {
-            Some(Self::Text(tag.into_boxed_str()))
+            Some(Box::new(Self::Text(tag.into_boxed_str())))
         }
     }
 
-    pub(crate) fn from_bytes(tag: Vec<u8>) -> Option<Self> {
+    pub(crate) fn from_bytes(tag: Vec<u8>) -> ItemTag {
         if tag.is_empty() {
             return None;
         }
         match String::from_utf8(tag) {
-            Ok(tag) => Some(Self::Text(tag.into_boxed_str())),
+            Ok(tag) => Some(Box::new(Self::Text(tag.into_boxed_str()))),
             Err(error) => {
                 let bytes = error.into_bytes().into_boxed_slice();
                 let display = String::from_utf8_lossy(&bytes)
                     .into_owned()
                     .into_boxed_str();
-                Some(Self::Opaque(Box::new(OpaqueModelTag { bytes, display })))
+                Some(Box::new(Self::Opaque(Box::new(OpaqueModelTag {
+                    bytes,
+                    display,
+                }))))
             }
         }
     }
 
-    pub(crate) fn from_slice(tag: &[u8]) -> Option<Self> {
+    pub(crate) fn from_slice(tag: &[u8]) -> ItemTag {
         Self::from_bytes(tag.to_vec())
     }
 

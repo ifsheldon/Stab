@@ -17,6 +17,12 @@ impl QubitId {
     pub fn get(self) -> u32 {
         self.0
     }
+
+    /// Rebuilds an id from the 24 value bits of a packed target, which are always in range.
+    #[inline(always)]
+    pub(crate) const fn from_packed(value: u32) -> Self {
+        Self(value & (STIM_TARGET_VALUE_LIMIT - 1))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -175,6 +181,17 @@ impl MeasureRecordOffset {
         let value = std::num::NonZeroI32::new(value)
             .ok_or_else(|| ModelError::invalid_domain_value("measurement record offset", value))?;
         Ok(Self(MeasureRecordOffsetRepr::Lookback(value)))
+    }
+
+    /// Rebuilds an offset from the lookback distance a packed target stores, where distance zero
+    /// is Stim's distinct `rec[-0]` and every distance is below `2^24`.
+    #[inline(always)]
+    pub(crate) const fn from_packed_distance(distance: u32) -> Self {
+        let lookback = 0_i32.wrapping_sub_unsigned(distance & (STIM_TARGET_VALUE_LIMIT - 1));
+        match std::num::NonZeroI32::new(lookback) {
+            Some(lookback) => Self(MeasureRecordOffsetRepr::Lookback(lookback)),
+            None => Self(MeasureRecordOffsetRepr::NegativeZero),
+        }
     }
 
     /// Preserves Stim v1.16's distinct parsed `rec[-0]` target.

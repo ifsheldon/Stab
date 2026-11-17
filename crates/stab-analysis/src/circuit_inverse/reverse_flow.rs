@@ -215,7 +215,7 @@ impl ReverseFlowEngine {
                 self.append_instruction(
                     reset_gate,
                     Vec::new(),
-                    vec![target.clone()],
+                    vec![*target],
                     instruction.tag_bytes(),
                 )?;
             } else {
@@ -223,7 +223,7 @@ impl ReverseFlowEngine {
                 self.append_instruction(
                     instruction.gate().generalized_inverse(),
                     instruction.args().to_vec(),
-                    vec![target.clone()],
+                    vec![*target],
                     instruction.tag_bytes(),
                 )?;
             }
@@ -231,7 +231,7 @@ impl ReverseFlowEngine {
             let tracker_instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
                 instruction.gate(),
                 Vec::new(),
-                vec![target.clone()],
+                vec![*target],
                 instruction.tag_bytes(),
             )?;
             self.tracker.undo_instruction(&tracker_instruction)?;
@@ -450,8 +450,8 @@ impl ReverseFlowEngine {
         let pauli_targets = instruction
             .targets()
             .iter()
-            .filter(|target| matches!(target, Target::Pauli { .. }))
-            .cloned()
+            .filter(|target| target.is_pauli_target())
+            .copied()
             .collect::<Vec<_>>();
         if pauli_targets.is_empty() {
             self.target_tags

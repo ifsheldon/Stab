@@ -3,7 +3,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::{
     Circuit, CircuitItem, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, ModelDialect,
-    Pauli, RepeatNestingLimit, Target,
+    Pauli, RepeatNestingLimit, Target, TargetKind,
 };
 
 const MODEL_FINGERPRINT_DOMAIN: &[u8] = b"stab:model-fingerprint\0";
@@ -127,21 +127,21 @@ impl StructuralEncoder {
 
     #[inline(always)]
     fn circuit_target(&mut self, target: &Target) {
-        match target {
-            Target::Qubit { id, inverted } => {
+        match target.kind() {
+            TargetKind::Qubit { id, inverted } => {
                 let [b0, b1, b2, b3] = id.get().to_be_bytes();
-                self.hasher.update([1, b0, b1, b2, b3, u8::from(*inverted)]);
+                self.hasher.update([1, b0, b1, b2, b3, u8::from(inverted)]);
             }
-            Target::MeasurementRecord { offset } => {
+            TargetKind::MeasurementRecord { offset } => {
                 let [b0, b1, b2, b3] = offset.get().to_be_bytes();
                 self.hasher
                     .update([2, b0, b1, b2, b3, u8::from(offset.is_negative_zero())]);
             }
-            Target::SweepBit { id } => {
+            TargetKind::SweepBit { id } => {
                 let [b0, b1, b2, b3] = id.to_be_bytes();
                 self.hasher.update([3, b0, b1, b2, b3]);
             }
-            Target::Pauli {
+            TargetKind::Pauli {
                 pauli,
                 id,
                 inverted,
@@ -153,9 +153,9 @@ impl StructuralEncoder {
                 };
                 let [b0, b1, b2, b3] = id.get().to_be_bytes();
                 self.hasher
-                    .update([4, disc, b0, b1, b2, b3, u8::from(*inverted)]);
+                    .update([4, disc, b0, b1, b2, b3, u8::from(inverted)]);
             }
-            Target::Combiner => self.byte(5),
+            TargetKind::Combiner => self.byte(5),
         }
     }
 

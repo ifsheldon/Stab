@@ -157,7 +157,10 @@ fn cq2_stim_format_sweep_target_roles_match_stim() {
         panic!("expected one instruction")
     };
     assert_eq!(instruction.args(), &[]);
-    assert_eq!(instruction.targets(), &[Target::sweep_bit(2), q(5)]);
+    assert_eq!(
+        instruction.targets(),
+        &[Target::sweep_bit(2).expect("sweep target"), q(5)]
+    );
 }
 
 #[test]
@@ -181,7 +184,7 @@ fn cq2_stim_format_target_accessors_match_stim() {
     assert_eq!(record_target.qubit_id(), None);
     assert_eq!(record_target.sweep_bit_id(), None);
 
-    let sweep = Target::sweep_bit(11);
+    let sweep = Target::sweep_bit(11).expect("sweep target");
     assert_eq!(sweep.sweep_bit_id(), Some(11));
     assert!(sweep.is_sweep_bit_target());
     assert_eq!(sweep.qubit_id(), None);
@@ -236,7 +239,11 @@ fn cq2_stim_format_target_inversion_matches_stim() {
         assert!(inverted.is_inverted_result_target());
         assert_eq!(inverted.try_inverted().unwrap(), target);
     }
-    for target in [Target::combiner(), record(-3), Target::sweep_bit(6)] {
+    for target in [
+        Target::combiner(),
+        record(-3),
+        Target::sweep_bit(6).expect("sweep target"),
+    ] {
         assert!(target.try_inverted().is_err());
     }
 }
@@ -261,7 +268,11 @@ fn cq2_stim_format_target_classification_matches_stim() {
         assert!(!target.is_classical_bit_target());
     }
     assert!(record(-7).is_classical_bit_target());
-    assert!(Target::sweep_bit(5).is_classical_bit_target());
+    assert!(
+        Target::sweep_bit(5)
+            .expect("sweep target")
+            .is_classical_bit_target()
+    );
     assert!(Target::combiner().is_combiner());
 }
 
@@ -279,7 +290,10 @@ fn cq2_stim_format_gate_target_fixture_contract() {
         })
         .collect::<Vec<_>>();
 
-    assert_eq!(instructions[0].targets(), &[Target::sweep_bit(2), q(5)]);
+    assert_eq!(
+        instructions[0].targets(),
+        &[Target::sweep_bit(2).expect("sweep target"), q(5)]
+    );
     assert_eq!(
         instructions[1].targets(),
         &[Target::qubit(QubitId::new(7).unwrap(), true)]

@@ -4,7 +4,7 @@ use std::ops::RangeBounds;
 
 use crate::gate::GateTargetGroupKind;
 use crate::model_bytes::{PreparedModelText, RecoveredTags};
-use crate::model_tag::ModelTag;
+use crate::model_tag::{ItemTag, ModelTag};
 use crate::target::TargetVec;
 use crate::{
     AbsoluteTolerance, Gate, GateArgumentRule, ModelDialect, ModelError, ModelFingerprint,
@@ -130,6 +130,10 @@ impl Circuit {
         if let Some(tags) = prepared.into_tags() {
             circuit.restore_byte_tags(tags)?;
             circuit.fuse_adjacent_instructions();
+            // Fusion only removes charged declarations, so the fused circuit's own count is
+            // the smaller, exact hold.
+            let fused_bytes = circuit.admitted_bytes().min(model_bytes);
+            return Ok((circuit, fused_bytes));
         }
         Ok((circuit, model_bytes))
     }
@@ -324,8 +328,9 @@ impl Circuit {
 
     fn push_instruction(&mut self, instruction: CircuitInstruction) {
         if let Some(CircuitItem::Instruction(previous)) = self.items.last_mut()
-            && previous.try_fuse(&instruction)
+            && previous.can_fuse(&instruction)
         {
+            previous.targets.extend_from_slice(&instruction.targets);
             return;
         }
         self.items.push(CircuitItem::Instruction(instruction));
@@ -387,16 +392,32 @@ impl Circuit {
         }
     }
 
+    /// Fuses adjacent fusable instructions in place, leaving every vector at its exact length.
     fn fuse_adjacent_instructions(&mut self) {
-        let items = std::mem::take(&mut self.items);
-        for item in items {
-            match item {
-                CircuitItem::Instruction(instruction) => self.push_instruction(instruction),
-                CircuitItem::RepeatBlock(mut repeat) => {
-                    repeat.body.fuse_adjacent_instructions();
-                    self.push(CircuitItem::RepeatBlock(repeat));
+        for item in &mut self.items {
+            if let CircuitItem::RepeatBlock(repeat) = item {
+                repeat.body.fuse_adjacent_instructions();
+            }
+        }
+        let mut fused = false;
+        self.items.dedup_by(|next, previous| {
+            if let (CircuitItem::Instruction(next), CircuitItem::Instruction(previous)) =
+                (next, previous)
+                && previous.can_fuse(next)
+            {
+                previous.targets.extend_from_slice(&next.targets);
+                fused = true;
+                return true;
+            }
+            false
+        });
+        if fused {
+            for item in &mut self.items {
+                if let CircuitItem::Instruction(instruction) = item {
+                    instruction.targets.shrink_to_fit();
                 }
             }
+            self.items.shrink_to_fit();
         }
     }
 
@@ -459,9 +480,9 @@ impl CircuitItem {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CircuitInstruction {
     gate: Gate,
-    args: Vec<f64>,
+    args: Box<[f64]>,
     targets: TargetVec,
-    tag: Option<ModelTag>,
+    tag: ItemTag,
 }
 
 impl CircuitInstruction {
@@ -487,7 +508,7 @@ impl CircuitInstruction {
         gate.validate(&args, &targets)?;
         Ok(Self {
             gate,
-            args,
+            args: args.into_boxed_slice(),
             targets,
             tag: tag.and_then(ModelTag::from_slice),
         })
@@ -501,7 +522,7 @@ impl CircuitInstruction {
     ) -> Self {
         Self {
             gate,
-            args,
+            args: args.into_boxed_slice(),
             targets,
             tag: tag.and_then(ModelTag::from_string),
         }
@@ -579,7 +600,7 @@ impl CircuitInstruction {
     }
 
     pub(crate) fn retained_heap_bytes(&self) -> Option<usize> {
-        let argument_bytes = self.args.capacity().checked_mul(size_of::<f64>())?;
+        let argument_bytes = self.args.len().checked_mul(size_of::<f64>())?;
         let target_bytes = if self.targets.spilled() {
             self.targets.capacity().checked_mul(size_of::<Target>())?
         } else {
@@ -593,12 +614,12 @@ impl CircuitInstruction {
     /// Opaque bytes are represented with the UTF-8 replacement character. Use
     /// [`Self::tag_bytes`] when exact metadata preservation matters.
     pub fn tag(&self) -> Option<&str> {
-        self.tag.as_ref().map(ModelTag::as_str)
+        self.tag.as_deref().map(ModelTag::as_str)
     }
 
     /// Returns the exact unescaped bytes of this instruction's optional Stim tag.
     pub fn tag_bytes(&self) -> Option<&[u8]> {
-        self.tag.as_ref().map(ModelTag::as_bytes)
+        self.tag.as_deref().map(ModelTag::as_bytes)
     }
 
     pub fn target_groups(&self) -> Vec<&[Target]> {
@@ -709,14 +730,6 @@ impl CircuitInstruction {
         }
     }
 
-    fn try_fuse(&mut self, other: &Self) -> bool {
-        if !self.can_fuse(other) {
-            return false;
-        }
-        self.targets.extend(other.targets.iter().cloned());
-        true
-    }
-
     fn can_fuse(&self, other: &Self) -> bool {
         // The gate checks are the cheap ones and reject most pairs, so they run first.
         self.gate == other.gate
@@ -783,7 +796,7 @@ impl CircuitInstruction {
 pub struct RepeatBlock {
     repeat_count: RepeatCount,
     body: Circuit,
-    tag: Option<ModelTag>,
+    tag: ItemTag,
 }
 
 impl RepeatBlock {
@@ -823,12 +836,12 @@ impl RepeatBlock {
     /// Opaque bytes are represented with the UTF-8 replacement character. Use
     /// [`Self::tag_bytes`] when exact metadata preservation matters.
     pub fn tag(&self) -> Option<&str> {
-        self.tag.as_ref().map(ModelTag::as_str)
+        self.tag.as_deref().map(ModelTag::as_str)
     }
 
     /// Returns the exact unescaped bytes of this repeat block's optional Stim tag.
     pub fn tag_bytes(&self) -> Option<&[u8]> {
-        self.tag.as_ref().map(ModelTag::as_bytes)
+        self.tag.as_deref().map(ModelTag::as_bytes)
     }
 
     fn write_stim(&self, out: &mut String, indent: usize) {

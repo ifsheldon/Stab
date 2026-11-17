@@ -1,7 +1,7 @@
 use stab_algebra::{AlgebraMemoryBudget, PauliBasis, PauliString, StabilizerError, Tableau};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind, MemoryBudget,
-    Pauli, QubitId, Target,
+    Pauli, QubitId, Target, TargetKind,
     advanced::{
         CancellationCountdown, ControlledPauliTargetPair, classify_controlled_pauli_target_pair,
     },
@@ -660,11 +660,11 @@ fn check_mpp_commutes(pauli: &PauliString, instruction: &CircuitInstruction) -> 
     for group in instruction.target_groups() {
         let mut group_anticommutes = false;
         for target in group {
-            let Target::Pauli {
+            let TargetKind::Pauli {
                 pauli: measured,
                 id,
                 ..
-            } = target
+            } = target.kind()
             else {
                 continue;
             };

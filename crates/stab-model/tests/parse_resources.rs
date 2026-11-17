@@ -297,58 +297,66 @@ fn parser_admission_charges_fast_path_targets_and_prefusion_declarations() {
 
 #[test]
 fn parser_admission_charges_arguments_and_tags_like_targets() {
-    // Each argument is charged for two f64 slots and each tag byte twice, so a line's retained
-    // charge grows by exactly those amounts beyond its extra source bytes.
-    let retained = |input: &str, parse: ParseStr| minimal_budget(input, parse) - input.len();
-    for (name, plain, decorated, extra, parse) in [
+    // A circuit retains each argument in one exact-size f64 slot and each tag as its bytes plus
+    // one boxed tag record, charged with the parsed copy of its bytes; a DEM argument is charged
+    // for two f64 slots and each DEM tag byte twice. The retained charge a parse reports grows by
+    // exactly those amounts.
+    fn circuit_retained(input: &str) -> u64 {
+        Circuit::from_stim_bytes_admitted(input.as_bytes(), ParseLimits::default())
+            .expect("circuit fixture parses")
+            .1
+    }
+    fn dem_retained(input: &str) -> u64 {
+        (minimal_budget(input, parse_dem_str) - input.len()) as u64
+    }
+    let tag_record = advanced::circuit_declaration_admitted_bytes(0, 0, 1)
+        - advanced::circuit_declaration_admitted_bytes(0, 0, 0)
+        - 2;
+    for (name, plain, decorated, extra, retained) in [
         (
             "circuit arguments",
             "M 0\nDETECTOR rec[-1]\n",
             "M 0\nDETECTOR(1,2,3,4,5,6,7,8) rec[-1]\n",
-            8 * 16,
-            parse_circuit_str as ParseStr,
+            8 * 8,
+            circuit_retained as fn(&str) -> u64,
         ),
         (
             "circuit instruction tag",
             "H 0\n",
             "H[abcdefgh] 0\n",
-            8 * 2,
-            parse_circuit_str,
+            8 * 2 + tag_record,
+            circuit_retained,
         ),
         (
             "circuit repeat tag",
             "REPEAT 2 {\nH 0\n}\n",
             "REPEAT[abcd] 2 {\nH 0\n}\n",
-            4 * 2,
-            parse_circuit_str,
+            4 * 2 + tag_record,
+            circuit_retained,
         ),
         (
             "DEM arguments",
             "detector D0\n",
             "detector(1,2,3,4,5,6,7,8) D0\n",
             8 * 16,
-            parse_dem_str,
+            dem_retained,
         ),
         (
             "DEM instruction tag",
             "error(0.1) D0\n",
             "error[abcdefgh](0.1) D0\n",
             8 * 2,
-            parse_dem_str,
+            dem_retained,
         ),
         (
             "DEM repeat tag",
             "repeat 2 {\nerror(0.1) D0\n}\n",
             "repeat[abcd] 2 {\nerror(0.1) D0\n}\n",
             4 * 2,
-            parse_dem_str,
+            dem_retained,
         ),
     ] {
-        assert_eq!(
-            retained(decorated, parse) - retained(plain, parse),
-            extra,
-            "{name}"
-        );
+        assert_eq!(retained(decorated) - retained(plain), extra, "{name}");
     }
 }
 

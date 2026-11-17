@@ -52,7 +52,7 @@ pub use memory_budget::{MemoryBudget, MemoryBudgetParseError};
 pub use parse_limits::{ParseLimits, RepeatNestingLimit, RepeatNestingLimitError};
 pub use resource_limit::{ResourceKind, ResourceLimitError, ResourceOperation};
 pub use resources::{Estimate, EstimateClass, ResourceEstimate, ResourceEstimateBuilder};
-pub use target::{Pauli, Target};
+pub use target::{Pauli, Target, TargetKind};
 pub use validation::{ValidationError, ValidationErrorCode};
 
 /// Low-level model operations for parsers and admitted algorithms.

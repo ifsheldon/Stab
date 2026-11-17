@@ -1,7 +1,7 @@
 use std::fmt::{self, NumBuffer, Write as _};
 use std::io::{self, Write};
 
-use crate::{Pauli, Target};
+use crate::{Pauli, Target, TargetKind};
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
@@ -64,11 +64,11 @@ fn targets_text_len(targets: &[Target]) -> usize {
 }
 
 fn target_text_len(target: &Target) -> usize {
-    match target {
-        Target::Qubit { id, inverted } => {
-            usize::from(*inverted) + decimal_len_u64(u64::from(id.get()))
+    match target.kind() {
+        TargetKind::Qubit { id, inverted } => {
+            usize::from(inverted) + decimal_len_u64(u64::from(id.get()))
         }
-        Target::MeasurementRecord { offset } => {
+        TargetKind::MeasurementRecord { offset } => {
             "rec[]".len()
                 + if offset.is_negative_zero() {
                     2
@@ -76,23 +76,23 @@ fn target_text_len(target: &Target) -> usize {
                     decimal_len_i32(offset.get())
                 }
         }
-        Target::SweepBit { id } => "sweep[]".len() + decimal_len_u64(u64::from(*id)),
-        Target::Pauli { id, inverted, .. } => {
-            usize::from(*inverted) + 1 + decimal_len_u64(u64::from(id.get()))
+        TargetKind::SweepBit { id } => "sweep[]".len() + decimal_len_u64(u64::from(id)),
+        TargetKind::Pauli { id, inverted, .. } => {
+            usize::from(inverted) + 1 + decimal_len_u64(u64::from(id.get()))
         }
-        Target::Combiner => 1,
+        TargetKind::Combiner => 1,
     }
 }
 
 pub(super) fn write_target(out: &mut String, target: &Target) {
-    match target {
-        Target::Qubit { id, inverted } => {
-            if *inverted {
+    match target.kind() {
+        TargetKind::Qubit { id, inverted } => {
+            if inverted {
                 out.push('!');
             }
             push_u64(out, u64::from(id.get()));
         }
-        Target::MeasurementRecord { offset } => {
+        TargetKind::MeasurementRecord { offset } => {
             out.push_str("rec[");
             if offset.is_negative_zero() {
                 out.push_str("-0");
@@ -101,17 +101,17 @@ pub(super) fn write_target(out: &mut String, target: &Target) {
             }
             out.push(']');
         }
-        Target::SweepBit { id } => {
+        TargetKind::SweepBit { id } => {
             out.push_str("sweep[");
-            push_u64(out, u64::from(*id));
+            push_u64(out, u64::from(id));
             out.push(']');
         }
-        Target::Pauli {
+        TargetKind::Pauli {
             pauli,
             id,
             inverted,
         } => {
-            if *inverted {
+            if inverted {
                 out.push('!');
             }
             out.push(match pauli {
@@ -121,19 +121,19 @@ pub(super) fn write_target(out: &mut String, target: &Target) {
             });
             push_u64(out, u64::from(id.get()));
         }
-        Target::Combiner => out.push('*'),
+        TargetKind::Combiner => out.push('*'),
     }
 }
 
 pub(super) fn write_target_io(out: &mut impl Write, target: &Target) -> io::Result<()> {
-    match target {
-        Target::Qubit { id, inverted } => {
-            if *inverted {
+    match target.kind() {
+        TargetKind::Qubit { id, inverted } => {
+            if inverted {
                 out.write_all(b"!")?;
             }
             write_u64_io(out, u64::from(id.get()))
         }
-        Target::MeasurementRecord { offset } => {
+        TargetKind::MeasurementRecord { offset } => {
             out.write_all(b"rec[")?;
             if offset.is_negative_zero() {
                 out.write_all(b"-0")?;
@@ -142,17 +142,17 @@ pub(super) fn write_target_io(out: &mut impl Write, target: &Target) -> io::Resu
             }
             out.write_all(b"]")
         }
-        Target::SweepBit { id } => {
+        TargetKind::SweepBit { id } => {
             out.write_all(b"sweep[")?;
-            write_u64_io(out, u64::from(*id))?;
+            write_u64_io(out, u64::from(id))?;
             out.write_all(b"]")
         }
-        Target::Pauli {
+        TargetKind::Pauli {
             pauli,
             id,
             inverted,
         } => {
-            if *inverted {
+            if inverted {
                 out.write_all(b"!")?;
             }
             out.write_all(&[match pauli {
@@ -162,7 +162,7 @@ pub(super) fn write_target_io(out: &mut impl Write, target: &Target) -> io::Resu
             }])?;
             write_u64_io(out, u64::from(id.get()))
         }
-        Target::Combiner => out.write_all(b"*"),
+        TargetKind::Combiner => out.write_all(b"*"),
     }
 }
 

@@ -10,7 +10,7 @@ use stab_decoder::{
     DecoderModelView, DecoderSession, ValidatedDecodeBatch, decode_batch,
 };
 use stab_engine::SamplingCompiler;
-use stab_model::{Cancellation, Circuit, DetectorErrorModel};
+use stab_model::{Cancellation, Circuit, CircuitItem, DetectorErrorModel, TargetKind};
 use stab_records::{
     BitPlaneBatch, MeasurementBatchView, MeasurementCodecSink, MeasurementSink, MeasurementWidth,
     ObservablePredictionBatch, PackedShotBatch, RecordFormat, read_measurement_records,
@@ -30,6 +30,15 @@ pub fn exercise_stable_components(
     clifford.right_multiply_in_place(&phase)?;
 
     let circuit = Circuit::from_stim_str("M 0\n")?;
+    let measured = circuit
+        .items()
+        .first()
+        .and_then(CircuitItem::as_instruction)
+        .and_then(|instruction| instruction.targets().first().copied())
+        .map(|target| target.kind());
+    if !matches!(measured, Some(TargetKind::Qubit { id, inverted: false }) if id.get() == 0) {
+        return Err(std::io::Error::other("typed target view changed the measured qubit").into());
+    }
     let stripped = circuit_without_tags(&circuit);
     let compiler = SamplingCompiler::new();
     let _plan = compiler.compile(&stripped)?;

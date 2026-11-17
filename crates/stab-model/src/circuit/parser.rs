@@ -3,7 +3,8 @@ use crate::model_parse::{line_error, validation_error};
 use crate::parse_limits::ParseAdmission;
 use crate::source_text::{SourceCommands, SourceSlice};
 use crate::target::{
-    parse_plain_qubit_targets_into, parse_target_token_into, take_exact, take_exact_targets,
+    TargetVec, parse_plain_qubit_targets_into, parse_target_token_into, take_exact,
+    take_exact_targets,
 };
 use crate::{
     ByteSpan, Gate, GateCategory, ModelDialect, ModelError, ModelResult, ParseErrorCode,
@@ -16,6 +17,9 @@ const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
 const MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE: u64 = 1_u64 << 63;
 
 mod fast;
+mod items;
+
+use items::BlockItems;
 
 pub(super) fn parse_circuit(input: &str, limits: ParseLimits) -> ModelResult<Circuit> {
     let admission = ParseAdmission::new(ModelDialect::StimCircuit, input.len(), limits)?;
@@ -46,12 +50,66 @@ struct Parser<'a> {
 ///
 /// Every line is parsed here first and then moved into its instruction with one exact-size
 /// allocation (none when the values fit inline), so a line with many targets never walks a
-/// reallocation chain per instruction. Each argument and target is admitted before it is pushed,
-/// so the scratch never holds more than the largest line admission accepted.
+/// reallocation chain per instruction. Each argument and target is admitted as retained before
+/// it is pushed, and the scratch capacity itself is charged as transient parse storage before it
+/// grows, so the scratch never holds more than admission accepted.
 #[derive(Default)]
 struct ParseScratch {
     args: Vec<f64>,
     targets: Vec<Target>,
+}
+
+/// The smallest capacity the target scratch grows to.
+const MIN_SCRATCH_TARGETS: usize = 4;
+
+impl ParseScratch {
+    /// Moves the scratch arguments into exact-size instruction storage.
+    fn take_args(&mut self, admission: &mut ParseAdmission) -> Vec<f64> {
+        let capacity = self.args.capacity();
+        let args = take_exact(&mut self.args);
+        release_scratch::<f64>(admission, capacity, self.args.capacity());
+        args
+    }
+
+    /// Moves the scratch targets into exact-size instruction storage.
+    fn take_targets(&mut self, admission: &mut ParseAdmission) -> TargetVec {
+        let capacity = self.targets.capacity();
+        let targets = take_exact_targets(&mut self.targets);
+        release_scratch::<Target>(admission, capacity, self.targets.capacity());
+        targets
+    }
+}
+
+/// Returns the transient charge of scratch capacity that a long line handed to its instruction.
+fn release_scratch<T>(admission: &mut ParseAdmission, before: usize, after: usize) {
+    admission.release_transient(before.saturating_sub(after).saturating_mul(size_of::<T>()));
+}
+
+/// Admits `target` as retained and appends it to the scratch, charging scratch growth first.
+fn push_scratch_target(
+    admission: &mut ParseAdmission,
+    targets: &mut Vec<Target>,
+    target: Target,
+    source_line: usize,
+    span: ByteSpan,
+) -> ModelResult<()> {
+    admission.admit_target(source_line, span)?;
+    if targets.len() == targets.capacity() {
+        let additional = targets.capacity().max(MIN_SCRATCH_TARGETS);
+        admission.admit_transient(
+            additional.saturating_mul(size_of::<Target>()),
+            source_line,
+            span,
+        )?;
+        targets.try_reserve_exact(additional).map_err(|error| {
+            ModelError::invalid_domain_value(
+                "circuit target allocation",
+                format!("unable to reserve {additional} target slots: {error}"),
+            )
+        })?;
+    }
+    targets.push(target);
+    Ok(())
 }
 
 impl<'a> Parser<'a> {
@@ -70,7 +128,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> ModelResult<Circuit> {
-        let mut circuit = Circuit::new();
+        let mut circuit = BlockItems::default();
         while let Some(command) = self.commands.next() {
             let line_number = command.line_number();
             let line = command.source().trim_command_space_start();
@@ -80,7 +138,7 @@ impl<'a> Parser<'a> {
             }
             if semantic_line.text() == "}" {
                 if stop_on_terminator {
-                    return Ok(circuit);
+                    return Ok(circuit.finish(&mut self.admission));
                 }
                 return Err(crate::model_parse::unexpected_repeat_terminator(
                     ModelDialect::StimCircuit,
@@ -104,11 +162,12 @@ impl<'a> Parser<'a> {
                     semantic_line.span(),
                 )?;
                 let body = self.parse_block(true, depth + 1)?;
-                circuit.push(CircuitItem::RepeatBlock(RepeatBlock::new(
-                    repeat.count,
-                    body,
-                    repeat.tag,
-                )));
+                circuit.push(
+                    CircuitItem::RepeatBlock(RepeatBlock::new(repeat.count, body, repeat.tag)),
+                    &mut self.admission,
+                    line_number,
+                    semantic_line.span(),
+                )?;
             } else {
                 let instruction = parse_instruction(
                     line_number,
@@ -126,9 +185,19 @@ impl<'a> Parser<'a> {
                     semantic_line.span(),
                 )?;
                 if self.fuse_instructions {
-                    circuit.push_instruction(instruction);
+                    circuit.push_instruction(
+                        instruction,
+                        &mut self.admission,
+                        line_number,
+                        semantic_line.span(),
+                    )?;
                 } else {
-                    circuit.push(CircuitItem::Instruction(instruction));
+                    circuit.push(
+                        CircuitItem::Instruction(instruction),
+                        &mut self.admission,
+                        line_number,
+                        semantic_line.span(),
+                    )?;
                 }
             }
         }
@@ -138,7 +207,7 @@ impl<'a> Parser<'a> {
                 self.input_len,
             ))
         } else {
-            Ok(circuit)
+            Ok(circuit.finish(&mut self.admission))
         }
     }
 
@@ -171,14 +240,14 @@ impl<'a> Parser<'a> {
         // headers accept and discard well-formed arguments while malformed
         // ones keep the shared argument diagnostics (circuit.cc:213-218). The
         // discarded arguments are checked against the budget but never charged.
-        let admission = &self.admission;
         let (_args, rest) = parse_optional_args(
             line_number,
             name.text(),
             rest,
             end_error_span,
             &mut self.scratch.args,
-            |count, span| admission.admit_transient_arguments(count, line_number, span),
+            &mut self.admission,
+            ArgumentCharge::Discarded,
         )?;
         if !rest
             .text()
@@ -291,11 +360,9 @@ fn parse_instruction(
         return Ok(instruction);
     }
     let (name, rest) = parse_name(line_number, line)?;
-    if admission.target_budget_allows_upper_bound(rest.text().len())
-        && let Some(instruction) =
-            parse_simple_plain_instruction(name.text(), rest.text(), &mut scratch.targets)
+    if let Some(instruction) =
+        parse_simple_plain_instruction(line_number, name.text(), rest, admission, scratch)?
     {
-        admission.admit_targets(instruction.targets().len(), line_number, rest.span())?;
         return Ok(instruction);
     }
     parse_instruction_fully_generic_from_parts(
@@ -353,7 +420,8 @@ fn parse_instruction_fully_generic_from_parts(
         rest,
         end_error_span,
         &mut scratch.args,
-        |_, span| admission.admit_argument(line_number, span),
+        admission,
+        ArgumentCharge::Retained,
     )?;
     let targets = parse_targets(
         line_number,
@@ -376,11 +444,10 @@ fn parse_instruction_fully_generic_from_parts(
                 true,
             )
         })?;
+    let args = scratch.take_args(admission);
+    let targets = scratch.take_targets(admission);
     Ok(CircuitInstruction::from_validated_parts(
-        gate,
-        take_exact(&mut scratch.args),
-        take_exact_targets(&mut scratch.targets),
-        tag,
+        gate, args, targets, tag,
     ))
 }
 
@@ -544,17 +611,28 @@ struct ParsedArguments {
     region: ByteSpan,
 }
 
+/// How parsed arguments are charged.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ArgumentCharge {
+    /// The arguments are retained by an instruction and charged as they are parsed.
+    Retained,
+    /// The arguments of a `REPEAT` header are discarded, so they must fit the remaining budget
+    /// but are never charged.
+    Discarded,
+}
+
 /// Parses an optional parenthesized argument list into `values`, which is cleared first.
 ///
-/// `admit` receives the argument count including the next argument and that argument's span,
-/// and must accept it before the argument is pushed.
+/// Each argument is admitted under `charge` before it is pushed, and the scratch capacity for
+/// the whole list is charged as transient storage before it is reserved.
 fn parse_optional_args<'a>(
     line_number: usize,
     instruction: &str,
     rest: SourceSlice<'a>,
     end_error_span: ByteSpan,
     values: &mut Vec<f64>,
-    mut admit: impl FnMut(usize, ByteSpan) -> ModelResult<()>,
+    admission: &mut ParseAdmission,
+    charge: ArgumentCharge,
 ) -> ModelResult<(ParsedArguments, SourceSlice<'a>)> {
     values.clear();
     let Some(body) = rest.strip_prefix("(") else {
@@ -582,6 +660,26 @@ fn parse_optional_args<'a>(
     let tail = body
         .suffix(end + 1)
         .ok_or_else(|| internal_parser_error(line_number, "unterminated argument list"))?;
+    let argument_count = raw_args
+        .text()
+        .bytes()
+        .filter(|byte| *byte == b',')
+        .count()
+        .saturating_add(1);
+    if values.capacity() < argument_count {
+        let additional = argument_count - values.capacity();
+        admission.admit_transient(
+            additional.saturating_mul(size_of::<f64>()),
+            line_number,
+            raw_args.span(),
+        )?;
+        values.try_reserve_exact(argument_count).map_err(|error| {
+            ModelError::invalid_domain_value(
+                "circuit argument allocation",
+                format!("unable to reserve {argument_count} argument slots: {error}"),
+            )
+        })?;
+    }
     let mut first_non_finite = None;
     let mut token_start = 0;
     loop {
@@ -612,13 +710,14 @@ fn parse_optional_args<'a>(
         if !value.is_finite() {
             first_non_finite.get_or_insert(token);
         }
-        admit(values.len().saturating_add(1), token.span())?;
-        values.try_reserve(1).map_err(|error| {
-            ModelError::invalid_domain_value(
-                "circuit argument allocation",
-                format!("unable to reserve an argument slot: {error}"),
-            )
-        })?;
+        match charge {
+            ArgumentCharge::Retained => admission.admit_argument(line_number, token.span())?,
+            ArgumentCharge::Discarded => admission.admit_transient_arguments(
+                values.len().saturating_add(1),
+                line_number,
+                token.span(),
+            )?,
+        }
         values.push(value);
         if token_end == raw_args.text().len() {
             break;
@@ -735,8 +834,8 @@ fn parse_targets(
         let token = content
             .slice(start, cursor)
             .ok_or_else(|| internal_parser_error(line_number, "invalid target"))?;
-        if let Err(error) = parse_target_token_into(token.text(), values, || {
-            admission.admit_target(line_number, token.span())
+        if let Err(error) = parse_target_token_into(token.text(), &mut |target| {
+            push_scratch_target(admission, values, target, line_number, token.span())
         }) {
             if error.resource_limit_error().is_some() {
                 return Err(error);
@@ -924,28 +1023,76 @@ fn trim_target_space_start(mut source: SourceSlice<'_>) -> SourceSlice<'_> {
 
 /// Parses a plain qubit-list instruction such as `H 0 1 2`, or returns `None` so the generic
 /// parser handles (and diagnoses) the line.
+///
+/// A plain list of `n` bytes holds at most `ceil(n / 2)` targets, so the scratch is grown to
+/// that bound first, charging the growth as transient storage, and the targets are charged as
+/// retained once the whole line is accepted; a line this path declines charges no target.
 fn parse_simple_plain_instruction(
+    line_number: usize,
     name: &str,
-    rest: &str,
-    scratch: &mut Vec<Target>,
-) -> Option<CircuitInstruction> {
-    let gate = Gate::from_simple_plain_name(name)?;
-    if rest.starts_with('[') || rest.starts_with('(') {
-        return None;
+    rest: SourceSlice<'_>,
+    admission: &mut ParseAdmission,
+    scratch: &mut ParseScratch,
+) -> ModelResult<Option<CircuitInstruction>> {
+    let Some(gate) = Gate::from_simple_plain_name(name) else {
+        return Ok(None);
+    };
+    let text = rest.text();
+    if text.starts_with('[')
+        || text.starts_with('(')
+        || !admission.target_budget_allows_upper_bound(text.len())
+    {
+        return Ok(None);
     }
-    scratch.clear();
-    if !matches!(parse_plain_qubit_targets_into(rest, scratch), Ok(true)) {
-        return None;
+    let bound = text.len().div_ceil(2);
+    if scratch.targets.capacity() < bound {
+        let additional = bound - scratch.targets.capacity();
+        if admission
+            .admit_transient(
+                additional.saturating_mul(size_of::<Target>()),
+                line_number,
+                rest.span(),
+            )
+            .is_err()
+        {
+            return Ok(None);
+        }
+        scratch.targets.clear();
+        scratch.targets.try_reserve_exact(bound).map_err(|error| {
+            ModelError::invalid_domain_value(
+                "circuit target allocation",
+                format!("unable to reserve {bound} target slots: {error}"),
+            )
+        })?;
     }
-    if gate == Gate::CX && validate_simple_plain_pairs(gate.canonical_name(), scratch).is_err() {
-        return None;
+    scratch.targets.clear();
+    let targets = &mut scratch.targets;
+    let parsed = parse_plain_qubit_targets_into(text, &mut |target| {
+        if targets.len() == targets.capacity() {
+            return Err(internal_parser_error(
+                line_number,
+                "plain target list exceeded its reserved bound",
+            ));
+        }
+        targets.push(target);
+        Ok(())
+    });
+    if !matches!(parsed, Ok(true)) {
+        return Ok(None);
     }
-    Some(CircuitInstruction::from_validated_parts(
+    if gate == Gate::CX
+        && validate_simple_plain_pairs(gate.canonical_name(), &scratch.targets).is_err()
+    {
+        return Ok(None);
+    }
+    admission.admit_targets(scratch.targets.len(), line_number, rest.span())?;
+    let targets = scratch.take_targets(admission);
+    Ok(Some(CircuitInstruction::from_validated_parts(
         gate,
         Vec::new(),
-        take_exact_targets(scratch),
+        targets,
         None,
-    ))
+    )))
 }
 
 fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> ModelResult<()> {

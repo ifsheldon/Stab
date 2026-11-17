@@ -73,7 +73,7 @@ fn gate_validation_reports_model_owned_errors() {
     );
 
     let cx = Gate::from_name("CX").expect("CX");
-    validate_gate_targets(cx, &[q0.clone(), q1]).expect("valid CX");
+    validate_gate_targets(cx, &[q0, q1]).expect("valid CX");
     assert_matches!(
         validate_gate_targets(cx, std::slice::from_ref(&q0)),
         Err(ModelError::Validation(
@@ -84,7 +84,7 @@ fn gate_validation_reports_model_owned_errors() {
         ))
     );
     assert_matches!(
-        validate_gate_targets(cx, &[q0.clone(), q0]),
+        validate_gate_targets(cx, &[q0, q0]),
         Err(ModelError::Validation(ValidationError::InvalidTarget {
             gate: "CX",
             ..

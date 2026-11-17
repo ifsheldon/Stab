@@ -110,6 +110,7 @@ stab_algebra::StabilizerResource
 stab_algebra::StabilizerResult
 stab_algebra::Tableau
 stab_model::Target
+stab_model::TargetKind
 stab_decoder::ValidatedDecodeBatch
 stab_model::ValidationError
 stab_model::ValidationErrorCode
