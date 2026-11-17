@@ -117,15 +117,46 @@ fn prepend_one_qubit(rows: &mut PauliRows, gate: &Tableau, qubit: usize) -> Stab
     Ok(())
 }
 
+/// The generator masks of a two-qubit gate packed four bits per generator, generator `g` at bits
+/// `4g..4g + 4`, in the order `X_0, Z_0, X_1, Z_1`. A generator's mask holds the old generators its
+/// image selects, `x_0 | z_0 << 1 | x_1 << 2 | z_1 << 3`.
+type TwoQubitKey = u16;
+
+/// Packs the two-qubit masks of `(x, z)` generator images given in `X_0, Z_0, X_1, Z_1` order.
 #[inline]
-fn pack_two_qubit_mask(x: u64, z: u64) -> u8 {
-    u8::from(x & 1 != 0)
-        | (u8::from(z & 1 != 0) << 1)
-        | (u8::from(x & 2 != 0) << 2)
-        | (u8::from(z & 2 != 0) << 3)
+fn two_qubit_key(images: [(u64, u64); 4]) -> TwoQubitKey {
+    let [(x0, z0), (x1, z1), (x2, z2), (x3, z3)] = images;
+    let xs = (x0 & 3) | ((x1 & 3) << 4) | ((x2 & 3) << 8) | ((x3 & 3) << 12);
+    let zs = (z0 & 3) | ((z1 & 3) << 4) | ((z2 & 3) << 8) | ((z3 & 3) << 12);
+    let key = (xs & 0x1111) | ((zs & 0x1111) << 1) | ((xs & 0x2222) << 1) | ((zs & 0x2222) << 2);
+    let [low, high, ..] = key.to_le_bytes();
+    TwoQubitKey::from_le_bytes([low, high])
 }
 
+/// The key of a gate whose generator `g` image selects the generators in `masks[g]`.
+const fn key_from_masks(masks: [u8; 4]) -> TwoQubitKey {
+    (masks[0] as u16)
+        | ((masks[1] as u16) << 4)
+        | ((masks[2] as u16) << 8)
+        | ((masks[3] as u16) << 12)
+}
+
+/// CX(q0, q1): X_0 -> X_0 X_1, Z_0 -> Z_0, X_1 -> X_1, Z_1 -> Z_0 Z_1.
+const CX_KEY: TwoQubitKey = key_from_masks([0b0101, 0b0010, 0b0100, 0b1010]);
+/// XCZ(q0, q1), that is CX(q1, q0).
+const XCZ_KEY: TwoQubitKey = key_from_masks([0b0001, 0b1010, 0b0101, 0b1000]);
+/// CZ(q0, q1): X_0 -> X_0 Z_1, Z_0 -> Z_0, X_1 -> Z_0 X_1, Z_1 -> Z_1.
+const CZ_KEY: TwoQubitKey = key_from_masks([0b1001, 0b0010, 0b0110, 0b1000]);
+/// XCX(q0, q1): X_0 -> X_0, Z_0 -> Z_0 X_1, X_1 -> X_1, Z_1 -> X_0 Z_1.
+const XCX_KEY: TwoQubitKey = key_from_masks([0b0001, 0b0110, 0b0100, 0b1001]);
+/// SWAP(q0, q1).
+const SWAP_KEY: TwoQubitKey = key_from_masks([0b0100, 0b1000, 0b0001, 0b0010]);
+
 /// Prepends any two-qubit gate directly from its eight packed local generator words.
+///
+/// CX in either direction, CZ, XCX, and SWAP, each with any local Pauli signs, rewrite two rows
+/// with straight-line code; other gates whose rewritten rows only select rows that stay fixed go
+/// through [`prepend_two_qubit_in_place`], and the rest through [`apply_small_masks`].
 fn prepend_two_qubit(
     rows: &mut PauliRows,
     gate: &Tableau,
@@ -137,138 +168,170 @@ fn prepend_two_qubit(
     else {
         return prepend_small(rows, gate, &[q0, q1]);
     };
-
-    let m0 = pack_two_qubit_mask(x0_x, x0_z);
-    let m1 = pack_two_qubit_mask(z0_x, z0_z);
-    let m2 = pack_two_qubit_mask(x1_x, x1_z);
-    let m3 = pack_two_qubit_mask(z1_x, z1_z);
-    let mut negative = u8::from(local_sign_word & 1 != 0)
-        | (u8::from(local_sign_word & 4 != 0) << 1)
-        | (u8::from(local_sign_word & 2 != 0) << 2)
-        | (u8::from(local_sign_word & 8 != 0) << 3);
+    let key = two_qubit_key([(x0_x, x0_z), (z0_x, z0_z), (x1_x, x1_z), (z1_x, z1_z)]);
+    // Local rows are ordered X_0, X_1, Z_0, Z_1; generators are ordered X_0, Z_0, X_1, Z_1.
+    let [mut negative, ..] = ((local_sign_word & 1)
+        | ((local_sign_word & 4) >> 1)
+        | ((local_sign_word & 2) << 1)
+        | (local_sign_word & 8))
+        .to_le_bytes();
 
     let num_qubits = rows.num_qubits();
-    let r_x0 = q0;
-    let r_z0 = num_qubits + q0;
-    let r_x1 = q1;
-    let r_z1 = num_qubits + q1;
+    let global = [q0, num_qubits + q0, q1, num_qubits + q1];
+    let [r_x0, r_z0, r_x1, r_z1] = global;
     let sx0 = rows.sign(r_x0)?;
     let sz0 = rows.sign(r_z0)?;
     let sx1 = rows.sign(r_x1)?;
     let sz1 = rows.sign(r_z1)?;
-    let half_words = rows.half_words();
-
-    match [m0, m1, m2, m3] {
-        // CX(q0, q1) + local Pauli signs: X_0 -> ±X_0 X_1, Z_0 -> ±Z_0, X_1 -> ±X_1, Z_1 -> ±Z_0 Z_1
-        [0b0101, 0b0010, 0b0100, 0b1010] => {
-            let (rx0, rx1) = rows.row_pair_mut(r_x0, r_x1)?;
-            let q_x = multiply_row_into(rx0, rx1, half_words)?;
-            let nx0 = (negative & 1 != 0) ^ sx0 ^ sx1 ^ real_phase_is_negative(u32::from(q_x))?;
-            let nz0 = (negative & 2 != 0) ^ sz0;
-            let nx1 = (negative & 4 != 0) ^ sx1;
-            let (rz1, rz0) = rows.row_pair_mut(r_z1, r_z0)?;
-            let q_z = multiply_row_into(rz1, rz0, half_words)?;
-            let nz1 =
-                (negative & 8 != 0) ^ sz0 ^ sz1 ^ real_phase_is_negative(u32::from((4 - q_z) & 3))?;
-            return write_four_signs(
-                rows,
-                [
-                    (r_x0, sx0, nx0),
-                    (r_z0, sz0, nz0),
-                    (r_x1, sx1, nx1),
-                    (r_z1, sz1, nz1),
-                ],
-            );
-        }
-        // XCZ(q0, q1) / CX(q1, q0) + local Pauli signs
-        [0b0001, 0b1010, 0b0101, 0b1000] => {
-            let nx0 = (negative & 1 != 0) ^ sx0;
-            let (rz0, rz1) = rows.row_pair_mut(r_z0, r_z1)?;
-            let q_z = multiply_row_into(rz0, rz1, half_words)?;
-            let nz0 = (negative & 2 != 0) ^ sz0 ^ sz1 ^ real_phase_is_negative(u32::from(q_z))?;
-            let (rx1, rx0) = rows.row_pair_mut(r_x1, r_x0)?;
-            let q_x = multiply_row_into(rx1, rx0, half_words)?;
-            let nx1 =
-                (negative & 4 != 0) ^ sx0 ^ sx1 ^ real_phase_is_negative(u32::from((4 - q_x) & 3))?;
-            let nz1 = (negative & 8 != 0) ^ sz1;
-            return write_four_signs(
-                rows,
-                [
-                    (r_x0, sx0, nx0),
-                    (r_z0, sz0, nz0),
-                    (r_x1, sx1, nx1),
-                    (r_z1, sz1, nz1),
-                ],
-            );
-        }
-        // CZ(q0, q1) + local Pauli signs: X_0 -> ±X_0 Z_1, Z_0 -> ±Z_0, X_1 -> ±Z_0 X_1, Z_1 -> ±Z_1
-        [0b1001, 0b0010, 0b0110, 0b1000] => {
-            let (rx0, rz1) = rows.row_pair_mut(r_x0, r_z1)?;
-            let q0_exp = multiply_row_into(rx0, rz1, half_words)?;
-            let nx0 = (negative & 1 != 0) ^ sx0 ^ sz1 ^ real_phase_is_negative(u32::from(q0_exp))?;
-            let nz0 = (negative & 2 != 0) ^ sz0;
-            let (rx1, rz0) = rows.row_pair_mut(r_x1, r_z0)?;
-            let q1_exp = multiply_row_into(rx1, rz0, half_words)?;
-            let nx1 = (negative & 4 != 0)
-                ^ sz0
-                ^ sx1
-                ^ real_phase_is_negative(u32::from((4 - q1_exp) & 3))?;
-            let nz1 = (negative & 8 != 0) ^ sz1;
-            return write_four_signs(
-                rows,
-                [
-                    (r_x0, sx0, nx0),
-                    (r_z0, sz0, nz0),
-                    (r_x1, sx1, nx1),
-                    (r_z1, sz1, nz1),
-                ],
-            );
-        }
-        // SWAP(q0, q1) + local Pauli signs
-        [0b0100, 0b1000, 0b0001, 0b0010] => {
-            let (rx0, rx1) = rows.two_rows_mut(r_x0, r_x1)?;
-            rx0.swap_with_slice(rx1);
-            let (rz0, rz1) = rows.two_rows_mut(r_z0, r_z1)?;
-            rz0.swap_with_slice(rz1);
-            let nx0 = (negative & 1 != 0) ^ sx1;
-            let nz0 = (negative & 2 != 0) ^ sz1;
-            let nx1 = (negative & 4 != 0) ^ sx0;
-            let nz1 = (negative & 8 != 0) ^ sz0;
-            return write_four_signs(
-                rows,
-                [
-                    (r_x0, sx0, nx0),
-                    (r_z0, sz0, nz0),
-                    (r_x1, sx1, nx1),
-                    (r_z1, sz1, nz1),
-                ],
-            );
-        }
-        _ => {}
-    }
-
-    let global = [r_x0, r_z0, r_x1, r_z1];
-    let factors = [m0, m1, m2, m3];
-    let y_terms = [
-        (x0_x & x0_z).count_ones(),
-        (z0_x & z0_z).count_ones(),
-        (x1_x & x1_z).count_ones(),
-        (z1_x & z1_z).count_ones(),
-    ];
     let old_signs =
         u8::from(sx0) | (u8::from(sz0) << 1) | (u8::from(sx1) << 2) | (u8::from(sz1) << 3);
+    let half_words = rows.half_words();
 
-    apply_small_masks(rows, 4, global, factors, y_terms, &mut negative, old_signs)
+    // Each arm computes the new sign of every generator as bits in `X_0, Z_0, X_1, Z_1` order.
+    let new_signs = match key {
+        CX_KEY => {
+            let (rx0, rx1) = rows.row_pair_mut(r_x0, r_x1)?;
+            let q_x = multiply_row_into(rx0, rx1, half_words)?;
+            let (rz1, rz0) = rows.row_pair_mut(r_z1, r_z0)?;
+            let q_z = multiply_row_into(rz1, rz0, half_words)?;
+            let nx0 = sx0 ^ sx1 ^ real_phase_is_negative(u32::from(q_x))?;
+            let nz1 = sz0 ^ sz1 ^ real_phase_is_negative(u32::from((4 - q_z) & 3))?;
+            u8::from(nx0) | (u8::from(sz0) << 1) | (u8::from(sx1) << 2) | (u8::from(nz1) << 3)
+        }
+        XCZ_KEY => {
+            let (rz0, rz1) = rows.row_pair_mut(r_z0, r_z1)?;
+            let q_z = multiply_row_into(rz0, rz1, half_words)?;
+            let (rx1, rx0) = rows.row_pair_mut(r_x1, r_x0)?;
+            let q_x = multiply_row_into(rx1, rx0, half_words)?;
+            let nz0 = sz0 ^ sz1 ^ real_phase_is_negative(u32::from(q_z))?;
+            let nx1 = sx0 ^ sx1 ^ real_phase_is_negative(u32::from((4 - q_x) & 3))?;
+            u8::from(sx0) | (u8::from(nz0) << 1) | (u8::from(nx1) << 2) | (u8::from(sz1) << 3)
+        }
+        CZ_KEY => {
+            let (rx0, rz1) = rows.row_pair_mut(r_x0, r_z1)?;
+            let q0_exp = multiply_row_into(rx0, rz1, half_words)?;
+            let (rx1, rz0) = rows.row_pair_mut(r_x1, r_z0)?;
+            let q1_exp = multiply_row_into(rx1, rz0, half_words)?;
+            let nx0 = sx0 ^ sz1 ^ real_phase_is_negative(u32::from(q0_exp))?;
+            let nx1 = sz0 ^ sx1 ^ real_phase_is_negative(u32::from((4 - q1_exp) & 3))?;
+            u8::from(nx0) | (u8::from(sz0) << 1) | (u8::from(nx1) << 2) | (u8::from(sz1) << 3)
+        }
+        XCX_KEY => {
+            let (rz0, rx1) = rows.row_pair_mut(r_z0, r_x1)?;
+            let q0_exp = multiply_row_into(rz0, rx1, half_words)?;
+            let (rz1, rx0) = rows.row_pair_mut(r_z1, r_x0)?;
+            let q1_exp = multiply_row_into(rz1, rx0, half_words)?;
+            let nz0 = sz0 ^ sx1 ^ real_phase_is_negative(u32::from(q0_exp))?;
+            let nz1 = sx0 ^ sz1 ^ real_phase_is_negative(u32::from((4 - q1_exp) & 3))?;
+            u8::from(sx0) | (u8::from(nz0) << 1) | (u8::from(sx1) << 2) | (u8::from(nz1) << 3)
+        }
+        SWAP_KEY => {
+            let (rx0, rx1) = rows.two_rows_mut(r_x0, r_x1)?;
+            swap_rows_words(rx0, rx1);
+            let (rz0, rz1) = rows.two_rows_mut(r_z0, r_z1)?;
+            swap_rows_words(rz0, rz1);
+            ((old_signs & 0b0011) << 2) | ((old_signs & 0b1100) >> 2)
+        }
+        _ => {
+            let factors = [0, 4, 8, 12].map(|shift| (key >> shift & 0b1111) as u8);
+            let y_terms = [
+                (x0_x & x0_z).count_ones(),
+                (z0_x & z0_z).count_ones(),
+                (x1_x & x1_z).count_ones(),
+                (z1_x & z1_z).count_ones(),
+            ];
+            if let Some(new_signs) =
+                prepend_two_qubit_in_place(rows, global, factors, y_terms, old_signs)?
+            {
+                new_signs
+            } else {
+                return apply_small_masks(
+                    rows,
+                    4,
+                    global,
+                    factors,
+                    y_terms,
+                    &mut negative,
+                    old_signs,
+                );
+            }
+        }
+    };
+    write_changed_signs(rows, global, old_signs, new_signs ^ negative)
 }
 
-#[inline]
-fn write_four_signs(
+/// Rewrites the rows of a two-qubit gate in place when every rewritten generator keeps its own row
+/// and selects only rows that no generator rewrites, as SQRT_XX and SQRT_ZZ do. Returns
+/// the new signs before the gate's own signs in `X_0, Z_0, X_1, Z_1` order, or `None` without
+/// changing anything when the gate needs saved rows.
+fn prepend_two_qubit_in_place(
     rows: &mut PauliRows,
-    updates: [(usize, bool, bool); 4],
+    global: [usize; 4],
+    factors: [u8; 4],
+    y_terms: [u32; 4],
+    old_signs: u8,
+) -> StabilizerResult<Option<u8>> {
+    let mut changed = 0_u8;
+    let mut needed = 0_u8;
+    for (generator, mask) in factors.into_iter().enumerate() {
+        let own = 1_u8 << generator;
+        if mask != own {
+            if mask & own == 0 {
+                return Ok(None);
+            }
+            changed |= own;
+            needed |= mask & !own;
+        }
+    }
+    if needed & changed != 0 {
+        return Ok(None);
+    }
+    let half_words = rows.half_words();
+    let mut new_signs = 0_u8;
+    for (generator, ((mask, y), destination)) in
+        factors.into_iter().zip(y_terms).zip(global).enumerate()
+    {
+        let mut negative = (mask & old_signs).count_ones() % 2 == 1;
+        if changed >> generator & 1 != 0 {
+            let mut log_i = y;
+            // Moving Z_j in front of X_j of the same qubit reverses an anticommuting pair.
+            if generator % 2 == 1 && mask >> (generator - 1) & 1 != 0 {
+                log_i += 2;
+            }
+            for (factor, source) in global.into_iter().enumerate() {
+                if factor != generator && mask >> factor & 1 != 0 {
+                    let (target, source) = rows.row_pair_mut(destination, source)?;
+                    log_i += u32::from(multiply_row_into(target, source, half_words)?);
+                }
+            }
+            negative ^= real_phase_is_negative(log_i)?;
+        }
+        new_signs |= u8::from(negative) << generator;
+    }
+    Ok(Some(new_signs))
+}
+
+/// Swaps the words of two equally wide rows.
+#[inline(always)]
+fn swap_rows_words(left: &mut [u64], right: &mut [u64]) {
+    for (left, right) in left.iter_mut().zip(right) {
+        std::mem::swap(left, right);
+    }
+}
+
+/// Writes the sign bits of `new` that differ from `old` to the rows in `global`, both in
+/// `X_0, Z_0, X_1, Z_1` order.
+#[inline]
+fn write_changed_signs(
+    rows: &mut PauliRows,
+    global: [usize; 4],
+    old: u8,
+    new: u8,
 ) -> StabilizerResult<()> {
-    for (row, old_sign, new_sign) in updates {
-        if new_sign != old_sign {
-            rows.set_sign(row, new_sign)?;
+    let changed = old ^ new;
+    for (generator, row) in global.into_iter().enumerate() {
+        if changed >> generator & 1 != 0 {
+            rows.set_sign(row, new >> generator & 1 != 0)?;
         }
     }
     Ok(())

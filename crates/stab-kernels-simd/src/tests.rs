@@ -10,6 +10,20 @@ use super::*;
 /// Covers empty input, every tail length, and at least four full vectors at 512 bits (8 words).
 const MAX_WORDS: usize = 40;
 
+/// Word counts around the mixed-block threshold of the 128-bit Pauli product: below it, at it, and
+/// with every remainder after whole six-word blocks.
+const PAULI_MIXED_WORDS: [usize; 9] = [
+    MIXED_MIN_WORDS - 1,
+    MIXED_MIN_WORDS,
+    MIXED_MIN_WORDS + 1,
+    MIXED_MIN_WORDS + 2,
+    MIXED_MIN_WORDS + 3,
+    MIXED_MIN_WORDS + 4,
+    MIXED_MIN_WORDS + 5,
+    MIXED_MIN_WORDS + 6,
+    3 * MIXED_MIN_WORDS + 1,
+];
+
 type Planes = [Vec<u64>; 6];
 
 /// Runs every differential check against one instruction-set level.
@@ -17,6 +31,9 @@ fn check_level<S: Simd>(simd: S) {
     for word_count in 0..=MAX_WORDS {
         check_xor(simd, word_count);
         check_clifford(simd, word_count);
+        check_pauli_multiply(simd, word_count);
+    }
+    for word_count in PAULI_MIXED_WORDS {
         check_pauli_multiply(simd, word_count);
     }
 }
@@ -57,10 +74,16 @@ fn check_pauli_multiply<S: Simd>(simd: S, word_count: usize) {
     assert_pauli_case(simd, &left_x, &left_z, &right_x, &right_z);
     // Cancelling equal operands produces all-zero output (`has_terms == false`, `log_i == 0`).
     assert_pauli_case(simd, &left_x, &left_z, &left_x, &left_z);
-    if word_count > 0 {
-        let mut sparse_rx = left_x.clone();
-        sparse_rx[word_count - 1] ^= 1_u64 << 63;
-        assert_pauli_case(simd, &left_x, &left_z, &sparse_rx, &left_z);
+    // A product that is identity except in one word must report that word's terms and phase from
+    // every position: vector lanes, the scalar words of a mixed block, and every tail.
+    for survivor in 0..word_count {
+        for (flip_x, flip_z) in [(1_u64 << 63, 0), (0, 1), (1 << 7, 1 << 7)] {
+            let mut right_x = left_x.clone();
+            let mut right_z = left_z.clone();
+            right_x[survivor] ^= flip_x;
+            right_z[survivor] ^= flip_z;
+            assert_pauli_case(simd, &left_x, &left_z, &right_x, &right_z);
+        }
     }
 }
 
@@ -73,14 +96,36 @@ fn assert_pauli_case<S: Simd>(
 ) {
     let (expected_x, expected_z, expected_product) =
         reference_pauli_multiply(left_x, left_z, right_x, right_z);
+    let context = format!("level={:?} words={}", simd.level(), left_x.len());
+
     let mut actual_x = left_x.to_vec();
     let mut actual_z = left_z.to_vec();
-    let product =
-        pauli_right_multiply_words_simd(simd, &mut actual_x, &mut actual_z, right_x, right_z);
-    let context = format!("level={:?} words={}", simd.level(), left_x.len());
+    let product = pauli_right_multiply_words_simd::<S, true>(
+        simd,
+        &mut actual_x,
+        &mut actual_z,
+        right_x,
+        right_z,
+    );
     assert_eq!(actual_x, expected_x, "{context}");
     assert_eq!(actual_z, expected_z, "{context}");
     assert_eq!(product, expected_product, "{context}");
+
+    let mut actual_x = left_x.to_vec();
+    let mut actual_z = left_z.to_vec();
+    let product = pauli_right_multiply_words_simd::<S, false>(
+        simd,
+        &mut actual_x,
+        &mut actual_z,
+        right_x,
+        right_z,
+    );
+    assert_eq!(actual_x, expected_x, "phase only, {context}");
+    assert_eq!(actual_z, expected_z, "phase only, {context}");
+    assert_eq!(
+        product.log_i, expected_product.log_i,
+        "phase only, {context}"
+    );
 }
 
 /// Independent bit-by-bit Pauli multiplication reference using the 4x4 single-qubit product table.
@@ -207,7 +252,7 @@ fn every_available_x86_level_matches_reference() {
 
 #[test]
 fn public_kernels_match_reference_at_the_detected_level() {
-    for word_count in 0..=MAX_WORDS {
+    for word_count in (0..=MAX_WORDS).chain(PAULI_MIXED_WORDS) {
         let left = words(word_count, 5);
         let right = words(word_count, 77);
         let mut actual = left.clone();
@@ -231,12 +276,19 @@ fn public_kernels_match_reference_at_the_detected_level() {
         let rx = words(word_count, 61);
         let rz = words(word_count, 83);
         let (exp_x, exp_z, exp_prod) = reference_pauli_multiply(&lx, &lz, &rx, &rz);
-        let mut act_x = lx;
-        let mut act_z = lz;
+        let mut act_x = lx.clone();
+        let mut act_z = lz.clone();
         let prod = pauli_right_multiply_words(&mut act_x, &mut act_z, &rx, &rz).unwrap();
         assert_eq!(act_x, exp_x, "words={word_count}");
         assert_eq!(act_z, exp_z, "words={word_count}");
         assert_eq!(prod, exp_prod, "words={word_count}");
+
+        let mut act_x = lx;
+        let mut act_z = lz;
+        let log_i = pauli_right_multiply_words_log_i(&mut act_x, &mut act_z, &rx, &rz).unwrap();
+        assert_eq!(act_x, exp_x, "phase only, words={word_count}");
+        assert_eq!(act_z, exp_z, "phase only, words={word_count}");
+        assert_eq!(log_i, exp_prod.log_i, "phase only, words={word_count}");
     }
 }
 
@@ -248,7 +300,10 @@ fn pauli_length_mismatch_in_any_plane_is_rejected_without_writing() {
         let [mut lx, mut lz, rx, rz] = planes;
         let orig_x = lx.clone();
         let orig_z = lz.clone();
+        let phase_only_error =
+            pauli_right_multiply_words_log_i(&mut lx, &mut lz, &rx, &rz).unwrap_err();
         let error = pauli_right_multiply_words(&mut lx, &mut lz, &rx, &rz).unwrap_err();
+        assert_eq!(phase_only_error, error, "plane={short_plane}");
         let expected = if short_plane == 0 {
             WordLengthMismatch {
                 expected: 4,

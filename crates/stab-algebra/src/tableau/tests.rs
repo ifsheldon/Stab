@@ -157,6 +157,41 @@ fn every_two_qubit_gate_alone_matches_the_references() {
     }
 }
 
+/// The two-qubit gates with dedicated prepend paths (CX both ways, CZ, XCX, SWAP), gates taking the
+/// in-place generic path (SQRT_XX, SQRT_ZZ), and ones needing saved rows (ISWAP, CY), each with
+/// all sixteen output-sign choices, at multi-word widths where the exhaustive test cannot afford
+/// every gate.
+#[test]
+fn dedicated_two_qubit_prepends_match_composition_with_every_sign_at_wide_widths() {
+    let gates: [[&str; 4]; 9] = [
+        ["XX", "Z_", "_X", "ZZ"],
+        ["X_", "ZZ", "XX", "_Z"],
+        ["XZ", "Z_", "ZX", "_Z"],
+        ["X_", "ZX", "_X", "XZ"],
+        ["_X", "_Z", "X_", "Z_"],
+        ["X_", "YX", "_X", "XY"],
+        ["YZ", "Z_", "ZY", "_Z"],
+        ["ZY", "_Z", "YZ", "Z_"],
+        ["XY", "Z_", "ZX", "ZZ"],
+    ];
+    let mut rng = SmallRng::seed_from_u64(0x5_19e5);
+    for width in [64, 65, 130, 200] {
+        let base = Tableau::random(width, &mut rng).unwrap();
+        for images in gates {
+            for signs in 0..16_u8 {
+                let [x0, z0, x1, z1] = std::array::from_fn(|output| {
+                    let sign = if signs >> output & 1 == 0 { '+' } else { '-' };
+                    format!("{sign}{}", images[output])
+                });
+                let gate = Tableau::gate2(&x0, &z0, &x1, &z1).unwrap();
+                for targets in [[3, width - 2], [width - 1, 0]] {
+                    check_prepend(&base, &gate, &targets);
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn wider_random_cliffords_match_the_references() {
     let mut rng = SmallRng::seed_from_u64(0x3_5eed);

@@ -96,6 +96,24 @@ pub(crate) fn pauli_right_multiply_words(
     Ok(PauliWordProduct { log_i, has_terms })
 }
 
+/// Right-multiplies `(right_x, right_z)` into `(left_x, left_z)` and returns only the base-`i`
+/// exponent of the product's scalar, skipping the non-identity tracking of
+/// [`pauli_right_multiply_words`].
+#[inline]
+pub(crate) fn pauli_right_multiply_words_log_i(
+    left_x: &mut [u64],
+    left_z: &mut [u64],
+    right_x: &[u64],
+    right_z: &[u64],
+) -> StabilizerResult<u8> {
+    stab_kernels_simd::pauli_right_multiply_words_log_i(left_x, left_z, right_x, right_z).map_err(
+        |mismatch| StabilizerError::LengthMismatch {
+            left: mismatch.expected,
+            right: mismatch.actual,
+        },
+    )
+}
+
 /// XORs one generator row `(x, z)` into the accumulated product `(acc_x, acc_z)` and returns the
 /// word-wise `acc_z & x` taken before the update, whose total parity over every accumulated row is
 /// the commutation sign `sum_{j<l} z_j . x_l` of the ordered product.
@@ -313,18 +331,29 @@ mod tests {
 
     #[test]
     fn simd_pauli_kernel_matches_scalar_across_blocks_and_tails() {
-        for word_count in [0_usize, 1, 2, 3, 4, 5, 8, 9, 17] {
+        for word_count in [0_usize, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 17] {
             let [lx, lz, rx, rz, _, _] = raw_planes(word_count, 11);
             let mut scalar_x = lx.clone();
             let mut scalar_z = lz.clone();
-            let mut simd_x = lx;
-            let mut simd_z = lz;
+            let mut simd_x = lx.clone();
+            let mut simd_z = lz.clone();
             let scalar_prod =
                 scalar_pauli_right_multiply_words(&mut scalar_x, &mut scalar_z, &rx, &rz);
             let simd_prod = pauli_right_multiply_words(&mut simd_x, &mut simd_z, &rx, &rz).unwrap();
             assert_eq!(simd_x, scalar_x, "word_count={word_count}");
             assert_eq!(simd_z, scalar_z, "word_count={word_count}");
             assert_eq!(simd_prod, scalar_prod, "word_count={word_count}");
+
+            let mut phase_x = lx;
+            let mut phase_z = lz;
+            let log_i =
+                pauli_right_multiply_words_log_i(&mut phase_x, &mut phase_z, &rx, &rz).unwrap();
+            assert_eq!(phase_x, scalar_x, "phase only, word_count={word_count}");
+            assert_eq!(phase_z, scalar_z, "phase only, word_count={word_count}");
+            assert_eq!(
+                log_i, scalar_prod.log_i,
+                "phase only, word_count={word_count}"
+            );
         }
     }
 

@@ -149,30 +149,26 @@ impl PauliRows {
         first: usize,
         second: usize,
     ) -> StabilizerResult<(&mut [u64], &mut [u64])> {
-        let first_range = self.range(first)?;
-        let second_range = self.range(second)?;
-        let width = self.row_words();
-        if first == second {
-            return Err(StabilizerError::TableauIndexOutOfRange {
-                index: second,
-                len: self.row_count,
-            });
+        let [first_words, second_words] = self.disjoint_rows_mut([first, second])?;
+        Ok((first_words, second_words))
+    }
+
+    /// Borrows `N` distinct rows mutably at once, in argument order.
+    ///
+    /// A row past the end, or a row named twice, is reported as out of range.
+    #[inline(always)]
+    pub(crate) fn disjoint_rows_mut<const N: usize>(
+        &mut self,
+        rows: [usize; N],
+    ) -> StabilizerResult<[&mut [u64]; N]> {
+        let mut ranges = [const { 0..0 }; N];
+        for (range, row) in ranges.iter_mut().zip(rows) {
+            *range = self.range(row)?;
         }
-        if first < second {
-            let (head, tail) = self.words.split_at_mut(second_range.start);
-            let first_words = head
-                .get_mut(first_range)
-                .ok_or_else(|| out_of_range(first))?;
-            let second_words = tail.get_mut(..width).ok_or_else(|| out_of_range(second))?;
-            Ok((first_words, second_words))
-        } else {
-            let (head, tail) = self.words.split_at_mut(first_range.start);
-            let second_words = head
-                .get_mut(second_range)
-                .ok_or_else(|| out_of_range(second))?;
-            let first_words = tail.get_mut(..width).ok_or_else(|| out_of_range(first))?;
-            Ok((first_words, second_words))
-        }
+        let row_count = self.row_count;
+        self.words
+            .get_disjoint_mut(ranges)
+            .map_err(|_| repeated_row(&rows, row_count))
     }
 
     /// Borrows `target` mutably and `source` shared; the rows must differ.
@@ -354,20 +350,18 @@ pub(crate) fn multiply_row_into(
     let (target_x, target_z) =
         target
             .split_at_mut_checked(half_words)
-            .ok_or(StabilizerError::LengthMismatch {
+            .ok_or_else(|| StabilizerError::LengthMismatch {
                 left: target_len,
                 right: 2 * half_words,
             })?;
     let (source_x, source_z) =
         source
             .split_at_checked(half_words)
-            .ok_or(StabilizerError::LengthMismatch {
+            .ok_or_else(|| StabilizerError::LengthMismatch {
                 left: source_len,
                 right: 2 * half_words,
             })?;
-    let product =
-        crate::kernels::pauli_right_multiply_words(target_x, target_z, source_x, source_z)?;
-    Ok(product.log_i)
+    crate::kernels::pauli_right_multiply_words_log_i(target_x, target_z, source_x, source_z)
 }
 
 /// The parity of the symplectic inner product of two packed rows.
@@ -388,6 +382,20 @@ pub(crate) fn y_count_mod_4(row: &[u64], half_words: usize) -> u8 {
         count.wrapping_add((x & z).count_ones())
     });
     (count & 3) as u8
+}
+
+/// The error for rows that [`PauliRows::disjoint_rows_mut`] could not borrow at once. Every row is
+/// already in range, so the slices can only overlap because a row is named twice.
+#[cold]
+fn repeated_row(rows: &[usize], row_count: usize) -> StabilizerError {
+    let repeated = rows
+        .iter()
+        .enumerate()
+        .find_map(|(index, row)| rows.get(..index)?.contains(row).then_some(*row));
+    StabilizerError::TableauIndexOutOfRange {
+        index: repeated.unwrap_or(row_count),
+        len: row_count,
+    }
 }
 
 fn out_of_range(index: usize) -> StabilizerError {
