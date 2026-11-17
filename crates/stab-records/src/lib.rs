@@ -21,7 +21,9 @@ pub use diagnostics::{
 };
 pub use encoder::{RecordBatchPart, RecordEncoder, RecordPart, RecordWriteError};
 pub use estimate::EncodedSizeEstimate;
-pub use record_stream::{HitsDuplicates, RecordFraming, RecordStreamReadError, RecordStreamReader};
+pub use record_stream::{
+    HitsDuplicates, RecordFraming, RecordStreamReadError, RecordStreamReader, RecordStreamStorage,
+};
 pub use result_formats::{
     CodecCapability, DetsLayout, DetsResultType, MeasureRecordWriter, RecordEncoding, RecordFormat,
     codec_capabilities, ptb64_record_count, read_dets_records, read_measurement_records,

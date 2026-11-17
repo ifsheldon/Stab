@@ -152,6 +152,35 @@ impl RecordEncoder {
         })
     }
 
+    /// Upper bound on the bytes an encoder of `format` records of `width` bits retains while it
+    /// encodes shot-major batches through [`Self::write_batch`] or single records through
+    /// [`Self::write_record`]: its PTB64 group planes and its pending-output buffer.
+    ///
+    /// Output drains once it reaches a threshold between records, after each segment of a wide
+    /// part, and after each part of a record wider than one segment, so the pending buffer holds
+    /// at most that threshold plus one segment's (or one PTB64 group's) encoding. Amortized growth
+    /// leaves its capacity at most twice that, and a growth briefly holds the old allocation as
+    /// well, so the bound charges three times it. Bit-plane batches add one transposed 64-shot
+    /// block per part, which this bound excludes.
+    pub fn shot_major_scratch_bytes(format: RecordFormat, width: usize) -> u128 {
+        let width_bytes = width as u128;
+        let (threshold, unit, planes) = if format == RecordFormat::Ptb64 {
+            let group = width_bytes.saturating_mul(size_of::<u64>() as u128);
+            (DRAIN_THRESHOLD_BYTES, group, group)
+        } else {
+            let threshold = if width > SEGMENT_BITS {
+                SEGMENT_DRAIN_BYTES
+            } else {
+                DRAIN_THRESHOLD_BYTES
+            };
+            (threshold, segment_encoded_bytes(format, width), 0)
+        };
+        (threshold as u128)
+            .saturating_add(unit)
+            .saturating_mul(3)
+            .saturating_add(planes)
+    }
+
     pub const fn format(&self) -> RecordFormat {
         self.format
     }
@@ -416,8 +445,17 @@ impl RecordEncoder {
     where
         W: Write + ?Sized,
     {
-        if len <= SEGMENT_BITS || self.format == RecordFormat::Ptb64 {
+        if self.format == RecordFormat::Ptb64 {
             return Ok(self.encode_part(namespace, words, len, 0)?);
+        }
+        if len <= SEGMENT_BITS {
+            // Narrow parts of one wide record drain like its segments, so a record of many
+            // parts never holds more than one segment past the drain threshold.
+            self.encode_part(namespace, words, len, 0)?;
+            if self.pending.len() >= SEGMENT_DRAIN_BYTES {
+                self.drain(out)?;
+            }
+            return Ok(());
         }
         let mut start = 0_usize;
         while start < len {
@@ -600,6 +638,34 @@ impl RecordEncoder {
         self.pending.clear();
         result.map_err(RecordWriteError::Io)
     }
+}
+
+/// Upper bound on the bytes one segment of a `width`-bit record encodes to in a non-PTB64
+/// `format`, including the record's framing and, for `r8`, every run byte the record's zero gaps
+/// can emit at once.
+fn segment_encoded_bytes(format: RecordFormat, width: usize) -> u128 {
+    let segment = width.min(SEGMENT_BITS) as u128;
+    let digits = decimal_digits(width) as u128;
+    let framing = b"shot\n".len() as u128;
+    let encoded = match format {
+        RecordFormat::ZeroOne => segment,
+        RecordFormat::B8 => segment.div_ceil(8),
+        RecordFormat::R8 => segment.saturating_add((width / usize::from(u8::MAX)) as u128 + 1),
+        RecordFormat::Hits => segment.saturating_mul(digits + 1),
+        RecordFormat::Dets => segment.saturating_mul(digits + 2),
+        RecordFormat::Ptb64 => segment.saturating_mul(size_of::<u64>() as u128),
+    };
+    encoded.saturating_add(framing)
+}
+
+/// Decimal digits of `value`, which bounds the digits of every index below it.
+const fn decimal_digits(mut value: usize) -> usize {
+    let mut digits = 1;
+    while value >= 10 {
+        value /= 10;
+        digits += 1;
+    }
+    digits
 }
 
 /// Calls `visit` with the index of every set bit below `len`, in increasing order.

@@ -8,8 +8,9 @@ use std::assert_matches;
 use std::hint::black_box;
 
 use stab_records::{
-    DetsLayout, RecordFormat, RecordFraming, RecordResult, RecordStreamReadError,
-    RecordStreamReader, write_ptb64_records_checked, write_records,
+    DetsLayout, DetsResultType, PackedShotBatch, RecordBatchPart, RecordEncoder, RecordFormat,
+    RecordFraming, RecordResult, RecordStreamReadError, RecordStreamReader, RecordStreamStorage,
+    write_ptb64_records_checked, write_records,
 };
 
 /// The packed reader's initial transport buffer.
@@ -148,6 +149,105 @@ fn declared_widths_beyond_the_input_fail_typed_without_width_sized_allocation() 
     let error = measurements(b"\n", RecordFormat::Hits, usize::MAX / 2)
         .expect_err("unsatisfiable record storage");
     assert_matches!(error, RecordStreamReadError::Format(_));
+}
+
+/// Hands out at most `step` bytes per read, so a frame spans many refills.
+struct Chunked<'a> {
+    bytes: &'a [u8],
+    step: usize,
+}
+
+impl std::io::Read for Chunked<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let step = self.step.min(self.bytes.len()).min(buffer.len());
+        let (head, tail) = self.bytes.split_at(step);
+        buffer
+            .get_mut(..step)
+            .expect("step fits the buffer")
+            .copy_from_slice(head);
+        self.bytes = tail;
+        Ok(step)
+    }
+}
+
+/// The admitted storage bounds of the packed reader and the encoder cover what a read-and-encode
+/// loop really allocates, for worst-case frames (every `r8` bit set) arriving in partial reads
+/// and for widths on both sides of the encoder's segment size.
+#[test]
+fn reader_and_encoder_storage_bounds_cover_peak_allocation() {
+    for width in [1_usize, 70, 65_537] {
+        let records = (0..64_usize)
+            .map(|shot| {
+                (0..width)
+                    .map(|bit| shot % 2 == 0 || bit % 3 == 0)
+                    .collect()
+            })
+            .collect::<Vec<Vec<bool>>>();
+        let batch_records = (1_usize << 20)
+            .checked_div(width.div_ceil(8))
+            .unwrap_or(1)
+            .clamp(1, 64);
+        for in_format in [
+            RecordFormat::B8,
+            RecordFormat::R8,
+            RecordFormat::Ptb64,
+            RecordFormat::ZeroOne,
+            RecordFormat::Hits,
+            RecordFormat::Dets,
+        ] {
+            let input = write_records(&records, in_format).expect("encode input");
+            for out_format in [
+                RecordFormat::ZeroOne,
+                RecordFormat::B8,
+                RecordFormat::R8,
+                RecordFormat::Hits,
+                RecordFormat::Dets,
+                RecordFormat::Ptb64,
+            ] {
+                let convert = || {
+                    let mut reader = RecordStreamReader::measurements(
+                        Chunked {
+                            bytes: &input,
+                            step: 4_093,
+                        },
+                        in_format,
+                        width,
+                        usize::MAX,
+                    );
+                    let mut encoder = RecordEncoder::try_new(out_format, width).expect("encoder");
+                    let mut sink = std::io::sink();
+                    while let Some(batch) = reader.read_batch(batch_records).expect("read") {
+                        let part = RecordBatchPart::new(DetsResultType::Measurement, batch);
+                        encoder.write_batch(&[part], &mut sink).expect("encode");
+                    }
+                };
+                let measured = allocation_counter::measure(convert);
+                let reader = RecordStreamStorage::new(in_format, width, batch_records);
+                // Text readers bound their transport buffer through the per-record cap instead,
+                // which here is the longest line.
+                let text_buffer = if reader.transport_bytes() == 0 {
+                    let line = input
+                        .split(|byte| *byte == b'\n')
+                        .map(<[u8]>::len)
+                        .max()
+                        .unwrap_or_default() as u128;
+                    (line * 4).max(64 * 1024)
+                } else {
+                    0
+                };
+                let bound = reader.bytes()
+                    + text_buffer
+                    + RecordEncoder::shot_major_scratch_bytes(out_format, width);
+                assert!(
+                    u128::from(measured.bytes_max) <= bound,
+                    "{in_format:?} to {out_format:?} at width {width} peaked at {} bytes above \
+                     the {bound}-byte bound: {measured:?}",
+                    measured.bytes_max
+                );
+            }
+        }
+    }
+    assert_eq!(PackedShotBatch::storage_bytes(3, 65), 48);
 }
 
 fn duplicate_dets_record(repetitions: usize) -> Vec<u8> {

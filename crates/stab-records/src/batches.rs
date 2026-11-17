@@ -26,6 +26,15 @@ impl PackedShotBatch {
         })
     }
 
+    /// Bytes of packed words that [`Self::zeros`] reserves for `shot_count` shots of
+    /// `bits_per_shot` bits: one `u64` per started 64 bits of each shot.
+    pub fn storage_bytes(shot_count: usize, bits_per_shot: usize) -> u128 {
+        let row_words = bits_per_shot.div_ceil(WORD_BITS) as u128;
+        (shot_count as u128)
+            .saturating_mul(row_words)
+            .saturating_mul(size_of::<u64>() as u128)
+    }
+
     pub fn from_records(records: &[Vec<bool>], bits_per_shot: usize) -> RecordResult<Self> {
         let mut batch = Self::zeros(records.len(), bits_per_shot)?;
         for (shot_index, record) in records.iter().enumerate() {

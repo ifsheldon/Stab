@@ -6,11 +6,11 @@ use stab_engine::detection_record_width;
 use stab_model::{Circuit, DetectorErrorModel};
 use stab_records::{
     DetsLayout, DetsResultType, FormatError, FormatErrorCode, PackedShotBatch, PackedShotBatchView,
-    RecordBatchPart, RecordEncoder, RecordStreamReader,
+    RecordBatchPart, RecordEncoder, RecordStreamReader, RecordStreamStorage,
 };
 
 use crate::{
-    CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg,
+    CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg, StageBudget,
     batch_output::record_write_io,
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
@@ -167,6 +167,25 @@ impl ConvertLayout {
         }
     }
 
+    /// Each record type's included width, in record order.
+    fn part_widths(self) -> [(DetsResultType, usize); 3] {
+        let included = |include: bool, count: usize| if include { count } else { 0 };
+        [
+            (
+                DetsResultType::Measurement,
+                included(self.include_measurements, self.num_measurements),
+            ),
+            (
+                DetsResultType::Detector,
+                included(self.include_detectors, self.num_detectors),
+            ),
+            (
+                DetsResultType::Observable,
+                included(self.include_observables, self.num_observables),
+            ),
+        ]
+    }
+
     /// The only included record type, when exactly one is included.
     fn single_part(self) -> Option<DetsResultType> {
         match (
@@ -251,16 +270,93 @@ where
         Some(input_file) => Box::new(input_file),
         None => Box::new(stdin),
     };
+    let storage = ConvertStorage::admit(&args, layout, ledger.stage())?;
+    let _storage_hold = ledger.hold(storage.bytes);
     let record_bytes = ledger.stage().record_bytes();
     stream_convert_records(
         input,
         input_path.as_deref(),
         layout,
         &args,
-        record_bytes,
+        RecordLimits {
+            batch_records: storage.batch_records,
+            text_record_bytes: record_bytes,
+        },
         io,
         stdout,
     )
+}
+
+/// The storage one record conversion retains while it streams, admitted before any is allocated.
+struct ConvertStorage {
+    batch_records: usize,
+    bytes: u64,
+}
+
+impl ConvertStorage {
+    /// Admits the reader's batch, PTB64 group, and packed-format transport buffer for the input
+    /// width and batch size, the column batches split from each batch, and each encoder's
+    /// scratch. Text inputs bound their transport buffer through the per-record text cap that
+    /// the stage after this one receives.
+    fn admit(
+        args: &ConvertArgs,
+        layout: ConvertLayout,
+        stage: StageBudget,
+    ) -> Result<Self, CliError> {
+        let width = layout.input_width()?;
+        let batch_records = convert_batch_records(width);
+        let split_observables = args.obs_output.is_some();
+        let reader = RecordStreamStorage::new(
+            args.in_format.required_record_format()?,
+            width,
+            batch_records,
+        )
+        .bytes();
+        let single = layout.single_part();
+        let columns = layout
+            .part_widths()
+            .into_iter()
+            .map(|(namespace, width)| {
+                PackedShotBatch::storage_bytes(
+                    batch_records,
+                    column_width(width, single, namespace),
+                )
+            })
+            .fold(0_u128, u128::saturating_add);
+        let mut encoders = RecordEncoder::shot_major_scratch_bytes(
+            args.out_format.required_record_format()?,
+            layout.primary_width(split_observables)?,
+        );
+        if split_observables {
+            encoders = encoders.saturating_add(RecordEncoder::shot_major_scratch_bytes(
+                args.obs_out_format.required_record_format()?,
+                layout.observable_width(),
+            ));
+        }
+        let required = reader.saturating_add(columns).saturating_add(encoders);
+        let budget = stage.get();
+        match u64::try_from(required) {
+            Ok(bytes) if budget.admits(required) => Ok(Self {
+                batch_records,
+                bytes,
+            }),
+            // A requirement beyond `u64` is reported as the largest byte count, still a true
+            // lower bound for the refused storage.
+            _ => Err(stage.refusal(CliError::ConvertStorageBudget {
+                width,
+                batch_records,
+                required_bytes: u64::try_from(required).unwrap_or(u64::MAX),
+                budget_bytes: budget.bytes(),
+            })),
+        }
+    }
+}
+
+/// The record shape a conversion streams with, fixed by its storage admission.
+#[derive(Clone, Copy, Debug)]
+struct RecordLimits {
+    batch_records: usize,
+    text_record_bytes: usize,
 }
 
 fn run_convert_stim<R, W>(
@@ -382,14 +478,15 @@ fn stream_convert_records<W>(
     input_path: Option<&Path>,
     layout: ConvertLayout,
     args: &ConvertArgs,
-    record_bytes: usize,
+    limits: RecordLimits,
     io: PendingIo,
     stdout: &mut W,
 ) -> Result<(), CliError>
 where
     W: Write,
 {
-    let mut reader = convert_record_reader(input, args.in_format, layout, record_bytes)?;
+    let mut reader =
+        convert_record_reader(input, args.in_format, layout, limits.text_record_bytes)?;
     let split_observables = args.obs_output.is_some();
     let mut primary = RecordEncoder::try_new(
         args.out_format.required_record_format()?,
@@ -419,7 +516,7 @@ where
                 })
         })
         .transpose()?;
-    let batch_records = convert_batch_records(layout.input_width()?);
+    let batch_records = limits.batch_records;
     let mut parts = ConvertParts::new(layout);
 
     let conversion_result = (|| -> Result<(), CliError> {
@@ -507,21 +604,7 @@ impl ConvertParts {
         write: impl FnOnce(&[RecordBatchPart<'_>], &[RecordBatchPart<'_>]) -> Result<(), CliError>,
     ) -> Result<(), CliError> {
         let layout = self.layout;
-        let included = |include: bool, count: usize| if include { count } else { 0 };
-        let widths = [
-            (
-                DetsResultType::Measurement,
-                included(layout.include_measurements, layout.num_measurements),
-            ),
-            (
-                DetsResultType::Detector,
-                included(layout.include_detectors, layout.num_detectors),
-            ),
-            (
-                DetsResultType::Observable,
-                included(layout.include_observables, layout.num_observables),
-            ),
-        ];
+        let widths = layout.part_widths();
         let shots = batch.shot_count();
         let single = layout.single_part();
         let columns = match &mut self.columns {

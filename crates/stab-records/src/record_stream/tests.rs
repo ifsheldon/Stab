@@ -433,3 +433,49 @@ fn transport_failures_surface_as_io_errors() {
         RecordStreamReader::measurements(FailingTransport, RecordFormat::ZeroOne, 1, 8);
     assert_matches!(reader.read_batch(1), Err(RecordStreamReadError::Io(_)));
 }
+
+#[test]
+fn every_format_regrows_its_batch_when_a_later_read_requests_more_records() {
+    let width = 70_usize;
+    let records = (0..192_usize)
+        .map(|shot| {
+            (0..width)
+                .map(|bit| (shot * 7 + bit * 3) % 5 == 0)
+                .collect::<Vec<bool>>()
+        })
+        .collect::<Vec<_>>();
+    for format in [
+        RecordFormat::ZeroOne,
+        RecordFormat::B8,
+        RecordFormat::R8,
+        RecordFormat::Hits,
+        RecordFormat::Dets,
+        RecordFormat::Ptb64,
+    ] {
+        let encoded = write_records(&records, format).expect("encode records");
+        let mut reader = RecordStreamReader::measurements(
+            Trickle::new(&encoded, 29),
+            format,
+            width,
+            TEST_TEXT_LIMIT,
+        );
+        // A probe and a one-record read allocate a one-row batch before wider reads follow.
+        assert!(reader.has_more_records().expect("probe the first record"));
+        let mut decoded = vec![records[0].clone()];
+        for batch in [1_usize, 2, 64, 3, 100].into_iter().cycle() {
+            let Some(view) = reader.read_batch(batch).unwrap_or_else(|error| {
+                panic!(
+                    "{format:?} batch of {batch} after {}: {error}",
+                    decoded.len()
+                )
+            }) else {
+                break;
+            };
+            for shot in 0..view.shot_count() {
+                let row = view.shot(shot).expect("shot in view");
+                decoded.push((0..row.len()).map(|bit| row.get(bit).unwrap()).collect());
+            }
+        }
+        assert_eq!(decoded, records, "{format:?}");
+    }
+}

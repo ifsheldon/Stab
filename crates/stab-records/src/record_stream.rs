@@ -22,6 +22,9 @@ use crate::{
 
 mod decode;
 mod fast_text;
+mod storage;
+
+pub use storage::RecordStreamStorage;
 
 #[cfg(test)]
 mod tests;
@@ -882,6 +885,9 @@ impl<R: Read> RecordStreamReader<R> {
                 // Prove the first frame before allocating storage proportional to the width.
                 decode::r8_frame_len(self.unconsumed(), width).map(|_| None)
             } else {
+                // A later read may request more records than the batch holds; regrow it like
+                // the other formats before decoding into the requested row.
+                self.ensure_batch(capacity)?;
                 let frame = self.buffer.get(self.start..self.end).unwrap_or_default();
                 let batch = self.batch.as_mut().ok_or_else(|| {
                     FormatError::invalid_data("r8 record lost its reusable batch")

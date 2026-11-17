@@ -170,6 +170,17 @@ pub(crate) enum CliError {
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
 
+    /// The record storage of `convert`, admitted before any of it is allocated.
+    #[error(
+        "convert needs at least {required_bytes} bytes to stream {width}-bit records in batches of {batch_records}, exceeding the {budget_bytes}-byte memory budget; raise the memory budget to admit it"
+    )]
+    ConvertStorageBudget {
+        width: usize,
+        batch_records: usize,
+        required_bytes: u64,
+        budget_bytes: u64,
+    },
+
     /// A stage's budget refusal while earlier stages of the same command held part of the budget.
     #[error(
         "{source}; earlier stages of this command hold {held_bytes} bytes of its {budget_bytes}-byte memory budget"
@@ -425,6 +436,7 @@ fn cli_error_code(error: &CliError) -> &'static str {
         CliError::IncompletePtb64OutputGroup { .. } => "incomplete-ptb64-output-group",
         CliError::UnknownHelpTopic { .. } => "unknown-help-topic",
         CliError::MeasurementCountOverflow => "measurement-count-overflow",
+        CliError::ConvertStorageBudget { .. } => "resource-limit-exceeded",
         CliError::CommandMemoryBudget { source, .. } => cli_error_code(source),
     }
 }
@@ -620,6 +632,19 @@ fn cli_error_context(error: &CliError) -> Value {
         }),
         CliError::UnknownHelpTopic { topic } => json!({
             "topic": topic,
+        }),
+        CliError::ConvertStorageBudget {
+            width,
+            batch_records,
+            required_bytes,
+            budget_bytes,
+        } => json!({
+            "operation": "record-conversion",
+            "resource": "materialized-bytes",
+            "actual": required_bytes,
+            "limit": budget_bytes,
+            "record_bits": width,
+            "batch_records": batch_records,
         }),
         CliError::CommandMemoryBudget { source, .. } => cli_error_context(source),
     }

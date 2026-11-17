@@ -733,3 +733,112 @@ fn convert_takes_model_counts_that_agree_with_the_engine_conversion_plan() {
         result.stderr_text()
     );
 }
+
+/// Runs `convert` with JSON diagnostics and returns the run plus the refused byte count, if any.
+fn convert_with_budget(
+    input: &[u8],
+    in_format: &str,
+    width: usize,
+    budget: u64,
+) -> (super::support::CliRun, Option<u64>) {
+    let args = [
+        "stab".to_owned(),
+        "--error-format=json".to_owned(),
+        "convert".to_owned(),
+        format!("--in_format={in_format}"),
+        "--out_format=b8".to_owned(),
+        format!("--bits_per_shot={width}"),
+        format!("--memory-budget={budget}"),
+    ];
+    let result = super::support::run_cli(args, input);
+    if result.status == 0 {
+        return (result, None);
+    }
+    let diagnostic: serde_json::Value =
+        serde_json::from_slice(&result.stderr).expect("JSON diagnostic");
+    assert_eq!(
+        diagnostic.pointer("/code"),
+        Some(&serde_json::json!("resource-limit-exceeded")),
+        "{diagnostic}"
+    );
+    assert_eq!(
+        diagnostic.pointer("/context/operation"),
+        Some(&serde_json::json!("record-conversion"))
+    );
+    assert_eq!(
+        diagnostic.pointer("/context/limit"),
+        Some(&serde_json::json!(budget))
+    );
+    assert!(
+        diagnostic
+            .pointer("/help")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|help| help.contains("--memory-budget")),
+        "{diagnostic}"
+    );
+    let required = diagnostic
+        .pointer("/context/actual")
+        .and_then(serde_json::Value::as_u64);
+    (result, required)
+}
+
+/// Every packed input format admits its batch, worst-case frame buffer, and encoder scratch for
+/// the declared width before allocating any of it: the exact requirement is admitted, one byte
+/// less is refused with the shared budget diagnostic, and a compact input declaring a huge width
+/// is refused without width-sized allocation.
+#[test]
+fn convert_admits_packed_record_storage_against_the_memory_budget_before_allocating() {
+    const WIDTH: usize = 100_003;
+    const HUGE_WIDTH: usize = 2_040_000_001;
+    let records = (0..64_usize)
+        .map(|shot| {
+            (0..WIDTH)
+                .map(|bit| (shot + bit) % 7 == 0)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    for (format, record_format) in [
+        ("b8", stab_records::RecordFormat::B8),
+        ("r8", stab_records::RecordFormat::R8),
+        ("ptb64", stab_records::RecordFormat::Ptb64),
+    ] {
+        let input = stab_records::write_records(&records, record_format).expect("encode input");
+        let expected = stab_records::write_records(&records, stab_records::RecordFormat::B8)
+            .expect("encode expected output");
+
+        let (refused, required) = convert_with_budget(&input, format, WIDTH, 1024);
+        assert_eq!(refused.status, 1, "{format}");
+        assert!(refused.stdout.is_empty(), "{format}");
+        let required = required.expect("refusal reports its requirement");
+        let (admitted, none) = convert_with_budget(&input, format, WIDTH, required);
+        assert_eq!(none, None, "{format}: {}", admitted.stderr_text());
+        admitted.assert_ok(&expected);
+        let (just_below, again) = convert_with_budget(&input, format, WIDTH, required - 1);
+        assert_eq!(
+            again,
+            Some(required),
+            "{format}: {}",
+            just_below.stderr_text()
+        );
+        assert!(just_below.stdout.is_empty(), "{format}");
+
+        // A two-byte input declaring a two-gigabit record is refused before the reader buffers
+        // or allocates anything proportional to the width.
+        let tiny = [0xFF_u8, 0x00];
+        let mut outcome = None;
+        let allocations = allocation_counter::measure(|| {
+            outcome = Some(convert_with_budget(&tiny, format, HUGE_WIDTH, 1 << 20));
+        });
+        let (huge, huge_required) = outcome.expect("measured run");
+        assert!(
+            huge_required.is_some_and(|bytes| bytes > 1 << 28),
+            "{format}: {}",
+            huge.stderr_text()
+        );
+        assert!(
+            allocations.bytes_max < 1 << 20,
+            "{format} allocated {} bytes before refusing: {allocations:?}",
+            allocations.bytes_max
+        );
+    }
+}
