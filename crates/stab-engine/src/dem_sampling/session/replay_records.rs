@@ -20,7 +20,7 @@ pub(super) enum ReplayRecords<'a> {
     },
     Sparse {
         error_count: usize,
-        hits: &'a [usize],
+        hits: &'a [u32],
         shot_starts: &'a [usize],
     },
 }

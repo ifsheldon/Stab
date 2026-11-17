@@ -124,19 +124,20 @@ impl ErrorRecordBits for BitSlice<'_> {
     }
 }
 
-/// One replayed sampled-error record represented as strictly increasing set-error ordinals.
+/// One replayed sampled-error record represented as strictly increasing set-error ordinals,
+/// each below `error_count`.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct SparseErrorRecord<'a> {
     error_count: usize,
-    hits: &'a [usize],
+    hits: &'a [u32],
 }
 
 impl<'a> SparseErrorRecord<'a> {
-    pub(super) const fn new(error_count: usize, hits: &'a [usize]) -> Self {
+    pub(super) const fn new(error_count: usize, hits: &'a [u32]) -> Self {
         Self { error_count, hits }
     }
 
-    pub(super) const fn hits(self) -> &'a [usize] {
+    pub(super) const fn hits(self) -> &'a [u32] {
         self.hits
     }
 }
@@ -159,6 +160,7 @@ impl ErrorRecordBits for SparseErrorRecord<'_> {
         let mut index = 0_usize;
         let mut words_emitted = 0_usize;
         while let Some(&first_hit) = self.hits.get(index) {
+            let first_hit = first_hit as usize;
             if first_hit >= limit {
                 break;
             }
@@ -169,6 +171,7 @@ impl ErrorRecordBits for SparseErrorRecord<'_> {
             let mut word = 1_u64 << (first_hit % RECORD_WORD_BITS);
             index += 1;
             while let Some(&hit) = self.hits.get(index) {
+                let hit = hit as usize;
                 if hit >= limit || hit / RECORD_WORD_BITS != word_index {
                     break;
                 }
@@ -186,7 +189,9 @@ impl ErrorRecordBits for SparseErrorRecord<'_> {
 
     #[cfg(test)]
     fn bit(&self, index: usize) -> Option<bool> {
-        (index < self.error_count).then(|| self.hits.binary_search(&index).is_ok())
+        (index < self.error_count).then(|| {
+            u32::try_from(index).is_ok_and(|index| self.hits.binary_search(&index).is_ok())
+        })
     }
 }
 

@@ -30,8 +30,10 @@ enum StoreLayout {
         batch_shots: Vec<usize>,
     },
     /// Set-error ordinals of sparse records, indexed by `shot_starts[shot]..shot_starts[shot + 1]`.
+    ///
+    /// Ordinals are `u32`, so only models of at most `2^32` errors retain sparse records.
     Sparse {
-        hits: Vec<usize>,
+        hits: Vec<u32>,
         shot_starts: Vec<usize>,
     },
 }
@@ -44,7 +46,7 @@ pub(super) enum RetainedBatch<'a> {
     },
     Sparse {
         error_count: usize,
-        hits: &'a [usize],
+        hits: &'a [u32],
         shot_starts: &'a [usize],
     },
 }
@@ -98,10 +100,11 @@ impl DemReplayRecordStore {
             store.budget.admits(store.error_major_bytes(batches))
                 && store.plan.error_count().checked_mul(batches).is_some()
         });
-        let fits_sparse = usize::try_from(expected_shots)
-            .ok()
-            .and_then(|shots| shots.checked_add(1))
-            .is_some_and(|starts| store.budget.admits(sparse_bytes(starts, 0)));
+        let fits_sparse = sparse_ordinals_fit(store.plan.error_count())
+            && usize::try_from(expected_shots)
+                .ok()
+                .and_then(|shots| shots.checked_add(1))
+                .is_some_and(|starts| store.budget.admits(sparse_bytes(starts, 0)));
         if !fits_error_major && !fits_sparse {
             store.release();
         }
@@ -272,6 +275,9 @@ impl DemReplayRecordStore {
     }
 
     fn init_sparse(&mut self) -> bool {
+        if !sparse_ordinals_fit(self.plan.error_count()) {
+            return false;
+        }
         let Some(starts_cap) = usize::try_from(self.expected_shots)
             .ok()
             .and_then(|shots| shots.max(1).checked_add(1))
@@ -415,7 +421,9 @@ impl DemReplayRecordStore {
             if budget.admits(sparse_bytes(starts_cap, doubled)) {
                 doubled
             } else {
-                needed_hits
+                // Growing by exactly the next batch would reallocate on every batch, so the last
+                // growth takes every ordinal the budget admits beside the record starts.
+                sparse_hits_capacity(budget, starts_cap).max(needed_hits)
             }
         };
         if !budget.admits(sparse_bytes(starts_cap, hits_cap)) {
@@ -461,8 +469,22 @@ impl DemReplayRecordStore {
 
 fn sparse_bytes(starts_cap: usize, hits_cap: usize) -> u128 {
     (starts_cap as u128)
-        .saturating_add(hits_cap as u128)
         .saturating_mul(std::mem::size_of::<usize>() as u128)
+        .saturating_add((hits_cap as u128).saturating_mul(std::mem::size_of::<u32>() as u128))
+}
+
+/// The most ordinals `budget` admits beside `starts_cap` record starts.
+fn sparse_hits_capacity(budget: MemoryBudget, starts_cap: usize) -> usize {
+    let starts_bytes = sparse_bytes(starts_cap, 0);
+    let spare = u128::from(budget.bytes()).saturating_sub(starts_bytes);
+    usize::try_from(spare / std::mem::size_of::<u32>() as u128).unwrap_or(usize::MAX)
+}
+
+/// Whether every set-error ordinal of a model with `error_count` errors fits a `u32`.
+fn sparse_ordinals_fit(error_count: usize) -> bool {
+    error_count
+        .checked_sub(1)
+        .is_none_or(|last| u32::try_from(last).is_ok())
 }
 
 fn count_row_ones(words: &[u64], bit_len: usize) -> usize {
@@ -481,7 +503,7 @@ fn count_row_ones(words: &[u64], bit_len: usize) -> usize {
     full.saturating_add(tail)
 }
 
-fn append_row_hits(words: &[u64], bit_len: usize, hits: &mut Vec<usize>) -> DemResult<()> {
+fn append_row_hits(words: &[u64], bit_len: usize, hits: &mut Vec<u32>) -> DemResult<()> {
     let used_words = bit_len.div_ceil(RETAINED_BATCH_SHOTS);
     let partial_word = bit_len / RETAINED_BATCH_SHOTS;
     let partial_mask = (1_u64 << (bit_len % RETAINED_BATCH_SHOTS)).wrapping_sub(1);
@@ -500,6 +522,7 @@ fn append_row_hits(words: &[u64], bit_len: usize, hits: &mut Vec<usize>) -> DemR
         while bits != 0 {
             let ordinal = word_start
                 .checked_add(bits.trailing_zeros() as usize)
+                .and_then(|ordinal| u32::try_from(ordinal).ok())
                 .ok_or_else(store_index_error)?;
             bits &= bits - 1;
             hits.push(ordinal);

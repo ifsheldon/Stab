@@ -9,6 +9,7 @@ use super::{
     DemSamplingRunProgress, ReplayRecords,
 };
 use crate::ShotCount;
+use crate::dem_sampling::DemResourceLimitError;
 use crate::dem_sampling::replay_store::RetainedBatch;
 use crate::dem_sampling::{DemReplayRecordStore, DemSamplerLimits, DemSamplingPlan};
 
@@ -39,6 +40,37 @@ impl DemSamplingPlan {
             MemoryBudget::from_bytes(free),
             session_fits,
         )
+    }
+
+    /// Admits `input_bytes` of a caller's replay-input storage (its record reader, for
+    /// example) beside the smallest replay session, a one-record batch with its sampled-error
+    /// planes, and returns the bytes of `limits`' memory budget both leave free.
+    ///
+    /// A caller that holds the input storage and creates its session under the rest of the
+    /// budget can give part of the returned bytes to other storage and still leave the session
+    /// room for at least its smallest batch; the session chooses its batch shape and admits its
+    /// own storage when it is created. A budget below the sum is refused as
+    /// [`DemResourceKind::ActiveBatchBytes`] for that sum.
+    ///
+    /// [`DemResourceKind::ActiveBatchBytes`]: crate::DemResourceKind::ActiveBatchBytes
+    pub fn admit_replay_input(
+        &self,
+        limits: &DemSamplerLimits,
+        input_bytes: u64,
+    ) -> Result<u64, DemSamplingExecutionError> {
+        let budget = limits.memory_budget().bytes();
+        let required =
+            u128::from(input_bytes).saturating_add(session_storage_bytes(self, 1, 1, true));
+        match u64::try_from(required) {
+            Ok(required) if required <= budget => Ok(budget - required),
+            _ => Err(DemSamplingExecutionError::InvalidRequest(
+                DemResourceLimitError::active_batch_bytes(
+                    u64::try_from(required).unwrap_or(u64::MAX),
+                    budget,
+                )
+                .into(),
+            )),
+        }
     }
 }
 

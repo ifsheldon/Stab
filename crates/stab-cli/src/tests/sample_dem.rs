@@ -1,6 +1,6 @@
 //! `stab sample_dem` output-role and replay behavior beyond the pinned-Stim manifest rows.
 
-use stab_records::write_ptb64_records_checked;
+use stab_records::{RecordFormat, write_ptb64_records_checked};
 
 use super::support::{CliRun, Scratch, ptb64_words, run};
 
@@ -257,8 +257,7 @@ fn sample_dem_rejects_malformed_or_short_replay_input() {
     let one_error_plan = stab_engine::DemSamplingCompiler::new()
         .compile(&one_error_dem)
         .expect("compile DEM");
-    let record_cap = usize::try_from((2 * 1024 * 1024 - one_error_plan.retained_bytes() - 1) / 2)
-        .expect("usize");
+    let record_cap = replay_text_record_cap(&one_error_plan, RecordFormat::Dets, 2 * 1024 * 1024);
     let mut blank_prefix = vec![b'\n'; record_cap + 1];
     blank_prefix.extend_from_slice(b"shot M0\n");
     let oversized_msg = format!(
@@ -301,6 +300,115 @@ fn sample_dem_rejects_malformed_or_short_replay_input() {
             dem,
         )
         .assert_err(&[expected]);
+    }
+}
+
+/// The bytes the CLI admits beside its compiled plan before reading a replay input of `format`:
+/// the reader's fixed storage for 64-record batches and the smallest replay session.
+fn replay_reader_floor(plan: &stab_engine::DemSamplingPlan, format: RecordFormat) -> u64 {
+    use stab_engine::DemSamplerLimits;
+    use stab_model::MemoryBudget;
+    use stab_records::RecordStreamStorage;
+
+    let batch = if format == RecordFormat::Ptb64 { 1 } else { 64 };
+    let fixed = u64::try_from(RecordStreamStorage::new(format, plan.error_count(), batch).bytes())
+        .expect("u64 reader bound");
+    let free = plan
+        .admit_replay_input(
+            &DemSamplerLimits::new(MemoryBudget::from_bytes(u64::MAX)),
+            fixed,
+        )
+        .expect("admit under an unbounded budget");
+    u64::MAX - free
+}
+
+/// The per-record cap of a text replay input of `format` under `--memory-budget=budget`: the
+/// largest whose transport buffer fits a quarter of what the plan, the reader's fixed storage,
+/// and the smallest replay session leave.
+fn replay_text_record_cap(
+    plan: &stab_engine::DemSamplingPlan,
+    format: RecordFormat,
+    budget: u64,
+) -> usize {
+    let free = budget - plan.retained_bytes() - replay_reader_floor(plan, format);
+    stab_records::RecordStreamStorage::max_text_record_bytes(u128::from(free / 4))
+}
+
+/// A replay admits its reader's storage and the smallest replay session against the command
+/// budget before reading: the exact requirement succeeds and one byte less is refused with the
+/// shared resource-limit diagnostic, and a text reader's cap admits its longest line exactly.
+#[test]
+fn sample_dem_replay_admits_reader_storage_against_the_command_budget() {
+    use stab_engine::DemSamplingCompiler;
+    use stab_model::{DetectorErrorModel, ParseLimits};
+
+    const DEM: &[u8] = b"repeat 4096 {\n    error(0.5) D0\n    shift_detectors 1\n}\n";
+    let (parsed, _) =
+        DetectorErrorModel::from_dem_bytes_admitted(DEM, ParseLimits::default()).expect("parse");
+    let plan = DemSamplingCompiler::new()
+        .compile(&parsed)
+        .expect("compile");
+    let held = plan.retained_bytes();
+    let scratch = Scratch::new();
+
+    let mut b8 = vec![0_u8; 3 * 512];
+    for (shot, byte) in [(0, 0), (1, 100), (2, 511)] {
+        *b8.get_mut(shot * 512 + byte).expect("record byte") = 0b0010_0001;
+    }
+    let hits = "0,5\n4095\n\n";
+    let longest_line = 5;
+    for (format, records, expected) in [
+        (
+            RecordFormat::B8,
+            b8,
+            &b"shot D0 D5\nshot D800 D805\nshot D4088 D4093\n"[..],
+        ),
+        (
+            RecordFormat::Hits,
+            hits.as_bytes().to_vec(),
+            &b"shot D0 D5\nshot D4095\nshot\n"[..],
+        ),
+    ] {
+        let replay = scratch.file(&format!("errors.{}", format.as_str()), &records);
+        let run_at = |budget: u64| {
+            sample_dem(
+                &[
+                    "--replay_err_in",
+                    &replay,
+                    "--replay_err_in_format",
+                    format.as_str(),
+                    "--out_format",
+                    "dets",
+                    "--shots",
+                    "3",
+                    &format!("--memory-budget={budget}"),
+                ],
+                DEM,
+            )
+        };
+        run_at(1 << 30).assert_ok(expected);
+
+        let floor = held + replay_reader_floor(&plan, format);
+        let text_bytes = if format == RecordFormat::Hits {
+            // A cap of `longest_line` bytes needs a transport buffer of one byte more, and the
+            // buffer receives a quarter of what the floor leaves.
+            4 * (longest_line + 1)
+        } else {
+            0
+        };
+        let exact = floor + text_bytes;
+        run_at(exact).assert_ok(expected);
+        if format == RecordFormat::Hits {
+            run_at(exact - 1).assert_err(&[&format!(
+                "sample_dem replay text record has more than {} bytes",
+                longest_line - 1
+            )]);
+        }
+        run_at(floor - 1).assert_err(&[&format!(
+            "the sampling session would require at least {} bytes, exceeding the {}-byte memory budget",
+            floor - held,
+            floor - 1 - held
+        )]);
     }
 }
 

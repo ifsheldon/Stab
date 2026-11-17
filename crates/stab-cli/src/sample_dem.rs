@@ -4,16 +4,17 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 use stab_engine::{
     DemReplayRecordStore, DemReplaySession, DemReplayTransaction, DemSamplerLimits,
-    DemSamplingCompiler, DemSamplingRunError, DemSamplingSession, RandomPolicy, Seed, ShotCount,
+    DemSamplingCompiler, DemSamplingPlan, DemSamplingRunError, DemSamplingSession, RandomPolicy,
+    Seed, ShotCount,
 };
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
     HitsDuplicates, RecordFormat, RecordFraming, RecordStreamReadError, RecordStreamReader,
-    validate_ptb64_shot_count,
+    RecordStreamStorage, validate_ptb64_shot_count,
 };
 
 use super::{
-    CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg, SampleOutFormatArg,
+    CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg, SampleOutFormatArg, StageBudget,
     batch_output::{DemSampleBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
@@ -23,6 +24,9 @@ use super::{
 const REPLAY_TEXT_RECORD_KIND: &str = "sample_dem replay text record";
 /// Replay records delivered to the engine per transaction batch.
 const REPLAY_BATCH_SHOTS: usize = u64::BITS as usize;
+/// A text replay reader's transport buffer may use one part in this many of the budget its fixed
+/// storage and the smallest replay session leave.
+const TEXT_BUFFER_SHARE: u64 = 4;
 
 enum SampleDemExecution {
     Replay {
@@ -155,15 +159,23 @@ where
     drop(dem);
     ledger.release(dem_hold);
     let _plan_hold = ledger.hold(plan.retained_bytes());
+    let shots = dem_shot_count(args.shots)?;
+    let mut replay_reader = None;
+    if args.replay_error_input.is_some() {
+        plan.validate_replay(shots).map_err(CliError::from)?;
+        let replay_format = sample_dem_record_format(args.replay_err_in_format)?;
+        let reader = ReplayReaderStorage::admit(&plan, replay_format, ledger.stage())?;
+        replay_reader = Some((reader, ledger.hold(reader.bytes)));
+    }
     let session_stage = ledger.stage();
     let limits = DemSamplerLimits::new(session_stage.get());
-    let record_bytes = session_stage.record_bytes();
-    let shots = dem_shot_count(args.shots)?;
+    let record_bytes = replay_reader
+        .as_ref()
+        .map_or(0, |(reader, _)| reader.text_record_bytes);
     // Records the validation pass keeps, so a replay that fits the budget is decoded once;
     // fixed-width binary files whose length already proves `expected_shots` stream directly.
     let mut retained = None;
     if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
-        plan.validate_replay(shots).map_err(CliError::from)?;
         let replay_format = sample_dem_record_format(args.replay_err_in_format)?;
         if !preflight_fixed_width_replay_file(
             replay_input,
@@ -313,6 +325,69 @@ where
             self.observable.as_mut(),
             self.sampled_errors.as_mut(),
         )
+    }
+}
+
+/// The replay reader's storage, admitted against the command budget before the reader exists.
+#[derive(Clone, Copy, Debug)]
+struct ReplayReaderStorage {
+    /// The per-record cap of a line-framed text replay input; packed formats ignore it.
+    text_record_bytes: usize,
+    /// The reader's batch, PTB64 group, first `r8` record, and transport buffer, with the text
+    /// transport buffer bounded by `text_record_bytes`.
+    bytes: u64,
+}
+
+impl ReplayReaderStorage {
+    /// Admits the reader's fixed storage for 64-record batches beside the smallest replay
+    /// session, then gives a text reader's transport buffer a quarter of what both leave.
+    ///
+    /// The buffer grows only to the longest line framed, which for realistic records is far
+    /// below the batch, so the rest stays for the session's batch shape and the records a
+    /// validation pass retains instead of being reserved for lines that rarely occur.
+    ///
+    /// A bound beyond `u64` saturates, which only ever refuses.
+    fn admit(
+        plan: &DemSamplingPlan,
+        format: RecordFormat,
+        stage: StageBudget,
+    ) -> Result<Self, CliError> {
+        let limits = DemSamplerLimits::new(stage.get());
+        let saturating = |bytes: u128| u64::try_from(bytes).unwrap_or(u64::MAX);
+        // PTB64 replays read whole groups as bit planes and never request a shot-major batch.
+        let batch_records = if format == RecordFormat::Ptb64 {
+            1
+        } else {
+            REPLAY_BATCH_SHOTS
+        };
+        let fixed =
+            saturating(RecordStreamStorage::new(format, plan.error_count(), batch_records).bytes());
+        let free = plan
+            .admit_replay_input(&limits, fixed)
+            .map_err(|error| stage.refusal(error))?;
+        if matches!(
+            format,
+            RecordFormat::B8 | RecordFormat::R8 | RecordFormat::Ptb64
+        ) {
+            return Ok(Self {
+                text_record_bytes: 0,
+                bytes: fixed,
+            });
+        }
+        // Every other format is line-framed text, whose transport buffer follows its cap.
+        let text_record_bytes =
+            RecordStreamStorage::max_text_record_bytes(u128::from(free / TEXT_BUFFER_SHARE));
+        // Admitting the whole reader again also refuses the one-byte buffer of a zero cap when
+        // nothing is left for it.
+        let bytes = fixed.saturating_add(saturating(RecordStreamStorage::text_transport_bytes(
+            text_record_bytes,
+        )));
+        plan.admit_replay_input(&limits, bytes)
+            .map_err(|error| stage.refusal(error))?;
+        Ok(Self {
+            text_record_bytes,
+            bytes,
+        })
     }
 }
 

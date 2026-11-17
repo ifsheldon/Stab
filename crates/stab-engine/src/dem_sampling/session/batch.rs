@@ -87,6 +87,7 @@ impl SessionBatch {
                     .map_err(internal_format_error)?;
                 words.fill(0);
                 for &hit in sparse.hits() {
+                    let hit = hit as usize;
                     let word = words.get_mut(hit / (u64::BITS as usize)).ok_or_else(|| {
                         DemSamplingExecutionError::InternalInvariant {
                             message: format!(

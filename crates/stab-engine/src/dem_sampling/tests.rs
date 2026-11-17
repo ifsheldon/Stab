@@ -628,6 +628,56 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
     );
 }
 
+/// Sparse retention charges eight bytes per record start and four per set-error ordinal, and its
+/// last growth takes every ordinal the budget admits, so a budget exactly fitting the records
+/// retains them all and one byte less releases the store.
+#[test]
+fn sparse_replay_store_admits_u32_ordinals_exactly() {
+    let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
+        .expect("parse DEM");
+    let plan = DemSamplingCompiler::new()
+        .compile(&model)
+        .expect("compile DEM");
+    let shots = ShotCount::new(200);
+    let records: Vec<Vec<bool>> = (0..200)
+        .map(|shot| (0..100).map(|error| error == shot % 100).collect())
+        .collect();
+    let batch = stab_records::PackedShotBatch::from_records(&records, plan.error_count())
+        .expect("pack one-hit records");
+    let store_at = |bytes: u64| {
+        plan.replay_record_store(
+            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            shots,
+        )
+    };
+    let (mut low, mut empty_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
+    while low + 1 < empty_budget {
+        let middle = low + (empty_budget - low) / 2;
+        if store_at(middle).is_retaining() {
+            empty_budget = middle;
+        } else {
+            low = middle;
+        }
+    }
+    // The smallest retaining store fits the 201 record starts alone.
+    let exact = empty_budget + 200 * 4;
+    let mut store = store_at(exact);
+    assert_eq!(
+        store
+            .try_retain(batch.view())
+            .expect("retain at exact budget"),
+        DemReplayRetention::Retained
+    );
+    assert_eq!(store.shot_count(), 200);
+    let mut short = store_at(exact - 1);
+    assert_eq!(
+        short
+            .try_retain(batch.view())
+            .expect("offer one byte short"),
+        DemReplayRetention::Released
+    );
+}
+
 #[test]
 fn compiler_admits_retained_bytes_and_honors_cancellation() {
     let model = DetectorErrorModel::from_dem_str(
