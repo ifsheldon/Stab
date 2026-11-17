@@ -140,8 +140,6 @@ struct PendingRepeat {
 struct RepeatAdmission {
     count: u64,
     entries_before: usize,
-    arena_before: ArenaCounts,
-    bytes_before: u64,
     counts_before: CountState,
 }
 
@@ -208,8 +206,6 @@ impl CircuitProgram {
                         .try_push(RepeatAdmission {
                             count,
                             entries_before: admission.entry_count,
-                            arena_before: admission.arena,
-                            bytes_before: admission.retained_bytes,
                             counts_before: counts,
                         })
                         .map_err(|_| program_shape_error())?;
@@ -225,10 +221,13 @@ impl CircuitProgram {
                     let repeat = repeats.pop().ok_or_else(program_shape_error)?;
                     integrate_repeat(&mut counts, repeat)?;
                     if admission.entry_count == repeat.entries_before + 1 {
-                        // A body that lowers to nothing is elided with its marker.
+                        // A body that lowers to nothing is elided with its marker; it added no
+                        // entry, so it added no arena payload either.
                         admission.entry_count = repeat.entries_before;
-                        admission.arena = repeat.arena_before;
-                        admission.retained_bytes = repeat.bytes_before;
+                        admission.retained_bytes = admission
+                            .retained_bytes
+                            .checked_sub(entry_bytes)
+                            .ok_or_else(admission_drift)?;
                     } else {
                         admission.entry_count = admission
                             .entry_count
