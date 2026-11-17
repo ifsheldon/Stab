@@ -6,13 +6,14 @@ use super::{InverseTableauSimulator, SimResult, SimulatorWork, WorkModel, invari
 use crate::work_poll::WorkPoll;
 
 impl InverseTableauSimulator {
-    /// Collapses each distinct qubit of `targets` in `basis`, in ascending qubit order.
+    /// Collapses each distinct qubit of `targets` in `basis`, in ascending qubit order, failing
+    /// on the first target that does not resolve.
     ///
     /// This is the order in which Stim's `collapse_x` and `collapse_y` collapse one
     /// instruction's targets before recording any of them.
     pub(in crate::sampling) fn collapse_ascending(
         &mut self,
-        targets: impl Iterator<Item = usize>,
+        targets: impl Iterator<Item = SimResult<usize>>,
         basis: PauliBasis,
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
@@ -26,7 +27,7 @@ impl InverseTableauSimulator {
     fn collapse_marked(
         &mut self,
         marks: &mut Vec<u64>,
-        targets: impl Iterator<Item = usize>,
+        targets: impl Iterator<Item = SimResult<usize>>,
         basis: PauliBasis,
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
@@ -34,6 +35,7 @@ impl InverseTableauSimulator {
         try_resize(marks, self.words, "reference collapse order marks")?;
         marks.fill(0);
         for qubit in targets {
+            let qubit = qubit?;
             self.x_row_index(qubit)?;
             set_bit(marks, qubit)?;
             self.charge(WorkModel::DISPATCH);
@@ -51,13 +53,14 @@ impl InverseTableauSimulator {
         Ok(())
     }
 
-    /// Collapses the pair products `P_a P_b` of `pairs` in Stim's `MXX` and `MYY` order.
+    /// Collapses the pair products `P_a P_b` of `pairs` in Stim's `MXX` and `MYY` order, failing
+    /// on the first pair that does not resolve.
     ///
     /// Stim splits the pairs into maximal runs of disjoint pairs and collapses each run's
     /// pairs in ascending order of their first qubit.
     pub(in crate::sampling) fn collapse_pair_segments(
         &mut self,
-        pairs: impl Iterator<Item = (usize, usize)>,
+        pairs: impl Iterator<Item = SimResult<(usize, usize)>>,
         basis: PauliBasis,
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
@@ -81,7 +84,7 @@ impl InverseTableauSimulator {
     fn collapse_marked_pairs(
         &mut self,
         (firsts, used, partners): (&mut Vec<u64>, &mut Vec<u64>, &mut Vec<usize>),
-        pairs: impl Iterator<Item = (usize, usize)>,
+        pairs: impl Iterator<Item = SimResult<(usize, usize)>>,
         basis: PauliBasis,
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
@@ -95,7 +98,8 @@ impl InverseTableauSimulator {
         )?;
         firsts.fill(0);
         used.fill(0);
-        for (first, second) in pairs {
+        for pair in pairs {
+            let (first, second) = pair?;
             self.x_row_index(first)?;
             self.x_row_index(second)?;
             if test_bit(used, first)? || test_bit(used, second)? {

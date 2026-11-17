@@ -145,26 +145,27 @@ impl StabilizerFrame {
         }
     }
 
-    pub(super) fn apply_tableau(&mut self, targets: &[usize], transform: &LocalTableauTransform) {
+    pub(super) fn apply_tableau(&mut self, targets: &[u32], transform: &LocalTableauTransform) {
         if targets.len() != transform.target_count() {
             return;
         }
-        match targets {
+        match *targets {
             [target] => {
                 for generator in &mut self.generators {
-                    generator.apply_single_qubit_tableau(*target, transform);
+                    generator.apply_single_qubit_tableau(target as usize, transform);
                 }
                 for generator in &mut self.destabilizers {
-                    generator.apply_single_qubit_tableau(*target, transform);
+                    generator.apply_single_qubit_tableau(target as usize, transform);
                 }
                 return;
             }
             [left, right] => {
+                let (left, right) = (left as usize, right as usize);
                 for generator in &mut self.generators {
-                    generator.apply_two_qubit_tableau(*left, *right, transform);
+                    generator.apply_two_qubit_tableau(left, right, transform);
                 }
                 for generator in &mut self.destabilizers {
-                    generator.apply_two_qubit_tableau(*left, *right, transform);
+                    generator.apply_two_qubit_tableau(left, right, transform);
                 }
                 return;
             }
@@ -488,14 +489,14 @@ impl StabilizerGenerator {
         set_word_bit(&mut self.zs, word, mask, basis.z_bit());
     }
 
-    fn apply_tableau(&mut self, targets: &[usize], transform: &LocalTableauTransform) {
+    fn apply_tableau(&mut self, targets: &[u32], transform: &LocalTableauTransform) {
         let input_index = self.local_input_index(targets);
         let Some(output) = transform.output(input_index) else {
             return;
         };
         self.negative ^= output.negative;
         for (target, basis) in targets.iter().copied().zip(output.bases.iter().copied()) {
-            self.set_basis(target, basis);
+            self.set_basis(target as usize, basis);
         }
     }
 
@@ -639,11 +640,12 @@ impl StabilizerGenerator {
         self.negative = (log_i & 2) != 0;
     }
 
-    fn local_input_index(&self, targets: &[usize]) -> usize {
+    fn local_input_index(&self, targets: &[u32]) -> usize {
         let mut index = 0usize;
         let mut scale = 1usize;
-        for target in targets {
-            index = index.saturating_add(basis_digit(self.basis(*target)).saturating_mul(scale));
+        for &target in targets {
+            index = index
+                .saturating_add(basis_digit(self.basis(target as usize)).saturating_mul(scale));
             scale = scale.saturating_mul(4);
         }
         index

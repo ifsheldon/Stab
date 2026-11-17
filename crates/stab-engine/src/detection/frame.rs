@@ -34,9 +34,9 @@ pub(crate) use plan::{
     FRAME_BATCH_SHOTS, FrameBatchState, LaneFrameBatch, frame_state_storage_bytes,
 };
 pub(crate) use program::{
-    CircuitProgram, CliffordStep, ControlledPair, FrameGate, NoiselessFusion,
-    PauliProductMeasurement, ProgramEntry, ProgramInstruction, ProgramOptions, ReferenceClifford,
-    lookback_distance,
+    ArenaSpan, CircuitProgram, CliffordStep, ControlledPair, FrameGate, NoiselessFusion,
+    PauliProductMeasurement, ProgramArena, ProgramEntry, ProgramInstruction, ProgramOptions,
+    ReferenceClifford, lookback_distance,
 };
 pub(in crate::detection) use program::{TraversalEvent, visit_circuit};
 #[cfg(test)]
@@ -229,7 +229,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         retained_limit: usize,
     ) -> DetectionResult<bool> {
         while let Some(instruction) = cursor.next_instruction()? {
-            self.execute_instruction(instruction, rng, mode, cursor.poll())?;
+            self.execute_instruction(instruction, cursor.arena(), rng, mode, cursor.poll())?;
             if self.measurements.len() >= retained_limit {
                 return Ok(true);
             }
@@ -245,6 +245,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     fn execute_instruction(
         &mut self,
         instruction: &ProgramInstruction,
+        arena: &ProgramArena,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
         poll: &mut WorkPoll<'_>,
@@ -254,19 +255,24 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         match instruction {
             ProgramInstruction::Clifford { frame, targets, .. } => match frame {
                 FrameGate::Identity => Ok(()),
-                FrameGate::Single(map) => poll.for_chunks(targets, op, 1, |_, part| {
-                    self.apply_single_qubit_map(*map, part)
-                }),
-                FrameGate::Two(map) => poll.for_chunks(targets, 2 * op, 2, |_, part| {
-                    self.apply_two_qubit_map(*map, part)
-                }),
+                FrameGate::Single(map) => {
+                    poll.for_chunks(arena.get(*targets)?, op, 1, |_, part| {
+                        self.apply_single_qubit_map(*map, part)
+                    })
+                }
+                FrameGate::Two(map) => {
+                    poll.for_chunks(arena.get(*targets)?, 2 * op, 2, |_, part| {
+                        self.apply_two_qubit_map(*map, part)
+                    })
+                }
             },
             ProgramInstruction::Reset {
                 basis: PauliBasis::Z,
                 targets,
                 ..
-            } => poll.for_chunks(targets, op, 1, |_, part| {
+            } => poll.for_chunks(arena.get(*targets)?, op, 1, |_, part| {
                 for &qubit in part {
+                    let qubit = qubit as usize;
                     self.set_x_word(qubit, W::default())?;
                     if let Some(z) = mode.collapse_mask(rng) {
                         self.set_z_word(qubit, z)?;
@@ -275,9 +281,9 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 Ok(())
             }),
             ProgramInstruction::Reset { basis, targets, .. } => {
-                poll.for_chunks(targets, op, 1, |_, part| {
+                poll.for_chunks(arena.get(*targets)?, op, 1, |_, part| {
                     for &qubit in part {
-                        self.reset_qubit(qubit, *basis, rng, mode)?;
+                        self.reset_qubit(qubit as usize, *basis, rng, mode)?;
                     }
                     Ok(())
                 })
@@ -288,15 +294,23 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 flip_probability,
                 targets,
                 ..
-            } => self.measure_z(targets, *reset, *flip_probability, rng, mode, poll),
+            } => self.measure_z(
+                arena.get(*targets)?,
+                *reset,
+                *flip_probability,
+                rng,
+                mode,
+                poll,
+            ),
             ProgramInstruction::Measure {
                 basis,
                 reset,
                 flip_probability,
                 targets,
                 ..
-            } => poll.for_chunks(targets, op + noise, 1, |_, part| {
+            } => poll.for_chunks(arena.get(*targets)?, op + noise, 1, |_, part| {
                 for &qubit in part {
+                    let qubit = qubit as usize;
                     let result = self.measure_qubit_frame(qubit, *basis, rng, mode)?
                         ^ mode.random_mask(rng, *flip_probability);
                     self.measurements.push(result);
@@ -312,7 +326,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 targets,
                 ..
             } => {
-                let (pairs, unpaired) = targets.as_chunks::<2>();
+                let (pairs, unpaired) = arena.get(*targets)?.as_chunks::<2>();
                 if !unpaired.is_empty() {
                     return Err(DetectionError::invalid_sampler_compilation(
                         "compiled pair measurement target list was not paired",
@@ -320,7 +334,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 }
                 poll.for_chunks(pairs, 2 * op + noise, 1, |_, part| {
                     for &[left, right] in part {
-                        let terms = [(left, *basis), (right, *basis)];
+                        let terms = [(left as usize, *basis), (right as usize, *basis)];
                         let terms = if left == right { &[][..] } else { &terms[..] };
                         self.measure_pauli_product_terms(terms, *flip_probability, rng, mode)?;
                     }
@@ -330,7 +344,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             ProgramInstruction::MeasurePads {
                 flip_probability,
                 values,
-            } => poll.for_chunks(values, noise, 1, |_, part| {
+            } => poll.for_chunks(arena.get(*values)?, noise, 1, |_, part| {
                 for _ in part {
                     self.measurements
                         .push(mode.random_mask(rng, *flip_probability));
@@ -338,41 +352,64 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 Ok(())
             }),
             ProgramInstruction::PauliProducts(measurement) => {
-                self.measure_pauli_products(measurement, rng, mode, poll)
+                self.measure_pauli_products(measurement, arena, rng, mode, poll)
             }
             ProgramInstruction::SinglePauliNoise {
                 probabilities,
                 targets,
-            } => self.apply_resolved_single_pauli_noise(targets, *probabilities, rng, mode, poll),
+            } => self.apply_resolved_single_pauli_noise(
+                arena.get(*targets)?,
+                arena.probabilities(*probabilities)?,
+                rng,
+                mode,
+                poll,
+            ),
             ProgramInstruction::TwoQubitPauliNoise {
                 probabilities,
                 targets,
-            } => {
-                self.apply_resolved_two_qubit_pauli_noise(targets, **probabilities, rng, mode, poll)
-            }
+            } => self.apply_resolved_two_qubit_pauli_noise(
+                arena.get(*targets)?,
+                arena.probabilities(*probabilities)?,
+                rng,
+                mode,
+                poll,
+            ),
             ProgramInstruction::CorrelatedError {
                 else_branch,
                 probability,
                 terms,
-            } => self.apply_correlated_error(terms, *else_branch, *probability, rng, mode, poll),
+            } => self.apply_correlated_error(
+                arena.get(*terms)?,
+                *else_branch,
+                *probability,
+                rng,
+                mode,
+                poll,
+            ),
             ProgramInstruction::HeraldedErase {
                 probability,
                 targets,
-            } => self.apply_heralded_erase(targets, *probability, rng, mode, poll),
+            } => self.apply_heralded_erase(arena.get(*targets)?, *probability, rng, mode, poll),
             ProgramInstruction::HeraldedPauliChannel {
                 probabilities,
                 targets,
-            } => self.apply_heralded_pauli_channel(targets, *probabilities, rng, mode, poll),
+            } => self.apply_heralded_pauli_channel(
+                arena.get(*targets)?,
+                arena.probabilities(*probabilities)?,
+                rng,
+                mode,
+                poll,
+            ),
             ProgramInstruction::ControlledPauli {
                 basis,
                 frame,
                 pairs,
                 ..
-            } => poll.for_chunks(pairs, 2 * op, 1, |_, part| {
+            } => poll.for_chunks(arena.get(*pairs)?, 2 * op, 1, |_, part| {
                 self.apply_controlled_pauli(*basis, *frame, part, mode)
             }),
             ProgramInstruction::Observable { id, terms } => {
-                poll.for_chunks(terms, op, 1, |_, part| {
+                poll.for_chunks(arena.get(*terms)?, op, 1, |_, part| {
                     self.record_pauli_observable(*id, part)
                 })
             }
@@ -381,7 +418,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn measure_z(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         reset: bool,
         probability: f64,
         rng: &mut impl Rng,
@@ -391,6 +428,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         let measurement_start = self.measurements.len();
         poll.for_chunks(targets, lane_units::<W>(WORD_OP_UNITS), 1, |_, part| {
             for &qubit in part {
+                let qubit = qubit as usize;
                 self.measurements.push(self.x_word(qubit)?);
                 if reset {
                     self.set_x_word(qubit, W::default())?;
@@ -448,7 +486,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn apply_resolved_single_pauli_noise(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         probabilities: [f64; 3],
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
@@ -479,7 +517,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                         ));
                     }
                 };
-                self.apply_pauli_mask(qubit, basis, lane_mask)
+                self.apply_pauli_mask(qubit as usize, basis, lane_mask)
             },
         )? {
             return Ok(());
@@ -492,7 +530,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     #[inline(never)]
     fn apply_dense_single_pauli_noise(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         probabilities: [f64; 3],
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
@@ -504,6 +542,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             1,
             |_, part| {
                 for &qubit in part {
+                    let qubit = qubit as usize;
                     let [x_mask, y_mask, z_mask] =
                         sample_categorical_masks(probabilities, mode.active_mask(), rng);
                     self.apply_pauli_mask(qubit, PauliBasis::X, x_mask)?;
@@ -517,7 +556,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn apply_resolved_two_qubit_pauli_noise(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         probabilities: [f64; 15],
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
@@ -563,10 +602,10 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                         )
                     })?;
                 if let Some(basis) = left_basis {
-                    self.apply_pauli_mask(left, basis, lane_mask)?;
+                    self.apply_pauli_mask(left as usize, basis, lane_mask)?;
                 }
                 if let Some(basis) = right_basis {
-                    self.apply_pauli_mask(right, basis, lane_mask)?;
+                    self.apply_pauli_mask(right as usize, basis, lane_mask)?;
                 }
                 Ok(())
             },
@@ -581,7 +620,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     #[inline(never)]
     fn apply_dense_two_qubit_pauli_noise(
         &mut self,
-        pairs: &[[usize; 2]],
+        pairs: &[[u32; 2]],
         probabilities: [f64; 15],
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
@@ -593,6 +632,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             1,
             |_, part| {
                 for &[left, right] in part {
+                    let (left, right) = (left as usize, right as usize);
                     let masks = sample_categorical_masks(probabilities, mode.active_mask(), rng);
                     for ((left_basis, right_basis), mask) in
                         TWO_QUBIT_FRAME_BASES.into_iter().zip(masks)
@@ -613,13 +653,14 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     fn measure_pauli_products(
         &mut self,
         measurement: &PauliProductMeasurement,
+        arena: &ProgramArena,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
         poll: &mut WorkPoll<'_>,
     ) -> DetectionResult<()> {
         let op = lane_units::<W>(WORD_OP_UNITS);
         let noise = lane_units::<W>(NOISE_WORD_UNITS);
-        for product in measurement.products() {
+        for product in measurement.products(arena)? {
             let (terms, _) = product?;
             if terms.len() <= LONG_PRODUCT_TERMS {
                 poll.charge(noise + terms.len() * op)?;
@@ -756,10 +797,10 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 }
                 ControlledPair::Record { offset, qubit } => {
                     let active = measurement_record_word(&self.measurements, offset)?;
-                    self.apply_pauli_mask(qubit, basis, active)?;
+                    self.apply_pauli_mask(qubit as usize, basis, active)?;
                 }
                 ControlledPair::Sweep { id, qubit } => {
-                    self.apply_pauli_mask(qubit, basis, mode.sweep_mask(id))?;
+                    self.apply_pauli_mask(qubit as usize, basis, mode.sweep_mask(id))?;
                 }
             }
         }
@@ -794,7 +835,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn apply_heralded_erase(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         probability: f64,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
@@ -814,7 +855,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     /// Records the all-false heralds of a channel that sweep correction does not sample.
     fn record_silent_heralds(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         poll: &mut WorkPoll<'_>,
     ) -> DetectionResult<()> {
         poll.for_chunks(targets, lane_units::<W>(WORD_OP_UNITS), 1, |_, part| {
@@ -826,12 +867,13 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn apply_heralded_erase_chunk(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         probability: f64,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         for &qubit in targets {
+            let qubit = qubit as usize;
             let occurred = mode.random_mask(rng, probability);
             self.measurements.push(occurred);
             let mut x_mask = W::default();
@@ -852,7 +894,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn apply_heralded_pauli_channel(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         probabilities: [f64; 4],
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
@@ -867,6 +909,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             1,
             |_, part| {
                 for &qubit in part {
+                    let qubit = qubit as usize;
                     let [identity_mask, x_mask, y_mask, z_mask] =
                         sample_categorical_masks(probabilities, mode.active_mask(), rng);
                     let occurred = identity_mask | x_mask | y_mask | z_mask;

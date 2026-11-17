@@ -442,7 +442,7 @@ impl InverseTableauSimulator {
     /// Applies a local Clifford `G` given the images `G^-1 P G` of its targets' X and Z.
     pub(super) fn apply_local_clifford(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         inverse: &LocalCliffordInverse,
     ) -> SimResult<()> {
         if targets.len() != inverse.target_count() {
@@ -465,8 +465,8 @@ impl InverseTableauSimulator {
             local_row_count,
             "local Clifford signs",
         )?;
-        for (index, target) in targets.iter().enumerate() {
-            for (offset, row) in [self.x_row_index(*target)?, self.z_row_index(*target)?]
+        for (index, target) in targets.iter().map(|&target| target as usize).enumerate() {
+            for (offset, row) in [self.x_row_index(target)?, self.z_row_index(target)?]
                 .into_iter()
                 .enumerate()
             {
@@ -480,8 +480,8 @@ impl InverseTableauSimulator {
                     sign(&self.signs, row)?;
             }
         }
-        for (index, target) in targets.iter().enumerate() {
-            for (offset, row) in [self.x_row_index(*target)?, self.z_row_index(*target)?]
+        for (index, target) in targets.iter().map(|&target| target as usize).enumerate() {
+            for (offset, row) in [self.x_row_index(target)?, self.z_row_index(target)?]
                 .into_iter()
                 .enumerate()
             {

@@ -27,7 +27,9 @@ use super::reference_run::{clifford_group_work, simulator_error};
 use super::reference_simulator::{
     InverseTableauSimulator, ReferenceStateSnapshot, SimulatorWork, WorkModel,
 };
-use crate::detection::frame::{CircuitProgram, ControlledPair, ProgramEntry, ProgramInstruction};
+use crate::detection::frame::{
+    CircuitProgram, ControlledPair, ProgramArena, ProgramEntry, ProgramInstruction,
+};
 use crate::work_poll::WorkPoll;
 
 /// After its first step, a probe may spend at most this fraction (one over the divisor) of the
@@ -149,7 +151,7 @@ impl FoldProbe {
             .entries()
             .get(body_start..body_end)
             .ok_or_else(|| probe_invariant("a fold probe body is outside the program"))?;
-        if count < 2 || !slot.is_free() || !body_is_foldable(body) {
+        if count < 2 || !slot.is_free() || !body_is_foldable(body, program.arena()) {
             return Ok(None);
         }
         let model = simulator.work_model();
@@ -344,7 +346,7 @@ pub(super) fn has_reference_fold_candidate(program: &CircuitProgram, qubit_count
                     && matches!(entries.get(*body_end), Some(ProgramEntry::EndRepeat)) =>
             {
                 let body = entries.get(index + 1..*body_end).unwrap_or_default();
-                body_is_foldable(body)
+                body_is_foldable(body, program.arena())
                     && iteration_work(program, body, model, true)
                         .saturating_mul(u128::from(*count - 1))
                         > u128::from(model.capture().saturating_add(model.tableau_pass()))
@@ -355,13 +357,20 @@ pub(super) fn has_reference_fold_candidate(program: &CircuitProgram, qubit_count
 
 /// Whether the iterations of `body` depend only on the state they start from: no instruction
 /// reads the measurement record or a sweep bit.
-fn body_is_foldable(body: &[ProgramEntry]) -> bool {
+///
+/// Pairs that do not resolve count as reading the record, so such a body is never folded and
+/// its execution reports the broken program.
+fn body_is_foldable(body: &[ProgramEntry], arena: &ProgramArena) -> bool {
     !body.iter().any(|entry| {
-        matches!(
-            entry,
-            ProgramEntry::Instruction(ProgramInstruction::ControlledPauli { pairs, .. })
-                if pairs.iter().any(|pair| !matches!(pair, ControlledPair::Quantum { .. }))
-        )
+        let ProgramEntry::Instruction(ProgramInstruction::ControlledPauli { pairs, .. }) = entry
+        else {
+            return false;
+        };
+        arena.get(*pairs).map_or(true, |pairs| {
+            pairs
+                .iter()
+                .any(|pair| !matches!(pair, ControlledPair::Quantum { .. }))
+        })
     })
 }
 
@@ -445,7 +454,9 @@ fn instruction_work(
             measurement(2 * rows(basis.x_bit(), basis.z_bit())),
         ),
         ProgramInstruction::PauliProducts(products) => products
-            .products()
+            .products(program.arena())
+            .into_iter()
+            .flatten()
             .map(|terms| match terms {
                 Ok((terms, _)) => product(
                     terms

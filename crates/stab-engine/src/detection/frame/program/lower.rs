@@ -17,12 +17,13 @@ use super::super::helpers::{
     single_probability_argument, unsupported_frame_instruction, unsupported_frame_target,
     zero_probability_noise,
 };
+use super::arena::{ArenaCounts, ArenaSpan, PauliProduct, PauliTerm, ProgramArena};
 use super::{
     CircuitProgram, CliffordStep, ControlledPair, FrameGate, NoiselessFusion,
     PauliProductMeasurement, ProgramCounts, ProgramEntry, ProgramInstruction, ReferenceClifford,
     ReferenceGateId, TraversalEvent, admission_drift, byte_product, checked_add_bytes,
     materialized_retained_bytes, program_shape_error, storage_overflow, validate_program,
-    visit_circuit,
+    visit_circuit, window_needs,
 };
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
@@ -49,6 +50,7 @@ impl ProgramOptions {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ProgramAdmission {
     entry_count: usize,
+    arena: ArenaCounts,
     retained_bytes: u64,
     frame_qubit_count: usize,
     counts: ProgramCounts,
@@ -138,6 +140,7 @@ struct PendingRepeat {
 struct RepeatAdmission {
     count: u64,
     entries_before: usize,
+    arena_before: ArenaCounts,
     bytes_before: u64,
     counts_before: CountState,
 }
@@ -186,9 +189,11 @@ impl CircuitProgram {
                                     .entry_count
                                     .checked_add(1)
                                     .ok_or_else(storage_overflow)?;
+                                let payload = arena_demand(lowered, kind)?;
+                                admission.arena.add(payload)?;
                                 admission.retained_bytes = checked_add_bytes(
                                     admission.retained_bytes,
-                                    checked_add_bytes(entry_bytes, payload_bytes(lowered, kind)?)?,
+                                    checked_add_bytes(entry_bytes, payload.bytes()?)?,
                                 )?;
                             }
                         }
@@ -203,6 +208,7 @@ impl CircuitProgram {
                         .try_push(RepeatAdmission {
                             count,
                             entries_before: admission.entry_count,
+                            arena_before: admission.arena,
                             bytes_before: admission.retained_bytes,
                             counts_before: counts,
                         })
@@ -221,6 +227,7 @@ impl CircuitProgram {
                     if admission.entry_count == repeat.entries_before + 1 {
                         // A body that lowers to nothing is elided with its marker.
                         admission.entry_count = repeat.entries_before;
+                        admission.arena = repeat.arena_before;
                         admission.retained_bytes = repeat.bytes_before;
                     } else {
                         admission.entry_count = admission
@@ -266,6 +273,7 @@ impl CircuitProgram {
                     admission.entry_count
                 ))
             })?;
+        let mut arena = ProgramArena::try_with_capacity(admission.arena)?;
         // A repeat marker is emitted only once its body emits an entry, so bodies that lower to
         // nothing vanish without ever exceeding the admitted entry capacity.
         let mut repeat_markers = ArrayVec::<PendingRepeat, { RepeatNestingLimit::HARD_MAX }>::new();
@@ -290,7 +298,7 @@ impl CircuitProgram {
                     visit_lowered_instructions(instruction, |lowered| {
                         let lowering = lower(lowered, options, &mut actions)?;
                         if let Lowering::Entry(kind) = lowering {
-                            let built = build(lowered, kind, fusion, &mut cliffords)?;
+                            let built = build(lowered, kind, fusion, &mut cliffords, &mut arena)?;
                             for pending in &mut repeat_markers {
                                 if pending.marker.is_none() {
                                     pending.marker = Some(entries.len());
@@ -349,13 +357,19 @@ impl CircuitProgram {
             return Err(admission_drift());
         }
         validate_program(&entries)?;
-        let retained_bytes = materialized_retained_bytes(&entries, entries.capacity())?;
+        let retained_bytes = materialized_retained_bytes(entries.capacity(), &arena)?;
+        if retained_bytes > admission.retained_bytes {
+            return Err(admission_drift());
+        }
+        let window_needs = window_needs(&entries, &arena)?;
         Ok(Self {
             entries,
+            arena,
             cliffords: cliffords.table,
             retained_bytes,
             frame_qubit_count,
             counts: admission.counts,
+            window_needs,
         })
     }
 }
@@ -802,87 +816,94 @@ fn any_inverted(instruction: &CircuitInstruction) -> bool {
         .any(Target::is_inverted_result_target)
 }
 
-/// The heap bytes `build` retains for `kind`, computed without allocating.
-fn payload_bytes(instruction: &CircuitInstruction, kind: EntryKind) -> DetectionResult<u64> {
+/// The arena elements `build` stores for `kind`, computed without allocating.
+fn arena_demand(instruction: &CircuitInstruction, kind: EntryKind) -> DetectionResult<ArenaCounts> {
     let targets = instruction.targets().len();
-    let words = byte_product(targets, size_of::<usize>())?;
-    let flags = if any_inverted(instruction) {
-        byte_product(targets, 1)?
-    } else {
-        0
+    let qubits = ArenaCounts {
+        qubits: targets,
+        ..ArenaCounts::default()
     };
-    let term_bytes = |count: usize| byte_product(count, size_of::<(usize, PauliBasis)>());
-    match kind {
-        EntryKind::Clifford(_)
-        | EntryKind::Reset(_)
-        | EntryKind::SinglePauliNoise(_)
-        | EntryKind::HeraldedErase
-        | EntryKind::HeraldedPauliChannel => Ok(words),
-        EntryKind::Measure { .. } | EntryKind::MeasurePairs(_) => checked_add_bytes(words, flags),
-        EntryKind::MeasurePads => byte_product(targets, 1),
-        EntryKind::PauliProducts { terms, products } => checked_add_bytes(
-            checked_add_bytes(
-                term_bytes(terms)?,
-                byte_product(products, size_of::<usize>())?,
-            )?,
-            byte_product(products, 1)?,
-        ),
-        EntryKind::TwoQubitPauliNoise(_) => {
-            checked_add_bytes(words, byte_product(15, size_of::<f64>())?)
-        }
-        EntryKind::CorrelatedError { .. } | EntryKind::Observable => term_bytes(
-            instruction
+    let probabilities = |count: usize| ArenaCounts {
+        probabilities: count,
+        ..qubits
+    };
+    let none = ArenaCounts::default();
+    Ok(match kind {
+        EntryKind::Clifford(_) | EntryKind::Reset(_) | EntryKind::HeraldedErase => qubits,
+        EntryKind::SinglePauliNoise(_) => probabilities(3),
+        EntryKind::TwoQubitPauliNoise(_) => probabilities(15),
+        EntryKind::HeraldedPauliChannel => probabilities(4),
+        EntryKind::Measure { .. } | EntryKind::MeasurePairs(_) => ArenaCounts {
+            flags: if any_inverted(instruction) {
+                targets
+            } else {
+                0
+            },
+            ..qubits
+        },
+        EntryKind::MeasurePads => ArenaCounts {
+            flags: targets,
+            ..none
+        },
+        EntryKind::PauliProducts { terms, products } => ArenaCounts {
+            terms,
+            products,
+            ..none
+        },
+        EntryKind::CorrelatedError { .. } | EntryKind::Observable => ArenaCounts {
+            terms: instruction
                 .targets()
                 .iter()
                 .filter(|target| target.is_pauli_target())
                 .count(),
-        ),
-        EntryKind::ControlledPauli { .. } => byte_product(targets / 2, size_of::<ControlledPair>()),
-    }
+            ..none
+        },
+        EntryKind::ControlledPauli { .. } => ArenaCounts {
+            pairs: targets / 2,
+            ..none
+        },
+    })
 }
 
-fn try_vec<T>(capacity: usize, context: &str) -> DetectionResult<Vec<T>> {
-    let mut values = Vec::new();
-    values.try_reserve_exact(capacity).map_err(|error| {
-        DetectionError::invalid_sampler_compilation(format!(
-            "unable to reserve {capacity} {context}: {error}"
-        ))
-    })?;
-    Ok(values)
+/// The frame qubit of a qubit target.
+fn frame_qubit(instruction: &CircuitInstruction, target: &Target) -> DetectionResult<u32> {
+    target
+        .qubit_id()
+        .map(|qubit| qubit.get())
+        .ok_or_else(|| unsupported_frame_instruction(instruction))
 }
 
-fn qubit_targets(instruction: &CircuitInstruction) -> DetectionResult<Vec<usize>> {
-    let mut targets = try_vec(
-        instruction.targets().len(),
-        "resolved detector-frame targets",
-    )?;
+fn qubit_targets(
+    instruction: &CircuitInstruction,
+    arena: &mut ProgramArena,
+) -> DetectionResult<ArenaSpan<u32>> {
+    let start = arena.mark::<u32>();
     for target in instruction.targets() {
-        targets.push(qubit_index(instruction, target)?);
+        arena.push(frame_qubit(instruction, target)?)?;
     }
-    Ok(targets)
+    arena.span_since(start)
 }
 
-fn inversion_flags(instruction: &CircuitInstruction) -> DetectionResult<Vec<bool>> {
+fn inversion_flags(
+    instruction: &CircuitInstruction,
+    arena: &mut ProgramArena,
+) -> DetectionResult<ArenaSpan<bool>> {
     if !any_inverted(instruction) {
-        return Ok(Vec::new());
+        return Ok(ArenaSpan::EMPTY);
     }
-    let mut flags = try_vec(instruction.targets().len(), "result inversion flags")?;
-    flags.extend(
+    arena.extend(
         instruction
             .targets()
             .iter()
             .map(Target::is_inverted_result_target),
-    );
-    Ok(flags)
+    )
 }
 
-fn pauli_terms(instruction: &CircuitInstruction) -> DetectionResult<Vec<(usize, PauliBasis)>> {
-    let count = instruction
-        .targets()
-        .iter()
-        .filter(|target| target.is_pauli_target())
-        .count();
-    let mut terms = try_vec(count, "resolved Pauli terms")?;
+fn pauli_terms(
+    instruction: &CircuitInstruction,
+    arena: &mut ProgramArena,
+) -> DetectionResult<ArenaSpan<PauliTerm>> {
+    let start = arena.mark::<PauliTerm>();
     for target in instruction.targets() {
         // Pinned Stim consults only the Pauli X/Z bits of correlated-error targets, so combiner
         // targets and inversion bits are ignored decoration (frame_simulator.inl:767-775).
@@ -893,12 +914,9 @@ fn pauli_terms(instruction: &CircuitInstruction) -> DetectionResult<Vec<(usize, 
         let Some(pauli) = target.pauli_type() else {
             return Err(unsupported_frame_instruction(instruction));
         };
-        if terms.len() == terms.capacity() {
-            return Err(admission_drift());
-        }
-        terms.push((qubit_index(instruction, target)?, pauli_basis(pauli)));
+        arena.push((qubit_index(instruction, target)?, pauli_basis(pauli)))?;
     }
-    Ok(terms)
+    arena.span_since(start)
 }
 
 fn build(
@@ -906,48 +924,46 @@ fn build(
     kind: EntryKind,
     fusion: NoiselessFusion,
     cliffords: &mut ReferenceCliffordTable,
+    arena: &mut ProgramArena,
 ) -> DetectionResult<ProgramInstruction> {
     Ok(match kind {
         EntryKind::Clifford(frame) => ProgramInstruction::Clifford {
             frame,
             reference: cliffords.id(instruction.gate())?,
-            targets: qubit_targets(instruction)?,
+            targets: qubit_targets(instruction, arena)?,
         },
         EntryKind::Reset(basis) => ProgramInstruction::Reset {
             basis,
-            targets: qubit_targets(instruction)?,
+            targets: qubit_targets(instruction, arena)?,
             fusion,
         },
         EntryKind::Measure { basis, reset } => ProgramInstruction::Measure {
             basis,
             reset,
             flip_probability: measurement_flip_probability(instruction)?,
-            targets: qubit_targets(instruction)?,
-            inverted: inversion_flags(instruction)?,
+            targets: qubit_targets(instruction, arena)?,
+            inverted: inversion_flags(instruction, arena)?,
             fusion,
         },
         EntryKind::MeasurePairs(basis) => ProgramInstruction::MeasurePairs {
             basis,
             flip_probability: measurement_flip_probability(instruction)?,
-            targets: qubit_targets(instruction)?,
-            inverted: inversion_flags(instruction)?,
+            targets: qubit_targets(instruction, arena)?,
+            inverted: inversion_flags(instruction, arena)?,
             fusion,
         },
         EntryKind::MeasurePads => {
-            let mut values = try_vec(instruction.targets().len(), "measurement pad values")?;
+            let start = arena.mark::<bool>();
             for target in instruction.targets() {
-                let qubit = target
-                    .qubit_id()
-                    .ok_or_else(|| unsupported_frame_instruction(instruction))?;
-                values.push(qubit.get() == 1);
+                arena.push(frame_qubit(instruction, target)? == 1)?;
             }
             ProgramInstruction::MeasurePads {
                 flip_probability: measurement_flip_probability(instruction)?,
-                values,
+                values: arena.span_since(start)?,
             }
         }
-        EntryKind::PauliProducts { terms, products } => {
-            ProgramInstruction::PauliProducts(build_pauli_products(instruction, terms, products)?)
+        EntryKind::PauliProducts { .. } => {
+            ProgramInstruction::PauliProducts(build_pauli_products(instruction, arena)?)
         }
         EntryKind::SinglePauliNoise(noise) => {
             let probabilities = match noise {
@@ -960,8 +976,8 @@ fn build(
                 SingleQubitNoise::PauliChannel => probability_list::<3>(instruction)?,
             };
             ProgramInstruction::SinglePauliNoise {
-                probabilities,
-                targets: qubit_targets(instruction)?,
+                probabilities: arena.extend(probabilities)?,
+                targets: qubit_targets(instruction, arena)?,
             }
         }
         EntryKind::TwoQubitPauliNoise(noise) => {
@@ -972,61 +988,29 @@ fn build(
                 TwoQubitNoise::PauliChannel => probability_list::<15>(instruction)?,
             };
             ProgramInstruction::TwoQubitPauliNoise {
-                probabilities: Box::new(probabilities),
-                targets: qubit_targets(instruction)?,
+                probabilities: arena.extend(probabilities)?,
+                targets: qubit_targets(instruction, arena)?,
             }
         }
         EntryKind::CorrelatedError { else_branch } => ProgramInstruction::CorrelatedError {
             else_branch,
             probability: single_probability_argument(instruction)?.get(),
-            terms: pauli_terms(instruction)?,
+            terms: pauli_terms(instruction, arena)?,
         },
         EntryKind::HeraldedErase => ProgramInstruction::HeraldedErase {
             probability: single_probability_argument(instruction)?.get(),
-            targets: qubit_targets(instruction)?,
+            targets: qubit_targets(instruction, arena)?,
         },
         EntryKind::HeraldedPauliChannel => ProgramInstruction::HeraldedPauliChannel {
-            probabilities: probability_list::<4>(instruction)?,
-            targets: qubit_targets(instruction)?,
+            probabilities: arena.extend(probability_list::<4>(instruction)?)?,
+            targets: qubit_targets(instruction, arena)?,
         },
-        EntryKind::ControlledPauli { basis, map } => {
-            let mut pairs = try_vec(instruction.targets().len() / 2, "controlled Pauli pairs")?;
-            for target_group in instruction.targets().chunks(2) {
-                let pair =
-                    match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
-                        ControlledPauliTargetPair::Quantum { .. } => {
-                            let [control, target] = target_group else {
-                                return Err(unsupported_frame_instruction(instruction));
-                            };
-                            ControlledPair::Quantum {
-                                control: qubit_index(instruction, control)?,
-                                target: qubit_index(instruction, target)?,
-                            }
-                        }
-                        ControlledPauliTargetPair::Classical { control, target } => {
-                            let qubit =
-                                usize::try_from(target.get()).map_err(|_| storage_overflow())?;
-                            match control {
-                                ClassicalControl::Record(offset) => {
-                                    ControlledPair::Record { offset, qubit }
-                                }
-                                ClassicalControl::Sweep(id) => ControlledPair::Sweep { id, qubit },
-                            }
-                        }
-                        ControlledPauliTargetPair::ClassicalNoop { .. } => continue,
-                        ControlledPauliTargetPair::Unsupported => {
-                            return Err(unsupported_frame_instruction(instruction));
-                        }
-                    };
-                pairs.push(pair);
-            }
-            ProgramInstruction::ControlledPauli {
-                basis,
-                frame: map,
-                reference: cliffords.id(instruction.gate())?,
-                pairs,
-            }
-        }
+        EntryKind::ControlledPauli { basis, map } => ProgramInstruction::ControlledPauli {
+            basis,
+            frame: map,
+            reference: cliffords.id(instruction.gate())?,
+            pairs: controlled_pairs(instruction, arena)?,
+        },
         EntryKind::Observable => {
             let observable = instruction.observable_id_argument()?.ok_or_else(|| {
                 DetectionError::invalid_result_format("OBSERVABLE_INCLUDE missing id")
@@ -1039,20 +1023,51 @@ fn build(
             })?;
             ProgramInstruction::Observable {
                 id,
-                terms: pauli_terms(instruction)?,
+                terms: pauli_terms(instruction, arena)?,
             }
         }
     })
 }
 
+fn controlled_pairs(
+    instruction: &CircuitInstruction,
+    arena: &mut ProgramArena,
+) -> DetectionResult<ArenaSpan<ControlledPair>> {
+    let start = arena.mark::<ControlledPair>();
+    for target_group in instruction.targets().chunks(2) {
+        let pair = match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
+            ControlledPauliTargetPair::Quantum { .. } => {
+                let [control, target] = target_group else {
+                    return Err(unsupported_frame_instruction(instruction));
+                };
+                ControlledPair::Quantum {
+                    control: frame_qubit(instruction, control)?,
+                    target: frame_qubit(instruction, target)?,
+                }
+            }
+            ControlledPauliTargetPair::Classical { control, target } => {
+                let qubit = target.get();
+                match control {
+                    ClassicalControl::Record(offset) => ControlledPair::Record { offset, qubit },
+                    ClassicalControl::Sweep(id) => ControlledPair::Sweep { id, qubit },
+                }
+            }
+            ControlledPauliTargetPair::ClassicalNoop { .. } => continue,
+            ControlledPauliTargetPair::Unsupported => {
+                return Err(unsupported_frame_instruction(instruction));
+            }
+        };
+        arena.push(pair)?;
+    }
+    arena.span_since(start)
+}
+
 fn build_pauli_products(
     instruction: &CircuitInstruction,
-    term_count: usize,
-    product_count: usize,
+    arena: &mut ProgramArena,
 ) -> DetectionResult<PauliProductMeasurement> {
-    let mut terms = try_vec(term_count, "detector-frame Pauli product terms")?;
-    let mut product_ends = try_vec(product_count, "detector-frame Pauli products")?;
-    let mut inverted = try_vec(product_count, "Pauli product inversion flags")?;
+    let terms = arena.mark::<PauliTerm>();
+    let products = arena.mark::<PauliProduct>();
     for target_group in instruction.target_groups() {
         let mut raw_terms = Vec::new();
         for target in target_group {
@@ -1070,22 +1085,12 @@ fn build_pauli_products(
         }
         let (normalized, product_inverted) =
             crate::sampling::pauli_product::normalize_terms(raw_terms, false)?;
-        if normalized.len() > terms.capacity() - terms.len()
-            || product_ends.len() == product_ends.capacity()
-        {
-            return Err(admission_drift());
-        }
-        terms.extend_from_slice(&normalized);
-        product_ends.push(terms.len());
-        inverted.push(product_inverted);
-    }
-    if product_ends.len() != product_count {
-        return Err(admission_drift());
+        arena.push(PauliProduct::new(normalized.len(), product_inverted)?)?;
+        arena.extend(normalized)?;
     }
     Ok(PauliProductMeasurement {
-        terms,
-        product_ends,
-        inverted,
+        terms: arena.span_since(terms)?,
+        products: arena.span_since(products)?,
         flip_probability: measurement_flip_probability(instruction)?,
     })
 }

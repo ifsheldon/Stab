@@ -232,7 +232,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     pub(super) fn apply_single_qubit_map(
         &mut self,
         map: SingleQubitFrameMap,
-        targets: &[usize],
+        targets: &[u32],
     ) -> DetectionResult<()> {
         match map {
             SingleQubitFrameMap::SwapXz => self.for_each_qubit(targets, |x, z| (z, x)),
@@ -246,10 +246,11 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     #[inline(always)]
     fn for_each_qubit(
         &mut self,
-        targets: &[usize],
+        targets: &[u32],
         kernel: impl Fn(W, W) -> (W, W),
     ) -> DetectionResult<()> {
         for &qubit in targets {
+            let qubit = qubit as usize;
             let (Some(x), Some(z)) = (self.xs.get_mut(qubit), self.zs.get_mut(qubit)) else {
                 return Err(frame_qubit_out_of_range(qubit));
             };
@@ -261,7 +262,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     pub(super) fn apply_two_qubit_map(
         &mut self,
         map: TwoQubitFrameMap,
-        targets: &[usize],
+        targets: &[u32],
     ) -> DetectionResult<()> {
         let (pairs, unpaired) = targets.as_chunks::<2>();
         if !unpaired.is_empty() {
@@ -272,6 +273,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         match map {
             TwoQubitFrameMap::ControlledX => {
                 for &[control, target] in pairs {
+                    let (control, target) = (control as usize, target as usize);
                     let control_x = self.x_word(control)?;
                     let target_z = self.z_word(target)?;
                     self.xor_x_word(target, control_x)?;
@@ -281,6 +283,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             }
             TwoQubitFrameMap::ControlledZ => {
                 for &[left, right] in pairs {
+                    let (left, right) = (left as usize, right as usize);
                     let left_x = self.x_word(left)?;
                     let right_x = self.x_word(right)?;
                     self.xor_z_word(left, right_x)?;
@@ -311,10 +314,11 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     #[inline(always)]
     fn for_each_pair(
         &mut self,
-        pairs: &[[usize; 2]],
+        pairs: &[[u32; 2]],
         kernel: impl Fn([W; TWO_QUBIT_PLANES]) -> [W; TWO_QUBIT_PLANES],
     ) -> DetectionResult<()> {
         for &[left, right] in pairs {
+            let (left, right) = (left as usize, right as usize);
             let inputs = [
                 self.x_word(left)?,
                 self.z_word(left)?,

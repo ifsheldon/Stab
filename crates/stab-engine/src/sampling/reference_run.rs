@@ -113,7 +113,14 @@ fn run_entries(
         match entry {
             ProgramEntry::Instruction(instruction) => {
                 poll.charge(STEP_UNITS)?;
-                collapse_fused_group(entries, index, simulator, &mut poll, &mut work)?;
+                collapse_fused_group(
+                    entries,
+                    program.arena(),
+                    index,
+                    simulator,
+                    &mut poll,
+                    &mut work,
+                )?;
                 apply_instruction(
                     program,
                     instruction,
@@ -263,14 +270,16 @@ impl DirectClifford {
 
     fn apply(
         self,
-        group: &[usize],
+        group: &[u32],
         simulator: &mut InverseTableauSimulator,
     ) -> Result<(), ReferenceSimulatorError> {
         match (self, group) {
-            (Self::ControlledZ, &[left, right]) => simulator.apply_controlled_z(left, right),
-            (Self::Swap, &[left, right]) => simulator.apply_swap(left, right),
-            (Self::SDag, &[qubit]) => simulator.apply_s_dag(qubit),
-            (Self::Pauli(basis), &[qubit]) => simulator.apply_pauli(qubit, basis),
+            (Self::ControlledZ, &[left, right]) => {
+                simulator.apply_controlled_z(left as usize, right as usize)
+            }
+            (Self::Swap, &[left, right]) => simulator.apply_swap(left as usize, right as usize),
+            (Self::SDag, &[qubit]) => simulator.apply_s_dag(qubit as usize),
+            (Self::Pauli(basis), &[qubit]) => simulator.apply_pauli(qubit as usize, basis),
             _ => Err(ReferenceSimulatorError::Invariant(
                 "direct gate targets disagree with its arity",
             )),
@@ -290,13 +299,13 @@ impl DirectClifford {
 /// Applies a resolved unitary gate to every target group of `targets`.
 fn apply_clifford(
     clifford: &ReferenceClifford,
-    targets: &[usize],
+    targets: &[u32],
     simulator: &mut InverseTableauSimulator,
 ) -> Result<(), ReferenceSimulatorError> {
     match clifford {
         ReferenceClifford::Hadamard => {
             for &qubit in targets {
-                simulator.apply_hadamard(qubit)?;
+                simulator.apply_hadamard(qubit as usize)?;
             }
         }
         ReferenceClifford::ControlledX => {
@@ -306,7 +315,7 @@ fn apply_clifford(
                         "controlled-X targets are not paired",
                     ));
                 };
-                simulator.apply_controlled_x(control, target)?;
+                simulator.apply_controlled_x(control as usize, target as usize)?;
             }
         }
         ReferenceClifford::Tableau { transform, steps } => {
@@ -325,11 +334,12 @@ fn apply_clifford(
                     continue;
                 };
                 let qubit = |index: u8| {
-                    group.get(usize::from(index)).copied().ok_or(
-                        ReferenceSimulatorError::Invariant(
+                    group
+                        .get(usize::from(index))
+                        .map(|&qubit| qubit as usize)
+                        .ok_or(ReferenceSimulatorError::Invariant(
                             "decomposition step escaped its target group",
-                        ),
-                    )
+                        ))
                 };
                 for step in steps {
                     match *step {
@@ -390,6 +400,7 @@ fn apply_instruction(
     output: &mut ReferenceBits,
     (poll, work): RunPoll<'_, '_>,
 ) -> Result<(), SamplingExecutionError> {
+    let arena = program.arena();
     match instruction {
         ProgramInstruction::Clifford {
             reference, targets, ..
@@ -397,6 +408,7 @@ fn apply_instruction(
             let clifford = program
                 .reference_clifford(*reference)
                 .map_err(program_error)?;
+            let targets = arena.get(*targets).map_err(program_error)?;
             for chunk in targets.chunks(clifford_arity(clifford) * CLIFFORD_GROUPS_PER_CHARGE) {
                 apply_clifford(clifford, chunk, simulator).map_err(simulator_error)?;
                 work.charge(simulator, poll)?;
@@ -404,9 +416,9 @@ fn apply_instruction(
             Ok(())
         }
         ProgramInstruction::Reset { basis, targets, .. } => {
-            for &qubit in targets {
+            for &qubit in arena.get(*targets).map_err(program_error)? {
                 simulator
-                    .reset(qubit, *basis, poll, work)
+                    .reset(qubit as usize, *basis, poll, work)
                     .map_err(simulator_error)?;
                 work.charge(simulator, poll)?;
             }
@@ -420,7 +432,14 @@ fn apply_instruction(
             ..
         } => {
             // Stim's reference sample is noiseless, so result-flip probabilities are ignored.
-            for (index, &qubit) in targets.iter().enumerate() {
+            let inverted = arena.get(*inverted).map_err(program_error)?;
+            for (index, &qubit) in arena
+                .get(*targets)
+                .map_err(program_error)?
+                .iter()
+                .enumerate()
+            {
+                let qubit = qubit as usize;
                 let measured = simulator
                     .measure(qubit, *basis, poll, work)
                     .map_err(simulator_error)?;
@@ -440,12 +459,15 @@ fn apply_instruction(
             inverted,
             ..
         } => {
+            let inverted = arena.get(*inverted).map_err(program_error)?;
+            let targets = arena.get(*targets).map_err(program_error)?;
             for (index, pair) in targets.chunks(2).enumerate() {
                 let &[left, right] = pair else {
                     return Err(run_invariant("pair measurement targets are not paired"));
                 };
+                let terms = [(left as usize, *basis), (right as usize, *basis)];
                 let measured = simulator
-                    .measure_product(&[(left, *basis), (right, *basis)], poll, work)
+                    .measure_product(&terms, poll, work)
                     .map_err(simulator_error)?;
                 let flip = inverted.get(2 * index).copied().unwrap_or(false)
                     ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
@@ -455,7 +477,7 @@ fn apply_instruction(
             Ok(())
         }
         ProgramInstruction::PauliProducts(measurement) => {
-            for product in measurement.products() {
+            for product in measurement.products(arena).map_err(program_error)? {
                 let (terms, inverted) = product.map_err(program_error)?;
                 let measured = simulator
                     .measure_product(terms, poll, work)
@@ -466,7 +488,7 @@ fn apply_instruction(
             Ok(())
         }
         ProgramInstruction::MeasurePads { values, .. } => {
-            output.extend_from_bools(values);
+            output.extend_from_bools(arena.get(*values).map_err(program_error)?);
             Ok(())
         }
         ProgramInstruction::HeraldedErase { targets, .. }
@@ -487,14 +509,14 @@ fn apply_instruction(
             let clifford = program
                 .reference_clifford(*reference)
                 .map_err(program_error)?;
-            for pair in pairs {
+            for pair in arena.get(*pairs).map_err(program_error)? {
                 match *pair {
                     ControlledPair::Quantum { control, target } => {
                         apply_clifford(clifford, &[control, target], simulator)
                     }
                     ControlledPair::Record { offset, qubit } => {
                         if output.lookback(offset) {
-                            simulator.apply_pauli(qubit, *basis)
+                            simulator.apply_pauli(qubit as usize, *basis)
                         } else {
                             Ok(())
                         }
@@ -506,7 +528,7 @@ fn apply_instruction(
                             .copied()
                             .unwrap_or(false);
                         if active {
-                            simulator.apply_pauli(qubit, *basis)
+                            simulator.apply_pauli(qubit as usize, *basis)
                         } else {
                             Ok(())
                         }
@@ -559,6 +581,7 @@ pub(super) fn count_determined_measurements(
     }
     let mut record = ReferenceBits::default();
     let mut count = 0_u64;
+    let arena = program.arena();
     let mut cursor = program.cursor(cancellation);
     let mut work = SimulatorWork::new(&simulator);
     while let Some(instruction) = cursor.next_instruction().map_err(program_error)? {
@@ -570,7 +593,14 @@ pub(super) fn count_determined_measurements(
                 inverted,
                 ..
             } => {
-                for (index, &qubit) in targets.iter().enumerate() {
+                let inverted = arena.get(*inverted).map_err(program_error)?;
+                for (index, &qubit) in arena
+                    .get(*targets)
+                    .map_err(program_error)?
+                    .iter()
+                    .enumerate()
+                {
+                    let qubit = qubit as usize;
                     let terms = [(qubit, *basis)];
                     count += u64::from(
                         simulator
@@ -595,11 +625,13 @@ pub(super) fn count_determined_measurements(
                 inverted,
                 ..
             } => {
+                let inverted = arena.get(*inverted).map_err(program_error)?;
+                let targets = arena.get(*targets).map_err(program_error)?;
                 for (index, pair) in targets.chunks(2).enumerate() {
                     let &[left, right] = pair else {
                         return Err(run_invariant("pair measurement targets are not paired"));
                     };
-                    let terms = [(left, *basis), (right, *basis)];
+                    let terms = [(left as usize, *basis), (right as usize, *basis)];
                     count += u64::from(
                         simulator
                             .is_deterministic(&terms, cursor.poll(), &mut work)
@@ -615,7 +647,7 @@ pub(super) fn count_determined_measurements(
                 }
             }
             ProgramInstruction::PauliProducts(measurement) => {
-                for product in measurement.products() {
+                for product in measurement.products(arena).map_err(program_error)? {
                     let (terms, inverted) = product.map_err(program_error)?;
                     count += u64::from(
                         simulator
@@ -651,13 +683,13 @@ pub(super) fn count_determined_measurements(
                 let clifford = program
                     .reference_clifford(*reference)
                     .map_err(program_error)?;
-                for pair in pairs {
+                for pair in arena.get(*pairs).map_err(program_error)? {
                     match *pair {
                         ControlledPair::Quantum { control, target } => {
                             apply_clifford(clifford, &[control, target], &mut simulator)
                         }
                         ControlledPair::Record { offset, qubit } if record.lookback(offset) => {
-                            simulator.apply_pauli(qubit, *basis)
+                            simulator.apply_pauli(qubit as usize, *basis)
                         }
                         ControlledPair::Record { .. } | ControlledPair::Sweep { .. } => Ok(()),
                     }

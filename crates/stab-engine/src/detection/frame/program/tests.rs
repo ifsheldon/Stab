@@ -17,7 +17,7 @@ fn structural_validation_does_not_execute_repeat_iterations() {
         },
         ProgramEntry::Instruction(ProgramInstruction::Reset {
             basis: PauliBasis::Z,
-            targets: vec![0],
+            targets: ArenaSpan::EMPTY,
             fusion: NoiselessFusion::Starts,
         }),
         ProgramEntry::EndRepeat,
@@ -72,4 +72,37 @@ fn every_unitary_gate_resolves_a_decomposed_reference_action() {
             gate.canonical_name()
         );
     }
+}
+
+/// Admission charges exactly what materialization retains: one fixed-size entry per retained
+/// instruction or repeat marker plus every arena element, including the slots that `MPP`
+/// normalization and classically controlled no-op pairs leave unused.
+#[test]
+fn admission_charges_exactly_the_materialized_program() {
+    let circuit = Circuit::from_stim_str(
+        "R 0 1 2\nH 0\nCX 0 1 sweep[0] 2\nMPAD 0 1\nDEPOLARIZE2(0.1) 0 1\n\
+         HERALDED_PAULI_CHANNEL_1(0.1, 0.1, 0.1, 0.1) 2\nE(0.1) X0 Z1\n\
+         REPEAT 3 {\n  MPP X0*X0*Z1 !Y2\n  MXX !0 1\n  CX rec[-1] 2\n}\n\
+         M !0 1\nOBSERVABLE_INCLUDE(0) X2 rec[-1]\n",
+    )
+    .expect("parse admission fixture");
+    for options in [ProgramOptions::SAMPLING, ProgramOptions::DETECTION] {
+        let admission =
+            CircuitProgram::admit(&circuit, options, 0, u64::MAX).expect("admit fixture");
+        let program = CircuitProgram::materialize(&circuit, &admission).expect("materialize");
+        assert_eq!(program.retained_bytes(), admission.retained_bytes());
+        let refused = CircuitProgram::admit(&circuit, options, 1, admission.retained_bytes());
+        assert_matches!(refused, Err(DetectionError::ResourceLimit(_)));
+    }
+}
+
+/// A one-target instruction costs one 32-byte entry and four bytes of target storage, with no
+/// allocation of its own.
+#[test]
+fn short_instructions_share_one_target_arena() {
+    let circuit = Circuit::from_stim_str(&"H 0\nS 1\n".repeat(1000)).expect("parse fixture");
+    let program =
+        CircuitProgram::compile(&circuit, ProgramOptions::SAMPLING).expect("compile fixture");
+    assert_eq!(program.entry_count(), 2000);
+    assert_eq!(program.retained_bytes(), 2000 * (32 + 4));
 }

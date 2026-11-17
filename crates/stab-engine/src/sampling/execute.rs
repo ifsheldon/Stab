@@ -70,17 +70,17 @@ pub(super) fn execute_program(
     Ok(())
 }
 
-fn apply_clifford(frame: &mut StabilizerFrame, clifford: &ReferenceClifford, targets: &[usize]) {
+fn apply_clifford(frame: &mut StabilizerFrame, clifford: &ReferenceClifford, targets: &[u32]) {
     match clifford {
         ReferenceClifford::Hadamard => {
             for &qubit in targets {
-                frame.apply_hadamard(qubit);
+                frame.apply_hadamard(qubit as usize);
             }
         }
         ReferenceClifford::ControlledX => {
             for pair in targets.chunks(2) {
                 if let &[control, target] = pair {
-                    frame.apply_controlled_x(control, target);
+                    frame.apply_controlled_x(control as usize, target as usize);
                 }
             }
         }
@@ -110,6 +110,8 @@ fn execute_instruction(
     sweep_record: &[bool],
 ) -> Result<(), SamplingExecutionError> {
     let randomness = mode.measurement_randomness();
+    let arena = program.arena();
+    let qubits = |span| arena.get(span).map_err(program_error);
     match instruction {
         ProgramInstruction::Clifford {
             reference, targets, ..
@@ -118,11 +120,11 @@ fn execute_instruction(
             program
                 .reference_clifford(*reference)
                 .map_err(program_error)?,
-            targets,
+            qubits(*targets)?,
         ),
         ProgramInstruction::Reset { basis, targets, .. } => {
-            for &qubit in targets {
-                buffers.frame.reset(qubit, *basis, rng, randomness);
+            for &qubit in qubits(*targets)? {
+                buffers.frame.reset(qubit as usize, *basis, rng, randomness);
             }
         }
         ProgramInstruction::Measure {
@@ -133,7 +135,9 @@ fn execute_instruction(
             inverted,
             ..
         } => {
-            for (index, &qubit) in targets.iter().enumerate() {
+            let inverted = arena.get(*inverted).map_err(program_error)?;
+            for (index, &qubit) in qubits(*targets)?.iter().enumerate() {
+                let qubit = qubit as usize;
                 let flip = mode.result_flip(*flip_probability, rng);
                 let inverted = inverted.get(index).copied().unwrap_or(false);
                 let result = buffers
@@ -152,7 +156,8 @@ fn execute_instruction(
             inverted,
             ..
         } => {
-            for (index, pair) in targets.chunks(2).enumerate() {
+            let inverted = arena.get(*inverted).map_err(program_error)?;
+            for (index, pair) in qubits(*targets)?.chunks(2).enumerate() {
                 let &[left, right] = pair else {
                     return Err(SamplingExecutionError::InternalInvariant {
                         message: "pair measurement targets are not paired".to_owned(),
@@ -162,7 +167,7 @@ fn execute_instruction(
                 let inverted = inverted.get(2 * index).copied().unwrap_or(false)
                     ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
                 let result = buffers.frame.measure_pauli_product(
-                    &[(left, *basis), (right, *basis)],
+                    &[(left as usize, *basis), (right as usize, *basis)],
                     inverted ^ flip,
                     rng,
                     randomness,
@@ -171,7 +176,7 @@ fn execute_instruction(
             }
         }
         ProgramInstruction::PauliProducts(measurement) => {
-            for product in measurement.products() {
+            for product in measurement.products(arena).map_err(program_error)? {
                 let (terms, inverted) = product.map_err(program_error)?;
                 let flip = mode.result_flip(measurement.flip_probability(), rng);
                 let result =
@@ -185,7 +190,7 @@ fn execute_instruction(
             flip_probability,
             values,
         } => {
-            for &value in values {
+            for &value in arena.get(*values).map_err(program_error)? {
                 let result = value ^ mode.result_flip(*flip_probability, rng);
                 push_result(buffers, result);
             }
@@ -195,12 +200,13 @@ fn execute_instruction(
             targets,
         } => {
             if mode.includes_noise() {
+                let probabilities = arena.probabilities(*probabilities).map_err(program_error)?;
                 let total = probabilities.iter().sum();
-                for &qubit in targets {
+                for &qubit in qubits(*targets)? {
                     noise::apply_single_qubit_pauli_channel(
                         buffers.frame,
-                        qubit,
-                        probabilities,
+                        qubit as usize,
+                        &probabilities,
                         total,
                         rng,
                     );
@@ -212,14 +218,15 @@ fn execute_instruction(
             targets,
         } => {
             if mode.includes_noise() {
+                let probabilities = arena.probabilities(*probabilities).map_err(program_error)?;
                 let total = probabilities.iter().sum();
-                for pair in targets.chunks(2) {
+                for pair in qubits(*targets)?.chunks(2) {
                     if let &[left, right] = pair {
                         noise::apply_two_qubit_pauli_channel(
                             buffers.frame,
-                            left,
-                            right,
-                            probabilities,
+                            left as usize,
+                            right as usize,
+                            &probabilities,
                             total,
                             rng,
                         );
@@ -235,7 +242,7 @@ fn execute_instruction(
             if mode.includes_noise() {
                 noise::apply_correlated_error(
                     buffers.frame,
-                    terms,
+                    arena.get(*terms).map_err(program_error)?,
                     *probability,
                     *else_branch,
                     buffers.correlated_error_occurred,
@@ -250,11 +257,11 @@ fn execute_instruction(
             targets,
         } => {
             let quarter = probability / 4.0;
-            for &qubit in targets {
+            for &qubit in qubits(*targets)? {
                 let herald = mode.includes_noise()
                     && noise::apply_heralded_pauli_channel(
                         buffers.frame,
-                        qubit,
+                        qubit as usize,
                         &[quarter; 4],
                         rng,
                     );
@@ -265,12 +272,13 @@ fn execute_instruction(
             probabilities,
             targets,
         } => {
-            for &qubit in targets {
+            let probabilities = arena.probabilities(*probabilities).map_err(program_error)?;
+            for &qubit in qubits(*targets)? {
                 let herald = mode.includes_noise()
                     && noise::apply_heralded_pauli_channel(
                         buffers.frame,
-                        qubit,
-                        probabilities,
+                        qubit as usize,
+                        &probabilities,
                         rng,
                     );
                 push_result(buffers, herald);
@@ -285,14 +293,14 @@ fn execute_instruction(
             let clifford = program
                 .reference_clifford(*reference)
                 .map_err(program_error)?;
-            for pair in pairs {
+            for pair in arena.get(*pairs).map_err(program_error)? {
                 match *pair {
                     ControlledPair::Quantum { control, target } => {
                         apply_clifford(buffers.frame, clifford, &[control, target]);
                     }
                     ControlledPair::Record { offset, qubit } => {
                         if record_lookback(buffers.record, offset) {
-                            buffers.frame.apply_pauli(qubit, *basis);
+                            buffers.frame.apply_pauli(qubit as usize, *basis);
                         }
                     }
                     ControlledPair::Sweep { id, qubit } => {
@@ -302,7 +310,7 @@ fn execute_instruction(
                             .copied()
                             .unwrap_or(false);
                         if active {
-                            buffers.frame.apply_pauli(qubit, *basis);
+                            buffers.frame.apply_pauli(qubit as usize, *basis);
                         }
                     }
                 }

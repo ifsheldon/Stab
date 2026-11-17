@@ -20,10 +20,12 @@ use crate::detection::error::{
 use crate::sampling::LocalTableauTransform;
 use crate::work_poll::{STEP_UNITS, WorkPoll};
 
+mod arena;
 mod lower;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use arena::{ArenaSpan, PauliProduct, PauliTerm, ProgramArena};
 pub(crate) use lower::ProgramOptions;
 
 /// One entry of the flat program tape.
@@ -83,16 +85,16 @@ impl ReferenceClifford {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ControlledPair {
     Quantum {
-        control: usize,
-        target: usize,
+        control: u32,
+        target: u32,
     },
     Record {
         offset: MeasureRecordOffset,
-        qubit: usize,
+        qubit: u32,
     },
     Sweep {
         id: u32,
-        qubit: usize,
+        qubit: u32,
     },
 }
 
@@ -115,83 +117,84 @@ pub(crate) enum NoiselessFusion {
 
 /// A resolved circuit instruction.
 ///
-/// Targets are qubit indices. `inverted` is empty when no target of the instruction carries a
-/// result inversion and otherwise holds one flag per target.
+/// Every variable-length payload lives in the program's [`ProgramArena`]. Targets are qubit
+/// indices. `inverted` is empty when no target of the instruction carries a result inversion
+/// and otherwise holds one flag per target. Probability spans hold exactly the channel's
+/// outcome probabilities.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ProgramInstruction {
     Clifford {
         frame: FrameGate,
         reference: ReferenceGateId,
-        targets: Vec<usize>,
+        targets: ArenaSpan<u32>,
     },
     Reset {
         basis: PauliBasis,
-        targets: Vec<usize>,
+        targets: ArenaSpan<u32>,
         fusion: NoiselessFusion,
     },
     Measure {
         basis: PauliBasis,
         reset: bool,
         flip_probability: f64,
-        targets: Vec<usize>,
-        inverted: Vec<bool>,
+        targets: ArenaSpan<u32>,
+        inverted: ArenaSpan<bool>,
         fusion: NoiselessFusion,
     },
     MeasurePairs {
         basis: PauliBasis,
         flip_probability: f64,
-        targets: Vec<usize>,
-        inverted: Vec<bool>,
+        targets: ArenaSpan<u32>,
+        inverted: ArenaSpan<bool>,
         fusion: NoiselessFusion,
     },
     MeasurePads {
         flip_probability: f64,
-        values: Vec<bool>,
+        values: ArenaSpan<bool>,
     },
     PauliProducts(PauliProductMeasurement),
     SinglePauliNoise {
-        probabilities: [f64; 3],
-        targets: Vec<usize>,
+        probabilities: ArenaSpan<f64>,
+        targets: ArenaSpan<u32>,
     },
     TwoQubitPauliNoise {
-        probabilities: Box<[f64; 15]>,
-        targets: Vec<usize>,
+        probabilities: ArenaSpan<f64>,
+        targets: ArenaSpan<u32>,
     },
     CorrelatedError {
         else_branch: bool,
         probability: f64,
-        terms: Vec<(usize, PauliBasis)>,
+        terms: ArenaSpan<PauliTerm>,
     },
     HeraldedErase {
         probability: f64,
-        targets: Vec<usize>,
+        targets: ArenaSpan<u32>,
     },
     HeraldedPauliChannel {
-        probabilities: [f64; 4],
-        targets: Vec<usize>,
+        probabilities: ArenaSpan<f64>,
+        targets: ArenaSpan<u32>,
     },
     ControlledPauli {
         basis: PauliBasis,
         frame: TwoQubitFrameMap,
         reference: ReferenceGateId,
-        pairs: Vec<ControlledPair>,
+        pairs: ArenaSpan<ControlledPair>,
     },
     Observable {
         id: usize,
-        terms: Vec<(usize, PauliBasis)>,
+        terms: ArenaSpan<PauliTerm>,
     },
 }
 
-/// The normalized Pauli products of one `MPP` instruction, stored in one term arena.
+/// The normalized Pauli products of one `MPP` instruction.
 ///
-/// Product `i` occupies `terms[product_ends[i - 1]..product_ends[i]]`, so execution walks
-/// precomputed slices and allocates nothing per batch. `inverted[i]` is the static sign of
-/// product `i`, which only the reference sample observes.
-#[derive(Clone, Debug, PartialEq)]
+/// The products' terms are consecutive in the term arena, in product order, so execution walks
+/// precomputed slices and allocates nothing per batch. Each product's static sign is observed
+/// only by the reference sample.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct PauliProductMeasurement {
-    terms: Vec<(usize, PauliBasis)>,
-    product_ends: Vec<usize>,
-    inverted: Vec<bool>,
+    terms: ArenaSpan<PauliTerm>,
+    products: ArenaSpan<PauliProduct>,
     flip_probability: f64,
 }
 
@@ -200,76 +203,21 @@ impl PauliProductMeasurement {
         self.flip_probability
     }
 
-    pub(crate) fn product_count(&self) -> usize {
-        self.product_ends.len()
+    pub(crate) const fn product_count(&self) -> usize {
+        self.products.len()
     }
 
     /// Yields each product's terms and static inversion.
-    pub(crate) fn products(
+    pub(crate) fn products<'a>(
         &self,
-    ) -> impl Iterator<Item = DetectionResult<(&[(usize, PauliBasis)], bool)>> + '_ {
-        let mut start = 0_usize;
-        self.product_ends
-            .iter()
-            .zip(&self.inverted)
-            .map(move |(&end, &inverted)| {
-                let product = self.terms.get(start..end).ok_or_else(|| {
-                    DetectionError::invalid_sampler_compilation(
-                        "compiled Pauli product escaped its term arena",
-                    )
-                })?;
-                start = end;
-                Ok((product, inverted))
-            })
-    }
-
-    fn retained_bytes(&self) -> Option<usize> {
-        self.terms
-            .capacity()
-            .checked_mul(size_of::<(usize, PauliBasis)>())?
-            .checked_add(
-                self.product_ends
-                    .capacity()
-                    .checked_mul(size_of::<usize>())?,
-            )?
-            .checked_add(self.inverted.capacity())
+        arena: &'a ProgramArena,
+    ) -> DetectionResult<impl Iterator<Item = DetectionResult<(&'a [PauliTerm], bool)>> + 'a> {
+        arena.pauli_products(self.terms, self.products)
     }
 }
 
-impl ProgramInstruction {
-    fn retained_bytes(&self) -> Option<usize> {
-        let words = |targets: &Vec<usize>| targets.capacity().checked_mul(size_of::<usize>());
-        let terms = |terms: &Vec<(usize, PauliBasis)>| {
-            terms
-                .capacity()
-                .checked_mul(size_of::<(usize, PauliBasis)>())
-        };
-        match self {
-            Self::Clifford { targets, .. }
-            | Self::Reset { targets, .. }
-            | Self::SinglePauliNoise { targets, .. }
-            | Self::HeraldedErase { targets, .. }
-            | Self::HeraldedPauliChannel { targets, .. } => words(targets),
-            Self::Measure {
-                targets, inverted, ..
-            }
-            | Self::MeasurePairs {
-                targets, inverted, ..
-            } => words(targets)?.checked_add(inverted.capacity()),
-            Self::MeasurePads { values, .. } => Some(values.capacity()),
-            Self::PauliProducts(measurement) => measurement.retained_bytes(),
-            Self::TwoQubitPauliNoise { targets, .. } => {
-                words(targets)?.checked_add(size_of::<[f64; 15]>())
-            }
-            Self::CorrelatedError { terms: list, .. } | Self::Observable { terms: list, .. } => {
-                terms(list)
-            }
-            Self::ControlledPauli { pairs, .. } => {
-                pairs.capacity().checked_mul(size_of::<ControlledPair>())
-            }
-        }
-    }
-}
+/// Every compiled entry fits in half a cache line; payloads live in the [`ProgramArena`].
+const _: () = assert!(size_of::<ProgramEntry>() <= 32);
 
 /// Retention a frame needs to run a program over bounded windows of measurement planes.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -293,10 +241,12 @@ pub(crate) struct ProgramCounts {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CircuitProgram {
     entries: Vec<ProgramEntry>,
+    arena: ProgramArena,
     cliffords: Vec<ReferenceClifford>,
     retained_bytes: u64,
     frame_qubit_count: usize,
     counts: ProgramCounts,
+    window_needs: MeasurementWindowNeeds,
 }
 
 impl CircuitProgram {
@@ -304,10 +254,12 @@ impl CircuitProgram {
     pub(crate) fn empty(counts: ProgramCounts) -> Self {
         Self {
             entries: Vec::new(),
+            arena: ProgramArena::default(),
             cliffords: Vec::new(),
             retained_bytes: 0,
             frame_qubit_count: 0,
             counts,
+            window_needs: MeasurementWindowNeeds::default(),
         }
     }
 
@@ -334,6 +286,11 @@ impl CircuitProgram {
         &self.entries
     }
 
+    /// The payload storage that the spans of [`Self::entries`] index.
+    pub(crate) const fn arena(&self) -> &ProgramArena {
+        &self.arena
+    }
+
     pub(crate) fn reference_clifford(
         &self,
         id: ReferenceGateId,
@@ -347,44 +304,14 @@ impl CircuitProgram {
 
     /// A cursor over the whole tape that polls `cancellation` while it expands repeats.
     pub(crate) fn cursor<'a>(&'a self, cancellation: &'a Cancellation) -> ProgramCursor<'a> {
-        ProgramCursor::new(&self.entries, 0, self.entries.len(), cancellation)
+        ProgramCursor::new(self, cancellation)
     }
 
     /// What a frame must retain to run this program over bounded windows of measurement planes:
     /// the deepest classical-control record lookback and the most measurements one instruction
     /// records, since a window is handed over only between instructions.
-    pub(crate) fn measurement_window_needs(&self) -> MeasurementWindowNeeds {
-        let mut needs = MeasurementWindowNeeds::default();
-        for entry in &self.entries {
-            let ProgramEntry::Instruction(instruction) = entry else {
-                continue;
-            };
-            let recorded = match instruction {
-                ProgramInstruction::Measure { targets, .. }
-                | ProgramInstruction::HeraldedErase { targets, .. }
-                | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len(),
-                ProgramInstruction::MeasurePairs { targets, .. } => targets.len() / 2,
-                ProgramInstruction::MeasurePads { values, .. } => values.len(),
-                ProgramInstruction::PauliProducts(measurement) => measurement.product_count(),
-                ProgramInstruction::ControlledPauli { pairs, .. } => {
-                    for pair in pairs {
-                        if let ControlledPair::Record { offset, .. } = pair {
-                            needs.feedback_lookback =
-                                needs.feedback_lookback.max(lookback_distance(*offset));
-                        }
-                    }
-                    0
-                }
-                ProgramInstruction::Clifford { .. }
-                | ProgramInstruction::Reset { .. }
-                | ProgramInstruction::SinglePauliNoise { .. }
-                | ProgramInstruction::TwoQubitPauliNoise { .. }
-                | ProgramInstruction::CorrelatedError { .. }
-                | ProgramInstruction::Observable { .. } => 0,
-            };
-            needs.largest_instruction = needs.largest_instruction.max(recorded);
-        }
-        needs
+    pub(crate) const fn measurement_window_needs(&self) -> MeasurementWindowNeeds {
+        self.window_needs
     }
 
     #[cfg(test)]
@@ -401,6 +328,7 @@ impl CircuitProgram {
 /// bounded amount of work and receives [`DetectionError::Cancelled`].
 pub(crate) struct ProgramCursor<'a> {
     entries: &'a [ProgramEntry],
+    arena: &'a ProgramArena,
     index: usize,
     end: usize,
     repeats: ArrayVec<RepeatExecutionFrame, { RepeatNestingLimit::HARD_MAX }>,
@@ -415,19 +343,21 @@ struct RepeatExecutionFrame {
 }
 
 impl<'a> ProgramCursor<'a> {
-    fn new(
-        entries: &'a [ProgramEntry],
-        start: usize,
-        end: usize,
-        cancellation: &'a Cancellation,
-    ) -> Self {
+    fn new(program: &'a CircuitProgram, cancellation: &'a Cancellation) -> Self {
         Self {
-            entries,
-            index: start,
-            end: end.min(entries.len()),
+            entries: &program.entries,
+            arena: &program.arena,
+            index: 0,
+            end: program.entries.len(),
             repeats: ArrayVec::new(),
             poll: WorkPoll::new(cancellation),
         }
+    }
+
+    /// The payload storage of the returned instructions.
+    #[inline(always)]
+    pub(crate) const fn arena(&self) -> &'a ProgramArena {
+        self.arena
     }
 
     /// The poll the executor charges for the work of each returned instruction.
@@ -580,22 +510,52 @@ fn validate_program(entries: &[ProgramEntry]) -> DetectionResult<()> {
     repeat_ends.is_empty().ok_or_else(program_shape_error)
 }
 
-fn materialized_retained_bytes(
+/// What a frame must retain to run `entries` over bounded windows of measurement planes.
+fn window_needs(
     entries: &[ProgramEntry],
-    entry_capacity: usize,
-) -> DetectionResult<u64> {
-    let mut retained = byte_product(entry_capacity, size_of::<ProgramEntry>())?;
+    arena: &ProgramArena,
+) -> DetectionResult<MeasurementWindowNeeds> {
+    let mut needs = MeasurementWindowNeeds::default();
     for entry in entries {
         let ProgramEntry::Instruction(instruction) = entry else {
             continue;
         };
-        let payload = instruction.retained_bytes().ok_or_else(storage_overflow)?;
-        retained = checked_add_bytes(
-            retained,
-            u64::try_from(payload).map_err(|_| storage_overflow())?,
-        )?;
+        let recorded = match instruction {
+            ProgramInstruction::Measure { targets, .. }
+            | ProgramInstruction::HeraldedErase { targets, .. }
+            | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len(),
+            ProgramInstruction::MeasurePairs { targets, .. } => targets.len() / 2,
+            ProgramInstruction::MeasurePads { values, .. } => values.len(),
+            ProgramInstruction::PauliProducts(measurement) => measurement.product_count(),
+            ProgramInstruction::ControlledPauli { pairs, .. } => {
+                for pair in arena.get(*pairs)? {
+                    if let ControlledPair::Record { offset, .. } = pair {
+                        needs.feedback_lookback =
+                            needs.feedback_lookback.max(lookback_distance(*offset));
+                    }
+                }
+                0
+            }
+            ProgramInstruction::Clifford { .. }
+            | ProgramInstruction::Reset { .. }
+            | ProgramInstruction::SinglePauliNoise { .. }
+            | ProgramInstruction::TwoQubitPauliNoise { .. }
+            | ProgramInstruction::CorrelatedError { .. }
+            | ProgramInstruction::Observable { .. } => 0,
+        };
+        needs.largest_instruction = needs.largest_instruction.max(recorded);
     }
-    Ok(retained)
+    Ok(needs)
+}
+
+fn materialized_retained_bytes(
+    entry_capacity: usize,
+    arena: &ProgramArena,
+) -> DetectionResult<u64> {
+    checked_add_bytes(
+        byte_product(entry_capacity, size_of::<ProgramEntry>())?,
+        arena.retained_bytes()?,
+    )
 }
 
 fn byte_product(count: usize, item_size: usize) -> DetectionResult<u64> {

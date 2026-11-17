@@ -48,10 +48,10 @@ fn smallest_compile_budget(circuit: &Circuit) -> u64 {
     admitted
 }
 
-/// A flat Clifford-heavy circuit whose compiled program outweighs its source text and whose
+/// A flat noise-heavy circuit whose compiled program outweighs its source text and whose
 /// one-qubit, one-measurement session is small.
 fn fixture() -> String {
-    let mut text = "S 0\nZ 0\n".repeat(2000);
+    let mut text = "DEPOLARIZE2(0.1) 1 2\nZ 0\n".repeat(2000);
     text.push_str("M 0\n");
     text
 }

@@ -26,8 +26,10 @@ use stab_algebra::PauliBasis;
 
 use super::api::SamplingExecutionError;
 use super::reference_run::simulator_error;
-use super::reference_simulator::{InverseTableauSimulator, SimulatorWork};
-use crate::detection::frame::{NoiselessFusion, ProgramEntry, ProgramInstruction};
+use super::reference_simulator::{InverseTableauSimulator, ReferenceSimulatorError, SimulatorWork};
+use crate::detection::frame::{
+    ArenaSpan, NoiselessFusion, ProgramArena, ProgramEntry, ProgramInstruction,
+};
 use crate::work_poll::WorkPoll;
 
 /// The collapsing gate family whose collapse order spans a fused instruction.
@@ -39,7 +41,7 @@ enum OrderedGate {
 }
 
 impl OrderedGate {
-    fn of(instruction: &ProgramInstruction) -> Option<(Self, NoiselessFusion, &[usize])> {
+    fn of(instruction: &ProgramInstruction) -> Option<(Self, NoiselessFusion, ArenaSpan<u32>)> {
         let (gate, fusion, targets) = match instruction {
             ProgramInstruction::Reset {
                 basis,
@@ -68,11 +70,7 @@ impl OrderedGate {
             } => (Self::Pairs(*basis), *fusion, targets),
             _ => return None,
         };
-        matches!(gate.basis(), PauliBasis::X | PauliBasis::Y).then_some((
-            gate,
-            fusion,
-            targets.as_slice(),
-        ))
+        matches!(gate.basis(), PauliBasis::X | PauliBasis::Y).then_some((gate, fusion, *targets))
     }
 
     fn basis(self) -> PauliBasis {
@@ -94,11 +92,12 @@ fn dropped_by_noiseless_circuit(instruction: &ProgramInstruction) -> bool {
 }
 
 /// The target lists of the fused group that starts at `entries[start]`, in program order.
-fn fused_targets(
-    entries: &[ProgramEntry],
+fn fused_targets<'a>(
+    entries: &'a [ProgramEntry],
+    arena: &'a ProgramArena,
     start: usize,
     gate: OrderedGate,
-) -> impl Iterator<Item = &[usize]> {
+) -> impl Iterator<Item = Result<&'a [u32], ReferenceSimulatorError>> {
     let mut rest = entries.get(start..).unwrap_or_default().iter();
     let mut first = true;
     let mut done = false;
@@ -119,7 +118,24 @@ fn fused_targets(
             });
         first = false;
         done = joined.is_none();
-        joined.map(|(_, _, targets)| targets)
+        joined.map(|(_, _, targets)| {
+            arena.get(targets).map_err(|_| {
+                ReferenceSimulatorError::Invariant("fused collapse targets escaped their arena")
+            })
+        })
+    })
+}
+
+/// Each item of `items`, or the error that replaced its list.
+fn flatten_resolved<'a, T: Copy + 'a>(
+    items: impl Iterator<Item = Result<&'a [T], ReferenceSimulatorError>>,
+) -> impl Iterator<Item = Result<T, ReferenceSimulatorError>> {
+    items.flat_map(|resolved| {
+        let (values, error) = match resolved {
+            Ok(values) => (values, None),
+            Err(error) => (&[][..], Some(error)),
+        };
+        values.iter().copied().map(Ok).chain(error.map(Err))
     })
 }
 
@@ -131,6 +147,7 @@ fn fused_targets(
 /// crosses a repeat-block edge.
 pub(super) fn collapse_fused_group(
     entries: &[ProgramEntry],
+    arena: &ProgramArena,
     index: usize,
     simulator: &mut InverseTableauSimulator,
     poll: &mut WorkPoll<'_>,
@@ -145,8 +162,11 @@ pub(super) fn collapse_fused_group(
     let basis = gate.basis();
     match gate {
         OrderedGate::Reset(_) | OrderedGate::Measure { .. } => {
-            let targets = || fused_targets(entries, index, gate).flatten().copied();
-            if is_sorted(targets()) {
+            let targets = || {
+                flatten_resolved(fused_targets(entries, arena, index, gate))
+                    .map(|qubit| qubit.map(|qubit| qubit as usize))
+            };
+            if is_sorted(targets()).map_err(simulator_error)? {
                 return Ok(());
             }
             simulator
@@ -155,10 +175,14 @@ pub(super) fn collapse_fused_group(
         }
         OrderedGate::Pairs(_) => {
             let pairs = || {
-                fused_targets(entries, index, gate)
-                    .flat_map(|targets| targets.as_chunks::<2>().0.iter().map(|&[a, b]| (a, b)))
+                let groups = fused_targets(entries, arena, index, gate)
+                    .map(|targets| targets.map(|targets| targets.as_chunks::<2>().0));
+                flatten_resolved(groups)
+                    .map(|pair| pair.map(|[first, second]| (first as usize, second as usize)))
             };
-            if is_sorted(pairs().map(|(first, _)| first)) {
+            if is_sorted(pairs().map(|pair| pair.map(|(first, _)| first)))
+                .map_err(simulator_error)?
+            {
                 return Ok(());
             }
             simulator
@@ -170,13 +194,16 @@ pub(super) fn collapse_fused_group(
 
 /// Whether `values` never decrease, in which case sequential collapse already follows Stim's
 /// ascending order (repeated values are deterministic by the time they recur).
-fn is_sorted(mut values: impl Iterator<Item = usize>) -> bool {
-    let Some(mut previous) = values.next() else {
-        return true;
-    };
-    values.all(|value| {
-        let ordered = previous <= value;
-        previous = value;
-        ordered
-    })
+fn is_sorted(
+    values: impl Iterator<Item = Result<usize, ReferenceSimulatorError>>,
+) -> Result<bool, ReferenceSimulatorError> {
+    let mut previous = None;
+    for value in values {
+        let value = value?;
+        if previous.is_some_and(|previous| previous > value) {
+            return Ok(false);
+        }
+        previous = Some(value);
+    }
+    Ok(true)
 }
