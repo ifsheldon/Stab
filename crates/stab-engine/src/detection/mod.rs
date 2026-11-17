@@ -1,6 +1,7 @@
 mod api;
 mod buffers;
 mod conversion_plan;
+mod conversion_window;
 mod error;
 pub(crate) mod frame;
 mod limits;
@@ -204,6 +205,12 @@ impl PreparedMeasurementToDetection {
             .as_ref()
             .map(SweepCorrectionPlan::state)
             .transpose()
+    }
+
+    /// Whether conversion replays a sweep-correction frame, which reads every measurement
+    /// plane of a batch at once.
+    const fn has_sweep_correction(&self) -> bool {
+        self.sweep_correction.is_some()
     }
 
     fn sweep_correction_storage_bytes(&self) -> u128 {

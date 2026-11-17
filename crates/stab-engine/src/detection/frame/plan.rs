@@ -1,5 +1,5 @@
 use rand::Rng;
-use stab_model::{Cancellation, Circuit};
+use stab_model::{Cancellation, Cancelled, Circuit};
 
 use super::program::{CircuitProgram, ProgramOptions};
 use super::window::PlaneWindow;
@@ -9,9 +9,10 @@ use crate::LaneWidth;
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
+use crate::detection::try_vec_with_capacity;
 use crate::detection::{ConversionPlan, DetectionConversionLimits};
 use crate::sampling::ReferenceBits;
-use crate::work_poll::WorkPoll;
+use crate::work_poll::{WORD_OP_UNITS, WorkPoll, chunk_units};
 
 /// Shots in one frame batch of the widest lane word, [`FrameLanes`]: the default for circuit
 /// sampling and detection sampling, and the only width of measurement-to-detection conversion and
@@ -239,6 +240,9 @@ pub(crate) struct FrameBatchState<W: FrameWord> {
     measurement_count: usize,
     detector_planes: Vec<W>,
     observable_planes: Vec<W>,
+    /// Output planes already moved down by a [`Self::discard_delivered_lanes`] that observed
+    /// cancellation before it finished; zero when no discard is pending.
+    discarded_planes: usize,
 }
 
 /// Conservative reusable storage of a frame batch state with the given widths at `lane_width`:
@@ -311,14 +315,17 @@ impl<W: FrameWord> FrameBatchState<W> {
             )?,
             records: FrameRecords::Detection,
             measurement_count,
-            detector_planes: super::try_zero_words(
+            // Conversion writes every detector and observable plane of each batch in polled
+            // chunks, so only capacity is reserved here.
+            detector_planes: try_vec_with_capacity(
                 detector_count,
                 "detection frame detector planes",
             )?,
-            observable_planes: super::try_zero_words(
+            observable_planes: try_vec_with_capacity(
                 observable_count,
                 "detection frame observable planes",
             )?,
+            discarded_planes: 0,
         })
     }
 
@@ -358,6 +365,7 @@ impl<W: FrameWord> FrameBatchState<W> {
         cancellation: &Cancellation,
         window: Option<&mut PlaneWindow<'_, W>>,
     ) -> DetectionResult<()> {
+        self.discarded_planes = 0;
         self.frame
             .reset(rng, mode, &mut WorkPoll::new(cancellation))?;
         match window {
@@ -383,8 +391,13 @@ impl<W: FrameWord> FrameBatchState<W> {
         &self.frame.measurements
     }
 
-    /// Flips every lane of each measurement plane whose reference bit is set.
-    pub(crate) fn xor_reference(&mut self, reference: &ReferenceBits) -> DetectionResult<()> {
+    /// Flips every lane of each measurement plane whose reference bit is set, charging `poll`
+    /// for every chunk of 64-plane groups.
+    pub(crate) fn xor_reference(
+        &mut self,
+        reference: &ReferenceBits,
+        poll: &mut WorkPoll<'_>,
+    ) -> DetectionResult<()> {
         if reference.len() != self.frame.measurements.len() {
             return Err(DetectionError::invalid_sampler_compilation(format!(
                 "reference sample has {} bits but the frame recorded {} measurements",
@@ -393,21 +406,23 @@ impl<W: FrameWord> FrameBatchState<W> {
             )));
         }
         let all_lanes = W::active_mask(W::LANE_COUNT);
-        for (planes, word) in self
-            .frame
-            .measurements
-            .chunks_mut(u64::BITS as usize)
-            .zip(reference.words())
-        {
-            let mut bits = *word;
-            while bits != 0 {
-                if let Some(plane) = planes.get_mut(bits.trailing_zeros() as usize) {
-                    *plane ^= all_lanes;
+        let group_planes = u64::BITS as usize;
+        let group_units = group_planes * super::lane_units::<W>(WORD_OP_UNITS);
+        let measurements = &mut self.frame.measurements;
+        poll.for_chunks(reference.words(), group_units, 1, |first_group, words| {
+            let start = first_group * group_planes;
+            let planes = measurements.get_mut(start..).unwrap_or_default();
+            for (planes, word) in planes.chunks_mut(group_planes).zip(words) {
+                let mut bits = *word;
+                while bits != 0 {
+                    if let Some(plane) = planes.get_mut(bits.trailing_zeros() as usize) {
+                        *plane ^= all_lanes;
+                    }
+                    bits &= bits - 1;
                 }
-                bits &= bits - 1;
             }
-        }
-        Ok(())
+            Ok::<_, DetectionError>(())
+        })
     }
 
     pub(in crate::detection) fn detection_planes(&self) -> (&[W], &[W]) {
@@ -416,19 +431,42 @@ impl<W: FrameWord> FrameBatchState<W> {
 
     /// Moves the lanes after the first `delivered` lanes of every recorded output plane down to
     /// lane zero, so the undelivered rest of a batch can be delivered as a prefix later.
-    pub(crate) fn discard_delivered_lanes(&mut self, delivered: usize) {
-        let planes: &mut [W] = match self.records {
-            FrameRecords::Measurements => &mut self.frame.measurements,
-            FrameRecords::Detection => &mut self.detector_planes,
+    ///
+    /// Planes are moved in chunks charged to `poll`. A cancellation observed between chunks
+    /// keeps the count of planes already moved, so calling again with the same `delivered`
+    /// moves only the rest and the batch ends exactly as an uninterrupted discard leaves it.
+    pub(crate) fn discard_delivered_lanes(
+        &mut self,
+        delivered: usize,
+        poll: &mut WorkPoll<'_>,
+    ) -> Result<(), Cancelled> {
+        let (records, observables): (&mut [W], &mut [W]) = match self.records {
+            FrameRecords::Measurements => (&mut self.frame.measurements, &mut []),
+            FrameRecords::Detection => (&mut self.detector_planes, &mut self.observable_planes),
         };
-        for plane in planes {
-            *plane = plane.shift_lanes_down(delivered);
-        }
-        if self.records == FrameRecords::Detection {
-            for plane in &mut self.observable_planes {
+        let units = super::lane_units::<W>(WORD_OP_UNITS);
+        let chunk = (chunk_units() / units).max(1);
+        let record_count = records.len();
+        let total = record_count + observables.len();
+        while self.discarded_planes < total {
+            let start = self.discarded_planes;
+            let end = total.min(start + chunk);
+            poll.charge((end - start) * units)?;
+            let (from_records, to_records) = (start.min(record_count), end.min(record_count));
+            let from_observables = start.max(record_count) - record_count;
+            let to_observables = end.max(record_count) - record_count;
+            let planes = records
+                .get_mut(from_records..to_records)
+                .into_iter()
+                .chain(observables.get_mut(from_observables..to_observables))
+                .flatten();
+            for plane in planes {
                 *plane = plane.shift_lanes_down(delivered);
             }
+            self.discarded_planes = end;
         }
+        self.discarded_planes = 0;
+        Ok(())
     }
 
     fn convert_batch(

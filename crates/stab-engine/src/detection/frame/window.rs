@@ -198,6 +198,22 @@ impl ShotRecordTransposer {
             .saturating_add(TRANSPOSE_SCRATCH_BYTES as u128)
     }
 
+    /// Grows the records to hold at least `lanes` shots, releasing the old ones first; the
+    /// caller admitted the largest batch it converts when it created this transposer.
+    pub(crate) fn ensure_lanes(&mut self, lanes: usize) -> DetectionResult<()> {
+        if self.records.shot_count() >= lanes {
+            return Ok(());
+        }
+        let width = self.records.bits_per_shot();
+        self.records = PackedShotBatch::zeros(0, width).map_err(records_error)?;
+        self.records = PackedShotBatch::zeros(lanes, width).map_err(|error| {
+            DetectionError::invalid_sampler_compilation(format!(
+                "streaming records of {lanes} shots and {width} bits: {error}"
+            ))
+        })?;
+        Ok(())
+    }
+
     /// Starts a batch that delivers its first `lanes` lanes.
     pub(crate) fn begin_batch(&mut self, lanes: usize) -> DetectionResult<()> {
         if lanes > self.records.shot_count() {
@@ -265,18 +281,26 @@ impl ShotRecordTransposer {
     ) -> DetectionResult<()> {
         let tiles = (end - start).div_ceil(WORD_BITS);
         let first_word = start / WORD_BITS;
-        let flip_words = flips.get(first_word..).unwrap_or_default();
+        let group = start
+            .checked_sub(base)
+            .and_then(|from| planes.get(from..end - base))
+            .ok_or_else(window_escape)?;
+        // The group's flip words, zero past the end of `flips`, so the row loop below reads
+        // three equally long sequences and compiles without per-word bounds checks.
+        let mut group_flips = [0_u64; GROUP_TILES];
+        for (slot, flip) in group_flips
+            .iter_mut()
+            .zip(flips.get(first_word..).unwrap_or_default())
+        {
+            *slot = *flip;
+        }
         self.scratch.resize(tiles, [0; WORD_BITS]);
         for block in 0..self.lanes.div_ceil(WORD_BITS) {
-            for (tile_index, tile) in self.scratch.iter_mut().enumerate() {
-                let tile_start = start + tile_index * WORD_BITS - base;
-                let tile_end = (tile_start + WORD_BITS).min(end - base);
-                let source = planes.get(tile_start..tile_end).ok_or_else(window_escape)?;
-                let (filled, rest) = tile.split_at_mut(source.len());
-                for (slot, plane) in filled.iter_mut().zip(source) {
-                    *slot = plane.lane_word(block);
+            for (tile, source) in self.scratch.iter_mut().zip(group.chunks(WORD_BITS)) {
+                let mut source = source.iter();
+                for slot in tile.iter_mut() {
+                    *slot = source.next().map_or(0, |plane| plane.lane_word(block));
                 }
-                rest.fill(0);
                 transpose_bit_tile(tile);
             }
             let block_lanes = (self.lanes - block * WORD_BITS).min(WORD_BITS);
@@ -290,9 +314,8 @@ impl ShotRecordTransposer {
                 let target = row
                     .get_mut(first_word..first_word + tiles)
                     .ok_or_else(window_escape)?;
-                for (index, (word, tile)) in target.iter_mut().zip(&self.scratch).enumerate() {
-                    let flip = flip_words.get(index).copied().unwrap_or(0);
-                    *word = tile.get(lane).copied().unwrap_or(0) ^ flip;
+                for ((word, tile), flip) in target.iter_mut().zip(&self.scratch).zip(&group_flips) {
+                    *word = tile.get(lane).copied().unwrap_or(0) ^ *flip;
                 }
             }
         }
@@ -320,6 +343,10 @@ impl<W: FrameWord> PlaneConsumer<W> for SampledRecords<'_> {
             .transpose_until(base, planes, upto, self.reference, poll)?;
         Ok(upto)
     }
+}
+
+fn records_error(error: stab_records::FormatError) -> DetectionError {
+    DetectionError::invalid_sampler_compilation(error.to_string())
 }
 
 fn window_escape() -> DetectionError {

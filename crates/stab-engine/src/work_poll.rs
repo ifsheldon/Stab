@@ -115,23 +115,6 @@ impl<'a> WorkPoll<'a> {
         }
         Ok(())
     }
-
-    /// Runs `body` over consecutive mutable chunks of `items`, charging each chunk before it
-    /// runs, as [`Self::for_chunks`] does.
-    #[inline]
-    pub(crate) fn for_chunks_mut<T, E: From<Cancelled>>(
-        &mut self,
-        items: &mut [T],
-        units_per_item: usize,
-        mut body: impl FnMut(&mut [T]) -> Result<(), E>,
-    ) -> Result<(), E> {
-        let chunk = (CHUNK_UNITS / units_per_item.max(1)).max(1);
-        for part in items.chunks_mut(chunk) {
-            self.charge(part.len().saturating_mul(units_per_item))?;
-            body(part)?;
-        }
-        Ok(())
-    }
 }
 
 /// The poll interval; this crate's unit tests can shorten it on their thread.

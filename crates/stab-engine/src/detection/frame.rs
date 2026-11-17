@@ -4,7 +4,7 @@ use stab_model::Cancellation;
 
 use super::error::{DetectionError, DetectionResult};
 use super::try_vec_with_capacity;
-use crate::work_poll::{NOISE_WORD_UNITS, WORD_OP_UNITS, WorkPoll};
+use crate::work_poll::{NOISE_WORD_UNITS, WORD_OP_UNITS, WorkPoll, chunk_units};
 
 mod clifford;
 #[cfg(test)]
@@ -17,11 +17,12 @@ mod program;
 mod window;
 mod word;
 
-use helpers::{TWO_QUBIT_FRAME_BASES, measurement_record_word, try_zero_words};
+use helpers::{TWO_QUBIT_FRAME_BASES, measurement_record_word};
 use noise::{
     FrameExecutionMode, for_each_set_lane, sample_categorical_masks,
     visit_sparse_categorical_events,
 };
+use program::ProgramCursor;
 
 pub(crate) use delivery::{
     DeliveryFailure, DeliveryOutcome, FrameBatchSource, PendingLanes, Refill, sample_or_rewind,
@@ -58,6 +59,46 @@ const _: () = {
     assert!(FRAME_BATCH_SHOTS == crate::LaneWidth::WIDEST.shots_per_batch());
 };
 
+/// Replaces `words` with `len` values of `value`, produced in order, charging `poll` for every
+/// chunk of `units`-unit words before it is written.
+///
+/// The vector must already reserve `len` words, so the refill never allocates.
+pub(super) fn refill_polled<T>(
+    words: &mut Vec<T>,
+    len: usize,
+    units: usize,
+    poll: &mut WorkPoll<'_>,
+    mut value: impl FnMut() -> T,
+) -> DetectionResult<()> {
+    words.clear();
+    let chunk = (chunk_units() / units.max(1)).max(1);
+    while words.len() < len {
+        let part = chunk.min(len - words.len());
+        poll.charge(part.saturating_mul(units))?;
+        words.extend(std::iter::repeat_with(&mut value).take(part));
+    }
+    Ok(())
+}
+
+/// Replaces `words` with `len` copies of `value` like [`refill_polled`], filling each chunk
+/// as one block write.
+pub(super) fn fill_polled<T: Clone>(
+    words: &mut Vec<T>,
+    len: usize,
+    units: usize,
+    poll: &mut WorkPoll<'_>,
+    value: T,
+) -> DetectionResult<()> {
+    words.clear();
+    let chunk = (chunk_units() / units.max(1)).max(1);
+    while words.len() < len {
+        let part = chunk.min(len - words.len());
+        poll.charge(part.saturating_mul(units))?;
+        words.resize(words.len() + part, value.clone());
+    }
+    Ok(())
+}
+
 /// Products with more terms than this are measured in polled chunks of terms.
 const LONG_PRODUCT_TERMS: usize = 1 << 12;
 
@@ -69,6 +110,10 @@ const fn lane_units<W: FrameWord>(per_word: usize) -> usize {
 
 #[derive(Debug)]
 pub(in crate::detection) struct BitPlaneDetectionFrame<W: FrameWord> {
+    /// Frame qubits; `xs` and `zs` hold this many planes once [`Self::reset`] ran.
+    qubit_count: usize,
+    /// Observables; `observables` holds this many planes once [`Self::reset`] ran.
+    observable_count: usize,
     xs: Vec<W>,
     zs: Vec<W>,
     /// The retained measurement planes: every plane of the batch, or the newest ones when the
@@ -86,15 +131,22 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         measurement_count: usize,
         observable_count: usize,
     ) -> DetectionResult<Self> {
+        // Only capacity is reserved: every plane is written by the polled `reset` that starts
+        // each batch, so creating a frame for millions of qubits does no unpolled work.
         Ok(Self {
-            xs: try_zero_words(qubit_count, "detection frame X state")?,
-            zs: try_zero_words(qubit_count, "detection frame Z state")?,
+            qubit_count,
+            observable_count,
+            xs: try_vec_with_capacity(qubit_count, "detection frame X state")?,
+            zs: try_vec_with_capacity(qubit_count, "detection frame Z state")?,
             measurements: try_vec_with_capacity(
                 measurement_count,
                 "detection frame measurement record",
             )?,
             measurement_base: 0,
-            observables: try_zero_words(observable_count, "detection frame observable record")?,
+            observables: try_vec_with_capacity(
+                observable_count,
+                "detection frame observable record",
+            )?,
             correlated_error_occurred: W::default(),
         })
     }
@@ -106,22 +158,19 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         poll: &mut WorkPoll<'_>,
     ) -> DetectionResult<()> {
         let units = lane_units::<W>(WORD_OP_UNITS);
-        poll.for_chunks_mut(&mut self.xs, units, |part| {
-            part.fill(W::default());
-            Ok::<_, DetectionError>(())
-        })?;
-        poll.for_chunks_mut(&mut self.zs, units, |part| {
-            for bit in part {
-                *bit = mode.random_mask(rng, 0.5);
-            }
-            Ok::<_, DetectionError>(())
+        fill_polled(&mut self.xs, self.qubit_count, units, poll, W::default())?;
+        refill_polled(&mut self.zs, self.qubit_count, units, poll, || {
+            mode.random_mask(rng, 0.5)
         })?;
         self.measurements.clear();
         self.measurement_base = 0;
-        poll.for_chunks_mut(&mut self.observables, units, |part| {
-            part.fill(W::default());
-            Ok::<_, DetectionError>(())
-        })?;
+        fill_polled(
+            &mut self.observables,
+            self.observable_count,
+            units,
+            poll,
+            W::default(),
+        )?;
         self.correlated_error_occurred = W::default();
         Ok(())
     }
@@ -134,17 +183,12 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         let mut cursor = program.cursor(cancellation);
-        while let Some(instruction) = cursor.next_instruction()? {
-            self.execute_instruction(instruction, rng, mode, cursor.poll())?;
-        }
+        self.execute_until(&mut cursor, rng, mode, usize::MAX)?;
         Ok(())
     }
 
     /// Executes `program` like [`Self::execute_program`], handing the measurement planes to
     /// `window` whenever it fills and once at the end.
-    ///
-    /// It is a separate function so the materializing loop compiles exactly as before.
-    #[inline(never)]
     fn execute_program_windowed(
         &mut self,
         program: &CircuitProgram,
@@ -154,16 +198,13 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         window: &mut PlaneWindow<'_, W>,
     ) -> DetectionResult<()> {
         let mut cursor = program.cursor(cancellation);
-        while let Some(instruction) = cursor.next_instruction()? {
-            self.execute_instruction(instruction, rng, mode, cursor.poll())?;
-            if self.measurements.len() >= window.hand_over_at {
-                self.measurement_base = window.hand_over(
-                    self.measurement_base,
-                    &mut self.measurements,
-                    false,
-                    cursor.poll(),
-                )?;
-            }
+        while self.execute_until(&mut cursor, rng, mode, window.hand_over_at)? {
+            self.measurement_base = window.hand_over(
+                self.measurement_base,
+                &mut self.measurements,
+                false,
+                cursor.poll(),
+            )?;
         }
         window.hand_over(
             self.measurement_base,
@@ -172,6 +213,28 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             cursor.poll(),
         )?;
         Ok(())
+    }
+
+    /// Executes instructions from `cursor` until the program ends, returning `false`, or until
+    /// an instruction leaves at least `retained_limit` measurement planes retained, returning
+    /// `true` with the cursor after that instruction.
+    ///
+    /// Materializing and windowed batches share this one loop, so the instruction dispatch is
+    /// compiled once per lane word and inlined into it like a single-caller function.
+    fn execute_until(
+        &mut self,
+        cursor: &mut ProgramCursor<'_>,
+        rng: &mut impl Rng,
+        mode: FrameExecutionMode<'_, W>,
+        retained_limit: usize,
+    ) -> DetectionResult<bool> {
+        while let Some(instruction) = cursor.next_instruction()? {
+            self.execute_instruction(instruction, rng, mode, cursor.poll())?;
+            if self.measurements.len() >= retained_limit {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Measurement planes recorded by the batch so far, retained or already handed over.

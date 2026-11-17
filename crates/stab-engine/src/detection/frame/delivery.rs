@@ -28,8 +28,10 @@ pub(crate) trait FrameBatchSource {
     /// Hands the first `lanes` pending lanes to the sink.
     fn deliver(&mut self, lanes: usize) -> Result<(), Self::Error>;
 
-    /// Drops the first `lanes` lanes and moves the rest of the batch down to lane zero.
-    fn discard(&mut self, lanes: usize);
+    /// Drops the first `lanes` lanes and moves the rest of the batch down to lane zero, or
+    /// returns [`Refill::Cancelled`] when cancellation was observed first. An interrupted
+    /// discard finishes when it is called again with the same `lanes`.
+    fn discard(&mut self, lanes: usize) -> Refill;
 }
 
 /// The lanes of the current frame batch not yet delivered.
@@ -43,10 +45,10 @@ pub(crate) struct PendingLanes {
     count: usize,
 }
 
-/// What one [`FrameBatchSource::refill`] did.
+/// What one [`FrameBatchSource::refill`] or [`FrameBatchSource::discard`] did.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Refill {
-    /// A full batch is ready to deliver.
+    /// A full batch, or the rest of the current one, is ready to deliver.
     Sampled,
     /// Cancellation was observed inside the batch; the source is as it was before the call.
     Cancelled,
@@ -120,7 +122,11 @@ impl PendingLanes {
                 self.count = S::BATCH_SHOTS;
                 self.delivered = 0;
             } else if self.delivered != 0 {
-                source.discard(self.delivered);
+                // The shift is polled; a cancelled one keeps `delivered` so the next run
+                // finishes it before delivering anything.
+                if source.discard(self.delivered) == Refill::Cancelled {
+                    break;
+                }
                 self.delivered = 0;
             }
             let lanes = wanted.min(self.count);

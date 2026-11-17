@@ -4,20 +4,8 @@ use stab_model::{
     Target,
 };
 
-use super::super::{
-    error::{DetectionError, DetectionResult},
-    try_vec_with_capacity,
-};
+use super::super::error::{DetectionError, DetectionResult};
 use super::word::FrameWord;
-
-pub(super) fn try_zero_words<W: FrameWord>(
-    len: usize,
-    context: &'static str,
-) -> DetectionResult<Vec<W>> {
-    let mut words = try_vec_with_capacity(len, context)?;
-    words.resize(len, W::default());
-    Ok(words)
-}
 
 #[inline(always)]
 pub(super) fn frame_word<W: FrameWord>(bits: &[W], qubit: usize) -> DetectionResult<W> {

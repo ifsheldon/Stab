@@ -1,6 +1,6 @@
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
-use stab_model::Cancellation;
+use stab_model::{Cancellation, Cancelled};
 use stab_records::DetectionSink;
 
 use super::{
@@ -8,11 +8,13 @@ use super::{
     DetectionRunSummary, DirectDetectionState, DirectDetectorFramePlan, MeasurementToDetectionPlan,
     detection_plane_view,
 };
+use crate::detection::conversion_window::WindowedConversion;
 use crate::detection::frame::{
     DeliveryFailure, DeliveryOutcome, FrameBatchSource, FrameBatchState, FrameLanes, FrameWord,
     LaneFrameBatch, PendingLanes, Refill, sample_or_rewind,
 };
 use crate::sampling::session_cancellation;
+use crate::work_poll::WorkPoll;
 use crate::{LaneWidth, RandomPolicy, ShotCount, SinkFailurePhase};
 
 pub(super) fn run_direct<Sink>(
@@ -154,8 +156,14 @@ where
             .map_err(DetectionDeliveryError::Sink)
     }
 
-    fn discard(&mut self, lanes: usize) {
-        self.frame.discard_delivered_lanes(lanes);
+    fn discard(&mut self, lanes: usize) -> Refill {
+        match self
+            .frame
+            .discard_delivered_lanes(lanes, &mut WorkPoll::new(self.cancellation))
+        {
+            Ok(()) => Refill::Sampled,
+            Err(Cancelled) => Refill::Cancelled,
+        }
     }
 }
 
@@ -167,10 +175,16 @@ pub(super) fn validate_conversion_session_storage(
 }
 
 /// Conservative reusable storage of a measurement-to-detection session: the reference sample
-/// at one byte per measurement, one frame plane per measurement, sweep, detector, and observable
-/// bit, one transpose word per input bit, and the sweep-correction frame state.
+/// at one byte per measurement and the storage of one batch. Without sweep correction that is
+/// a windowed conversion's planes and records; with it, one frame plane per measurement, sweep,
+/// detector, and observable bit, one transpose word per input bit, and the sweep-correction
+/// frame state.
 pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan) -> u128 {
+    let converter = &plan.inner.converter;
     let measurements = plan.measurement_width().get() as u128;
+    if !converter.has_sweep_correction() {
+        return measurements.saturating_add(WindowedConversion::storage_bytes(&converter.plan));
+    }
     let sweeps = plan.sweep_width().get() as u128;
     let detectors = plan.detector_width().get() as u128;
     let observables = plan.observable_width().get() as u128;

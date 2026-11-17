@@ -390,3 +390,77 @@ fn batched_pivot_column_collapses_poll_in_chunks_and_retry_cleanly() {
         }
     });
 }
+
+/// Runs `prefix` shots, then cancels the next run at the middle poll of the shift that moves
+/// the rest of the batch down to lane zero, then resumes; the delivered shots must equal one
+/// uninterrupted run.
+fn assert_lane_shift_resumes<S: Session>(session: impl Fn() -> S, lanes: u64) {
+    let (prefix, total) = (3, lanes + 5);
+    let mut expected = Shots::default();
+    assert_eq!(session().run_shots(total, &mut expected), (true, total));
+    test_hook::with_units_per_poll(TEST_UNITS_PER_POLL, || {
+        // One more shot of the same batch costs nothing but the shift and its delivery.
+        let mut counted = session();
+        assert_eq!(
+            counted.run_shots(prefix, &mut Shots::default()),
+            (true, prefix)
+        );
+        let ((completed, _), shift_polls) =
+            test_hook::count_polls(|| counted.run_shots(1, &mut Shots::default()));
+        assert!(
+            completed && shift_polls >= 2,
+            "the lane shift polls only {shift_polls} times"
+        );
+
+        let mut session = session();
+        let mut shots = Shots::default();
+        assert_eq!(session.run_shots(prefix, &mut shots), (true, prefix));
+        let ((completed, committed), fired) = test_hook::cancel_at_poll(shift_polls / 2, || {
+            session.run_shots(total - prefix, &mut shots)
+        });
+        assert!(
+            fired && !completed && committed == 0,
+            "the cancellation must land inside the shift, before any delivery"
+        );
+        assert!(!session.poisoned(), "a cancelled shift must not poison");
+        let rest = total - prefix;
+        assert_eq!(session.run_shots(rest, &mut shots), (true, rest));
+        assert!(
+            shots.0 == expected.0,
+            "output resumed after a cancelled lane shift diverged ({lanes} lanes)"
+        );
+    });
+}
+
+/// Partial deliveries shift the rest of the batch down by one pass over every output plane; on
+/// a wide record that pass is polled, and a cancellation it observes keeps the planes already
+/// moved, so the next run finishes the shift instead of moving any plane twice.
+#[test]
+fn cancellation_inside_a_pending_lane_shift_resumes_byte_identically() {
+    let circuit = Circuit::from_stim_str(
+        "R 0 1\nREPEAT 1500 {\n    X_ERROR(0.3) 0 1\n    M 0 1\n    DETECTOR rec[-1] rec[-2]\n}\n",
+    )
+    .expect("parse wide record");
+    let sampling = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile sampling");
+    let detection = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile detection");
+    let seed = RandomPolicy::Seeded(Seed::new(11));
+    for &lane_width in LaneWidth::ALL {
+        let lanes = lane_width.shots_per_batch() as u64;
+        let sampling_session = || {
+            sampling
+                .session_with_lane_width(seed, ReferenceSampleMode::UseReferenceSample, lane_width)
+                .expect("create sampling session")
+        };
+        assert_lane_shift_resumes(sampling_session, lanes);
+        let detection_session = || {
+            detection
+                .session_with_lane_width(seed, lane_width)
+                .expect("create detection session")
+        };
+        assert_lane_shift_resumes(detection_session, lanes);
+    }
+}

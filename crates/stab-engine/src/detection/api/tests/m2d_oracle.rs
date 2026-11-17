@@ -182,3 +182,100 @@ fn conversion_matches_first_principles_oracle_for_packed_and_bit_plane_input() {
         }
     }
 }
+
+/// Rounds of the windowed oracle circuit; three measurements per round.
+const WINDOWED_ROUNDS: usize = 300;
+
+/// Without sweep correction a batch converts through windows of planes. This circuit's
+/// detectors and observables read measurements up to most of the record back, so with 64- and
+/// 192-plane windows they straddle many hand-overs; `X 1` makes every second-qubit reference
+/// bit one. Expectations are parities of input bits, XOR reference bits when used.
+const WINDOWED_ORACLE_CIRCUIT: &str = "R 0 1 2
+X 1
+REPEAT 300 {
+    M 0 1 2
+    DETECTOR rec[-1] rec[-2]
+}
+DETECTOR rec[-900] rec[-1]
+DETECTOR rec[-451] rec[-2] rec[-899]
+OBSERVABLE_INCLUDE(0) rec[-450] rec[-3]
+OBSERVABLE_INCLUDE(1) rec[-898]
+";
+
+fn windowed_expected(measurements: &[bool], mode: ReferenceSampleMode) -> DetectionRecordBuffer {
+    let count = 3 * WINDOWED_ROUNDS;
+    let bit = |index: usize| {
+        measurements[index] ^ (mode == ReferenceSampleMode::UseReferenceSample && index % 3 == 1)
+    };
+    let parity = |indices: &[usize]| indices.iter().fold(false, |parity, &i| parity ^ bit(i));
+    let mut detectors = (0..WINDOWED_ROUNDS)
+        .map(|round| parity(&[3 * round + 2, 3 * round + 1]))
+        .collect::<Vec<_>>();
+    detectors.push(parity(&[0, count - 1]));
+    detectors.push(parity(&[count - 451, count - 2, 1]));
+    DetectionRecordBuffer {
+        detectors,
+        observables: vec![parity(&[count - 450, count - 3]), parity(&[2])],
+    }
+}
+
+#[test]
+fn windowed_conversion_matches_first_principles_across_window_boundaries() {
+    let circuit = circuit(WINDOWED_ORACLE_CIRCUIT);
+    let width = 3 * WINDOWED_ROUNDS;
+    let mut rng = SmallRng::seed_from_u64(0x0A11_0C1F);
+    let measurements = random_records(&mut rng, 600, width);
+    for window in [64, 192] {
+        crate::detection::frame::with_window_planes(window, || {
+            for mode in [
+                ReferenceSampleMode::UseReferenceSample,
+                ReferenceSampleMode::SkipReferenceSample,
+            ] {
+                let plan = MeasurementToDetectionCompiler::new()
+                    .reference_sample_mode(mode)
+                    .compile(&circuit)
+                    .expect("compile windowed oracle conversion");
+                let mut session = plan.session().expect("create conversion session");
+                for bit_planes in [false, true] {
+                    let mut sink = CollectSink::default();
+                    let mut transaction = session
+                        .start_transaction(&mut sink)
+                        .expect("start conversion");
+                    // Batch sizes grow, as the CLI's do, and end in a partial 64-shot block.
+                    let mut start = 0;
+                    for chunk in [1, 63, 64, 256, 216] {
+                        let end = start + chunk;
+                        let records = packed(&measurements[start..end], width);
+                        if bit_planes {
+                            let planes = BitPlaneBatch::from_shot_major(records.view())
+                                .expect("transpose measurements");
+                            transaction
+                                .write_batch_with_sweep(
+                                    MeasurementBatchView::from_bit_planes(planes.view()),
+                                    None,
+                                )
+                                .expect("convert bit-plane chunk");
+                        } else {
+                            transaction
+                                .write_batch_with_sweep(
+                                    MeasurementBatchView::new(records.view()),
+                                    None,
+                                )
+                                .expect("convert packed chunk");
+                        }
+                        start = end;
+                    }
+                    transaction.finish().expect("finish conversion");
+                    let expected = measurements
+                        .iter()
+                        .map(|record| windowed_expected(record, mode))
+                        .collect::<Vec<_>>();
+                    assert!(
+                        sink.records == expected,
+                        "{window}-plane windows, {mode:?}, bit planes {bit_planes}"
+                    );
+                }
+            }
+        });
+    }
+}

@@ -966,9 +966,20 @@ fn session_storage_estimates_match_retained_allocations_at_word_boundaries() {
             let conversion = MeasurementToDetectionCompiler::new()
                 .compile(&circuit(&text))
                 .expect("compile conversion allocation fixture");
+            // A windowed session sizes its records by the batches it converts, so its storage
+            // is complete once it converted a batch of the most shots it accepts.
+            let records = PackedShotBatch::zeros(MAX_BATCH_SHOTS, 1).expect("full input batch");
             let mut session = None;
             let allocated = allocation_counter::measure(|| {
-                session = Some(conversion.session().expect("allocate conversion session"));
+                let mut created = conversion.session().expect("allocate conversion session");
+                created
+                    .run(
+                        MeasurementBatchView::new(records.view()),
+                        None,
+                        &mut NullSink::default(),
+                    )
+                    .expect("convert a full batch");
+                session = Some(created);
             });
             assert_eq!(
                 execution::conversion_session_storage_bytes(&conversion),

@@ -811,7 +811,13 @@ where
     // seeded stream is therefore a function of the seed and the total shot count.
     let lane_width = LaneWidth::for_total_shots(shots);
     let session_stage = ledger.stage();
-    let run = if !streams_one_partial_batch(shots, lane_width) {
+    let streams = streams_records(
+        shots,
+        lane_width,
+        args.out_format.record_format(),
+        plan.measurement_width().get(),
+    );
+    let run = if !streams {
         SampleRun::Session(
             plan.session_with_budget(
                 random_policy,
@@ -855,19 +861,38 @@ where
         .map_err(CliError::SampleOutput)
 }
 
-/// Whether a `sample` or `detect` request runs as one streaming run.
+/// Bytes of output planes one batch must hold before a `sample` or `detect` request of at least
+/// one batch streams.
+const STREAMING_MIN_BATCH_PLANE_BYTES: u128 = 8 << 20;
+
+/// Whether a `sample` or `detect` request writing `format` runs as one streaming run, given the
+/// output planes (measurements, or measurements and detectors) one materialized batch keeps.
 ///
-/// A request smaller than the narrowest batch (1 to 63 shots, which `LaneWidth::for_total_shots`
-/// samples at 64 lanes) streams: it keeps shot-major records of only its shots instead of one
-/// plane per measurement for every lane, which is where streaming saves memory on wide records.
-/// A larger request keeps about as many record bits as planes and measured 5 to 15 percent
-/// slower streaming, so it materializes; that includes every PTB64 request, which needs whole
-/// 64-shot groups.
-pub(crate) fn streams_one_partial_batch(shots: ShotCount, lane_width: LaneWidth) -> bool {
+/// A request smaller than the narrowest batch (1 to 63 shots) always streams: it keeps
+/// shot-major records of only its shots instead of one plane per output bit for every lane.
+/// From one batch on, a streaming run keeps at most one lane width of records, about one
+/// batch's output planes, but no measurement planes beside detector records and none of the
+/// encoder's per-block transpose scratch, and it transposes each window while the window is in
+/// cache, which measured faster than materializing once a batch's planes outgrow the caches and
+/// up to 4 percent slower below [`STREAMING_MIN_BATCH_PLANE_BYTES`], where materializing costs
+/// little memory. PTB64 is plane-major, so it always materializes and the encoder copies the
+/// frame's plane words; a streamed PTB64 run would transpose twice. Fewer than 64 PTB64 shots
+/// stream, which keeps their incomplete-group diagnostic unchanged.
+pub(crate) fn streams_records(
+    shots: ShotCount,
+    lane_width: LaneWidth,
+    format: RecordFormat,
+    output_planes: usize,
+) -> bool {
     let narrowest = LaneWidth::Lanes64
         .shots_per_batch()
         .min(lane_width.shots_per_batch());
-    usize::try_from(shots.get()).is_ok_and(|shots| shots < narrowest)
+    if usize::try_from(shots.get()).is_ok_and(|shots| shots < narrowest) {
+        return true;
+    }
+    let batch_plane_bytes =
+        (output_planes as u128).saturating_mul((lane_width.shots_per_batch() / 8) as u128);
+    format != RecordFormat::Ptb64 && batch_plane_bytes >= STREAMING_MIN_BATCH_PLANE_BYTES
 }
 
 /// The one run a `sample` command executes.

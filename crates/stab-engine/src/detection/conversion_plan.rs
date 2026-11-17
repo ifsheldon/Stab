@@ -11,6 +11,7 @@ use super::frame::{TraversalEvent, visit_circuit};
 use super::{
     DetectionConversionLimits, DetectionRecordBuffer, UNSUPPORTED_SWEEP_DETECTION_MESSAGE,
 };
+use crate::work_poll::{WORD_OP_UNITS, WorkPoll};
 
 mod execution;
 
@@ -918,10 +919,24 @@ impl ConversionPlan {
                 self.measurement_count
             )));
         }
-        detector_planes.resize(self.detector_count, Plane::default());
-        detector_planes.fill(Plane::default());
-        observable_planes.resize(self.observable_count, Plane::default());
-        observable_planes.fill(Plane::default());
+        // Clearing every output plane is as much work as the planes are wide, so it is polled
+        // like the conversion itself; a cancellation here rejects the batch before any output.
+        let units = WORD_OP_UNITS * size_of::<Plane>().div_ceil(size_of::<u64>());
+        let mut poll = WorkPoll::new(cancellation);
+        super::frame::fill_polled(
+            detector_planes,
+            self.detector_count,
+            units,
+            &mut poll,
+            Plane::default(),
+        )?;
+        super::frame::fill_polled(
+            observable_planes,
+            self.observable_count,
+            units,
+            &mut poll,
+            Plane::default(),
+        )?;
         let mut cursor = ConversionCursor::default();
         execute_program(
             &self.program,

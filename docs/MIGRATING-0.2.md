@@ -224,7 +224,7 @@ Circuit sampling and detection sampling can run one request of a known shot coun
 | `stab_records::PackedShotBatch::shot_words_mut` | Now public, returning the shot's storage words with bits past the width cleared on drop. |
 | `RecordEncoder` | Encodes a record part wider than 65,536 bits in segments and drains between them; its output is unchanged. |
 
-The CLI's `sample` and `detect` use a streaming run for 1 to 63 shots, less than one batch of the narrowest lane width, and their output is byte-identical to the previous build. On a 5,000,000-round distance-3 repetition code (10,000,000 measurements) `sample --shots 1` peaks at about 7 MB instead of 249 MB, and `detect --shots 1` at about 7 MB instead of 317 MB. Budget refusals of `sample` and `detect` report the new estimates.
+The CLI's `sample` and `detect` use a streaming run for 1 to 63 shots and for larger non-PTB64 requests whose output planes fill at least 8 MiB per batch, and their output is byte-identical to the previous build. On a 5,000,000-round distance-3 repetition code (10,000,000 measurements) `sample --shots 1` peaks at about 7 MB instead of 249 MB, and `detect --shots 1` at about 7 MB instead of 317 MB. Budget refusals of `sample` and `detect` report the new estimates. A `MeasurementToDetectionSession` whose plan has no sweep correction converts each batch through bounded windows and delivers shot-major detector and observable records instead of bit planes, so a sink that asks `RecordBatchView::bit_planes` for them gets `None` and reads them through `shot_major_records` or `get`; its `retained_bytes` and budget refusals report the windowed storage, and `m2d` of one record of the repetition code above peaks at about 30 MB instead of 1.2 GB.
 
 ## Extension APIs
 

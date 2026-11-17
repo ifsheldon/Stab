@@ -20,11 +20,44 @@ use crate::{
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
-    streams_one_partial_batch,
+    streams_records,
 };
 
 /// Records read per conversion call: the most one measurement-to-detection call accepts.
 const M2D_BATCH_SHOTS: usize = stab_engine::MAX_BATCH_SHOTS;
+
+/// Bytes of decoded measurement records the first `m2d` batch may hold.
+const M2D_FIRST_BATCH_BYTES: usize = 1 << 20;
+
+/// Records the first `m2d` batch reads: the largest power of two up to [`M2D_BATCH_SHOTS`]
+/// whose packed records fit [`M2D_FIRST_BATCH_BYTES`], and at least one.
+///
+/// A short input of very wide records then holds only the records it has, since the reader
+/// sizes its batch by the records requested. Conversion is deterministic, so batch sizes never
+/// change the output.
+fn first_m2d_batch_records(measurement_width: usize) -> usize {
+    let record_bytes = measurement_width.div_ceil(64).saturating_mul(8).max(1);
+    let fitting = (M2D_FIRST_BATCH_BYTES / record_bytes).clamp(1, M2D_BATCH_SHOTS);
+    1 << fitting.ilog2()
+}
+
+/// Records the batch after one of `records` reads: one 64-record block, then four times as
+/// many up to [`M2D_BATCH_SHOTS`].
+///
+/// Each batch converts every plane of the circuit at full lane width whatever its record
+/// count, so the sizes grow quickly to keep the number of small batches at most three.
+const fn next_m2d_batch_records(records: usize) -> usize {
+    let next = if records < 64 {
+        64
+    } else {
+        records.saturating_mul(4)
+    };
+    if next < M2D_BATCH_SHOTS {
+        next
+    } else {
+        M2D_BATCH_SHOTS
+    }
+}
 
 #[derive(Debug, Args)]
 pub(crate) struct DetectArgs {
@@ -194,7 +227,16 @@ where
     // seeded stream is therefore a function of the seed and the total shot count.
     let lane_width = LaneWidth::for_total_shots(shots);
     let session_stage = ledger.stage();
-    if !streams_one_partial_batch(shots, lane_width) {
+    let output_planes = plan
+        .measurement_width()
+        .get()
+        .saturating_add(plan.detector_width().get());
+    if !streams_records(
+        shots,
+        lane_width,
+        args.out_format.record_format(),
+        output_planes,
+    ) {
         let mut session = plan
             .session_with_budget(random_policy(args.seed), lane_width, session_stage.get())
             .map_err(|error| session_stage.refusal(error))?;
@@ -336,7 +378,9 @@ where
         let mut delivery = session
             .start_transaction(&mut sink)
             .map_err(CliError::from)?;
-        while let Some(measurement_batch) = measurements.read_batch(M2D_BATCH_SHOTS)? {
+        let mut batch_records = first_m2d_batch_records(plan.measurement_width().get());
+        while let Some(measurement_batch) = measurements.read_batch(batch_records)? {
+            batch_records = next_m2d_batch_records(batch_records);
             let shots = measurement_batch.shot_count();
             let Some(sweeps) = sweeps.as_mut() else {
                 write_m2d_batch(&mut delivery, measurement_batch, None)?;

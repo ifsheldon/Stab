@@ -178,6 +178,72 @@ fn streaming_runs_match_materializing_sessions_across_window_boundaries() {
     });
 }
 
+/// The transposer works in groups of 64 tiles of 64 planes; with the default window, one
+/// hand-over of a record of several thousand planes spans several groups and ends in a partial
+/// tile, and the reference flips of every group must land on the right words of every lane.
+#[test]
+fn streaming_transposes_whole_groups_and_partial_tiles_like_materializing_sessions() {
+    let circuit = Circuit::from_stim_str(
+        "R 0 1 2\nX 1\nREPEAT 3001 {\n    X_ERROR(0.2) 0 2\n    CX 0 1 2 1\n    M 0 1 2\n    \
+         DETECTOR rec[-1] rec[-2]\n    DETECTOR rec[-3]\n}\nOBSERVABLE_INCLUDE(0) rec[-2]\n",
+    )
+    .expect("parse wide record circuit");
+    let sampling = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile sampling plan");
+    let detection = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile detection plan");
+    for lane_width in LaneWidth::ALL.iter().copied() {
+        let lanes = lane_width.shots_per_batch() as u64;
+        for shots in [lanes, lanes + 7] {
+            let policy = RandomPolicy::Seeded(Seed::new(shots));
+            let shots = ShotCount::new(shots);
+            let mut expected = Records::default();
+            sampling
+                .session_with_lane_width(
+                    policy,
+                    ReferenceSampleMode::UseReferenceSample,
+                    lane_width,
+                )
+                .expect("materializing session")
+                .run(shots, &mut expected)
+                .expect("materializing run");
+            let mut streamed = Records::default();
+            sampling
+                .streaming_run(
+                    policy,
+                    ReferenceSampleMode::UseReferenceSample,
+                    lane_width,
+                    shots,
+                )
+                .expect("streaming run")
+                .run(&mut streamed)
+                .expect("streaming run delivers");
+            assert_eq!(
+                streamed.0, expected.0,
+                "sampling at {lane_width:?}, {shots:?}"
+            );
+            let mut expected = Records::default();
+            detection
+                .session_with_lane_width(policy, lane_width)
+                .expect("materializing detection session")
+                .run(shots, &mut expected)
+                .expect("materializing detection run");
+            let mut streamed = Records::default();
+            detection
+                .streaming_run(policy, lane_width, shots)
+                .expect("streaming detection run")
+                .run(&mut streamed)
+                .expect("streaming detection run delivers");
+            assert_eq!(
+                streamed.0, expected.0,
+                "detection at {lane_width:?}, {shots:?}"
+            );
+        }
+    }
+}
+
 /// A streaming run of one shot retains a bounded window and one packed record instead of one
 /// plane per measurement for every lane, so a budget far below either materializing session
 /// admits it at both lane widths.

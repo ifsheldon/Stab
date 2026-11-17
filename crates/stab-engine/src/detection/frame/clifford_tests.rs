@@ -99,8 +99,16 @@ fn assert_gate_matches_reference<W: FrameWord + std::fmt::Debug>(gate: Gate, see
     assert_eq!(program.frame_qubit_count(), FRAME_QUBITS);
 
     let mut rng = SmallRng::seed_from_u64(seed);
+    let mode = FrameExecutionMode::Sample {
+        active_lanes: W::LANE_COUNT,
+    };
     let mut frame =
         BitPlaneDetectionFrame::<W>::try_reusable(FRAME_QUBITS, 0, 0).expect("frame fixture");
+    let never = stab_model::Cancellation::never();
+    frame
+        .reset(&mut rng, mode, &mut WorkPoll::new(&never))
+        .expect("reset frame");
+    assert_eq!(frame.xs.len(), FRAME_QUBITS);
     for (x, z) in frame.xs.iter_mut().zip(frame.zs.iter_mut()) {
         *x = random_word(&mut rng);
         *z = random_word(&mut rng);
@@ -109,9 +117,6 @@ fn assert_gate_matches_reference<W: FrameWord + std::fmt::Debug>(gate: Gate, see
     let mut expected_zs = frame.zs.clone();
     reference_apply(gate, targets, &mut expected_xs, &mut expected_zs);
 
-    let mode = FrameExecutionMode::Sample {
-        active_lanes: W::LANE_COUNT,
-    };
     frame
         .execute_program(&program, &mut rng, mode, &stab_model::Cancellation::never())
         .expect("execute compiled gate");

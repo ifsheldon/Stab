@@ -7,7 +7,7 @@
 //! batch that observes cancellation is discarded with the random stream rewound.
 
 use rand::rngs::SmallRng;
-use stab_model::Cancellation;
+use stab_model::{Cancellation, Cancelled};
 use stab_records::{MeasurementBatchView, MeasurementSink};
 
 use super::{SamplingExecutionError, ShotCount};
@@ -18,6 +18,7 @@ use crate::detection::frame::{
     sample_or_rewind,
 };
 use crate::sampling::ReferenceBits;
+use crate::work_poll::WorkPoll;
 
 pub(super) enum SamplingDeliveryError<SinkError> {
     Engine(SamplingExecutionError),
@@ -94,20 +95,19 @@ where
         let Some(state) = self.frame.as_deref_mut() else {
             return Ok(Refill::Sampled);
         };
-        let (program, cancellation) = (self.program, self.cancellation);
+        let (program, cancellation, reference) = (self.program, self.cancellation, self.reference);
+        // The reference flips are part of the batch, so a cancellation they observe discards
+        // the batch and rewinds its random stream like one observed while sampling.
         let sampled = sample_or_rewind(self.rng, |rng| {
-            state.sample_measurements(program, rng, cancellation)
+            state.sample_measurements(program, rng, cancellation)?;
+            match reference {
+                Some(reference) => state.xor_reference(reference, &mut WorkPoll::new(cancellation)),
+                None => Ok(()),
+            }
         })
         .map_err(|error| SamplingDeliveryError::Engine(frame_error(error)))?;
         if sampled.is_none() {
             return Ok(Refill::Cancelled);
-        }
-        if let Some(reference) = self.reference {
-            state.xor_reference(reference).map_err(|error| {
-                SamplingDeliveryError::Engine(SamplingExecutionError::InternalInvariant {
-                    message: error.to_string(),
-                })
-            })?;
         }
         Ok(Refill::Sampled)
     }
@@ -127,9 +127,13 @@ where
             .map_err(SamplingDeliveryError::Sink)
     }
 
-    fn discard(&mut self, lanes: usize) {
-        if let Some(state) = self.frame.as_deref_mut() {
-            state.discard_delivered_lanes(lanes);
+    fn discard(&mut self, lanes: usize) -> Refill {
+        let Some(state) = self.frame.as_deref_mut() else {
+            return Refill::Sampled;
+        };
+        match state.discard_delivered_lanes(lanes, &mut WorkPoll::new(self.cancellation)) {
+            Ok(()) => Refill::Sampled,
+            Err(Cancelled) => Refill::Cancelled,
         }
     }
 }

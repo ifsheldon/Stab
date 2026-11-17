@@ -112,16 +112,15 @@ impl<W: FrameWord> StreamingDetectionFrame<W> {
         self.detectors.begin_batch(lanes)?;
         self.observables.begin_batch(lanes)?;
         self.observable_planes.fill(W::default());
-        let mut consumer = DetectionWindow {
-            conversion: plan.conversion(),
-            runner: ConversionRunner::default(),
-            lookback: self.lookback,
-            detector_window: &mut self.detector_window,
-            detector_base: 0,
-            detectors: &mut self.detectors,
-            observables: &mut self.observable_planes,
+        let mut consumer = DetectionWindow::new(
+            plan.conversion(),
+            ConversionRunner::default(),
+            self.lookback,
+            &mut self.detector_window,
+            &mut self.detectors,
+            &mut self.observable_planes,
             cancellation,
-        };
+        );
         let mut window = PlaneWindow::new(self.shape, &mut consumer);
         self.state
             .sample_measurement_window(plan.executable(), rng, cancellation, &mut window)?;
@@ -151,8 +150,9 @@ impl<W: FrameWord> StreamingDetectionFrame<W> {
     }
 }
 
-/// The consumer of a streaming detection batch's measurement planes.
-struct DetectionWindow<'a, W> {
+/// The consumer of a streaming detection batch's measurement planes, and of the windows a
+/// windowed measurement-to-detection conversion transposes from its input.
+pub(super) struct DetectionWindow<'a, W> {
     conversion: &'a ConversionPlan,
     runner: ConversionRunner,
     /// Most measurements back from its own position that a detector or observable reads.
@@ -163,6 +163,30 @@ struct DetectionWindow<'a, W> {
     detectors: &'a mut ShotRecordTransposer,
     observables: &'a mut [W],
     cancellation: &'a Cancellation,
+}
+
+impl<'a, W> DetectionWindow<'a, W> {
+    /// A consumer that converts with `runner` from the start of a batch.
+    pub(super) fn new(
+        conversion: &'a ConversionPlan,
+        runner: ConversionRunner,
+        lookback: usize,
+        detector_window: &'a mut [W],
+        detectors: &'a mut ShotRecordTransposer,
+        observables: &'a mut [W],
+        cancellation: &'a Cancellation,
+    ) -> Self {
+        Self {
+            conversion,
+            runner,
+            lookback,
+            detector_window,
+            detector_base: 0,
+            detectors,
+            observables,
+            cancellation,
+        }
+    }
 }
 
 impl<W: FrameWord> PlaneConsumer<W> for DetectionWindow<'_, W> {

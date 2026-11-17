@@ -12,6 +12,7 @@ use stab_records::{
     ObservableWidth,
 };
 
+use super::conversion_window::WindowedConversion;
 use super::error::DetectionError;
 use super::frame::{
     DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FrameBatchState, FrameLanes, FrameWord,
@@ -176,6 +177,26 @@ fn detection_plane_view<'a, W: FrameWord>(
 pub struct MeasurementToDetectionSession {
     plan: MeasurementToDetectionPlan,
     reference_sample: Vec<bool>,
+    storage: ConversionStorage,
+    cancellation: OnceLock<Cancellation>,
+    total_committed_shots: u64,
+    poisoned: bool,
+    transaction_active: bool,
+    not_sync: PhantomData<Cell<()>>,
+}
+
+/// How a conversion session holds one batch while it converts it.
+enum ConversionStorage {
+    /// A plan without sweep correction converts through bounded windows of planes and keeps
+    /// shot-major records of only the batch's detectors and observables.
+    Windowed(WindowedConversion),
+    /// Sweep correction replays the circuit's frame over every measurement plane, so a plan
+    /// with it keeps one 256-lane plane per measurement, sweep bit, detector, and observable.
+    Planes(ConversionPlanes),
+}
+
+/// The full-width planes of a conversion with sweep correction.
+struct ConversionPlanes {
     sweep_correction: Option<FrameBatchState<FrameLanes>>,
     correction_rng: SmallRng,
     measurement_planes: Vec<FrameLanes>,
@@ -183,11 +204,41 @@ pub struct MeasurementToDetectionSession {
     detector_planes: Vec<FrameLanes>,
     observable_planes: Vec<FrameLanes>,
     input_column: Vec<u64>,
-    cancellation: OnceLock<Cancellation>,
-    total_committed_shots: u64,
-    poisoned: bool,
-    transaction_active: bool,
-    not_sync: PhantomData<Cell<()>>,
+}
+
+impl ConversionPlanes {
+    fn try_new(
+        converter: &PreparedMeasurementToDetection,
+    ) -> Result<Self, DetectionExecutionError> {
+        Ok(Self {
+            sweep_correction: converter
+                .try_reusable_sweep_correction()
+                .map_err(DetectionExecutionError::Conversion)?,
+            correction_rng: SmallRng::seed_from_u64(0),
+            measurement_planes: try_zero_word_planes(
+                converter.measurement_count(),
+                "measurement-to-detection input planes",
+            )?,
+            sweep_planes: try_zero_word_planes(
+                converter.sweep_bit_count(),
+                "measurement-to-detection sweep planes",
+            )?,
+            detector_planes: try_zero_word_planes(
+                converter.detector_count(),
+                "measurement-to-detection detector planes",
+            )?,
+            observable_planes: try_zero_word_planes(
+                converter.observable_count(),
+                "measurement-to-detection observable planes",
+            )?,
+            input_column: try_zero_word_planes(
+                converter
+                    .measurement_count()
+                    .max(converter.sweep_bit_count()),
+                "measurement-to-detection input transpose column",
+            )?,
+        })
+    }
 }
 
 impl fmt::Debug for MeasurementToDetectionSession {
@@ -220,34 +271,17 @@ impl MeasurementToDetectionSession {
             .reference_sample
             .fill(converter.measurement_count(), &mut reference_sample)
             .map_err(DetectionExecutionError::Conversion)?;
+        let storage = if converter.has_sweep_correction() {
+            ConversionStorage::Planes(ConversionPlanes::try_new(converter)?)
+        } else {
+            ConversionStorage::Windowed(
+                WindowedConversion::try_new(&converter.plan)
+                    .map_err(DetectionExecutionError::Conversion)?,
+            )
+        };
         Ok(Self {
             reference_sample,
-            sweep_correction: converter
-                .try_reusable_sweep_correction()
-                .map_err(DetectionExecutionError::Conversion)?,
-            correction_rng: SmallRng::seed_from_u64(0),
-            measurement_planes: try_zero_word_planes(
-                converter.measurement_count(),
-                "measurement-to-detection input planes",
-            )?,
-            sweep_planes: try_zero_word_planes(
-                converter.sweep_bit_count(),
-                "measurement-to-detection sweep planes",
-            )?,
-            detector_planes: try_zero_word_planes(
-                converter.detector_count(),
-                "measurement-to-detection detector planes",
-            )?,
-            observable_planes: try_zero_word_planes(
-                converter.observable_count(),
-                "measurement-to-detection observable planes",
-            )?,
-            input_column: try_zero_word_planes(
-                converter
-                    .measurement_count()
-                    .max(converter.sweep_bit_count()),
-                "measurement-to-detection input transpose column",
-            )?,
+            storage,
             cancellation: session_cancellation_slot(converter.plan.limits.cancellation()),
             plan,
             total_committed_shots: 0,
@@ -341,11 +375,17 @@ impl MeasurementToDetectionSession {
                 progress: DetectionRunProgress::new(committed_shots, shots.get()),
             });
         }
-        let batch = match detection_plane_view(
-            &self.detector_planes,
-            &self.observable_planes,
-            shot_count,
-        ) {
+        let view = match &self.storage {
+            ConversionStorage::Windowed(windowed) => windowed
+                .batch_view()
+                .map_err(DetectionExecutionError::Conversion),
+            ConversionStorage::Planes(planes) => detection_plane_view(
+                &planes.detector_planes,
+                &planes.observable_planes,
+                shot_count,
+            ),
+        };
+        let batch = match view {
             Ok(batch) => batch,
             Err(source) => {
                 self.poisoned = true;
@@ -488,27 +528,47 @@ impl MeasurementToDetectionSession {
         shot_count: usize,
     ) -> Result<(), DetectionExecutionError> {
         let converter = &self.plan.inner.converter;
+        let cancellation = session_cancellation(&self.cancellation);
+        let planes = match &mut self.storage {
+            ConversionStorage::Windowed(windowed) => {
+                // Without sweep correction the sweep bits change nothing, as in the plane path.
+                return windowed
+                    .convert(
+                        &converter.plan,
+                        measurements,
+                        shot_count,
+                        &self.reference_sample,
+                        cancellation,
+                    )
+                    .map_err(DetectionExecutionError::from);
+            }
+            ConversionStorage::Planes(planes) => planes,
+        };
         copy_batch_into_frame_planes(
             measurements,
-            &mut self.measurement_planes,
-            &mut self.input_column,
+            &mut planes.measurement_planes,
+            &mut planes.input_column,
         )?;
         if let Some(sweeps) = sweeps {
-            copy_batch_into_frame_planes(sweeps, &mut self.sweep_planes, &mut self.input_column)?;
+            copy_batch_into_frame_planes(
+                sweeps,
+                &mut planes.sweep_planes,
+                &mut planes.input_column,
+            )?;
         } else {
-            self.sweep_planes.fill(FrameLanes::ZERO);
+            planes.sweep_planes.fill(FrameLanes::ZERO);
         }
         converter
             .convert_word_planes_with_sweep_into(
-                &mut self.measurement_planes,
-                &self.sweep_planes,
+                &mut planes.measurement_planes,
+                &planes.sweep_planes,
                 shot_count,
                 &self.reference_sample,
-                &mut self.detector_planes,
-                &mut self.observable_planes,
-                self.sweep_correction.as_mut(),
-                &mut self.correction_rng,
-                session_cancellation(&self.cancellation),
+                &mut planes.detector_planes,
+                &mut planes.observable_planes,
+                planes.sweep_correction.as_mut(),
+                &mut planes.correction_rng,
+                cancellation,
             )
             .map_err(DetectionExecutionError::from)
     }
