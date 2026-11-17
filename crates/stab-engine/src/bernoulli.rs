@@ -65,6 +65,43 @@ pub(crate) fn sample_indexed_range_into(
     Ok(())
 }
 
+/// Seed of a stream family derived from `seed` for one fixed `domain`, independent of the
+/// family `seed` itself keys.
+pub(crate) fn derived_seed(seed: u64, domain: u64) -> u64 {
+    splitmix64(seed ^ domain)
+}
+
+/// Uniform draws of the counter-keyed substream of one shot of one indexed stream.
+///
+/// The substream depends only on the seed, stream index, and global shot index, so any split of
+/// a shot range across calls reproduces the same draws.
+pub(crate) struct ShotUniforms {
+    rng: SplitMixSource,
+}
+
+impl ShotUniforms {
+    pub(crate) fn new(seed: u64, stream_index: u64, shot: u64) -> Self {
+        Self {
+            rng: SplitMixSource::new(indexed_seed(seed, stream_index, shot)),
+        }
+    }
+
+    /// A uniform draw in `[0, 1)`.
+    pub(crate) fn unit(&mut self) -> f64 {
+        self.rng.next_unit_f64()
+    }
+
+    /// A uniform draw in `(0, 1]`.
+    pub(crate) fn open_unit(&mut self) -> f64 {
+        1.0 - self.rng.next_unit_f64()
+    }
+
+    /// A fair coin.
+    pub(crate) fn bit(&mut self) -> bool {
+        self.rng.next_word() >> 63 != 0
+    }
+}
+
 trait RandomSource {
     fn next_word(&mut self) -> u64;
 

@@ -4,6 +4,7 @@ mod error;
 mod limits;
 mod plan;
 mod program;
+mod record;
 mod replay;
 mod replay_planes;
 mod replay_store;
@@ -24,10 +25,13 @@ pub(crate) use error::DemResult;
 use crate::{CompilationDescriptor, CompilationOperation};
 
 /// Detector-error-model sampling compiler registration.
+///
+/// Schema `2` marks the sampled-error stream that leaves seeded detector and observable output
+/// unchanged by recording sampled errors.
 pub const DEM_SAMPLING_COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
     CompilationOperation::DemSampling,
     stab_model::ModelDialect::DetectorErrorModel,
-    1,
+    2,
     None,
     false,
 );

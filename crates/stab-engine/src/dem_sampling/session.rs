@@ -293,6 +293,9 @@ impl DemSamplingSession {
     }
 
     /// Samples detector, observable, and sampled-error records.
+    ///
+    /// The detector and observable records equal those [`Self::run`] samples for the same seed
+    /// and shot range, and replaying the sampled-error records reproduces them.
     pub fn run_with_sampled_errors<Sink>(
         &mut self,
         shots: ShotCount,

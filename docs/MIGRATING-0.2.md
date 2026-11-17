@@ -259,6 +259,12 @@ Printing, counting, folded walking, and coordinate queries of a `Circuit`, and p
 Parsing a circuit from bytes that are not valid UTF-8 charges the display text and record of each opaque tag, so such an input needs a larger `ParseLimits` memory budget than before and `Circuit::admitted_bytes` reports the larger hold.
 The CLI's `sample`, `detect`, and `m2d` admit their record encoders' scratch and the buffers of named output files against `--memory-budget` before the session, and a request whose session fits but not beside that storage is refused with a new output-storage diagnostic.
 
+## DEM Sampled-Error Streams
+
+Seeded `sample_dem` detector and observable output no longer depends on `--err_out`. A run that records sampled errors, through `--err_out` or `DemSamplingSession::run_with_sampled_errors`, now draws exactly the random streams of a run that does not, so its detector and observable records are byte-identical to the plain seeded run, and replaying its sampled-error file with `--replay_err_in` reproduces them. Pinned Stim's detector output is likewise independent of the flag.
+
+Seeded sampled-error records, and the detector and observable records of a recording run, therefore change once for every model with a repeat that the detector stream skips, applies by parity, or folds; for other models they are byte-identical to the previous build. Errors that the detector stream samples directly keep their draws. Errors inside a repeat that cannot fire stay clear, and errors inside a deterministic zero-shift repeat are set. The copies of an error inside a stochastic zero-shift repeat, which the detector stream samples as one folded parity error, are drawn from separate streams derived from the seed and conditioned on that folded parity, so each copy still fires independently with its own probability. Seeded output without `--err_out`, every `--replay_err_in` replay, and all other commands are byte-identical to the previous build, and no public item was added, removed, or renamed. The `sample_dem` compiler schema reported by `capabilities` moves from `1` to `2` to mark the new sampled-error stream.
+
 ## Extension APIs
 
 The typed circuit-pass seam is canonical in `stab-analysis`. It admits folded input, requires a conservative output-resource projection before proportional allocation, validates the returned closed-dialect circuit, and reports typed input, projection, or output failures. The separate Stable `stab-reference-noise-pass` crate proves this public boundary without depending on `stab-core`.

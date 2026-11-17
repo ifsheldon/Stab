@@ -336,7 +336,7 @@ fn capabilities_json_is_generated_from_product_and_clap_descriptors() {
             {
                 "operation": "sample_dem",
                 "input_dialect": "detector-error-model",
-                "compiler_schema_version": 1,
+                "compiler_schema_version": 2,
                 "request_fingerprint_schema_version": null,
                 "configurable_limits": false
             }

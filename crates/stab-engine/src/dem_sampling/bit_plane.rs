@@ -1,4 +1,5 @@
 use super::program::{DemPoll, DemSampleBlock, DemSampleError, DemSampleOperation};
+use super::record::record_block;
 use super::{DemError, DemResult};
 use crate::bernoulli::{
     INDEXED_BLOCK_SHOTS, INDEXED_BLOCK_WORDS, IndexedRangeError, IndexedShotRange, SparseBernoulli,
@@ -10,12 +11,12 @@ pub(super) enum SampledErrorPlanes<'a> {
     Record(&'a mut Vec<u64>),
 }
 
-impl SampledErrorPlanes<'_> {
-    fn is_discard(&self) -> bool {
-        matches!(self, Self::Discard)
-    }
-}
-
+/// Samples one batch of detector and observable planes, and optionally the sampled-error planes.
+///
+/// Both modes draw the same random streams in the same order, so detector and observable
+/// planes never depend on whether sampled errors are recorded. Recording only adds the error
+/// planes, filling the errors that the detector stream skips or folds from separate streams
+/// derived from the same seed.
 #[allow(
     clippy::too_many_arguments,
     reason = "the compiled program, deterministic stream identity, and three reusable outputs are independent inputs"
@@ -52,28 +53,33 @@ pub(super) fn sample_into_planes(
     if let SampledErrorPlanes::Record(error_planes) = &mut error_output {
         reset_planes(error_planes, block.error_count, word_count)?;
     }
-    let expected_streams = if error_output.is_discard() {
-        block.direct_sample_work_count
-    } else {
-        block.error_count
-    };
     // An invalid range is reported by the first sampled error, as the per-error sampler did.
     let range = IndexedShotRange::try_new(first_shot, shot_count);
     let mut stream_cursor = 0_usize;
-    sample_block(
-        block,
-        0,
-        seed,
-        range,
-        detector_planes,
-        observable_planes,
-        &mut error_output,
-        &mut stream_cursor,
-        poll,
-    )?;
-    if stream_cursor != expected_streams {
+    let stream = DetectionStream { seed, range, poll };
+    match &mut error_output {
+        SampledErrorPlanes::Discard => sample_block(
+            block,
+            0,
+            stream,
+            detector_planes,
+            observable_planes,
+            &mut stream_cursor,
+        )?,
+        SampledErrorPlanes::Record(error_planes) => record_block(
+            block,
+            stream,
+            shot_count,
+            detector_planes,
+            observable_planes,
+            error_planes,
+            &mut stream_cursor,
+        )?,
+    }
+    if stream_cursor != block.direct_sample_work_count {
         return Err(DemError::invalid_sampler_compilation(format!(
-            "DEM bit-plane sampler consumed {stream_cursor} random streams but {expected_streams} were compiled"
+            "DEM bit-plane sampler consumed {stream_cursor} random streams but {} were compiled",
+            block.direct_sample_work_count
         )));
     }
     if let SampledErrorPlanes::Record(error_planes) = error_output
@@ -92,98 +98,100 @@ pub(super) fn sample_into_planes(
     Ok(())
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "recursive DEM traversal carries immutable stream coordinates and reusable plane outputs"
-)]
-fn sample_block(
+/// The seed, shot range, and cancellation poll every detector-stream draw of one batch shares.
+pub(super) struct DetectionStream<'a, 'p> {
+    pub(super) seed: u64,
+    pub(super) range: Result<IndexedShotRange, IndexedRangeError>,
+    pub(super) poll: &'a mut DemPoll<'p>,
+}
+
+impl<'p> DetectionStream<'_, 'p> {
+    pub(super) fn reborrow(&mut self) -> DetectionStream<'_, 'p> {
+        DetectionStream {
+            seed: self.seed,
+            range: self.range,
+            poll: self.poll,
+        }
+    }
+}
+
+/// Walks `block` drawing one detector stream per sampled or folded error.
+///
+/// Repeats whose errors cannot fire are skipped, deterministic zero-shift repeats are applied
+/// once or not at all by parity, and stochastic zero-shift repeats sample their folded parity
+/// errors. This walk defines the detector stream of both run modes.
+pub(super) fn sample_block(
     block: &DemSampleBlock,
     detector_shift: u64,
-    seed: u64,
-    range: Result<IndexedShotRange, IndexedRangeError>,
+    mut stream: DetectionStream<'_, '_>,
     detector_planes: &mut [u64],
     observable_planes: &mut [u64],
-    error_output: &mut SampledErrorPlanes<'_>,
     stream_cursor: &mut usize,
-    poll: &mut DemPoll<'_>,
 ) -> DemResult<()> {
     for operation in &block.operations {
         match operation {
             DemSampleOperation::Error(error) => {
-                poll.tick()?;
+                stream.poll.tick()?;
                 sample_error(
                     error,
                     detector_shift,
-                    seed,
-                    range,
+                    stream.seed,
+                    stream.range,
                     detector_planes,
                     observable_planes,
-                    error_output,
+                    None,
                     stream_cursor,
                 )?;
             }
             DemSampleOperation::Repeat(repeat) => {
-                if error_output.is_discard() {
-                    if repeat.body.direct_sample_effect_count == 0 {
-                        continue;
-                    }
-                    if repeat.body.detector_shift == 0
-                        && !repeat.body.direct_sample_has_stochastic_error
-                    {
-                        if repeat.repeat_count.is_multiple_of(2) {
-                            continue;
-                        }
-                        let shift = detector_shift
-                            .checked_add(repeat.start_detector_shift)
-                            .ok_or_else(detector_shift_overflow_error)?;
-                        sample_block(
-                            &repeat.body,
-                            shift,
-                            seed,
-                            range,
-                            detector_planes,
-                            observable_planes,
-                            error_output,
-                            stream_cursor,
-                            poll,
-                        )?;
-                        continue;
-                    }
-                    if let Some(folded_errors) = repeat.folded_zero_shift_errors.as_deref() {
-                        let shift = detector_shift
-                            .checked_add(repeat.start_detector_shift)
-                            .ok_or_else(detector_shift_overflow_error)?;
-                        for error in folded_errors {
-                            poll.tick()?;
-                            sample_error(
-                                error,
-                                shift,
-                                seed,
-                                range,
-                                detector_planes,
-                                observable_planes,
-                                error_output,
-                                stream_cursor,
-                            )?;
-                        }
-                        continue;
-                    }
+                if repeat.body.direct_sample_effect_count == 0 {
+                    continue;
                 }
-                let mut shift = detector_shift
+                let shift = detector_shift
                     .checked_add(repeat.start_detector_shift)
                     .ok_or_else(detector_shift_overflow_error)?;
-                for _ in 0..repeat.repeat_count {
-                    poll.tick()?;
+                if repeat.body.detector_shift == 0
+                    && !repeat.body.direct_sample_has_stochastic_error
+                {
+                    if repeat.repeat_count.is_multiple_of(2) {
+                        continue;
+                    }
                     sample_block(
                         &repeat.body,
                         shift,
-                        seed,
-                        range,
+                        stream.reborrow(),
                         detector_planes,
                         observable_planes,
-                        error_output,
                         stream_cursor,
-                        poll,
+                    )?;
+                    continue;
+                }
+                if let Some(folded_errors) = repeat.folded_zero_shift_errors.as_deref() {
+                    for error in folded_errors {
+                        stream.poll.tick()?;
+                        sample_error(
+                            error,
+                            shift,
+                            stream.seed,
+                            stream.range,
+                            detector_planes,
+                            observable_planes,
+                            None,
+                            stream_cursor,
+                        )?;
+                    }
+                    continue;
+                }
+                let mut shift = shift;
+                for _ in 0..repeat.repeat_count {
+                    stream.poll.tick()?;
+                    sample_block(
+                        &repeat.body,
+                        shift,
+                        stream.reborrow(),
+                        detector_planes,
+                        observable_planes,
+                        stream_cursor,
                     )?;
                     shift = shift
                         .checked_add(repeat.body.detector_shift)
@@ -199,14 +207,16 @@ fn sample_block(
     clippy::too_many_arguments,
     reason = "one sampled error combines stream coordinates, shifted targets, and reusable outputs"
 )]
-fn sample_error(
+/// Draws detector stream `*stream_cursor` for `error`, toggles its detectors and observables, and
+/// ORs its hits into `error_plane` when one is given.
+pub(super) fn sample_error(
     error: &DemSampleError,
     detector_shift: u64,
     seed: u64,
     range: Result<IndexedShotRange, IndexedRangeError>,
     detector_planes: &mut [u64],
     observable_planes: &mut [u64],
-    error_output: &mut SampledErrorPlanes<'_>,
+    error_plane: Option<&mut [u64]>,
     stream_cursor: &mut usize,
 ) -> DemResult<()> {
     let stream_position = *stream_cursor;
@@ -226,7 +236,7 @@ fn sample_error(
             stream,
             detector_planes,
             observable_planes,
-            error_output,
+            error_plane,
         ),
         None => sample_masked_error(
             error,
@@ -234,7 +244,7 @@ fn sample_error(
             stream,
             detector_planes,
             observable_planes,
-            error_output,
+            error_plane,
         ),
     }
 }
@@ -267,23 +277,9 @@ fn sample_sparse_error(
     stream: ErrorStream,
     detector_planes: &mut [u64],
     observable_planes: &mut [u64],
-    error_output: &mut SampledErrorPlanes<'_>,
+    mut error_plane: Option<&mut [u64]>,
 ) -> DemResult<()> {
     let word_count = stream.word_count();
-    let mut error_plane = match error_output {
-        SampledErrorPlanes::Discard => None,
-        SampledErrorPlanes::Record(error_planes) => Some(
-            stream
-                .position
-                .checked_mul(word_count)
-                .and_then(|start| error_planes.get_mut(start..start.checked_add(word_count)?))
-                .ok_or_else(|| {
-                    DemError::invalid_sampler_compilation(
-                        "DEM sampled-error plane index escaped compiled storage",
-                    )
-                })?,
-        ),
-    };
     sparse.try_for_each_hit(stream.seed, stream.index()?, stream.range, |position| {
         let word = position / u64::BITS as usize;
         let bit = 1_u64 << (position % u64::BITS as usize);
@@ -326,7 +322,7 @@ fn sample_masked_error(
     stream: ErrorStream,
     detector_planes: &mut [u64],
     observable_planes: &mut [u64],
-    error_output: &mut SampledErrorPlanes<'_>,
+    error_plane: Option<&mut [u64]>,
 ) -> DemResult<()> {
     let word_count = stream.word_count();
     let mut masks = [0_u64; INDEXED_BLOCK_WORDS];
@@ -342,17 +338,15 @@ fn sample_masked_error(
         active_masks,
     )
     .map_err(indexed_range_error)?;
-    if let SampledErrorPlanes::Record(error_planes) = error_output {
-        let plane = stream
-            .position
-            .checked_mul(word_count)
-            .and_then(|start| error_planes.get_mut(start..start.checked_add(word_count)?))
-            .ok_or_else(|| {
-                DemError::invalid_sampler_compilation(
-                    "DEM sampled-error plane index escaped compiled storage",
-                )
-            })?;
-        plane.copy_from_slice(active_masks);
+    if let Some(plane) = error_plane {
+        let plane = plane.get_mut(..word_count).ok_or_else(|| {
+            DemError::invalid_sampler_compilation(
+                "DEM sampled-error plane is narrower than its shot range",
+            )
+        })?;
+        for (plane, mask) in plane.iter_mut().zip(active_masks.iter()) {
+            *plane |= *mask;
+        }
     }
     if active_masks.iter().all(|mask| *mask == 0) {
         return Ok(());
@@ -425,7 +419,11 @@ fn xor_plane_masks(
     Ok(())
 }
 
-fn reset_planes(planes: &mut Vec<u64>, width: usize, word_count: usize) -> DemResult<()> {
+pub(super) fn reset_planes(
+    planes: &mut Vec<u64>,
+    width: usize,
+    word_count: usize,
+) -> DemResult<()> {
     let len = width
         .checked_mul(word_count)
         .ok_or_else(plane_storage_overflow_error)?;
@@ -434,17 +432,17 @@ fn reset_planes(planes: &mut Vec<u64>, width: usize, word_count: usize) -> DemRe
     Ok(())
 }
 
-fn indexed_range_error(error: IndexedRangeError) -> DemError {
+pub(super) fn indexed_range_error(error: IndexedRangeError) -> DemError {
     DemError::invalid_sampler_compilation(format!(
         "DEM indexed Bernoulli range is invalid: {error:?}"
     ))
 }
 
-fn plane_storage_overflow_error() -> DemError {
+pub(super) fn plane_storage_overflow_error() -> DemError {
     DemError::invalid_sampler_compilation("DEM bit-plane storage size overflowed")
 }
 
-fn detector_shift_overflow_error() -> DemError {
+pub(super) fn detector_shift_overflow_error() -> DemError {
     DemError::invalid_sampler_compilation("DEM sampler detector shift overflowed")
 }
 
@@ -501,7 +499,7 @@ mod tests {
                         let mut detector_planes = patterned_planes(DETECTORS * word_count, 1);
                         let mut observable_planes = patterned_planes(OBSERVABLES * word_count, 2);
                         let mut error_planes = vec![0; ERRORS * word_count];
-                        let mut error_output = SampledErrorPlanes::Record(&mut error_planes);
+                        let error_output = Some(&mut error_planes[word_count..2 * word_count]);
                         if use_sparse {
                             sample_sparse_error(
                                 &error,
@@ -510,7 +508,7 @@ mod tests {
                                 stream,
                                 &mut detector_planes,
                                 &mut observable_planes,
-                                &mut error_output,
+                                error_output,
                             )
                         } else {
                             sample_masked_error(
@@ -519,7 +517,7 @@ mod tests {
                                 stream,
                                 &mut detector_planes,
                                 &mut observable_planes,
-                                &mut error_output,
+                                error_output,
                             )
                         }
                         .expect("sample one error");
@@ -556,7 +554,7 @@ mod tests {
             stream,
             &mut detector_planes,
             &mut [],
-            &mut SampledErrorPlanes::Discard,
+            None,
         )
         .expect_err("detector 7 is outside one plane");
         assert!(
