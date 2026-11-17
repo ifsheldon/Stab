@@ -338,6 +338,7 @@ pub(super) fn random_clifford_circuit(rng: &mut SmallRng, qubits: usize) -> Stri
 #[test]
 fn inverse_tableau_matches_generator_baseline_on_random_clifford_circuits() {
     let mut rng = SmallRng::seed_from_u64(0xC11F_F04D);
+    super::super::reference_simulator::take_pivot_column_stats();
     for qubits in [1_usize, 2, 3, 5, 8, 17, 63, 64, 65, 127, 128, 129, 300] {
         for _ in 0..3 {
             let text = random_clifford_circuit(&mut rng, qubits);
@@ -345,6 +346,48 @@ fn inverse_tableau_matches_generator_baseline_on_random_clifford_circuits() {
             paths.assert_agree(&format!("{qubits}-qubit random Clifford circuit:\n{text}"));
         }
     }
+    // The wide final measurement layers collapse through the transposed pivot columns, and
+    // their collapses update the copy both bit by bit and by row mask.
+    let stats = super::super::reference_simulator::take_pivot_column_stats();
+    assert!(stats.builds > 0, "{stats:?}");
+    assert!(stats.bit_follows > 0, "{stats:?}");
+    assert!(stats.mask_follows > 0, "{stats:?}");
+}
+
+#[test]
+fn pivot_columns_survive_interleaved_gates_resets_and_sign_updates() {
+    // Wide random layers whose collapses build the transposed pivot columns, interleaved with
+    // gates that discard them, reset corrections and Paulis that keep them, and feedback, in
+    // every basis and inside a folded repeat.
+    let mut rng = SmallRng::seed_from_u64(0x9_1707);
+    let qubits = 150_usize;
+    let all = (0..qubits)
+        .map(|qubit| qubit.to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut text = String::new();
+    for gate in ["MR", "MX", "MRY", "M", "MY", "MRX"] {
+        writeln!(text, "H {all}").expect("write layer");
+        for _ in 0..qubits {
+            let control = rng.random_range(0..qubits);
+            let target = (control + rng.random_range(1..qubits)) % qubits;
+            writeln!(text, "CX {control} {target}").expect("write entangler");
+        }
+        let half = (0..qubits)
+            .step_by(2)
+            .map(|qubit| qubit.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        writeln!(text, "{gate} {half}\nX 1 3\nCX rec[-1] 5\nM {all}").expect("write measurements");
+    }
+    text.push_str("REPEAT 20 {\n    H 0 2 4\n    CX 0 1 2 3 4 5\n    MX ");
+    text.push_str(&all);
+    text.push_str("\n}\n");
+    super::super::reference_simulator::take_pivot_column_stats();
+    let paths = ReferencePaths::compute(&parse(&text));
+    paths.assert_agree("interleaved wide collapse layers");
+    let stats = super::super::reference_simulator::take_pivot_column_stats();
+    assert!(stats.builds > 6, "{stats:?}");
 }
 
 #[test]
@@ -371,12 +414,14 @@ fn inverse_tableau_matches_generator_baseline_above_one_thousand_qubits() {
         .compile(&circuit)
         .expect("compile wide circuit");
     assert_eq!(plan.qubit_count(), qubits);
+    super::super::reference_simulator::take_pivot_column_stats();
     assert_eq!(
         plan.try_reference_sample()
             .expect("inverse-tableau reference"),
         super::super::api::compute_stabilizer_frame_reference_sample(&plan.inner)
             .expect("generator-list reference"),
     );
+    assert!(super::super::reference_simulator::take_pivot_column_stats().builds > 0);
 }
 
 /// Rewrites the last top-level `REPEAT n` loop as `REPEAT outer { REPEAT n / outer { .. } }`

@@ -22,6 +22,7 @@ pub(crate) mod pauli_product;
 mod reference;
 mod reference_bits;
 mod reference_fold;
+mod reference_order;
 mod reference_run;
 mod reference_simulator;
 #[cfg(test)]

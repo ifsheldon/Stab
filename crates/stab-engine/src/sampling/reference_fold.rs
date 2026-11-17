@@ -435,7 +435,7 @@ fn instruction_work(
             }
             Err(_) => 0,
         },
-        ProgramInstruction::Reset { basis, targets }
+        ProgramInstruction::Reset { basis, targets, .. }
         | ProgramInstruction::Measure { basis, targets, .. } => per_target(
             targets.len(),
             measurement(rows(basis.x_bit(), basis.z_bit())),

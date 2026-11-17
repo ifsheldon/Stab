@@ -33,8 +33,9 @@ pub(crate) use plan::{
     FRAME_BATCH_SHOTS, FrameBatchState, LaneFrameBatch, frame_state_storage_bytes,
 };
 pub(crate) use program::{
-    CircuitProgram, CliffordStep, ControlledPair, FrameGate, PauliProductMeasurement, ProgramEntry,
-    ProgramInstruction, ProgramOptions, ReferenceClifford, lookback_distance,
+    CircuitProgram, CliffordStep, ControlledPair, FrameGate, NoiselessFusion,
+    PauliProductMeasurement, ProgramEntry, ProgramInstruction, ProgramOptions, ReferenceClifford,
+    lookback_distance,
 };
 pub(in crate::detection) use program::{TraversalEvent, visit_circuit};
 #[cfg(test)]
@@ -200,6 +201,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
             ProgramInstruction::Reset {
                 basis: PauliBasis::Z,
                 targets,
+                ..
             } => poll.for_chunks(targets, op, 1, |_, part| {
                 for &qubit in part {
                     self.set_x_word(qubit, W::default())?;
@@ -209,7 +211,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 }
                 Ok(())
             }),
-            ProgramInstruction::Reset { basis, targets } => {
+            ProgramInstruction::Reset { basis, targets, .. } => {
                 poll.for_chunks(targets, op, 1, |_, part| {
                     for &qubit in part {
                         self.reset_qubit(qubit, *basis, rng, mode)?;

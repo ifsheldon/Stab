@@ -96,6 +96,23 @@ pub(crate) enum ControlledPair {
     },
 }
 
+/// Whether Stim's noiseless reference circuit fuses an instruction into the one before it.
+///
+/// Stim computes its reference sample on `Circuit::aliased_noiseless_circuit`, which drops
+/// noise channels and result-flip arguments and then fuses adjacent instructions of the same
+/// gate and tag. The collapse order of an X- or Y-basis measurement or reset spans the whole
+/// fused instruction, so the reference simulator needs to know which compiled instructions
+/// Stim sees as one. Only X- and Y-basis `Reset`, `Measure`, and `MeasurePairs` instructions
+/// are ever marked [`NoiselessFusion::WithPrevious`].
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum NoiselessFusion {
+    /// The instruction starts a new instruction of the noiseless circuit.
+    #[default]
+    Starts,
+    /// The instruction extends the previous kept instruction, with only noise between them.
+    WithPrevious,
+}
+
 /// A resolved circuit instruction.
 ///
 /// Targets are qubit indices. `inverted` is empty when no target of the instruction carries a
@@ -110,6 +127,7 @@ pub(crate) enum ProgramInstruction {
     Reset {
         basis: PauliBasis,
         targets: Vec<usize>,
+        fusion: NoiselessFusion,
     },
     Measure {
         basis: PauliBasis,
@@ -117,12 +135,14 @@ pub(crate) enum ProgramInstruction {
         flip_probability: f64,
         targets: Vec<usize>,
         inverted: Vec<bool>,
+        fusion: NoiselessFusion,
     },
     MeasurePairs {
         basis: PauliBasis,
         flip_probability: f64,
         targets: Vec<usize>,
         inverted: Vec<bool>,
+        fusion: NoiselessFusion,
     },
     MeasurePads {
         flip_probability: f64,

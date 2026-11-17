@@ -18,10 +18,11 @@ use super::super::helpers::{
     zero_probability_noise,
 };
 use super::{
-    CircuitProgram, CliffordStep, ControlledPair, FrameGate, PauliProductMeasurement,
-    ProgramCounts, ProgramEntry, ProgramInstruction, ReferenceClifford, ReferenceGateId,
-    TraversalEvent, admission_drift, byte_product, checked_add_bytes, materialized_retained_bytes,
-    program_shape_error, storage_overflow, validate_program, visit_circuit,
+    CircuitProgram, CliffordStep, ControlledPair, FrameGate, NoiselessFusion,
+    PauliProductMeasurement, ProgramCounts, ProgramEntry, ProgramInstruction, ReferenceClifford,
+    ReferenceGateId, TraversalEvent, admission_drift, byte_product, checked_add_bytes,
+    materialized_retained_bytes, program_shape_error, storage_overflow, validate_program,
+    visit_circuit,
 };
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
@@ -271,6 +272,7 @@ impl CircuitProgram {
         let mut frame_qubit_count = 0_usize;
         let mut actions = FrameCliffordActionCache::default();
         let mut cliffords = ReferenceCliffordTable::default();
+        let mut noiseless_previous: Option<&CircuitInstruction> = None;
         let push = |entries: &mut Vec<ProgramEntry>, entry: ProgramEntry| {
             if entries.len() == entries.capacity() {
                 return Err(admission_drift());
@@ -281,10 +283,14 @@ impl CircuitProgram {
         visit_circuit(circuit, |event| {
             match event {
                 TraversalEvent::Instruction(instruction) => {
+                    let fusion = noiseless_fusion(noiseless_previous, instruction);
+                    if kept_by_noiseless_circuit(instruction.gate()) {
+                        noiseless_previous = Some(instruction);
+                    }
                     visit_lowered_instructions(instruction, |lowered| {
                         let lowering = lower(lowered, options, &mut actions)?;
                         if let Lowering::Entry(kind) = lowering {
-                            let built = build(lowered, kind, &mut cliffords)?;
+                            let built = build(lowered, kind, fusion, &mut cliffords)?;
                             for pending in &mut repeat_markers {
                                 if pending.marker.is_none() {
                                     pending.marker = Some(entries.len());
@@ -307,6 +313,8 @@ impl CircuitProgram {
                     })?;
                 }
                 TraversalEvent::BeginRepeat(count) => {
+                    // A repeat block is its own operation, so nothing fuses across its edges.
+                    noiseless_previous = None;
                     repeat_markers
                         .try_push(PendingRepeat {
                             count,
@@ -315,6 +323,7 @@ impl CircuitProgram {
                         .map_err(|_| program_shape_error())?;
                 }
                 TraversalEvent::EndRepeat => {
+                    noiseless_previous = None;
                     let pending = repeat_markers.pop().ok_or_else(program_shape_error)?;
                     let Some(marker) = pending.marker else {
                         return Ok(());
@@ -348,6 +357,50 @@ impl CircuitProgram {
             frame_qubit_count,
             counts: admission.counts,
         })
+    }
+}
+
+/// Whether Stim's `Circuit::aliased_noiseless_circuit` keeps an instruction of `gate`.
+///
+/// It drops noise channels that produce no results, keeps result-producing gates without their
+/// flip arguments (heralded noise becomes `MPAD`), and keeps every other instruction, including
+/// annotations such as `TICK` and `DETECTOR` that the compiled program elides.
+fn kept_by_noiseless_circuit(gate: Gate) -> bool {
+    !gate.is_noisy() || gate.produces_measurements()
+}
+
+/// Whether Stim's noiseless reference circuit fuses `instruction` into `previous`, the last
+/// instruction it kept in the same block, for the X- and Y-basis collapsing gates whose
+/// collapse order spans a fused instruction.
+///
+/// Stim fuses two operations of the same gate with equal arguments and tags; result-producing
+/// gates lose their arguments first, so only the gate and tag must agree for them.
+fn noiseless_fusion(
+    previous: Option<&CircuitInstruction>,
+    instruction: &CircuitInstruction,
+) -> NoiselessFusion {
+    let gate = instruction.gate();
+    let ordered = matches!(
+        gate.kind(),
+        GateKind::RX
+            | GateKind::RY
+            | GateKind::MX
+            | GateKind::MY
+            | GateKind::MRX
+            | GateKind::MRY
+            | GateKind::MXX
+            | GateKind::MYY
+    );
+    match previous {
+        Some(previous)
+            if ordered
+                && previous.gate().kind() == gate.kind()
+                && previous.tag_bytes() == instruction.tag_bytes()
+                && (gate.produces_measurements() || previous.args() == instruction.args()) =>
+        {
+            NoiselessFusion::WithPrevious
+        }
+        _ => NoiselessFusion::Starts,
     }
 }
 
@@ -851,6 +904,7 @@ fn pauli_terms(instruction: &CircuitInstruction) -> DetectionResult<Vec<(usize, 
 fn build(
     instruction: &CircuitInstruction,
     kind: EntryKind,
+    fusion: NoiselessFusion,
     cliffords: &mut ReferenceCliffordTable,
 ) -> DetectionResult<ProgramInstruction> {
     Ok(match kind {
@@ -862,6 +916,7 @@ fn build(
         EntryKind::Reset(basis) => ProgramInstruction::Reset {
             basis,
             targets: qubit_targets(instruction)?,
+            fusion,
         },
         EntryKind::Measure { basis, reset } => ProgramInstruction::Measure {
             basis,
@@ -869,12 +924,14 @@ fn build(
             flip_probability: measurement_flip_probability(instruction)?,
             targets: qubit_targets(instruction)?,
             inverted: inversion_flags(instruction)?,
+            fusion,
         },
         EntryKind::MeasurePairs(basis) => ProgramInstruction::MeasurePairs {
             basis,
             flip_probability: measurement_flip_probability(instruction)?,
             targets: qubit_targets(instruction)?,
             inverted: inversion_flags(instruction)?,
+            fusion,
         },
         EntryKind::MeasurePads => {
             let mut values = try_vec(instruction.targets().len(), "measurement pad values")?;

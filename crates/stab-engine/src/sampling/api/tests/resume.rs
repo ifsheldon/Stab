@@ -324,3 +324,69 @@ fn single_collapse_and_fold_comparison_poll_in_chunks_and_retry_cleanly() {
         });
     }
 }
+
+#[test]
+fn batched_pivot_column_collapses_poll_in_chunks_and_retry_cleanly() {
+    use std::fmt::Write as _;
+
+    // A wide random layer: its collapses build the transposed pivot columns in polled chunks
+    // and then follow each collapse, so cancellation can land in the build, in a column read,
+    // or in an update, and every retry must reproduce the uninterrupted reference and shots.
+    let qubits = 160;
+    let mut src = String::from("H");
+    for q in 0..qubits {
+        let _ = write!(src, " {q}");
+    }
+    src.push_str("\nCX");
+    for q in 0..qubits - 1 {
+        let _ = write!(src, " {q} {}", q + 1);
+    }
+    src.push_str("\nMX 7 3\nM");
+    for q in 0..qubits {
+        let _ = write!(src, " {q}");
+    }
+    src.push('\n');
+    let circuit = Circuit::from_stim_str(&src).expect("parse wide layer");
+    let compile = || {
+        SamplingCompiler::new()
+            .reference_sample_loop_policy(ReferenceSampleLoopPolicy::Iterate)
+            .compile(&circuit)
+            .expect("compile wide layer")
+    };
+    let seed = RandomPolicy::Seeded(Seed::new(23));
+    crate::sampling::reference_simulator::take_pivot_column_stats();
+    let reference = compile()
+        .try_reference_sample()
+        .expect("baseline reference");
+    let stats = crate::sampling::reference_simulator::take_pivot_column_stats();
+    assert!(stats.builds > 0 && stats.bit_follows > 0, "{stats:?}");
+    let mut expected = Shots::default();
+    compile()
+        .session(seed)
+        .expect("baseline session")
+        .run_shots(64, &mut expected);
+
+    test_hook::with_units_per_poll(64, || {
+        let (created, polls) = test_hook::count_polls(|| compile().session(seed));
+        created.expect("counted session");
+        assert!(polls >= 64, "expected chunked inner polls, got {polls}");
+        for poll in (1..polls).step_by(usize::try_from(polls / 24).unwrap_or(1).max(1)) {
+            let plan = compile();
+            let (interrupted, fired) =
+                test_hook::cancel_at_poll(poll, || plan.session(seed).map(drop));
+            assert!(fired);
+            assert_eq!(
+                interrupted,
+                Err(SamplingExecutionError::Cancelled(stab_model::Cancelled))
+            );
+            assert_eq!(
+                plan.try_reference_sample().expect("retried reference"),
+                reference
+            );
+            let mut resumed = Shots::default();
+            let mut session = plan.session(seed).expect("retry session");
+            assert_eq!(session.run_shots(64, &mut resumed), (true, 64));
+            assert_eq!(resumed.0, expected.0);
+        }
+    });
+}

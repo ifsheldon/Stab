@@ -120,7 +120,7 @@ fn execute_instruction(
                 .map_err(program_error)?,
             targets,
         ),
-        ProgramInstruction::Reset { basis, targets } => {
+        ProgramInstruction::Reset { basis, targets, .. } => {
             for &qubit in targets {
                 buffers.frame.reset(qubit, *basis, rng, randomness);
             }
@@ -131,6 +131,7 @@ fn execute_instruction(
             flip_probability,
             targets,
             inverted,
+            ..
         } => {
             for (index, &qubit) in targets.iter().enumerate() {
                 let flip = mode.result_flip(*flip_probability, rng);
@@ -149,6 +150,7 @@ fn execute_instruction(
             flip_probability,
             targets,
             inverted,
+            ..
         } => {
             for (index, pair) in targets.chunks(2).enumerate() {
                 let &[left, right] = pair else {

@@ -18,6 +18,7 @@ fn structural_validation_does_not_execute_repeat_iterations() {
         ProgramEntry::Instruction(ProgramInstruction::Reset {
             basis: PauliBasis::Z,
             targets: vec![0],
+            fusion: NoiselessFusion::Starts,
         }),
         ProgramEntry::EndRepeat,
     ];

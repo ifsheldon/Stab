@@ -6,6 +6,7 @@ use stab_model::{Cancellation, RepeatNestingLimit};
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
 use super::reference_bits::ReferenceBits;
 use super::reference_fold::{FoldProbe, ProbeStep, SnapshotSlot};
+use super::reference_order::collapse_fused_group;
 use super::reference_simulator::{
     InverseTableauSimulator, ReferenceSimulatorError, SimulatorWork, WorkModel, reset_correction,
 };
@@ -112,6 +113,7 @@ fn run_entries(
         match entry {
             ProgramEntry::Instruction(instruction) => {
                 poll.charge(STEP_UNITS)?;
+                collapse_fused_group(entries, index, simulator, &mut poll, &mut work)?;
                 apply_instruction(
                     program,
                     instruction,
@@ -401,7 +403,7 @@ fn apply_instruction(
             }
             Ok(())
         }
-        ProgramInstruction::Reset { basis, targets } => {
+        ProgramInstruction::Reset { basis, targets, .. } => {
             for &qubit in targets {
                 simulator
                     .reset(qubit, *basis, poll, work)

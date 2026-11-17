@@ -13,7 +13,10 @@
 //! reference sample selects: with `S = T Z_k T^-1` a stabilizer anticommuting with `M`, the
 //! Clifford `U = (1 + M S) / sqrt(2)` maps the state onto `(1 + M) |psi> / sqrt(2)`, and
 //! appending `U` multiplies every row anticommuting with `M S` by `T^-1 M S T = m Z_k`.
-//! Each collapse costs one strided bit read per row plus `O(W)` per updated row.
+//! Each collapse costs one strided bit read per row plus `O(W)` per updated row; a long run of
+//! collapses between gates reads its pivot columns from a transposed copy instead (see
+//! `pivot_columns`). Random outcomes collapse in Stim's per-instruction order (see the
+//! `reference_order` module).
 //!
 //! The API takes qubit indices and Pauli bases only, so callers can drive it from any resolved
 //! circuit representation.
@@ -27,7 +30,13 @@ use stab_model::Cancelled;
 
 use crate::work_poll::{WorkPoll, chunk_units};
 
+mod collapse_order;
+mod pivot_columns;
 mod snapshot;
+
+use pivot_columns::PivotColumns;
+#[cfg(test)]
+pub(in crate::sampling) use pivot_columns::take_pivot_column_stats;
 
 pub(super) use snapshot::ReferenceStateSnapshot;
 
@@ -53,6 +62,15 @@ impl SimulatorWork {
         let work = simulator.work();
         let done = work.saturating_sub(self.seen);
         self.seen = work;
+        poll.charge(usize::try_from(done).unwrap_or(usize::MAX))
+    }
+
+    /// Forwards a simulator work tally of `total` units, for charges made while the simulator
+    /// itself is borrowed.
+    #[inline]
+    fn charge_total(&mut self, total: u64, poll: &mut WorkPoll<'_>) -> Result<(), Cancelled> {
+        let done = total.saturating_sub(self.seen);
+        self.seen = total;
         poll.charge(usize::try_from(done).unwrap_or(usize::MAX))
     }
 }
@@ -256,6 +274,15 @@ pub(super) struct InverseTableauSimulator {
     /// Rows of the measured observable's own support, which commute with `m` oppositely.
     collapse_flips: Vec<usize>,
     stabilizer_terms: Vec<(usize, PauliBasis)>,
+    /// Qubit bitsets and per-qubit pair partners for collapsing a fused X- or Y-basis
+    /// instruction in Stim's order, sized on first use. Their `n / 4 + 8 n` bytes stay well
+    /// inside the `256 n` bytes per qubit that reference work admission reserves beyond the
+    /// tableau.
+    order_marks: Vec<u64>,
+    order_used: Vec<u64>,
+    order_partners: Vec<usize>,
+    /// A transposed copy of the X halves for wide runs of collapses.
+    pivot_columns: PivotColumns,
 }
 
 impl InverseTableauSimulator {
@@ -283,11 +310,16 @@ impl InverseTableauSimulator {
             collapse_rows: Vec::new(),
             collapse_flips: Vec::new(),
             stabilizer_terms: Vec::new(),
+            order_marks: Vec::new(),
+            order_used: Vec::new(),
+            order_partners: Vec::new(),
+            pivot_columns: PivotColumns::default(),
         })
     }
 
     /// Returns to `|0...0>` without reallocating.
     pub(super) fn reset_to_zero_state(&mut self) {
+        self.pivot_columns.discard();
         fill_identity(
             &mut self.rows,
             &mut self.signs,
@@ -313,6 +345,7 @@ impl InverseTableauSimulator {
         let x_row = self.x_row_index(qubit)?;
         let z_row = self.z_row_index(qubit)?;
         let row_words = 2 * self.words;
+        self.pivot_columns.discard();
         let (head, tail) = self.rows.split_at_mut(z_row * row_words);
         let x = head
             .get_mut(x_row * row_words..(x_row + 1) * row_words)
@@ -357,6 +390,7 @@ impl InverseTableauSimulator {
         if left == right {
             return Err(invariant("swap targets coincide"));
         }
+        self.pivot_columns.discard();
         for (first, second) in [
             (self.x_row_index(left)?, self.x_row_index(right)?),
             (self.z_row_index(left)?, self.z_row_index(right)?),
@@ -422,6 +456,7 @@ impl InverseTableauSimulator {
             }
         }
         let row_words = 2 * self.words;
+        self.pivot_columns.discard();
         let local_row_count = targets.len() * 2;
         let local_words = local_row_count * row_words;
         try_resize(&mut self.local_rows, local_words, "local Clifford rows")?;
@@ -545,6 +580,15 @@ impl InverseTableauSimulator {
         if let Some(word) = self.multiplier.get_mut(self.words + pivot_word) {
             *word ^= pivot_mask;
         }
+        if !self.pivot_columns.is_valid() && self.pivot_columns.should_build(self.model, self.words)
+        {
+            self.pivot_columns.build(
+                &self.rows,
+                self.qubit_count,
+                self.words,
+                (&mut self.work, poll, work),
+            )?;
+        }
 
         let row_count = 2 * self.qubit_count;
         let mut anticommuting = std::mem::take(&mut self.collapse_rows);
@@ -591,21 +635,33 @@ impl InverseTableauSimulator {
             }
         }
         flips.sort_unstable();
-        // Scan pivot X bits in bounded row chunks so wide collapses observe cancellation.
-        let scan_chunk_rows =
-            (chunk_units() / usize::try_from(WorkModel::STRIDED_WORD).unwrap_or(5)).max(1);
         self.charge(WorkModel::DISPATCH);
         let mut scan_result: SimResult<()> = Ok(());
-        {
-            let mut toggle_iter = flips.iter().copied().peekable();
-            let mut next_toggle = |limit: usize| {
-                let toggle = toggle_iter.next_if(|&toggle| toggle <= limit)?;
-                let mut odd = true;
-                while toggle_iter.next_if_eq(&toggle).is_some() {
-                    odd = !odd;
-                }
-                Some((toggle, odd))
-            };
+        let mut merge = ToggleMerge {
+            toggles: flips.iter().copied().peekable(),
+        };
+        if self.pivot_columns.is_valid() {
+            // One contiguous column of the transposed copy lists the rows directly.
+            let column_words = row_count.div_ceil(u64::BITS as usize);
+            self.charge((column_words as u64).saturating_mul(WorkModel::COPY_WORD));
+            scan_result = work
+                .charge(self, poll)
+                .map_err(ReferenceSimulatorError::from)
+                .and_then(|()| self.pivot_columns.column(pivot))
+                .map(|column| {
+                    for (word_index, &word) in column.iter().enumerate() {
+                        let mut remaining = word;
+                        while remaining != 0 {
+                            let bit = remaining.trailing_zeros() as usize;
+                            remaining &= remaining - 1;
+                            merge.mark(word_index * u64::BITS as usize + bit, &mut anticommuting);
+                        }
+                    }
+                });
+        } else {
+            // Scan pivot X bits in bounded row chunks so wide collapses observe cancellation.
+            let scan_chunk_rows =
+                (chunk_units() / usize::try_from(WorkModel::STRIDED_WORD).unwrap_or(5)).max(1);
             let mut row_start = 0;
             while row_start < row_count {
                 let row_end = (row_start + scan_chunk_rows).min(row_count);
@@ -623,30 +679,15 @@ impl InverseTableauSimulator {
                             .get(pivot_word)
                             .is_some_and(|word| word & pivot_mask != 0)
                         {
-                            let row = row_start + offset;
-                            let mut keep = true;
-                            while let Some((toggle, odd)) = next_toggle(row) {
-                                if toggle == row {
-                                    keep ^= odd;
-                                } else if odd {
-                                    anticommuting.push(toggle);
-                                }
-                            }
-                            if keep {
-                                anticommuting.push(row);
-                            }
+                            merge.mark(row_start + offset, &mut anticommuting);
                         }
                     }
                 }
                 row_start = row_end;
             }
-            if scan_result.is_ok() {
-                while let Some((toggle, odd)) = next_toggle(usize::MAX) {
-                    if odd {
-                        anticommuting.push(toggle);
-                    }
-                }
-            }
+        }
+        if scan_result.is_ok() {
+            merge.finish(&mut anticommuting);
         }
         self.collapse_flips = flips;
         if let Err(error) = scan_result {
@@ -689,6 +730,18 @@ impl InverseTableauSimulator {
             if result.is_err() {
                 break;
             }
+        }
+        if result.is_ok() {
+            let (multiplier_x, _) = self.multiplier.split_at(self.words);
+            result = self.pivot_columns.follow_collapse(
+                multiplier_x,
+                &anticommuting,
+                self.model,
+                (&mut self.work, poll, work),
+            );
+        }
+        if result.is_err() {
+            self.pivot_columns.discard();
         }
         self.collapse_rows = anticommuting;
         result?;
@@ -802,6 +855,7 @@ impl InverseTableauSimulator {
         extra_log_i: u8,
     ) -> SimResult<()> {
         let row_words = 2 * self.words;
+        self.pivot_columns.discard();
         let (destination_row, source_row) = if destination < source {
             let (head, tail) = self.rows.split_at_mut(source * row_words);
             (
@@ -844,6 +898,48 @@ impl InverseTableauSimulator {
             Ok(self.qubit_count + qubit)
         } else {
             Err(invariant("qubit is outside the reference simulator"))
+        }
+    }
+}
+
+/// Merges the measured observable's support rows, whose commutation with `m Z_k` is the
+/// opposite of their pivot bit, into the ascending rows that carry the pivot bit.
+struct ToggleMerge<'a> {
+    toggles: std::iter::Peekable<std::iter::Copied<std::slice::Iter<'a, usize>>>,
+}
+
+impl ToggleMerge<'_> {
+    /// The next support row at most `limit`, with whether it occurs an odd number of times.
+    fn next_toggle(&mut self, limit: usize) -> Option<(usize, bool)> {
+        let toggle = self.toggles.next_if(|&toggle| toggle <= limit)?;
+        let mut odd = true;
+        while self.toggles.next_if_eq(&toggle).is_some() {
+            odd = !odd;
+        }
+        Some((toggle, odd))
+    }
+
+    /// Lists the support rows below `row`, then `row` unless the support toggles it off.
+    fn mark(&mut self, row: usize, anticommuting: &mut Vec<usize>) {
+        let mut keep = true;
+        while let Some((toggle, odd)) = self.next_toggle(row) {
+            if toggle == row {
+                keep ^= odd;
+            } else if odd {
+                anticommuting.push(toggle);
+            }
+        }
+        if keep {
+            anticommuting.push(row);
+        }
+    }
+
+    /// Lists the support rows after the last pivot row.
+    fn finish(&mut self, anticommuting: &mut Vec<usize>) {
+        while let Some((toggle, odd)) = self.next_toggle(usize::MAX) {
+            if odd {
+                anticommuting.push(toggle);
+            }
         }
     }
 }
