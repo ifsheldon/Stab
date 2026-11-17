@@ -9,8 +9,9 @@ use super::{HitsDuplicates, Ptb64Group};
 use crate::{
     BitPlaneBatchView, DetsLayout, FormatError, PackedShotBatch, RecordFormat, RecordResult,
     result_packed::{
-        b8_length_multiple_error, b8_record_byte_width, decode_next_r8_record,
-        ptb64_bytes_per_group, ptb64_length_multiple_error, ptb64_zero_width_count_error,
+        b8_length_multiple_error, b8_record_byte_width, ptb64_bytes_per_group,
+        ptb64_length_multiple_error, ptb64_zero_width_count_error, r8_truncated_error,
+        resume_r8_record,
     },
     result_text::{
         DetsEvent, HitsEvent, for_each_dets_event, for_each_hits_event, for_each_zero_one_line,
@@ -65,21 +66,165 @@ pub(super) fn b8_record(frame: &[u8], words: &mut [u64]) {
     }
 }
 
-/// Validates one complete `r8` frame without materializing it and returns its byte length.
-pub(super) fn r8_frame_len(frame: &[u8], width: usize) -> RecordResult<usize> {
-    let mut consumed = 0_usize;
-    decode_next_r8_record(frame, width, &mut consumed, |_| Ok(()))?;
-    Ok(consumed)
+/// Decodes the buffered run bytes of one `r8` record into its row words, setting only hit bits.
+///
+/// The row must be cleared before the record's first bytes. Decoding resumes at `*bit_index` and
+/// advances it and `*consumed` past every byte read, returning whether the record completed;
+/// otherwise every byte of `input` was consumed and the record continues in later input.
+pub(super) fn r8_row_bytes(
+    input: &[u8],
+    width: usize,
+    bit_index: &mut usize,
+    consumed: &mut usize,
+    words: &mut [u64],
+) -> RecordResult<bool> {
+    // Apply ordinary runs here; the shared decoder takes over at the first byte that ends the
+    // record, overshoots, or needs any check, so it owns termination and every diagnostic.
+    let mut bits = *bit_index;
+    let mut position = *consumed;
+    while let Some(&byte) = input.get(position) {
+        let Some(decoded) = bits.checked_add(usize::from(byte)) else {
+            break;
+        };
+        if decoded >= width {
+            break;
+        }
+        if byte == u8::MAX {
+            bits = decoded;
+        } else {
+            let Some(word) = words.get_mut(decoded / WORD_BITS) else {
+                break;
+            };
+            *word |= 1_u64 << (decoded % WORD_BITS);
+            bits = decoded + 1;
+        }
+        position += 1;
+    }
+    *bit_index = bits;
+    *consumed = position;
+    resume_r8_record(input, width, bit_index, consumed, |bit| {
+        set_bit(words, bit, width, "r8 hit")
+    })
 }
 
-/// Decodes one `r8` frame into row words, setting only hit bits, and returns its byte length.
-pub(super) fn r8_record(frame: &[u8], width: usize, words: &mut [u64]) -> RecordResult<usize> {
-    words.fill(0);
-    let mut consumed = 0_usize;
-    decode_next_r8_record(frame, width, &mut consumed, |bit_index| {
-        set_bit(words, bit_index, width, "r8 hit")
-    })?;
-    Ok(consumed)
+/// The hits of the first `r8` record, decoded before any batch exists.
+///
+/// Its storage follows the input received rather than the declared width: a sparse record keeps
+/// the indexes of its hits, at most a quarter row of them, and a denser one switches to the row
+/// words up to its last hit, grown geometrically up to the whole row. Either way it holds less
+/// than two rows at its peak and at most one row once the record completes.
+#[derive(Debug)]
+pub(super) enum FirstR8Row {
+    Hits(Vec<usize>),
+    Words(Vec<u64>),
+}
+
+impl Default for FirstR8Row {
+    fn default() -> Self {
+        Self::Hits(Vec::new())
+    }
+}
+
+impl FirstR8Row {
+    fn record_hit(&mut self, bit: usize, width: usize) -> RecordResult<()> {
+        let row_words = width.div_ceil(WORD_BITS);
+        if let Self::Hits(hits) = self {
+            if hits.len() < hits.capacity() {
+                hits.push(bit);
+                return Ok(());
+            }
+            let grown = hits.capacity().saturating_mul(2).max(4);
+            if grown <= row_words / 4 {
+                hits.try_reserve_exact(grown - hits.len())
+                    .map_err(|error| first_row_error(grown, error))?;
+                hits.push(bit);
+                return Ok(());
+            }
+            // Hits arrive in increasing order, so sizing the words for this one up front means
+            // the indexes and the words never coexist with a word growth.
+            let needed = bit / WORD_BITS + 1;
+            let mut words = Vec::new();
+            words
+                .try_reserve_exact(needed)
+                .map_err(|error| first_row_error(needed, error))?;
+            for &hit in hits.iter() {
+                set_grown_bit(&mut words, hit, width, row_words)?;
+            }
+            *self = Self::Words(words);
+        }
+        match self {
+            Self::Words(words) => set_grown_bit(words, bit, width, row_words),
+            Self::Hits(_) => Err(FormatError::invalid_data(
+                "r8 first record kept hit indexes past its switch to row words",
+            )),
+        }
+    }
+
+    /// Writes the decoded hits into a cleared batch row and releases this storage.
+    pub(super) fn take_into(&mut self, words: &mut [u64], width: usize) -> RecordResult<()> {
+        match std::mem::take(self) {
+            Self::Hits(hits) => {
+                for hit in hits {
+                    set_bit(words, hit, width, "r8 hit")?;
+                }
+            }
+            Self::Words(source) => {
+                for (target, word) in words.iter_mut().zip(source) {
+                    *target = word;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Sets `bit` in row words that hold only the words up to the last hit, growing them fallibly
+/// and geometrically, capped at the `row_words`-word row.
+fn set_grown_bit(
+    words: &mut Vec<u64>,
+    bit: usize,
+    width: usize,
+    row_words: usize,
+) -> RecordResult<()> {
+    let needed = bit / WORD_BITS + 1;
+    if needed > words.len() {
+        if needed > words.capacity() {
+            let target = words
+                .capacity()
+                .saturating_mul(2)
+                .clamp(needed, row_words.max(needed));
+            words
+                .try_reserve_exact(target - words.len())
+                .map_err(|error| first_row_error(target, error))?;
+        }
+        words.resize(needed, 0);
+    }
+    set_bit(words, bit, width, "r8 hit")
+}
+
+fn first_row_error(entries: usize, error: std::collections::TryReserveError) -> FormatError {
+    FormatError::invalid_data(format!(
+        "r8 reader could not reserve {entries} words for its first record: {error}"
+    ))
+}
+
+/// Like [`r8_row_bytes`], for the first record, decoded before any batch exists.
+pub(super) fn r8_first_row_bytes(
+    input: &[u8],
+    width: usize,
+    bit_index: &mut usize,
+    consumed: &mut usize,
+    row: &mut FirstR8Row,
+) -> RecordResult<bool> {
+    resume_r8_record(input, width, bit_index, consumed, |bit| {
+        row.record_hit(bit, width)
+    })
+}
+
+/// The diagnostic for an `r8` record that input ended inside, at absolute input offset `offset`
+/// after `bit_index` decoded bits.
+pub(super) fn r8_truncated(offset: usize, bit_index: usize, width: usize) -> FormatError {
+    r8_truncated_error(offset, bit_index, width)
 }
 
 /// Decodes one framed text line into row words; returns whether the line held a record.

@@ -204,6 +204,13 @@ fn reader_and_encoder_storage_bounds_cover_peak_allocation() {
                 RecordFormat::Dets,
                 RecordFormat::Ptb64,
             ] {
+                // Text readers bound their transport buffer through the per-record cap, which
+                // here admits the longest line exactly.
+                let text_cap = input
+                    .split_inclusive(|byte| *byte == b'\n')
+                    .map(<[u8]>::len)
+                    .max()
+                    .unwrap_or_default();
                 let convert = || {
                     let mut reader = RecordStreamReader::measurements(
                         Chunked {
@@ -212,7 +219,7 @@ fn reader_and_encoder_storage_bounds_cover_peak_allocation() {
                         },
                         in_format,
                         width,
-                        usize::MAX,
+                        text_cap,
                     );
                     let mut encoder = RecordEncoder::try_new(out_format, width).expect("encoder");
                     let mut sink = std::io::sink();
@@ -223,15 +230,8 @@ fn reader_and_encoder_storage_bounds_cover_peak_allocation() {
                 };
                 let measured = allocation_counter::measure(convert);
                 let reader = RecordStreamStorage::new(in_format, width, batch_records);
-                // Text readers bound their transport buffer through the per-record cap instead,
-                // which here is the longest line.
                 let text_buffer = if reader.transport_bytes() == 0 {
-                    let line = input
-                        .split(|byte| *byte == b'\n')
-                        .map(<[u8]>::len)
-                        .max()
-                        .unwrap_or_default() as u128;
-                    (line * 4).max(64 * 1024)
+                    RecordStreamStorage::text_transport_bytes(text_cap)
                 } else {
                     0
                 };
@@ -248,6 +248,129 @@ fn reader_and_encoder_storage_bounds_cover_peak_allocation() {
         }
     }
     assert_eq!(PackedShotBatch::storage_bytes(3, 65), 48);
+}
+
+/// `r8` records decode as their bytes arrive, so a record frame many times the transport buffer
+/// costs one fixed buffer, the first record's row, and the batch rather than the frame.
+#[test]
+fn wide_r8_records_decode_through_a_fixed_transport_buffer() {
+    const WIDTH: usize = 2_000_000;
+    // Every bit set (a 2 MB frame), then no bit set (about 7.8 KB of 255 runs).
+    let records = vec![vec![true; WIDTH], vec![false; WIDTH]];
+    let input = write_records(&records, RecordFormat::R8).expect("encode r8");
+    assert!(input.len() > 2_000_000);
+    for step in [65_536, 4_093] {
+        let read = || {
+            let mut reader = RecordStreamReader::measurements(
+                Chunked {
+                    bytes: &input,
+                    step,
+                },
+                RecordFormat::R8,
+                WIDTH,
+                0,
+            );
+            let mut set_bits = Vec::new();
+            while let Some(batch) = reader.read_batch(1).expect("read r8") {
+                let row = batch.shot(0).expect("one record");
+                set_bits.push((0..WIDTH).filter(|bit| row.get(*bit) == Some(true)).count());
+            }
+            set_bits
+        };
+        let mut set_bits = Vec::new();
+        let measured = allocation_counter::measure(|| set_bits = read());
+        assert_eq!(set_bits, vec![WIDTH, 0]);
+        let bound = RecordStreamStorage::new(RecordFormat::R8, WIDTH, 1).bytes();
+        // The vector of counts the closure returns.
+        let slack = 1_024;
+        assert!(
+            u128::from(measured.bytes_max) <= bound + slack,
+            "step {step} peaked at {} bytes above the {bound}-byte bound",
+            measured.bytes_max
+        );
+        assert!(bound < input.len() as u128 / 3);
+    }
+}
+
+/// A text reader's transport buffer stays within [`RecordStreamStorage::text_transport_bytes`]
+/// of its record cap for caps on both sides of the initial buffer and between its doublings,
+/// for the longest line the cap accepts and for one byte more, whatever the read sizes.
+#[test]
+fn text_transport_buffer_stays_within_its_record_cap_bound() {
+    const KIB: usize = 1024;
+    // Diagnostic strings of a refused line.
+    const DIAGNOSTIC_SLACK: u128 = 1_024;
+    for cap in [
+        1_000,
+        64 * KIB - 1,
+        64 * KIB,
+        64 * KIB + 1,
+        96 * KIB + 7,
+        128 * KIB + 1,
+    ] {
+        for format in [RecordFormat::ZeroOne, RecordFormat::Hits] {
+            for (line_len, accepted) in [(cap, true), (cap + 1, false)] {
+                let (line, width) = match format {
+                    RecordFormat::ZeroOne => {
+                        let mut line = b"01".repeat(line_len / 2 + 1);
+                        line.truncate(line_len - 1);
+                        line.push(b'\n');
+                        (line, line_len - 1)
+                    }
+                    // `0,0,...,0\n` toggles one bit; an odd length ends in `\r\n`.
+                    _ => {
+                        let mut line = b"0,".repeat(line_len / 2);
+                        line.pop();
+                        line.extend_from_slice(if line_len % 2 == 0 { b"\n" } else { b"\r\n" });
+                        (line, 1)
+                    }
+                };
+                assert_eq!(line.len(), line_len);
+                for step in [1, 4_093, usize::MAX] {
+                    let read = || {
+                        let mut reader = RecordStreamReader::measurements(
+                            Chunked { bytes: &line, step },
+                            format,
+                            width,
+                            cap,
+                        );
+                        let mut records = 0;
+                        let result = loop {
+                            match reader.read_batch(BATCH_RECORDS) {
+                                Ok(Some(batch)) => records += batch.shot_count(),
+                                Ok(None) => break Ok(records),
+                                Err(error) => break Err(error),
+                            }
+                        };
+                        black_box(result)
+                    };
+                    let mut outcome = None;
+                    let measured = allocation_counter::measure(|| outcome = Some(read()));
+                    let outcome = outcome.expect("measured read ran");
+                    assert_eq!(
+                        outcome.is_ok_and(|records| records == 1),
+                        accepted,
+                        "{format:?} cap {cap} line {line_len} step {step}"
+                    );
+                    let bound = RecordStreamStorage::text_transport_bytes(cap)
+                        + PackedShotBatch::storage_bytes(BATCH_RECORDS, width)
+                        + DIAGNOSTIC_SLACK;
+                    assert!(
+                        u128::from(measured.bytes_max) <= bound,
+                        "{format:?} cap {cap} line {line_len} step {step} peaked at {} bytes \
+                         above the {bound}-byte bound",
+                        measured.bytes_max
+                    );
+                }
+            }
+        }
+    }
+    // The cap a budget admits keeps the buffer within that budget.
+    for budget in [0_u128, 1, 2, 3, 64 * 1024, 64 * 1024 + 1, 1 << 30] {
+        let cap = RecordStreamStorage::max_text_record_bytes(budget);
+        assert!(budget == 0 || RecordStreamStorage::text_transport_bytes(cap) <= budget);
+        assert!(RecordStreamStorage::text_transport_bytes(cap + 1) > budget);
+    }
 }
 
 fn duplicate_dets_record(repetitions: usize) -> Vec<u8> {

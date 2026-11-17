@@ -206,7 +206,7 @@ fn m2d_rejects_oversized_text_records() {
         .expect("compile SWEEP_CX");
     let session = plan.session().expect("session");
     let active_holds = plan.retained_bytes() + session.retained_bytes();
-    let record_cap = usize::try_from((2 * 1024 * 1024 - active_holds) / 2).expect("fits usize");
+    let record_cap = usize::try_from((2 * 1024 * 1024 - active_holds - 1) / 2).expect("fits usize");
     let mut oversized = vec![b'0'; record_cap + 1];
     oversized.push(b'\n');
     m2d(

@@ -257,8 +257,8 @@ fn sample_dem_rejects_malformed_or_short_replay_input() {
     let one_error_plan = stab_engine::DemSamplingCompiler::new()
         .compile(&one_error_dem)
         .expect("compile DEM");
-    let record_cap =
-        usize::try_from((2 * 1024 * 1024 - one_error_plan.retained_bytes()) / 2).expect("usize");
+    let record_cap = usize::try_from((2 * 1024 * 1024 - one_error_plan.retained_bytes() - 1) / 2)
+        .expect("usize");
     let mut blank_prefix = vec![b'\n'; record_cap + 1];
     blank_prefix.extend_from_slice(b"shot M0\n");
     let oversized_msg = format!(

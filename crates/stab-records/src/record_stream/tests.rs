@@ -9,7 +9,7 @@
 use std::assert_matches;
 
 use super::*;
-use crate::{read_records, write_records};
+use crate::{FormatErrorCode, read_records, write_records};
 
 const TEST_TEXT_LIMIT: usize = 1024 * 1024;
 
@@ -478,4 +478,167 @@ fn every_format_regrows_its_batch_when_a_later_read_requests_more_records() {
         }
         assert_eq!(decoded, records, "{format:?}");
     }
+}
+
+/// Delivers its input in exactly two reads split at `split`, then reports end of input.
+struct SplitAt<'a> {
+    head: &'a [u8],
+    tail: &'a [u8],
+}
+
+impl Read for SplitAt<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let source = if self.head.is_empty() {
+            &mut self.tail
+        } else {
+            &mut self.head
+        };
+        let step = source.len().min(buffer.len());
+        buffer[..step].copy_from_slice(&source[..step]);
+        *source = &source[step..];
+        Ok(step)
+    }
+}
+
+/// Streams `input` split at `split` and returns the records and the error, if any.
+fn r8_split(
+    input: &[u8],
+    width: usize,
+    split: usize,
+) -> (Vec<Vec<bool>>, Option<RecordStreamReadError>) {
+    let (head, tail) = input.split_at(split);
+    let mut reader = RecordStreamReader::measurements(
+        SplitAt { head, tail },
+        RecordFormat::R8,
+        width,
+        TEST_TEXT_LIMIT,
+    );
+    drain(&mut reader, 2)
+}
+
+/// `r8` records whose runs end exactly at 255-byte boundaries, at the last bit, and at zero
+/// width, so refills land inside pending 255 runs, before terminators, and between records.
+fn r8_boundary_records(width: usize) -> Vec<Vec<bool>> {
+    // Dense records only at small widths keep the every-offset sweeps quick.
+    let mut records = vec![
+        vec![false; width],
+        vec![width <= 9; width],
+        (0..width).map(|bit| bit % 7 == 3).collect(),
+    ];
+    for hits in [
+        &[255_usize, 511][..],
+        &[0, 254, 510, 765],
+        &[width.saturating_sub(1)],
+        &[1, width.saturating_sub(2)],
+    ] {
+        let mut record = vec![false; width];
+        for &hit in hits {
+            if let Some(bit) = record.get_mut(hit) {
+                *bit = true;
+            }
+        }
+        records.push(record);
+    }
+    records
+}
+
+#[test]
+fn r8_refills_at_every_byte_offset_match_whole_buffer_decoding() {
+    for width in [0_usize, 1, 254, 255, 256, 510, 511, 766, 1_021] {
+        let mut records = r8_boundary_records(width);
+        // Each record leads once, since the first record decodes before the batch exists.
+        for _ in 0..records.len() {
+            records.rotate_left(1);
+            let input = write_records(&records, RecordFormat::R8).expect("encode r8");
+            assert_eq!(
+                read_records(&input, RecordFormat::R8, width).unwrap(),
+                records
+            );
+            for split in 0..=input.len() {
+                let (streamed, error) = r8_split(&input, width, split);
+                assert!(error.is_none(), "width {width} split {split}: {error:?}");
+                assert_eq!(streamed, records, "width {width} split {split}");
+            }
+            // One byte per read resumes after every byte, including inside every pending run.
+            assert_eq!(measurements(&input, RecordFormat::R8, width, 1), records);
+        }
+    }
+}
+
+#[test]
+fn r8_truncation_and_overshoot_at_every_offset_match_whole_buffer_diagnostics() {
+    for width in [0_usize, 1, 255, 256, 511] {
+        let records = r8_boundary_records(width);
+        let input = write_records(&records, RecordFormat::R8).expect("encode r8");
+        let mut corrupt = Vec::new();
+        for (index, byte) in input.iter().enumerate() {
+            // Raising a run byte past the width overshoots inside that record.
+            let mut bad = input.clone();
+            bad[index] = byte.saturating_add(u8::try_from(width.min(254)).unwrap() + 1);
+            if bad[index] != *byte {
+                corrupt.push(bad);
+            }
+        }
+        let prefixes = (0..input.len()).map(|len| input[..len].to_vec());
+        for case in prefixes.chain(corrupt) {
+            let expected = read_records(&case, RecordFormat::R8, width).err();
+            // The records before the first malformed or truncated one, decoded whole.
+            let mut decodable = 0;
+            let mut offset = 0;
+            while offset < case.len()
+                && crate::result_packed::decode_next_r8_record(
+                    &case,
+                    width,
+                    &mut offset,
+                    |_| Ok(()),
+                )
+                .is_ok()
+            {
+                decodable = offset;
+            }
+            let leading = read_records(&case[..decodable], RecordFormat::R8, width).unwrap();
+            for split in 0..=case.len() {
+                let (streamed, error) = r8_split(&case, width, split);
+                let error = error.map(|error| format_error(Some(error)));
+                assert_eq!(error, expected, "width {width} {case:?} split {split}");
+                assert_eq!(streamed, leading, "width {width} {case:?} split {split}");
+            }
+        }
+    }
+}
+
+#[test]
+fn r8_failures_inside_a_partly_read_record_are_reported_again() {
+    // The second record overshoots after its first bytes were consumed in an earlier read.
+    let input = [255_u8, 255, 90, 255, 255, 255];
+    let mut reader =
+        RecordStreamReader::measurements(Trickle::new(&input, 2), RecordFormat::R8, 600, 0);
+    let (records, error) = drain(&mut reader, 4);
+    assert_eq!(records, vec![vec![false; 600]]);
+    let error = format_error(error);
+    assert_eq!(
+        error,
+        read_records(&input, RecordFormat::R8, 600).unwrap_err()
+    );
+    assert_eq!(error.span().expect("span").byte_start(), 5);
+    assert_eq!(format_error(reader.read_batch(4).err()), error);
+    assert_eq!(format_error(reader.skip_records(1).err()), error);
+
+    // A transport failure inside a record cannot be resumed past.
+    struct FailAfter<'a>(&'a [u8]);
+    impl Read for FailAfter<'_> {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            if self.0.is_empty() {
+                return Err(std::io::Error::other("intentional transport stop"));
+            }
+            let step = self.0.len().min(buffer.len());
+            buffer[..step].copy_from_slice(&self.0[..step]);
+            self.0 = &self.0[step..];
+            Ok(step)
+        }
+    }
+    let mut reader =
+        RecordStreamReader::measurements(FailAfter(&[255, 255]), RecordFormat::R8, 600, 0);
+    assert_matches!(reader.read_batch(1), Err(RecordStreamReadError::Io(_)));
+    assert_matches!(reader.read_batch(1), Err(RecordStreamReadError::Format(_)));
 }

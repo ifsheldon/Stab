@@ -782,7 +782,7 @@ fn convert_with_budget(
     (result, required)
 }
 
-/// Every packed input format admits its batch, worst-case frame buffer, and encoder scratch for
+/// Every packed input format admits its batch, peak transport buffer, and encoder scratch for
 /// the declared width before allocating any of it: the exact requirement is admitted, one byte
 /// less is refused with the shared budget diagnostic, and a compact input declaring a huge width
 /// is refused without width-sized allocation.

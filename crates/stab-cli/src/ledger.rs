@@ -5,6 +5,7 @@
 //! storage is dropped, so later stages draw on that budget again.
 
 use stab_model::{Circuit, DetectorErrorModel, MemoryBudget, ParseLimits};
+use stab_records::RecordStreamStorage;
 
 use crate::diagnostics::is_memory_budget_refusal;
 use crate::{CliError, MemoryBudgetArg};
@@ -105,10 +106,10 @@ impl StageBudget {
         self.get().bytes()
     }
 
-    /// The per-record text cap of streamed record inputs. A record's buffer doubles while it is
-    /// framed, so half the stage budget keeps the buffer itself within it.
+    /// The per-record text cap of streamed record inputs: the largest cap whose transport
+    /// buffer, at its peak while one record is framed, stays within the stage budget.
     pub(crate) fn record_bytes(self) -> usize {
-        self.get().bytes_usize() / 2
+        RecordStreamStorage::max_text_record_bytes(u128::from(self.get().bytes()))
     }
 
     /// Attributes a budget refusal reported against this stage's budget to the whole command.

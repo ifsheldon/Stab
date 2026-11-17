@@ -294,10 +294,11 @@ struct ConvertStorage {
 }
 
 impl ConvertStorage {
-    /// Admits the reader's batch, PTB64 group, and packed-format transport buffer for the input
-    /// width and batch size, the column batches split from each batch, and each encoder's
-    /// scratch. Text inputs bound their transport buffer through the per-record text cap that
-    /// the stage after this one receives.
+    /// Admits the reader's batch, PTB64 group, first `r8` record, and packed-format transport
+    /// buffer (fixed for `r8`, whose records decode as they arrive) for the input width and
+    /// batch size, the column batches split from each batch, and each encoder's scratch. Text
+    /// inputs bound their transport buffer through the per-record text cap that the stage after
+    /// this one receives.
     fn admit(
         args: &ConvertArgs,
         layout: ConvertLayout,

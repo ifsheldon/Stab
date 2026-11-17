@@ -16,8 +16,8 @@ use std::io::Read;
 use thiserror::Error;
 
 use crate::{
-    BitPlaneBatchView, DetsLayout, FormatError, FormatErrorCode, PackedShotBatch,
-    PackedShotBatchView, RecordFormat, RecordResult,
+    BitPlaneBatchView, DetsLayout, FormatError, PackedShotBatch, PackedShotBatchView, RecordFormat,
+    RecordResult,
 };
 
 mod decode;
@@ -127,8 +127,8 @@ enum StreamDecoder {
     },
     /// Fixed-width byte-packed records.
     B8,
-    /// Run-length records with data-dependent frame lengths.
-    R8,
+    /// Run-length records with data-dependent frame lengths, decoded as their bytes arrive.
+    R8(R8State),
     /// 64-record measurement-major bit-plane groups.
     Ptb64(Ptb64Group),
 }
@@ -139,6 +139,16 @@ struct Ptb64Group {
     plane_words: Vec<u64>,
     rows: Option<PackedShotBatch>,
     served: usize,
+}
+
+/// Resumable `r8` decoding state that outlives one record.
+#[derive(Debug, Default)]
+struct R8State {
+    /// Hits of the first record, decoded before any batch exists.
+    first_row: decode::FirstR8Row,
+    /// The failure of a record whose earlier bytes were already consumed. Decoding cannot
+    /// resume inside it, so every later read reports it again, as rereading the record would.
+    failed: Option<FormatError>,
 }
 
 /// Decodes records into packed shot-major batches from a byte transport.
@@ -229,7 +239,7 @@ impl<R: Read> RecordStreamReader<R> {
     ) -> Self {
         let decoder = match format {
             RecordFormat::B8 => StreamDecoder::B8,
-            RecordFormat::R8 => StreamDecoder::R8,
+            RecordFormat::R8 => StreamDecoder::R8(R8State::default()),
             RecordFormat::Ptb64 => StreamDecoder::Ptb64(Ptb64Group::default()),
             RecordFormat::ZeroOne | RecordFormat::Hits | RecordFormat::Dets => {
                 StreamDecoder::Text {
@@ -535,12 +545,23 @@ impl<R: Read> RecordStreamReader<R> {
         Ok(())
     }
 
+    /// The most bytes the transport buffer may hold: unlimited for the packed formats, and for
+    /// line-framed text one byte past the record limit, which is all framing ever needs.
+    fn buffer_limit(&self) -> usize {
+        match self.decoder {
+            StreamDecoder::Text { .. } => storage::text_buffer_limit(self.max_text_record_bytes),
+            StreamDecoder::B8 | StreamDecoder::R8(_) | StreamDecoder::Ptb64(_) => usize::MAX,
+        }
+    }
+
     /// Moves unconsumed bytes to the front of the buffer and reads once from the transport.
     ///
-    /// The buffer doubles (zero-filled once per growth) only when unconsumed input already fills
-    /// at least half of it, so its size follows bytes actually received rather than any declared
-    /// record width, a record spanning many refills costs amortized linear work, and ordinary
-    /// reads never re-initialize storage.
+    /// The buffer doubles (zero-filled once per growth), up to [`Self::buffer_limit`], only when
+    /// unconsumed input already fills at least half of it, so its size follows bytes actually
+    /// received rather than any declared record width, a record spanning many refills costs
+    /// amortized linear work, and ordinary reads never re-initialize storage. Text framing
+    /// refills only while fewer than the limit's bytes are unconsumed, so a buffer at its limit
+    /// always has room to read.
     fn refill(&mut self) -> Result<(), RecordStreamReadError> {
         if self.eof {
             return Ok(());
@@ -559,14 +580,23 @@ impl<R: Read> RecordStreamReader<R> {
                 .buffer
                 .len()
                 .saturating_mul(2)
-                .max(INITIAL_BUFFER_BYTES);
-            let additional = grown - self.buffer.len();
-            self.buffer.try_reserve_exact(additional).map_err(|error| {
-                FormatError::invalid_data(format!(
-                    "record stream could not reserve {additional} buffered input bytes: {error}"
-                ))
-            })?;
-            self.buffer.resize(grown, 0);
+                .max(INITIAL_BUFFER_BYTES)
+                .min(self.buffer_limit());
+            if grown <= self.buffer.len() && free == 0 {
+                return Err(FormatError::invalid_data(
+                    "record stream buffer filled at its limit before framing a record",
+                )
+                .into());
+            }
+            if grown > self.buffer.len() {
+                let additional = grown - self.buffer.len();
+                self.buffer.try_reserve_exact(additional).map_err(|error| {
+                    FormatError::invalid_data(format!(
+                        "record stream could not reserve {additional} buffered input bytes: {error}"
+                    ))
+                })?;
+                self.buffer.resize(grown, 0);
+            }
         }
         let read = loop {
             let window = self.buffer.get_mut(self.end..).unwrap_or_default();
@@ -592,7 +622,7 @@ impl<R: Read> RecordStreamReader<R> {
                 RecordFraming::Records => self.next_line_text_record(row, capacity),
             },
             StreamDecoder::B8 => self.next_b8_record(row, capacity),
-            StreamDecoder::R8 => self.next_r8_record(row, capacity),
+            StreamDecoder::R8(_) => self.next_r8_record(row, capacity),
             StreamDecoder::Ptb64(_) => self.next_ptb64_record(row, capacity),
         }
     }
@@ -864,53 +894,113 @@ impl<R: Read> RecordStreamReader<R> {
         Ok(true)
     }
 
+    /// Decodes the next `r8` record into batch row `row` as its bytes arrive, so a record of any
+    /// length spans refills of the fixed transport buffer without being buffered whole.
+    ///
+    /// The first record decodes into a row that grows only with its decoded hits, and the batch
+    /// is allocated once that record completes. A failure after part of a record was consumed is
+    /// reported again by every later read.
     fn next_r8_record(
         &mut self,
         row: usize,
         capacity: usize,
     ) -> Result<bool, RecordStreamReadError> {
+        let StreamDecoder::R8(state) = &self.decoder else {
+            return Err(internal_decoder_mismatch().into());
+        };
+        if let Some(error) = &state.failed {
+            return Err(error.clone().into());
+        }
+        let record_start = self.record_offset();
+        let result = self.decode_r8_record(row, capacity);
+        if let Err(error) = &result
+            && self.record_offset() != record_start
+            && let StreamDecoder::R8(state) = &mut self.decoder
+        {
+            state.failed = Some(match error {
+                RecordStreamReadError::Format(error) => error.clone(),
+                _ => FormatError::invalid_data(
+                    "r8 record stream cannot resume a record whose read failed partway",
+                ),
+            });
+        }
+        result
+    }
+
+    fn decode_r8_record(
+        &mut self,
+        row: usize,
+        capacity: usize,
+    ) -> Result<bool, RecordStreamReadError> {
         let width = self.bits_per_record;
+        self.fill_at_least(1)?;
+        if self.available() == 0 {
+            return Ok(false);
+        }
+        let proven = self.batch.is_some();
+        if proven {
+            // A later read may request more records than the batch holds; regrow it like the
+            // other formats before decoding into the requested row.
+            self.ensure_batch(capacity)?;
+            self.r8_batch_row(row)?.fill(0);
+        } else if let StreamDecoder::R8(state) = &mut self.decoder {
+            state.first_row = decode::FirstR8Row::default();
+        }
+        let mut bit_index = 0_usize;
         loop {
-            if self.available() == 0 {
-                if self.eof {
-                    return Ok(false);
-                }
-                self.refill()?;
-                continue;
-            }
-            let record_offset = self.record_offset().ok_or_else(|| {
+            let slice_offset = self.record_offset().ok_or_else(|| {
                 FormatError::invalid_data("streamed record byte offset overflowed")
             })?;
-            let decoded = if self.batch.is_none() {
-                // Prove the first frame before allocating storage proportional to the width.
-                decode::r8_frame_len(self.unconsumed(), width).map(|_| None)
-            } else {
-                // A later read may request more records than the batch holds; regrow it like
-                // the other formats before decoding into the requested row.
-                self.ensure_batch(capacity)?;
-                let frame = self.buffer.get(self.start..self.end).unwrap_or_default();
-                let batch = self.batch.as_mut().ok_or_else(|| {
-                    FormatError::invalid_data("r8 record lost its reusable batch")
-                })?;
-                decode::r8_record(frame, width, &mut batch.shot_words_mut(row)?).map(Some)
+            let input = self.buffer.get(self.start..self.end).unwrap_or_default();
+            let mut consumed = 0_usize;
+            let step = match (&mut self.decoder, self.batch.as_mut()) {
+                (StreamDecoder::R8(_), Some(batch)) if proven => decode::r8_row_bytes(
+                    input,
+                    width,
+                    &mut bit_index,
+                    &mut consumed,
+                    &mut batch.shot_words_mut(row)?,
+                ),
+                (StreamDecoder::R8(state), _) => decode::r8_first_row_bytes(
+                    input,
+                    width,
+                    &mut bit_index,
+                    &mut consumed,
+                    &mut state.first_row,
+                ),
+                _ => return Err(internal_decoder_mismatch().into()),
             };
-            match decoded {
-                Ok(Some(consumed)) => {
-                    self.consume(consumed)?;
-                    return Ok(true);
-                }
-                Ok(None) => self.ensure_batch(capacity)?,
-                Err(error)
-                    if error.code() == FormatErrorCode::UnexpectedEndOfInput && !self.eof =>
-                {
-                    // The record spans the buffered window; fetch more bytes and redecode it
-                    // from its start. The buffer grows geometrically, bounding total redecode
-                    // work by a constant factor of the record length.
-                    self.refill()?;
-                }
-                Err(error) => return Err(error.with_span_offset(record_offset).into()),
+            let complete = step.map_err(|error| error.with_span_offset(slice_offset))?;
+            self.consume(consumed)?;
+            if complete {
+                break;
             }
+            if self.eof {
+                let offset = self.record_offset().ok_or_else(|| {
+                    FormatError::invalid_data("streamed record byte offset overflowed")
+                })?;
+                return Err(decode::r8_truncated(offset, bit_index, width).into());
+            }
+            self.refill()?;
         }
+        if !proven {
+            self.ensure_batch(capacity)?;
+            let StreamDecoder::R8(state) = &mut self.decoder else {
+                return Err(internal_decoder_mismatch().into());
+            };
+            let mut first_row = std::mem::take(&mut state.first_row);
+            let mut words = self.r8_batch_row(row)?;
+            words.fill(0);
+            first_row.take_into(&mut words, width)?;
+        }
+        Ok(true)
+    }
+
+    fn r8_batch_row(&mut self, row: usize) -> RecordResult<stab_bits::BitWordsMut<'_>> {
+        self.batch
+            .as_mut()
+            .ok_or_else(|| FormatError::invalid_data("r8 record lost its reusable batch"))?
+            .shot_words_mut(row)
     }
 
     fn frame_ptb64_group(&mut self) -> Result<Option<usize>, RecordStreamReadError> {
