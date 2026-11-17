@@ -61,7 +61,7 @@ A stage refused while earlier stages hold bytes keeps its error class, code, exi
 | `RepeatNestingLimit::HARD_MAX` | `stab-model/src/parse_limits.rs` | Nesting | The shared 256-level envelope that callers may tighten but not raise. |
 | `MAX_DEM_REPEAT_NESTING` | `stab-model/src/dem.rs` | Nesting | Re-export of the shared envelope for DEM consumers. |
 | `ReferenceSampleTree::MAX_NESTING` | `stab-engine/src/reference_sample_tree.rs` | Nesting | The shared envelope. |
-| `ParseLimits::DEFAULT_REPEAT_NESTING` | `stab-model/src/parse_limits.rs` | Nesting | The shared envelope as a `RepeatNestingLimit`. The model's folded circuit walk (`stab_model::advanced::visit_folded_circuit` and `FoldedCircuitSummary`) enforces it for the analyzer, flattening, feedback inlining, flow generation, missing-detector discovery, measurement-rich time reversal, the CLI herald count, and the sampling request estimate, and detecting-region validation enforces the same `RepeatNestingLimit::HARD_MAX`, each reporting its own nesting error. |
+| `ParseLimits::DEFAULT_REPEAT_NESTING` | `stab-model/src/parse_limits.rs` | Nesting | The shared envelope as a `RepeatNestingLimit`. The model's folded circuit walk (`stab_model::advanced::visit_folded_circuit` and `FoldedCircuitSummary`) enforces it for the analyzer with and without loop folding, the whole-circuit counts of detecting-region extraction, flattening, feedback inlining, flow generation, missing-detector discovery, measurement-rich time reversal, the CLI herald count, and the sampling request estimate, and detecting-region validation enforces the same `RepeatNestingLimit::HARD_MAX`, each reporting its own nesting error. |
 | `ParseLimits::DEFAULT_MEMORY_BUDGET` | `stab-model/src/parse_limits.rs` | Byte budget | The parse budget for source bytes plus the conservative retained model. |
 | `MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES` | `stab-model/src/dem/api.rs` | Byte budget | The default budget divided by 48 conservative bytes per retained candidate; truncation beyond it reports a typed error naming the budget. |
 | `AlgebraMemoryBudget::DEFAULT` | `stab-algebra/src/budget.rs` | Byte budget | One gibibyte, the same default as `MemoryBudget`, used by the unbudgeted algebra constructors and parsers, each of which delegates to a `*_with_budget` sibling; `stab-analysis` maps its `MemoryBudget` onto it. |
@@ -74,7 +74,7 @@ A stage refused while earlier stages hold bytes keeps its error class, code, exi
 | `LaneWidth::WIDEST_FROM_TOTAL_SHOTS` | `stab-engine/src/lane_width.rs` | Threshold | 512 shots, two widest batches: `LaneWidth::for_total_shots` picks the widest lane width from this total on and otherwise the width that samples the fewest lanes; it never rejects work. |
 | `MAX_REPLAY_BATCH_SHOTS` | `stab-engine/src/dem_sampling/session.rs` | Threshold | The 64-record shot-major DEM replay batch, which also caps the DEM session's batch-shape search. |
 | `RETAINED_BATCH_SHOTS` | `stab-engine/src/dem_sampling/replay_store.rs` | Threshold | 64 records per retained replay batch, one word per error; it never rejects work. |
-| `MAX_POOLED_SETS` | `stab-analysis/src/sparse_rev_frame_tracker.rs` | Threshold | Bounds the recycled-set pool; it never rejects work. |
+| `MAX_POOLED_SETS` | `stab-analysis/src/sparse_rev_frame_tracker/sets.rs` | Threshold | Bounds the recycled-set pool, whose buffers the tracker meter counts; it never rejects work. |
 | `INITIAL_NESTED_DEM_CAPACITY` | `stab-model/src/dem/parser/items.rs` | Threshold | An initial vector capacity. |
 | `CAPABILITIES_OUTPUT_SCHEMA_VERSION` | `stab-cli/src/agent.rs` | Not a limit | A schema version. |
 | `MEMORY_BUDGET_HELP` | `stab-cli/src/diagnostics.rs` | Not a limit | Help text for budget refusals. |
@@ -120,6 +120,9 @@ The reset also introduced unmatched cost-model and threshold constants: `REFEREN
 
 Each of these operations admits every retained allocation it makes against the one caller budget, including the algebra values it builds, which receive the same byte count as an `AlgebraMemoryBudget`; the functions without a budget parameter use `MemoryBudget::DEFAULT`.
 The unbudgeted flow checks keep failing a flow closed when the default budget refuses live tracker state or an extracted Pauli string; the `*_with_options` siblings report the refusal instead.
+The sparse reverse tracker counts what its sets retain by buffer capacity, together with their map entries, the recycled-set pool, the merge and operand buffers, and any sensitivity held outside its maps while it is merged.
+Each merge that may allocate first admits its worst-case growth, at most the sum of the merged lengths under amortized growth, so one wide instruction is refused before its sets outgrow the budget rather than after; uncounted map nodes and per-instruction term lists stay a few kilobytes beyond it.
+The tracker folds a unitary repeat above one iteration into one slot transform built from a single basis tracker on its own undo stack, so nested unitary repeats cost one body undo per level and no native recursion, and the transform's compositions are admitted before they are built.
 `sample_if_circuit_has_stabilizer_flows` in `stab-engine` is the default-budget, never-cancelled form of `sample_if_circuit_has_stabilizer_flows_with_options`.
 
 ## Cooperative Cancellation

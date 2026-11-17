@@ -128,3 +128,56 @@ fn rejected_mpp_storage_is_admitted_before_product_allocation() {
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
 }
+
+/// Nests `depth` repeat blocks of `count`, each body being the inner block followed by `suffix`.
+fn nested_repeats(depth: usize, count: u64, innermost: &str, suffix: &str) -> Circuit {
+    let suffix = circuit(suffix);
+    let mut body = circuit(innermost);
+    for _ in 0..depth {
+        let mut outer = Circuit::new();
+        outer.append_repeat_block(RepeatBlock::new(
+            RepeatCount::try_new(count).expect("repeat count"),
+            body,
+            None,
+        ));
+        for item in suffix.items() {
+            let stab_model::CircuitItem::Instruction(instruction) = item else {
+                continue;
+            };
+            outer.append_instruction(instruction.clone());
+        }
+        body = outer;
+    }
+    body
+}
+
+/// The sparse checker folds nested unitary repeats one body undo per level and without native
+/// recursion, so the full 256-level envelope of `REPEAT 2` blocks is checked on a small stack;
+/// unrolling it would take 2^256 body undos.
+#[test]
+fn sparse_flow_check_folds_the_full_nesting_envelope_of_unitary_repeats() {
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            // Each level applies H S S H = X, which keeps Z and X up to sign.
+            let nested = nested_repeats(
+                stab_model::RepeatNestingLimit::HARD_MAX,
+                2,
+                "H 0\nH 0\nCX 0 1\nCX 0 1\n",
+                "H 0\nS 0\nS 0\nH 0\n",
+            );
+            let flows = ["Z0 -> Z0", "X0 -> X0", "X0 -> Z0", "Z1 -> Z1"]
+                .map(|flow| flow.parse::<Flow>().expect("flow"));
+            assert_eq!(
+                stab_analysis::check_if_circuit_has_unsigned_stabilizer_flows_with_options(
+                    &nested,
+                    &flows,
+                    &stab_analysis::UnsignedFlowCheckOptions::default(),
+                ),
+                Ok(vec![true, true, false, true])
+            );
+        })
+        .expect("spawn")
+        .join()
+        .expect("deep unitary flow check");
+}

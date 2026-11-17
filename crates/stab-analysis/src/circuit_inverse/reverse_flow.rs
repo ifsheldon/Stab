@@ -23,7 +23,30 @@ pub(super) fn requires_general_reversal(circuit: &Circuit, flows: &[Flow]) -> bo
     flows
         .iter()
         .any(|flow| flow.measurements().next().is_some() || flow.observables().next().is_some())
-        || circuit.items().iter().any(item_requires_general_reversal)
+        || any_nested_instruction(circuit, instruction_requires_general_reversal)
+}
+
+/// Reports whether any instruction at any nesting depth satisfies `predicate`, walking repeat
+/// bodies with an explicit stack.
+fn any_nested_instruction(
+    circuit: &Circuit,
+    mut predicate: impl FnMut(&CircuitInstruction) -> bool,
+) -> bool {
+    let mut stack = vec![circuit.items().iter()];
+    while let Some(items) = stack.last_mut() {
+        match items.next() {
+            Some(CircuitItem::Instruction(instruction)) => {
+                if predicate(instruction) {
+                    return true;
+                }
+            }
+            Some(CircuitItem::RepeatBlock(repeat)) => stack.push(repeat.body().items().iter()),
+            None => {
+                stack.pop();
+            }
+        }
+    }
+    false
 }
 
 pub(super) fn reverse_flows(
@@ -697,21 +720,12 @@ impl ReverseFlowEngine {
     }
 }
 
-fn item_requires_general_reversal(item: &CircuitItem) -> bool {
-    match item {
-        CircuitItem::Instruction(instruction) => {
-            !instruction.gate().is_unitary()
-                || instruction
-                    .targets()
-                    .iter()
-                    .any(Target::is_classical_bit_target)
-        }
-        CircuitItem::RepeatBlock(repeat) => repeat
-            .body()
-            .items()
+fn instruction_requires_general_reversal(instruction: &CircuitInstruction) -> bool {
+    !instruction.gate().is_unitary()
+        || instruction
+            .targets()
             .iter()
-            .any(item_requires_general_reversal),
-    }
+            .any(Target::is_classical_bit_target)
 }
 
 /// Measurement-rich reversal expands every repeat into the inverted circuit, its detector and
@@ -731,7 +745,7 @@ fn validate_general_reversal(circuit: &Circuit, budget: MemoryBudget) -> Analysi
         )
         .into());
     }
-    validate_items(circuit.items())
+    validate_instructions(circuit)
 }
 
 /// Conservative retained bytes of one expanded copy of `circuit`, with checked arithmetic.
@@ -774,14 +788,13 @@ fn projected_reversal_bytes(circuit: &Circuit) -> AnalysisResult<u64> {
     Ok(total)
 }
 
-fn validate_items(items: &[CircuitItem]) -> AnalysisResult<()> {
-    for item in items {
-        match item {
-            CircuitItem::Instruction(instruction) => validate_instruction(instruction)?,
-            CircuitItem::RepeatBlock(repeat) => validate_items(repeat.body().items())?,
-        }
-    }
-    Ok(())
+fn validate_instructions(circuit: &Circuit) -> AnalysisResult<()> {
+    let mut failure = None;
+    any_nested_instruction(circuit, |instruction| {
+        failure = validate_instruction(instruction).err();
+        failure.is_some()
+    });
+    failure.map_or(Ok(()), Err)
 }
 
 fn validate_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> {

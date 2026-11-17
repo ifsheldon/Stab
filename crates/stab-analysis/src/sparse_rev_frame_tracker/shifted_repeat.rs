@@ -5,7 +5,8 @@ use stab_model::{Circuit, CircuitItem, DemTarget};
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
-use super::{GaugeOutputPolicy, SparseReverseFrameTracker, TargetSets, unitary_repeat};
+use super::unitary_repeat::UnitaryFold;
+use super::{GaugeOutputPolicy, SparseReverseFrameTracker, TargetSets};
 
 #[derive(Clone, Copy)]
 enum ProbeTarget {
@@ -43,8 +44,14 @@ impl RecurrenceProbe<'_> {
 
 enum UndoFrame<'a> {
     Items(std::slice::Iter<'a, CircuitItem>),
-    Unroll { body: &'a Circuit, remaining: u64 },
+    Unroll {
+        body: &'a Circuit,
+        remaining: u64,
+    },
     Probe(Box<RecurrenceProbe<'a>>),
+    /// A unitary repeat whose body is being undone once on the fold's basis tracker; the body's
+    /// items frame sits directly above it.
+    UnitaryFold(Box<UnitaryFold<'a>>),
 }
 
 #[cfg(test)]
@@ -77,6 +84,22 @@ pub(super) fn undo_loop_with_gauge_output(
     tracker.meter.sibling_tracker_bytes = 0;
     let initial = prepare_loop_frame(tracker, body, repetitions)?;
     run_undo_stack(tracker, vec![initial], gauge_output)
+}
+
+#[cfg(test)]
+pub(super) fn undo_unitary_fold(
+    tracker: &mut SparseReverseFrameTracker,
+    fold: UnitaryFold<'_>,
+) -> AnalysisResult<()> {
+    let body = fold.body();
+    run_undo_stack(
+        tracker,
+        vec![
+            UndoFrame::UnitaryFold(Box::new(fold)),
+            UndoFrame::Items(body.items().iter()),
+        ],
+        GaugeOutputPolicy::Preserve,
+    )
 }
 
 #[cfg(test)]
@@ -130,6 +153,7 @@ fn active_tracker_mut<'t>(
             UndoFrame::Probe(probe) => acc
                 .saturating_add(probe.tortoise.live_bytes())
                 .saturating_add(probe.hare.live_bytes()),
+            UndoFrame::UnitaryFold(fold) => acc.saturating_add(fold.basis().live_bytes()),
             UndoFrame::Items(_) | UndoFrame::Unroll { .. } => acc,
         });
     let active = stack
@@ -137,6 +161,7 @@ fn active_tracker_mut<'t>(
         .rev()
         .find_map(|frame| match frame {
             UndoFrame::Probe(probe) => Some(probe.active_mut()),
+            UndoFrame::UnitaryFold(fold) => Some(fold.basis_mut()),
             UndoFrame::Items(_) | UndoFrame::Unroll { .. } => None,
         })
         .unwrap_or(root);
@@ -182,8 +207,11 @@ fn run_undo_stack<'a>(
                     }
                     CircuitItem::RepeatBlock(repeat) => {
                         if gauge_output == GaugeOutputPolicy::Preserve
-                            && unitary_repeat::try_undo_supported_unitary_repeat(active, repeat)?
+                            && let Some(fold) = UnitaryFold::start(active, repeat)?
                         {
+                            let body = fold.body();
+                            stack.push(UndoFrame::UnitaryFold(Box::new(fold)));
+                            stack.push(UndoFrame::Items(body.items().iter()));
                             continue;
                         }
                         let next_frame =
@@ -201,6 +229,14 @@ fn run_undo_stack<'a>(
                 let body = *body;
                 active_tracker_mut(root, below).poll_cancellation()?;
                 stack.push(UndoFrame::Items(body.items().iter()));
+            }
+            UndoFrame::UnitaryFold(_) => {
+                let Some(UndoFrame::UnitaryFold(fold)) = stack.pop() else {
+                    return Err(AnalysisError::invalid_detector_error_model(
+                        "sparse reverse unitary fold frame disappeared from the undo stack",
+                    ));
+                };
+                fold.finish(active_tracker_mut(root, &mut stack))?;
             }
             UndoFrame::Probe(probe) => match probe.phase {
                 ProbePhase::StartHare => {

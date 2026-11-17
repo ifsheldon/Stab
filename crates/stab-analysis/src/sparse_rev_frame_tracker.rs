@@ -11,6 +11,7 @@ mod clifford_action;
 mod error_analysis;
 mod pauli_product;
 mod regions;
+mod sets;
 mod shifted_recurrence;
 mod shifted_repeat;
 mod unitary_repeat;
@@ -21,7 +22,14 @@ use crate::target_xor_set::{TargetXorSet, xor_merge_into};
 use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceOperation};
 use budget::{TrackerMeter, recompute_live_bytes, set_entry_bytes};
 use clifford_action::{single_qubit_action, two_qubit_action};
-use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
+use pauli_product::{
+    pair_measurement_terms_reversed, pauli_product_measurement_terms_reversed,
+    pauli_product_terms_reversed, qubits_reversed,
+};
+use sets::{
+    TrackerScratch, buffer_growth_bytes, replace_qubit_set, toggle_qubit_set, xor_growth_bytes,
+    xor_item_growth_bytes,
+};
 pub(crate) use shifted_recurrence::{ShiftedRecurrenceSearch, search_shifted_recurrence};
 pub(crate) use unitary_repeat::is_supported_unitary_circuit as folds_unitary_repeat_body;
 
@@ -40,9 +48,6 @@ fn tracked_controlled_pauli(
 /// Sensitivity sets keyed by qubit, record index, or observable; absent keys are empty sets.
 type TargetSets<K> = BTreeMap<K, TargetXorSet>;
 
-/// Upper bound on recycled sensitivity buffers kept between operations.
-const MAX_POOLED_SETS: usize = 32;
-
 fn tracker_basis(basis: PauliBasis) -> AnalysisResult<TrackerBasis> {
     TrackerBasis::from_pauli_basis(basis).ok_or_else(|| {
         AnalysisError::invalid_detector_error_model(
@@ -51,7 +56,8 @@ fn tracker_basis(basis: PauliBasis) -> AnalysisResult<TrackerBasis> {
     })
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// `Clone` is implemented in `budget` so a clone's meter matches its own buffers.
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct SparseReverseFrameTracker {
     xs: TargetSets<QubitId>,
     zs: TargetSets<QubitId>,
@@ -85,48 +91,6 @@ impl PartialEq for TrackerCancellation {
 }
 
 impl Eq for TrackerCancellation {}
-
-/// Reused merge buffers. They hold no tracker state, so clones start empty and every
-/// scratch value compares equal.
-#[derive(Debug, Default)]
-struct TrackerScratch {
-    merge: Vec<DemTarget>,
-    operand: Vec<DemTarget>,
-    pool: Vec<TargetXorSet>,
-}
-
-impl TrackerScratch {
-    fn take_set(&mut self) -> TargetXorSet {
-        self.pool.pop().unwrap_or_default()
-    }
-
-    fn recycle(&mut self, mut set: TargetXorSet) {
-        if self.pool.len() < MAX_POOLED_SETS {
-            set.clear();
-            self.pool.push(set);
-        }
-    }
-
-    fn take_operand(&mut self) -> Vec<DemTarget> {
-        let mut operand = std::mem::take(&mut self.operand);
-        operand.clear();
-        operand
-    }
-}
-
-impl Clone for TrackerScratch {
-    fn clone(&self) -> Self {
-        Self::default()
-    }
-}
-
-impl PartialEq for TrackerScratch {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
-
-impl Eq for TrackerScratch {}
 
 impl SparseReverseFrameTracker {
     pub(crate) fn new(
@@ -170,21 +134,39 @@ impl SparseReverseFrameTracker {
         self.meter.base_bytes = base_bytes;
     }
 
-    /// Bytes currently retained across the tracker's sensitivity maps, gauge sets, and
-    /// anticommutation records.
+    /// Bytes currently retained across the tracker's sensitivity maps, gauge sets,
+    /// anticommutation records, recycled-set pool, and merge buffers, counted by capacity.
     pub(crate) fn live_bytes(&self) -> u64 {
-        self.meter.live_bytes
+        self.meter
+            .live_bytes
+            .saturating_add(self.scratch.retained_bytes())
     }
 
     /// Fails when the tracker's live state exceeds its configured memory budget.
     #[inline]
     pub(crate) fn check_live_budget(&self) -> AnalysisResult<()> {
-        self.meter.admit(0)
+        self.meter.admit(self.scratch.retained_bytes())
     }
 
     /// Fails when the tracker's live state plus `extra_bytes` exceeds its configured budget.
     pub(crate) fn check_live_budget_with_extra(&self, extra_bytes: u64) -> AnalysisResult<()> {
-        self.meter.admit(extra_bytes)
+        self.meter
+            .admit(self.scratch.retained_bytes().saturating_add(extra_bytes))
+    }
+
+    /// Runs `work` with `held` bytes of an operand taken out of the scratch or a map admitted
+    /// alongside every growth it makes.
+    #[inline]
+    fn holding<T>(
+        &mut self,
+        held: u64,
+        work: impl FnOnce(&mut Self) -> AnalysisResult<T>,
+    ) -> AnalysisResult<T> {
+        let previous = self.meter.held_bytes;
+        self.meter.held_bytes = previous.saturating_add(held);
+        let result = work(self);
+        self.meter.held_bytes = previous;
+        result
     }
 
     pub(super) fn sync_live_bytes(&mut self) {
@@ -286,17 +268,24 @@ impl SparseReverseFrameTracker {
                 "measurement record index {index} is outside the sparse reverse tracker history"
             )));
         }
-        self.toggle_record_target(index, target);
-        Ok(())
+        self.toggle_record_target(index, target)
     }
 
-    pub(crate) fn toggle_observable_effect(&mut self, observable: u32, target: DemTarget) {
+    pub(crate) fn toggle_observable_effect(
+        &mut self,
+        observable: u32,
+        target: DemTarget,
+    ) -> AnalysisResult<()> {
         let key = u64::from(observable);
-        let before = set_entry_bytes(self.observable_effects.get(&key));
+        let existing = self.observable_effects.get(&key);
+        self.scratch
+            .admit_growth(&self.meter, xor_item_growth_bytes(existing))?;
+        let before = set_entry_bytes(existing);
         let set = self.observable_effects.entry(key).or_default();
         set.xor_item(target);
         let after = set_entry_bytes(Some(set));
         self.meter.adjust(before, after);
+        Ok(())
     }
 
     pub(crate) fn pauli_targets_at(&self, qubit: QubitId) -> AnalysisResult<BTreeSet<DemTarget>> {
@@ -511,8 +500,11 @@ impl SparseReverseFrameTracker {
             let sensitivity = self.product_anticommuting_sensitivity(&terms)?;
             // SPP and SPP_DAG differ only by phase signs on anticommuting Paulis; this tracker
             // stores unsigned detector and observable regions, so both gates share propagation.
-            self.toggle_product_sensitivity(&terms, sensitivity.as_slice())?;
+            let toggled = self.holding(held_set_bytes(&sensitivity), |tracker| {
+                tracker.toggle_product_sensitivity(&terms, sensitivity.as_slice())
+            });
             self.scratch.recycle(sensitivity);
+            toggled?;
             self.check_live_budget()?;
         }
         Ok(())
@@ -528,7 +520,9 @@ impl SparseReverseFrameTracker {
         term: &[(QubitId, TrackerBasis)],
     ) -> AnalysisResult<()> {
         let sensitivity = self.pop_record_sensitivity()?;
-        let merged = self.toggle_product_sensitivity(term, sensitivity.as_slice());
+        let merged = self.holding(held_set_bytes(&sensitivity), |tracker| {
+            tracker.toggle_product_sensitivity(term, sensitivity.as_slice())
+        });
         self.scratch.recycle(sensitivity);
         merged?;
         self.check_product_measurement_gauge(term)?;
@@ -541,7 +535,9 @@ impl SparseReverseFrameTracker {
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
         let sensitivity = self.pop_record_sensitivity()?;
-        let result = self.toggle_product_sensitivity(&[(qubit, basis)], sensitivity.as_slice());
+        let result = self.holding(held_set_bytes(&sensitivity), |tracker| {
+            tracker.toggle_product_sensitivity(&[(qubit, basis)], sensitivity.as_slice())
+        });
         self.scratch.recycle(sensitivity);
         result
     }
@@ -678,9 +674,11 @@ impl SparseReverseFrameTracker {
         let mut sensitivity = self.scratch.take_operand();
         self.anticommuting_sensitivity_into(qubit, basis, &mut sensitivity)?;
         let index = self.record_index_from_offset(record.get())?;
-        self.toggle_record_sensitivity(index, &sensitivity);
+        let toggled = self.holding(budget::buffer_bytes(sensitivity.capacity()), |tracker| {
+            tracker.toggle_record_sensitivity(index, &sensitivity)
+        });
         self.scratch.operand = sensitivity;
-        Ok(())
+        toggled
     }
 
     fn undo_quantum_controlled_pauli(
@@ -715,10 +713,20 @@ impl SparseReverseFrameTracker {
         // Each operand is copied before the toggle that could alias it.
         let mut operand = self.scratch.take_operand();
         self.anticommuting_sensitivity_into(target, target_basis, &mut operand)?;
-        self.toggle_zs(control, &operand)?;
+        self.holding(budget::buffer_bytes(operand.capacity()), |tracker| {
+            tracker.toggle_zs(control, &operand)
+        })?;
+        let control_xs = self.xs_for(control)?;
+        self.scratch.admit_growth(
+            &self.meter,
+            buffer_growth_bytes(operand.capacity(), control_xs.len())
+                .saturating_add(budget::buffer_bytes(operand.capacity())),
+        )?;
         operand.clear();
-        operand.extend_from_slice(self.xs_for(control)?);
-        self.toggle_product_sensitivity(&[(target, target_basis)], &operand)?;
+        operand.extend_from_slice(control_xs);
+        self.holding(budget::buffer_bytes(operand.capacity()), |tracker| {
+            tracker.toggle_product_sensitivity(&[(target, target_basis)], &operand)
+        })?;
         self.scratch.operand = operand;
         Ok(())
     }
@@ -762,7 +770,10 @@ impl SparseReverseFrameTracker {
                 ))
             })?;
             let index = self.record_index_from_offset(offset.get())?;
-            let before = set_entry_bytes(self.rec_bits.get(&index));
+            let existing = self.rec_bits.get(&index);
+            self.scratch
+                .admit_growth(&self.meter, xor_item_growth_bytes(existing))?;
+            let before = set_entry_bytes(existing);
             let set = self.rec_bits.entry(index).or_default();
             set.xor_item(detector);
             let after = set_entry_bytes(Some(set));
@@ -779,24 +790,51 @@ impl SparseReverseFrameTracker {
             )
         })?;
         let mut sensitivity = self.scratch.take_operand();
-        match self.observable_effects.get(&observable.get()) {
+        let effects = self.observable_effects.get(&observable.get());
+        self.scratch.admit_growth(
+            &self.meter,
+            buffer_growth_bytes(sensitivity.capacity(), effects.map_or(1, TargetXorSet::len)),
+        )?;
+        match effects {
             Some(effects) => sensitivity.extend_from_slice(effects.as_slice()),
             None => sensitivity.push(DemTarget::logical_observable(observable.get())?),
         }
+        let held = budget::buffer_bytes(sensitivity.capacity());
+        let included = self.holding(held, |tracker| {
+            tracker.include_observable_sensitivity(instruction, &sensitivity)
+        });
+        self.scratch.operand = sensitivity;
+        included
+    }
+
+    /// XORs an observable's sensitivity into each record and Pauli target of its include.
+    fn include_observable_sensitivity(
+        &mut self,
+        instruction: &CircuitInstruction,
+        sensitivity: &[DemTarget],
+    ) -> AnalysisResult<()> {
         for target in instruction.targets() {
             match target {
                 Target::MeasurementRecord { offset } => {
                     let index = self.record_index_from_offset(offset.get())?;
-                    let before = set_entry_bytes(self.rec_bits.get(&index));
+                    let existing = self.rec_bits.get(&index);
+                    let growth = xor_growth_bytes(
+                        existing,
+                        sensitivity.len(),
+                        0,
+                        self.scratch.merge.capacity(),
+                    );
+                    self.scratch.admit_growth(&self.meter, growth)?;
+                    let before = set_entry_bytes(existing);
                     let set = self.rec_bits.entry(index).or_default();
-                    set.xor_sorted(&sensitivity, &mut self.scratch.merge);
+                    set.xor_sorted(sensitivity, &mut self.scratch.merge);
                     let after = set_entry_bytes(Some(set));
                     self.meter.adjust(before, after);
                 }
                 Target::Pauli { pauli, id, .. } => {
                     self.toggle_product_sensitivity(
                         &[(*id, TrackerBasis::from_pauli(*pauli))],
-                        &sensitivity,
+                        sensitivity,
                     )?;
                 }
                 Target::Qubit { .. } | Target::SweepBit { .. } | Target::Combiner => {
@@ -807,7 +845,6 @@ impl SparseReverseFrameTracker {
             }
             self.check_live_budget()?;
         }
-        self.scratch.operand = sensitivity;
         Ok(())
     }
 
@@ -818,15 +855,30 @@ impl SparseReverseFrameTracker {
         basis: TrackerBasis,
         out: &mut Vec<DemTarget>,
     ) -> AnalysisResult<()> {
+        let xs = self.xs_for(qubit)?;
+        let zs = self.zs_for(qubit)?;
+        let needed = match basis {
+            TrackerBasis::X => zs.len(),
+            TrackerBasis::Y => xs.len().saturating_add(zs.len()),
+            TrackerBasis::Z => xs.len(),
+        };
+        let growth = buffer_growth_bytes(out.capacity(), needed);
+        if growth > 0 {
+            // `out` is usually the operand, out of the scratch while it is filled.
+            self.scratch.admit_growth(
+                &self.meter,
+                growth.saturating_add(budget::buffer_bytes(out.capacity())),
+            )?;
+        }
         match basis {
             TrackerBasis::X => {
                 out.clear();
-                out.extend_from_slice(self.zs_for(qubit)?);
+                out.extend_from_slice(zs);
             }
-            TrackerBasis::Y => xor_merge_into(self.xs_for(qubit)?, self.zs_for(qubit)?, out),
+            TrackerBasis::Y => xor_merge_into(xs, zs, out),
             TrackerBasis::Z => {
                 out.clear();
-                out.extend_from_slice(self.xs_for(qubit)?);
+                out.extend_from_slice(xs);
             }
         }
         Ok(())
@@ -837,6 +889,16 @@ impl SparseReverseFrameTracker {
         &mut self,
         terms: &[(QubitId, TrackerBasis)],
     ) -> AnalysisResult<TargetXorSet> {
+        // The product and every partial product stay within the sum of the terms' sensitivities.
+        let mut needed = 0_usize;
+        for (qubit, _) in terms {
+            needed = needed
+                .saturating_add(self.xs_for(*qubit)?.len())
+                .saturating_add(self.zs_for(*qubit)?.len());
+        }
+        // The product and the merge buffer trade storage, so each may grow to hold the product.
+        let growth = sets::unknown_buffer_growth_bytes(needed).saturating_mul(2);
+        self.scratch.admit_growth(&self.meter, growth)?;
         let mut product = self.scratch.take_set();
         let mut operand = self.scratch.take_operand();
         for (qubit, basis) in terms {
@@ -868,11 +930,25 @@ impl SparseReverseFrameTracker {
     /// Toggles a record's sensitivity, dropping the entry when it cancels to empty.
     ///
     /// An empty `sensitivity` leaves the record untouched, like toggling no targets one by one.
-    fn toggle_record_sensitivity(&mut self, index: usize, sensitivity: &[DemTarget]) {
+    fn toggle_record_sensitivity(
+        &mut self,
+        index: usize,
+        sensitivity: &[DemTarget],
+    ) -> AnalysisResult<()> {
         if sensitivity.is_empty() {
-            return;
+            return Ok(());
         }
-        let before = set_entry_bytes(self.rec_bits.get(&index));
+        let existing = self.rec_bits.get(&index);
+        self.scratch.admit_growth(
+            &self.meter,
+            xor_growth_bytes(
+                existing,
+                sensitivity.len(),
+                0,
+                self.scratch.merge.capacity(),
+            ),
+        )?;
+        let before = set_entry_bytes(existing);
         let targets = self.rec_bits.entry(index).or_default();
         targets.xor_sorted(sensitivity, &mut self.scratch.merge);
         if targets.is_empty()
@@ -882,10 +958,11 @@ impl SparseReverseFrameTracker {
         }
         let after = set_entry_bytes(self.rec_bits.get(&index));
         self.meter.adjust(before, after);
+        Ok(())
     }
 
-    fn toggle_record_target(&mut self, index: usize, target: DemTarget) {
-        self.toggle_record_sensitivity(index, &[target]);
+    fn toggle_record_target(&mut self, index: usize, target: DemTarget) -> AnalysisResult<()> {
+        self.toggle_record_sensitivity(index, &[target])
     }
 
     fn clear_qubit(&mut self, qubit: QubitId) -> AnalysisResult<()> {
@@ -918,8 +995,7 @@ impl SparseReverseFrameTracker {
             targets,
             &mut self.scratch,
             &mut self.meter,
-        );
-        Ok(())
+        )
     }
 
     fn toggle_zs(&mut self, qubit: QubitId, targets: &[DemTarget]) -> AnalysisResult<()> {
@@ -930,8 +1006,7 @@ impl SparseReverseFrameTracker {
             targets,
             &mut self.scratch,
             &mut self.meter,
-        );
-        Ok(())
+        )
     }
 
     fn ensure_measurements_available(
@@ -1029,54 +1104,6 @@ impl TrackerBasis {
     }
 }
 
-fn qubits_reversed(instruction: &CircuitInstruction) -> AnalysisResult<Vec<QubitId>> {
-    instruction
-        .targets()
-        .iter()
-        .rev()
-        .map(|target| {
-            target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {target} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
-            })
-        })
-        .collect()
-}
-
-fn pair_measurement_terms_reversed(
-    instruction: &CircuitInstruction,
-    basis: TrackerBasis,
-) -> AnalysisResult<Vec<Vec<(QubitId, TrackerBasis)>>> {
-    instruction
-        .target_groups()
-        .into_iter()
-        .rev()
-        .map(|group| {
-            let [left, right] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "{} expected paired targets during sparse reverse tracking",
-                    instruction.gate().canonical_name()
-                )));
-            };
-            let left = left.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {left} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
-            })?;
-            let right = right.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {right} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
-            })?;
-            Ok(vec![(left, basis), (right, basis)])
-        })
-        .collect()
-}
-
 fn qubit_index(qubit: QubitId) -> AnalysisResult<usize> {
     usize::try_from(qubit.get()).map_err(|_| {
         AnalysisError::invalid_detector_error_model(format!(
@@ -1086,52 +1113,13 @@ fn qubit_index(qubit: QubitId) -> AnalysisResult<usize> {
     })
 }
 
+/// Bytes of a sensitivity set held outside the tracker's maps while it is merged.
+fn held_set_bytes(set: &TargetXorSet) -> u64 {
+    budget::buffer_bytes(set.capacity())
+}
+
 fn sorted_slice(set: Option<&TargetXorSet>) -> &[DemTarget] {
     set.map_or(&[], TargetXorSet::as_slice)
-}
-
-/// XORs `targets` into one qubit's set, dropping the entry when it cancels to empty.
-fn toggle_qubit_set(
-    sets: &mut TargetSets<QubitId>,
-    qubit: QubitId,
-    targets: &[DemTarget],
-    scratch: &mut TrackerScratch,
-    meter: &mut TrackerMeter,
-) {
-    if targets.is_empty() {
-        return;
-    }
-    let before = set_entry_bytes(sets.get(&qubit));
-    let set = sets.entry(qubit).or_insert_with(|| scratch.take_set());
-    set.xor_sorted(targets, &mut scratch.merge);
-    if set.is_empty()
-        && let Some(removed) = sets.remove(&qubit)
-    {
-        scratch.recycle(removed);
-    }
-    let after = set_entry_bytes(sets.get(&qubit));
-    meter.adjust(before, after);
-}
-
-/// Stores one qubit's recomputed set, recycling whichever buffer it displaces.
-fn replace_qubit_set(
-    sets: &mut TargetSets<QubitId>,
-    qubit: QubitId,
-    value: TargetXorSet,
-    scratch: &mut TrackerScratch,
-    meter: &mut TrackerMeter,
-) {
-    let before = set_entry_bytes(sets.get(&qubit));
-    if value.is_empty() {
-        if let Some(removed) = sets.remove(&qubit) {
-            scratch.recycle(removed);
-        }
-        scratch.recycle(value);
-    } else if let Some(replaced) = sets.insert(qubit, value) {
-        scratch.recycle(replaced);
-    }
-    let after = set_entry_bytes(sets.get(&qubit));
-    meter.adjust(before, after);
 }
 
 #[cfg(test)]

@@ -3,7 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
-    GateKind, MemoryBudget, QubitId, RepeatNestingLimit, Target,
+    FoldedCircuitSummary, FoldedCount, FoldedWalkError, GateKind, MemoryBudget, ParseLimits,
+    QubitId, RepeatNestingLimit, Target,
 };
 
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
@@ -81,9 +82,17 @@ pub fn circuit_detecting_regions_for_targets(
     let fail_on_anticommute = !options.ignore_anticommutation_errors;
     let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
     let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
-    let detector_count = circuit.count_detectors()?;
+    // One folded walk supplies every whole-circuit count the extraction needs.
+    let summary = folded_summary(circuit, &options.cancellation)?;
+    let detector_count = exact_count(summary.detectors(), "detector")?;
     let observable_count = circuit.count_observables()?;
-    let tick_count = circuit.count_ticks()?;
+    let tick_count = exact_count(summary.ticks(), "tick")?;
+    let measurement_count = usize::try_from(exact_count(summary.measurements(), "measurement")?)
+        .map_err(|_| {
+            AnalysisError::invalid_detector_error_model(
+                "detecting-region measurement count does not fit in memory on this platform",
+            )
+        })?;
     validate_targets(&targets, detector_count, observable_count)?;
     validate_ticks(&ticks, tick_count)?;
 
@@ -92,7 +101,7 @@ pub fn circuit_detecting_regions_for_targets(
     let mut regions = DetectingRegionTargetMap::new();
     let mut tracker = SparseReverseFrameTracker::new(
         qubit_count,
-        detecting_region_measurement_count(circuit)?,
+        measurement_count,
         detector_count,
         fail_on_anticommute,
     );
@@ -841,11 +850,28 @@ fn validate_observable_include_targets(instruction: &CircuitInstruction) -> Anal
     Ok(())
 }
 
-fn detecting_region_measurement_count(circuit: &Circuit) -> AnalysisResult<usize> {
-    usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
-            "detecting-region measurement count does not fit in memory on this platform",
-        )
+/// Summarizes a circuit whose nesting `validate_supported_subset` already admitted.
+fn folded_summary(
+    circuit: &Circuit,
+    cancellation: &Cancellation,
+) -> AnalysisResult<FoldedCircuitSummary> {
+    FoldedCircuitSummary::of(circuit, ParseLimits::DEFAULT_REPEAT_NESTING, cancellation).map_err(
+        |error| match error {
+            FoldedWalkError::RepeatNesting { depth, limit } => detecting_region_resource_error(
+                ResourceKind::RepeatNesting,
+                u64::try_from(depth).unwrap_or(u64::MAX),
+                limit as u64,
+            ),
+            FoldedWalkError::Cancelled(cancelled) => cancelled.into(),
+        },
+    )
+}
+
+fn exact_count(count: FoldedCount, label: &str) -> AnalysisResult<u64> {
+    count.exact().ok_or_else(|| {
+        AnalysisError::invalid_detector_error_model(format!(
+            "detecting-region circuit {label} count overflowed"
+        ))
     })
 }
 

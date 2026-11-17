@@ -38,6 +38,11 @@ impl TargetXorSet {
         self.sorted.len()
     }
 
+    /// Targets the set's buffer holds without reallocating.
+    pub(crate) fn capacity(&self) -> usize {
+        self.sorted.capacity()
+    }
+
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, DemTarget> {
         self.sorted.iter()
     }

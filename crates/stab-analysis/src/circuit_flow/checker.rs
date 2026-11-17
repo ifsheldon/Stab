@@ -642,7 +642,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                     tracker.toggle_record_target_absolute(record_index, tracked_target)?;
                 }
                 for observable in flow.observables() {
-                    tracker.toggle_observable_effect(observable, tracked_target);
+                    tracker.toggle_observable_effect(observable, tracked_target)?;
                 }
                 tracker.check_live_budget()?;
                 preliminary.push(None);

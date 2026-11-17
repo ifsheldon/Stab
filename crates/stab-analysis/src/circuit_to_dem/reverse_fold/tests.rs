@@ -96,3 +96,48 @@ fn error_accumulator_admits_live_classes_before_flushing_to_dem() {
     assert_eq!(resource.limit(), tight.bytes());
     assert!(resource.actual() > resource.limit());
 }
+
+/// Folded and unrolled analysis both recurse once per repeat level, so both admit exactly the
+/// shared nesting envelope and refuse one level more with the typed nesting error.
+#[test]
+fn analyzer_repeat_nesting_boundary_is_exact_with_and_without_folding() {
+    fn nested(depth: usize) -> Circuit {
+        let mut body = Circuit::from_stim_str("R 0\nX_ERROR(0.125) 0\nM 0\nDETECTOR rec[-1]\n")
+            .expect("innermost body");
+        for _ in 0..depth {
+            let mut outer = Circuit::new();
+            outer.append_repeat_block(stab_model::RepeatBlock::new(
+                stab_model::RepeatCount::try_new(1).expect("one repetition"),
+                body,
+                None,
+            ));
+            body = outer;
+        }
+        body
+    }
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            let max_depth = stab_model::RepeatNestingLimit::HARD_MAX;
+            for fold_loops in [false, true] {
+                let options = ErrorAnalyzerOptions {
+                    fold_loops,
+                    ..ErrorAnalyzerOptions::default()
+                };
+                let model = try_analyze(&nested(max_depth), options.clone())
+                    .expect("the full nesting envelope is analyzed");
+                assert_eq!(model.count_errors(), Ok(1), "fold_loops={fold_loops}");
+                let error = try_analyze(&nested(max_depth + 1), options)
+                    .expect_err("one level beyond the envelope");
+                let resource = error
+                    .resource_limit_error()
+                    .expect("typed repeat-nesting error");
+                assert_eq!(resource.resource(), crate::ResourceKind::RepeatNesting);
+                assert_eq!(resource.actual(), (max_depth + 1) as u64);
+                assert_eq!(resource.limit(), max_depth as u64);
+            }
+        })
+        .expect("spawn")
+        .join()
+        .expect("nesting boundary thread");
+}

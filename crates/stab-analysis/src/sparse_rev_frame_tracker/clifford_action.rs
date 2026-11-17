@@ -10,6 +10,8 @@ use std::sync::LazyLock;
 use stab_algebra::{PauliBasis, Tableau};
 use stab_model::{DemTarget, Gate, GateKind, QubitId};
 
+use super::budget::{TrackerMeter, buffer_bytes};
+use super::sets::{buffer_growth_bytes, unknown_buffer_growth_bytes};
 use super::{
     SparseReverseFrameTracker, TargetXorSet, TrackerScratch, replace_qubit_set, sorted_slice,
 };
@@ -45,6 +47,31 @@ impl<const SLOTS: usize> CliffordAction<SLOTS> {
                 bit ^ (set && mask & (1 << slot) != 0)
             })
         })
+    }
+
+    /// Worst-case bytes computing every output allocates beyond the buffers' current storage.
+    ///
+    /// An output is at most the sum of the inputs XORed into it. An output fed by one input is
+    /// copied into its own buffer; one fed by several merges through the scratch buffer, trading
+    /// storage with it, so both buffers may grow to hold that output.
+    fn output_growth_bytes(self, inputs: &[&[DemTarget]; SLOTS], outputs: &[TargetXorSet]) -> u64 {
+        self.sources
+            .iter()
+            .zip(outputs)
+            .fold(0_u64, |growth, (mask, output)| {
+                let (count, needed) = inputs
+                    .iter()
+                    .enumerate()
+                    .filter(|(slot, input)| mask & (1 << slot) != 0 && !input.is_empty())
+                    .fold((0_usize, 0_usize), |(count, needed), (_, input)| {
+                        (count + 1, needed.saturating_add(input.len()))
+                    });
+                growth.saturating_add(match count {
+                    0 => 0,
+                    1 => buffer_growth_bytes(output.capacity(), needed),
+                    _ => unknown_buffer_growth_bytes(needed).saturating_mul(2),
+                })
+            })
     }
 
     /// Writes every output slot from borrowed input slots into `outputs`.
@@ -193,6 +220,23 @@ impl TrackerScratch {
     fn take_sets<const N: usize>(&mut self) -> [TargetXorSet; N] {
         std::array::from_fn(|_| self.take_set())
     }
+
+    /// Admits `growth` for computing `outputs`, which are out of the pool while they are
+    /// computed, so their current storage is admitted with the growth.
+    fn admit_action_outputs(
+        &self,
+        meter: &TrackerMeter,
+        outputs: &[TargetXorSet],
+        growth: u64,
+    ) -> AnalysisResult<()> {
+        if growth == 0 {
+            return Ok(());
+        }
+        let in_flight = outputs.iter().fold(0_u64, |sum, output| {
+            sum.saturating_add(buffer_bytes(output.capacity()))
+        });
+        self.admit_growth(meter, growth.saturating_add(in_flight))
+    }
 }
 
 impl SparseReverseFrameTracker {
@@ -210,6 +254,9 @@ impl SparseReverseFrameTracker {
             return Ok(());
         }
         let mut outputs = self.scratch.take_sets::<2>();
+        let growth = action.output_growth_bytes(&inputs, &outputs);
+        self.scratch
+            .admit_action_outputs(&self.meter, &outputs, growth)?;
         action.compute(inputs, &mut outputs, &mut self.scratch.merge);
         let [x, z] = outputs;
         replace_qubit_set(&mut self.xs, qubit, x, &mut self.scratch, &mut self.meter);
@@ -235,6 +282,9 @@ impl SparseReverseFrameTracker {
             return Ok(());
         }
         let mut outputs = self.scratch.take_sets::<4>();
+        let growth = action.output_growth_bytes(&inputs, &outputs);
+        self.scratch
+            .admit_action_outputs(&self.meter, &outputs, growth)?;
         action.compute(inputs, &mut outputs, &mut self.scratch.merge);
         let [left_x, left_z, right_x, right_z] = outputs;
         replace_qubit_set(

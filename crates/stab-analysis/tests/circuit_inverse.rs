@@ -1,5 +1,6 @@
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     reason = "M6 inverse-circuit parity tests mirror compact upstream examples"
 )]
 
@@ -102,4 +103,47 @@ fn circuit_inverse_unitary_composes_to_identity_tableau() {
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
+}
+
+/// Inversion rebuilds repeat bodies with its own stack, so nesting far beyond the parser's
+/// envelope costs heap rather than native stack.
+#[test]
+fn circuit_inverse_unitary_handles_deep_nesting_without_native_recursion() {
+    const DEPTH: usize = 2048;
+    std::thread::Builder::new()
+        .stack_size(512 * 1024)
+        .spawn(|| {
+            let mut nested = circuit("QUBIT_COORDS(1) 0\nS 0\nCX 0 1\n");
+            for _ in 0..DEPTH {
+                let mut outer = circuit("H 0\n");
+                outer.append_repeat_block(stab_model::RepeatBlock::new(
+                    stab_model::RepeatCount::try_new(3).expect("count"),
+                    nested,
+                    None,
+                ));
+                nested = outer;
+            }
+            let inverse = circuit_inverse_unitary(&nested).expect("deep inverse");
+            let mut body = &inverse;
+            for _ in 0..DEPTH {
+                let [
+                    stab_model::CircuitItem::RepeatBlock(repeat),
+                    stab_model::CircuitItem::Instruction(h),
+                ] = body.items()
+                else {
+                    panic!("each level inverts to its repeat followed by H");
+                };
+                assert_eq!(repeat.repeat_count().get(), 3);
+                assert_eq!(h.gate().canonical_name(), "H");
+                body = repeat.body();
+            }
+            assert_eq!(
+                body,
+                &circuit("QUBIT_COORDS(1) 0\nCX 0 1\nS_DAG 0\n"),
+                "leading coordinates stay first in the innermost body"
+            );
+        })
+        .expect("spawn")
+        .join()
+        .expect("deep inverse thread");
 }

@@ -47,11 +47,10 @@ pub(super) fn try_analyze(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
-    if !options.fold_loops {
-        // Unrolled analysis recurses once per repeat level, so it admits the shared nesting
-        // envelope before any work; expanded work itself is not capped.
-        super::budget::validate_analyzer_repeat_nesting(circuit)?;
-    }
+    // Folded and unrolled analysis both recurse once per repeat level, and the reversed model
+    // they emit nests no deeper, so the shared nesting envelope is admitted before any work;
+    // expanded work itself is not capped.
+    super::budget::validate_analyzer_repeat_nesting(circuit)?;
     ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)
 }
 

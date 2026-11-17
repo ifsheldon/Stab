@@ -99,7 +99,7 @@ impl SparseReverseFrameTracker {
             .iter()
             .any(|target| matches!(target, DemTarget::LogicalObservable(_)));
         if self.eliminate_detector_gauges && !has_observables {
-            self.eliminate_detector_gauge(&gauge);
+            self.eliminate_detector_gauge(&gauge)?;
             self.gauge_errors.push(gauge);
             self.sync_live_bytes();
             return Ok(());
@@ -135,6 +135,9 @@ impl SparseReverseFrameTracker {
             }
             return Err(AnalysisError::invalid_detector_error_model(message));
         }
+        self.check_live_budget_with_extra(super::budget::anticommutation_bytes(
+            terms.len().saturating_mul(gauge.len()),
+        ))?;
         for (qubit, basis) in terms {
             for target in &gauge {
                 self.anticommutations.insert(Anticommutation {
@@ -150,7 +153,7 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
-    fn eliminate_detector_gauge(&mut self, gauge: &TargetXorSet) {
+    fn eliminate_detector_gauge(&mut self, gauge: &TargetXorSet) -> AnalysisResult<()> {
         let Some(pivot) = gauge
             .iter()
             .filter_map(|target| match target {
@@ -162,11 +165,24 @@ impl SparseReverseFrameTracker {
             .max_by_key(|(detector, _)| *detector)
             .map(|(_, target)| target)
         else {
-            return;
+            return Ok(());
         };
         // Vendor ErrorAnalyzer::remove_gauge (error_analyzer.cc:226-242) rewrites only the
         // qubit frames. Pending measurement-record sensitivities keep the eliminated pivot, so a
         // record merged later reintroduces it exactly as pinned Stim does.
+        // Each rewritten set merges through the scratch buffer and keeps the merged storage, so
+        // every one may grow to under twice its merged length.
+        let growth = self
+            .xs
+            .values()
+            .chain(self.zs.values())
+            .filter(|targets| targets.contains(&pivot))
+            .fold(0_u64, |sum, targets| {
+                sum.saturating_add(super::sets::unknown_buffer_growth_bytes(
+                    targets.len().saturating_add(gauge.len()),
+                ))
+            });
+        self.scratch.admit_growth(&self.meter, growth)?;
         let merge = &mut self.scratch.merge;
         for targets in self.xs.values_mut().chain(self.zs.values_mut()) {
             if targets.contains(&pivot) {
@@ -175,5 +191,6 @@ impl SparseReverseFrameTracker {
         }
         self.xs.retain(|_, targets| !targets.is_empty());
         self.zs.retain(|_, targets| !targets.is_empty());
+        Ok(())
     }
 }

@@ -1,25 +1,109 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, DemTarget, QubitId, RepeatBlock, Target,
-    advanced::{CircuitBuilder, circuit_instruction_with_tag_bytes, repeat_block_with_tag_bytes},
 };
 
+use super::budget::slot_transform_bytes;
 use super::{SparseReverseFrameTracker, TargetXorSet, qubit_index, replace_qubit_set};
 use crate::{AnalysisError, AnalysisResult, gate_has_tableau, single_qubit_clifford_for_gate};
 
+/// One supported unitary repeat being folded into a qubit-slot transform.
+///
+/// The basis tracker seeds every X and Z slot of the body's touched qubits with its own
+/// observable target. The reverse undo stack undoes the body once on that tracker, folding nested
+/// unitary repeats the same way on their own frames, so a nesting chain costs one body undo per
+/// level and no native recursion. Each target then marks the slots its source slot maps to.
+#[derive(Debug)]
+pub(super) struct UnitaryFold<'a> {
+    repeat: &'a RepeatBlock,
+    qubits: Vec<usize>,
+    basis: SparseReverseFrameTracker,
+}
+
+impl<'a> UnitaryFold<'a> {
+    /// Starts folding `repeat` when its count is above one and its body is a supported unitary.
+    pub(super) fn start(
+        parent: &SparseReverseFrameTracker,
+        repeat: &'a RepeatBlock,
+    ) -> AnalysisResult<Option<Self>> {
+        if repeat.repeat_count().get() <= 1 || !is_supported_unitary_circuit(repeat.body()) {
+            return Ok(None);
+        }
+        let qubits = touched_qubits(repeat.body());
+        if let Some(&qubit) = qubits.iter().find(|&&qubit| qubit >= parent.qubit_count) {
+            return Err(AnalysisError::invalid_detector_error_model(format!(
+                "unitary repeat touches qubit {qubit} outside the sparse reverse tracker"
+            )));
+        }
+        let slot_count = qubits.len().checked_mul(2).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(
+                "sparse reverse unitary repeat slot count overflowed",
+            )
+        })?;
+        // Every seeded slot holds one target and one map entry.
+        parent.check_live_budget_with_extra(super::budget::seeded_slot_bytes(slot_count))?;
+        let mut basis = SparseReverseFrameTracker::new(parent.qubit_count, 0, 0, true);
+        basis.cancellation = parent.cancellation.clone();
+        basis.meter.policy = parent.meter.policy;
+        basis.meter.base_bytes = parent.meter.base_bytes;
+        for (local, &qubit) in qubits.iter().enumerate() {
+            let qubit = qubit_id_from_index(qubit)?;
+            basis.toggle_xs(qubit, &[slot_target(local)?])?;
+            let z_slot = local.checked_add(qubits.len()).ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "sparse reverse unitary repeat slot overflowed",
+                )
+            })?;
+            basis.toggle_zs(qubit, &[slot_target(z_slot)?])?;
+        }
+        Ok(Some(Self {
+            repeat,
+            qubits,
+            basis,
+        }))
+    }
+
+    pub(super) fn body(&self) -> &'a Circuit {
+        self.repeat.body()
+    }
+
+    pub(super) fn basis(&self) -> &SparseReverseFrameTracker {
+        &self.basis
+    }
+
+    pub(super) fn basis_mut(&mut self) -> &mut SparseReverseFrameTracker {
+        &mut self.basis
+    }
+
+    /// Reads the body's slot transform off the basis tracker, raises it to the repeat count, and
+    /// applies it to `parent`.
+    pub(super) fn finish(self, parent: &mut SparseReverseFrameTracker) -> AnalysisResult<()> {
+        let Self {
+            repeat,
+            qubits,
+            basis,
+        } = self;
+        let transform = SlotTransform::from_basis(qubits, &basis, parent)?;
+        drop(basis);
+        // `pow` holds the accumulated result, the squared base, and one composition at a time.
+        parent.check_live_budget_with_extra(transform.retained_bytes().saturating_mul(3))?;
+        transform
+            .pow(repeat.repeat_count().get(), parent)?
+            .apply_to(parent)
+    }
+}
+
+/// Folds one supported unitary repeat on its own undo stack, reporting whether it applied.
+#[cfg(test)]
 pub(super) fn try_undo_supported_unitary_repeat(
     tracker: &mut SparseReverseFrameTracker,
     repeat: &RepeatBlock,
 ) -> AnalysisResult<bool> {
-    if repeat.repeat_count().get() <= 1 || !is_supported_unitary_circuit(repeat.body()) {
+    let Some(fold) = UnitaryFold::start(tracker, repeat)? else {
         return Ok(false);
-    }
-
-    let transform = SlotTransform::for_body(repeat.body(), tracker)?;
-    transform
-        .pow(repeat.repeat_count().get())?
-        .apply_to(tracker)?;
+    };
+    super::shifted_repeat::undo_unitary_fold(tracker, fold)?;
     Ok(true)
 }
 
@@ -39,35 +123,47 @@ impl SlotTransform {
         }
     }
 
-    fn for_body(body: &Circuit, parent: &SparseReverseFrameTracker) -> AnalysisResult<Self> {
-        let qubits = touched_qubits(body);
-        if let Some(&qubit) = qubits.iter().find(|&&qubit| qubit >= parent.qubit_count) {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "unitary repeat touches qubit {qubit} outside the sparse reverse tracker"
-            )));
-        }
-        let dense_body = remap_circuit_to_dense_qubits(body, &qubits)?;
-        let dense_qubit_count = qubits.len();
-        let slot_count = dense_qubit_count.checked_mul(2).ok_or_else(|| {
+    fn from_basis(
+        qubits: Vec<usize>,
+        basis: &SparseReverseFrameTracker,
+        parent: &SparseReverseFrameTracker,
+    ) -> AnalysisResult<Self> {
+        let active_qubit_count = qubits.len();
+        let slot_count = active_qubit_count.checked_mul(2).ok_or_else(|| {
             AnalysisError::invalid_detector_error_model(
                 "sparse reverse unitary repeat slot count overflowed",
             )
         })?;
-        let mut destinations = Vec::with_capacity(slot_count);
-        let mut retained_slots = 0_u64;
-        for slot in 0..slot_count {
-            parent.check_cancelled()?;
-            let target = slot_target(slot)?;
-            let mut basis_tracker = SparseReverseFrameTracker::new(dense_qubit_count, 0, 0, true);
-            basis_tracker.cancellation = parent.cancellation.clone();
-            basis_tracker.meter.policy = parent.meter.policy;
-            seed_slot(&mut basis_tracker, dense_qubit_count, slot, target)?;
-            basis_tracker.undo_circuit(&dense_body)?;
-            let mapped = collect_target_slots(&basis_tracker, target)?;
-            retained_slots = retained_slots
-                .saturating_add((mapped.len() as u64).saturating_mul(size_of::<usize>() as u64));
-            parent.check_live_budget_with_extra(retained_slots)?;
-            destinations.push(mapped);
+        let mut destinations = vec![BTreeSet::new(); slot_count];
+        let mut retained = 0_u64;
+        for (sets, offset) in [(&basis.xs, 0), (&basis.zs, active_qubit_count)] {
+            for (qubit, targets) in sets {
+                parent.check_cancelled()?;
+                let local = qubits.binary_search(&qubit_index(*qubit)?).map_err(|_| {
+                    AnalysisError::invalid_detector_error_model(format!(
+                        "unitary repeat moved a slot onto untouched qubit {}",
+                        qubit.get()
+                    ))
+                })?;
+                let slot = local.checked_add(offset).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model(
+                        "unitary repeat target slot overflowed",
+                    )
+                })?;
+                retained = retained.saturating_add(slot_transform_bytes(targets.len()));
+                parent.check_live_budget_with_extra(retained.saturating_add(basis.live_bytes()))?;
+                for target in targets {
+                    let source = slot_from_target(*target)?;
+                    destinations
+                        .get_mut(source)
+                        .ok_or_else(|| {
+                            AnalysisError::invalid_detector_error_model(format!(
+                                "unitary repeat source slot {source} is out of bounds"
+                            ))
+                        })?
+                        .insert(slot);
+                }
+            }
         }
         Ok(Self {
             qubits,
@@ -75,10 +171,17 @@ impl SlotTransform {
         })
     }
 
-    fn pow(&self, mut exponent: u64) -> AnalysisResult<Self> {
+    fn retained_bytes(&self) -> u64 {
+        self.destinations.iter().fold(0_u64, |acc, slots| {
+            acc.saturating_add(slot_transform_bytes(slots.len()))
+        })
+    }
+
+    fn pow(&self, mut exponent: u64, parent: &SparseReverseFrameTracker) -> AnalysisResult<Self> {
         let mut result = self.identity();
         let mut base = self.clone();
         while exponent > 0 {
+            parent.check_cancelled()?;
             if exponent & 1 == 1 {
                 result = result.then(&base)?;
             }
@@ -123,11 +226,27 @@ impl SlotTransform {
         let slot_count = self.destinations.len();
         let mut old_slots = Vec::with_capacity(slot_count);
         for &qubit in &self.qubits {
-            old_slots.push(tracker.xs_for(qubit_id_from_index(qubit)?)?.to_vec());
+            old_slots.push(tracker.xs_for(qubit_id_from_index(qubit)?)?);
         }
         for &qubit in &self.qubits {
-            old_slots.push(tracker.zs_for(qubit_id_from_index(qubit)?)?.to_vec());
+            old_slots.push(tracker.zs_for(qubit_id_from_index(qubit)?)?);
         }
+        // A destination set is at most the sum of the sets mapped onto it, and every new set
+        // is live alongside the sets it replaces until it is stored.
+        let mut new_targets = 0_u64;
+        for (source_targets, destination_slots) in old_slots.iter().zip(&self.destinations) {
+            new_targets = new_targets.saturating_add(
+                (source_targets.len() as u64).saturating_mul(destination_slots.len() as u64),
+            );
+        }
+        tracker.check_live_budget_with_extra(super::budget::target_run_bytes(
+            new_targets,
+            slot_count,
+        ))?;
+        let old_slots = old_slots
+            .into_iter()
+            .map(<[DemTarget]>::to_vec)
+            .collect::<Vec<_>>();
 
         let mut new_slots = vec![TargetXorSet::new(); slot_count];
         let mut merge = Vec::new();
@@ -150,6 +269,8 @@ impl SlotTransform {
                 destination_targets.xor_sorted(source_targets, &mut merge);
             }
         }
+        drop(old_slots);
+        drop(merge);
 
         for (local, &qubit) in self.qubits.iter().enumerate() {
             let value = new_slots
@@ -211,73 +332,6 @@ fn touched_qubits(circuit: &Circuit) -> Vec<usize> {
     qubits.into_iter().collect()
 }
 
-fn remap_circuit_to_dense_qubits(circuit: &Circuit, qubits: &[usize]) -> AnalysisResult<Circuit> {
-    let dense_ids = qubits
-        .iter()
-        .enumerate()
-        .map(|(dense, &original)| {
-            let dense = u32::try_from(dense).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(
-                    "active unitary repeat qubit count does not fit u32",
-                )
-            })?;
-            Ok((original, QubitId::new(dense)?))
-        })
-        .collect::<AnalysisResult<BTreeMap<_, _>>>()?;
-    remap_circuit_items(circuit, &dense_ids)
-}
-
-fn remap_circuit_items(
-    circuit: &Circuit,
-    dense_ids: &BTreeMap<usize, QubitId>,
-) -> AnalysisResult<Circuit> {
-    let items = circuit
-        .items()
-        .iter()
-        .map(|item| match item {
-            CircuitItem::Instruction(instruction) => {
-                let targets = instruction
-                    .targets()
-                    .iter()
-                    .map(|target| {
-                        let original = target.qubit_id().ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(format!(
-                                "unitary repeat target {target} is not a plain qubit"
-                            ))
-                        })?;
-                        let dense = dense_ids
-                            .get(&(original.get() as usize))
-                            .copied()
-                            .ok_or_else(|| {
-                                AnalysisError::invalid_detector_error_model(format!(
-                                    "unitary repeat target qubit {} has no dense mapping",
-                                    original.get()
-                                ))
-                            })?;
-                        Ok(Target::qubit(dense, false))
-                    })
-                    .collect::<AnalysisResult<Vec<_>>>()?;
-                Ok(CircuitItem::Instruction(
-                    circuit_instruction_with_tag_bytes(
-                        instruction.gate(),
-                        instruction.args().to_vec(),
-                        targets,
-                        instruction.tag_bytes(),
-                    )?,
-                ))
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                Ok(CircuitItem::RepeatBlock(repeat_block_with_tag_bytes(
-                    repeat.repeat_count(),
-                    remap_circuit_items(repeat.body(), dense_ids)?,
-                    repeat.tag_bytes(),
-                )))
-            }
-        })
-        .collect::<AnalysisResult<Vec<_>>>()?;
-    Ok(CircuitBuilder::from_unfused_items(items).finish())
-}
-
 /// Reports whether a repeat body is folded as one qubit-slot transform raised to the repeat count
 /// instead of being undone once per iteration.
 pub(crate) fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
@@ -325,60 +379,6 @@ fn is_plain_qubit_target(target: &Target) -> bool {
     )
 }
 
-fn seed_slot(
-    tracker: &mut SparseReverseFrameTracker,
-    qubit_count: usize,
-    slot: usize,
-    target: DemTarget,
-) -> AnalysisResult<()> {
-    if slot < qubit_count {
-        let qubit = QubitId::new(u32::try_from(slot).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
-                "sparse reverse unitary repeat slot does not fit u32",
-            )
-        })?)?;
-        tracker.toggle_xs(qubit, &[target])
-    } else {
-        let z_slot = slot.checked_sub(qubit_count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "sparse reverse unitary repeat z slot underflowed",
-            )
-        })?;
-        let qubit = QubitId::new(u32::try_from(z_slot).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
-                "sparse reverse unitary repeat slot does not fit u32",
-            )
-        })?)?;
-        tracker.toggle_zs(qubit, &[target])
-    }
-}
-
-fn collect_target_slots(
-    tracker: &SparseReverseFrameTracker,
-    target: DemTarget,
-) -> AnalysisResult<BTreeSet<usize>> {
-    let mut slots = BTreeSet::new();
-    let qubit_count = tracker.qubit_count;
-    for (qubit, targets) in &tracker.xs {
-        if targets.contains(&target) {
-            slots.insert(qubit_index(*qubit)?);
-        }
-    }
-    for (qubit, targets) in &tracker.zs {
-        if targets.contains(&target) {
-            let slot = qubit_index(*qubit)?
-                .checked_add(qubit_count)
-                .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "unitary repeat target slot overflowed",
-                    )
-                })?;
-            slots.insert(slot);
-        }
-    }
-    Ok(slots)
-}
-
 fn qubit_id_from_index(index: usize) -> AnalysisResult<QubitId> {
     Ok(QubitId::new(u32::try_from(index).map_err(|_| {
         AnalysisError::invalid_detector_error_model(format!(
@@ -394,6 +394,21 @@ fn slot_target(slot: usize) -> AnalysisResult<DemTarget> {
         )
     })?;
     DemTarget::logical_observable(observable).map_err(Into::into)
+}
+
+fn slot_from_target(target: DemTarget) -> AnalysisResult<usize> {
+    match target {
+        DemTarget::LogicalObservable(slot) => usize::try_from(slot.get()).map_err(|_| {
+            AnalysisError::invalid_detector_error_model(
+                "sparse reverse unitary repeat slot does not fit usize",
+            )
+        }),
+        DemTarget::RelativeDetector(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
+            Err(AnalysisError::invalid_detector_error_model(format!(
+                "unitary repeat basis tracker holds non-slot target {target}"
+            )))
+        }
+    }
 }
 
 fn toggle_slots(target: &mut BTreeSet<usize>, values: impl Iterator<Item = usize>) {
@@ -637,6 +652,38 @@ mod tests {
             }
             ",
             "XYZXYZ",
+        );
+    }
+
+    #[test]
+    fn unitary_repeat_folding_matches_naive_multi_level_nesting() {
+        // Every level mixes its own gates with a nested fold, including sibling repeats, a
+        // count-one level that is not folded itself, and qubits only inner levels touch.
+        assert_repeat_folding_matches_naive(
+            "
+            REPEAT 3 {
+                CX 0 1
+                REPEAT 2 {
+                    H 1
+                    REPEAT 1 {
+                        REPEAT 5 {
+                            ISWAP 2 3
+                            REPEAT 2 {
+                                C_XYZ 3
+                                SQRT_XX 3 4
+                            }
+                            S 2
+                        }
+                        CZSWAP 1 2
+                    }
+                    REPEAT 3 {
+                        SWAPCX 0 4
+                    }
+                }
+                SQRT_Y_DAG 0
+            }
+            ",
+            "XYZXZ",
         );
     }
 

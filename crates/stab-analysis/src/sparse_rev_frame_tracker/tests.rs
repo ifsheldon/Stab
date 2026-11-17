@@ -781,14 +781,17 @@ fn live_bytes_matches_recomputed_state_across_instruction_kinds() {
         };
         tracker.undo_instruction(inst).unwrap();
         assert_eq!(
-            tracker.live_bytes(),
+            tracker.meter.live_bytes,
             budget::recompute_live_bytes(&tracker),
             "after undoing {inst:?}"
         );
     }
     tracker.undo_implicit_rz_at_start_of_circuit().unwrap();
     assert!(!tracker.take_gauge_errors().is_empty());
-    assert_eq!(tracker.live_bytes(), budget::recompute_live_bytes(&tracker));
+    assert_eq!(
+        tracker.meter.live_bytes,
+        budget::recompute_live_bytes(&tracker)
+    );
 
     // Also exercise recorded anticommutations when fail_on_anticommute is false.
     let anticommuting = circuit("R 0\nM 0\nR 0\nMX 0\nDETECTOR rec[-1]\n");
@@ -804,12 +807,78 @@ fn live_bytes_matches_recomputed_state_across_instruction_kinds() {
         };
         non_failing.undo_instruction(inst).unwrap();
         assert_eq!(
-            non_failing.live_bytes(),
+            non_failing.meter.live_bytes,
             budget::recompute_live_bytes(&non_failing),
         );
     }
     assert!(
         non_failing.target_anticommuted(DemTarget::relative_detector(0).unwrap()),
         "expected recorded anticommutation"
+    );
+}
+
+/// One `MPP` product of `K` Z terms whose record is sensitive to `S` detectors XORs those `S`
+/// targets into `K` fresh qubit sets inside a single instruction. Admission must refuse that
+/// growth before it happens, so the instruction's peak allocation stays within the budget plus
+/// the uncounted bookkeeping: map nodes, the instruction's term list, and the error message.
+#[test]
+fn wide_product_merge_is_refused_before_it_outgrows_the_budget() {
+    const TERMS: usize = 2000;
+    const DETECTORS: u64 = 500;
+    const BUDGET: u64 = 1 << 20;
+    const SLACK: u64 = 16 << 10;
+
+    let mut text = String::from("MPP");
+    for qubit in 0..TERMS {
+        text.push_str(if qubit == 0 { " Z" } else { "*Z" });
+        text.push_str(&qubit.to_string());
+    }
+    text.push('\n');
+    let product = instruction(&text);
+    let detector = instruction("DETECTOR rec[-1]\n");
+    let prepared = |budget: Option<MemoryBudget>| {
+        let mut tracker = SparseReverseFrameTracker::new(TERMS, 1, DETECTORS, true);
+        if let Some(budget) = budget {
+            tracker.set_memory_budget(
+                ResourceOperation::DetectingRegions,
+                ResourceKind::LiveStateUnits,
+                budget,
+            );
+        }
+        for _ in 0..DETECTORS {
+            tracker.undo_instruction(&detector).unwrap();
+        }
+        tracker
+    };
+
+    let mut unbounded = prepared(None);
+    let unbounded_peak = allocation_counter::measure(|| {
+        unbounded.undo_instruction(&product).unwrap();
+    })
+    .bytes_max;
+    assert!(
+        unbounded_peak > 8 * BUDGET,
+        "the fixture must outgrow the budget by far, peaked at {unbounded_peak} bytes"
+    );
+
+    let mut bounded = prepared(Some(MemoryBudget::from_bytes(BUDGET)));
+    let mut result = Ok(());
+    let peak = allocation_counter::measure(|| {
+        result = bounded.undo_instruction(&product);
+    })
+    .bytes_max;
+    let Err(AnalysisError::ResourceLimit(limit)) = result else {
+        panic!("expected a typed budget refusal, got {result:?}");
+    };
+    assert_eq!(limit.resource(), ResourceKind::LiveStateUnits);
+    assert_eq!(limit.limit(), BUDGET);
+    assert!(
+        bounded.live_bytes() <= BUDGET,
+        "refused growth must not be retained: {} bytes live",
+        bounded.live_bytes()
+    );
+    assert!(
+        peak <= BUDGET + SLACK,
+        "peak allocation {peak} exceeds the {BUDGET}-byte budget plus {SLACK} bytes of slack"
     );
 }

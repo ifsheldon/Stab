@@ -210,10 +210,11 @@ fn collected_pauli_bytes(qubits: u64) -> u64 {
 #[test]
 fn sparse_flow_checking_takes_the_caller_budget() {
     // The measurement keeps the query on the sparse tracker, which extracts each flow's region
-    // only as wide as its support: qubits 0 through 129.
-    let source = circuit("M 0\nH 129\n");
-    let flows = ["X129 -> Z129".parse::<Flow>().expect("flow")];
-    let required = collected_pauli_bytes(130);
+    // only as wide as its support: qubits 0 through 999. The extracted string is wide enough to
+    // outweigh the tracker's own retained sets, pool, and merge buffers.
+    let source = circuit("M 0\nH 999\n");
+    let flows = ["X999 -> Z999".parse::<Flow>().expect("flow")];
+    let required = collected_pauli_bytes(1000);
     let options = |bytes| UnsignedFlowCheckOptions {
         memory_budget: MemoryBudget::from_bytes(bytes),
         ..UnsignedFlowCheckOptions::default()

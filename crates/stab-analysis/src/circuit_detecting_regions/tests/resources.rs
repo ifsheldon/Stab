@@ -196,6 +196,51 @@ fn repeat_nesting_boundary_is_exact() {
             .unwrap();
             assert_eq!(regions.len(), 1);
 
+            // Nested unitary repeats above one iteration fold one body undo per level on the
+            // tracker's own stack; unrolling these would take 2^256 body undos.
+            let mut unitary = Circuit::from_stim_str("H 0\nH 0\n").unwrap();
+            let suffix = Circuit::from_stim_str("H 0\nS 0\nS 0\nH 0\n").unwrap();
+            for _ in 1..max_depth {
+                let mut outer = Circuit::new();
+                outer.append_repeat_block(RepeatBlock::new(
+                    RepeatCount::try_new(2).unwrap(),
+                    unitary,
+                    None,
+                ));
+                for item in suffix.items() {
+                    if let CircuitItem::Instruction(instruction) = item {
+                        outer.append_instruction(instruction.clone());
+                    }
+                }
+                unitary = outer;
+            }
+            let mut folded = Circuit::from_stim_str("R 0\nTICK\n").unwrap();
+            folded.append_repeat_block(RepeatBlock::new(
+                RepeatCount::try_new(3).unwrap(),
+                unitary,
+                None,
+            ));
+            for item in Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n")
+                .unwrap()
+                .items()
+            {
+                if let CircuitItem::Instruction(instruction) = item {
+                    folded.append_instruction(instruction.clone());
+                }
+            }
+            let regions = circuit_detecting_regions_for_targets(
+                &folded,
+                DetectingRegionTargetOptions {
+                    targets: vec![DemTarget::relative_detector(0).unwrap()],
+                    ticks: vec![CircuitTick::new(0)],
+                    ignore_anticommutation_errors: false,
+                    memory_budget: stab_model::MemoryBudget::DEFAULT,
+                    cancellation: stab_model::Cancellation::never(),
+                },
+            )
+            .unwrap();
+            assert_eq!(regions.len(), 1);
+
             assert_resource_error(
                 circuit_detecting_regions_for_targets(
                     &nested(max_depth + 1, "TICK\n"),

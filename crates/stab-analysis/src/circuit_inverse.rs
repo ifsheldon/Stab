@@ -1,6 +1,7 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, Tableau};
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, MemoryBudget, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, MemoryBudget, RepeatBlock,
+    Target,
 };
 
 use crate::{
@@ -53,67 +54,49 @@ impl TimeReversedForFlowsOptions {
 /// Returns the strict inverse of a unitary circuit and its invertible annotations.
 ///
 /// Leading `QUBIT_COORDS` instructions are preserved, `TICK` is self-inverse,
-/// `SHIFT_COORDS` arguments are negated, and repeat blocks are inverted recursively.
+/// `SHIFT_COORDS` arguments are negated, and repeat blocks are inverted at every nesting depth
+/// without native recursion.
 /// Measurements, resets, noise, detectors, observables, and non-leading qubit
 /// coordinates return an error instead of being skipped or approximated.
 pub fn circuit_inverse_unitary(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    let leading_coordinates = circuit
-        .items()
-        .iter()
-        .take_while(|item| {
-            matches!(
-                item,
-                CircuitItem::Instruction(instruction)
-                    if instruction.gate().kind() == GateKind::QUBIT_COORDS
-            )
-        })
-        .count();
-    let mut result = Circuit::new();
-    for item in circuit.items().iter().take(leading_coordinates) {
-        let CircuitItem::Instruction(instruction) = item else {
-            return Err(AnalysisError::invalid_tableau_conversion(
-                "leading-coordinate prefix unexpectedly contained a repeat block",
-            ));
-        };
-        result.append_instruction(inverse_coordinate_instruction(instruction)?);
-    }
-    for item in circuit.items().iter().skip(leading_coordinates).rev() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                let inverse = inverse_public_instruction(instruction)?;
-                result.append_instruction(inverse);
+    rebuild_reversed(
+        circuit,
+        |body| {
+            let items = body.items();
+            let leading_coordinates = items
+                .iter()
+                .take_while(|item| {
+                    matches!(
+                        item,
+                        CircuitItem::Instruction(instruction)
+                            if instruction.gate().kind() == GateKind::QUBIT_COORDS
+                    )
+                })
+                .count();
+            let (prefix, rest) = items.split_at(leading_coordinates);
+            let mut result = Circuit::new();
+            for item in prefix {
+                let CircuitItem::Instruction(instruction) = item else {
+                    return Err(AnalysisError::invalid_tableau_conversion(
+                        "leading-coordinate prefix unexpectedly contained a repeat block",
+                    ));
+                };
+                result.append_instruction(inverse_coordinate_instruction(instruction)?);
             }
-            CircuitItem::RepeatBlock(repeat) => {
-                let inverse_body = circuit_inverse_unitary(repeat.body())?;
-                result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
-                    repeat.repeat_count(),
-                    inverse_body,
-                    repeat.tag_bytes(),
-                ));
-            }
-        }
-    }
-    Ok(result)
+            Ok((result, rest))
+        },
+        |instruction| inverse_public_instruction(instruction).map(Some),
+        RepeatBodies::KeepEmpty,
+    )
 }
 
 fn circuit_inverse_unitary_strict(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    let mut result = Circuit::new();
-    for item in circuit.items().iter().rev() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                result.append_instruction(inverse_unitary_instruction(instruction)?);
-            }
-            CircuitItem::RepeatBlock(repeat) => {
-                let inverse_body = circuit_inverse_unitary_strict(repeat.body())?;
-                result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
-                    repeat.repeat_count(),
-                    inverse_body,
-                    repeat.tag_bytes(),
-                ));
-            }
-        }
-    }
-    Ok(result)
+    rebuild_reversed(
+        circuit,
+        |body| Ok((Circuit::new(), body.items())),
+        |instruction| inverse_unitary_instruction(instruction).map(Some),
+        RepeatBodies::KeepEmpty,
+    )
 }
 
 /// Returns the inverse of a circuit's unitary instructions, dropping every other instruction.
@@ -122,27 +105,91 @@ fn circuit_inverse_unitary_strict(circuit: &Circuit) -> AnalysisResult<Circuit> 
 /// example annotations and noise around Pauli-only flows; a repeat whose inverse body is empty is
 /// dropped too.
 pub(crate) fn unitary_part_inverse(circuit: &Circuit) -> AnalysisResult<Circuit> {
-    let mut result = Circuit::new();
-    for item in circuit.items().iter().rev() {
-        match item {
-            CircuitItem::Instruction(instruction) => {
-                if instruction.gate().is_unitary() {
-                    result.append_instruction(inverse_unitary_instruction(instruction)?);
+    rebuild_reversed(
+        circuit,
+        |body| Ok((Circuit::new(), body.items())),
+        |instruction| {
+            if instruction.gate().is_unitary() {
+                inverse_unitary_instruction(instruction).map(Some)
+            } else {
+                Ok(None)
+            }
+        },
+        RepeatBodies::DropEmpty,
+    )
+}
+
+/// Whether a rebuilt repeat whose body came out empty is kept.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum RepeatBodies {
+    KeepEmpty,
+    DropEmpty,
+}
+
+/// One body being rebuilt in reverse: its items left to visit, its rebuilt part, and the repeat
+/// block that owns it, `None` at the top level.
+struct ReversedBody<'a> {
+    items: std::iter::Rev<std::slice::Iter<'a, CircuitItem>>,
+    result: Circuit,
+    repeat: Option<&'a RepeatBlock>,
+}
+
+/// Rebuilds `circuit` with the items of every body in reverse order, keeping each repeat block's
+/// count and tag around its rebuilt body.
+///
+/// The walk keeps its own stack, so nesting depth costs heap rather than native stack. `begin`
+/// starts each body, the top level and every repeat body, returning its rebuilt prefix and the
+/// items still to reverse; `instruction` maps each such instruction, dropping it on `None`.
+fn rebuild_reversed<'a>(
+    circuit: &'a Circuit,
+    mut begin: impl FnMut(&'a Circuit) -> AnalysisResult<(Circuit, &'a [CircuitItem])>,
+    mut instruction: impl FnMut(&CircuitInstruction) -> AnalysisResult<Option<CircuitInstruction>>,
+    repeat_bodies: RepeatBodies,
+) -> AnalysisResult<Circuit> {
+    let stack_error =
+        || AnalysisError::invalid_tableau_conversion("circuit inversion lost its body stack");
+    let (result, items) = begin(circuit)?;
+    let mut stack = vec![ReversedBody {
+        items: items.iter().rev(),
+        result,
+        repeat: None,
+    }];
+    loop {
+        let top = stack.last_mut().ok_or_else(stack_error)?;
+        match top.items.next() {
+            Some(CircuitItem::Instruction(original)) => {
+                if let Some(inverse) = instruction(original)? {
+                    top.result.append_instruction(inverse);
                 }
             }
-            CircuitItem::RepeatBlock(repeat) => {
-                let inverse_body = unitary_part_inverse(repeat.body())?;
-                if !inverse_body.items().is_empty() {
-                    result.append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
+            Some(CircuitItem::RepeatBlock(repeat)) => {
+                let (result, items) = begin(repeat.body())?;
+                stack.push(ReversedBody {
+                    items: items.iter().rev(),
+                    result,
+                    repeat: Some(repeat),
+                });
+            }
+            None => {
+                let finished = stack.pop().ok_or_else(stack_error)?;
+                let Some(repeat) = finished.repeat else {
+                    return Ok(finished.result);
+                };
+                if repeat_bodies == RepeatBodies::DropEmpty && finished.result.items().is_empty() {
+                    continue;
+                }
+                stack
+                    .last_mut()
+                    .ok_or_else(stack_error)?
+                    .result
+                    .append_repeat_block(stab_model::advanced::repeat_block_with_tag_bytes(
                         repeat.repeat_count(),
-                        inverse_body,
+                        finished.result,
                         repeat.tag_bytes(),
                     ));
-                }
             }
         }
     }
-    Ok(result)
 }
 
 /// Returns the tracker-driven QEC inverse of a circuit.
