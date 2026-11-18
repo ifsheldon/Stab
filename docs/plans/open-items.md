@@ -25,5 +25,4 @@ Timings are shared-host diagnostics from the AArch64 development host and promot
 ## Structure And Evidence
 
 - The engine's admission counting inside lowering does not use `FoldedCircuitSummary`: it needs a running measurement count in source order to validate record lookbacks, the sweep-bit and simulated-qubit maxima, and counts that depend on the lowering itself, none of which the whole-circuit summary carries. The detecting-region snapshot walk takes its entry counts from the summary but still counts ticks per repeat body by hand.
-- `stab-model` parses and visits nested DEM repeats iteratively, but the DEM consumers in `stab-engine` (sampling plan) and `stab-analysis` (flattening, error search, and SAT export) still recurse once per repeat level and refuse models deeper than 256 levels before recursing. The per-query caches of body detector counts and coordinate shifts that make coordinate queries linear in nesting depth are not charged to a memory budget.
 - `registry.global-min-publish-age` is not configured, because a publish-age cooldown conflicts with the rule to add dependencies at their latest crates.io version; that policy choice is open.
