@@ -72,15 +72,15 @@ fn drop_items_bounded(items: &mut Vec<CircuitItem>, depth: usize) {
         drop_items_iterative(items);
         return;
     }
-    // Native vector destruction is substantially cheaper for ordinary shallow
-    // circuits. Empty each nested body first, then retain the iterative path
-    // before recursion can exhaust the stack.
-    for item in items.iter_mut() {
-        if let CircuitItem::RepeatBlock(repeat) = item {
+    // Native destruction is substantially cheaper for ordinary shallow
+    // circuits. Empty each nested body just before its item drops, in the same
+    // pass, and switch to the iterative path before recursion can exhaust the
+    // stack.
+    for mut item in items.drain(..) {
+        if let CircuitItem::RepeatBlock(repeat) = &mut item {
             drop_items_bounded(&mut repeat.body.items, depth + 1);
         }
     }
-    items.clear();
 }
 
 fn drop_items_iterative(items: &mut Vec<CircuitItem>) {

@@ -217,6 +217,7 @@ pub(super) struct FrameCliffordActionCache {
 }
 
 impl FrameCliffordActionCache {
+    #[inline(always)]
     pub(super) fn action(&mut self, gate: Gate) -> DetectionResult<Option<FrameCliffordAction>> {
         if let Some((_, action)) = self.entries.iter().find(|(cached, _)| *cached == gate) {
             return Ok(*action);

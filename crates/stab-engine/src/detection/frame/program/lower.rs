@@ -13,22 +13,23 @@ use stab_model::{
 
 use super::super::clifford::{FrameCliffordAction, FrameCliffordActionCache, TwoQubitFrameMap};
 use super::super::helpers::{
-    measurement_flip_probability, pauli_basis, probability_list, qubit_index,
-    single_probability_argument, unsupported_frame_instruction, unsupported_frame_target,
-    zero_probability_noise,
+    pauli_basis, unsupported_frame_instruction, unsupported_frame_target, zero_probability_noise,
 };
-use super::arena::{ArenaCounts, ArenaSpan, PauliProduct, PauliTerm, ProgramArena};
+use super::arena::{ArenaCounts, ProgramArena};
 use super::{
-    CircuitProgram, CliffordStep, ControlledPair, FrameGate, NoiselessFusion,
-    PauliProductMeasurement, ProgramCounts, ProgramEntry, ProgramInstruction, ReferenceClifford,
-    ReferenceGateId, TraversalEvent, admission_drift, byte_product, checked_add_bytes,
-    materialized_retained_bytes, program_shape_error, storage_overflow, validate_program,
-    visit_circuit, window_needs,
+    CircuitProgram, FrameGate, NoiselessFusion, ProgramCounts, ProgramEntry, ProgramInstruction,
+    TraversalEvent, admission_drift, byte_product, checked_add_bytes, materialized_retained_bytes,
+    program_shape_error, storage_overflow, validate_program, visit_circuit,
 };
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
-use crate::sampling::LocalTableauTransform;
+
+mod build;
+#[cfg(test)]
+mod tests;
+
+use build::{ReferenceCliffordTable, build, build_clifford};
 
 /// Lowering choices that change which instructions a program retains.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -58,6 +59,38 @@ pub(crate) struct ProgramAdmission {
 }
 
 impl ProgramAdmission {
+    /// Counts one entry and its arena payload.
+    #[inline(always)]
+    fn admit_entry(&mut self, entry_bytes: u64, payload: ArenaCounts) -> DetectionResult<()> {
+        self.entry_count = self
+            .entry_count
+            .checked_add(1)
+            .ok_or_else(storage_overflow)?;
+        self.arena.add(payload)?;
+        self.retained_bytes = checked_add_bytes(
+            self.retained_bytes,
+            checked_add_bytes(entry_bytes, payload.bytes()?)?,
+        )?;
+        Ok(())
+    }
+
+    /// Counts one entry whose only payload is `targets` qubit targets, as [`Self::admit_entry`]
+    /// does for that payload.
+    #[inline(always)]
+    fn admit_qubit_entry(&mut self, entry_bytes: u64, targets: usize) -> DetectionResult<()> {
+        self.entry_count = self
+            .entry_count
+            .checked_add(1)
+            .ok_or_else(storage_overflow)?;
+        self.arena.add_qubits(targets)?;
+        let payload_bytes = byte_product(targets, size_of::<u32>())?;
+        self.retained_bytes = checked_add_bytes(
+            self.retained_bytes,
+            checked_add_bytes(entry_bytes, payload_bytes)?,
+        )?;
+        Ok(())
+    }
+
     pub(crate) const fn retained_bytes(&self) -> u64 {
         self.retained_bytes
     }
@@ -152,95 +185,42 @@ impl CircuitProgram {
         retained_base_bytes: u64,
         max_combined_bytes: u64,
     ) -> DetectionResult<ProgramAdmission> {
-        let mut admission = ProgramAdmission {
-            options,
-            ..ProgramAdmission::default()
+        let mut admitter = Admitter {
+            admission: ProgramAdmission {
+                options,
+                ..ProgramAdmission::default()
+            },
+            counts: CountState::default(),
+            simulated_qubits: 0,
+            actions: FrameCliffordActionCache::default(),
+            entry_bytes: byte_product(1, size_of::<ProgramEntry>())?,
+            retained_base_bytes,
+            max_combined_bytes,
         };
-        let mut counts = CountState::default();
-        let mut simulated_qubits = 0_usize;
         let mut repeats = ArrayVec::<RepeatAdmission, { RepeatNestingLimit::HARD_MAX }>::new();
-        let mut actions = FrameCliffordActionCache::default();
-        let entry_bytes = byte_product(1, size_of::<ProgramEntry>())?;
-        let check = |admission: &ProgramAdmission| {
-            let combined = checked_add_bytes(retained_base_bytes, admission.retained_bytes)?;
-            if combined > max_combined_bytes {
-                return Err(DetectionError::from(
-                    ResourceLimitError::detection_compiled_bytes(combined, max_combined_bytes),
-                ));
+        visit_circuit(circuit, |event| match event {
+            TraversalEvent::Instruction(instruction) => admitter.instruction(instruction),
+            TraversalEvent::BeginRepeat(count) => {
+                repeats
+                    .try_push(RepeatAdmission {
+                        count,
+                        entries_before: admitter.admission.entry_count,
+                        counts_before: admitter.counts,
+                    })
+                    .map_err(|_| program_shape_error())?;
+                admitter.add_marker()
             }
-            Ok(())
-        };
-        visit_circuit(circuit, |event| {
-            match event {
-                TraversalEvent::Instruction(instruction) => {
-                    // The source instruction, not its lowering, sizes Stim's simulated qubit count, so
-                    // instructions that lower to nothing still count.
-                    simulated_qubits = simulated_qubits.max(instruction_qubit_count(instruction)?);
-                    visit_lowered_instructions(instruction, |lowered| {
-                        let lowering = lower(lowered, options, &mut actions)?;
-                        record_effects(lowered, lowering, &mut counts)?;
-                        match lowering {
-                            Lowering::Noop => return Ok(()),
-                            Lowering::FrameIdentity => {}
-                            Lowering::Entry(kind) => {
-                                admission.entry_count = admission
-                                    .entry_count
-                                    .checked_add(1)
-                                    .ok_or_else(storage_overflow)?;
-                                let payload = arena_demand(lowered, kind)?;
-                                admission.arena.add(payload)?;
-                                admission.retained_bytes = checked_add_bytes(
-                                    admission.retained_bytes,
-                                    checked_add_bytes(entry_bytes, payload.bytes()?)?,
-                                )?;
-                            }
-                        }
-                        admission.frame_qubit_count = admission
-                            .frame_qubit_count
-                            .max(instruction_qubit_count(lowered)?);
-                        check(&admission)
-                    })?;
-                }
-                TraversalEvent::BeginRepeat(count) => {
-                    repeats
-                        .try_push(RepeatAdmission {
-                            count,
-                            entries_before: admission.entry_count,
-                            counts_before: counts,
-                        })
-                        .map_err(|_| program_shape_error())?;
-                    admission.entry_count = admission
-                        .entry_count
-                        .checked_add(1)
-                        .ok_or_else(storage_overflow)?;
-                    admission.retained_bytes =
-                        checked_add_bytes(admission.retained_bytes, entry_bytes)?;
-                    check(&admission)?;
-                }
-                TraversalEvent::EndRepeat => {
-                    let repeat = repeats.pop().ok_or_else(program_shape_error)?;
-                    integrate_repeat(&mut counts, repeat)?;
-                    if admission.entry_count == repeat.entries_before + 1 {
-                        // A body that lowers to nothing is elided with its marker; it added no
-                        // entry, so it added no arena payload either.
-                        admission.entry_count = repeat.entries_before;
-                        admission.retained_bytes = admission
-                            .retained_bytes
-                            .checked_sub(entry_bytes)
-                            .ok_or_else(admission_drift)?;
-                    } else {
-                        admission.entry_count = admission
-                            .entry_count
-                            .checked_add(1)
-                            .ok_or_else(storage_overflow)?;
-                        admission.retained_bytes =
-                            checked_add_bytes(admission.retained_bytes, entry_bytes)?;
-                        check(&admission)?;
-                    }
-                }
+            TraversalEvent::EndRepeat => {
+                let repeat = repeats.pop().ok_or_else(program_shape_error)?;
+                admitter.end_repeat(repeat)
             }
-            Ok(())
         })?;
+        let Admitter {
+            mut admission,
+            counts,
+            simulated_qubits,
+            ..
+        } = admitter;
         admission.counts = ProgramCounts {
             measurements: usize::try_from(counts.measurements).map_err(|_| {
                 DetectionError::invalid_sampler_compilation(
@@ -262,7 +242,6 @@ impl CircuitProgram {
         circuit: &Circuit,
         admission: &ProgramAdmission,
     ) -> DetectionResult<Self> {
-        let options = admission.options;
         let mut entries = Vec::new();
         entries
             .try_reserve_exact(admission.entry_count)
@@ -272,95 +251,51 @@ impl CircuitProgram {
                     admission.entry_count
                 ))
             })?;
-        let mut arena = ProgramArena::try_with_capacity(admission.arena)?;
-        // A repeat marker is emitted only once its body emits an entry, so bodies that lower to
-        // nothing vanish without ever exceeding the admitted entry capacity.
-        let mut repeat_markers = ArrayVec::<PendingRepeat, { RepeatNestingLimit::HARD_MAX }>::new();
-        let mut frame_qubit_count = 0_usize;
-        let mut actions = FrameCliffordActionCache::default();
-        let mut cliffords = ReferenceCliffordTable::default();
-        let mut noiseless_previous: Option<&CircuitInstruction> = None;
-        let push = |entries: &mut Vec<ProgramEntry>, entry: ProgramEntry| {
-            if entries.len() == entries.capacity() {
-                return Err(admission_drift());
-            }
-            entries.push(entry);
-            Ok(())
+        let mut materializer = Materializer {
+            options: admission.options,
+            entries,
+            arena: ProgramArena::try_with_capacity(admission.arena)?,
+            repeat_markers: ArrayVec::new(),
+            frame_qubit_count: 0,
+            actions: FrameCliffordActionCache::default(),
+            cliffords: ReferenceCliffordTable::default(),
+            noiseless_previous: None,
         };
-        visit_circuit(circuit, |event| {
-            match event {
-                TraversalEvent::Instruction(instruction) => {
-                    let fusion = noiseless_fusion(noiseless_previous, instruction);
-                    if kept_by_noiseless_circuit(instruction.gate()) {
-                        noiseless_previous = Some(instruction);
-                    }
-                    visit_lowered_instructions(instruction, |lowered| {
-                        let lowering = lower(lowered, options, &mut actions)?;
-                        if let Lowering::Entry(kind) = lowering {
-                            let built = build(lowered, kind, fusion, &mut cliffords, &mut arena)?;
-                            for pending in &mut repeat_markers {
-                                if pending.marker.is_none() {
-                                    pending.marker = Some(entries.len());
-                                    push(
-                                        &mut entries,
-                                        ProgramEntry::Repeat {
-                                            count: pending.count,
-                                            body_end: usize::MAX,
-                                        },
-                                    )?;
-                                }
-                            }
-                            push(&mut entries, ProgramEntry::Instruction(built))?;
-                        }
-                        if !matches!(lowering, Lowering::Noop) {
-                            frame_qubit_count =
-                                frame_qubit_count.max(instruction_qubit_count(lowered)?);
-                        }
-                        Ok(())
-                    })?;
-                }
-                TraversalEvent::BeginRepeat(count) => {
-                    // A repeat block is its own operation, so nothing fuses across its edges.
-                    noiseless_previous = None;
-                    repeat_markers
-                        .try_push(PendingRepeat {
-                            count,
-                            marker: None,
-                        })
-                        .map_err(|_| program_shape_error())?;
-                }
-                TraversalEvent::EndRepeat => {
-                    noiseless_previous = None;
-                    let pending = repeat_markers.pop().ok_or_else(program_shape_error)?;
-                    let Some(marker) = pending.marker else {
-                        return Ok(());
-                    };
-                    let body_end = entries.len();
-                    push(&mut entries, ProgramEntry::EndRepeat)?;
-                    let Some(ProgramEntry::Repeat {
-                        body_end: stored_end,
-                        ..
-                    }) = entries.get_mut(marker)
-                    else {
-                        return Err(program_shape_error());
-                    };
-                    *stored_end = body_end;
-                }
+        visit_circuit(circuit, |event| match event {
+            TraversalEvent::Instruction(instruction) => materializer.instruction(instruction),
+            TraversalEvent::BeginRepeat(count) => {
+                // A repeat block is its own operation, so nothing fuses across its edges.
+                materializer.noiseless_previous = None;
+                materializer
+                    .repeat_markers
+                    .try_push(PendingRepeat {
+                        count,
+                        marker: None,
+                    })
+                    .map_err(|_| program_shape_error())
             }
-            Ok(())
+            TraversalEvent::EndRepeat => materializer.end_repeat(),
         })?;
+        let Materializer {
+            entries,
+            arena,
+            repeat_markers,
+            frame_qubit_count,
+            cliffords,
+            ..
+        } = materializer;
         if !repeat_markers.is_empty()
             || entries.len() != admission.entry_count
             || frame_qubit_count != admission.frame_qubit_count
         {
             return Err(admission_drift());
         }
-        validate_program(&entries)?;
+        let window_needs = validate_program(&entries, &arena)?;
         let retained_bytes = materialized_retained_bytes(entries.capacity(), &arena)?;
         if retained_bytes > admission.retained_bytes {
             return Err(admission_drift());
         }
-        let window_needs = window_needs(&entries, &arena)?;
+        let window_needs = window_needs?;
         Ok(Self {
             entries,
             arena,
@@ -371,6 +306,234 @@ impl CircuitProgram {
             window_needs,
         })
     }
+}
+
+/// The running state of one admission walk.
+struct Admitter {
+    admission: ProgramAdmission,
+    counts: CountState,
+    simulated_qubits: usize,
+    actions: FrameCliffordActionCache,
+    entry_bytes: u64,
+    retained_base_bytes: u64,
+    max_combined_bytes: u64,
+}
+
+impl Admitter {
+    /// Refuses the program once its retained bytes exceed the budget.
+    #[inline]
+    fn check(&self) -> DetectionResult<()> {
+        let combined = checked_add_bytes(self.retained_base_bytes, self.admission.retained_bytes)?;
+        if combined > self.max_combined_bytes {
+            return Err(compiled_bytes_limit(combined, self.max_combined_bytes));
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn instruction(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
+        let Some(plain) = plain_clifford(instruction, &mut self.actions)? else {
+            return self.general_instruction(instruction);
+        };
+        self.simulated_qubits = self.simulated_qubits.max(plain.qubits);
+        self.admission
+            .admit_qubit_entry(self.entry_bytes, plain.targets)?;
+        self.admission.frame_qubit_count = self.admission.frame_qubit_count.max(plain.qubits);
+        self.check()
+    }
+
+    /// Admits any instruction through the general lowering, kept out of line so the walk over
+    /// plain Clifford instructions stays small.
+    #[inline(never)]
+    fn general_instruction(&mut self, instruction: &CircuitInstruction) -> DetectionResult<()> {
+        // The source instruction, not its lowering, sizes Stim's simulated qubit count, so
+        // instructions that lower to nothing still count.
+        self.simulated_qubits = self
+            .simulated_qubits
+            .max(instruction_qubit_count(instruction)?);
+        let options = self.admission.options;
+        visit_lowered_instructions(instruction, |lowered| {
+            let lowering = lower(lowered, options, &mut self.actions)?;
+            record_effects(lowered, lowering, &mut self.counts)?;
+            match lowering {
+                Lowering::Noop => return Ok(()),
+                Lowering::FrameIdentity => {}
+                Lowering::Entry(kind) => {
+                    self.admission
+                        .admit_entry(self.entry_bytes, arena_demand(lowered, kind))?;
+                }
+            }
+            self.admission.frame_qubit_count = self
+                .admission
+                .frame_qubit_count
+                .max(instruction_qubit_count(lowered)?);
+            self.check()
+        })
+    }
+
+    /// Counts one repeat marker entry.
+    fn add_marker(&mut self) -> DetectionResult<()> {
+        self.admission.entry_count = self
+            .admission
+            .entry_count
+            .checked_add(1)
+            .ok_or_else(storage_overflow)?;
+        self.admission.retained_bytes =
+            checked_add_bytes(self.admission.retained_bytes, self.entry_bytes)?;
+        self.check()
+    }
+
+    fn end_repeat(&mut self, repeat: RepeatAdmission) -> DetectionResult<()> {
+        integrate_repeat(&mut self.counts, repeat)?;
+        if self.admission.entry_count == repeat.entries_before + 1 {
+            // A body that lowers to nothing is elided with its marker; it added no entry, so it
+            // added no arena payload either.
+            self.admission.entry_count = repeat.entries_before;
+            self.admission.retained_bytes = self
+                .admission
+                .retained_bytes
+                .checked_sub(self.entry_bytes)
+                .ok_or_else(admission_drift)?;
+            return Ok(());
+        }
+        self.add_marker()
+    }
+}
+
+#[cold]
+fn compiled_bytes_limit(combined: u64, max_combined_bytes: u64) -> DetectionError {
+    DetectionError::from(ResourceLimitError::detection_compiled_bytes(
+        combined,
+        max_combined_bytes,
+    ))
+}
+
+/// The running state of one materialization walk.
+struct Materializer<'a> {
+    options: ProgramOptions,
+    entries: Vec<ProgramEntry>,
+    arena: ProgramArena,
+    // A repeat marker is emitted only once its body emits an entry, so bodies that lower to
+    // nothing vanish without ever exceeding the admitted entry capacity.
+    repeat_markers: ArrayVec<PendingRepeat, { RepeatNestingLimit::HARD_MAX }>,
+    frame_qubit_count: usize,
+    actions: FrameCliffordActionCache,
+    cliffords: ReferenceCliffordTable,
+    noiseless_previous: Option<&'a CircuitInstruction>,
+}
+
+impl<'a> Materializer<'a> {
+    #[inline(always)]
+    fn instruction(&mut self, instruction: &'a CircuitInstruction) -> DetectionResult<()> {
+        let Some(plain) = plain_clifford(instruction, &mut self.actions)? else {
+            return self.general_instruction(instruction);
+        };
+        // A unitary gate never fuses, but it is the previous instruction of the one after it.
+        if kept_by_noiseless_circuit(instruction.gate()) {
+            self.noiseless_previous = Some(instruction);
+        }
+        let built = build_clifford(
+            instruction,
+            plain.frame,
+            &mut self.cliffords,
+            &mut self.arena,
+        )?;
+        emit(&mut self.entries, &mut self.repeat_markers, built)?;
+        self.frame_qubit_count = self.frame_qubit_count.max(plain.qubits);
+        Ok(())
+    }
+
+    /// Materializes any instruction through the general lowering, kept out of line so the walk
+    /// over plain Clifford instructions stays small.
+    #[inline(never)]
+    fn general_instruction(&mut self, instruction: &'a CircuitInstruction) -> DetectionResult<()> {
+        let fusion = noiseless_fusion(self.noiseless_previous, instruction);
+        if kept_by_noiseless_circuit(instruction.gate()) {
+            self.noiseless_previous = Some(instruction);
+        }
+        let options = self.options;
+        visit_lowered_instructions(instruction, |lowered| {
+            let lowering = lower(lowered, options, &mut self.actions)?;
+            if let Lowering::Entry(kind) = lowering {
+                let built = build(lowered, kind, fusion, &mut self.cliffords, &mut self.arena)?;
+                emit(&mut self.entries, &mut self.repeat_markers, built)?;
+            }
+            if !matches!(lowering, Lowering::Noop) {
+                self.frame_qubit_count = self
+                    .frame_qubit_count
+                    .max(instruction_qubit_count(lowered)?);
+            }
+            Ok(())
+        })
+    }
+
+    fn end_repeat(&mut self) -> DetectionResult<()> {
+        self.noiseless_previous = None;
+        let pending = self.repeat_markers.pop().ok_or_else(program_shape_error)?;
+        let Some(marker) = pending.marker else {
+            return Ok(());
+        };
+        let body_end = self.entries.len();
+        push(&mut self.entries, ProgramEntry::EndRepeat)?;
+        let Some(ProgramEntry::Repeat {
+            body_end: stored_end,
+            ..
+        }) = self.entries.get_mut(marker)
+        else {
+            return Err(program_shape_error());
+        };
+        *stored_end = body_end;
+        Ok(())
+    }
+}
+
+/// Appends an entry within the admitted capacity.
+#[inline(always)]
+fn push(entries: &mut Vec<ProgramEntry>, entry: ProgramEntry) -> DetectionResult<()> {
+    if entries.len() == entries.capacity() {
+        return Err(admission_drift());
+    }
+    entries.push(entry);
+    Ok(())
+}
+
+/// Appends an instruction, first emitting the marker of every enclosing repeat whose body had
+/// emitted nothing yet.
+#[inline(always)]
+fn emit(
+    entries: &mut Vec<ProgramEntry>,
+    repeat_markers: &mut [PendingRepeat],
+    instruction: ProgramInstruction,
+) -> DetectionResult<()> {
+    // Markers are emitted outermost first and all at once, so the unmarked repeats are always
+    // the innermost ones and a marked innermost repeat means every repeat is marked.
+    if repeat_markers
+        .last()
+        .is_some_and(|pending| pending.marker.is_none())
+    {
+        emit_markers(entries, repeat_markers)?;
+    }
+    push(entries, ProgramEntry::Instruction(instruction))
+}
+
+#[cold]
+fn emit_markers(
+    entries: &mut Vec<ProgramEntry>,
+    repeat_markers: &mut [PendingRepeat],
+) -> DetectionResult<()> {
+    for pending in repeat_markers {
+        if pending.marker.is_none() {
+            pending.marker = Some(entries.len());
+            push(
+                entries,
+                ProgramEntry::Repeat {
+                    count: pending.count,
+                    body_end: usize::MAX,
+                },
+            )?;
+        }
+    }
+    Ok(())
 }
 
 /// Whether Stim's `Circuit::aliased_noiseless_circuit` keeps an instruction of `gate`.
@@ -471,6 +634,63 @@ fn visit_lowered_instructions(
         return Err(error);
     }
     Ok(())
+}
+
+/// A unitary instruction whose targets all name qubits, the shape of almost every instruction
+/// of a large circuit.
+#[derive(Clone, Copy)]
+struct PlainClifford {
+    frame: FrameGate,
+    /// One past the largest target qubit.
+    qubits: usize,
+    targets: usize,
+}
+
+/// Recognizes a [`PlainClifford`] in one pass over its targets, or returns `None` to send the
+/// instruction through the general lowering, which derives the same entry, qubit counts, and
+/// record effects for every instruction this accepts and fails the same way when the gate's
+/// frame action cannot be derived.
+#[inline(always)]
+fn plain_clifford(
+    instruction: &CircuitInstruction,
+    actions: &mut FrameCliffordActionCache,
+) -> DetectionResult<Option<PlainClifford>> {
+    let gate = instruction.gate();
+    if !gate.is_unitary() || is_pauli_product_phase(gate) {
+        return Ok(None);
+    }
+    let targets = instruction.targets();
+    let mut largest = None::<u32>;
+    for target in targets {
+        let Some(qubit) = target.qubit_id() else {
+            return Ok(None);
+        };
+        largest = largest.max(Some(qubit.get()));
+    }
+    // Every target pair of a controlled Pauli on qubits is a quantum pair, which records nothing;
+    // an unpaired target takes the general lowering and its error.
+    if gate.controlled_pauli().is_some() && !targets.len().is_multiple_of(2) {
+        return Ok(None);
+    }
+    let qubits = match largest {
+        None => 0,
+        Some(qubit) => match usize::try_from(qubit).ok().and_then(|q| q.checked_add(1)) {
+            Some(qubits) => qubits,
+            None => return Ok(None),
+        },
+    };
+    let Some(action) = actions.action(gate)? else {
+        return Ok(None);
+    };
+    Ok(Some(PlainClifford {
+        frame: match action {
+            FrameCliffordAction::Identity => FrameGate::Identity,
+            FrameCliffordAction::Single(map) => FrameGate::Single(map),
+            FrameCliffordAction::Two(map) => FrameGate::Two(map),
+        },
+        qubits,
+        targets: targets.len(),
+    }))
 }
 
 fn is_pauli_product_phase(gate: Gate) -> bool {
@@ -816,7 +1036,7 @@ fn any_inverted(instruction: &CircuitInstruction) -> bool {
 }
 
 /// The arena elements `build` stores for `kind`, computed without allocating.
-fn arena_demand(instruction: &CircuitInstruction, kind: EntryKind) -> DetectionResult<ArenaCounts> {
+fn arena_demand(instruction: &CircuitInstruction, kind: EntryKind) -> ArenaCounts {
     let targets = instruction.targets().len();
     let qubits = ArenaCounts {
         qubits: targets,
@@ -827,7 +1047,7 @@ fn arena_demand(instruction: &CircuitInstruction, kind: EntryKind) -> DetectionR
         ..qubits
     };
     let none = ArenaCounts::default();
-    Ok(match kind {
+    match kind {
         EntryKind::Clifford(_) | EntryKind::Reset(_) | EntryKind::HeraldedErase => qubits,
         EntryKind::SinglePauliNoise(_) => probabilities(3),
         EntryKind::TwoQubitPauliNoise(_) => probabilities(15),
@@ -861,320 +1081,5 @@ fn arena_demand(instruction: &CircuitInstruction, kind: EntryKind) -> DetectionR
             pairs: targets / 2,
             ..none
         },
-    })
-}
-
-/// The frame qubit of a qubit target.
-fn frame_qubit(instruction: &CircuitInstruction, target: &Target) -> DetectionResult<u32> {
-    target
-        .qubit_id()
-        .map(|qubit| qubit.get())
-        .ok_or_else(|| unsupported_frame_instruction(instruction))
-}
-
-fn qubit_targets(
-    instruction: &CircuitInstruction,
-    arena: &mut ProgramArena,
-) -> DetectionResult<ArenaSpan<u32>> {
-    let start = arena.mark::<u32>();
-    for target in instruction.targets() {
-        arena.push(frame_qubit(instruction, target)?)?;
     }
-    arena.span_since(start)
-}
-
-fn inversion_flags(
-    instruction: &CircuitInstruction,
-    arena: &mut ProgramArena,
-) -> DetectionResult<ArenaSpan<bool>> {
-    if !any_inverted(instruction) {
-        return Ok(ArenaSpan::EMPTY);
-    }
-    arena.extend(
-        instruction
-            .targets()
-            .iter()
-            .map(Target::is_inverted_result_target),
-    )
-}
-
-fn pauli_terms(
-    instruction: &CircuitInstruction,
-    arena: &mut ProgramArena,
-) -> DetectionResult<ArenaSpan<PauliTerm>> {
-    let start = arena.mark::<PauliTerm>();
-    for target in instruction.targets() {
-        // Pinned Stim consults only the Pauli X/Z bits of correlated-error targets, so combiner
-        // targets and inversion bits are ignored decoration (frame_simulator.inl:767-775).
-        // Observable record targets belong to detection conversion.
-        if target.is_combiner() || target.measurement_record_offset().is_some() {
-            continue;
-        }
-        let Some(pauli) = target.pauli_type() else {
-            return Err(unsupported_frame_instruction(instruction));
-        };
-        arena.push((qubit_index(instruction, target)?, pauli_basis(pauli)))?;
-    }
-    arena.span_since(start)
-}
-
-fn build(
-    instruction: &CircuitInstruction,
-    kind: EntryKind,
-    fusion: NoiselessFusion,
-    cliffords: &mut ReferenceCliffordTable,
-    arena: &mut ProgramArena,
-) -> DetectionResult<ProgramInstruction> {
-    Ok(match kind {
-        EntryKind::Clifford(frame) => ProgramInstruction::Clifford {
-            frame,
-            reference: cliffords.id(instruction.gate())?,
-            targets: qubit_targets(instruction, arena)?,
-        },
-        EntryKind::Reset(basis) => ProgramInstruction::Reset {
-            basis,
-            targets: qubit_targets(instruction, arena)?,
-            fusion,
-        },
-        EntryKind::Measure { basis, reset } => ProgramInstruction::Measure {
-            basis,
-            reset,
-            flip_probability: measurement_flip_probability(instruction)?,
-            targets: qubit_targets(instruction, arena)?,
-            inverted: inversion_flags(instruction, arena)?,
-            fusion,
-        },
-        EntryKind::MeasurePairs(basis) => ProgramInstruction::MeasurePairs {
-            basis,
-            flip_probability: measurement_flip_probability(instruction)?,
-            targets: qubit_targets(instruction, arena)?,
-            inverted: inversion_flags(instruction, arena)?,
-            fusion,
-        },
-        EntryKind::MeasurePads => {
-            let start = arena.mark::<bool>();
-            for target in instruction.targets() {
-                arena.push(frame_qubit(instruction, target)? == 1)?;
-            }
-            ProgramInstruction::MeasurePads {
-                flip_probability: measurement_flip_probability(instruction)?,
-                values: arena.span_since(start)?,
-            }
-        }
-        EntryKind::PauliProducts { .. } => {
-            ProgramInstruction::PauliProducts(build_pauli_products(instruction, arena)?)
-        }
-        EntryKind::SinglePauliNoise(noise) => {
-            let probabilities = match noise {
-                SingleQubitNoise::X => [single_probability_argument(instruction)?.get(), 0.0, 0.0],
-                SingleQubitNoise::Y => [0.0, single_probability_argument(instruction)?.get(), 0.0],
-                SingleQubitNoise::Z => [0.0, 0.0, single_probability_argument(instruction)?.get()],
-                SingleQubitNoise::Depolarize => {
-                    [single_probability_argument(instruction)?.get() / 3.0; 3]
-                }
-                SingleQubitNoise::PauliChannel => probability_list::<3>(instruction)?,
-            };
-            ProgramInstruction::SinglePauliNoise {
-                probabilities: arena.extend(probabilities)?,
-                targets: qubit_targets(instruction, arena)?,
-            }
-        }
-        EntryKind::TwoQubitPauliNoise(noise) => {
-            let probabilities = match noise {
-                TwoQubitNoise::Depolarize => {
-                    [single_probability_argument(instruction)?.get() / 15.0; 15]
-                }
-                TwoQubitNoise::PauliChannel => probability_list::<15>(instruction)?,
-            };
-            ProgramInstruction::TwoQubitPauliNoise {
-                probabilities: arena.extend(probabilities)?,
-                targets: qubit_targets(instruction, arena)?,
-            }
-        }
-        EntryKind::CorrelatedError { else_branch } => ProgramInstruction::CorrelatedError {
-            else_branch,
-            probability: single_probability_argument(instruction)?.get(),
-            terms: pauli_terms(instruction, arena)?,
-        },
-        EntryKind::HeraldedErase => ProgramInstruction::HeraldedErase {
-            probability: single_probability_argument(instruction)?.get(),
-            targets: qubit_targets(instruction, arena)?,
-        },
-        EntryKind::HeraldedPauliChannel => ProgramInstruction::HeraldedPauliChannel {
-            probabilities: arena.extend(probability_list::<4>(instruction)?)?,
-            targets: qubit_targets(instruction, arena)?,
-        },
-        EntryKind::ControlledPauli { basis, map } => ProgramInstruction::ControlledPauli {
-            basis,
-            frame: map,
-            reference: cliffords.id(instruction.gate())?,
-            pairs: controlled_pairs(instruction, arena)?,
-        },
-        EntryKind::Observable => {
-            let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-                DetectionError::invalid_result_format("OBSERVABLE_INCLUDE missing id")
-            })?;
-            let id = usize::try_from(observable.get()).map_err(|_| {
-                DetectionError::invalid_result_format(format!(
-                    "observable id {} does not fit usize",
-                    observable.get()
-                ))
-            })?;
-            ProgramInstruction::Observable {
-                id,
-                terms: pauli_terms(instruction, arena)?,
-            }
-        }
-    })
-}
-
-fn controlled_pairs(
-    instruction: &CircuitInstruction,
-    arena: &mut ProgramArena,
-) -> DetectionResult<ArenaSpan<ControlledPair>> {
-    let start = arena.mark::<ControlledPair>();
-    for target_group in instruction.targets().chunks(2) {
-        let pair = match classify_controlled_pauli_target_pair(instruction.gate(), target_group) {
-            ControlledPauliTargetPair::Quantum { .. } => {
-                let [control, target] = target_group else {
-                    return Err(unsupported_frame_instruction(instruction));
-                };
-                ControlledPair::Quantum {
-                    control: frame_qubit(instruction, control)?,
-                    target: frame_qubit(instruction, target)?,
-                }
-            }
-            ControlledPauliTargetPair::Classical { control, target } => {
-                let qubit = target.get();
-                match control {
-                    ClassicalControl::Record(offset) => ControlledPair::Record { offset, qubit },
-                    ClassicalControl::Sweep(id) => ControlledPair::Sweep { id, qubit },
-                }
-            }
-            ControlledPauliTargetPair::ClassicalNoop { .. } => continue,
-            ControlledPauliTargetPair::Unsupported => {
-                return Err(unsupported_frame_instruction(instruction));
-            }
-        };
-        arena.push(pair)?;
-    }
-    arena.span_since(start)
-}
-
-fn build_pauli_products(
-    instruction: &CircuitInstruction,
-    arena: &mut ProgramArena,
-) -> DetectionResult<PauliProductMeasurement> {
-    let terms = arena.mark::<PauliTerm>();
-    let products = arena.mark::<PauliProduct>();
-    for target_group in instruction.target_groups() {
-        let mut raw_terms = Vec::new();
-        for target in target_group {
-            if target.is_combiner() {
-                continue;
-            }
-            let Some(pauli) = target.pauli_type() else {
-                return Err(unsupported_frame_instruction(instruction));
-            };
-            raw_terms.push((
-                qubit_index(instruction, target)?,
-                pauli_basis(pauli),
-                target.is_inverted_result_target(),
-            ));
-        }
-        let (normalized, product_inverted) =
-            crate::sampling::pauli_product::normalize_terms(raw_terms, false)?;
-        arena.push(PauliProduct::new(normalized.len(), product_inverted)?)?;
-        arena.extend(normalized)?;
-    }
-    Ok(PauliProductMeasurement {
-        terms: arena.span_since(terms)?,
-        products: arena.span_since(products)?,
-        flip_probability: measurement_flip_probability(instruction)?,
-    })
-}
-
-/// Resolves each distinct gate's reference-sample action once per program.
-#[derive(Default)]
-struct ReferenceCliffordTable {
-    gates: Vec<Gate>,
-    table: Vec<ReferenceClifford>,
-}
-
-impl ReferenceCliffordTable {
-    fn id(&mut self, gate: Gate) -> DetectionResult<ReferenceGateId> {
-        let index = match self.gates.iter().position(|cached| *cached == gate) {
-            Some(index) => index,
-            None => {
-                let clifford = reference_clifford(gate)?;
-                self.gates.push(gate);
-                self.table.push(clifford);
-                self.table.len() - 1
-            }
-        };
-        u16::try_from(index)
-            .map(ReferenceGateId)
-            .map_err(|_| program_shape_error())
-    }
-}
-
-fn reference_clifford(gate: Gate) -> DetectionResult<ReferenceClifford> {
-    // `H` and `CX` have dedicated reference kernels; every other gate takes the general tableau
-    // path, which rejects gates without a Clifford action.
-    Ok(match gate.kind() {
-        GateKind::H => ReferenceClifford::Hadamard,
-        GateKind::CX => ReferenceClifford::ControlledX,
-        _ => {
-            let tableau = match stab_analysis::single_qubit_clifford_for_gate(gate) {
-                Ok(clifford) => clifford.tableau(),
-                Err(_) => stab_analysis::gate_tableau(gate)?,
-            };
-            ReferenceClifford::Tableau {
-                transform: LocalTableauTransform::from_tableau(&tableau)?,
-                steps: decomposition_steps(gate, tableau.len()),
-            }
-        }
-    })
-}
-
-/// Parses the gate's pinned Stim `H`/`S`/`CX` decomposition, which is exact including signs,
-/// or returns `None` when the gate has none in that form.
-fn decomposition_steps(gate: Gate, arity: usize) -> Option<Vec<CliffordStep>> {
-    let decomposition = stab_model::advanced::gate_decomposition(gate)?;
-    let mut steps = Vec::new();
-    for line in decomposition.as_stim_str().lines() {
-        let mut tokens = line
-            .split('#')
-            .next()
-            .unwrap_or_default()
-            .split_whitespace();
-        let Some(name) = tokens.next() else {
-            continue;
-        };
-        let mut qubits = Vec::new();
-        for token in tokens {
-            let qubit = token.parse::<u8>().ok()?;
-            if usize::from(qubit) >= arity {
-                return None;
-            }
-            qubits.push(qubit);
-        }
-        match name {
-            "H" => steps.extend(qubits.iter().map(|&qubit| CliffordStep::H(qubit))),
-            "S" => steps.extend(qubits.iter().map(|&qubit| CliffordStep::S(qubit))),
-            "CX" | "CNOT" => {
-                let (pairs, unpaired) = qubits.as_chunks::<2>();
-                if !unpaired.is_empty() {
-                    return None;
-                }
-                steps.extend(
-                    pairs
-                        .iter()
-                        .map(|&[control, target]| CliffordStep::Cx(control, target)),
-                );
-            }
-            _ => return None,
-        }
-    }
-    Some(steps)
 }

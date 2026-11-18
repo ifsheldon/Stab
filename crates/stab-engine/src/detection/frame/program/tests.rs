@@ -23,7 +23,9 @@ fn structural_validation_does_not_execute_repeat_iterations() {
         ProgramEntry::EndRepeat,
     ];
 
-    validate_program(&entries).expect("validate compact repeat tape structurally");
+    validate_program(&entries, &ProgramArena::default())
+        .expect("validate compact repeat tape structurally")
+        .expect("measure window needs");
 }
 
 #[test]

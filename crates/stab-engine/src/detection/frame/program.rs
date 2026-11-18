@@ -481,11 +481,27 @@ pub(crate) fn visit_circuit<'a>(
     }
 }
 
-fn validate_program(entries: &[ProgramEntry]) -> DetectionResult<()> {
+/// Validates the repeat structure of `entries` and, in the same pass, measures what a frame must
+/// retain to run them over bounded windows of measurement planes.
+///
+/// A structural error is returned at once; a failure to measure the window needs is returned
+/// inside the outer `Ok`, so callers that check other invariants between validation and
+/// measurement report errors in the same order as two separate passes would.
+fn validate_program(
+    entries: &[ProgramEntry],
+    arena: &ProgramArena,
+) -> DetectionResult<DetectionResult<MeasurementWindowNeeds>> {
     let mut repeat_ends = ArrayVec::<usize, { RepeatNestingLimit::HARD_MAX }>::new();
+    let mut needs = Ok(MeasurementWindowNeeds::default());
     for (index, entry) in entries.iter().enumerate() {
         match entry {
-            ProgramEntry::Instruction(_) => {}
+            ProgramEntry::Instruction(instruction) => {
+                if let Ok(current) = &mut needs
+                    && let Err(error) = include_window_needs(current, instruction, arena)
+                {
+                    needs = Err(error);
+                }
+            }
             ProgramEntry::Repeat { count, body_end } => {
                 if *count == 0
                     || *body_end <= index + 1
@@ -507,45 +523,42 @@ fn validate_program(entries: &[ProgramEntry]) -> DetectionResult<()> {
             }
         }
     }
-    repeat_ends.is_empty().ok_or_else(program_shape_error)
+    repeat_ends.is_empty().ok_or_else(program_shape_error)?;
+    Ok(needs)
 }
 
-/// What a frame must retain to run `entries` over bounded windows of measurement planes.
-fn window_needs(
-    entries: &[ProgramEntry],
+/// Widens `needs` to cover `instruction`.
+#[inline]
+fn include_window_needs(
+    needs: &mut MeasurementWindowNeeds,
+    instruction: &ProgramInstruction,
     arena: &ProgramArena,
-) -> DetectionResult<MeasurementWindowNeeds> {
-    let mut needs = MeasurementWindowNeeds::default();
-    for entry in entries {
-        let ProgramEntry::Instruction(instruction) = entry else {
-            continue;
-        };
-        let recorded = match instruction {
-            ProgramInstruction::Measure { targets, .. }
-            | ProgramInstruction::HeraldedErase { targets, .. }
-            | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len(),
-            ProgramInstruction::MeasurePairs { targets, .. } => targets.len() / 2,
-            ProgramInstruction::MeasurePads { values, .. } => values.len(),
-            ProgramInstruction::PauliProducts(measurement) => measurement.product_count(),
-            ProgramInstruction::ControlledPauli { pairs, .. } => {
-                for pair in arena.get(*pairs)? {
-                    if let ControlledPair::Record { offset, .. } = pair {
-                        needs.feedback_lookback =
-                            needs.feedback_lookback.max(lookback_distance(*offset));
-                    }
+) -> DetectionResult<()> {
+    let recorded = match instruction {
+        ProgramInstruction::Measure { targets, .. }
+        | ProgramInstruction::HeraldedErase { targets, .. }
+        | ProgramInstruction::HeraldedPauliChannel { targets, .. } => targets.len(),
+        ProgramInstruction::MeasurePairs { targets, .. } => targets.len() / 2,
+        ProgramInstruction::MeasurePads { values, .. } => values.len(),
+        ProgramInstruction::PauliProducts(measurement) => measurement.product_count(),
+        ProgramInstruction::ControlledPauli { pairs, .. } => {
+            for pair in arena.get(*pairs)? {
+                if let ControlledPair::Record { offset, .. } = pair {
+                    needs.feedback_lookback =
+                        needs.feedback_lookback.max(lookback_distance(*offset));
                 }
-                0
             }
-            ProgramInstruction::Clifford { .. }
-            | ProgramInstruction::Reset { .. }
-            | ProgramInstruction::SinglePauliNoise { .. }
-            | ProgramInstruction::TwoQubitPauliNoise { .. }
-            | ProgramInstruction::CorrelatedError { .. }
-            | ProgramInstruction::Observable { .. } => 0,
-        };
-        needs.largest_instruction = needs.largest_instruction.max(recorded);
-    }
-    Ok(needs)
+            0
+        }
+        ProgramInstruction::Clifford { .. }
+        | ProgramInstruction::Reset { .. }
+        | ProgramInstruction::SinglePauliNoise { .. }
+        | ProgramInstruction::TwoQubitPauliNoise { .. }
+        | ProgramInstruction::CorrelatedError { .. }
+        | ProgramInstruction::Observable { .. } => 0,
+    };
+    needs.largest_instruction = needs.largest_instruction.max(recorded);
+    Ok(())
 }
 
 fn materialized_retained_bytes(

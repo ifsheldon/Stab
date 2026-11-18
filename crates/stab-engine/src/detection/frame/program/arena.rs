@@ -121,6 +121,18 @@ impl ArenaCounts {
         Ok(())
     }
 
+    /// Adds `qubits` qubit targets, which is [`Self::add`] of a payload holding only qubit
+    /// targets, since every other total already fits an [`ArenaSpan`] index.
+    #[inline(always)]
+    pub(super) fn add_qubits(&mut self, qubits: usize) -> DetectionResult<()> {
+        self.qubits = self
+            .qubits
+            .checked_add(qubits)
+            .filter(|total| u32::try_from(*total).is_ok())
+            .ok_or_else(arena_index_limit)?;
+        Ok(())
+    }
+
     /// The bytes these elements occupy.
     pub(super) fn bytes(self) -> DetectionResult<u64> {
         [
