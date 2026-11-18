@@ -13,7 +13,8 @@ use crate::{
     CliError, MemoryBudgetArg, MemoryLedger, RecordFormatArg, StageBudget,
     batch_output::record_write_io,
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
-    io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
+    io_plan::{FileRole, OUTPUT_BUFFER_BYTES, PendingIo, StandardStreams, StreamUse},
+    output_storage::{EncodedBatches, OutputStorage},
     streaming::{FileOutputSink, OutputSink},
 };
 
@@ -243,7 +244,7 @@ where
             [(FileRole::Output, args.output.as_deref())],
         )?;
         io.reject_standard_stream_aliases(streams, stream_use)?;
-        return run_convert_stim(io, stdin, stdout, args.memory);
+        return run_convert_stim(io, stdin, stdout, args.memory, args.output.is_some());
     }
     if args.obs_out_format == RecordFormatArg::Stim {
         return Err(CliError::UnsupportedConversion);
@@ -296,9 +297,10 @@ struct ConvertStorage {
 impl ConvertStorage {
     /// Admits the reader's batch, PTB64 group, first `r8` record, and packed-format transport
     /// buffer (fixed for `r8`, whose records decode as they arrive) for the input width and
-    /// batch size, the column batches split from each batch, and each encoder's scratch. Text
-    /// inputs bound their transport buffer through the per-record text cap that the stage after
-    /// this one receives.
+    /// batch size, the column batches split from each batch, each encoder's scratch, and the
+    /// write buffer of each named `--out` and `--obs_out` file. Standard output's buffer exists
+    /// before the budget is known and is not charged. Text inputs bound their transport buffer
+    /// through the per-record text cap that the stage after this one receives.
     fn admit(
         args: &ConvertArgs,
         layout: ConvertLayout,
@@ -334,7 +336,16 @@ impl ConvertStorage {
                 layout.observable_width(),
             ));
         }
-        let required = reader.saturating_add(columns).saturating_add(encoders);
+        let file_buffers = [args.output.is_some(), split_observables]
+            .into_iter()
+            .filter(|named| *named)
+            .fold(0_u128, |total, _| {
+                total.saturating_add(OUTPUT_BUFFER_BYTES as u128)
+            });
+        let required = reader
+            .saturating_add(columns)
+            .saturating_add(encoders)
+            .saturating_add(file_buffers);
         let budget = stage.get();
         match u64::try_from(required) {
             Ok(bytes) if budget.admits(required) => Ok(Self {
@@ -365,6 +376,7 @@ fn run_convert_stim<R, W>(
     stdin: &mut R,
     stdout: &mut W,
     memory: MemoryBudgetArg,
+    named_output: bool,
 ) -> Result<(), CliError>
 where
     R: Read,
@@ -378,7 +390,12 @@ where
         read_limited_stdin(stdin, input_cap, "convert input")?
     };
     let (circuit, _circuit_hold) = ledger.parse_circuit(input)?;
-    // Canonical text streams to the output instead of materializing a second copy.
+    // Canonical text streams to the output instead of materializing a second copy, so the only
+    // output storage is a named file's write buffer, admitted beside the parsed circuit before
+    // the file is activated.
+    let _output_hold = OutputStorage::new("convert", EncodedBatches::ShotMajor, None)
+        .file_buffer(named_output)
+        .admit(&mut ledger)?;
     let mut outputs = io.activate()?;
     let mut primary_output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
     primary_output.write_with(|mut writer| circuit.write_stim_io(&mut writer))?;

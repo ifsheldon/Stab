@@ -842,3 +842,194 @@ fn convert_admits_packed_record_storage_against_the_memory_budget_before_allocat
         );
     }
 }
+
+/// Runs `convert` from `b8` detector-and-observable records to `b8` output with JSON
+/// diagnostics, writing the primary records to a named file when `named_out` and the observables
+/// to a named file when `obs_out`, and returns the run plus the refused byte count, if any.
+fn convert_outputs_with_budget(
+    scratch: &Scratch,
+    input: &[u8],
+    named_out: bool,
+    obs_out: bool,
+    budget: u64,
+) -> (super::support::CliRun, Option<u64>) {
+    let mut args = vec![
+        "stab".to_owned(),
+        "--error-format=json".to_owned(),
+        "convert".to_owned(),
+        "--in_format=b8".to_owned(),
+        "--out_format=b8".to_owned(),
+        "--num_detectors=5".to_owned(),
+        "--num_observables=3".to_owned(),
+        format!("--memory-budget={budget}"),
+    ];
+    if named_out {
+        args.push(format!("--out={}", scratch.path("out.b8")));
+    }
+    if obs_out {
+        args.push(format!("--obs_out={}", scratch.path("obs.b8")));
+        args.push("--obs_out_format=b8".to_owned());
+    }
+    let result = super::support::run_cli(args, input);
+    if result.status == 0 {
+        return (result, None);
+    }
+    let diagnostic: serde_json::Value =
+        serde_json::from_slice(&result.stderr).expect("JSON diagnostic");
+    assert_eq!(
+        diagnostic.pointer("/code"),
+        Some(&serde_json::json!("resource-limit-exceeded")),
+        "{diagnostic}"
+    );
+    assert_eq!(
+        diagnostic.pointer("/context/operation"),
+        Some(&serde_json::json!("record-conversion")),
+        "{diagnostic}"
+    );
+    let required = diagnostic
+        .pointer("/context/actual")
+        .and_then(serde_json::Value::as_u64);
+    (result, required)
+}
+
+/// The record conversion storage charges the 64 KiB write buffer of each named `--out` and
+/// `--obs_out` file but not standard output's, so a budget that fits the reader, columns, and
+/// encoders but not those buffers is refused before any output file is activated, and the budget
+/// that adds them converts the records.
+#[test]
+fn convert_charges_each_named_output_file_buffer_against_the_memory_budget() {
+    let buffer = crate::io_plan::OUTPUT_BUFFER_BYTES as u64;
+    let records = alternating_records_64(8)
+        .lines()
+        .map(|line| line.bytes().map(|bit| bit == b'1').collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let b8 = |records: &[Vec<bool>]| {
+        stab_records::write_records(records, stab_records::RecordFormat::B8).expect("encode")
+    };
+    let input = b8(&records);
+    let detectors = records
+        .iter()
+        .map(|bits| bits.get(..5).expect("8-bit record").to_vec())
+        .collect::<Vec<_>>();
+    let observables = records
+        .iter()
+        .map(|bits| bits.get(5..).expect("8-bit record").to_vec())
+        .collect::<Vec<_>>();
+    let requirement = |named_out, obs_out| {
+        let (_, required) =
+            convert_outputs_with_budget(&Scratch::new(), &input, named_out, obs_out, 1);
+        required.expect("refusal reports its requirement")
+    };
+    let scratch_bytes = |width| {
+        u64::try_from(stab_records::RecordEncoder::shot_major_scratch_bytes(
+            stab_records::RecordFormat::B8,
+            width,
+        ))
+        .expect("scratch fits u64")
+    };
+
+    let stdout_only = requirement(false, false);
+    // Standard output is uncharged; a named primary file adds exactly one buffer.
+    assert_eq!(requirement(true, false), stdout_only + buffer);
+    // Splitting observables replaces the 8-bit encoder with 5-bit and 3-bit encoders and adds
+    // the always-named observable file's buffer.
+    let split_encoders = scratch_bytes(5) + scratch_bytes(3) - scratch_bytes(8);
+    assert_eq!(
+        requirement(false, true),
+        stdout_only + split_encoders + buffer
+    );
+    assert_eq!(
+        requirement(true, true),
+        stdout_only + split_encoders + 2 * buffer
+    );
+
+    for obs_out in [false, true] {
+        let scratch = Scratch::new();
+        let required = requirement(true, obs_out);
+        // Preflight opens the outputs without truncating them; only activation, after the
+        // storage is admitted, empties them.
+        scratch.file("out.b8", b"stale");
+        scratch.file("obs.b8", b"stale");
+        let (refused, again) =
+            convert_outputs_with_budget(&scratch, &input, true, obs_out, required - buffer);
+        assert_eq!(again, Some(required), "{}", refused.stderr_text());
+        assert_eq!(
+            scratch.read("out.b8"),
+            b"stale",
+            "refused before activation"
+        );
+        assert_eq!(
+            scratch.read("obs.b8"),
+            b"stale",
+            "refused before activation"
+        );
+
+        let (admitted, none) =
+            convert_outputs_with_budget(&scratch, &input, true, obs_out, required);
+        assert_eq!(none, None, "{}", admitted.stderr_text());
+        admitted.assert_ok(b"");
+        if obs_out {
+            assert_eq!(scratch.read("out.b8"), b8(&detectors));
+            assert_eq!(scratch.read("obs.b8"), b8(&observables));
+        } else {
+            assert_eq!(scratch.read("out.b8"), input);
+        }
+    }
+}
+
+/// Canonicalizing a circuit to a named file charges that file's 64 KiB write buffer beside the
+/// parsed circuit before the file is activated, while standard output's buffer stays uncharged.
+#[test]
+fn convert_stim_charges_a_named_output_file_buffer_against_the_memory_budget() {
+    let buffer = crate::io_plan::OUTPUT_BUFFER_BYTES as u64;
+    let circuit = b"H 0\nH 1\nM 0\nM 1\n";
+    let run_with = |budget: u64, output: Option<&str>| {
+        let mut args = vec![
+            "stab".to_owned(),
+            "--error-format=json".to_owned(),
+            "convert".to_owned(),
+            "--in_format=stim".to_owned(),
+            "--out_format=stim".to_owned(),
+            format!("--memory-budget={budget}"),
+        ];
+        if let Some(output) = output {
+            args.push("--out".to_owned());
+            args.push(output.to_owned());
+        }
+        super::support::run_cli(args, circuit)
+    };
+
+    // The smallest budget that canonicalizes to standard output is far below one file buffer.
+    let (mut refused, mut admitted) = (0_u64, buffer);
+    while admitted - refused > 1 {
+        let middle = refused + (admitted - refused) / 2;
+        if run_with(middle, None).status == 0 {
+            admitted = middle;
+        } else {
+            refused = middle;
+        }
+    }
+    assert!(admitted < buffer, "stdout budget {admitted}");
+    run_with(admitted, None).assert_ok(b"H 0 1\nM 0 1\n");
+
+    let scratch = Scratch::new();
+    let output = scratch.file("output.stim", "stale");
+    let short = run_with(buffer, Some(&output));
+    assert_eq!(short.status, 1);
+    let diagnostic: serde_json::Value =
+        serde_json::from_slice(&short.stderr).expect("JSON diagnostic");
+    assert_eq!(
+        diagnostic.pointer("/code"),
+        Some(&serde_json::json!("resource-limit-exceeded")),
+        "{diagnostic}"
+    );
+    assert_eq!(
+        diagnostic.pointer("/context/operation"),
+        Some(&serde_json::json!("record-output")),
+        "{diagnostic}"
+    );
+    assert_eq!(scratch.read("output.stim"), b"stale");
+
+    run_with(admitted + buffer, Some(&output)).assert_ok(b"");
+    assert_eq!(scratch.read("output.stim"), b"H 0 1\nM 0 1\n");
+}
