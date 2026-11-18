@@ -36,7 +36,8 @@ pub(crate) mod advanced {
 use traversal::FoldedDemTraversal;
 
 use crate::circuit::printing::DemFloatCache;
-use crate::model_bytes::{PreparedModelText, RecoveredTags};
+use crate::model_bytes::{PreparedModelText, RecoveredTags, locate_recovered_tag};
+use crate::parse_limits::ParseAdmission;
 use crate::{
     AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
     ParseLimits, Probability, RepeatNestingLimit,
@@ -78,11 +79,14 @@ impl DetectorErrorModel {
     pub fn from_dem_bytes_admitted(input: &[u8], limits: ParseLimits) -> ModelResult<(Self, u64)> {
         let prepared = PreparedModelText::new(input, ModelDialect::DetectorErrorModel, limits)?;
         let parsed = prepared.resolve(parse_dem_admitted(prepared.text(), prepared.admission()));
-        let (mut model, model_bytes) = parsed?;
-        if let Some(tags) = prepared.into_tags() {
-            model.restore_byte_tags(tags)?;
-        }
-        Ok((model, model_bytes))
+        let (mut model, mut admission) = parsed?;
+        let Some(tags) = prepared.into_tags() else {
+            return Ok((model, admission.retained_model_bytes()));
+        };
+        // Taking the tags freed the sanitized text copy.
+        admission.release_sanitized_copy(input.len());
+        model.restore_byte_tags(tags, &mut admission, input)?;
+        Ok((model, admission.retained_model_bytes()))
     }
 
     pub fn from_dem_str_with_limits(input: &str, limits: ParseLimits) -> ModelResult<Self> {
@@ -90,7 +94,7 @@ impl DetectorErrorModel {
     }
 
     /// Conservative retained bytes of this model under [`ParseLimits`] item, target, argument, and
-    /// tag accounting.
+    /// tag accounting, including the display text of tags restored from non-UTF-8 bytes.
     pub fn admitted_bytes(&self) -> u64 {
         let mut total = 0_u64;
         let mut stack = vec![self.items.iter()];
@@ -109,6 +113,7 @@ impl DetectorErrorModel {
                             instruction.tag_bytes().map_or(0, <[u8]>::len),
                         ),
                     );
+                    total = total.saturating_add(opaque_overhead(instruction.tag.as_ref()));
                 }
                 DemItem::RepeatBlock(repeat) => {
                     total = total.saturating_add(
@@ -119,6 +124,7 @@ impl DetectorErrorModel {
                             repeat.tag_bytes().map_or(0, <[u8]>::len),
                         ),
                     );
+                    total = total.saturating_add(opaque_overhead(repeat.tag.as_ref()));
                     stack.push(repeat.body().items().iter());
                 }
             }
@@ -258,7 +264,15 @@ impl DetectorErrorModel {
         })
     }
 
-    fn restore_byte_tags(&mut self, tags: RecoveredTags) -> ModelResult<()> {
+    /// Replaces the sanitized tags the parser produced with the exact recovered bytes, in
+    /// source order, charging what an opaque tag retains beyond its parsed text before it is
+    /// built.
+    fn restore_byte_tags(
+        &mut self,
+        tags: RecoveredTags,
+        admission: &mut ParseAdmission,
+        input: &[u8],
+    ) -> ModelResult<()> {
         let expected = self.non_empty_tag_count();
         if expected != tags.len() {
             return Err(ModelError::invalid_domain_value(
@@ -269,7 +283,22 @@ impl DetectorErrorModel {
                 ),
             ));
         }
-        let mut tags = tags.into_owned_tags();
+        let mut tags = tags.into_owned_tags().enumerate();
+        let mut restore = |tag: &mut Option<DemTag>| -> ModelResult<()> {
+            if tag.is_none() {
+                return Ok(());
+            }
+            let Some((index, bytes)) = tags.next() else {
+                return Err(ModelError::invalid_domain_value(
+                    "DEM byte parser",
+                    "metadata scanner ran out of tags",
+                ));
+            };
+            let overhead = DemTag::opaque_overhead_bytes_of(&bytes);
+            admission.admit_opaque_tag_overhead(overhead, || locate_recovered_tag(input, index))?;
+            *tag = DemTag::from_bytes(bytes);
+            Ok(())
+        };
         let mut pending = vec![self.items.iter_mut()];
         while let Some(items) = pending.last_mut() {
             let Some(item) = items.next() else {
@@ -277,21 +306,13 @@ impl DetectorErrorModel {
                 continue;
             };
             match item {
-                DemItem::Instruction(instruction) => {
-                    if instruction.tag.is_some() {
-                        instruction.tag = tags.next().and_then(DemTag::from_bytes);
-                    }
-                }
+                DemItem::Instruction(instruction) => restore(&mut instruction.tag)?,
                 DemItem::RepeatBlock(repeat) => {
-                    if repeat.tag.is_some() {
-                        repeat.tag = tags.next().and_then(DemTag::from_bytes);
-                    }
+                    restore(&mut repeat.tag)?;
                     pending.push(repeat.body.items.iter_mut());
                 }
             }
         }
-        let exhausted = tags.next().is_none();
-        debug_assert!(exhausted);
         Ok(())
     }
 
@@ -954,6 +975,11 @@ fn write_indent_io<W: Write>(out: &mut W, indent: usize) -> io::Result<()> {
         out.write_all(b" ")?;
     }
     Ok(())
+}
+
+/// Bytes an item's opaque tag retains beyond its tag charge.
+fn opaque_overhead(tag: Option<&DemTag>) -> u64 {
+    tag.map_or(0, |tag| tag.opaque_overhead_bytes() as u64)
 }
 
 fn normalize_tag(tag: Option<String>) -> Option<DemTag> {

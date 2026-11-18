@@ -27,14 +27,14 @@ pub(super) fn parse_dem(input: &str, limits: ParseLimits) -> ModelResult<Detecto
 }
 
 /// Parses `input` under `admission`, which has already charged `input` and any preparation
-/// storage, and returns the retained model bytes it charged, excluding both.
+/// storage, and returns the admission holding everything it charged.
 pub(super) fn parse_dem_admitted(
     input: &str,
     admission: ParseAdmission,
-) -> ModelResult<(DetectorErrorModel, u64)> {
+) -> ModelResult<(DetectorErrorModel, ParseAdmission)> {
     let mut parser = DemParser::new(input, admission);
     let model = parser.parse_block()?;
-    Ok((model, parser.admission.retained_model_bytes()))
+    Ok((model, parser.admission))
 }
 
 struct DemParser<'a> {

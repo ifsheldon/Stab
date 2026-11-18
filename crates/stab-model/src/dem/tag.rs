@@ -2,7 +2,9 @@ use std::io::{self, Write};
 
 use arrayvec::ArrayString;
 
-use crate::model_tag::{write_escaped_tag_bytes, write_escaped_tag_text};
+use crate::model_tag::{
+    lossy_display, lossy_display_len, write_escaped_tag_bytes, write_escaped_tag_text,
+};
 
 const INLINE_DEM_TAG_BYTES: usize = 16;
 
@@ -48,11 +50,29 @@ impl DemTag {
             Ok(tag) => Self::from_string(tag),
             Err(error) => {
                 let bytes = error.into_bytes().into_boxed_slice();
-                let display = String::from_utf8_lossy(&bytes)
-                    .into_owned()
-                    .into_boxed_str();
+                let display = lossy_display(&bytes);
                 Some(Self::Opaque(Box::new(OpaqueDemTag { bytes, display })))
             }
+        }
+    }
+
+    /// Bytes an opaque tag of `bytes` retains beyond the tag charge every tag pays: its display
+    /// text and the record holding both; zero for valid UTF-8.
+    ///
+    /// The display replaces each invalid sequence with U+FFFD, so it can take three bytes per
+    /// source byte.
+    pub(super) fn opaque_overhead_bytes_of(bytes: &[u8]) -> usize {
+        if std::str::from_utf8(bytes).is_ok() {
+            return 0;
+        }
+        lossy_display_len(bytes).saturating_add(size_of::<OpaqueDemTag>())
+    }
+
+    /// [`Self::opaque_overhead_bytes_of`] for this tag.
+    pub(super) fn opaque_overhead_bytes(&self) -> usize {
+        match self {
+            Self::Inline(_) | Self::Heap(_) => 0,
+            Self::Opaque(tag) => tag.display.len().saturating_add(size_of::<OpaqueDemTag>()),
         }
     }
 

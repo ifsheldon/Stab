@@ -3,10 +3,10 @@
     reason = "contract tests extract required failures directly"
 )]
 
-//! Circuit tags are charged against the parse budget before their storage is allocated, and the
-//! reported parse hold covers what a parsed tag retains.
+//! Circuit and DEM tags are charged against the parse budget before their storage is allocated,
+//! and the reported parse hold covers what a parsed tag retains.
 
-use stab_model::{Circuit, MemoryBudget, ParseLimits, ResourceKind};
+use stab_model::{Circuit, DetectorErrorModel, MemoryBudget, ParseLimits, ResourceKind};
 
 fn budget(bytes: usize) -> ParseLimits {
     ParseLimits::default().with_memory_budget(MemoryBudget::from_bytes(bytes as u64))
@@ -99,4 +99,48 @@ fn fused_instructions_restored_from_bytes_hold_exactly_their_admitted_bytes() {
     assert!(retained <= hold, "retained {retained} > hold {hold}");
     let circuit = Circuit::from_stim_bytes(&input).expect("fixture parses");
     assert_eq!(circuit.len(), 1);
+}
+
+#[test]
+fn opaque_dem_tags_restored_from_bytes_are_charged_before_they_are_built() {
+    // Every invalid byte displays as a three-byte U+FFFD, so the display text of these tags is
+    // three times their byte length.
+    let mut input = b"error[".to_vec();
+    input.extend(b"\xff".repeat(4_096));
+    input.extend(b"](0.125) D0\nerror[");
+    input.extend(b"\xfe".repeat(4_096));
+    input.extend(b"](0.25) D1\ndetector D2\n");
+
+    let mut kept = Vec::with_capacity(1);
+    let measured = allocation_counter::measure(|| {
+        kept.push(
+            DetectorErrorModel::from_dem_bytes_admitted(&input, ParseLimits::default())
+                .expect("fixture parses"),
+        );
+    });
+    let (model, hold) = kept.pop().expect("parsed model");
+    let retained = u64::try_from(measured.bytes_current).expect("parse retains storage");
+    assert_eq!(hold, model.admitted_bytes());
+    assert!(hold > 2 * 3 * 4_096, "hold {hold} omits the display text");
+    assert!(retained <= hold, "retained {retained} > hold {hold}");
+
+    // The smallest budget that parses the input is set by the last opaque tag's display text,
+    // which is refused at that tag's line and span, before it is allocated.
+    let (mut low, mut high) = (input.len(), 1_usize << 20);
+    while low < high {
+        let middle = low + (high - low) / 2;
+        if DetectorErrorModel::from_dem_bytes_with_limits(&input, budget(middle)).is_ok() {
+            high = middle;
+        } else {
+            low = middle + 1;
+        }
+    }
+    let error = DetectorErrorModel::from_dem_bytes_with_limits(&input, budget(low - 1))
+        .expect_err("one byte short is refused");
+    let resource = error.resource_limit_error().expect("typed rejection");
+    assert_eq!(resource.resource(), ResourceKind::RetainedBytes);
+    assert_eq!(resource.source_line(), Some(2), "{resource}");
+    let second_tag = "error[".len() + 4_096 + "](0.125) D0\n".len() + "error[".len();
+    assert_eq!(resource.span().byte_start(), second_tag, "{resource}");
+    assert_eq!(resource.span().byte_length(), 4_096, "{resource}");
 }

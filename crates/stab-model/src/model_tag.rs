@@ -95,7 +95,7 @@ impl ModelTag {
 
 /// Length of [`String::from_utf8_lossy`]'s text for `bytes`, which replaces each invalid chunk
 /// with one U+FFFD.
-fn lossy_display_len(bytes: &[u8]) -> usize {
+pub(crate) fn lossy_display_len(bytes: &[u8]) -> usize {
     bytes.utf8_chunks().fold(0_usize, |len, chunk| {
         let replacement = if chunk.invalid().is_empty() {
             0
@@ -108,7 +108,7 @@ fn lossy_display_len(bytes: &[u8]) -> usize {
 }
 
 /// [`String::from_utf8_lossy`]'s text for `bytes`, built in one exact-size allocation.
-fn lossy_display(bytes: &[u8]) -> Box<str> {
+pub(crate) fn lossy_display(bytes: &[u8]) -> Box<str> {
     let mut display = String::with_capacity(lossy_display_len(bytes));
     for chunk in bytes.utf8_chunks() {
         display.push_str(chunk.valid());
