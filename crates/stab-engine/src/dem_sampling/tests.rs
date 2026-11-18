@@ -678,6 +678,81 @@ fn sparse_replay_store_admits_u32_ordinals_exactly() {
     );
 }
 
+/// A store that cannot hold the next batch keeps the whole batches it retained, none of the
+/// declined batch even when part of it would fit, and declines every later batch; replaying that
+/// prefix and then delivering the declined records reproduces the uninterrupted replay.
+#[test]
+fn full_replay_store_keeps_its_whole_batch_prefix_for_a_resumed_replay() {
+    let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
+        .expect("parse DEM");
+    let plan = DemSamplingCompiler::new()
+        .compile(&model)
+        .expect("compile DEM");
+    let shots = ShotCount::new(200);
+    let records: Vec<Vec<bool>> = (0..200)
+        .map(|shot| (0..100).map(|error| error == shot % 100).collect())
+        .collect();
+    let pack = |range: std::ops::Range<usize>| {
+        stab_records::PackedShotBatch::from_records(&records[range], plan.error_count())
+            .expect("pack one-hit records")
+    };
+    let store_at = |bytes: u64| {
+        plan.replay_record_store(
+            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            shots,
+        )
+    };
+    let (mut low, mut empty_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
+    while low + 1 < empty_budget {
+        let middle = low + (empty_budget - low) / 2;
+        if store_at(middle).is_retaining() {
+            empty_budget = middle;
+        } else {
+            low = middle;
+        }
+    }
+    // Room for the record starts and 150 ordinals: the first batch fits, and of the 136-record
+    // batch only its first 64-record chunk would, which the store must not keep.
+    let mut store = store_at(empty_budget + 150 * 4);
+    assert_eq!(
+        store.try_retain(pack(0..64).view()).expect("retain prefix"),
+        DemReplayRetention::Retained
+    );
+    assert_eq!(
+        store
+            .try_retain(pack(64..200).view())
+            .expect("offer the batch that overflows"),
+        DemReplayRetention::Full
+    );
+    assert_eq!(
+        store.shot_count(),
+        64,
+        "the declined batch leaves no records"
+    );
+    assert!(!store.is_retaining() && !store.is_released());
+    assert_eq!(
+        store
+            .try_retain(pack(64..65).view())
+            .expect("offer to full"),
+        DemReplayRetention::Full
+    );
+
+    let mut session = plan.replay_session(shots).expect("replay session");
+    let mut sink = CollectingSink::default();
+    let mut transaction = session.start_transaction(&mut sink).expect("transaction");
+    transaction
+        .write_retained(&store)
+        .expect("replay the retained prefix");
+    for range in [64..128, 128..192, 192..200] {
+        transaction
+            .write_packed_batch(pack(range).view())
+            .expect("deliver the declined records");
+    }
+    transaction.finish().expect("finish resumed replay");
+    assert_eq!(sink.records, reference_records(&plan, &records));
+    assert_eq!(sink.error_records, records);
+}
+
 #[test]
 fn compiler_admits_retained_bytes_and_honors_cancellation() {
     let model = DetectorErrorModel::from_dem_str(
@@ -717,4 +792,67 @@ fn compiler_admits_retained_bytes_and_honors_cancellation() {
         .compile(&model)
         .expect_err("cancelled compile");
     assert!(matches!(err, super::DemError::Cancelled(_)));
+}
+
+/// Dense records whose error-major words for every expected record exceed the budget, and whose
+/// sparse ordinals would too, keep the whole error-major batches the budget admits instead of
+/// retaining nothing, and that prefix replays like the records it holds.
+#[test]
+fn dense_replay_store_keeps_the_error_major_batches_its_budget_admits() {
+    let model = DetectorErrorModel::from_dem_str("repeat 100 {\n    error(0.5) D0 D1\n}\n")
+        .expect("parse DEM");
+    let plan = DemSamplingCompiler::new()
+        .compile(&model)
+        .expect("compile DEM");
+    let shots = ShotCount::new(200);
+    let records = random_records(&mut SmallRng::seed_from_u64(11), 200, 100, 0.5);
+    let pack = |range: std::ops::Range<usize>| {
+        stab_records::PackedShotBatch::from_records(&records[range], plan.error_count())
+            .expect("pack dense records")
+    };
+    let store_at = |bytes: u64| {
+        plan.replay_record_store(
+            &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
+            shots,
+        )
+    };
+    let (mut low, mut sparse_min_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
+    while low + 1 < sparse_min_budget {
+        let middle = low + (sparse_min_budget - low) / 2;
+        if store_at(middle).is_retaining() {
+            sparse_min_budget = middle;
+        } else {
+            low = middle;
+        }
+    }
+    // The 201 record starts leave room for two of the four 808-byte error-major batches.
+    let mut store = store_at(sparse_min_budget + 2 * 808 - 1608);
+    for range in [0..64, 64..128] {
+        assert_eq!(
+            store.try_retain(pack(range).view()).expect("retain dense"),
+            DemReplayRetention::Retained
+        );
+    }
+    assert_eq!(
+        store
+            .try_retain(pack(128..192).view())
+            .expect("offer third"),
+        DemReplayRetention::Full
+    );
+    assert_eq!(store.shot_count(), 128);
+
+    let mut session = plan.replay_session(shots).expect("replay session");
+    let mut sink = CollectingSink::default();
+    let mut transaction = session.start_transaction(&mut sink).expect("transaction");
+    transaction
+        .write_retained(&store)
+        .expect("replay the retained prefix");
+    for range in [128..192, 192..200] {
+        transaction
+            .write_packed_batch(pack(range).view())
+            .expect("deliver the declined records");
+    }
+    transaction.finish().expect("finish resumed replay");
+    assert_eq!(sink.records, reference_records(&plan, &records));
+    assert_eq!(sink.error_records, records);
 }

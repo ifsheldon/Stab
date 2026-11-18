@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use clap::Args;
 use stab_engine::{
-    DemReplayRecordStore, DemReplaySession, DemReplayTransaction, DemSamplerLimits,
-    DemSamplingCompiler, DemSamplingPlan, DemSamplingRunError, DemSamplingSession, RandomPolicy,
-    Seed, ShotCount,
+    DemReplayBatchStatus, DemReplayRecordStore, DemReplayRetention, DemReplaySession,
+    DemReplayTransaction, DemSamplerLimits, DemSamplingCompiler, DemSamplingPlan,
+    DemSamplingRunError, DemSamplingSession, RandomPolicy, Seed, ShotCount,
 };
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
@@ -172,9 +172,11 @@ where
     let record_bytes = replay_reader
         .as_ref()
         .map_or(0, |(reader, _)| reader.text_record_bytes);
-    // Records the validation pass keeps, so a replay that fits the budget is decoded once;
-    // fixed-width binary files whose length already proves `expected_shots` stream directly.
+    // Records the validation pass keeps, so the retained prefix of a replay is decoded once and
+    // delivery decodes only the records after it; fixed-width binary files whose length already
+    // proves `expected_shots` stream directly.
     let mut retained = None;
+    let mut resume = ReplayResume::START;
     if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
         let replay_format = sample_dem_record_format(args.replay_err_in_format)?;
         if !preflight_fixed_width_replay_file(
@@ -184,7 +186,7 @@ where
             args.shots,
         )? {
             let mut store = plan.replay_record_store(&limits, shots);
-            validate_replay_input(
+            resume = validate_replay_input(
                 replay_input,
                 args.replay_err_in_format,
                 plan.error_count(),
@@ -192,7 +194,7 @@ where
                 record_bytes,
                 &mut store,
             )?;
-            retained = Some(store).filter(DemReplayRecordStore::is_retaining);
+            retained = Some(store).filter(|store| store.shot_count() > 0);
         }
     }
     let encoder = DemSampleBatchEncoder::try_new(
@@ -250,11 +252,13 @@ where
             let mut transaction = session
                 .start_transaction(&mut sink)
                 .map_err(map_dem_run_error)?;
+            let mut status = DemReplayBatchStatus::Accepted;
             if let Some(retained) = &retained {
-                transaction
+                status = transaction
                     .write_retained(retained)
                     .map_err(map_dem_run_error)?;
-            } else {
+            }
+            if status.is_accepted() && resume.records < args.shots {
                 ReplayInput::new(
                     input,
                     args.replay_err_in_format,
@@ -262,6 +266,7 @@ where
                     args.shots,
                     record_bytes,
                 )?
+                .resuming_at(resume)
                 .deliver_to(&mut transaction)?;
             }
             transaction.finish().map(|_| ()).map_err(map_dem_run_error)
@@ -479,13 +484,32 @@ fn preflight_fixed_width_replay_file(
         .is_some_and(|len| len >= expected_bytes_u64))
 }
 
+/// Where delivery resumes after the records a validation pass retained.
+#[derive(Clone, Copy, Debug)]
+struct ReplayResume {
+    /// Records the store holds, which are every record before `byte_offset`.
+    records: usize,
+    /// Input offset of the first record the store does not hold, a record boundary.
+    byte_offset: usize,
+}
+
+impl ReplayResume {
+    const START: Self = Self {
+        records: 0,
+        byte_offset: 0,
+    };
+}
+
 /// Checks that the replay file holds `expected_shots` well-formed records before any output
-/// file is activated, so a malformed replay produces no partial output, then rewinds it.
+/// file is activated, so a malformed replay produces no partial output, then seeks it to the
+/// first record the store does not hold.
 ///
 /// This pass decodes into the reader's reusable batch and hands each batch to `retained`, which
-/// keeps dense and sparse records while the whole replay fits the budget the session leaves;
-/// once it releases, the remaining records are decoded and discarded, and the replay is decoded
-/// again for delivery.
+/// keeps dense and sparse records while they fit the budget the session leaves. Once a batch
+/// does not fit, the store keeps the whole batches before it, the remaining records are decoded
+/// and discarded, and delivery replays the kept prefix from the store and decodes only the
+/// records after it again. The seek happens whether or not records remain, so a non-seekable
+/// replay input fails here, before any output exists, exactly as a rewind would.
 fn validate_replay_input(
     input: &mut InputFile,
     format: RecordFormatArg,
@@ -493,8 +517,8 @@ fn validate_replay_input(
     expected_shots: usize,
     max_record_bytes: usize,
     retained: &mut DemReplayRecordStore,
-) -> Result<(), CliError> {
-    {
+) -> Result<ReplayResume, CliError> {
+    let resume = {
         let mut replay = ReplayInput::new(
             &mut *input,
             format,
@@ -502,9 +526,14 @@ fn validate_replay_input(
             expected_shots,
             max_record_bytes,
         )?;
-        replay.retain_or_skip_all(retained)?;
-    }
-    input.rewind()
+        replay.retain_or_skip_all(retained)?
+    };
+    let offset =
+        u64::try_from(resume.byte_offset).map_err(|_| CliError::InputByteOffsetOverflow {
+            kind: REPLAY_TEXT_RECORD_KIND,
+        })?;
+    input.seek_to(offset)?;
+    Ok(resume)
 }
 
 /// The sampled-error replay stream: exactly `expected_shots` records from the Records reader,
@@ -515,6 +544,8 @@ struct ReplayInput<'a> {
     format: RecordFormat,
     error_count: usize,
     expected_shots: usize,
+    /// Records before the transport's first byte, which another source delivers.
+    first_record: usize,
 }
 
 impl<'a> ReplayInput<'a> {
@@ -542,7 +573,17 @@ impl<'a> ReplayInput<'a> {
             format,
             error_count,
             expected_shots,
+            first_record: 0,
         })
+    }
+
+    /// Continues a replay whose transport was positioned at `resume.byte_offset` after its first
+    /// `resume.records` records were delivered from a store, so record counts and diagnostic
+    /// offsets stay those of the whole input.
+    fn resuming_at(mut self, resume: ReplayResume) -> Self {
+        self.reader = self.reader.starting_at_offset(resume.byte_offset);
+        self.first_record = resume.records;
+        self
     }
 
     /// Delivers every expected record to `transaction` in batches of at most 64 records, reading
@@ -554,7 +595,7 @@ impl<'a> ReplayInput<'a> {
     where
         Sink: DemSampleSink<Error = CliError>,
     {
-        let mut delivered = 0_usize;
+        let mut delivered = self.first_record;
         if self.format == RecordFormat::Ptb64 {
             while delivered < self.expected_shots {
                 match self.reader.read_ptb64_group() {
@@ -588,35 +629,63 @@ impl<'a> ReplayInput<'a> {
         Ok(())
     }
 
-    /// Decodes every expected record, keeping them in `retained` while it admits them and
-    /// discarding the rest once it releases.
-    fn retain_or_skip_all(&mut self, retained: &mut DemReplayRecordStore) -> Result<(), CliError> {
+    /// Decodes every expected record, keeping whole batches in `retained` while it admits them
+    /// and discarding the rest, and returns where delivery resumes after the kept prefix.
+    fn retain_or_skip_all(
+        &mut self,
+        retained: &mut DemReplayRecordStore,
+    ) -> Result<ReplayResume, CliError> {
         let mut decoded = 0_usize;
-        if self.format == RecordFormat::Ptb64 {
-            while decoded < self.expected_shots && retained.is_retaining() {
+        let mut declined = None;
+        while decoded < self.expected_shots && retained.is_retaining() {
+            let byte_offset = self
+                .reader
+                .consumed_offset()
+                .map_err(|error| self.read_error(error))?;
+            let (shots, retention) = if self.format == RecordFormat::Ptb64 {
                 match self.reader.read_ptb64_group() {
-                    Ok(Some(planes)) => {
-                        decoded += planes.shot_count();
+                    Ok(Some(planes)) => (
+                        planes.shot_count(),
                         retained
                             .try_retain_bit_planes(planes)
-                            .map_err(CliError::from)?;
-                    }
+                            .map_err(CliError::from)?,
+                    ),
                     Ok(None) => return Err(self.shortfall_error(decoded)),
                     Err(error) => return Err(self.read_error(error)),
                 }
-            }
-        } else {
-            while decoded < self.expected_shots && retained.is_retaining() {
+            } else {
                 let wanted = (self.expected_shots - decoded).min(REPLAY_BATCH_SHOTS);
                 match self.reader.read_batch(wanted) {
-                    Ok(Some(batch)) => {
-                        decoded += batch.shot_count();
-                        retained.try_retain(batch).map_err(CliError::from)?;
-                    }
+                    Ok(Some(batch)) => (
+                        batch.shot_count(),
+                        retained.try_retain(batch).map_err(CliError::from)?,
+                    ),
                     Ok(None) => return Err(self.shortfall_error(decoded)),
                     Err(error) => return Err(self.read_error(error)),
                 }
+            };
+            if retention != DemReplayRetention::Retained {
+                declined = Some(ReplayResume {
+                    records: decoded,
+                    byte_offset,
+                });
             }
+            decoded += shots;
+        }
+        let resume = match declined {
+            Some(resume) => resume,
+            None => ReplayResume {
+                records: decoded,
+                byte_offset: self
+                    .reader
+                    .consumed_offset()
+                    .map_err(|error| self.read_error(error))?,
+            },
+        };
+        if u64::try_from(resume.records).ok() != Some(retained.shot_count()) {
+            return Err(CliError::IoPlanInvariant {
+                message: "the replay record store disagreed with the records it was offered",
+            });
         }
         let skipped = self
             .reader
@@ -625,7 +694,7 @@ impl<'a> ReplayInput<'a> {
         if decoded + skipped < self.expected_shots {
             return Err(self.shortfall_error(decoded + skipped));
         }
-        Ok(())
+        Ok(resume)
     }
 
     fn shortfall_error(&self, actual: usize) -> CliError {

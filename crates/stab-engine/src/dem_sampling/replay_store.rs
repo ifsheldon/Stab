@@ -15,9 +15,28 @@ const RETAINED_BATCH_SHOTS: usize = u64::BITS as usize;
 pub enum DemReplayRetention {
     /// The batch was copied into the store.
     Retained,
+    /// The batch would exceed the store's budget, so none of its records were kept; the store
+    /// keeps every batch it retained before and declines every later one, and the caller replays
+    /// those records from the store and decodes the rest of its input again.
+    Full,
     /// The store holds no records and accepts no more, so the caller replays by decoding its
     /// input again.
     Released,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StoreState {
+    Retaining,
+    Full,
+    Released,
+}
+
+/// Lengths of a store's vectors before one offered batch, restored when the batch does not fit.
+#[derive(Clone, Copy, Debug)]
+struct RetainedMark {
+    words: usize,
+    batches: usize,
+    shot_count: u64,
 }
 
 #[derive(Debug)]
@@ -59,8 +78,11 @@ pub(super) enum RetainedBatch<'a> {
 /// error, which error-major replay consumes directly; sparse shot-major batches are kept as set
 /// error ordinals per record, which per-record replay consumes without scanning zero words. Every
 /// allocation is admitted against the part of the memory budget a replay session leaves free (see
-/// [`DemSamplingPlan::replay_record_store`]); when the records would exceed that budget, the
-/// store releases its storage, holds nothing, and the caller decodes its input again.
+/// [`DemSamplingPlan::replay_record_store`]). When a batch would exceed that budget, the store
+/// becomes full: it keeps every whole batch retained before, which stays charged against the
+/// budget, declines that batch and every later one, and the caller decodes only the records after
+/// the retained prefix again. A store whose records fit no layout at all releases its storage and
+/// holds nothing.
 #[derive(Debug)]
 pub struct DemReplayRecordStore {
     plan: DemSamplingPlan,
@@ -68,7 +90,7 @@ pub struct DemReplayRecordStore {
     layout: StoreLayout,
     shot_count: u64,
     budget: MemoryBudget,
-    released: bool,
+    state: StoreState,
 }
 
 impl DemReplayRecordStore {
@@ -86,7 +108,7 @@ impl DemReplayRecordStore {
             layout: StoreLayout::Empty,
             shot_count: 0,
             budget,
-            released: false,
+            state: StoreState::Retaining,
         };
         if !session_fits {
             store.release();
@@ -112,24 +134,25 @@ impl DemReplayRecordStore {
     }
 
     /// Copies `batch`, whose records must each hold exactly the plan's error count, into the
-    /// store, or releases the store when the records would exceed its budget.
+    /// store, or keeps none of it and becomes full when the records would exceed its budget.
     ///
     /// The first non-empty batch chooses error-major bit planes when dense enough for error-major
-    /// replay and sparse set-error ordinals otherwise. A released store stays released and
-    /// declines every later batch.
+    /// replay and sparse set-error ordinals otherwise, and the store releases when neither layout
+    /// can be allocated for it. A full or released store declines every later batch.
     pub fn try_retain(&mut self, batch: PackedShotBatchView<'_>) -> DemResult<DemReplayRetention> {
-        if self.released {
-            return Ok(DemReplayRetention::Released);
+        if let Some(declined) = self.declined() {
+            return Ok(declined);
         }
         let error_count = self.plan.error_count();
         if batch.bits_per_shot() != error_count {
             return Err(width_mismatch_error(error_count, batch.bits_per_shot()));
         }
+        let mark = self.mark();
         let mut first = 0;
         while first < batch.shot_count() {
             let shots = (batch.shot_count() - first).min(RETAINED_BATCH_SHOTS);
             if matches!(self.layout, StoreLayout::Empty)
-                && !self.init_for_batch(prefers_error_major(&self.plan, batch, first, shots))
+                && !self.init_for_batch(batch, first, shots)?
             {
                 return Ok(self.release());
             }
@@ -141,7 +164,7 @@ impl DemReplayRecordStore {
                 StoreLayout::Sparse { .. } => self.retain_packed_sparse(batch, first, shots)?,
             };
             if !retained {
-                return Ok(self.release());
+                return self.fill(mark);
             }
             self.shot_count = self.shot_count.saturating_add(shots as u64);
             first += shots;
@@ -150,28 +173,31 @@ impl DemReplayRecordStore {
     }
 
     /// Copies `batch`, whose bit planes must match the plan's error count, directly into
-    /// error-major retention without a shot-major transpose, or releases the store when the
-    /// planes would exceed its budget.
+    /// error-major retention without a shot-major transpose, or keeps none of it and becomes
+    /// full when the planes would exceed its budget.
     pub fn try_retain_bit_planes(
         &mut self,
         batch: BitPlaneBatchView<'_>,
     ) -> DemResult<DemReplayRetention> {
-        if self.released {
-            return Ok(DemReplayRetention::Released);
+        if let Some(declined) = self.declined() {
+            return Ok(declined);
         }
         let error_count = self.plan.error_count();
         if batch.bits_per_shot() != error_count {
             return Err(width_mismatch_error(error_count, batch.bits_per_shot()));
         }
+        let mark = self.mark();
         let mut word_index = 0_usize;
         let mut first = 0_usize;
         while first < batch.shot_count() {
             let shots = (batch.shot_count() - first).min(RETAINED_BATCH_SHOTS);
-            if matches!(self.layout, StoreLayout::Empty) && !self.init_error_major() {
+            if matches!(self.layout, StoreLayout::Empty)
+                && !(self.init_error_major() || self.init_error_major_prefix())
+            {
                 return Ok(self.release());
             }
             if !self.retain_plane_word_column(batch, word_index, shots)? {
-                return Ok(self.release());
+                return self.fill(mark);
             }
             self.shot_count = self.shot_count.saturating_add(shots as u64);
             first += shots;
@@ -180,9 +206,14 @@ impl DemReplayRecordStore {
         Ok(DemReplayRetention::Retained)
     }
 
-    /// Whether the store still holds every batch offered to it.
+    /// Whether the store still holds every batch offered to it and accepts more.
     pub const fn is_retaining(&self) -> bool {
-        !self.released
+        matches!(self.state, StoreState::Retaining)
+    }
+
+    /// Whether the store was released and holds no records.
+    pub const fn is_released(&self) -> bool {
+        matches!(self.state, StoreState::Released)
     }
 
     /// Records held by the store.
@@ -244,11 +275,52 @@ impl DemReplayRecordStore {
         Ok(delivered)
     }
 
-    fn init_for_batch(&mut self, error_major_first: bool) -> bool {
-        if error_major_first {
-            return self.init_error_major() || self.init_sparse();
+    /// Chooses the layout for the first offered chunk, `shots` records of `batch` from `first`.
+    ///
+    /// Sparse chunks take sparse ordinals, or error-major words when the record starts do not
+    /// fit. Dense chunks take error-major words for every expected record when they fit, sparse
+    /// ordinals when the chunk's set errors projected over every expected record fit, and
+    /// otherwise whichever layout costs fewer bytes per record at that density, error-major
+    /// words being sized to the whole batches the budget admits, so a dense replay that just
+    /// misses retention still keeps a prefix.
+    fn init_for_batch(
+        &mut self,
+        batch: PackedShotBatchView<'_>,
+        first: usize,
+        shots: usize,
+    ) -> DemResult<bool> {
+        if !prefers_error_major(&self.plan, batch, first, shots) {
+            return Ok(self.init_sparse() || self.init_error_major());
         }
-        self.init_sparse() || self.init_error_major()
+        if self.init_error_major() {
+            return Ok(true);
+        }
+        let error_count = self.plan.error_count();
+        let mut chunk_hits = 0_usize;
+        for row_index in first..first + shots {
+            let row = batch
+                .shot(row_index)
+                .map_err(|source| DemError::invalid_result_format(source.to_string()))?;
+            chunk_hits = chunk_hits.saturating_add(count_row_ones(row.words(), error_count));
+        }
+        let shots = shots.max(1) as u128;
+        let ordinal_bytes = std::mem::size_of::<u32>() as u128;
+        // Sparse bytes per record at this chunk's density, scaled by the chunk's record count.
+        let sparse_per_shots = (std::mem::size_of::<usize>() as u128)
+            .saturating_mul(shots)
+            .saturating_add((chunk_hits as u128).saturating_mul(ordinal_bytes));
+        let projected_sparse = sparse_per_shots
+            .saturating_mul(u128::from(self.expected_shots))
+            .div_ceil(shots);
+        // Error-major bytes for the same number of records.
+        let error_major_per_shots = self
+            .error_major_bytes(1)
+            .saturating_mul(shots)
+            .div_ceil(RETAINED_BATCH_SHOTS as u128);
+        if !self.budget.admits(projected_sparse) && error_major_per_shots < sparse_per_shots {
+            return Ok(self.init_error_major_prefix() || self.init_sparse());
+        }
+        Ok(self.init_sparse() || self.init_error_major_prefix())
     }
 
     fn init_error_major(&mut self) -> bool {
@@ -256,7 +328,20 @@ impl DemReplayRecordStore {
         let Ok(batches) = usize::try_from(expected_batches) else {
             return false;
         };
-        let batches = batches.max(1);
+        self.init_error_major_batches(batches.max(1))
+    }
+
+    /// Reserves error-major words for as many whole batches of the expected records as the
+    /// budget admits, at least one.
+    fn init_error_major_prefix(&mut self) -> bool {
+        let expected_batches = self.expected_shots.div_ceil(RETAINED_BATCH_SHOTS as u64);
+        let admitted = u128::from(self.budget.bytes()) / self.error_major_bytes(1).max(1);
+        let batches = u128::from(expected_batches).min(admitted);
+        usize::try_from(batches)
+            .is_ok_and(|batches| batches > 0 && self.init_error_major_batches(batches))
+    }
+
+    fn init_error_major_batches(&mut self, batches: usize) -> bool {
         if !self.budget.admits(self.error_major_bytes(batches)) {
             return false;
         }
@@ -462,8 +547,52 @@ impl DemReplayRecordStore {
     fn release(&mut self) -> DemReplayRetention {
         self.layout = StoreLayout::Empty;
         self.shot_count = 0;
-        self.released = true;
+        self.state = StoreState::Released;
         DemReplayRetention::Released
+    }
+
+    /// The outcome every batch offered to a full or released store receives.
+    const fn declined(&self) -> Option<DemReplayRetention> {
+        match self.state {
+            StoreState::Retaining => None,
+            StoreState::Full => Some(DemReplayRetention::Full),
+            StoreState::Released => Some(DemReplayRetention::Released),
+        }
+    }
+
+    fn mark(&self) -> RetainedMark {
+        let (words, batches) = match &self.layout {
+            StoreLayout::Empty => (0, 0),
+            StoreLayout::ErrorMajor { words, batch_shots } => (words.len(), batch_shots.len()),
+            StoreLayout::Sparse { hits, shot_starts } => (hits.len(), shot_starts.len()),
+        };
+        RetainedMark {
+            words,
+            batches,
+            shot_count: self.shot_count,
+        }
+    }
+
+    /// Drops every record of the batch offered since `mark` and declines later batches, keeping
+    /// the whole batches retained before it; a store that still holds nothing releases instead.
+    fn fill(&mut self, mark: RetainedMark) -> DemResult<DemReplayRetention> {
+        if mark.shot_count == 0 {
+            return Ok(self.release());
+        }
+        match &mut self.layout {
+            StoreLayout::Empty => return Err(store_index_error()),
+            StoreLayout::ErrorMajor { words, batch_shots } => {
+                words.truncate(mark.words);
+                batch_shots.truncate(mark.batches);
+            }
+            StoreLayout::Sparse { hits, shot_starts } => {
+                hits.truncate(mark.words);
+                shot_starts.truncate(mark.batches);
+            }
+        }
+        self.shot_count = mark.shot_count;
+        self.state = StoreState::Full;
+        Ok(DemReplayRetention::Full)
     }
 }
 

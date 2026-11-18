@@ -329,6 +329,24 @@ fn pack_zero_one_line(line: &[u8], width: usize, words: &mut [u64]) -> bool {
     terminator && pack_zero_one_bytes(bits, words)
 }
 
+/// Frame length of a canonical `01` line at the start of `input` (exactly `width` bit bytes then
+/// `\n` or `\r\n`), which the full grammar would accept unchanged, or `None` for any other
+/// input, including a line not yet wholly buffered.
+pub(super) fn canonical_zero_one_line_len(input: &[u8], width: usize) -> Option<usize> {
+    let bits = input.get(..width)?;
+    let line_len = match input.get(width..)? {
+        [b'\n', ..] => width.checked_add(1)?,
+        [b'\r', b'\n', ..] => width.checked_add(2)?,
+        _ => return None,
+    };
+    let (chunks, tail) = bits.as_chunks::<WORD_BYTES>();
+    let chunks_valid = chunks.iter().fold(true, |valid, chunk| {
+        valid & (u64::from_le_bytes(*chunk) & BYTE_HIGH_MASK == ASCII_BIT_HIGH)
+    });
+    let valid = chunks_valid && tail.iter().all(|byte| matches!(byte, b'0' | b'1'));
+    valid.then_some(line_len)
+}
+
 /// Packs `01` bit bytes into row words, returning `false` if any byte is not `0` or `1`.
 fn pack_zero_one_bytes(bits: &[u8], words: &mut [u64]) -> bool {
     let mut valid = true;

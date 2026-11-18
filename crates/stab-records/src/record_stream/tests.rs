@@ -332,6 +332,107 @@ fn buffered_reads_issue_a_bounded_number_of_transport_reads() {
     }
 }
 
+/// Skipping record-framed `01` lines without decoding canonical ones reports the same counts,
+/// consumed offsets, and diagnostics as the full grammar for every line shape and refill split.
+#[test]
+fn skipping_canonical_zero_one_lines_matches_the_full_grammar() {
+    let inputs: [&[u8]; 9] = [
+        b"101\n010\r\n111\n000\n",
+        b"101\n1x1\n111\n",
+        b"101\n10\n111\n",
+        b"101\n1011\n111\n",
+        b"101\n101\r111\n",
+        b"101\n101",
+        b"101\n\n",
+        b"101\n10\r\n",
+        b"",
+    ];
+    let outcome = |reader: &mut RecordStreamReader<Trickle<'_>>, records: usize| {
+        let skipped = reader
+            .skip_records(records)
+            .map_err(|error| format!("{error:?}"));
+        (skipped, reader.consumed_offset().ok())
+    };
+    for input in inputs {
+        for limit in [4, 5, 8] {
+            for step in [1, 2, 3, 5, usize::MAX] {
+                for records in [1, 2, 4, 9] {
+                    let reader = |grammar_only: bool| {
+                        let reader = RecordStreamReader::measurements(
+                            Trickle::new(input, step),
+                            RecordFormat::ZeroOne,
+                            3,
+                            limit,
+                        )
+                        .with_framing(RecordFraming::Records);
+                        if grammar_only {
+                            reader.with_grammar_only()
+                        } else {
+                            reader
+                        }
+                    };
+                    let (mut fast, mut full) = (reader(false), reader(true));
+                    for _ in 0..3 {
+                        assert_eq!(
+                            outcome(&mut fast, records),
+                            outcome(&mut full, records),
+                            "{:?} limit {limit} step {step} records {records}",
+                            String::from_utf8_lossy(input)
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A reader started at another reader's consumed offset decodes the remaining records and
+/// reports their failures at the same absolute offsets as the reader that consumed the prefix.
+#[test]
+fn a_reader_resumed_at_a_consumed_offset_continues_the_original_stream() {
+    let records = vec![vec![true, false, true, true, false, false, true, false, true]; 7];
+    for format in [
+        RecordFormat::ZeroOne,
+        RecordFormat::Hits,
+        RecordFormat::Dets,
+        RecordFormat::B8,
+        RecordFormat::R8,
+    ] {
+        let mut input = write_records(&records, format).expect("encode");
+        let trailer: &[u8] = match format {
+            RecordFormat::B8 => &[0xFF],
+            RecordFormat::R8 => &[0x01],
+            _ => b"bad\n",
+        };
+        input.extend_from_slice(trailer);
+        for prefix in [0, 3, 6] {
+            fn framed(bytes: &[u8], format: RecordFormat) -> RecordStreamReader<&[u8]> {
+                RecordStreamReader::measurements(bytes, format, 9, TEST_TEXT_LIMIT)
+                    .with_framing(RecordFraming::Records)
+                    .with_hits_duplicates(HitsDuplicates::Set)
+                    .with_blank_dets_line_budget()
+            }
+            let mut original = framed(&input, format);
+            if prefix > 0 {
+                let batch = original.read_batch(prefix).expect("prefix").expect("batch");
+                assert_eq!(batch.shot_count(), prefix);
+            }
+            let offset = original.consumed_offset().expect("offset");
+            let mut resumed = framed(&input[offset..], format).starting_at_offset(offset);
+            let (expected, expected_error) = drain(&mut original, 2);
+            let (actual, actual_error) = drain(&mut resumed, 2);
+            assert_eq!(actual, expected, "{format:?} after {prefix}");
+            assert_eq!(
+                format!("{actual_error:?}"),
+                format!("{expected_error:?}"),
+                "{format:?} after {prefix}"
+            );
+            assert!(expected_error.is_some(), "{format:?} trailer must fail");
+            assert_eq!(resumed.bytes_read(), original.bytes_read());
+        }
+    }
+}
+
 #[test]
 fn skipping_and_probing_records_consume_exactly_what_they_report() {
     let input = b"1\n0\n1\n";

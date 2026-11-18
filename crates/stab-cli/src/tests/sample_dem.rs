@@ -596,9 +596,35 @@ fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
         std::fs::read(&sparse_kept_err).expect("err")
     );
 
-    // At sparse_budget (zero-hit sparse retention only), an empty first batch selects Sparse, a
-    // hit-heavy second batch releases mid-stream, and a malformed final record in the skipped
-    // suffix must still abort before activating any output path.
+    // At sparse_budget (zero-hit sparse retention only), an empty first batch selects Sparse and
+    // a hit-heavy second batch fills the store, so delivery replays the 64 retained records and
+    // resumes decoding at the first declined record, with CRLF lines on both sides of the seek.
+    let mut midstream = format!("{}\r\n", "0".repeat(64)).repeat(64);
+    midstream.push_str(&format!("{}\n", "1".repeat(64)).repeat(2));
+    midstream.push_str(&format!("{}\r\n", "1".repeat(64)).repeat(SHOTS - 66));
+    let midstream_path = scratch.file("sparse_midstream.01", &midstream);
+    let (whole, whole_out, whole_obs, whole_err) = run_with_budget(
+        "whole_midstream",
+        &midstream_path,
+        MemoryBudget::DEFAULT.bytes(),
+    );
+    whole.assert_ok(b"");
+    let (resumed, resumed_out, resumed_obs, resumed_err) =
+        run_with_budget("resumed_midstream", &midstream_path, sparse_budget);
+    resumed.assert_ok(b"");
+    for (resumed, whole) in [
+        (resumed_out, whole_out),
+        (resumed_obs, whole_obs),
+        (resumed_err, whole_err),
+    ] {
+        assert_eq!(
+            std::fs::read(resumed).expect("resumed output"),
+            std::fs::read(whole).expect("whole output")
+        );
+    }
+
+    // At the same budget a malformed final record in the skipped suffix must still abort before
+    // activating any output path.
     let mut midstream_then_bad = format!("{}\n", "0".repeat(64)).repeat(64);
     midstream_then_bad.push_str(&format!("{}\n", "1".repeat(64)).repeat(SHOTS - 65));
     midstream_then_bad.push_str("bad\n");

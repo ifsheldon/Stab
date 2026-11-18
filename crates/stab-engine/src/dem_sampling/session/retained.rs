@@ -78,11 +78,12 @@ impl<Sink> DemReplayTransaction<'_, '_, Sink>
 where
     Sink: DemSampleSink,
 {
-    /// Delivers every record of a store that still retains all records offered to it, as
-    /// [`Self::write_packed_batch`] or [`Self::write_bit_plane_batch`] would deliver them batch by
-    /// batch.
+    /// Delivers every record a store holds, as [`Self::write_packed_batch`] or
+    /// [`Self::write_bit_plane_batch`] would deliver them batch by batch.
     ///
-    /// A released store is rejected, since it no longer holds the records it was offered.
+    /// A store that retained every record offered to it delivers all of them; a full store
+    /// delivers the prefix it kept, after which the caller delivers the records it declined. A
+    /// released store is rejected, since it no longer holds the records it was offered.
     pub fn write_retained(
         &mut self,
         records: &DemReplayRecordStore,
@@ -91,7 +92,7 @@ where
             source: DemSamplingExecutionError::ReplayLifecycle { message },
             progress: DemSamplingRunProgress::new(committed, 0),
         };
-        if !records.is_retaining() {
+        if records.is_released() {
             return Err(lifecycle_error(
                 "a released replay record store holds no records to deliver",
                 self.session.committed_shots,

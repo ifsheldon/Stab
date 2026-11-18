@@ -196,6 +196,17 @@ impl<R> RecordStreamReader<R> {
         self.absolute_base.saturating_add(self.end)
     }
 
+    /// Absolute input offset of the first byte no decoded record has consumed: after a read that
+    /// returned whole records, where the next record frame starts.
+    ///
+    /// A caller that seeks a fresh transport to this offset and resumes there with
+    /// [`Self::starting_at_offset`] decodes the remaining records exactly as this reader would,
+    /// provided no failure is pending and no PTB64 group is partly served.
+    pub fn consumed_offset(&self) -> Result<usize, RecordStreamReadError> {
+        self.record_offset()
+            .ok_or(RecordStreamReadError::ByteOffsetOverflow)
+    }
+
     /// Declared width of every decoded record.
     pub const fn bits_per_record(&self) -> usize {
         self.bits_per_record
@@ -292,6 +303,17 @@ impl<R: Read> RecordStreamReader<R> {
     #[must_use]
     pub const fn with_framing(mut self, framing: RecordFraming) -> Self {
         self.options.framing = framing;
+        self
+    }
+
+    /// Declares that the transport's first byte is input offset `offset`, a record boundary, so
+    /// every diagnostic offset and [`Self::bytes_read`] count from the start of the whole input.
+    ///
+    /// Use it on a transport positioned at an offset another reader's
+    /// [`Self::consumed_offset`] returned.
+    #[must_use]
+    pub const fn starting_at_offset(mut self, offset: usize) -> Self {
+        self.absolute_base = offset;
         self
     }
 
@@ -452,8 +474,21 @@ impl<R: Read> RecordStreamReader<R> {
                 skipped += 64;
             }
         }
+        let skips_zero_one_lines = self.skips_canonical_zero_one_lines();
         while skipped < max_records {
-            let wanted = (max_records - skipped).min(SKIP_CHUNK_RECORDS);
+            if skips_zero_one_lines {
+                skipped += self.skip_canonical_zero_one_lines(max_records - skipped)?;
+                if skipped == max_records {
+                    break;
+                }
+            }
+            // Under `01` line skipping, only the one line the fast check declined goes through
+            // the full grammar, which owns its framing, refills, and diagnostics.
+            let wanted = if skips_zero_one_lines {
+                1
+            } else {
+                (max_records - skipped).min(SKIP_CHUNK_RECORDS)
+            };
             let (count, error) = self.fill(wanted);
             if let Some(error) = error {
                 return Err(error);
@@ -462,6 +497,44 @@ impl<R: Read> RecordStreamReader<R> {
             if count < wanted {
                 break;
             }
+        }
+        Ok(skipped)
+    }
+
+    /// Whether skipped records are line-framed `01` text, whose canonical lines are checked
+    /// without decoding them.
+    fn skips_canonical_zero_one_lines(&self) -> bool {
+        #[cfg(test)]
+        if self.options.grammar_only {
+            return false;
+        }
+        self.options.framing == RecordFraming::Records
+            && matches!(
+                self.decoder,
+                StreamDecoder::Text {
+                    format: RecordFormat::ZeroOne,
+                    ..
+                }
+            )
+    }
+
+    /// Consumes up to `max_records` wholly buffered canonical `01` lines within the record byte
+    /// limit, which the full grammar would accept, and returns how many it consumed. It stops,
+    /// without reading, at the first line it cannot prove from buffered bytes alone.
+    fn skip_canonical_zero_one_lines(
+        &mut self,
+        max_records: usize,
+    ) -> Result<usize, RecordStreamReadError> {
+        let width = self.bits_per_record;
+        let mut skipped = 0_usize;
+        while skipped < max_records {
+            let Some(line_len) = decode::canonical_zero_one_line_len(self.unconsumed(), width)
+                .filter(|line_len| *line_len <= self.max_text_record_bytes)
+            else {
+                break;
+            };
+            self.consume(line_len)?;
+            skipped += 1;
         }
         Ok(skipped)
     }

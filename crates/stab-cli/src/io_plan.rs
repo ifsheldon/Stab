@@ -114,8 +114,9 @@ impl InputFile {
         self.identity.as_file_mut()
     }
 
-    pub(crate) fn rewind(&mut self) -> Result<(), CliError> {
-        self.seek(SeekFrom::Start(0))
+    /// Positions the next read at absolute byte `offset`; a non-seekable input fails here.
+    pub(crate) fn seek_to(&mut self, offset: u64) -> Result<(), CliError> {
+        self.seek(SeekFrom::Start(offset))
             .map(|_| ())
             .map_err(|source| CliError::ReadPath {
                 path: self.path.clone(),
