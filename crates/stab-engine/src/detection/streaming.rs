@@ -76,10 +76,13 @@ impl StreamingDetectionShape {
 }
 
 impl<W: FrameWord> StreamingDetectionFrame<W> {
+    /// Reserves the run's storage, zeroing its records in chunks that poll `cancellation`.
     pub(super) fn try_new(
         plan: &DirectDetectorFramePlan,
         shape: StreamingDetectionShape,
+        cancellation: &Cancellation,
     ) -> DetectionResult<Self> {
+        let mut poll = WorkPoll::new(cancellation);
         let mut detector_window =
             try_vec_with_capacity(shape.detector_window, "streaming detector window")?;
         detector_window.resize(shape.detector_window, W::default());
@@ -95,8 +98,16 @@ impl<W: FrameWord> StreamingDetectionFrame<W> {
             shape: shape.window,
             detector_window,
             observable_planes,
-            detectors: ShotRecordTransposer::try_new(shape.lanes, plan.detector_count())?,
-            observables: ShotRecordTransposer::try_new(shape.lanes, plan.observable_count())?,
+            detectors: ShotRecordTransposer::try_new(
+                shape.lanes,
+                plan.detector_count(),
+                &mut poll,
+            )?,
+            observables: ShotRecordTransposer::try_new(
+                shape.lanes,
+                plan.observable_count(),
+                &mut poll,
+            )?,
             lookback: shape.lookback,
         })
     }

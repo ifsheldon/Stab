@@ -52,7 +52,9 @@ pub enum DetectionExecutionError {
     InternalInvariant { message: String },
 
     /// Cancellation was observed by an engine step. Sessions report cooperative cancellation
-    /// as [`DetectionRunStatus::Cancelled`] instead, so a run does not return this variant.
+    /// as [`DetectionRunStatus::Cancelled`] instead, so a run does not return this variant;
+    /// creating a streaming run returns it when the plan's signal is observed while the run's
+    /// records are zeroed.
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
 }

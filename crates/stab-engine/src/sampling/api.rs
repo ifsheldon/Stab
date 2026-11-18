@@ -15,6 +15,7 @@ use crate::detection::frame::{
     CircuitProgram, DeliveryFailure, FrameBatchState, FrameLanes, LaneFrameBatch, PendingLanes,
     ShotRecordTransposer, WindowShape,
 };
+use crate::work_poll::WorkPoll;
 use crate::{CompilationRequestFingerprint, LaneWidth};
 
 mod compile_error;
@@ -620,22 +621,30 @@ enum SessionFrame {
 }
 
 impl SessionFrame {
+    /// Reserves one streaming run's storage, zeroing its records in chunks that poll
+    /// `cancellation`.
     fn streaming(
         program: &CircuitProgram,
         lane_width: LaneWidth,
         shots: ShotCount,
+        cancellation: &Cancellation,
     ) -> Result<Self, SamplingExecutionError> {
         let measurements = program.counts().measurements;
         let lanes = usize::try_from(shots.get()).map_or(lane_width.shots_per_batch(), |shots| {
             shots.min(lane_width.shots_per_batch())
         });
         let shape = WindowShape::for_program(program, lane_width.plane_bytes(), 0);
-        let allocation = |error: crate::detection::DetectionError| {
-            SamplingExecutionError::SessionStorageAllocation {
-                message: error.to_string(),
+        let allocation = |error: crate::detection::DetectionError| match error {
+            crate::detection::DetectionError::Cancelled(cancelled) => {
+                SamplingExecutionError::Cancelled(cancelled)
             }
+            error => SamplingExecutionError::SessionStorageAllocation {
+                message: error.to_string(),
+            },
         };
-        let records = ShotRecordTransposer::try_new(lanes, measurements).map_err(allocation)?;
+        let records =
+            ShotRecordTransposer::try_new(lanes, measurements, &mut WorkPoll::new(cancellation))
+                .map_err(allocation)?;
         Ok(match lane_width {
             LaneWidth::Lanes64 => Self::Streaming64(StreamingFrame {
                 state: FrameBatchState::for_measurement_window(program, shape.capacity())
@@ -700,8 +709,9 @@ pub enum SamplingExecutionError {
     #[error("sampling execution violated an internal batch invariant: {message}")]
     InternalInvariant { message: String },
 
-    /// Cancellation was observed while computing the reference sample, which creating a session
-    /// that uses it does first; the plan caches nothing, so a later call starts it again.
+    /// Cancellation was observed while creating a session: while computing the reference
+    /// sample, which creating a session that uses it does first and the plan does not cache, or
+    /// while zeroing a streaming run's records; a later call starts over.
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
 }
@@ -901,7 +911,12 @@ impl SamplingSession {
         let frame = if plan.inner.measurement_count == 0 {
             SessionFrame::Empty(lane_width)
         } else if let Some(shots) = streaming_shots {
-            SessionFrame::streaming(&plan.inner.program, lane_width, shots)?
+            SessionFrame::streaming(
+                &plan.inner.program,
+                lane_width,
+                shots,
+                &plan.inner.cancellation,
+            )?
         } else {
             SessionFrame::Pauli(
                 LaneFrameBatch::for_measurements(&plan.inner.program, lane_width).map_err(

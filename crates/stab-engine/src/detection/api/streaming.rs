@@ -84,13 +84,19 @@ impl DetectionSamplingPlan {
         });
         let shape = StreamingDetectionShape::new(direct, lane_width, lanes);
         validate_session_storage(shape.storage_bytes(direct, lane_width), memory_budget)?;
+        // Only the plan's signal exists yet; the run's own signal is created after the run.
+        let cancellation = direct.cancellation();
         let frame = match lane_width {
-            LaneWidth::Lanes64 => {
-                StreamingFrame::Lanes64(StreamingDetectionFrame::try_new(direct, shape)?)
-            }
-            LaneWidth::Lanes256 => {
-                StreamingFrame::Lanes256(StreamingDetectionFrame::try_new(direct, shape)?)
-            }
+            LaneWidth::Lanes64 => StreamingFrame::Lanes64(StreamingDetectionFrame::try_new(
+                direct,
+                shape,
+                cancellation,
+            )?),
+            LaneWidth::Lanes256 => StreamingFrame::Lanes256(StreamingDetectionFrame::try_new(
+                direct,
+                shape,
+                cancellation,
+            )?),
         };
         Ok(StreamingDetectionRun {
             plan: self.clone(),

@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use stab_bits::{BitMatrix, BitSlice, BitWordsMut};
 
 const WORD_BITS: usize = u64::BITS as usize;
@@ -24,6 +26,38 @@ impl PackedShotBatch {
         Ok(Self {
             storage: BitMatrix::zeros(shot_count, bits_per_shot).map_err(bit_storage_error)?,
         })
+    }
+
+    /// Builds the same batch as [`Self::zeros`], zeroing its storage in chunks of at most
+    /// `chunk_words` packed words and calling `before_chunk` with each chunk's word count before
+    /// that chunk is written; see [`BitMatrix::zeros_chunked`].
+    ///
+    /// The storage is reserved fallibly once, up front. The first error `before_chunk` returns
+    /// stops the zeroing and is returned unchanged; a shape or reservation failure is returned as
+    /// the [`FormatError`] [`Self::zeros`] reports.
+    pub fn zeros_chunked<E: From<FormatError>>(
+        shot_count: usize,
+        bits_per_shot: usize,
+        chunk_words: NonZeroUsize,
+        mut before_chunk: impl FnMut(usize) -> Result<(), E>,
+    ) -> Result<Self, E> {
+        enum Stop<E> {
+            Storage(stab_bits::BitError),
+            Caller(E),
+        }
+        impl<E> From<stab_bits::BitError> for Stop<E> {
+            fn from(error: stab_bits::BitError) -> Self {
+                Self::Storage(error)
+            }
+        }
+        let storage = BitMatrix::zeros_chunked(shot_count, bits_per_shot, chunk_words, |words| {
+            before_chunk(words).map_err(Stop::Caller)
+        })
+        .map_err(|stop| match stop {
+            Stop::Storage(error) => E::from(bit_storage_error(error)),
+            Stop::Caller(error) => error,
+        })?;
+        Ok(Self { storage })
     }
 
     /// Bytes of packed words that [`Self::zeros`] reserves for `shot_count` shots of

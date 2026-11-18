@@ -6,13 +6,16 @@
 //! program's own classical controls can still read. [`ShotRecordTransposer`] is the consumer that
 //! turns those windows into shot-major records of only the lanes a run delivers.
 
+use std::num::NonZeroUsize;
+
 use stab_bits::transpose_bit_tile;
-use stab_records::{PackedShotBatch, PackedShotBatchView};
+use stab_model::Cancelled;
+use stab_records::{FormatError, PackedShotBatch, PackedShotBatchView};
 
 use super::program::CircuitProgram;
 use super::word::FrameWord;
 use crate::detection::error::{DetectionError, DetectionResult};
-use crate::work_poll::{WORD_OP_UNITS, WorkPoll};
+use crate::work_poll::{WORD_OP_UNITS, WorkPoll, chunk_units};
 
 /// Bytes of planes one window holds before it is handed over, independent of the circuit.
 pub(crate) const WINDOW_TARGET_BYTES: usize = 1 << 20;
@@ -170,12 +173,24 @@ pub(crate) struct ShotRecordTransposer {
 
 impl ShotRecordTransposer {
     /// Storage for batches of at most `max_lanes` delivered lanes of `width`-bit records.
-    pub(crate) fn try_new(max_lanes: usize, width: usize) -> DetectionResult<Self> {
-        let records = PackedShotBatch::zeros(max_lanes, width).map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "streaming records of {max_lanes} shots and {width} bits: {error}"
-            ))
-        })?;
+    ///
+    /// The records are zeroed in chunks charged to `poll`, so creating a wide store stays
+    /// cancellable; cancellation releases what was reserved and returns
+    /// [`DetectionError::Cancelled`].
+    pub(crate) fn try_new(
+        max_lanes: usize,
+        width: usize,
+        poll: &mut WorkPoll<'_>,
+    ) -> DetectionResult<Self> {
+        Self::with_records(zeroed_records(max_lanes, width, poll)?)
+    }
+
+    /// Storage without records, which [`Self::ensure_lanes`] grows to each batch's lanes.
+    pub(crate) fn without_lanes(width: usize) -> DetectionResult<Self> {
+        Self::with_records(PackedShotBatch::zeros(0, width).map_err(records_error)?)
+    }
+
+    fn with_records(records: PackedShotBatch) -> DetectionResult<Self> {
         let mut scratch = Vec::new();
         scratch.try_reserve_exact(GROUP_TILES).map_err(|error| {
             DetectionError::invalid_sampler_compilation(format!(
@@ -200,17 +215,20 @@ impl ShotRecordTransposer {
 
     /// Grows the records to hold at least `lanes` shots, releasing the old ones first; the
     /// caller admitted the largest batch it converts when it created this transposer.
-    pub(crate) fn ensure_lanes(&mut self, lanes: usize) -> DetectionResult<()> {
+    ///
+    /// The new records are zeroed in chunks charged to `poll`. Cancellation leaves records of no
+    /// shots, which a later call grows again.
+    pub(crate) fn ensure_lanes(
+        &mut self,
+        lanes: usize,
+        poll: &mut WorkPoll<'_>,
+    ) -> DetectionResult<()> {
         if self.records.shot_count() >= lanes {
             return Ok(());
         }
         let width = self.records.bits_per_shot();
         self.records = PackedShotBatch::zeros(0, width).map_err(records_error)?;
-        self.records = PackedShotBatch::zeros(lanes, width).map_err(|error| {
-            DetectionError::invalid_sampler_compilation(format!(
-                "streaming records of {lanes} shots and {width} bits: {error}"
-            ))
-        })?;
+        self.records = zeroed_records(lanes, width, poll)?;
         Ok(())
     }
 
@@ -345,7 +363,42 @@ impl<W: FrameWord> PlaneConsumer<W> for SampledRecords<'_> {
     }
 }
 
-fn records_error(error: stab_records::FormatError) -> DetectionError {
+/// Units of zeroing one fresh record word, page faults included: about 1.6 ns on the reference
+/// host (64 ms for 320 MB) and up to about 3.6 ns on slower runs, so it is charged like one
+/// lane-word operation and a poll falls at most about a millisecond apart.
+const ZEROED_WORD_UNITS: usize = WORD_OP_UNITS;
+
+/// Zeroed records of `lanes` shots and `width` bits, written in chunks of about a quarter of a
+/// poll interval that are each charged to `poll` first.
+fn zeroed_records(
+    lanes: usize,
+    width: usize,
+    poll: &mut WorkPoll<'_>,
+) -> DetectionResult<PackedShotBatch> {
+    enum Stop {
+        Storage(FormatError),
+        Cancelled(Cancelled),
+    }
+    impl From<FormatError> for Stop {
+        fn from(error: FormatError) -> Self {
+            Self::Storage(error)
+        }
+    }
+    let chunk_words =
+        NonZeroUsize::new(chunk_units() / ZEROED_WORD_UNITS).unwrap_or(NonZeroUsize::MIN);
+    PackedShotBatch::zeros_chunked(lanes, width, chunk_words, |words| {
+        poll.charge(words.saturating_mul(ZEROED_WORD_UNITS))
+            .map_err(Stop::Cancelled)
+    })
+    .map_err(|stop| match stop {
+        Stop::Storage(error) => DetectionError::invalid_sampler_compilation(format!(
+            "streaming records of {lanes} shots and {width} bits: {error}"
+        )),
+        Stop::Cancelled(cancelled) => DetectionError::Cancelled(cancelled),
+    })
+}
+
+fn records_error(error: FormatError) -> DetectionError {
     DetectionError::invalid_sampler_compilation(error.to_string())
 }
 

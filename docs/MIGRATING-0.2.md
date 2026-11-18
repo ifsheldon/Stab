@@ -263,6 +263,7 @@ Parsing a circuit from bytes that are not valid UTF-8 charges the display text a
 Parsing a detector error model from such bytes charges the same display text and record for each opaque tag, so `DetectorErrorModel::from_dem_bytes`, `from_dem_bytes_with_limits`, and `from_dem_bytes_admitted` can refuse a budget that was accepted before, and `DetectorErrorModel::admitted_bytes` and the hold `from_dem_bytes_admitted` returns report the larger value.
 The CLI's `sample`, `detect`, and `m2d` admit their record encoders' scratch and the buffers of named output files against `--memory-budget` before the session, and a request whose session fits but not beside that storage is refused with a new output-storage diagnostic.
 `convert` charges the 64 KiB write buffer of each named `--out` and `--obs_out` file as well: record conversions add it to the record-conversion storage they already admit, and a circuit-to-circuit conversion admits it beside the parsed circuit and reports the output-storage diagnostic, so a budget within 64 KiB per named file of the old minimum is now refused before any output file is activated.
+`stab_bits::BitMatrix::zeros_chunked` and `stab_records::PackedShotBatch::zeros_chunked` build the same storage as `zeros` in bounded chunks, calling a fallible callback before each chunk, and creating a streaming sampling or detection run now polls the plan's cancellation signal while zeroing its records and can return the existing `Cancelled` error.
 
 ## DEM Sampled-Error Streams
 

@@ -300,3 +300,162 @@ fn single_shot_streaming_admission_does_not_scale_with_lane_width() {
         assert_eq!(streamed.0[0].len(), 1_000_000);
     }
 }
+
+/// 4096 noisy measurements, 2048 detectors, and one observable: 256 lanes of these records hold
+/// 16384 measurement words and 8192 detector words, so zeroing them polls many times at
+/// [`CREATION_UNITS_PER_POLL`].
+const WIDE_RECORDS: &str = "\
+X_ERROR(0.3) 0 1 2 3
+REPEAT 1024 {
+    M(0.1) 0 1 2 3
+    DETECTOR rec[-1] rec[-2]
+    DETECTOR rec[-3]
+}
+OBSERVABLE_INCLUDE(0) rec[-1]
+";
+
+const CREATION_UNITS_PER_POLL: u32 = 512;
+
+/// Creating a streaming sampling or detection run zeroes its shot-major records in polled
+/// chunks: a cancellation landing among those polls fails creation with the typed `Cancelled`
+/// error, and a run created afterwards delivers exactly the uninterrupted seeded records.
+#[test]
+fn streaming_run_creation_polls_while_zeroing_its_records() {
+    use crate::work_poll::test_hook;
+    use crate::{DetectionExecutionError, SamplingExecutionError};
+
+    let circuit = Circuit::from_stim_str(WIDE_RECORDS).expect("fixture parses");
+    let sampling = SamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile sampling plan");
+    let detection = DetectionSamplingCompiler::new()
+        .compile(&circuit)
+        .expect("compile detection plan");
+    let policy = RandomPolicy::Seeded(Seed::new(11));
+    let mode = ReferenceSampleMode::SkipReferenceSample;
+    let lane_width = LaneWidth::Lanes256;
+    let shots = ShotCount::new(300);
+    let cancelled = stab_model::Cancelled;
+
+    let mut expected = Records::default();
+    sampling
+        .streaming_run(policy, mode, lane_width, shots)
+        .expect("streaming run")
+        .run(&mut expected)
+        .expect("streaming run delivers");
+    let mut expected_detection = Records::default();
+    detection
+        .streaming_run(policy, lane_width, shots)
+        .expect("streaming detection run")
+        .run(&mut expected_detection)
+        .expect("streaming detection run delivers");
+
+    test_hook::with_units_per_poll(CREATION_UNITS_PER_POLL, || {
+        let (created, polls) =
+            test_hook::count_polls(|| sampling.streaming_run(policy, mode, lane_width, shots));
+        drop(created.expect("counted streaming run"));
+        // 16384 words at 4 units each, one poll per 512 units.
+        assert!(polls >= 100, "zeroing the records polled {polls} times");
+        let (interrupted, fired) = test_hook::cancel_at_poll(polls / 2, || {
+            sampling
+                .streaming_run(policy, mode, lane_width, shots)
+                .map(drop)
+        });
+        assert!(fired);
+        assert_eq!(
+            interrupted,
+            Err(SamplingExecutionError::Cancelled(cancelled))
+        );
+        let mut retried = Records::default();
+        sampling
+            .streaming_run(policy, mode, lane_width, shots)
+            .expect("streaming run after cancellation")
+            .run(&mut retried)
+            .expect("retried run delivers");
+        assert!(retried.0 == expected.0, "retried streaming run diverged");
+
+        let (created, polls) =
+            test_hook::count_polls(|| detection.streaming_run(policy, lane_width, shots));
+        drop(created.expect("counted streaming detection run"));
+        assert!(
+            polls >= 50,
+            "zeroing the detection records polled {polls} times"
+        );
+        let (interrupted, fired) = test_hook::cancel_at_poll(polls / 2, || {
+            detection.streaming_run(policy, lane_width, shots).map(drop)
+        });
+        assert!(fired);
+        assert!(
+            matches!(interrupted, Err(DetectionExecutionError::Cancelled(_))),
+            "{interrupted:?}"
+        );
+        let mut retried = Records::default();
+        detection
+            .streaming_run(policy, lane_width, shots)
+            .expect("streaming detection run after cancellation")
+            .run(&mut retried)
+            .expect("retried detection run delivers");
+        assert!(
+            retried.0 == expected_detection.0,
+            "retried streaming detection run diverged"
+        );
+    });
+}
+
+/// A windowed measurement-to-detection session zeroes its records when its first full batch
+/// arrives, in polled chunks before any other work of that batch: cancellation there reports a
+/// cancelled batch without poisoning the session, and converting the batch again delivers what
+/// an uninterrupted session does.
+#[test]
+fn windowed_conversion_polls_while_zeroing_its_records() {
+    use stab_records::PackedShotBatch;
+
+    use crate::work_poll::test_hook;
+    use crate::{DetectionRunStatus, MAX_BATCH_SHOTS, MeasurementToDetectionCompiler};
+
+    let circuit = Circuit::from_stim_str(WIDE_RECORDS).expect("fixture parses");
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("compile conversion plan");
+    let mut rng = SmallRng::seed_from_u64(7);
+    let measurements = (0..MAX_BATCH_SHOTS)
+        .map(|_| (0..4096).map(|_| rng.random_bool(0.5)).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let measurements = PackedShotBatch::from_records(&measurements, 4096).expect("pack input");
+    let input = || stab_records::MeasurementBatchView::new(measurements.view());
+
+    let mut expected = Records::default();
+    let mut uninterrupted = plan.session().expect("conversion session");
+    uninterrupted
+        .run(input(), None, &mut expected)
+        .expect("convert a batch");
+
+    test_hook::with_units_per_poll(CREATION_UNITS_PER_POLL, || {
+        let mut counted = plan.session().expect("conversion session");
+        let (first, first_polls) =
+            test_hook::count_polls(|| counted.run(input(), None, &mut Records::default()));
+        first.expect("first batch");
+        let (later, later_polls) =
+            test_hook::count_polls(|| counted.run(input(), None, &mut Records::default()));
+        later.expect("later batch");
+        // 8192 detector words at 4 units each, one poll per 512 units.
+        assert!(
+            first_polls >= later_polls + 50,
+            "zeroing polled {first_polls} - {later_polls} times"
+        );
+
+        let mut session = plan.session().expect("conversion session");
+        let mut delivered = Records::default();
+        let (interrupted, fired) =
+            test_hook::cancel_at_poll(1, || session.run(input(), None, &mut delivered));
+        assert!(fired);
+        let summary = interrupted.expect("cancellation is a status, not an error");
+        assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+        assert!(delivered.0.is_empty());
+        assert!(!session.is_poisoned());
+        session
+            .run(input(), None, &mut delivered)
+            .expect("convert the batch again");
+        assert!(delivered.0 == expected.0, "retried conversion diverged");
+    });
+}

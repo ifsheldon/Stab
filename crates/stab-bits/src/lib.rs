@@ -3,6 +3,7 @@
 mod scalar;
 mod transpose;
 
+use std::num::NonZeroUsize;
 use std::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Deref, DerefMut, Not, Range,
 };
@@ -466,6 +467,23 @@ pub struct BitMatrix {
 
 impl BitMatrix {
     pub fn zeros(rows: usize, cols: impl Into<BitLen>) -> BitResult<Self> {
+        Self::zeros_chunked(rows, cols, NonZeroUsize::MAX, |_| Ok::<(), BitError>(()))
+    }
+
+    /// Builds the same matrix as [`Self::zeros`], zeroing its storage in chunks of at most
+    /// `chunk_words` words and calling `before_chunk` with each chunk's word count before that
+    /// chunk is written.
+    ///
+    /// The whole storage is still reserved fallibly, once, before the first chunk, so a caller can
+    /// interleave bounded work, such as polling a cancellation signal, with the zeroing of a large
+    /// matrix without reallocating. The first error `before_chunk` returns stops the zeroing and
+    /// is returned after the partial storage is released; a matrix with no words never calls it.
+    pub fn zeros_chunked<E: From<BitError>>(
+        rows: usize,
+        cols: impl Into<BitLen>,
+        chunk_words: NonZeroUsize,
+        mut before_chunk: impl FnMut(usize) -> Result<(), E>,
+    ) -> Result<Self, E> {
         let cols = cols.into();
         let row_words = cols.word_count();
         let word_count = rows
@@ -478,7 +496,12 @@ impl BitMatrix {
         words
             .try_reserve_exact(word_count)
             .map_err(|_| BitError::StorageAllocationFailed { words: word_count })?;
-        words.resize(word_count, 0);
+        while words.len() < word_count {
+            let chunk = chunk_words.get().min(word_count - words.len());
+            before_chunk(chunk)?;
+            // Within the reserved capacity, so this never reallocates.
+            words.resize(words.len() + chunk, 0);
+        }
         Ok(Self {
             rows,
             cols,
@@ -978,6 +1001,70 @@ mod tests {
     )]
 
     use super::*;
+
+    /// The chunked constructor builds exactly the matrix `zeros` builds, in chunks that cover
+    /// every word once and never exceed the requested size.
+    #[test]
+    fn chunked_zeros_equal_zeros_in_bounded_chunks() {
+        for (rows, cols, chunk) in [(0, 100, 3), (5, 0, 1), (1, 1, 1), (7, 130, 4), (3, 64, 100)] {
+            let chunk = NonZeroUsize::new(chunk).unwrap();
+            let mut chunks = Vec::new();
+            let chunked = BitMatrix::zeros_chunked(rows, cols, chunk, |words| {
+                chunks.push(words);
+                Ok::<(), BitError>(())
+            })
+            .unwrap();
+            let zeros = BitMatrix::zeros(rows, cols).unwrap();
+            assert_eq!(chunked, zeros, "{rows}x{cols}");
+            assert_eq!(
+                chunks.iter().sum::<usize>(),
+                zeros.words.len(),
+                "{rows}x{cols}"
+            );
+            assert!(chunks.iter().all(|words| (1..=chunk.get()).contains(words)));
+        }
+    }
+
+    /// The first failing callback stops the zeroing and its error is returned unchanged, while
+    /// shape errors are still reported before any callback.
+    #[test]
+    fn chunked_zeros_stop_at_the_first_failing_chunk() {
+        #[derive(Debug, PartialEq)]
+        enum Stop {
+            Bits(BitError),
+            Callback(usize),
+        }
+        impl From<BitError> for Stop {
+            fn from(error: BitError) -> Self {
+                Self::Bits(error)
+            }
+        }
+        let mut calls = 0;
+        let result = BitMatrix::zeros_chunked(4, 640, NonZeroUsize::new(7).unwrap(), |_| {
+            calls += 1;
+            if calls == 3 {
+                Err(Stop::Callback(calls))
+            } else {
+                Ok(())
+            }
+        });
+        assert_eq!(result, Err(Stop::Callback(3)));
+        assert_eq!(calls, 3);
+
+        let mut called = false;
+        let overflow = BitMatrix::zeros_chunked(usize::MAX, 128, NonZeroUsize::MIN, |_| {
+            called = true;
+            Ok::<(), Stop>(())
+        });
+        assert_eq!(
+            overflow,
+            Err(Stop::Bits(BitError::MatrixSizeOverflow {
+                rows: usize::MAX,
+                cols: 128
+            }))
+        );
+        assert!(!called);
+    }
 
     #[test]
     fn simd_xor_matches_scalar_across_blocks_and_tails() {

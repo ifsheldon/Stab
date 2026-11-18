@@ -99,8 +99,8 @@ impl WindowedConversion {
             lookback: counts.lookback,
             detector_window,
             observable_planes,
-            detectors: ShotRecordTransposer::try_new(0, plan.detector_count)?,
-            observables: ShotRecordTransposer::try_new(0, plan.observable_count)?,
+            detectors: ShotRecordTransposer::without_lanes(plan.detector_count)?,
+            observables: ShotRecordTransposer::without_lanes(plan.observable_count)?,
         })
     }
 
@@ -122,14 +122,14 @@ impl WindowedConversion {
                 plan.measurement_count
             )));
         }
-        self.detectors.ensure_lanes(shot_count)?;
-        self.observables.ensure_lanes(shot_count)?;
+        let mut poll = WorkPoll::new(cancellation);
+        self.detectors.ensure_lanes(shot_count, &mut poll)?;
+        self.observables.ensure_lanes(shot_count, &mut poll)?;
         self.detectors.begin_batch(shot_count)?;
         self.observables.begin_batch(shot_count)?;
         self.observable_planes.fill(FrameLanes::ZERO);
         self.planes.clear();
         let active = FrameLanes::active_mask(shot_count);
-        let mut poll = WorkPoll::new(cancellation);
         let mut consumer = DetectionWindow::new(
             plan,
             ConversionRunner::default(),
