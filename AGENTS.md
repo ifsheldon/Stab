@@ -37,7 +37,8 @@
 ### Rust And Cargo
 
 - Treat this as a Cargo workspace project, even while the repository is still small.
-- When adding a new dependency, search for its latest stable version on crates.io before adding it. Do not recall a version from your memory.
+- When adding a new dependency, search crates.io for its latest stable version that was published at least three days ago and add that one. Do not recall a version from your memory.
+- `.cargo/config.toml` sets `registry.global-min-publish-age` to three days, so the resolver ignores younger crates.io versions unless `Cargo.lock` already pins them; do not lower or override that cooldown to pick up a fresher release.
 - Use the component ownership and dependency graph described in `docs/architecture/README.md` unless an architecture decision deliberately revises it.
 - The workspace pins Stable Rust `1.100.0` in `rust-toolchain.toml`, every product crate declares 1.100 as its minimum supported Rust version, and unstable features must not be introduced.
 - Keep direct `fearless_simd` usage isolated in `stab-kernels-simd`, with scalar reference implementations available for tests.
