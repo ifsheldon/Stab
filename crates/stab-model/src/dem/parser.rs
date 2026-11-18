@@ -13,8 +13,10 @@ use crate::{
 
 mod fast;
 mod items;
+mod tag;
 
-use items::{ParsedDemItemStorage, ParsedNestedDemItems};
+use items::{OpenDemRepeat, OpenDemRepeatHeader, ParsedDemItems};
+use tag::parse_optional_tag;
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
@@ -31,7 +33,7 @@ pub(super) fn parse_dem_admitted(
     admission: ParseAdmission,
 ) -> ModelResult<(DetectorErrorModel, u64)> {
     let mut parser = DemParser::new(input, admission);
-    let model = parser.parse_block(Vec::new(), 0)?;
+    let model = parser.parse_block()?;
     Ok((model, parser.admission.retained_model_bytes()))
 }
 
@@ -51,17 +53,19 @@ impl<'a> DemParser<'a> {
     }
 
     fn parse(mut self) -> ModelResult<DetectorErrorModel> {
-        self.parse_block(Vec::new(), 0)
+        self.parse_block()
     }
 
-    // Keep the top-level Vec and nested inline-storage loops in separate compact code paths.
+    /// Parses the whole input without recursing: each open `repeat` block is a frame holding
+    /// its enclosing block's items, and the repeat-nesting admission bounds the frame count.
+    ///
+    /// A block's tag is charged when the block closes, after its body, and the charge reports
+    /// the header line, as a body-first recursion would.
     #[inline(never)]
-    fn parse_block<S: ParsedDemItemStorage>(
-        &mut self,
-        mut items: S,
-        depth: usize,
-    ) -> ModelResult<DetectorErrorModel> {
-        while let Some(command) = self.next_command()? {
+    fn parse_block(&mut self) -> ModelResult<DetectorErrorModel> {
+        let mut items = ParsedDemItems::top_level();
+        let mut enclosing: Vec<OpenDemRepeat> = Vec::new();
+        while let Some(command) = self.commands.next() {
             let line_number = command.line_number();
             let line = command.source().trim_command_space_start();
             let semantic_line = trim_command_space_end(line);
@@ -69,43 +73,32 @@ impl<'a> DemParser<'a> {
                 continue;
             }
             if semantic_line.text() == "}" {
-                if S::STOPS_ON_TERMINATOR {
-                    return Ok(items.into_model());
-                }
-                return Err(unexpected_repeat_terminator(
-                    ModelDialect::DetectorErrorModel,
-                    semantic_line.span(),
-                ));
+                let Some(open) = enclosing.pop() else {
+                    return Err(unexpected_repeat_terminator(
+                        ModelDialect::DetectorErrorModel,
+                        semantic_line.span(),
+                    ));
+                };
+                let body = std::mem::replace(&mut items, open.parent);
+                let repeat = self.close_repeat(body, open.header)?;
+                items.push_item(super::DemItem::RepeatBlock(repeat));
+                continue;
             }
             self.admission
                 .admit_instruction(line_number, semantic_line.span())?;
 
             if let Some(header) = semantic_line.without_suffix('{') {
-                let header = trim_command_space_end(header);
-                let repeat = if let Some((count, tag)) =
-                    fast::parse_canonical_repeat_header(header.text())
-                {
-                    ParsedRepeatHeader {
-                        count: DemRepeatCount::new(count),
-                        tag,
-                    }
-                } else {
-                    self.parse_repeat_header(line_number, header, command.end_error_span())?
-                };
-                let actual = depth.checked_add(1).ok_or_else(|| {
-                    ModelError::invalid_detector_error_model("DEM repeat nesting depth overflowed")
-                })?;
-                self.admission
-                    .admit_repeat_nesting(line_number, actual, semantic_line.span())?;
-                let body = self.parse_block(ParsedNestedDemItems::nested(), depth + 1)?;
-                let repeat = DemRepeatBlock::from_parts(repeat.count, body, repeat.tag);
-                self.admission.admit_payload(
-                    0,
-                    repeat.tag_bytes().map_or(0, <[u8]>::len),
+                let header = self.open_repeat(
+                    enclosing.len(),
                     line_number,
+                    header,
                     semantic_line.span(),
+                    command.end_error_span(),
                 )?;
-                items.push_item(super::DemItem::RepeatBlock(repeat));
+                enclosing.push(OpenDemRepeat {
+                    parent: std::mem::replace(&mut items, ParsedDemItems::nested()),
+                    header,
+                });
             } else {
                 // The fast path retains its arguments within the line-length bound it checked
                 // and charges them with the tag; the diagnostic parser admits each argument
@@ -141,21 +134,65 @@ impl<'a> DemParser<'a> {
             }
         }
 
-        if S::STOPS_ON_TERMINATOR {
+        if enclosing.is_empty() {
+            Ok(items.into_model())
+        } else {
             Err(unterminated_repeat_block(
                 ModelDialect::DetectorErrorModel,
                 self.input_len,
             ))
-        } else {
-            Ok(items.into_model())
         }
     }
 
-    fn next_command(&mut self) -> ModelResult<Option<crate::source_text::SourceCommand<'a>>> {
-        let Some(command) = self.commands.next() else {
-            return Ok(None);
+    /// Parses the header of a `repeat` block opened inside `depth` open blocks and admits the
+    /// nesting it reaches.
+    #[inline(never)]
+    fn open_repeat(
+        &mut self,
+        depth: usize,
+        line_number: usize,
+        header: SourceSlice<'a>,
+        span: ByteSpan,
+        end_error_span: ByteSpan,
+    ) -> ModelResult<OpenDemRepeatHeader> {
+        let header = trim_command_space_end(header);
+        let repeat = if let Some((count, tag)) = fast::parse_canonical_repeat_header(header.text())
+        {
+            ParsedRepeatHeader {
+                count: DemRepeatCount::new(count),
+                tag,
+            }
+        } else {
+            self.parse_repeat_header(line_number, header, end_error_span)?
         };
-        Ok(Some(command))
+        let actual = depth.checked_add(1).ok_or_else(|| {
+            ModelError::invalid_detector_error_model("DEM repeat nesting depth overflowed")
+        })?;
+        self.admission
+            .admit_repeat_nesting(line_number, actual, span)?;
+        Ok(OpenDemRepeatHeader {
+            count: repeat.count,
+            tag: repeat.tag,
+            line_number,
+            span,
+        })
+    }
+
+    /// Builds a closed `repeat` block and charges its tag against the header line.
+    #[inline(never)]
+    fn close_repeat(
+        &mut self,
+        body: ParsedDemItems,
+        header: OpenDemRepeatHeader,
+    ) -> ModelResult<DemRepeatBlock> {
+        let repeat = DemRepeatBlock::from_parts(header.count, body.into_model(), header.tag);
+        self.admission.admit_payload(
+            0,
+            repeat.tag_bytes().map_or(0, <[u8]>::len),
+            header.line_number,
+            header.span,
+        )?;
+        Ok(repeat)
     }
 
     fn parse_repeat_header(
@@ -230,6 +267,8 @@ struct ParsedRepeatHeader {
     tag: Option<DemTag>,
 }
 
+// Kept out of line so the parse loop stays compact.
+#[inline(never)]
 fn parse_dem_instruction(
     line_number: usize,
     line: SourceSlice<'_>,
@@ -354,116 +393,6 @@ fn parse_name(
         .suffix(end)
         .ok_or_else(|| parse_line_error(line_number, "missing DEM instruction name"))?;
     Ok((name, rest))
-}
-
-fn parse_optional_tag<'a>(
-    line_number: usize,
-    instruction: &str,
-    rest: SourceSlice<'a>,
-    end_error_span: ByteSpan,
-) -> ModelResult<(Option<DemTag>, SourceSlice<'a>)> {
-    let Some(mut body) = rest.strip_prefix("[") else {
-        return Ok((None, rest));
-    };
-    if let Some(end) = body.text().as_bytes().iter().position(|byte| *byte == b']') {
-        let raw_tag = body
-            .prefix(end)
-            .ok_or_else(|| parse_line_error(line_number, "unterminated tag"))?;
-        if !raw_tag
-            .text()
-            .as_bytes()
-            .iter()
-            .any(|byte| matches!(byte, b'\\' | b'\r' | b'\n'))
-        {
-            let tail = body
-                .suffix(end + 1)
-                .ok_or_else(|| parse_line_error(line_number, "unterminated tag"))?;
-            return Ok((DemTag::from_text(raw_tag.text()), tail));
-        }
-    }
-    let mut tag = String::new();
-    loop {
-        let Some((character, character_len)) = body
-            .text()
-            .chars()
-            .next()
-            .map(|character| (character, character.len_utf8()))
-        else {
-            return Err(line_error(
-                ModelDialect::DetectorErrorModel,
-                line_number,
-                ParseErrorCode::UnterminatedTag,
-                "unterminated tag",
-                "unterminated tag",
-                end_error_span,
-                instruction_context(instruction),
-            ));
-        };
-        let character_span = body
-            .subspan(0, character_len)
-            .unwrap_or_else(|| body.span());
-        body = body
-            .suffix(character_len)
-            .ok_or_else(|| parse_line_error(line_number, "unterminated tag"))?;
-        match character {
-            ']' => return Ok((DemTag::from_string(tag), body)),
-            '\\' => {
-                let Some((escaped, escaped_len)) = body
-                    .text()
-                    .chars()
-                    .next()
-                    .map(|escaped| (escaped, escaped.len_utf8()))
-                else {
-                    return Err(line_error(
-                        ModelDialect::DetectorErrorModel,
-                        line_number,
-                        ParseErrorCode::UnterminatedTagEscape,
-                        "unterminated tag escape",
-                        "unterminated tag escape",
-                        end_error_span,
-                        instruction_context(instruction),
-                    ));
-                };
-                let escape_span = ByteSpan::try_new(
-                    character_span.byte_start(),
-                    character_span.byte_length() + escaped_len,
-                )
-                .unwrap_or(character_span);
-                body = body
-                    .suffix(escaped_len)
-                    .ok_or_else(|| parse_line_error(line_number, "unterminated tag escape"))?;
-                tag.push(match escaped {
-                    'C' => ']',
-                    'r' => '\r',
-                    'n' => '\n',
-                    'B' => '\\',
-                    _ => {
-                        return Err(line_error(
-                            ModelDialect::DetectorErrorModel,
-                            line_number,
-                            ParseErrorCode::InvalidTagEscape,
-                            format!("invalid tag escape \\{escaped}"),
-                            format!("invalid tag escape \\{escaped}"),
-                            escape_span,
-                            instruction_context(instruction),
-                        ));
-                    }
-                });
-            }
-            '\r' | '\n' => {
-                return Err(line_error(
-                    ModelDialect::DetectorErrorModel,
-                    line_number,
-                    ParseErrorCode::UnterminatedTag,
-                    "invalid tag newline",
-                    "invalid tag newline",
-                    character_span,
-                    instruction_context(instruction),
-                ));
-            }
-            _ => tag.push(character),
-        }
-    }
 }
 
 struct ParsedDemArguments<'a> {

@@ -7,8 +7,11 @@
 //! 256-level limit. Every whole-model operation must then either finish without recursing per
 //! nesting level or refuse the model before recursing, so a thread with a small stack survives.
 
+use std::ops::ControlFlow;
+
 use stab_model::{
-    Cancellation, Circuit, DemInstruction, DemRepeatBlock, DemRepeatCount, DemTarget,
+    Cancellation, Circuit, DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
+    DemErrorMechanismVisitor, DemInstruction, DemRepeatBlock, DemRepeatCount, DemTarget,
     DetectorErrorModel, FoldedCircuitSummary, FoldedWalkError, Probability, RepeatBlock,
     RepeatCount, RepeatNestingLimit,
 };
@@ -120,11 +123,12 @@ fn deeply_nested_circuit_prints_on_a_small_stack() {
 }
 
 #[test]
-fn nested_circuit_finds_coordinates_on_a_small_stack() {
-    // Coordinate queries revisit repeat bodies, so their time grows with depth squared; a depth
-    // of 3000 still overflows a recursive walk on the small stack.
+fn deeply_nested_circuit_finds_coordinates_on_a_small_stack() {
+    // Each repeat body's detector count and coordinate shift is computed once per query, so a
+    // query that recomputed them at every enclosing level would take time quadratic in depth
+    // and not finish at this depth.
     on_small_stack(|| {
-        let circuit = nested_circuit(3_000, 10);
+        let circuit = nested_circuit(DEEP, 10);
         assert_eq!(
             circuit.final_coordinate_shift().expect("coordinate shift"),
             [0.0, 1024.0]
@@ -167,7 +171,7 @@ fn nested_dem(depth: usize) -> DetectorErrorModel {
 }
 
 #[test]
-fn deeply_nested_dem_prints_fingerprints_and_refuses_visits_on_a_small_stack() {
+fn deeply_nested_dem_prints_fingerprints_and_visits_on_a_small_stack() {
     on_small_stack(|| {
         let deep = nested_dem(DEEP);
         assert_eq!(deep.clone(), deep);
@@ -178,14 +182,21 @@ fn deeply_nested_dem_prints_fingerprints_and_refuses_visits_on_a_small_stack() {
                 .expect("empty coordinate shift"),
             Vec::<f64>::new()
         );
-        // Visiting recurses once per level, so it is refused before any callback.
-        let refused = deep.detector_coordinates().expect_err("too deep");
-        assert!(
-            refused
-                .to_string()
-                .contains("repeat nesting exceeds current limit 256"),
-            "{refused}"
+        // The folded visit keeps its open repeat bodies on the heap, so it accepts any depth.
+        assert_eq!(
+            deep.detector_coordinates().expect("detector coordinates"),
+            [(DemDetectorId::try_new(0).expect("D0"), Vec::new())].into()
         );
+        let mut mechanisms = Vec::new();
+        assert_eq!(
+            deep.try_visit_error_mechanisms(
+                DemErrorMechanismTraversalLimits::new(1, 1),
+                &mut CollectMechanisms(&mut mechanisms),
+            )
+            .expect("error mechanisms"),
+            ControlFlow::Continue(())
+        );
+        assert_eq!(mechanisms, [(0.125, 1)]);
 
         let printed = nested_dem(PRINT_DEPTH);
         let mut expected = String::new();
@@ -201,5 +212,83 @@ fn deeply_nested_dem_prints_fingerprints_and_refuses_visits_on_a_small_stack() {
         }
         assert_eq!(printed.to_dem_string(), expected);
         assert_eq!(printed.to_dem_bytes(), expected.into_bytes());
+    });
+}
+
+struct CollectMechanisms<'a>(&'a mut Vec<(f64, usize)>);
+
+impl DemErrorMechanismVisitor for CollectMechanisms<'_> {
+    type Error = std::convert::Infallible;
+
+    fn visit_error_mechanism(
+        &mut self,
+        mechanism: DemErrorMechanismView<'_>,
+    ) -> Result<ControlFlow<()>, Self::Error> {
+        self.0
+            .push((mechanism.probability().get(), mechanism.targets().len()));
+        Ok(ControlFlow::Continue(()))
+    }
+}
+
+/// `depth` repeat-once blocks around a detector that shifts detector ids by `detector_shift`
+/// and the second coordinate by one.
+fn nested_coordinate_dem(depth: usize, detector_shift: u64) -> DetectorErrorModel {
+    let mut model = DetectorErrorModel::from_dem_str(&format!(
+        "shift_detectors(0, 1) {detector_shift}\ndetector(4, 5) D0\n"
+    ))
+    .expect("leaf model");
+    for _ in 0..depth {
+        let mut outer = DetectorErrorModel::new();
+        outer.push_repeat_block(DemRepeatBlock::new(DemRepeatCount::new(1), model, None));
+        model = outer;
+    }
+    model
+}
+
+#[test]
+fn deeply_nested_dem_finds_coordinates_on_a_small_stack() {
+    // A body without a detector shift is visited level by level, and a body with one is scanned
+    // flattened; both keep their open bodies on the heap. Each body's coordinate shift is
+    // computed once per query, so recomputing it at every enclosing level would take time
+    // quadratic in depth and not finish at this depth.
+    on_small_stack(|| {
+        for (detector_shift, detector) in [(0, 0), (1, 1)] {
+            let model = nested_coordinate_dem(DEEP, detector_shift);
+            let detector = DemDetectorId::try_new(detector).expect("detector id");
+            assert_eq!(
+                model
+                    .coordinates_of_detector(detector)
+                    .expect("detector coordinates"),
+                [4.0, 6.0]
+            );
+            assert_eq!(
+                model.final_coordinate_shift().expect("coordinate shift"),
+                [0.0, 1.0]
+            );
+        }
+    });
+}
+
+#[test]
+fn maximally_nested_dem_text_parses_and_round_trips_on_a_small_stack() {
+    // The parser keeps one heap frame per open repeat block, so text at the parse nesting
+    // limit, which a recursive parser needs far more than the small stack for in a debug
+    // build, parses there too.
+    on_small_stack(|| {
+        let depth = RepeatNestingLimit::HARD_MAX;
+        let model = nested_dem(depth);
+        let text = model.to_dem_string();
+        let parsed = DetectorErrorModel::from_dem_str(&text).expect("maximally nested text");
+        assert_eq!(parsed, model);
+        assert_eq!(parsed.to_dem_string(), text);
+
+        let too_deep = format!("repeat 1 {{\n{text}}}\n");
+        let refused = DetectorErrorModel::from_dem_str(&too_deep).expect_err("one level too deep");
+        assert!(
+            refused
+                .to_string()
+                .contains("repeat nesting exceeds current limit 256"),
+            "{refused}"
+        );
     });
 }

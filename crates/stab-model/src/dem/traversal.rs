@@ -18,6 +18,10 @@ use super::{
 };
 use crate::{ModelError, ModelResult};
 
+mod visit;
+
+pub(super) use visit::CoordinateShifts;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct DemDetectorBounds {
     pub(super) min: u64,
@@ -104,26 +108,23 @@ impl<'a> FoldedDemTraversal<'a> {
 
     /// Traverses the model with coordinate-free state.
     ///
-    /// The visit recurses once per repeat level, so a model nested deeper than
-    /// [`MAX_DEM_REPEAT_NESTING`] is refused before any callback runs. Visitor errors and
-    /// [`ControlFlow::Break`] propagate immediately. Repeat expansion occurs
-    /// only when the visitor explicitly returns [`DemRepeatSelection::Expand`], whose cumulative
-    /// iteration limit is enforced by the traversal.
+    /// The visit keeps an explicit stack of open repeat bodies instead of recursing, so it accepts
+    /// any nesting depth. Visitor errors and [`ControlFlow::Break`] propagate immediately. Repeat
+    /// expansion occurs only when the visitor explicitly returns [`DemRepeatSelection::Expand`],
+    /// whose cumulative iteration limit is enforced by the traversal.
     pub fn try_visit<V>(&self, visitor: &mut V) -> Result<ControlFlow<()>, V::Error>
     where
         V: FoldedDemVisitor,
     {
-        self.validate_repeat_depth("traversal")?;
-        let mut state = DemTraversalState::default();
-        let mut expansion = ExpansionBudget::default();
-        self.root.visit(visitor, &mut state, &mut expansion)
+        visit::visit(&self.root, visitor, DemTraversalState::default())
     }
 
     /// Traverses the model with opt-in coordinate-shift state.
     ///
     /// Coordinate updates have a separate aggregate scalar-work limit. Consumers that do not need
     /// coordinates must use [`Self::try_visit`] so wide coordinate annotations cannot inflate
-    /// their retained state or work. Nesting is refused as in [`Self::try_visit`].
+    /// their retained state or work. Each repeat body's coordinate shift is computed once per
+    /// visit and kept until the visit ends.
     pub fn try_visit_with_coordinates<V>(
         &self,
         visitor: &mut V,
@@ -131,16 +132,14 @@ impl<'a> FoldedDemTraversal<'a> {
     where
         V: FoldedDemVisitor,
     {
-        self.validate_repeat_depth("traversal")?;
-        let mut state = DemTraversalState::with_coordinates();
-        let mut expansion = ExpansionBudget::default();
-        self.root.visit(visitor, &mut state, &mut expansion)
+        visit::visit(&self.root, visitor, DemTraversalState::with_coordinates())
     }
 
-    /// Applies a consumer-owned repeat-depth admission limit.
+    /// Refuses a model nested deeper than [`MAX_DEM_REPEAT_NESTING`].
     ///
-    /// Depth validation is not part of construction because compact model queries and consumers
-    /// historically have different accepted depth contracts.
+    /// Traversal itself accepts any depth. Consumers whose own processing recurses once per
+    /// repeat level call this before they start; depth validation is not part of construction
+    /// because compact model queries and consumers have different accepted depth contracts.
     pub fn validate_repeat_depth(&self, context: &'static str) -> ModelResult<()> {
         let depth = self.root.summary().max_repeat_depth();
         if depth > MAX_DEM_REPEAT_NESTING {
@@ -255,70 +254,7 @@ impl<'a> FoldedDemBlock<'a> {
     /// Each repeat body's shift is accumulated from zero and added, times the repeat count, to
     /// its parent's shift when the body ends, matching a body-first recursion exactly.
     pub(super) fn coordinate_shift(&self) -> ModelResult<Vec<f64>> {
-        let mut enclosing: Vec<(std::slice::Iter<'_, FoldedDemItem<'a>>, Vec<f64>, u64)> =
-            Vec::new();
-        let mut items = self.items.iter();
-        let mut shift = Vec::new();
-        loop {
-            match items.next() {
-                Some(FoldedDemItem::Instruction(instruction))
-                    if instruction.kind() == DemInstructionKind::ShiftDetectors =>
-                {
-                    add_coordinate_shift_mul(&mut shift, instruction.args(), 1.0)?;
-                }
-                Some(FoldedDemItem::Instruction(_)) => {}
-                Some(FoldedDemItem::Repeat { repeat, body }) => {
-                    let parent = std::mem::replace(&mut items, body.items.iter());
-                    let parent_shift = std::mem::take(&mut shift);
-                    enclosing.push((parent, parent_shift, repeat.repeat_count().get()));
-                }
-                None => {
-                    let Some((parent, parent_shift, repeat_count)) = enclosing.pop() else {
-                        return Ok(shift);
-                    };
-                    let body_shift = std::mem::replace(&mut shift, parent_shift);
-                    add_coordinate_shift_mul(&mut shift, &body_shift, repeat_count as f64)?;
-                    items = parent;
-                }
-            }
-        }
-    }
-
-    fn visit<V>(
-        &self,
-        visitor: &mut V,
-        state: &mut DemTraversalState,
-        expansion: &mut ExpansionBudget,
-    ) -> Result<ControlFlow<()>, V::Error>
-    where
-        V: FoldedDemVisitor,
-    {
-        for item in &self.items {
-            match item {
-                FoldedDemItem::Instruction(instruction) => {
-                    if visitor.visit_instruction(instruction, state)?.is_break() {
-                        return Ok(ControlFlow::Break(()));
-                    }
-                    state.apply_instruction(instruction)?;
-                }
-                FoldedDemItem::Repeat { repeat, body } => {
-                    if repeat.repeat_count().get() == 0 {
-                        continue;
-                    }
-                    let selection = visitor.enter_repeat(repeat, body, state)?;
-                    if visit_repeat_selection(repeat, body, selection, visitor, state, expansion)?
-                        .is_break()
-                    {
-                        return Ok(ControlFlow::Break(()));
-                    }
-                    if visitor.exit_repeat(repeat, body, state)?.is_break() {
-                        return Ok(ControlFlow::Break(()));
-                    }
-                    state.advance_repeat(body, repeat.repeat_count().get())?;
-                }
-            }
-        }
-        Ok(ControlFlow::Continue(()))
+        CoordinateShifts::default().accumulate(self, false)
     }
 }
 
@@ -468,6 +404,7 @@ impl DemTraversalState {
         iteration: u64,
         folded: bool,
         repeat_count: u64,
+        shifts: &mut CoordinateShifts,
     ) -> ModelResult<Self> {
         let detector_offset = body
             .summary()
@@ -481,8 +418,8 @@ impl DemTraversalState {
             })?;
         let mut coordinate_shift = self.coordinate_shift.clone();
         if let Some(coordinate_shift) = &mut coordinate_shift {
-            let body_shift = body.coordinate_shift()?;
-            add_coordinate_shift_mul(coordinate_shift, &body_shift, iteration as f64)?;
+            let body_shift = shifts.of(body)?;
+            add_coordinate_shift_mul(coordinate_shift, body_shift, iteration as f64)?;
         }
         let folded_repeat_multiplicity = if folded {
             self.folded_repeat_multiplicity
@@ -511,7 +448,12 @@ impl DemTraversalState {
         })
     }
 
-    fn advance_repeat(&mut self, body: &FoldedDemBlock<'_>, repeat_count: u64) -> ModelResult<()> {
+    fn advance_repeat(
+        &mut self,
+        body: &FoldedDemBlock<'_>,
+        repeat_count: u64,
+        shifts: &mut CoordinateShifts,
+    ) -> ModelResult<()> {
         self.detector_offset = body
             .summary()
             .detector_shift()?
@@ -523,8 +465,8 @@ impl DemTraversalState {
                 )
             })?;
         if let Some(coordinate_shift) = &mut self.coordinate_shift {
-            let body_shift = body.coordinate_shift()?;
-            add_coordinate_shift_mul(coordinate_shift, &body_shift, repeat_count as f64)?;
+            let body_shift = shifts.of(body)?;
+            add_coordinate_shift_mul(coordinate_shift, body_shift, repeat_count as f64)?;
         }
         Ok(())
     }
@@ -615,94 +557,6 @@ pub trait FoldedDemVisitor {
             "DEM {context} traversal currently supports at most {limit} expanded repeat iterations, got at least {actual}"
         ))
         .into()
-    }
-}
-
-#[derive(Default)]
-struct ExpansionBudget {
-    used_iterations: u64,
-}
-
-fn visit_repeat_selection<V>(
-    repeat: &DemRepeatBlock,
-    body: &FoldedDemBlock<'_>,
-    selection: DemRepeatSelection,
-    visitor: &mut V,
-    state: &DemTraversalState,
-    expansion: &mut ExpansionBudget,
-) -> Result<ControlFlow<()>, V::Error>
-where
-    V: FoldedDemVisitor,
-{
-    let repeat_count = repeat.repeat_count().get();
-    match selection {
-        DemRepeatSelection::Skip => Ok(ControlFlow::Continue(())),
-        DemRepeatSelection::StructuralOnce => {
-            let mut iteration_state = state.at_iteration(body, 0, false, repeat_count)?;
-            body.visit(visitor, &mut iteration_state, expansion)
-        }
-        DemRepeatSelection::FoldOnce => {
-            if body.summary().detector_shift()? != 0 {
-                return Err(ModelError::invalid_detector_error_model(
-                    "folded-once traversal requires a zero detector-shift repeat body",
-                )
-                .into());
-            }
-            let mut iteration_state = state.at_iteration(body, 0, true, repeat_count)?;
-            body.visit(visitor, &mut iteration_state, expansion)
-        }
-        DemRepeatSelection::Expand {
-            max_total_iterations,
-            context,
-        } => {
-            expansion.used_iterations = expansion
-                .used_iterations
-                .checked_add(repeat_count)
-                .ok_or_else(|| {
-                    visitor.repeat_expansion_limit_error(context, u64::MAX, max_total_iterations)
-                })?;
-            if expansion.used_iterations > max_total_iterations {
-                return Err(visitor.repeat_expansion_limit_error(
-                    context,
-                    expansion.used_iterations,
-                    max_total_iterations,
-                ));
-            }
-            for iteration in 0..repeat_count {
-                visitor.poll_cancellation()?;
-                let mut iteration_state =
-                    state.at_iteration(body, iteration, false, repeat_count)?;
-                if body
-                    .visit(visitor, &mut iteration_state, expansion)?
-                    .is_break()
-                {
-                    return Ok(ControlFlow::Break(()));
-                }
-            }
-            Ok(ControlFlow::Continue(()))
-        }
-        DemRepeatSelection::Selected(iterations) => {
-            let mut previous = None;
-            for iteration in iterations {
-                if iteration >= repeat_count || previous.is_some_and(|value| value >= iteration) {
-                    return Err(ModelError::invalid_detector_error_model(
-                        "folded traversal selected repeat iterations must be strictly increasing and in range",
-                    )
-                    .into());
-                }
-                previous = Some(iteration);
-                visitor.poll_cancellation()?;
-                let mut iteration_state =
-                    state.at_iteration(body, iteration, false, repeat_count)?;
-                if body
-                    .visit(visitor, &mut iteration_state, expansion)?
-                    .is_break()
-                {
-                    return Ok(ControlFlow::Break(()));
-                }
-            }
-            Ok(ControlFlow::Continue(()))
-        }
     }
 }
 

@@ -3,6 +3,8 @@ use super::super::{
     validate_dem_instruction,
 };
 use super::{MAX_DEM_TEXT_INTEGER, MAX_STIM_NUMBER_TOKEN_BYTES};
+// Kept out of line: inlined into the parse loop it measurably slows every line.
+#[inline(never)]
 pub(super) fn parse_canonical_instruction(line: &str) -> Option<DemInstruction> {
     let (kind, rest) = match line.as_bytes().first().copied()? {
         b'e' => (DemInstructionKind::Error, line.strip_prefix("error")?),

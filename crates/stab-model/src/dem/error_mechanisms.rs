@@ -174,7 +174,6 @@ impl DetectorErrorModel {
         Visitor: DemErrorMechanismVisitor,
     {
         let traversal = FoldedDemTraversal::new(self)?;
-        traversal.validate_repeat_depth("error-mechanism")?;
         let mechanism_count = traversal.root().summary().error_count()?;
         if mechanism_count > limits.max_mechanisms() {
             return Err(DemErrorMechanismVisitError::MechanismLimit {

@@ -10,8 +10,8 @@ use super::coordinate_scan::{
     flattened_detector_declaration_count_up_to,
 };
 use super::traversal::{
-    DemDetectorBounds, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
-    FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates, shifted_targets,
+    CoordinateShifts, DemDetectorBounds, DemRepeatSelection, DemTraversalState, FoldedDemBlock,
+    FoldedDemItem, FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates, shifted_targets,
 };
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
@@ -297,6 +297,7 @@ fn detector_coordinates_for_traversal(
         detector_set: &detector_set,
         coordinates: &mut coordinates,
         pending_truncated: Vec::new(),
+        shifts: CoordinateShifts::default(),
     };
     let _ = traversal.try_visit_with_coordinates(&mut visitor)?;
     for detector in detector_set {
@@ -390,6 +391,7 @@ struct SelectedCoordinateVisitor<'a> {
     detector_set: &'a BTreeSet<DemDetectorId>,
     coordinates: &'a mut BTreeMap<DemDetectorId, Vec<f64>>,
     pending_truncated: Vec<BTreeSet<DemDetectorId>>,
+    shifts: CoordinateShifts,
 }
 
 impl FoldedDemVisitor for SelectedCoordinateVisitor<'_> {
@@ -445,7 +447,7 @@ impl FoldedDemVisitor for SelectedCoordinateVisitor<'_> {
         }
 
         if repeat_body_is_flat(body) {
-            let body_coordinate_shift = body.coordinate_shift()?;
+            let body_coordinate_shift = self.shifts.of(body)?.to_vec();
             find_selected_detector_coordinates_in_flat_repeat_body(
                 repeat,
                 body,
@@ -466,7 +468,7 @@ impl FoldedDemVisitor for SelectedCoordinateVisitor<'_> {
         )?
         .is_some()
         {
-            let body_coordinate_shift = body.coordinate_shift()?;
+            let body_coordinate_shift = self.shifts.of(body)?.to_vec();
             find_selected_detector_coordinates_in_bounded_flattened_repeat_body(
                 repeat,
                 body,

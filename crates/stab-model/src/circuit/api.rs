@@ -6,6 +6,10 @@ use crate::{
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
+mod body_summaries;
+
+use body_summaries::BodySummaries;
+
 impl Circuit {
     pub fn len(&self) -> usize {
         self.items.len()
@@ -418,12 +422,14 @@ fn coordinate_shift_of(circuit: &Circuit) -> ModelResult<Vec<f64>> {
 /// Records the final coordinates of every `QUBIT_COORDS` target, without recursing.
 ///
 /// Entering a repeat body first advances `shift` by all but one iteration of the body's shift and
-/// then visits the body once, as the recursive definition does.
+/// then visits the body once, as the recursive definition does. Each body is entered once, so
+/// its cached shift is released when it is used.
 fn apply_final_qubit_coordinates(
     circuit: &Circuit,
     shift: &mut Vec<f64>,
     coordinates: &mut BTreeMap<QubitId, Vec<f64>>,
 ) -> ModelResult<()> {
+    let mut bodies = BodySummaries::default();
     let mut enclosing = Vec::new();
     let mut items = circuit.items().iter();
     loop {
@@ -445,7 +451,7 @@ fn apply_final_qubit_coordinates(
             }
             Some(CircuitItem::RepeatBlock(repeat)) => {
                 let repeat_count = repeat.repeat_count().get();
-                let body_shift = coordinate_shift_of(repeat.body())?;
+                let body_shift = bodies.take_shift(repeat.body())?;
                 if repeat_count > 1 {
                     add_coordinate_shift_mul(
                         shift,
@@ -469,7 +475,7 @@ fn apply_final_qubit_coordinates(
 struct RepeatScan<'a> {
     body: &'a Circuit,
     body_detector_count: u64,
-    body_shift: Vec<f64>,
+    body_shift: std::rc::Rc<Vec<f64>>,
     used_repetitions: u64,
     repetitions: u64,
 }
@@ -499,8 +505,10 @@ impl DetectorCoordinateScan {
     ///
     /// A repeat block skips whole iterations that cannot contain the next desired detector and
     /// visits its body once per remaining iteration, each visit a stack frame instead of a
-    /// recursive call, with the same checked arithmetic in the same order.
+    /// recursive call, with the same checked arithmetic in the same order. Body detector counts
+    /// and shifts are computed once per scan, so the scan's time is linear in nesting depth.
     fn visit_circuit(&mut self, circuit: &Circuit, shift: &mut Vec<f64>) -> ModelResult<()> {
+        let mut bodies = BodySummaries::default();
         let mut enclosing: Vec<(std::slice::Iter<'_, CircuitItem>, RepeatScan<'_>)> = Vec::new();
         let mut items = circuit.items().iter();
         loop {
@@ -516,8 +524,8 @@ impl DetectorCoordinateScan {
                     let body = repeat.body();
                     let mut scan = RepeatScan {
                         body,
-                        body_detector_count: body.count_detectors()?,
-                        body_shift: coordinate_shift_of(body)?,
+                        body_detector_count: bodies.detector_count(body)?,
+                        body_shift: bodies.shift(body)?,
                         used_repetitions: 0,
                         repetitions: repeat.repeat_count().get(),
                     };
