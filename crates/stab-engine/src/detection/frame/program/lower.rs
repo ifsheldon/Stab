@@ -251,11 +251,19 @@ impl CircuitProgram {
                     admission.entry_count
                 ))
             })?;
+        let mut repeat_markers = Vec::new();
+        repeat_markers
+            .try_reserve_exact(RepeatNestingLimit::HARD_MAX)
+            .map_err(|error| {
+                DetectionError::invalid_sampler_compilation(format!(
+                    "unable to reserve detector-frame repeat markers: {error}"
+                ))
+            })?;
         let mut materializer = Materializer {
             options: admission.options,
             entries,
             arena: ProgramArena::try_with_capacity(admission.arena)?,
-            repeat_markers: ArrayVec::new(),
+            repeat_markers,
             frame_qubit_count: 0,
             actions: FrameCliffordActionCache::default(),
             cliffords: ReferenceCliffordTable::default(),
@@ -266,13 +274,15 @@ impl CircuitProgram {
             TraversalEvent::BeginRepeat(count) => {
                 // A repeat block is its own operation, so nothing fuses across its edges.
                 materializer.noiseless_previous = None;
-                materializer
-                    .repeat_markers
-                    .try_push(PendingRepeat {
-                        count,
-                        marker: None,
-                    })
-                    .map_err(|_| program_shape_error())
+                let markers = &mut materializer.repeat_markers;
+                if markers.len() >= RepeatNestingLimit::HARD_MAX {
+                    return Err(program_shape_error());
+                }
+                markers.push(PendingRepeat {
+                    count,
+                    marker: None,
+                });
+                Ok(())
             }
             TraversalEvent::EndRepeat => materializer.end_repeat(),
         })?;
@@ -415,7 +425,9 @@ struct Materializer<'a> {
     arena: ProgramArena,
     // A repeat marker is emitted only once its body emits an entry, so bodies that lower to
     // nothing vanish without ever exceeding the admitted entry capacity.
-    repeat_markers: ArrayVec<PendingRepeat, { RepeatNestingLimit::HARD_MAX }>,
+    // Heap storage reserved once for the whole nesting envelope: the walk runs on the caller's
+    // stack, which an inline array of every level would dominate.
+    repeat_markers: Vec<PendingRepeat>,
     frame_qubit_count: usize,
     actions: FrameCliffordActionCache,
     cliffords: ReferenceCliffordTable,

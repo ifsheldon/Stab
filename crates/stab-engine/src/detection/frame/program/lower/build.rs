@@ -28,8 +28,18 @@ fn frame_qubit(instruction: &CircuitInstruction, target: &Target) -> DetectionRe
         .ok_or_else(|| unsupported_frame_instruction(instruction))
 }
 
-#[inline(always)]
+/// The out-of-line form the general builder uses, so its arms share one copy of the loop
+/// instead of each widening the builder's frame.
+#[inline(never)]
 fn qubit_targets(
+    instruction: &CircuitInstruction,
+    arena: &mut ProgramArena,
+) -> DetectionResult<ArenaSpan<u32>> {
+    qubit_targets_inline(instruction, arena)
+}
+
+#[inline(always)]
+fn qubit_targets_inline(
     instruction: &CircuitInstruction,
     arena: &mut ProgramArena,
 ) -> DetectionResult<ArenaSpan<u32>> {
@@ -85,11 +95,22 @@ pub(super) fn build_clifford(
     Ok(ProgramInstruction::Clifford {
         frame,
         reference: cliffords.id(instruction.gate())?,
-        targets: qubit_targets(instruction, arena)?,
+        targets: qubit_targets_inline(instruction, arena)?,
     })
 }
 
-#[inline(always)]
+#[inline(never)]
+fn build_clifford_general(
+    instruction: &CircuitInstruction,
+    frame: FrameGate,
+    cliffords: &mut ReferenceCliffordTable,
+    arena: &mut ProgramArena,
+) -> DetectionResult<ProgramInstruction> {
+    build_clifford(instruction, frame, cliffords, arena)
+}
+
+// Only the out-of-line general path calls this, so it is left to the optimizer: forcing it inline
+// puts every arm's temporaries into one caller frame in unoptimized builds.
 pub(super) fn build(
     instruction: &CircuitInstruction,
     kind: EntryKind,
@@ -98,7 +119,7 @@ pub(super) fn build(
     arena: &mut ProgramArena,
 ) -> DetectionResult<ProgramInstruction> {
     Ok(match kind {
-        EntryKind::Clifford(frame) => build_clifford(instruction, frame, cliffords, arena)?,
+        EntryKind::Clifford(frame) => build_clifford_general(instruction, frame, cliffords, arena)?,
         EntryKind::Reset(basis) => ProgramInstruction::Reset {
             basis,
             targets: qubit_targets(instruction, arena)?,
