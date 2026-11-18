@@ -5,9 +5,14 @@
 //! `g` has the local image `(-1)^s prod_j B_j` with `B_j` acting on `t_j`, so its new row is the
 //! signed product of the old rows of the target generators that `G(g)` selects, with `Y` read as
 //! `iXZ`. A `k`-qubit gate therefore rewrites at most `2k` rows with at most `2k` row products
-//! each, `O(k^2 n / 64)` word operations. Rows whose old value another rewritten row still needs
-//! are copied first, and a row whose product includes itself is updated in place.
+//! each, `O(k^2 n / 64)` word operations. A two-qubit gate rewrites its four rows in place with a
+//! shortest compile-time program of row products and swaps; for wider gates, rows whose old value
+//! another rewritten row still needs are copied first, and a row whose product includes itself is
+//! updated in place.
 
+mod program;
+
+use self::program::TwoQubitProgram;
 use super::rows::multiply_row_into;
 use super::small_gate::MAX_SMALL_ARITY;
 use super::{PauliRows, Tableau};
@@ -155,8 +160,9 @@ const SWAP_KEY: TwoQubitKey = key_from_masks([0b0100, 0b1000, 0b0001, 0b0010]);
 /// Prepends any two-qubit gate directly from its eight packed local generator words.
 ///
 /// CX in either direction, CZ, XCX, and SWAP, each with any local Pauli signs, rewrite two rows
-/// with straight-line code; other gates whose rewritten rows only select rows that stay fixed go
-/// through [`prepend_two_qubit_in_place`], and the rest through [`apply_small_masks`].
+/// with straight-line code; every other two-qubit Clifford runs its shortest in-place
+/// [`TwoQubitProgram`], so no two-qubit prepend copies a row.
+#[inline]
 fn prepend_two_qubit(
     rows: &mut PauliRows,
     gate: &Tableau,
@@ -170,7 +176,7 @@ fn prepend_two_qubit(
     };
     let key = two_qubit_key([(x0_x, x0_z), (z0_x, z0_z), (x1_x, x1_z), (z1_x, z1_z)]);
     // Local rows are ordered X_0, X_1, Z_0, Z_1; generators are ordered X_0, Z_0, X_1, Z_1.
-    let [mut negative, ..] = ((local_sign_word & 1)
+    let [negative, ..] = ((local_sign_word & 1)
         | ((local_sign_word & 4) >> 1)
         | ((local_sign_word & 2) << 1)
         | (local_sign_word & 8))
@@ -233,82 +239,15 @@ fn prepend_two_qubit(
             ((old_signs & 0b0011) << 2) | ((old_signs & 0b1100) >> 2)
         }
         _ => {
-            let factors = [0, 4, 8, 12].map(|shift| (key >> shift & 0b1111) as u8);
-            let y_terms = [
-                (x0_x & x0_z).count_ones(),
-                (z0_x & z0_z).count_ones(),
-                (x1_x & x1_z).count_ones(),
-                (z1_x & z1_z).count_ones(),
-            ];
-            if let Some(new_signs) =
-                prepend_two_qubit_in_place(rows, global, factors, y_terms, old_signs)?
-            {
-                new_signs
-            } else {
-                return apply_small_masks(
-                    rows,
-                    4,
-                    global,
-                    factors,
-                    y_terms,
-                    &mut negative,
-                    old_signs,
-                );
-            }
+            // Every two-qubit Clifford has a symplectic key; anything else takes the general
+            // route, which computes the same product.
+            let Some(program) = TwoQubitProgram::of(key) else {
+                return prepend_small(rows, gate, &[q0, q1]);
+            };
+            return program.apply(rows, global, old_signs, negative);
         }
     };
     write_changed_signs(rows, global, old_signs, new_signs ^ negative)
-}
-
-/// Rewrites the rows of a two-qubit gate in place when every rewritten generator keeps its own row
-/// and selects only rows that no generator rewrites, as SQRT_XX and SQRT_ZZ do. Returns
-/// the new signs before the gate's own signs in `X_0, Z_0, X_1, Z_1` order, or `None` without
-/// changing anything when the gate needs saved rows.
-fn prepend_two_qubit_in_place(
-    rows: &mut PauliRows,
-    global: [usize; 4],
-    factors: [u8; 4],
-    y_terms: [u32; 4],
-    old_signs: u8,
-) -> StabilizerResult<Option<u8>> {
-    let mut changed = 0_u8;
-    let mut needed = 0_u8;
-    for (generator, mask) in factors.into_iter().enumerate() {
-        let own = 1_u8 << generator;
-        if mask != own {
-            if mask & own == 0 {
-                return Ok(None);
-            }
-            changed |= own;
-            needed |= mask & !own;
-        }
-    }
-    if needed & changed != 0 {
-        return Ok(None);
-    }
-    let half_words = rows.half_words();
-    let mut new_signs = 0_u8;
-    for (generator, ((mask, y), destination)) in
-        factors.into_iter().zip(y_terms).zip(global).enumerate()
-    {
-        let mut negative = (mask & old_signs).count_ones() % 2 == 1;
-        if changed >> generator & 1 != 0 {
-            let mut log_i = y;
-            // Moving Z_j in front of X_j of the same qubit reverses an anticommuting pair.
-            if generator % 2 == 1 && mask >> (generator - 1) & 1 != 0 {
-                log_i += 2;
-            }
-            for (factor, source) in global.into_iter().enumerate() {
-                if factor != generator && mask >> factor & 1 != 0 {
-                    let (target, source) = rows.row_pair_mut(destination, source)?;
-                    log_i += u32::from(multiply_row_into(target, source, half_words)?);
-                }
-            }
-            negative ^= real_phase_is_negative(log_i)?;
-        }
-        new_signs |= u8::from(negative) << generator;
-    }
-    Ok(Some(new_signs))
 }
 
 /// Swaps the words of two equally wide rows.

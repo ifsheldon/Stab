@@ -157,10 +157,10 @@ fn every_two_qubit_gate_alone_matches_the_references() {
     }
 }
 
-/// The two-qubit gates with dedicated prepend paths (CX both ways, CZ, XCX, SWAP), gates taking the
-/// in-place generic path (SQRT_XX, SQRT_ZZ), and ones needing saved rows (ISWAP, CY), each with
-/// all sixteen output-sign choices, at multi-word widths where the exhaustive test cannot afford
-/// every gate.
+/// The two-qubit gates with dedicated prepend paths (CX both ways, CZ, XCX, SWAP) and gates whose
+/// compile-time programs use only row products (SQRT_XX, SQRT_ZZ, CY) or products and swaps
+/// (ISWAP), each with all sixteen output-sign choices, at multi-word widths where the exhaustive
+/// test cannot afford every gate.
 #[test]
 fn dedicated_two_qubit_prepends_match_composition_with_every_sign_at_wide_widths() {
     let gates: [[&str; 4]; 9] = [
