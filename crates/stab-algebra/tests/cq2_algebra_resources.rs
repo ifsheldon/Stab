@@ -257,7 +257,7 @@ fn caller_budgets_govern_requested_string_widths() {
     let width = 1_000_u64;
     let n = 1_000_usize;
     let pauli = packed_plane_bytes(2, width);
-    let clifford = packed_plane_bytes(6, width) + width;
+    let clifford = packed_plane_bytes(6, width);
 
     assert_eq!(
         assert_exact_boundary(StabilizerResource::PauliString, |budget| {
@@ -316,7 +316,7 @@ fn caller_budgets_govern_requested_string_widths() {
         pauli + width * (size_of::<usize>() + size_of::<PauliBasis>()) as u64
     );
 
-    // Six packed planes plus one table-index byte per gate.
+    // Six packed planes, the only storage a Clifford string holds.
     assert_eq!(
         assert_exact_boundary(StabilizerResource::CliffordString, |budget| {
             CliffordString::identity_with_budget(n, budget)
@@ -343,7 +343,7 @@ fn caller_budgets_govern_requested_string_widths() {
         }),
         clifford
     );
-    // Collected gates are charged their own size beside the planes and table indices.
+    // Collected gates are charged their own size beside the planes.
     assert_collected_boundary(
         StabilizerResource::CliffordString,
         clifford + width * size_of::<SingleQubitClifford>() as u64,

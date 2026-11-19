@@ -4,7 +4,7 @@ use std::ops::RangeBounds;
 
 use crate::gate::GateTargetGroupKind;
 use crate::model_bytes::{PreparedModelText, RecoveredTags, locate_recovered_tag};
-use crate::model_tag::{ItemTag, ModelTag};
+use crate::model_tag::{ItemTag, ModelTag, RecoveredTag};
 use crate::parse_limits::ParseAdmission;
 use crate::target::TargetVec;
 use crate::{
@@ -408,9 +408,10 @@ impl Circuit {
                     "metadata scanner ran out of tags",
                 ));
             };
-            let overhead = ModelTag::opaque_overhead_bytes_of(&bytes);
+            let recovered = RecoveredTag::new(bytes);
+            let overhead = ModelTag::opaque_overhead_bytes_of(&recovered);
             admission.admit_opaque_tag_overhead(overhead, || locate_recovered_tag(input, index))?;
-            *tag = ModelTag::from_bytes(bytes);
+            *tag = ModelTag::from_recovered(recovered);
             Ok(())
         };
         let mut pending = vec![self.items.iter_mut()];

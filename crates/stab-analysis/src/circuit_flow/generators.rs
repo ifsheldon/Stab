@@ -1061,21 +1061,17 @@ fn anticommutes_with_pauli_product(input: &PauliString, measured_product: &Pauli
     })
 }
 
+/// Clears `qubit` from every flow input in place, touching only the flows that have a term there.
 fn clear_input_term(flows: &mut [Flow], qubit: usize) -> AnalysisResult<()> {
     for flow in flows {
-        let mut input = flow.input().clone();
-        if qubit < input.len() {
-            input
-                .set(qubit, PauliBasis::I)
+        if flow
+            .input()
+            .get(qubit)
+            .is_some_and(|basis| basis != PauliBasis::I)
+        {
+            flow.set_input_term(qubit, PauliBasis::I)
                 .map_err(stabilizer_to_circuit_error)?;
         }
-        *flow = Flow::new(
-            input,
-            flow.output().clone(),
-            flow.measurements(),
-            flow.observables(),
-        )
-        .map_err(stabilizer_to_circuit_error)?;
     }
     Ok(())
 }

@@ -6,7 +6,10 @@ use super::{
     PauliBasis, PauliPhase, PauliSign, StabilizerError, StabilizerResource, StabilizerResult,
     Tableau,
 };
-use crate::budget::{AlgebraMemoryBudget, clifford_bytes, try_reserve_one, try_zeroed_words};
+use crate::bit_runs::{extend_periodic, or_bits_at};
+use crate::budget::{
+    AlgebraMemoryBudget, clifford_bytes, try_reserve_one, try_zeroed_words, words_for_bits,
+};
 use crate::kernels::{
     CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words,
 };
@@ -352,21 +355,38 @@ impl CliffordString {
         budget: AlgebraMemoryBudget,
     ) -> StabilizerResult<Self> {
         admit_clifford_planes(budget, num_qubits, 0)?;
-        let plane = || -> StabilizerResult<BitVec> {
-            Ok(BitVec::from_words_truncated(
-                num_qubits,
-                try_zeroed_words(StabilizerResource::CliffordString, num_qubits.div_ceil(64))?,
-            ))
-        };
-        Ok(Self {
-            z_signs: plane()?,
-            x_signs: plane()?,
-            inv_x2x: plane()?,
-            x2z: plane()?,
-            z2x: plane()?,
-            inv_z2z: plane()?,
-            non_identity_count: 0,
-        })
+        Ok(Self::from_plane_words(
+            num_qubits,
+            zeroed_planes(num_qubits)?,
+            0,
+        ))
+    }
+
+    /// Wraps six planes of `len` bits, in table-index bit order, whose tail bits are zero.
+    fn from_plane_words(len: usize, planes: [Vec<u64>; 6], non_identity_count: usize) -> Self {
+        let [z_signs, x_signs, inv_x2x, x2z, z2x, inv_z2z] =
+            planes.map(|words| BitVec::from_words_truncated(len, words));
+        Self {
+            z_signs,
+            x_signs,
+            inv_x2x,
+            x2z,
+            z2x,
+            inv_z2z,
+            non_identity_count,
+        }
+    }
+
+    /// The six planes in table-index bit order: bit `b` of a gate's table index is in plane `b`.
+    fn planes(&self) -> [&BitVec; 6] {
+        [
+            &self.z_signs,
+            &self.x_signs,
+            &self.inv_x2x,
+            &self.x2z,
+            &self.z2x,
+            &self.inv_z2z,
+        ]
     }
 
     pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
@@ -390,8 +410,8 @@ impl CliffordString {
         Self::from_gates_with_budget(gates, AlgebraMemoryBudget::DEFAULT)
     }
 
-    /// Collects Clifford gates, refusing the first item whose collected gates, table indices, and
-    /// packed planes would exceed `budget`.
+    /// Collects Clifford gates, refusing the first item whose collected gates and packed planes
+    /// would exceed `budget`.
     pub fn from_gates_with_budget(
         gates: impl IntoIterator<Item = SingleQubitClifford>,
         budget: AlgebraMemoryBudget,
@@ -407,28 +427,36 @@ impl CliffordString {
             try_reserve_one(StabilizerResource::CliffordString, &mut collected)?;
             collected.push(gate);
         }
-        Ok(Self::from_collected_gates(collected))
+        Self::from_gate_slice(&collected)
     }
 
-    fn from_collected_gates(gates: Vec<SingleQubitClifford>) -> Self {
-        let table_indices = gates
-            .into_iter()
-            .map(SingleQubitClifford::table_index)
-            .collect::<Vec<_>>();
-        Self::from_table_indices(&table_indices)
-    }
-
-    fn from_table_indices(table_indices: &[u8]) -> Self {
-        let plane = |bit| BitVec::from_bits(table_indices.iter().map(move |code| code & bit != 0));
-        Self {
-            z_signs: plane(1 << 0),
-            x_signs: plane(1 << 1),
-            inv_x2x: plane(1 << 2),
-            x2z: plane(1 << 3),
-            z2x: plane(1 << 4),
-            inv_z2z: plane(1 << 5),
-            non_identity_count: table_indices.iter().filter(|code| **code != 0).count(),
+    /// Packs `gates` straight into fallibly reserved planes.
+    fn from_gate_slice(gates: &[SingleQubitClifford]) -> StabilizerResult<Self> {
+        let mut planes = zeroed_planes(gates.len())?;
+        let mut non_identity_count = 0_usize;
+        for (word_index, chunk) in gates.chunks(u64::BITS as usize).enumerate() {
+            let mut packed = [0_u64; 6];
+            for (bit_index, gate) in chunk.iter().enumerate() {
+                let code = gate.table_index();
+                non_identity_count += usize::from(code != 0);
+                for (plane_bit, word) in packed.iter_mut().enumerate() {
+                    *word |= u64::from((code >> plane_bit) & 1) << bit_index;
+                }
+            }
+            for (plane, word) in planes.iter_mut().zip(packed) {
+                *plane.get_mut(word_index).ok_or(StabilizerError::Bit(
+                    BitError::BitIndexOutOfRange {
+                        index: word_index * u64::BITS as usize,
+                        len: gates.len(),
+                    },
+                ))? = word;
+            }
         }
+        Ok(Self::from_plane_words(
+            gates.len(),
+            planes,
+            non_identity_count,
+        ))
     }
 
     /// Creates a random string of independent single-qubit Clifford gates.
@@ -561,10 +589,19 @@ impl CliffordString {
                 right: rhs.len(),
             })?;
         admit_clifford_planes(budget, new_len, 0)?;
-        let mut table_indices = self.table_indices()?;
-        table_indices.reserve(rhs.len());
-        table_indices.extend(rhs.table_indices()?);
-        Ok(Self::from_table_indices(&table_indices))
+        let non_identity_count = self
+            .non_identity_count
+            .checked_add(rhs.non_identity_count)
+            .ok_or(StabilizerError::InconsistentCliffordStringMetadata)?;
+        let mut planes = zeroed_planes(new_len)?;
+        for (target, (left, right)) in planes
+            .iter_mut()
+            .zip(self.planes().into_iter().zip(rhs.planes()))
+        {
+            or_bits_at(target, 0, left.words(), self.len())?;
+            or_bits_at(target, self.len(), right.words(), rhs.len())?;
+        }
+        Ok(Self::from_plane_words(new_len, planes, non_identity_count))
     }
 
     /// Repeats this string, admitting the result against [`AlgebraMemoryBudget::DEFAULT`].
@@ -593,14 +630,16 @@ impl CliffordString {
                     repetitions,
                 })?;
         admit_clifford_planes(budget, new_len, 0)?;
-        let source = self.table_indices()?;
-        let table_indices = source
-            .iter()
-            .copied()
-            .cycle()
-            .take(new_len)
-            .collect::<Vec<_>>();
-        Ok(Self::from_table_indices(&table_indices))
+        let non_identity_count = self
+            .non_identity_count
+            .checked_mul(repetitions)
+            .ok_or(StabilizerError::InconsistentCliffordStringMetadata)?;
+        let mut planes = zeroed_planes(new_len)?;
+        for (target, source) in planes.iter_mut().zip(self.planes()) {
+            or_bits_at(target, 0, source.words(), self.len())?;
+            extend_periodic(target, self.len(), new_len)?;
+        }
+        Ok(Self::from_plane_words(new_len, planes, non_identity_count))
     }
 
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<Self> {
@@ -674,20 +713,9 @@ impl CliffordString {
         self.inv_z2z.set(index, table_index & (1 << 5) != 0)?;
         Ok(())
     }
-
-    fn table_indices(&self) -> StabilizerResult<Vec<u8>> {
-        (0..self.len())
-            .map(|index| {
-                self.gate_at(index)
-                    .map(SingleQubitClifford::table_index)
-                    .ok_or(StabilizerError::InvalidSingleQubitCliffordProduct)
-            })
-            .collect()
-    }
 }
 
-/// Admits the six planes of a `num_qubits`-gate string, its one-byte table indices, and `extra`
-/// bytes against `budget`.
+/// Admits the six planes of a `num_qubits`-gate string and `extra` bytes against `budget`.
 fn admit_clifford_planes(
     budget: AlgebraMemoryBudget,
     num_qubits: usize,
@@ -695,8 +723,20 @@ fn admit_clifford_planes(
 ) -> StabilizerResult<()> {
     budget.admit(
         StabilizerResource::CliffordString,
-        clifford_bytes(num_qubits) + num_qubits as u128 + extra,
+        clifford_bytes(num_qubits) + extra,
     )
+}
+
+/// Reserves six zeroed planes of `num_qubits` bits fallibly; these are the only storage a string
+/// holds, so they are exactly what [`admit_clifford_planes`] charged.
+fn zeroed_planes(num_qubits: usize) -> StabilizerResult<[Vec<u64>; 6]> {
+    let plane = || {
+        try_zeroed_words(
+            StabilizerResource::CliffordString,
+            words_for_bits(num_qubits),
+        )
+    };
+    Ok([plane()?, plane()?, plane()?, plane()?, plane()?, plane()?])
 }
 
 fn prefix_mut(words: &mut [u64], len: usize) -> StabilizerResult<&mut [u64]> {
@@ -898,6 +938,96 @@ mod tests {
             assert_eq!(value.non_identity_count, width - index - 1);
         }
         assert_eq!(value, CliffordString::identity_unchecked(width));
+    }
+
+    fn random_gates(len: usize, rng: &mut SmallRng) -> Vec<SingleQubitClifford> {
+        (0..len)
+            .map(|_| SingleQubitClifford::random(&mut *rng))
+            .collect()
+    }
+
+    /// Checks `value` against the scalar reference `expected`, gate by gate, and that every plane
+    /// keeps the bits past its length zero.
+    fn assert_matches_gates(value: &CliffordString, expected: &[SingleQubitClifford], label: &str) {
+        assert_eq!(value.len(), expected.len(), "{label}");
+        for (index, gate) in expected.iter().enumerate() {
+            assert_eq!(value.gate_at(index), Some(*gate), "{label} index={index}");
+        }
+        let non_identity = expected
+            .iter()
+            .filter(|gate| **gate != SingleQubitClifford::I)
+            .count();
+        assert_eq!(value.non_identity_count, non_identity, "{label}");
+        let tail = value.len() % u64::BITS as usize;
+        for plane in value.planes() {
+            assert_eq!(plane.word_count(), value.len().div_ceil(64), "{label}");
+            if tail != 0 {
+                assert_eq!(plane.words().last().unwrap() >> tail, 0, "{label}");
+            }
+        }
+    }
+
+    #[test]
+    fn concat_matches_scalar_reference_at_unaligned_lengths() {
+        let mut rng = SmallRng::seed_from_u64(0xc0_ca7);
+        let lengths = [0, 1, 37, 63, 64, 65, 127, 129, 200];
+        for left_len in lengths {
+            for right_len in lengths {
+                let left_gates = random_gates(left_len, &mut rng);
+                let right_gates = random_gates(right_len, &mut rng);
+                let left = CliffordString::from_gates(left_gates.iter().copied()).unwrap();
+                let right = CliffordString::from_gates(right_gates.iter().copied()).unwrap();
+
+                let joined = left.concat(&right).unwrap();
+
+                let expected = [left_gates, right_gates].concat();
+                assert_matches_gates(&joined, &expected, &format!("{left_len}+{right_len}"));
+            }
+        }
+    }
+
+    #[test]
+    fn repeat_matches_scalar_reference_for_word_boundary_patterns() {
+        let mut rng = SmallRng::seed_from_u64(0x007e_9ea7);
+        for pattern_len in [1, 3, 63, 64, 65, 130] {
+            let gates = random_gates(pattern_len, &mut rng);
+            let pattern = CliffordString::from_gates(gates.iter().copied()).unwrap();
+            for repetitions in [1, 2, 3, 64, 65, 131] {
+                let repeated = pattern.repeat(repetitions).unwrap();
+
+                let expected = gates
+                    .iter()
+                    .copied()
+                    .cycle()
+                    .take(pattern_len * repetitions)
+                    .collect::<Vec<_>>();
+                assert_matches_gates(
+                    &repeated,
+                    &expected,
+                    &format!("pattern={pattern_len} repetitions={repetitions}"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn concat_and_repeat_allocate_only_the_admitted_planes() {
+        let mut rng = SmallRng::seed_from_u64(0x000a_110c);
+        let left = CliffordString::from_gates(random_gates(1_000, &mut rng)).unwrap();
+        let right = CliffordString::from_gates(random_gates(77, &mut rng)).unwrap();
+        let held = |len: usize| u64::try_from(clifford_bytes(len)).unwrap();
+
+        let mut joined = None;
+        let allocations = allocation_counter::measure(|| joined = Some(left.concat(&right)));
+        assert_eq!(allocations.count_total, 6, "{allocations:?}");
+        assert_eq!(allocations.bytes_total, held(1_077), "{allocations:?}");
+        assert_eq!(joined.unwrap().unwrap().len(), 1_077);
+
+        let mut repeated = None;
+        let allocations = allocation_counter::measure(|| repeated = Some(right.repeat(1_000)));
+        assert_eq!(allocations.count_total, 6, "{allocations:?}");
+        assert_eq!(allocations.bytes_total, held(77_000), "{allocations:?}");
+        assert_eq!(repeated.unwrap().unwrap().len(), 77_000);
     }
 
     #[test]

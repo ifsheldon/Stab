@@ -37,6 +37,7 @@ use traversal::FoldedDemTraversal;
 
 use crate::circuit::printing::DemFloatCache;
 use crate::model_bytes::{PreparedModelText, RecoveredTags, locate_recovered_tag};
+use crate::model_tag::RecoveredTag;
 use crate::parse_limits::ParseAdmission;
 use crate::{
     AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
@@ -294,9 +295,10 @@ impl DetectorErrorModel {
                     "metadata scanner ran out of tags",
                 ));
             };
-            let overhead = DemTag::opaque_overhead_bytes_of(&bytes);
+            let recovered = RecoveredTag::new(bytes);
+            let overhead = DemTag::opaque_overhead_bytes_of(&recovered);
             admission.admit_opaque_tag_overhead(overhead, || locate_recovered_tag(input, index))?;
-            *tag = DemTag::from_bytes(bytes);
+            *tag = DemTag::from_recovered(recovered);
             Ok(())
         };
         let mut pending = vec![self.items.iter_mut()];

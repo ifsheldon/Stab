@@ -96,6 +96,15 @@ impl Flow {
         &self.output
     }
 
+    /// Replaces the input term at `index` with `basis` in place.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StabilizerError::Bit`] when `index` is outside the input string.
+    pub fn set_input_term(&mut self, index: usize, basis: PauliBasis) -> StabilizerResult<()> {
+        self.input.set(index, basis)
+    }
+
     pub fn measurements(&self) -> impl Iterator<Item = i32> + '_ {
         self.measurements
             .iter()

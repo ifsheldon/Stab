@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use arrayvec::ArrayString;
 
 use crate::model_tag::{
-    lossy_display, lossy_display_len, write_escaped_tag_bytes, write_escaped_tag_text,
+    RecoveredTag, lossy_display, write_escaped_tag_bytes, write_escaped_tag_text,
 };
 
 const INLINE_DEM_TAG_BYTES: usize = 16;
@@ -43,29 +43,25 @@ impl DemTag {
     }
 
     pub(super) fn from_bytes(tag: Vec<u8>) -> Option<Self> {
-        if tag.is_empty() {
-            return None;
-        }
-        match String::from_utf8(tag) {
-            Ok(tag) => Self::from_string(tag),
-            Err(error) => {
-                let bytes = error.into_bytes().into_boxed_slice();
+        Self::from_recovered(RecoveredTag::new(tag))
+    }
+
+    /// Builds the tag from bytes validated once by [`RecoveredTag::new`].
+    pub(super) fn from_recovered(tag: RecoveredTag) -> Option<Self> {
+        match tag {
+            RecoveredTag::Text(tag) => Self::from_string(tag),
+            RecoveredTag::Opaque(bytes) => {
+                let bytes = bytes.into_boxed_slice();
                 let display = lossy_display(&bytes);
                 Some(Self::Opaque(Box::new(OpaqueDemTag { bytes, display })))
             }
         }
     }
 
-    /// Bytes an opaque tag of `bytes` retains beyond the tag charge every tag pays: its display
-    /// text and the record holding both; zero for valid UTF-8.
-    ///
-    /// The display replaces each invalid sequence with U+FFFD, so it can take three bytes per
-    /// source byte.
-    pub(super) fn opaque_overhead_bytes_of(bytes: &[u8]) -> usize {
-        if std::str::from_utf8(bytes).is_ok() {
-            return 0;
-        }
-        lossy_display_len(bytes).saturating_add(size_of::<OpaqueDemTag>())
+    /// Bytes `tag` will retain as a DEM tag beyond the tag charge every tag pays; see
+    /// [`RecoveredTag::opaque_overhead_bytes`].
+    pub(super) fn opaque_overhead_bytes_of(tag: &RecoveredTag) -> usize {
+        tag.opaque_overhead_bytes(size_of::<OpaqueDemTag>())
     }
 
     /// [`Self::opaque_overhead_bytes_of`] for this tag.

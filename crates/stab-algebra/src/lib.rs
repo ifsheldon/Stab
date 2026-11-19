@@ -1,5 +1,6 @@
 //! Stable Pauli, Clifford, tableau, and stabilizer-flow algebra.
 
+mod bit_runs;
 mod budget;
 mod clifford;
 mod conversions;

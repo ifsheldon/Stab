@@ -204,13 +204,56 @@ impl Display for PauliBasis {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// What a Pauli string knows about whether any of its terms is not the identity.
+///
+/// Clearing a term cannot tell whether it was the last one without a scan, so it leaves the
+/// answer unresolved and [`PauliString::has_no_pauli_terms`] scans only when asked. A run of
+/// clears, such as undoing a wide reset, then costs one scan instead of one per term.
+#[derive(Clone, Copy, Debug)]
+enum TermPresence {
+    Absent,
+    Present,
+    Unresolved,
+}
+
+impl TermPresence {
+    const fn known(has_terms: bool) -> Self {
+        if has_terms {
+            Self::Present
+        } else {
+            Self::Absent
+        }
+    }
+
+    /// The presence after one term was written with `basis`; `old_was_identity` is `None` when
+    /// the previous basis is unknown.
+    const fn after_write(self, old_was_identity: Option<bool>, basis: PauliBasis) -> Self {
+        match basis {
+            PauliBasis::X | PauliBasis::Y | PauliBasis::Z => Self::Present,
+            PauliBasis::I => match (self, old_was_identity) {
+                (Self::Absent, _) | (_, Some(true)) => self,
+                _ => Self::Unresolved,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct PauliString {
     sign: PauliSign,
     xs: BitVec,
     zs: BitVec,
-    has_terms: bool,
+    terms: TermPresence,
 }
+
+impl PartialEq for PauliString {
+    /// Compares sign and terms; the cached term presence is derived from the terms.
+    fn eq(&self, rhs: &Self) -> bool {
+        self.sign == rhs.sign && self.xs == rhs.xs && self.zs == rhs.zs
+    }
+}
+
+impl Eq for PauliString {}
 
 impl PauliString {
     /// Creates an all-identity string admitted against [`AlgebraMemoryBudget::DEFAULT`].
@@ -237,7 +280,7 @@ impl PauliString {
                 num_qubits,
                 try_zeroed_words(StabilizerResource::PauliString, words)?,
             ),
-            has_terms: false,
+            terms: TermPresence::Absent,
         })
     }
 
@@ -246,7 +289,7 @@ impl PauliString {
             sign: PauliSign::Plus,
             xs: BitVec::zeros(num_qubits),
             zs: BitVec::zeros(num_qubits),
-            has_terms: false,
+            terms: TermPresence::Absent,
         }
     }
 
@@ -336,7 +379,7 @@ impl PauliString {
             sign,
             xs: BitVec::from_words_truncated(bases.len(), x_words),
             zs: BitVec::from_words_truncated(bases.len(), z_words),
-            has_terms,
+            terms: TermPresence::known(has_terms),
         }
     }
 
@@ -374,11 +417,9 @@ impl PauliString {
         let old_basis = self.get_or_error(index)?;
         self.xs.set(index, basis.x_bit())?;
         self.zs.set(index, basis.z_bit())?;
-        match (old_basis == PauliBasis::I, basis == PauliBasis::I) {
-            (true, false) => self.has_terms = true,
-            (false, true) => self.has_terms = bits_have_terms(&self.xs, &self.zs),
-            _ => {}
-        }
+        self.terms = self
+            .terms
+            .after_write(Some(old_basis == PauliBasis::I), basis);
         Ok(())
     }
 
@@ -395,7 +436,7 @@ impl PauliString {
         };
         self.xs = BitVec::from_words_truncated(len, random_words(len, rng));
         self.zs = BitVec::from_words_truncated(len, random_words(len, rng));
-        self.has_terms = bits_have_terms(&self.xs, &self.zs);
+        self.terms = TermPresence::known(bits_have_terms(&self.xs, &self.zs));
     }
 
     pub fn x_bits(&self) -> &[u64] {
@@ -415,25 +456,29 @@ impl PauliString {
             .sum()
     }
 
+    /// Whether every term is the identity.
+    ///
+    /// This is constant time unless a term was cleared since the presence was last known, in
+    /// which case it scans the planes up to the first non-identity term.
     #[inline]
     pub fn has_no_pauli_terms(&self) -> bool {
-        !self.has_terms
+        match self.terms {
+            TermPresence::Absent => true,
+            TermPresence::Present => false,
+            TermPresence::Unresolved => !bits_have_terms(&self.xs, &self.zs),
+        }
     }
 
     pub(crate) fn set_in_bounds(&mut self, index: usize, basis: PauliBasis) {
         self.write_basis_in_bounds(index, basis);
-        if basis == PauliBasis::I {
-            self.has_terms = bits_have_terms(&self.xs, &self.zs);
-        } else {
-            self.has_terms = true;
-        }
+        self.terms = self.terms.after_write(None, basis);
     }
 
     pub(crate) fn clear_known_terms(&mut self, positions: &[usize]) {
         for position in positions.iter().copied() {
             self.write_basis_in_bounds(position, PauliBasis::I);
         }
-        self.has_terms = false;
+        self.terms = TermPresence::Absent;
     }
 
     fn write_basis_in_bounds(&mut self, index: usize, basis: PauliBasis) {
@@ -495,7 +540,7 @@ impl PauliString {
                 sign: self.sign,
                 xs: BitVec::from_words_truncated(rhs.len(), self.xs.words().to_vec()),
                 zs: BitVec::from_words_truncated(rhs.len(), self.zs.words().to_vec()),
-                has_terms: self.has_terms,
+                terms: self.terms,
             }
         };
         let log_i = value.right_multiply_in_place_returning_log_i_scalar(rhs)?;
@@ -556,7 +601,7 @@ impl PauliString {
                     right: right_len,
                 })?;
         let product = pauli_right_multiply_words(left_x, left_z, rhs.xs.words(), rhs.zs.words())?;
-        self.has_terms = trailing_has_terms || product.has_terms;
+        self.terms = TermPresence::known(trailing_has_terms || product.has_terms);
 
         let log_i = product.log_i ^ (u8::from(rhs.sign.is_negative()) << 1);
         Ok(log_i & 3)
@@ -633,12 +678,12 @@ impl PauliString {
                 right: zs.len(),
             });
         }
-        let has_terms = bits_have_terms(&xs, &zs);
+        let terms = TermPresence::known(bits_have_terms(&xs, &zs));
         Ok(Self {
             sign,
             xs,
             zs,
-            has_terms,
+            terms,
         })
     }
 
@@ -1089,5 +1134,39 @@ mod tests {
 
         assert_eq!(log_i, 0);
         assert_eq!(left.to_string(), "+X__");
+    }
+
+    #[test]
+    fn clearing_terms_keeps_identity_detection_exact() {
+        let width = 1_000;
+        let mut value = PauliString::from_bases_unchecked(
+            PauliSign::Plus,
+            [PauliBasis::X, PauliBasis::Y, PauliBasis::Z]
+                .into_iter()
+                .cycle()
+                .take(width),
+        );
+        // Clear from both ends so the last surviving term sits in a middle word.
+        for index in (0..width / 2).chain((width / 2 + 1..width).rev()) {
+            value.set(index, PauliBasis::I).unwrap();
+            assert!(!value.has_no_pauli_terms(), "index={index}");
+        }
+        value.set(width / 2, PauliBasis::I).unwrap();
+        assert!(value.has_no_pauli_terms());
+        assert_eq!(value, PauliString::identity_unchecked(width));
+
+        // An identity right operand reached by clearing still takes the identity fast path.
+        let mut left = PauliString::from_bases_unchecked(PauliSign::Plus, [PauliBasis::Y; 3]);
+        assert_eq!(
+            left.right_multiply_in_place_returning_log_i_scalar(&value)
+                .unwrap(),
+            0
+        );
+        assert_eq!(left.to_string(), format!("+YYY{}", "_".repeat(width - 3)));
+
+        value.set(7, PauliBasis::Z).unwrap();
+        assert!(!value.has_no_pauli_terms());
+        value.set_in_bounds(7, PauliBasis::I);
+        assert!(value.has_no_pauli_terms());
     }
 }
