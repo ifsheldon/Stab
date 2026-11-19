@@ -7,6 +7,7 @@ This directory contains Stab's active plans, architecture records, generated par
 - [plans/GOAL.md](plans/GOAL.md) is the short current execution contract.
 - [plans/stim-core-parity-and-lean-evidence-plan.md](plans/stim-core-parity-and-lean-evidence-plan.md) owns the scope, the active milestone, the test contract, and the acceptance criteria.
 - [plans/open-items.md](plans/open-items.md) lists known gaps that no milestone owns.
+- [plans/review-fix-plan.md](plans/review-fix-plan.md) is the draft plan for the findings of the 2026-11-19 code review.
 - [stim-parity.md](stim-parity.md) is the generated Stim v1.16.0 feature and evidence view. Its source is `oracle/stim-v1.16-parity.toml` and the bounded family fragments it names.
 - [architecture/](architecture/) owns durable product dependency rules and architecture decisions.
 - [MIGRATING-0.2.md](MIGRATING-0.2.md) covers the component-crate and public-path migration.

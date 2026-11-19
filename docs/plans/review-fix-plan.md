@@ -1,0 +1,212 @@
+# Review Fix Plan
+
+This plan covers the findings of the code review run on 2026-11-19 against commit `c7e3a679`.
+It is a draft for approval; no code has been changed.
+Each finding is marked **verified** when the main session reproduced it or traced it in the code, and **reported** when only a reviewer did.
+A reported finding is reproduced first, and dropped from the plan with a note if it does not hold.
+Timings quoted here are shared-host diagnostics and promote no performance claim.
+
+## Priority Rule
+
+`AGENTS.md` ranks the project's goals in three tiers, and a higher tier wins.
+
+1. Good, well-designed, and correct APIs; performance comparable to or better than Stim; and a well-designed modular architecture.
+2. Stim compatibility.
+3. Backward compatibility.
+
+A step therefore chooses the design that is right even when it changes a public signature, and a deliberate difference from Stim is recorded in the parity ledger as a design choice.
+Every public change still gets its `docs/MIGRATING-0.2.md` note, because `AGENTS.md` requires documentation to move with the API.
+
+## Decisions Needed Before Work Starts
+
+Each decision has a recommended answer, and the plan below assumes it.
+
+1. **`m2d --ran_without_feedback` on non-deterministic detectors.** Recommended: reject, in the library function as well as the CLI, with no lenient mode. Good design and Stim agree here: a detector that anticommutes with a reset has no defined value, so a converted circuit that keeps it is wrong.
+2. **Piped `--replay_err_in`.** Recommended: accept a non-seekable replay input whenever the whole replay fits in the retained store, and keep the current refusal only when records were declined. The alternative is to keep refusing every pipe and record a divergence.
+3. **Device files in the same-file guard.** Recommended: exempt paths that are not regular files (character devices such as `/dev/null`, FIFOs), which is the rule the standard-stream guard already follows.
+4. **`--fold_loops` when the period search does not fit the budget.** Recommended: fall back to unrolling, as Stim does when its hare fails.
+5. **Library reference-sample APIs that return `Vec<bool>`.** Recommended: change them to return a packed, typed reference sample. The earlier draft kept the signatures to avoid a break; under the priority rule that reason no longer holds, and a byte per measurement is the wrong shape for a value every consumer immediately packs.
+6. **PTB64 trailing partial group in `convert`.** Recommended: document only. Every streaming conversion leaves partial output when the input turns out malformed late, so a precheck for this one case would be inconsistent and impossible on a pipe.
+7. **`DemTarget` redesign.** Recommended: schedule it (step C9) instead of deferring it. The earlier draft deferred it because it is a public `stab-model` type.
+
+## Settled: Overflowing `--shots` And `--seed`
+
+Stab's usage error is the right behaviour and stays.
+Pinned Stim also rejects these values: `9223372036854775808`, `18446744073709551615`, and `99999999999999999999999` all exit 1 with "Got non-int64 value".
+Only exactly `18446744073709551616` slips through Stim's overflow check and is read as zero, so `--seed 2^64` samples with seed 0 and `--shots 2^64` prints nothing with exit 0.
+That is a Stim defect, not a contract, and rejecting every unrepresentable value is recorded as a deliberate design choice.
+This is done: the `cli.argument-values` ledger family and the generated `docs/stim-parity.md` row now cover it, and its test `tests::args::empty_and_missing_flag_values_are_rejected` includes the `2^64` cases for `--shots` and `--seed`.
+
+## Phase A: Stim Compatibility
+
+One commit per step unless noted.
+Every step that changes CLI behaviour updates the parity ledger source under `oracle/stim-v1.16-parity/` and regenerates `docs/stim-parity.md` with `just oracle::parity-render`.
+
+### A1. Reject non-deterministic detectors in `m2d --ran_without_feedback` (verified)
+
+- **Now:** `circuit_with_inlined_feedback_with_limits` builds `SparseReverseFrameTracker::new(..., false)` at `crates/stab-analysis/src/circuit_feedback.rs:79`, so anticommutation never fails. Stim's `WithoutFeedbackHelper` uses the failing default.
+- **Repro:** `R 0`, `H 0`, `M 0`, `DETECTOR rec[-1]` with `m2d --ran_without_feedback`. Stim exits 1; Stab exits 0 and prints records.
+- **Change:** pass `true`, so `circuit_with_inlined_feedback` and `circuit_with_inlined_feedback_with_limits` reject such circuits for every caller, and check that the tracker's anticommutation error surfaces as a typed circuit-validation error (exit 1 on the CLI), not as an internal error.
+- **No lenient mode:** the function has one correct behaviour, so no option is added. If the literal `bool` on `SparseReverseFrameTracker::new` has no remaining caller that passes `false`, remove the parameter; if it has, replace it with a two-variant enum so call sites say what they mean.
+- **Tests:** an oracle fixture row for the detector case and for `OBSERVABLE_INCLUDE(0) Y0` after `M 0`, comparing exit status and stderr class against pinned Stim; a deterministic-feedback circuit that must still convert.
+- **Docs:** `docs/MIGRATING-0.2.md` for the stricter library behaviour.
+
+### A2. Accept piped replay input when nothing needs a second pass (verified)
+
+- **Now:** `validate_replay_input` in `crates/stab-cli/src/sample_dem.rs` always calls `input.seek_to(offset)`, so `--replay_err_in /dev/stdin` fails with "Illegal seek" even when the store kept every record.
+- **Change:** have `retain_or_skip_all` report whether any record was declined. Seek only in that case. When nothing was declined, delivery reads the store alone and never touches the input again.
+- **Unchanged:** a non-seekable input whose replay does not fit the budget still fails before any output exists, with a message that names the cause and suggests a larger `--memory-budget` or a regular file, instead of the bare OS error.
+- **Tests:** piped replay for `01`, `b8`, `r8`, HITS, and DETS matches the file-backed output byte for byte; a piped replay under a budget too small to retain it fails with no output file created.
+- **Docs:** the two-pass replay paragraph in `docs/architecture/README.md` (currently says the seek happens unconditionally) and the function's doc comment.
+
+### A3. Let two outputs name the same device (verified)
+
+- **Now:** `crates/stab-cli/src/io_plan.rs:416` treats any two existing paths with the same identity as an alias, so `--out /dev/null --obs_out /dev/null` is refused. Stim accepts it.
+- **Change:** apply the path guard only when the shared target is a regular file. The guard exists to stop one output truncating another file role; a device or FIFO cannot be truncated that way.
+- **Keep:** symlinks to a regular file, hardlinks, and normalized paths are still refused. The file type is taken from the opened handle, not from a second path lookup, so there is no window between the check and the open.
+- **Tests:** `/dev/null` for both outputs succeeds on each command that has two output roles; the four existing identity rows still pass.
+- **Docs:** the contract text of the `resource-safety.cli-file-*-identities` ledger rows says "every active file-role pairing"; narrow it to regular files.
+
+### A4. Ledger the 32-term decomposition divergence (verified)
+
+- **Now:** Stim's `brute_force_decomp_helper` shifts a plain `int`, so a component with 32 or more terms loses terms (`D33` is dropped on a 34-term case). Stab shifts a `u64` and is correct. Nothing records this.
+- **Change:** no code change. Add a `stim-bug` divergence family next to `analysis.circuit-to-dem-error-decomposition`, with the pinned reproduction, and a Stab regression test on a component of at least 33 terms asserting that the printed components XOR back to the original error.
+- **Check:** what Stab does at 64 or more terms, where its own `u64` mask would run out. It must be a typed error or a wider path, not a wrong answer or a panic.
+
+### A5. Document the PTB64 partial-output behaviour (reported)
+
+- Reproduce a 70-record `01` to PTB64 conversion leaving a 56-byte file and exit 1.
+- Extend the existing PTB64 divergence row's rationale to say that complete groups are written before a trailing partial group is refused.
+
+### A6. Ledger the `2^64` argument divergence (done)
+
+- Done as described under "Settled" above; it is uncommitted and goes in with the A4 and A5 ledger commit.
+
+## Phase B: Memory Budget And Cancellation
+
+These are hostile-input policy fixes: admission before allocation, fallible allocation, and bounded unpolled work.
+Each adds a row or sentence to `docs/architecture/resource-policy-inventory.md`, and a `docs/MIGRATING-0.2.md` note where a previously accepted budget is now refused.
+
+### B1. Charge `m2d`'s input record batches (reported, with a measured repro)
+
+- **Now:** the measurement reader in `crates/stab-cli/src/detection.rs` grows to `M2D_BATCH_SHOTS` (256) records and the sweep reader does the same; neither is admitted. The reviewer measured a 39 MB peak under `--memory-budget 16MiB` on a one-million-wide measurement.
+- **Change:** before `io.activate()`, admit `RecordStreamStorage::new(format, width, batch).bytes()` for the measurement reader and the sweep reader, the way `ConvertStorage::admit` does. When the full 256-record batch does not fit, cap the batch growth at the largest power of two that does, so a wide circuit under a small budget still runs with smaller batches instead of being refused outright.
+- **Why capping is safe:** `m2d` output does not depend on batch size.
+- **Tests:** the wide-measurement case under a small budget stays under it (assert on the admitted bytes, not RSS); output is byte-identical across batch caps.
+
+### B2. Stop the bounded reader doubling past its cap (verified)
+
+- **Change:** `input.try_reserve(grown)` becomes `try_reserve_exact(grown)` at `crates/stab-cli/src/input.rs:168`. The geometric growth is already in `grown`.
+- **Test:** a reader that reports its largest requested capacity, fed one byte more than the cap.
+
+### B3. Give the reverse tracker the analyzer's held bytes (verified)
+
+- **Now:** `sync_error_budget_base` in `circuit_to_dem/reverse_fold.rs:104` sets the accumulator's base only. The tracker's base stays zero during circuit-to-DEM, so it can grow against the whole budget on top of the output already held; the overrun is caught only at the end of the instruction. `circuit_detecting_regions.rs` already sets the tracker's base correctly.
+- **Change:** also call `self.tracker.set_base_bytes(output_bytes + errors.admitted_bytes())` in the same function.
+- **Test:** the reviewer's `budget2.stim` shape, asserting the refusal reports a need no larger than the budget plus one growth step.
+- **Risk:** some circuits near the limit that completed by luck will now be refused earlier. That is the intended contract; note it in the migration guide.
+
+### B4. Fall back to unrolling when the fold search does not fit (verified)
+
+- **Now:** `search_shifted_recurrence` returns a budget error when three tracker copies do not fit, so `--fold_loops` refuses a circuit that the unfolded run completes under the same budget.
+- **Change:** a memory-budget refusal raised by the search's own checks or by a probe step returns `ShiftedRecurrenceSearch::Exhausted`, after dropping both clones. Cancellation and every other error still propagate. A genuine shortage then resurfaces from the unrolled run with its real numbers.
+- **Test:** the `foldbudget.stim` shape succeeds with `--fold_loops` and produces the same DEM as without it.
+
+### B5. Return a packed reference sample from the library (reported)
+
+- **Now:** `try_reference_sample`, `circuit_reference_sample`, and `reference_measurement_record_with_sweep_into` in `stab-engine`'s `sampling` module build a `Vec<bool>`, one byte per measurement, with no budget check, while admission charges only the packed bits; the sweep path builds it twice.
+- **Change:** make the packed record the public value. A `ReferenceSample` type owns the packed words and the measurement count, offers `len`, `get(index)`, an iterator of bits, and a borrowed word view, and is what the plan already caches, so `try_reference_sample` returns a shared handle to the cached value instead of copying it.
+- **Sweep input:** take the sweep record as packed bits too, through a typed constructor that checks the width, so the function no longer accepts a `&[bool]` of the wrong length.
+- **Callers:** update `m2d`'s reference path, the reference-sample tree, and tests; remove `to_bools` and the `Vec<bool>` buffer helpers if nothing else uses them.
+- **Result:** the admitted bytes are the allocated bytes, and the under-charge disappears instead of being papered over.
+- **Check first:** whether an existing type in `stab-bits` or `stab-records` already fits, so no second packed-bits type is introduced.
+
+### B6. Build `CliffordString` concat and repeat without transient copies (reported)
+
+- **Where:** `crates/stab-algebra/src/clifford.rs:551-604`, with `from_table_indices`, `table_indices`, and `BitVec::from_bits`.
+- **Change:** write the six result planes directly with word-level copies and shifts into storage reserved with `try_zeroed_words`, so the admitted planes are the only allocation and every allocation is fallible. This also removes the per-gate decode and per-bit rebuild.
+- **Tests:** existing concat and repeat tests plus lengths that are not multiples of 64 on either operand, and a repeat whose pattern length is 1, 63, 64, and 65.
+
+### B7. Poll the remaining full-width detection passes (reported)
+
+- **Where:** `detection/api.rs` (`try_zero_word_planes`, `copy_batch_into_frame_planes`, `sweep_planes.fill`), `detection/mod.rs` (reference XOR, `xor_words`), `detection/streaming.rs` and `conversion_window.rs` (observable plane resize, fill, XOR).
+- **Change:** route them through the existing `fill_polled` and `poll.for_chunks` helpers with the session's `WorkPoll`, mapping cancellation as `ensure_lanes` does.
+- **Scope limit:** start by measuring which of these exceed about a millisecond at a realistic worst case. Passes that cannot will be listed in the architecture README's unpolled-stretches sentence instead of being changed.
+
+### B8. Poll and speed up folded reference repeats (reported, with a measured repro)
+
+- **Where:** `append_repeated` in `sampling/reference_bits.rs`.
+- **Change:** double the pattern in place until it is at least 64 bits, then copy whole words at a fixed shift, charging the `WorkPoll` per chunk of words.
+- **Tests:** pattern lengths 1, 3, 63, 64, 65, and 130 at start offsets that are and are not word-aligned, compared with the current bitwise result; a cancellation test.
+
+### B9. Charge named output buffers in `analyze_errors` and `gen` (reported)
+
+- Route both through `OutputStorage::file_buffer(named)`, matching `convert`, `sample`, `detect`, and `m2d`.
+- Streaming `gen`'s circuit text instead of building a `String` is not included; the reviewer saw no overrun, and it goes to Phase D.
+
+## Phase C: Contained Speed And Cleanup
+
+Each item is measured before and after, pinned with `taskset -c 7`, and must leave seeded output byte-identical.
+An item whose measured gain is within noise is dropped, not committed.
+
+| Step | Change | Where | Status |
+|---|---|---|---|
+| C1 | Remove the unread `ticks_left` counter and its `count_ticks()` walk. | `circuit_to_dem/reverse_fold.rs:60,95,256` | verified |
+| C2 | Stop `PauliString::set` rescanning the whole string when a term is cleared: add a batch clear that rescans once, and use it in `undo_reset` and the flow generators. | `stab-algebra/src/pauli.rs:373`, `stab-analysis/src/circuit_pauli.rs:635` | verified |
+| C3 | Size replay sessions at one word per plane instead of 1,024 shots. | `dem_sampling/session/replay_session.rs:59` | reported, RSS measured |
+| C4 | Round the DEM sample capacity down to a power of two no larger than 1,024 so windows do not straddle RNG blocks. | `dem_sampling/session/batch.rs:144` | reported |
+| C5 | Reuse one scratch buffer for MPP product terms during lowering. | `frame/program/lower/build.rs:259` | reported |
+| C6 | Store `PauliTerm` qubits as `u32`. | `frame/program/arena.rs:58` | reported |
+| C7 | Remove per-error and per-instruction allocations in analysis: fixed arrays in local decomposition, borrowed instructions on the `ELSE_CORRELATED_ERROR` stack, reverse iteration without collecting. | `reverse_fold/local_decomposition.rs:38`, `reverse_fold.rs:194`, `sparse_rev_frame_tracker/pauli_product.rs:9` | reported |
+| C8 | Write unescaped tag runs in one call; validate recovered tag bytes once. | `stab-model/src/model_tag.rs:140`, `dem/tag.rs:45` | reported |
+
+### C9. Redesign `DemTarget` as a packed target (reported, refusal measured)
+
+- **Now:** `DemTarget` in `crates/stab-model/src/dem.rs:713` is a 16-byte enum with `RelativeDetector`, `LogicalObservable`, `Separator`, and `Numeric(u64)`. Stim's target is 8 bytes. The size doubles the reverse tracker's sets, the error accumulator's arena, and DEM output, and one quadratic-output model was refused at the default 1 GiB budget where Stim finished in 757 MB.
+- **Design fault beyond size:** `Numeric` exists only to carry the offset of `shift_detectors`, which is not a target at all. It lets an error or a detector instruction hold a value that is meaningless there.
+- **Change:** make `DemTarget` an 8-byte newtype over a `u64` with typed constructors and accessors (`detector()`, `observable()`, `is_separator()`, and a matchable `kind()` view), and move the `shift_detectors` offset into that instruction's own typed field. Detector ids are already capped at `2^62 - 1` and observables at `u32`, so the packing loses nothing.
+- **Order:** an `Ord` that keeps today's ordering (detectors, then observables, then separator) so DEM output and merge order stay byte-identical; this is asserted by the existing oracle rows.
+- **Scope:** `stab-model` first, then `stab-analysis`, `stab-engine`'s DEM sampling, and the CLI, in one change set because the type crosses all of them.
+- **Measure:** peak admitted bytes and wall time of `analyze_errors` on the surface-code and quadratic-output cases before and after, and review `ARENA_SLACK_FACTOR` once the element size is halved.
+- **Placement:** last in this phase, after C1 and C7 have settled the analysis code it touches.
+
+C3 and C4 change how many shots a batch holds.
+Seeded output is documented as independent of capacity, and both steps re-run the seeded-determinism tests and the `sample_dem` two-sample oracle rows to confirm it.
+
+## Phase D: Larger Changes, Each Needing Its Own Decision
+
+These are not scheduled by this plan.
+Each would be proposed separately with measurements, because it restructures an algorithm or is a large mechanical move, not because it would change an API.
+
+- **Review the public API surface for design quality.** The review looked mainly for bugs; under the priority rule a dedicated pass over each crate's public types and functions is worth doing, looking for `bool` and `Vec<bool>` parameters, enums with variants that are invalid in some positions (as `DemTarget::Numeric` was), free functions that belong on a type, and budget-less variants that should not exist.
+- **Run the fold search with the analyzer as the tortoise.** Today the search holds two tracker clones and replays the transient iterations; Stim holds one. This is the root cause behind B4, which only adds the fallback.
+- **Store `ConversionPlan` detector terms in one arena** instead of a `Vec` per detector, as `ProgramArena` already does for the frame program.
+- **Share one tree walk between the circuit and DEM models** for admission, tag restore, equality, and drop, and share one opaque-tag record. The two copies drifted once already (`99283291`).
+- **Split the files at the 1,200-line limit:** `record_stream.rs` by decoder, `reverse_fold.rs` into dispatch, noise recording, and loop folding, `circuit_flow/generators.rs`, and `dem/parser.rs` diagnostics.
+- **Rewrite the unitary-to-tableau conversion** to identify each generator from `n + 1` columns. This matters only if that path is used at ten or more qubits.
+- **Add a short-length path before SIMD dispatch in the XOR kernel.** This is a suspicion and needs a measurement before anything else.
+- **Stream `gen` output** instead of building the whole text.
+- **Release tooling:** poll the sparse index, not only the crates.io API, before packaging the next crate, and add a test that the Cargo sandbox runs outside the repository so the three-day cooldown can never apply to sibling crates.
+
+## Order And Delegation
+
+1. A1, A2, A3 in sequence: all three touch `stab-cli` and its tests.
+2. A4, A5, A6 together as one ledger commit: documentation and tests only.
+3. B2, B3, B4 next: small, verified, and independent.
+4. B1 and B9 together: both are CLI output and input admission.
+5. B5, B6, B8, B7 one at a time: each is in a different module, B7 last because it starts with a measurement.
+6. Phase C in table order, with C9 last and on its own.
+
+Implementation steps go to one subagent at a time per crate so that no two writers share files, and the main session reviews each diff, edits `docs/`, runs the checks, and commits.
+Nothing is pushed until asked.
+
+## Verification
+
+- Per step: the targeted `cargo test -p <crate>` for the touched crate, and a direct comparison against pinned Stim for every Phase A step.
+- Per phase, before the last commit of the phase: `cargo fmt --check`, `cargo clippy --workspace --all-targets`, `cargo test --workspace --locked`, `just oracle::parity-check`, `just oracle::parity-render --check`, `just oracle::parity-run`, `just oracle::run --all-rows`, `just oracle::result-formats --check`, `just architecture::check`, `just architecture::docs-check`, `just bench::e2e-check`, and `just docs::api-check`.
+- Stack safety: every step that touches lowering or a recursive walk re-runs the 64 KiB stack tests, and the phase is confirmed on the x86-64 CI runner after the push, since this host cannot fail those tests.
+
+## Not Reviewed
+
+The review did not read `ops/` outside part of `ops/release`, the detecting-regions, missing-detector, and DEM-search parts of `stab-analysis`, or `circuit/parser.rs` beyond black-box fuzzing.
+A second pass over those areas is a separate task.
