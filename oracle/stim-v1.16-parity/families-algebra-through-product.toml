@@ -532,12 +532,12 @@ name = "tests::args::repeated_flags_and_arguments_after_terminator_are_rejected"
 [[families]]
 id = "cli.argument-values"
 area = "cli"
-contract = "Computational commands reject an empty boolean value, a missing or empty integer or seed value, and an empty probability threshold instead of substituting a default."
+contract = "Computational commands reject an empty boolean value, a missing or empty integer or seed value, an integer or seed value above the signed 64-bit maximum, and an empty probability threshold instead of substituting a default."
 stim_refs = ["src/stim/util_bot/arg_parse.cc"]
 status = "divergence"
 owner = "stab-cli"
 divergence_kind = "stab-extension"
-rationale = "Stim reads `--flag=` as true, a missing --shots as one shot, a missing --seed as seed 0, and an empty --approximate_disjoint_errors as 1, silently replacing what the user typed; Stab reports a usage error."
+rationale = "Stim reads `--flag=` as true, a missing --shots as one shot, a missing --seed as seed 0, and an empty --approximate_disjoint_errors as 1, replacing what the user typed. Stim rejects integers above the signed 64-bit maximum, but its overflow check misses exactly 18446744073709551616 and reads it as 0. By design Stab reports a usage error for all of these: a value the program cannot represent is never read as a different one."
 [families.evidence]
 status = "verified"
 [families.evidence.test]

@@ -47,6 +47,14 @@ pub(super) fn render(ledger: &Ledger) -> String {
         ledger.stim.version, ledger.stim.commit
     ));
     output.push_str("Supporting pinned-Stim fixtures live in [the fixture corpus](../oracle/fixtures/manifest.csv) and run in CI; they do not replace canonical family evidence.\n\n");
+    output.push_str("## Priorities\n\n");
+    output.push_str(
+        "Stab ranks its goals in three tiers, and a higher tier wins when goals conflict.\n\n",
+    );
+    output.push_str("1. Good, well-designed, and correct APIs; performance comparable to or better than Stim; and a well-designed modular architecture.\n");
+    output.push_str("2. Stim compatibility.\n");
+    output.push_str("3. Backward compatibility.\n\n");
+    output.push_str("Exact parity with Stim is therefore the default, not the top rule. A `divergence` row is a deliberate design choice made for the first tier: a `stab-extension` row is behavior Stab defines differently or adds, a `resource-limit` row is a bound Stab enforces where Stim has none, and a `stim-bug` row is a place where matching Stim would mean reproducing a defect.\n\n");
     output.push_str("## Summary\n\n");
     output.push_str("| Status | Families |\n| --- | ---: |\n");
     for status in [

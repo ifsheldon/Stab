@@ -8,6 +8,19 @@
 - Do not make commits unless the user explicitly asks for a commit.
 - Perform current development directly on the `main` checkout. Do not create another branch or linked worktree unless the user explicitly changes this policy.
 
+## Priorities
+
+When goals conflict, the higher tier wins.
+
+1. Good, well-designed, and correct APIs; performance comparable to or better than Stim; and a well-designed modular architecture.
+2. Stim compatibility.
+3. Backward compatibility.
+
+- The three goals in the first tier rank equally; when they pull against each other, raise the tradeoff with the user instead of choosing silently.
+- This repository is experimental, so change a public API whenever the result is a better and correct design; do not keep a weaker signature or defer a redesign only to avoid breakage.
+- Diverge from Stim only when the first tier requires it, and record every deliberate divergence in the parity ledger as a design choice with its rationale and a test.
+- Still document each public change in the matching migration notes, and do not treat this order as permission to promote an unmeasured performance claim.
+
 ## Documentation
 
 - Parity-ledger and oracle workflows live in `docs/AGENTS.md` (served by `docs/README.md`); the single E2E performance contract lives in `benchmarks/AGENTS.md`. Read the matching file before correctness or benchmark work.

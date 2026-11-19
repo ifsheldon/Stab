@@ -405,6 +405,16 @@ fn empty_and_missing_flag_values_are_rejected() {
         (&["detect", "--shots", "--seed=1"][..], CIRCUIT),
         (&["sample_dem", "--shots="][..], "error(0.1) D0\n"),
         (&["sample", "--shots=2", "--seed"][..], CIRCUIT),
+        // Pinned Stim's overflow check misses exactly 2^64 and reads it as 0.
+        (&["sample", "--shots=18446744073709551616"][..], CIRCUIT),
+        (
+            &["sample", "--shots=2", "--seed=18446744073709551616"][..],
+            CIRCUIT,
+        ),
+        (
+            &["sample_dem", "--shots=18446744073709551616"][..],
+            "error(0.1) D0\n",
+        ),
         (
             &["sample_dem", "--shots=2", "--seed="][..],
             "error(0.1) D0\n",
