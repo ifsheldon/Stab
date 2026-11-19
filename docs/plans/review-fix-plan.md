@@ -1,10 +1,39 @@
 # Review Fix Plan
 
 This plan covers the findings of the code review run on 2026-11-19 against commit `c7e3a679`.
-It is a draft for approval; no code has been changed.
+Its scheduled steps are complete; the outcome table below records what each one did.
 Each finding is marked **verified** when the main session reproduced it or traced it in the code, and **reported** when only a reviewer did.
 A reported finding is reproduced first, and dropped from the plan with a note if it does not hold.
 Timings quoted here are shared-host diagnostics and promote no performance claim.
+
+## Outcome
+
+Every scheduled step is finished as of 2026-11-20; Phase D and the areas listed under "Not Reviewed" remain open.
+
+| Step | Outcome |
+| --- | --- |
+| A1 | Done. Inlining rejects detectors and observables a collapse randomizes; the tracker's flag became `AnticommutationPolicy`. |
+| A2 | Done. A pipe replays when every record is retained; otherwise the new `replay-input-not-rewindable` diagnostic. |
+| A3 | Done. The same-file guard applies to regular files only, for input and output pairs as well as output pairs. |
+| A4 | Done. Ledger family, regression test, and pinned reproduction; both programs refuse 64 or more components. |
+| A5, A6 | Done in the ledger. |
+| B1 | Done. On the review's one-million-wide case under a 16 MiB budget, peak memory fell from 39.4 MB to 18.1 MB. |
+| B2, B3, B4 | Done. |
+| B5 | Done. `ReferenceSample` and `SweepRecord` replace `Vec<bool>` and `&[bool]`. |
+| B6 | Done. A `CliffordString` is charged exactly its six planes. |
+| B7 | Done for the passes that can exceed a millisecond; the three left unpolled are listed in the architecture README. |
+| B8 | Done. A 300-million-bit fold went from about 0.55 s unpolled to negligible. |
+| B9 | Done for `analyze_errors`. Dropped for `gen`, which writes its named output in one call and has no buffer to charge. |
+| C1 | Done. Analysis also stopped refusing circuits with more than `u64::MAX` ticks, matching Stim. |
+| C2 | Done with a lazily resolved flag instead of a batch clear; 200,000-qubit reset 92.8 ms to 1.4 ms, and the flow generators 2.35 s to 0.38 s at 4,000 qubits. |
+| C3 | Done. Replay of a wide model fell from 76 MB to 26 MB peak. |
+| C4 | Dropped. Rounding the window to a power of two was 6% faster on one case and 4% slower on another. |
+| C5, C6 | Done. Compiling one million two-term products fell from 101.7 ms to 61 ms. |
+| C7 | Done. About 12% on a measurement-heavy case and 20% on an `ELSE_CORRELATED_ERROR`-heavy one; the local-decomposition part gained about 2%. |
+| C8 | Done. Printing 20,000 long tags fell from 36.6 ms to 17.5 ms for circuits and 27.7 ms to 8.5 ms for models. |
+| C9 | Done. `DemTarget` is eight bytes and the shift offset is no longer a target; the quadratic-output case needs about 735 MiB instead of 1,468 MiB and now runs at the default budget. |
+
+Found during the work and added to Phase D below: the measurement-to-detection compiler takes 13 to 32 seconds on one million `MPP` products where detection compilation takes 0.1 seconds, the flow generators remain cubic for wide resets, and `CircuitReferenceSigns` still returns `Vec<bool>`.
 
 ## Priority Rule
 
@@ -178,6 +207,11 @@ Seeded output is documented as independent of capacity, and both steps re-run th
 These are not scheduled by this plan.
 Each would be proposed separately with measurements, because it restructures an algorithm or is a large mechanical move, not because it would change an API.
 
+- **Find the superlinear step in `MeasurementToDetectionCompiler::compile` on `MPP`-heavy circuits.** One million two-term products take 13 to 32 seconds, against 0.1 seconds for detection compilation of the same circuit; pinned Stim's `m2d` takes 137 seconds, so this is not a parity gap.
+- **Remove the remaining cubic cost in `circuit_flow_generators` for wide resets,** where `remove_single_anticommutations` scans every flow per qubit.
+- **Give analysis errors a taxonomy that fits them.** A circuit whose detector anticommutes with a reset is reported as `InvalidDetectorErrorModel`, and a public matchable view of `DemInstruction` would remove one internal-invariant error in the reverse-fold output.
+- **Pack `CircuitReferenceSigns`,** which still returns detector and observable signs as `Vec<bool>`.
+- **Share the periodic word fill** between `stab-algebra`'s `bit_runs` and `stab-engine`'s `ReferenceBits::append_repeated` by moving it into `stab-bits`.
 - **Review the public API surface for design quality.** The review looked mainly for bugs; under the priority rule a dedicated pass over each crate's public types and functions is worth doing, looking for `bool` and `Vec<bool>` parameters, enums with variants that are invalid in some positions (as `DemTarget::Numeric` was), free functions that belong on a type, and budget-less variants that should not exist.
 - **Run the fold search with the analyzer as the tortoise.** Today the search holds two tracker clones and replays the transient iterations; Stim holds one. This is the root cause behind B4, which only adds the fallback.
 - **Store `ConversionPlan` detector terms in one arena** instead of a `Vec` per detector, as `ProgramArena` already does for the frame program.
