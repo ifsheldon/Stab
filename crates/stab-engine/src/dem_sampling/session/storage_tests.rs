@@ -101,14 +101,16 @@ fn batch_shape_follows_the_preferred_64_mib_target_whatever_the_budget() {
     assert_eq!(session_storage_bytes(&fits, 8, 8, true), preferred - 2);
     for limits in [DemSamplerLimits::default(), budget(u128::from(u64::MAX))] {
         assert_eq!(
-            initial_capacities(&fits, &limits).expect("admit an eight-shot batch"),
+            initial_capacities(&fits, &limits, SessionUse::Sampling)
+                .expect("admit an eight-shot batch"),
             SessionCapacities {
                 output: 8,
                 sample: 8
             }
         );
         assert_eq!(
-            initial_capacities(&plan(6_710_879, 0, 0), &limits).expect("admit a smaller batch"),
+            initial_capacities(&plan(6_710_879, 0, 0), &limits, SessionUse::Sampling)
+                .expect("admit a smaller batch"),
             SessionCapacities {
                 output: 7,
                 sample: 7
@@ -123,7 +125,8 @@ fn session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte_bef
     let model = plan(1000, 3, 7);
     let exact = session_storage_bytes(&model, 1, 1, false);
     assert_eq!(
-        initial_capacities(&model, &budget(exact)).expect("admit the exact one-shot budget"),
+        initial_capacities(&model, &budget(exact), SessionUse::Sampling)
+            .expect("admit the exact one-shot budget"),
         SessionCapacities {
             output: 1,
             sample: 1
@@ -154,11 +157,47 @@ fn session_storage_admits_the_exact_budget_and_rejects_the_first_excess_byte_bef
     // A one-shot session above the preferred batch target is admitted within the budget.
     let above_target = plan(8_000_000, 0, 0);
     assert_eq!(
-        initial_capacities(&above_target, &DemSamplerLimits::default())
-            .expect("a one-shot batch above 64 MiB fits the default budget"),
+        initial_capacities(
+            &above_target,
+            &DemSamplerLimits::default(),
+            SessionUse::Sampling
+        )
+        .expect("a one-shot batch above 64 MiB fits the default budget"),
         SessionCapacities {
             output: 1,
             sample: 1
         }
+    );
+}
+
+/// A replay session fills one word per plane, so its planes hold 64 shots whatever the budget,
+/// and the bytes it admits and allocates are those of a 64-shot window.
+#[test]
+fn replay_sessions_size_their_planes_at_one_word() {
+    let model = plan(1000, 3, 7);
+    assert_eq!(
+        initial_capacities(&model, &DemSamplerLimits::default(), SessionUse::Replay)
+            .expect("admit a replay batch"),
+        SessionCapacities {
+            output: 64,
+            sample: 64
+        }
+    );
+    let mut session = None;
+    let constructed = allocation_counter::measure(|| {
+        session = Some(
+            DemReplaySession::new(
+                model.clone(),
+                ShotCount::new(1),
+                DemSamplerLimits::default(),
+            )
+            .expect("open a replay session"),
+        );
+    });
+    let session = session.expect("constructed replay session");
+    assert_eq!(session.session.sample_capacity, 64);
+    assert_eq!(
+        session_storage_bytes(&model, 64, 64, true),
+        u128::try_from(constructed.bytes_current).expect("retained bytes") + INLINE_RECORD_BYTES
     );
 }

@@ -199,7 +199,7 @@ fn run_entries(
                             let copies = later
                                 .checked_div(period)
                                 .ok_or_else(|| run_invariant("a folded repeat had no period"))?;
-                            output.append_repeated(block_start, copies)?;
+                            output.append_repeated(block_start, copies, &mut poll)?;
                             #[cfg(test)]
                             record_fold(
                                 entries.get(frame.body_start..frame.body_end),
@@ -465,7 +465,7 @@ fn apply_instruction(
                 let &[left, right] = pair else {
                     return Err(run_invariant("pair measurement targets are not paired"));
                 };
-                let terms = [(left as usize, *basis), (right as usize, *basis)];
+                let terms = [(left, *basis), (right, *basis)];
                 let measured = simulator
                     .measure_product(&terms, poll, work)
                     .map_err(simulator_error)?;
@@ -600,8 +600,8 @@ pub(super) fn count_determined_measurements(
                     .iter()
                     .enumerate()
                 {
-                    let qubit = qubit as usize;
                     let terms = [(qubit, *basis)];
+                    let qubit = qubit as usize;
                     count += u64::from(
                         simulator
                             .is_deterministic(&terms, cursor.poll(), &mut work)
@@ -631,7 +631,7 @@ pub(super) fn count_determined_measurements(
                     let &[left, right] = pair else {
                         return Err(run_invariant("pair measurement targets are not paired"));
                     };
-                    let terms = [(left as usize, *basis), (right as usize, *basis)];
+                    let terms = [(left, *basis), (right, *basis)];
                     count += u64::from(
                         simulator
                             .is_deterministic(&terms, cursor.poll(), &mut work)

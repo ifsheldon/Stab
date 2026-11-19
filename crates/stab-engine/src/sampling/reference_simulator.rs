@@ -28,6 +28,7 @@
 use stab_algebra::PauliBasis;
 use stab_model::Cancelled;
 
+use crate::detection::frame::PauliTerm;
 use crate::work_poll::{WorkPoll, chunk_units};
 
 mod collapse_order;
@@ -273,7 +274,7 @@ pub(super) struct InverseTableauSimulator {
     collapse_rows: Vec<usize>,
     /// Rows of the measured observable's own support, which commute with `m` oppositely.
     collapse_flips: Vec<usize>,
-    stabilizer_terms: Vec<(usize, PauliBasis)>,
+    stabilizer_terms: Vec<PauliTerm>,
     /// Qubit bitsets and per-qubit pair partners for collapsing a fused X- or Y-basis
     /// instruction in Stim's order, sized on first use. Their `n / 4 + 8 n` bytes stay well
     /// inside the `256 n` bytes per qubit that reference work admission reserves beyond the
@@ -521,6 +522,8 @@ impl InverseTableauSimulator {
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
     ) -> SimResult<bool> {
+        let qubit = u32::try_from(qubit)
+            .map_err(|_| invariant("qubit is outside the reference simulator"))?;
         self.measure_product(&[(qubit, basis)], poll, work)
     }
 
@@ -541,7 +544,7 @@ impl InverseTableauSimulator {
     /// Reports whether measuring the Hermitian product `terms` has a determined outcome.
     pub(super) fn is_deterministic(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
     ) -> SimResult<bool> {
@@ -555,7 +558,7 @@ impl InverseTableauSimulator {
     /// Returns the deterministic outcome, or `false` after collapsing a random outcome.
     pub(super) fn measure_product(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
     ) -> SimResult<bool> {
@@ -614,7 +617,7 @@ impl InverseTableauSimulator {
         }
         for (qubit, basis) in terms {
             if basis.z_bit() {
-                match self.x_row_index(*qubit) {
+                match self.x_row_index(*qubit as usize) {
                     Ok(row) => flips.push(row),
                     Err(error) => {
                         self.collapse_rows = anticommuting;
@@ -624,7 +627,7 @@ impl InverseTableauSimulator {
                 }
             }
             if basis.x_bit() {
-                match self.z_row_index(*qubit) {
+                match self.z_row_index(*qubit as usize) {
                     Ok(row) => flips.push(row),
                     Err(error) => {
                         self.collapse_rows = anticommuting;
@@ -755,25 +758,25 @@ impl InverseTableauSimulator {
     /// pivot column, so flipping all their signs is the gauge `T -> T Z_k`, which leaves the
     /// state unchanged. Fixing it makes equal states after equal histories produce equal
     /// tableaux, which is what lets repeat folding recognize recurring iterations.
-    fn fix_collapse_gauge(&mut self, terms: &[(usize, PauliBasis)]) -> SimResult<()> {
+    fn fix_collapse_gauge(&mut self, terms: &[PauliTerm]) -> SimResult<()> {
         let Some((qubit, basis)) = terms.iter().find(|(_, basis)| *basis != PauliBasis::I) else {
             return Ok(());
         };
         let representative = if basis.z_bit() {
-            self.x_row_index(*qubit)?
+            self.x_row_index(*qubit as usize)?
         } else {
-            self.z_row_index(*qubit)?
+            self.z_row_index(*qubit as usize)?
         };
         if !sign(&self.signs, representative)? {
             return Ok(());
         }
         for (qubit, basis) in terms {
             if basis.z_bit() {
-                let row = self.x_row_index(*qubit)?;
+                let row = self.x_row_index(*qubit as usize)?;
                 flip(&mut self.signs, row)?;
             }
             if basis.x_bit() {
-                let row = self.z_row_index(*qubit)?;
+                let row = self.z_row_index(*qubit as usize)?;
                 flip(&mut self.signs, row)?;
             }
         }
@@ -784,7 +787,7 @@ impl InverseTableauSimulator {
     /// phase as a power of `i`.
     fn observable_into_product(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
     ) -> SimResult<u8> {
@@ -950,22 +953,20 @@ fn pauli_image_append(
     signs: &[bool],
     qubit_count: usize,
     words: usize,
-    terms: &[(usize, PauliBasis)],
+    terms: &[PauliTerm],
     product: &mut [u64],
 ) -> SimResult<u8> {
     let row_words = 2 * words;
     let mut log_i = 0_u8;
-    for (qubit, basis) in terms {
-        if *qubit >= qubit_count {
+    for &(qubit, basis) in terms {
+        let qubit = qubit as usize;
+        if qubit >= qubit_count {
             return Err(invariant("qubit is outside the reference simulator"));
         }
-        if *basis == PauliBasis::Y {
+        if basis == PauliBasis::Y {
             log_i += 1;
         }
-        for (row, present) in [
-            (*qubit, basis.x_bit()),
-            (qubit_count + *qubit, basis.z_bit()),
-        ] {
+        for (row, present) in [(qubit, basis.x_bit()), (qubit_count + qubit, basis.z_bit())] {
             if present {
                 log_i += u8::from(sign(signs, row)?) * 2
                     + right_multiply(product, row_slice(rows, row, row_words)?, words);

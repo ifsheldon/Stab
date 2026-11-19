@@ -139,7 +139,12 @@ impl InverseTableauSimulator {
                     .ok_or(invariant("pair collapse partner is outside the tableau"))?;
                 // A pair on one qubit measures the identity, which collapses nothing.
                 if first != second {
-                    self.measure_product(&[(first, basis), (second, basis)], poll, work)?;
+                    let qubit = |index: usize| {
+                        u32::try_from(index)
+                            .map_err(|_| invariant("pair collapse qubit exceeds the qubit range"))
+                    };
+                    let terms = [(qubit(first)?, basis), (qubit(second)?, basis)];
+                    self.measure_product(&terms, poll, work)?;
                 }
                 work.charge(self, poll)?;
             }

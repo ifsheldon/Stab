@@ -3,6 +3,7 @@ use rand::{Rng, RngExt as _};
 use stab_algebra::PauliBasis;
 
 use super::stabilizer_frame::StabilizerFrame;
+use crate::detection::frame::PauliTerm;
 
 pub(super) fn apply_heralded_pauli_channel(
     frame: &mut StabilizerFrame,
@@ -55,7 +56,7 @@ pub(super) fn apply_single_qubit_pauli_channel(
 
 pub(super) fn apply_correlated_error(
     frame: &mut StabilizerFrame,
-    terms: &[(usize, PauliBasis)],
+    terms: &[PauliTerm],
     probability: f64,
     else_branch: bool,
     correlated_error_occurred: &mut bool,
@@ -65,8 +66,8 @@ pub(super) fn apply_correlated_error(
         return;
     }
     if rng.random::<f64>() < probability {
-        for (qubit, basis) in terms {
-            frame.apply_pauli(*qubit, *basis);
+        for &(qubit, basis) in terms {
+            frame.apply_pauli(qubit as usize, basis);
         }
         *correlated_error_occurred = true;
     } else if !else_branch {

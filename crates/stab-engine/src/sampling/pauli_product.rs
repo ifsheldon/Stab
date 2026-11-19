@@ -10,25 +10,28 @@ const SCANNED_PRODUCT_TERMS: usize = 32;
 
 /// Multiplies the raw terms of one product left to right into one term per qubit, in order of
 /// each qubit's first surviving appearance, and folds the phase into the inversion flag.
-pub(crate) fn normalize_terms(
-    raw_terms: Vec<(usize, PauliBasis, bool)>,
+///
+/// The terms replace the contents of `terms`, so a caller normalizing many products reuses one
+/// buffer; the returned flag is the product's inversion.
+pub(crate) fn normalize_terms_into(
+    raw_terms: &[(u32, PauliBasis, bool)],
     base_inverted: bool,
-) -> Result<(Vec<(usize, PauliBasis)>, bool), SamplingCompileError> {
+    terms: &mut Vec<(u32, PauliBasis)>,
+) -> Result<bool, SamplingCompileError> {
     let mut inverted = base_inverted;
     let mut phase = 0u8;
-    let terms = if raw_terms.len() <= SCANNED_PRODUCT_TERMS {
-        let mut terms = Vec::new();
-        for (qubit, basis, term_inverted) in raw_terms {
-            multiply_term(&mut terms, qubit, basis, &mut phase);
+    terms.clear();
+    if raw_terms.len() <= SCANNED_PRODUCT_TERMS {
+        for &(qubit, basis, term_inverted) in raw_terms {
+            multiply_term(terms, qubit, basis, &mut phase);
             inverted ^= term_inverted;
         }
-        terms
     } else {
-        multiply_indexed_terms(raw_terms, &mut inverted, &mut phase)
-    };
+        terms.extend(multiply_indexed_terms(raw_terms, &mut inverted, &mut phase));
+    }
     match phase {
-        0 => Ok((terms, inverted)),
-        2 => Ok((terms, !inverted)),
+        0 => Ok(inverted),
+        2 => Ok(!inverted),
         _ => Err(SamplingCompileError::invalid_circuit(
             "MPP Pauli product is anti-Hermitian",
         )),
@@ -38,13 +41,13 @@ pub(crate) fn normalize_terms(
 /// The indexed form of repeated [`multiply_term`] calls: a cancelled term leaves an empty slot
 /// instead of shifting the later terms, which keeps the surviving terms in the same order.
 fn multiply_indexed_terms(
-    raw_terms: Vec<(usize, PauliBasis, bool)>,
+    raw_terms: &[(u32, PauliBasis, bool)],
     inverted: &mut bool,
     phase: &mut u8,
-) -> Vec<(usize, PauliBasis)> {
-    let mut slots: Vec<Option<(usize, PauliBasis)>> = Vec::with_capacity(raw_terms.len());
-    let mut slot_of_qubit: HashMap<usize, usize> = HashMap::with_capacity(raw_terms.len());
-    for (qubit, incoming, term_inverted) in raw_terms {
+) -> impl Iterator<Item = (u32, PauliBasis)> {
+    let mut slots: Vec<Option<(u32, PauliBasis)>> = Vec::with_capacity(raw_terms.len());
+    let mut slot_of_qubit: HashMap<u32, usize> = HashMap::with_capacity(raw_terms.len());
+    for &(qubit, incoming, term_inverted) in raw_terms {
         *inverted ^= term_inverted;
         let existing = slot_of_qubit
             .get(&qubit)
@@ -63,12 +66,12 @@ fn multiply_indexed_terms(
             }
         }
     }
-    slots.into_iter().flatten().collect()
+    slots.into_iter().flatten()
 }
 
 fn multiply_term(
-    terms: &mut Vec<(usize, PauliBasis)>,
-    qubit: usize,
+    terms: &mut Vec<(u32, PauliBasis)>,
+    qubit: u32,
     incoming: PauliBasis,
     phase: &mut u8,
 ) {
@@ -138,7 +141,8 @@ mod tests {
                 scanned_inverted ^= inverted;
             }
             let (mut indexed_phase, mut indexed_inverted) = (0, false);
-            let indexed = multiply_indexed_terms(raw, &mut indexed_inverted, &mut indexed_phase);
+            let indexed: Vec<_> =
+                multiply_indexed_terms(&raw, &mut indexed_inverted, &mut indexed_phase).collect();
             assert_eq!(indexed, scanned);
             assert_eq!(
                 (indexed_phase, indexed_inverted),

@@ -141,9 +141,29 @@ pub(super) struct SessionCapacities {
     pub(super) sample: usize,
 }
 
+/// What a session's sample planes are for, which bounds how many shots they hold.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum SessionUse {
+    /// Sampling fills whole windows of up to one indexed RNG block of shots.
+    Sampling,
+    /// Replay fills one word per plane for each batch of at most 64 records.
+    Replay,
+}
+
+impl SessionUse {
+    /// Largest sample window the session admits.
+    const fn max_sample_shots(self) -> usize {
+        match self {
+            Self::Sampling => INDEXED_BLOCK_SHOTS,
+            Self::Replay => MAX_REPLAY_BATCH_SHOTS,
+        }
+    }
+}
+
 pub(super) fn initial_capacities(
     plan: &DemSamplingPlan,
     limits: &DemSamplerLimits,
+    session_use: SessionUse,
 ) -> Result<SessionCapacities, DemSamplingExecutionError> {
     // Batch shape follows the historical 64 MiB active-batch target, which keeps seeded streams
     // independent of the admission budget; only a smaller budget shrinks it further.
@@ -169,7 +189,7 @@ pub(super) fn initial_capacities(
                 sample: output,
             });
         }
-        for sample in (1..=INDEXED_BLOCK_SHOTS).rev() {
+        for sample in (1..=session_use.max_sample_shots()).rev() {
             if fits(output, sample, include_sampled_errors) {
                 return Ok(SessionCapacities { output, sample });
             }

@@ -15,11 +15,12 @@ use stab_records::{
 use super::conversion_window::WindowedConversion;
 use super::error::DetectionError;
 use super::frame::{
-    DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FrameBatchState, FrameLanes, FrameWord,
-    LaneFrameBatch, PendingLanes,
+    DirectDetectorFramePlan, FRAME_BATCH_SHOTS, FRAME_LANES_PLANE_UNITS, FrameBatchState,
+    FrameLanes, FrameWord, LaneFrameBatch, PendingLanes, fill_polled, for_chunks_mut_polled,
 };
 use super::{DetectionConversionLimits, PreparedMeasurementToDetection};
 use crate::sampling::{session_cancellation, session_cancellation_slot};
+use crate::work_poll::{WORD_OP_UNITS, WorkPoll};
 use crate::{LaneWidth, RandomPolicy, ReferenceSampleMode, ShotCount, SinkFailurePhase};
 
 mod contracts;
@@ -207,9 +208,12 @@ struct ConversionPlanes {
 }
 
 impl ConversionPlanes {
+    /// Reserves and zeroes the planes, in chunks that poll `cancellation`.
     fn try_new(
         converter: &PreparedMeasurementToDetection,
+        cancellation: &Cancellation,
     ) -> Result<Self, DetectionExecutionError> {
+        let poll = &mut WorkPoll::new(cancellation);
         Ok(Self {
             sweep_correction: converter
                 .try_reusable_sweep_correction()
@@ -218,24 +222,34 @@ impl ConversionPlanes {
             measurement_planes: try_zero_word_planes(
                 converter.measurement_count(),
                 "measurement-to-detection input planes",
+                FRAME_LANES_PLANE_UNITS,
+                poll,
             )?,
             sweep_planes: try_zero_word_planes(
                 converter.sweep_bit_count(),
                 "measurement-to-detection sweep planes",
+                FRAME_LANES_PLANE_UNITS,
+                poll,
             )?,
             detector_planes: try_zero_word_planes(
                 converter.detector_count(),
                 "measurement-to-detection detector planes",
+                FRAME_LANES_PLANE_UNITS,
+                poll,
             )?,
             observable_planes: try_zero_word_planes(
                 converter.observable_count(),
                 "measurement-to-detection observable planes",
+                FRAME_LANES_PLANE_UNITS,
+                poll,
             )?,
             input_column: try_zero_word_planes(
                 converter
                     .measurement_count()
                     .max(converter.sweep_bit_count()),
                 "measurement-to-detection input transpose column",
+                WORD_OP_UNITS,
+                poll,
             )?,
         })
     }
@@ -272,7 +286,10 @@ impl MeasurementToDetectionSession {
             .fill(converter.measurement_count(), &mut reference_sample)
             .map_err(DetectionExecutionError::Conversion)?;
         let storage = if converter.has_sweep_correction() {
-            ConversionStorage::Planes(ConversionPlanes::try_new(converter)?)
+            ConversionStorage::Planes(ConversionPlanes::try_new(
+                converter,
+                converter.plan.limits.cancellation(),
+            )?)
         } else {
             ConversionStorage::Windowed(
                 WindowedConversion::try_new(&converter.plan)
@@ -544,16 +561,19 @@ impl MeasurementToDetectionSession {
             }
             ConversionStorage::Planes(planes) => planes,
         };
+        let mut poll = WorkPoll::new(cancellation);
         copy_batch_into_frame_planes(
             measurements,
             &mut planes.measurement_planes,
             &mut planes.input_column,
+            &mut poll,
         )?;
         if let Some(sweeps) = sweeps {
             copy_batch_into_frame_planes(
                 sweeps,
                 &mut planes.sweep_planes,
                 &mut planes.input_column,
+                &mut poll,
             )?;
         } else {
             planes.sweep_planes.fill(FrameLanes::ZERO);
@@ -588,9 +608,12 @@ impl MeasurementToDetectionSession {
     }
 }
 
+/// Reserves `width` zero planes of `units` work units each, zeroing them in polled chunks.
 fn try_zero_word_planes<Plane: Copy + Default>(
     width: usize,
     context: &'static str,
+    units: usize,
+    poll: &mut WorkPoll<'_>,
 ) -> Result<Vec<Plane>, DetectionExecutionError> {
     let mut planes = Vec::new();
     planes.try_reserve_exact(width).map_err(|error| {
@@ -598,16 +621,20 @@ fn try_zero_word_planes<Plane: Copy + Default>(
             message: format!("could not reserve {width} planes for {context}: {error}"),
         }
     })?;
-    planes.resize(width, Plane::default());
+    fill_polled(&mut planes, width, units, poll, Plane::default())?;
     Ok(planes)
 }
 
 /// Replaces every frame plane with the records of `batch`, at most [`FRAME_BATCH_SHOTS`] of
 /// them, using `column` as scratch for one 64-shot word per result bit.
+///
+/// The clear and every scatter of a column into the planes poll `poll` in chunks; transposing
+/// one 64-shot column of the input is a single charged step.
 fn copy_batch_into_frame_planes(
     batch: MeasurementBatchView<'_>,
     target: &mut [FrameLanes],
     column: &mut [u64],
+    poll: &mut WorkPoll<'_>,
 ) -> Result<(), DetectionExecutionError> {
     let width = target.len();
     let column =
@@ -622,9 +649,12 @@ fn copy_batch_into_frame_planes(
             message: "measurement-to-detection input exceeds its frame planes".to_owned(),
         });
     }
-    target.fill(FrameLanes::ZERO);
+    for_chunks_mut_polled(target, FRAME_LANES_PLANE_UNITS, poll, |_, part| {
+        part.fill(FrameLanes::ZERO);
+    })?;
     for (word_index, row_start) in (0..batch.shot_count()).step_by(64).enumerate() {
         let row_count = (batch.shot_count() - row_start).min(64);
+        poll.charge(width.saturating_mul(WORD_OP_UNITS))?;
         let copied = if let Some(records) = batch.shot_major_records() {
             records.copy_rows_into_bit_plane_words(row_start, row_count, column)
         } else if let Some(planes) = batch.bit_planes() {
@@ -635,13 +665,16 @@ fn copy_batch_into_frame_planes(
             });
         };
         copied.map_err(invariant_error)?;
-        for (plane, word) in target.iter_mut().zip(column.iter()) {
-            let mut words = plane.words();
-            if let Some(slot) = words.get_mut(word_index) {
-                *slot = *word;
+        let column = &*column;
+        for_chunks_mut_polled(target, WORD_OP_UNITS, poll, |start, part| {
+            for (plane, word) in part.iter_mut().zip(column.iter().skip(start)) {
+                let mut words = plane.words();
+                if let Some(slot) = words.get_mut(word_index) {
+                    *slot = *word;
+                }
+                *plane = FrameLanes::from_words(words);
             }
-            *plane = FrameLanes::from_words(words);
-        }
+        })?;
     }
     Ok(())
 }

@@ -35,8 +35,8 @@ pub(crate) use plan::{
 };
 pub(crate) use program::{
     ArenaSpan, CircuitProgram, CliffordStep, ControlledPair, FrameGate, NoiselessFusion,
-    PauliProductMeasurement, ProgramArena, ProgramEntry, ProgramInstruction, ProgramOptions,
-    ReferenceClifford, lookback_distance,
+    PauliProductMeasurement, PauliTerm, ProgramArena, ProgramEntry, ProgramInstruction,
+    ProgramOptions, ReferenceClifford, lookback_distance,
 };
 pub(in crate::detection) use program::{TraversalEvent, visit_circuit};
 #[cfg(test)]
@@ -98,6 +98,25 @@ pub(super) fn fill_polled<T: Clone>(
     }
     Ok(())
 }
+
+/// Runs `body` over consecutive chunks of `items` with each chunk's start index, charging
+/// `poll` for every chunk of `units`-unit items before `body` runs on it.
+pub(super) fn for_chunks_mut_polled<T>(
+    items: &mut [T],
+    units: usize,
+    poll: &mut WorkPoll<'_>,
+    mut body: impl FnMut(usize, &mut [T]),
+) -> DetectionResult<()> {
+    let chunk = (chunk_units() / units.max(1)).max(1);
+    for (index, part) in items.chunks_mut(chunk).enumerate() {
+        poll.charge(part.len().saturating_mul(units))?;
+        body(index * chunk, part);
+    }
+    Ok(())
+}
+
+/// Work units of one whole-plane operation on a 256-lane frame plane.
+pub(super) const FRAME_LANES_PLANE_UNITS: usize = lane_units::<FrameLanes>(WORD_OP_UNITS);
 
 /// Products with more terms than this are measured in polled chunks of terms.
 const LONG_PRODUCT_TERMS: usize = 1 << 12;
@@ -334,7 +353,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
                 }
                 poll.for_chunks(pairs, 2 * op + noise, 1, |_, part| {
                     for &[left, right] in part {
-                        let terms = [(left as usize, *basis), (right as usize, *basis)];
+                        let terms = [(left, *basis), (right, *basis)];
                         let terms = if left == right { &[][..] } else { &terms[..] };
                         self.measure_pauli_product_terms(terms, *flip_probability, rng, mode)?;
                     }
@@ -684,7 +703,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     #[inline(never)]
     fn measure_long_pauli_product(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         flip_probability: f64,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
@@ -693,8 +712,8 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         let op = lane_units::<W>(WORD_OP_UNITS);
         let mut result = mode.random_mask(rng, flip_probability);
         poll.for_chunks(terms, op, 1, |_, part| {
-            for (qubit, basis) in part {
-                result ^= self.frame_measurement_bit(*qubit, *basis)?;
+            for &(qubit, basis) in part {
+                result ^= self.frame_measurement_bit(qubit as usize, basis)?;
             }
             Ok::<_, DetectionError>(())
         })?;
@@ -708,7 +727,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     fn record_pauli_observable(
         &mut self,
         observable_id: usize,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
     ) -> DetectionResult<()> {
         if self.observables.get(observable_id).is_none() {
             return Err(DetectionError::invalid_result_format(format!(
@@ -717,7 +736,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         }
         let mut bit = W::default();
         for &(qubit, basis) in terms {
-            bit ^= self.frame_measurement_bit(qubit, basis)?;
+            bit ^= self.frame_measurement_bit(qubit as usize, basis)?;
         }
         let observable = self.observables.get_mut(observable_id).ok_or_else(|| {
             DetectionError::invalid_result_format(format!(
@@ -730,19 +749,19 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn measure_pauli_product_terms(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         flip_probability: f64,
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
         let mut result = mode.random_mask(rng, flip_probability);
-        for (qubit, basis) in terms {
-            result ^= self.frame_measurement_bit(*qubit, *basis)?;
+        for &(qubit, basis) in terms {
+            result ^= self.frame_measurement_bit(qubit as usize, basis)?;
         }
         self.measurements.push(result);
         match terms {
             [] => {}
-            [(qubit, basis)] => self.randomize_measured_basis(*qubit, *basis, rng, mode)?,
+            &[(qubit, basis)] => self.randomize_measured_basis(qubit as usize, basis, rng, mode)?,
             _ => self.xor_random_measured_product(terms, rng, mode)?,
         }
         Ok(())
@@ -756,7 +775,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
     /// later commuting measurements.
     fn xor_random_measured_product(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         rng: &mut impl Rng,
         mode: FrameExecutionMode<'_, W>,
     ) -> DetectionResult<()> {
@@ -764,19 +783,16 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         self.xor_measured_product(terms, mask)
     }
 
-    fn xor_measured_product(
-        &mut self,
-        terms: &[(usize, PauliBasis)],
-        mask: W,
-    ) -> DetectionResult<()> {
-        for (qubit, basis) in terms {
+    fn xor_measured_product(&mut self, terms: &[PauliTerm], mask: W) -> DetectionResult<()> {
+        for &(qubit, basis) in terms {
+            let qubit = qubit as usize;
             match basis {
                 PauliBasis::I => {}
-                PauliBasis::X => self.xor_x_word(*qubit, mask)?,
-                PauliBasis::Z => self.xor_z_word(*qubit, mask)?,
+                PauliBasis::X => self.xor_x_word(qubit, mask)?,
+                PauliBasis::Z => self.xor_z_word(qubit, mask)?,
                 PauliBasis::Y => {
-                    self.xor_x_word(*qubit, mask)?;
-                    self.xor_z_word(*qubit, mask)?;
+                    self.xor_x_word(qubit, mask)?;
+                    self.xor_z_word(qubit, mask)?;
                 }
             }
         }
@@ -809,7 +825,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
 
     fn apply_correlated_error(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         else_branch: bool,
         probability: f64,
         rng: &mut impl Rng,
@@ -827,7 +843,7 @@ impl<W: FrameWord> BitPlaneDetectionFrame<W> {
         self.correlated_error_occurred |= occurred;
         poll.for_chunks(terms, lane_units::<W>(WORD_OP_UNITS), 1, |_, part| {
             for &(qubit, basis) in part {
-                self.apply_pauli_mask(qubit, basis, occurred)?;
+                self.apply_pauli_mask(qubit as usize, basis, occurred)?;
             }
             Ok(())
         })

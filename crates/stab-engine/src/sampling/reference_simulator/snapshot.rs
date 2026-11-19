@@ -13,6 +13,7 @@
 use stab_algebra::PauliBasis;
 use stab_bits::BitMatrix;
 
+use crate::detection::frame::PauliTerm;
 use crate::work_poll::{WorkPoll, chunk_units};
 
 use super::{
@@ -149,11 +150,7 @@ impl ReferenceStateSnapshot {
     }
 
     /// Writes the unsigned support of stabilizer `stabilizer` into `terms` in qubit order.
-    fn support_terms(
-        &self,
-        stabilizer: usize,
-        terms: &mut Vec<(usize, PauliBasis)>,
-    ) -> SimResult<()> {
+    fn support_terms(&self, stabilizer: usize, terms: &mut Vec<PauliTerm>) -> SimResult<()> {
         let support_error = |_| invariant("snapshot stabilizer is outside its supports");
         let z_words = self
             .support_z
@@ -172,8 +169,12 @@ impl ReferenceStateSnapshot {
                 let bit = remaining.trailing_zeros();
                 remaining &= remaining - 1;
                 let mask = 1_u64 << bit;
+                let qubit =
+                    u32::try_from(word_index * BLOCK_BITS + bit as usize).map_err(|_| {
+                        invariant("snapshot stabilizer support exceeds the qubit range")
+                    })?;
                 terms.push((
-                    word_index * BLOCK_BITS + bit as usize,
+                    qubit,
                     PauliBasis::from_xz(x_word & mask != 0, z_word & mask != 0),
                 ));
             }
@@ -313,7 +314,7 @@ impl InverseTableauSimulator {
         &mut self,
         snapshot: &mut ReferenceStateSnapshot,
         stabilizer: usize,
-        terms: &mut Vec<(usize, PauliBasis)>,
+        terms: &mut Vec<PauliTerm>,
         poll: &mut WorkPoll<'_>,
         work: &mut SimulatorWork,
     ) -> SimResult<bool> {

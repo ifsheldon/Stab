@@ -7,6 +7,7 @@ use smallvec::{SmallVec, smallvec};
 use stab_algebra::PauliBasis;
 
 use super::local_tableau::LocalTableauTransform;
+use crate::detection::frame::PauliTerm;
 
 #[derive(Clone, Debug)]
 pub(super) struct StabilizerFrame {
@@ -237,15 +238,15 @@ impl StabilizerFrame {
 
     pub(super) fn measure_pauli_product(
         &mut self,
-        terms: &[(usize, PauliBasis)],
+        terms: &[PauliTerm],
         inverted: bool,
         rng: &mut impl Rng,
         randomness: MeasurementRandomness,
     ) -> bool {
         let mut observable = std::mem::take(&mut self.observable_scratch);
         observable.reset_to_identity(self.len());
-        for (qubit, basis) in terms {
-            observable.multiply_single_assign(*qubit, *basis);
+        for &(qubit, basis) in terms {
+            observable.multiply_single_assign(qubit as usize, basis);
         }
         let result = self.measure_observable(&observable, rng, randomness) ^ inverted;
         observable.reset_to_identity(self.len());

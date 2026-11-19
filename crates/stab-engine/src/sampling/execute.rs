@@ -167,7 +167,7 @@ fn execute_instruction(
                 let inverted = inverted.get(2 * index).copied().unwrap_or(false)
                     ^ inverted.get(2 * index + 1).copied().unwrap_or(false);
                 let result = buffers.frame.measure_pauli_product(
-                    &[(left as usize, *basis), (right as usize, *basis)],
+                    &[(left, *basis), (right, *basis)],
                     inverted ^ flip,
                     rng,
                     randomness,

@@ -3,6 +3,7 @@
 use stab_model::MeasureRecordOffset;
 
 use super::api::SamplingExecutionError;
+use crate::work_poll::{WORD_OP_UNITS, WorkPoll, chunk_units};
 
 const WORD_BITS: usize = u64::BITS as usize;
 
@@ -126,10 +127,17 @@ impl ReferenceBits {
     }
 
     /// Appends `repetitions` copies of the bits from `start` to the current end.
+    ///
+    /// Every appended bit equals the bit one copy distance back, where the distance is a
+    /// multiple of the pattern length no longer than the record already written past `start`.
+    /// The distance doubles until it reaches a word, after which every step copies a whole word
+    /// at a fixed shift, so a short pattern repeated many times costs one step per output word.
+    /// The copy charges `poll` per chunk of words, so a fold of any length polls cancellation.
     pub(crate) fn append_repeated(
         &mut self,
         start: usize,
         repetitions: u64,
+        poll: &mut WorkPoll<'_>,
     ) -> Result<(), SamplingExecutionError> {
         let pattern_len = self.len.saturating_sub(start);
         if pattern_len == 0 || repetitions == 0 {
@@ -152,13 +160,23 @@ impl ReferenceBits {
             .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
                 message: format!("reference folding output capacity {total_bits} bits: {error}"),
             })?;
-        for _ in 0..repetitions {
-            let mut copied = 0;
-            while copied < pattern_len {
-                let count = (pattern_len - copied).min(WORD_BITS);
-                let chunk = self.chunk_at(start + copied, count);
+        let steps_per_charge = (chunk_units() / WORD_OP_UNITS).max(1);
+        let mut distance = pattern_len;
+        let mut remaining = appended;
+        while remaining > 0 {
+            poll.charge(steps_per_charge.saturating_mul(WORD_OP_UNITS))?;
+            for _ in 0..steps_per_charge {
+                if remaining == 0 {
+                    break;
+                }
+                let count = remaining.min(distance).min(WORD_BITS);
+                let chunk = self.chunk_at(self.len - distance, count);
                 self.append_chunk(chunk, count);
-                copied += count;
+                remaining -= count;
+                if distance < WORD_BITS {
+                    // The record past `start` now holds twice `distance` periodic bits.
+                    distance *= 2;
+                }
             }
         }
         Ok(())
@@ -191,7 +209,10 @@ impl ReferenceBits {
     reason = "fold fixtures are bounded, so a failed append is a test failure"
 )]
 mod tests {
+    use stab_model::Cancellation;
+
     use super::*;
+    use crate::work_poll::test_hook;
 
     fn bits_of(record: &ReferenceBits) -> Vec<bool> {
         let mut bools = Vec::new();
@@ -199,22 +220,28 @@ mod tests {
         bools
     }
 
-    /// Folding copies a recurring period at arbitrary bit alignments; the packed copy must agree
-    /// with the flag-list copy it replaced and keep every bit past the end zero.
+    fn record_with(prefix: usize, pattern: usize) -> (ReferenceBits, Vec<bool>) {
+        let mut record = ReferenceBits::default();
+        let mut expected = Vec::new();
+        for index in 0..prefix + pattern {
+            let bit = (index * 7 + index / 3) % 5 < 2;
+            record.push(bit);
+            expected.push(bit);
+        }
+        (record, expected)
+    }
+
+    /// Folding copies a recurring period at arbitrary bit alignments; the word-wise copy must
+    /// agree with a bit-by-bit copy and keep every bit past the end zero.
     #[test]
-    fn repeated_appends_match_flag_list_copies_at_every_alignment() {
+    fn repeated_appends_match_bitwise_copies_at_every_alignment() {
+        let cancellation = Cancellation::new();
         for prefix in [0_usize, 1, 7, 63, 64, 65, 130] {
-            for pattern in [1_usize, 3, 63, 64, 65, 129] {
-                for repetitions in [1_u64, 2, 5] {
-                    let mut record = ReferenceBits::default();
-                    let mut expected = Vec::new();
-                    for index in 0..prefix + pattern {
-                        let bit = (index * 7 + index / 3) % 5 < 2;
-                        record.push(bit);
-                        expected.push(bit);
-                    }
+            for pattern in [1_usize, 2, 3, 5, 31, 63, 64, 65, 129, 130] {
+                for repetitions in [1_u64, 2, 3, 5, 67, 200] {
+                    let (mut record, mut expected) = record_with(prefix, pattern);
                     record
-                        .append_repeated(prefix, repetitions)
+                        .append_repeated(prefix, repetitions, &mut WorkPoll::new(&cancellation))
                         .expect("bounded fold");
                     for _ in 0..repetitions {
                         expected.extend_from_within(prefix..prefix + pattern);
@@ -228,5 +255,27 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A long fold polls between chunks of words, so cancellation lands inside the copy instead
+    /// of after it.
+    #[test]
+    fn long_repeated_appends_poll_and_honor_cancellation() {
+        let cancellation = Cancellation::new();
+        test_hook::with_units_per_poll(1 << 8, || {
+            let (mut record, _) = record_with(3, 1);
+            let (result, polls) = test_hook::count_polls(|| {
+                record.append_repeated(3, 1 << 16, &mut WorkPoll::new(&cancellation))
+            });
+            result.expect("uncancelled fold");
+            assert!(polls >= 8, "a 1024-word fold polled only {polls} times");
+
+            let (mut record, _) = record_with(3, 1);
+            let (result, fired) = test_hook::cancel_at_poll(2, || {
+                record.append_repeated(3, 1 << 16, &mut WorkPoll::new(&cancellation))
+            });
+            assert!(fired);
+            assert!(matches!(result, Err(SamplingExecutionError::Cancelled(_))));
+        });
     }
 }

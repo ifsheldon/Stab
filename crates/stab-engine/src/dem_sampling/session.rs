@@ -27,7 +27,7 @@ mod window;
 
 pub use replay_session::{DemReplayBatchStatus, DemReplaySession, DemReplayTransaction};
 
-use batch::{SessionBatch, initial_capacities, validate_session_storage};
+use batch::{SessionBatch, SessionUse, initial_capacities, validate_session_storage};
 use replay_records::{ReplayRecord, ReplayRecords};
 
 /// Engine-side DEM sampling execution failure.
@@ -224,7 +224,17 @@ impl DemSamplingSession {
         random_policy: RandomPolicy,
         limits: DemSamplerLimits,
     ) -> Result<Self, DemSamplingExecutionError> {
-        let capacities = initial_capacities(&plan, &limits)?;
+        Self::with_use(plan, random_policy, limits, SessionUse::Sampling)
+    }
+
+    /// Creates a session whose sample planes are sized for `session_use`.
+    fn with_use(
+        plan: DemSamplingPlan,
+        random_policy: RandomPolicy,
+        limits: DemSamplerLimits,
+        session_use: SessionUse,
+    ) -> Result<Self, DemSamplingExecutionError> {
+        let capacities = initial_capacities(&plan, &limits, session_use)?;
         let record = plan.try_reusable_detection_record().map_err(|source| {
             DemSamplingExecutionError::SessionStorageAllocation {
                 message: source.to_string(),

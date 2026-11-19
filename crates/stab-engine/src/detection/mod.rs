@@ -25,12 +25,13 @@ use buffers::{try_false_vec, try_vec_with_capacity};
 use conversion_plan::ConversionPlan;
 use error::DetectionResult;
 use frame::{
-    CircuitProgram, FrameBatchState, FrameLanes, FrameWord, ProgramOptions, SweepCorrectionPlan,
-    admit_combined_compiled_storage,
+    CircuitProgram, FRAME_LANES_PLANE_UNITS, FrameBatchState, FrameLanes, FrameWord,
+    ProgramOptions, SweepCorrectionPlan, admit_combined_compiled_storage, for_chunks_mut_polled,
 };
 use reference::ReferenceSampleSource;
 use stab_model::Circuit;
 
+use crate::work_poll::WorkPoll;
 use crate::{CompilationDescriptor, CompilationOperation};
 
 #[cfg(test)]
@@ -253,12 +254,22 @@ impl PreparedMeasurementToDetection {
         self.validate_word_plane_widths(measurement_planes, sweep_planes)?;
         reference::validate_reference_sample_len(reference_sample, self.measurement_count())?;
         let active_mask = FrameLanes::active_mask(shot_count);
-        for (plane, reference_bit) in measurement_planes.iter_mut().zip(reference_sample) {
-            if *reference_bit {
-                *plane ^= active_mask;
-            }
-            *plane &= active_mask;
-        }
+        let mut poll = WorkPoll::new(cancellation);
+        for_chunks_mut_polled(
+            measurement_planes,
+            FRAME_LANES_PLANE_UNITS,
+            &mut poll,
+            |start, part| {
+                for (plane, reference_bit) in
+                    part.iter_mut().zip(reference_sample.iter().skip(start))
+                {
+                    if *reference_bit {
+                        *plane ^= active_mask;
+                    }
+                    *plane &= active_mask;
+                }
+            },
+        )?;
         self.plan.convert_word_planes_into(
             measurement_planes,
             detector_planes,
@@ -275,8 +286,8 @@ impl PreparedMeasurementToDetection {
                     correction_rng,
                     cancellation,
                 )?;
-                xor_words(detector_planes, detectors, "detector")?;
-                xor_words(observable_planes, observables, "observable")?;
+                xor_words(detector_planes, detectors, "detector", &mut poll)?;
+                xor_words(observable_planes, observables, "observable", &mut poll)?;
                 Ok(())
             }
             (None, None) => Ok(()),
@@ -328,6 +339,7 @@ fn xor_words(
     output: &mut [FrameLanes],
     correction: &[FrameLanes],
     kind: &str,
+    poll: &mut WorkPoll<'_>,
 ) -> DetectionResult<()> {
     if output.len() != correction.len() {
         return Err(DetectionError::invalid_result_format(format!(
@@ -336,10 +348,11 @@ fn xor_words(
             output.len()
         )));
     }
-    for (output, correction) in output.iter_mut().zip(correction) {
-        *output ^= *correction;
-    }
-    Ok(())
+    for_chunks_mut_polled(output, FRAME_LANES_PLANE_UNITS, poll, |start, part| {
+        for (output, correction) in part.iter_mut().zip(correction.iter().skip(start)) {
+            *output ^= *correction;
+        }
+    })
 }
 
 pub fn measurement_record_count(circuit: &Circuit) -> DetectionResult<usize> {

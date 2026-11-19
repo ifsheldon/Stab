@@ -8,8 +8,8 @@ use stab_model::{
 };
 
 use super::super::super::helpers::{
-    measurement_flip_probability, pauli_basis, probability_list, qubit_index,
-    single_probability_argument, unsupported_frame_instruction,
+    measurement_flip_probability, pauli_basis, probability_list, single_probability_argument,
+    unsupported_frame_instruction,
 };
 use super::super::arena::{ArenaSpan, PauliProduct, PauliTerm, ProgramArena};
 use super::super::{
@@ -80,7 +80,7 @@ fn pauli_terms(
         let Some(pauli) = target.pauli_type() else {
             return Err(unsupported_frame_instruction(instruction));
         };
-        arena.push((qubit_index(instruction, target)?, pauli_basis(pauli)))?;
+        arena.push((frame_qubit(instruction, target)?, pauli_basis(pauli)))?;
     }
     arena.span_since(start)
 }
@@ -256,8 +256,11 @@ fn build_pauli_products(
 ) -> DetectionResult<PauliProductMeasurement> {
     let terms = arena.mark::<PauliTerm>();
     let products = arena.mark::<PauliProduct>();
+    // One pair of buffers serves every product of the instruction.
+    let mut raw_terms = Vec::new();
+    let mut normalized = Vec::new();
     for target_group in instruction.target_groups() {
-        let mut raw_terms = Vec::new();
+        raw_terms.clear();
         for target in target_group {
             if target.is_combiner() {
                 continue;
@@ -266,15 +269,18 @@ fn build_pauli_products(
                 return Err(unsupported_frame_instruction(instruction));
             };
             raw_terms.push((
-                qubit_index(instruction, target)?,
+                frame_qubit(instruction, target)?,
                 pauli_basis(pauli),
                 target.is_inverted_result_target(),
             ));
         }
-        let (normalized, product_inverted) =
-            crate::sampling::pauli_product::normalize_terms(raw_terms, false)?;
+        let product_inverted = crate::sampling::pauli_product::normalize_terms_into(
+            &raw_terms,
+            false,
+            &mut normalized,
+        )?;
         arena.push(PauliProduct::new(normalized.len(), product_inverted)?)?;
-        arena.extend(normalized)?;
+        arena.extend(normalized.iter().copied())?;
     }
     Ok(PauliProductMeasurement {
         terms: arena.span_since(terms)?,

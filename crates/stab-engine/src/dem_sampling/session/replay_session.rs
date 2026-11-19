@@ -5,6 +5,7 @@ use std::fmt;
 use stab_model::Cancellation;
 use stab_records::{BitPlaneBatchView, DemSampleSink, PackedShotBatchView};
 
+use super::batch::SessionUse;
 use super::replay_planes::ErrorMajorRecords;
 use super::replay_records::ReplayRecords;
 use super::{
@@ -62,8 +63,12 @@ impl DemReplaySession {
         expected_shots: ShotCount,
         limits: DemSamplerLimits,
     ) -> Result<Self, DemSamplingExecutionError> {
-        let mut session =
-            DemSamplingSession::new(plan, RandomPolicy::Seeded(crate::Seed::new(0)), limits)?;
+        let mut session = DemSamplingSession::with_use(
+            plan,
+            RandomPolicy::Seeded(crate::Seed::new(0)),
+            limits,
+            SessionUse::Replay,
+        )?;
         session.preflight_common(expected_shots)?;
         if expected_shots.get() != 0 {
             session

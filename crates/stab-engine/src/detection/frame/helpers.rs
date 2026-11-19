@@ -1,7 +1,6 @@
 use stab_algebra::PauliBasis;
 use stab_model::{
-    CircuitInstruction, Gate, GateCategory, MeasureRecordOffset, Pauli, Probability, QubitId,
-    Target,
+    CircuitInstruction, Gate, GateCategory, MeasureRecordOffset, Pauli, Probability, Target,
 };
 
 use super::super::error::{DetectionError, DetectionResult};
@@ -109,25 +108,6 @@ pub(super) fn zero_probability_noise(instruction: &CircuitInstruction) -> Detect
         .args()
         .iter()
         .all(|probability| *probability == 0.0))
-}
-
-pub(super) fn qubit_index(
-    instruction: &CircuitInstruction,
-    target: &Target,
-) -> DetectionResult<usize> {
-    let Some(qubit) = target.qubit_id() else {
-        return Err(unsupported_frame_instruction(instruction));
-    };
-    qubit_id_index(qubit)
-}
-
-pub(super) fn qubit_id_index(qubit: QubitId) -> DetectionResult<usize> {
-    usize::try_from(qubit.get()).map_err(|_| {
-        DetectionError::invalid_sampler_compilation(format!(
-            "qubit target {} cannot fit in this platform's usize",
-            qubit.get()
-        ))
-    })
 }
 
 pub(super) fn pauli_basis(pauli: Pauli) -> PauliBasis {

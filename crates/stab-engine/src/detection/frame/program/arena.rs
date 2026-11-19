@@ -54,8 +54,10 @@ impl PauliProduct {
     }
 }
 
-/// A resolved Pauli term: a qubit index and the basis applied to it.
-pub(crate) type PauliTerm = (usize, PauliBasis);
+/// A resolved Pauli term: a frame qubit and the basis applied to it.
+///
+/// Qubit ids are `u32` in the circuit model, so the term packs into 8 bytes.
+pub(crate) type PauliTerm = (u32, PauliBasis);
 
 /// The element types a [`ProgramArena`] stores, each in its own pool.
 pub(crate) trait ArenaElement: Copy + Sized {

@@ -3,7 +3,7 @@
 use stab_model::MemoryBudget;
 use stab_records::DemSampleSink;
 
-use super::batch::{initial_capacities, session_storage_bytes};
+use super::batch::{SessionUse, initial_capacities, session_storage_bytes};
 use super::{
     DemReplayBatchStatus, DemReplayTransaction, DemSamplingExecutionError, DemSamplingRunError,
     DemSamplingRunProgress, ReplayRecords,
@@ -26,9 +26,11 @@ impl DemSamplingPlan {
         limits: &DemSamplerLimits,
         expected_shots: ShotCount,
     ) -> DemReplayRecordStore {
-        let session_bytes = initial_capacities(self, limits).ok().map(|capacities| {
-            session_storage_bytes(self, capacities.output, capacities.sample, true)
-        });
+        let session_bytes = initial_capacities(self, limits, SessionUse::Replay)
+            .ok()
+            .map(|capacities| {
+                session_storage_bytes(self, capacities.output, capacities.sample, true)
+            });
         let budget_bytes = limits.memory_budget().bytes();
         let (free, session_fits) = match session_bytes.and_then(|bytes| u64::try_from(bytes).ok()) {
             Some(bytes) if bytes <= budget_bytes => (budget_bytes - bytes, true),

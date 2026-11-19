@@ -459,3 +459,70 @@ fn windowed_conversion_polls_while_zeroing_its_records() {
         assert!(delivered.0 == expected.0, "retried conversion diverged");
     });
 }
+
+/// A measurement-to-detection session with sweep correction keeps full-width planes: creating
+/// it zeroes them in polled chunks, so cancellation there fails creation with the typed error,
+/// and a batch cancelled inside its plane passes reports a cancelled batch, leaves the session
+/// usable, and converts again to what an uninterrupted session delivers.
+#[test]
+fn sweep_corrected_conversion_polls_its_full_width_passes() {
+    use stab_records::PackedShotBatch;
+
+    use crate::work_poll::test_hook;
+    use crate::{
+        DetectionExecutionError, DetectionRunStatus, MAX_BATCH_SHOTS,
+        MeasurementToDetectionCompiler,
+    };
+
+    let circuit =
+        Circuit::from_stim_str(&format!("CX sweep[0] 0\n{WIDE_RECORDS}")).expect("fixture parses");
+    let plan = MeasurementToDetectionCompiler::new()
+        .compile(&circuit)
+        .expect("compile conversion plan");
+    let mut rng = SmallRng::seed_from_u64(9);
+    let measurements = (0..MAX_BATCH_SHOTS)
+        .map(|_| (0..4096).map(|_| rng.random_bool(0.5)).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let measurements = PackedShotBatch::from_records(&measurements, 4096).expect("pack input");
+    let input = || stab_records::MeasurementBatchView::new(measurements.view());
+
+    let mut expected = Records::default();
+    plan.session()
+        .expect("conversion session")
+        .run(input(), None, &mut expected)
+        .expect("convert a batch");
+
+    test_hook::with_units_per_poll(CREATION_UNITS_PER_POLL, || {
+        let (created, polls) = test_hook::count_polls(|| plan.session());
+        drop(created.expect("counted conversion session"));
+        // 6144 frame planes at 16 units and 4096 column words at 4 units, one poll per 512.
+        assert!(polls >= 200, "zeroing the planes polled {polls} times");
+        let (interrupted, fired) =
+            test_hook::cancel_at_poll(polls / 2, || plan.session().map(drop));
+        assert!(fired);
+        assert!(
+            matches!(interrupted, Err(DetectionExecutionError::Cancelled(_))),
+            "{interrupted:?}"
+        );
+
+        let mut counted = plan.session().expect("conversion session");
+        let (first, batch_polls) =
+            test_hook::count_polls(|| counted.run(input(), None, &mut Records::default()));
+        first.expect("counted batch");
+        for fire_at in [1, batch_polls / 2] {
+            let mut session = plan.session().expect("conversion session");
+            let mut delivered = Records::default();
+            let (interrupted, fired) =
+                test_hook::cancel_at_poll(fire_at, || session.run(input(), None, &mut delivered));
+            assert!(fired);
+            let summary = interrupted.expect("cancellation is a status, not an error");
+            assert_eq!(summary.status(), DetectionRunStatus::Cancelled);
+            assert!(delivered.0.is_empty());
+            assert!(!session.is_poisoned());
+            session
+                .run(input(), None, &mut delivered)
+                .expect("convert the batch again");
+            assert!(delivered.0 == expected.0, "retried conversion diverged");
+        }
+    });
+}
