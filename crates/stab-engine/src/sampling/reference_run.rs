@@ -1,6 +1,7 @@
 //! Drives the inverse-tableau reference simulator over the resolved circuit program.
 
 use stab_algebra::PauliBasis;
+use stab_bits::BitSlice;
 use stab_model::{Cancellation, RepeatNestingLimit};
 
 use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
@@ -51,7 +52,7 @@ impl ReferenceWorkspace {
         &mut self,
         program: &CircuitProgram,
         loop_policy: ReferenceSampleLoopPolicy,
-        sweep_record: &[bool],
+        sweep_record: BitSlice<'_>,
         output: &mut ReferenceBits,
         cancellation: &Cancellation,
     ) -> Result<(), SamplingExecutionError> {
@@ -97,7 +98,7 @@ fn run_entries(
     program: &CircuitProgram,
     simulator: &mut InverseTableauSimulator,
     mut snapshot: Option<&mut SnapshotSlot>,
-    sweep_record: &[bool],
+    sweep_record: BitSlice<'_>,
     output: &mut ReferenceBits,
     cancellation: &Cancellation,
 ) -> Result<(), SamplingExecutionError> {
@@ -396,7 +397,7 @@ fn apply_instruction(
     program: &CircuitProgram,
     instruction: &ProgramInstruction,
     simulator: &mut InverseTableauSimulator,
-    sweep_record: &[bool],
+    sweep_record: BitSlice<'_>,
     output: &mut ReferenceBits,
     (poll, work): RunPoll<'_, '_>,
 ) -> Result<(), SamplingExecutionError> {
@@ -525,7 +526,6 @@ fn apply_instruction(
                         let active = usize::try_from(id)
                             .ok()
                             .and_then(|index| sweep_record.get(index))
-                            .copied()
                             .unwrap_or(false);
                         if active {
                             simulator.apply_pauli(qubit as usize, *basis)
@@ -701,7 +701,7 @@ pub(super) fn count_determined_measurements(
                 program,
                 other,
                 &mut simulator,
-                &[],
+                BitSlice::default(),
                 &mut record,
                 (cursor.poll(), &mut work),
             )?,

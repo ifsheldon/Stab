@@ -1,8 +1,10 @@
+use stab_bits::BitSlice;
 use stab_model::{Cancellation, MemoryBudget};
 
 use super::api::{ReferenceSampleLoopPolicy, validate_reference_width};
 use super::reference_bits::ReferenceBits;
 use super::reference_run::{ReferenceWorkspace, has_reference_fold_candidate};
+use super::reference_sample::{ReferenceSample, SweepRecord, validate_sweep_width};
 use super::{
     SamplingExecutionError, SamplingPlan, reference_state_snapshot_fits,
     simulator_work_storage_bytes, validate_simulator_work_storage,
@@ -20,51 +22,32 @@ impl SamplingPlan {
         )
     }
 
-    /// Writes the noiseless reference measurement record for one sweep assignment.
+    /// Computes the noiseless reference measurement record for one sweep assignment.
     ///
-    /// The all-false sweep record reuses the plan's cached reference sample; other sweep
-    /// records run the inverse-tableau reference simulator once.
-    pub(crate) fn reference_measurement_record_with_sweep_into(
+    /// The all-false sweep record returns the plan's cached reference sample without a copy;
+    /// other sweep records run the inverse-tableau reference simulator once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SamplingExecutionError::InvalidSweepRecordWidth`] when `sweep` was built for a
+    /// plan of a different sweep width, and a storage, cancellation, or invariant error from the
+    /// reference run.
+    pub fn try_reference_sample_with_sweep(
         &self,
-        sweep_record: &[bool],
-        record: &mut Vec<bool>,
-    ) -> Result<(), SamplingExecutionError> {
-        if sweep_record.len() != self.inner.sweep_bit_count {
-            return Err(SamplingExecutionError::InvalidSweepRecordWidth {
-                expected: self.inner.sweep_bit_count,
-                actual: sweep_record.len(),
-            });
+        sweep: &SweepRecord,
+    ) -> Result<ReferenceSample, SamplingExecutionError> {
+        validate_sweep_width(self.sweep_width(), sweep.width().get())?;
+        if sweep.is_all_false() {
+            return self.try_reference_sample();
         }
-        if record.capacity() < self.inner.measurement_count {
-            record
-                .try_reserve_exact(self.inner.measurement_count - record.capacity())
-                .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
-                    message: format!(
-                        "reference measurement record capacity {}: {error}",
-                        self.inner.measurement_count
-                    ),
-                })?;
-        }
-        record.clear();
-        if self.inner.measurement_count == 0 {
-            return Ok(());
-        }
-        if !sweep_record.contains(&true) {
-            self.inner
-                .cached_reference_sample()?
-                .extend_bools_into(record);
-            return Ok(());
-        }
-        let output = program_reference_sample(
+        program_reference_sample(
             &self.inner.program,
             self.inner.qubit_count,
             self.inner.reference_sample_loop_policy,
-            sweep_record,
+            sweep.as_bitslice(),
             self.inner.memory_budget,
             &self.inner.cancellation,
-        )?;
-        record.extend_from_slice(&output);
-        Ok(())
+        )
     }
 }
 
@@ -100,18 +83,19 @@ pub(crate) fn reference_work_storage_bytes(
 
 /// Runs the reference simulator over `program` for one sweep assignment.
 ///
-/// `qubit_count` is the circuit's simulated qubit count, which bounds every program target.
+/// `qubit_count` is the circuit's simulated qubit count, which bounds every program target, and
+/// sweep bits past the end of `sweep_record` read as false.
 pub(crate) fn program_reference_sample(
     program: &CircuitProgram,
     qubit_count: usize,
     loop_policy: ReferenceSampleLoopPolicy,
-    sweep_record: &[bool],
+    sweep_record: BitSlice<'_>,
     budget: MemoryBudget,
     cancellation: &Cancellation,
-) -> Result<Vec<bool>, SamplingExecutionError> {
+) -> Result<ReferenceSample, SamplingExecutionError> {
     let measurement_count = program.counts().measurements;
     if measurement_count == 0 {
-        return Ok(Vec::new());
+        return Ok(ReferenceSample::default());
     }
     let needs_snapshot = uses_snapshot(program, qubit_count, loop_policy, budget);
     validate_simulator_work_storage(qubit_count, measurement_count, needs_snapshot, budget)?;
@@ -125,5 +109,5 @@ pub(crate) fn program_reference_sample(
         cancellation,
     )?;
     validate_reference_width(output.len(), measurement_count)?;
-    output.to_bools("reference measurement output")
+    Ok(output.into_sample())
 }

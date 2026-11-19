@@ -279,6 +279,21 @@ A `CliffordString` is charged its six packed planes and nothing else: `identity_
 Creating a measurement-to-detection session with sweep correction polls the plan's cancellation signal while zeroing its planes and can return the existing `Cancelled` error.
 A `sample_dem` replay session sizes its planes for one 64-record batch instead of 1,024 shots, so a replay needs less of the budget and retains more records under the same budget.
 
+## Packed Reference Samples
+
+A reference sample is the packed, shared `stab_engine::ReferenceSample`, one bit per measurement, instead of a `Vec<bool>`; the plan computes it once and every reader shares that storage, so the bytes admitted are the bytes allocated.
+
+| Removed or changed item | Replacement |
+| --- | --- |
+| `SamplingPlan::try_reference_sample` returning `Vec<bool>` | Returns `ReferenceSample`, a handle to the plan's cached sample; `len`, `get`, `iter`, `as_bitslice`, and `words` read it, and `.iter().collect::<Vec<bool>>()` rebuilds a flag list where one is still wanted |
+| `circuit_reference_sample` returning `Vec<bool>` | Returns `ReferenceSample` |
+| None | `SweepRecord::try_for_plan(&SamplingPlan, BitVec)`, a packed sweep record whose width is checked against the plan, `SamplingPlan::sweep_width`, and `SamplingPlan::try_reference_sample_with_sweep(&SweepRecord)`, which returns the cached sample for an all-false record |
+| `ReferenceSampleTree::try_new` taking `Vec<bool>` prefix bits, `prefix_bits` returning `&[bool]`, and `decompress` returning `Vec<bool>` | Each takes or returns `ReferenceSample`; build one with `ReferenceSample::from(BitVec)` |
+| `ReferenceSampleTree::decompress_into` | `ReferenceSampleTree::decompress` |
+| None | `stab_bits::BitIter`, returned by `BitSlice::iter` and `BitVec::iter`, and `BitSlice: Default` |
+
+`MeasurementToDetectionPlan::retained_bytes` now includes the plan's packed reference sample and `MeasurementToDetectionSession::retained_bytes` no longer includes a byte per measurement, so `m2d` needs about seven eighths of a byte less per measurement; a sampling session that uses the reference sample admits 48 more bytes for the shared handle.
+
 ## DEM Sampled-Error Streams
 
 Seeded `sample_dem` detector and observable output no longer depends on `--err_out`. A run that records sampled errors, through `--err_out` or `DemSamplingSession::run_with_sampled_errors`, now draws exactly the random streams of a run that does not, so its detector and observable records are byte-identical to the plain seeded run, and replaying its sampled-error file with `--replay_err_in` reproduces them. Pinned Stim's detector output is likewise independent of the flag.

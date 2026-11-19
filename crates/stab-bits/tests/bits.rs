@@ -61,6 +61,19 @@ proptest! {
         for index in 0..=len {
             prop_assert_eq!(view.get(index), bits.get(index));
         }
+        // A view over the dirty source words must iterate only its logical bits.
+        let dirty_view = BitSlice::new(&words[..len.div_ceil(WORD_BITS)], len)
+            .expect("dirty-tail view");
+        let expected = (0..len).map(|index| word_bit(&words, index)).collect::<Vec<_>>();
+        prop_assert_eq!(dirty_view.iter().len(), len);
+        prop_assert_eq!(dirty_view.iter().collect::<Vec<_>>(), expected.clone());
+        prop_assert_eq!(
+            bits.iter().rev().collect::<Vec<_>>(),
+            expected.iter().rev().copied().collect::<Vec<_>>()
+        );
+        for skip in [0, 1, 63, 64, 65, len / 2, len] {
+            prop_assert_eq!(bits.iter().nth(skip), expected.get(skip).copied());
+        }
         let mut copied = BitVec::zeros(len);
         copied.copy_from_bitslice(&view).expect("same-width copy");
         prop_assert_eq!(&copied, &bits);

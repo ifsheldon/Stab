@@ -460,7 +460,10 @@ fn assert_heralded_plan_across_surfaces(
 fn assert_deterministic_noise_effect(text: &str, expected_sample: &[bool], expected_dem: &str) {
     let circuit = circuit(text);
     assert_eq!(
-        circuit_reference_sample(&circuit).expect("noise-free reference"),
+        circuit_reference_sample(&circuit)
+            .expect("noise-free reference")
+            .iter()
+            .collect::<Vec<_>>(),
         vec![false; expected_sample.len()]
     );
     assert_eq!(

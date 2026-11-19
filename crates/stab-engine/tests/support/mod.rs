@@ -35,7 +35,7 @@ impl SamplingFixture {
     }
 
     pub(super) fn reference_sample(&self) -> Result<Vec<bool>, SamplingExecutionError> {
-        self.plan.try_reference_sample()
+        Ok(self.plan.try_reference_sample()?.iter().collect())
     }
 
     pub(super) fn count_determined_measurements(

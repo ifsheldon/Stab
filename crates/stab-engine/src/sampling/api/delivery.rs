@@ -17,7 +17,7 @@ use crate::detection::frame::{
     PendingLanes, PlaneWindow, Refill, SampledRecords, ShotRecordTransposer, WindowShape,
     sample_or_rewind,
 };
-use crate::sampling::ReferenceBits;
+use crate::sampling::ReferenceSample;
 use crate::work_poll::WorkPoll;
 
 pub(super) enum SamplingDeliveryError<SinkError> {
@@ -52,7 +52,7 @@ pub(super) struct SamplingBatchSource<'run, W: FrameWord, Sink> {
     program: &'run CircuitProgram,
     /// The frame state, or `None` for a plan without measurements.
     frame: Option<&'run mut FrameBatchState<W>>,
-    reference: Option<&'run ReferenceBits>,
+    reference: Option<&'run ReferenceSample>,
     rng: &'run mut SmallRng,
     cancellation: &'run Cancellation,
     sink: &'run mut Sink,
@@ -62,7 +62,7 @@ impl<'run, W: FrameWord, Sink> SamplingBatchSource<'run, W, Sink> {
     pub(super) const fn new(
         program: &'run CircuitProgram,
         frame: Option<&'run mut FrameBatchState<W>>,
-        reference: Option<&'run ReferenceBits>,
+        reference: Option<&'run ReferenceSample>,
         rng: &'run mut SmallRng,
         cancellation: &'run Cancellation,
         sink: &'run mut Sink,
@@ -150,7 +150,7 @@ pub(super) struct StreamingFrame<W: FrameWord> {
 pub(super) struct StreamingDelivery<'run, W: FrameWord, Sink> {
     pub(super) program: &'run CircuitProgram,
     pub(super) frame: &'run mut StreamingFrame<W>,
-    pub(super) reference: Option<&'run ReferenceBits>,
+    pub(super) reference: Option<&'run ReferenceSample>,
     pub(super) rng: &'run mut SmallRng,
     pub(super) cancellation: &'run Cancellation,
     pub(super) sink: &'run mut Sink,
@@ -170,7 +170,7 @@ where
         self,
         shots: ShotCount,
     ) -> Result<DeliveryOutcome, DeliveryFailure<SamplingDeliveryError<Sink::Error>>> {
-        let flips = self.reference.map_or(&[][..], ReferenceBits::words);
+        let flips = self.reference.map_or(&[][..], ReferenceSample::words);
         let mut remaining = shots.get();
         let mut committed = 0_u64;
         while remaining > 0 {

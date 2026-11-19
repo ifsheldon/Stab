@@ -1,5 +1,6 @@
 //! Stable packed bit storage, checked views, scalar kernels, and layout primitives.
 
+mod iter;
 mod scalar;
 mod transpose;
 
@@ -9,6 +10,8 @@ use std::ops::{
 };
 
 use thiserror::Error;
+
+pub use iter::BitIter;
 
 pub const BIT_BLOCK_WORDS: usize = 4;
 const WORD_BITS: usize = u64::BITS as usize;
@@ -207,7 +210,7 @@ impl Not for BitBlock {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct BitSlice<'a> {
     words: &'a [u64],
     bit_len: BitLen,

@@ -32,7 +32,7 @@ use reference::ReferenceSampleSource;
 use stab_model::Circuit;
 
 use crate::work_poll::WorkPoll;
-use crate::{CompilationDescriptor, CompilationOperation};
+use crate::{CompilationDescriptor, CompilationOperation, ReferenceSample};
 
 #[cfg(test)]
 mod test_support;
@@ -192,13 +192,6 @@ impl PreparedMeasurementToDetection {
         })
     }
 
-    fn try_reusable_reference_sample(&self) -> DetectionResult<Vec<bool>> {
-        try_false_vec(
-            self.measurement_count(),
-            "detection conversion reference sample",
-        )
-    }
-
     fn try_reusable_sweep_correction(
         &self,
     ) -> DetectionResult<Option<FrameBatchState<FrameLanes>>> {
@@ -220,7 +213,13 @@ impl PreparedMeasurementToDetection {
             .map_or(0, SweepCorrectionPlan::state_storage_bytes)
     }
 
+    /// Bytes the prepared conversion retains: its compiled program, any sweep-correction
+    /// program, and the packed words of its reference sample.
     fn compiled_bytes(&self) -> DetectionResult<u64> {
+        let reference_bytes = self
+            .reference_sample
+            .sample()
+            .map_or(0, |sample| ReferenceSample::storage_bytes(sample.len()));
         self.plan
             .compiled_storage_bytes()?
             .checked_add(
@@ -228,6 +227,7 @@ impl PreparedMeasurementToDetection {
                     .as_ref()
                     .map_or(0, SweepCorrectionPlan::retained_bytes),
             )
+            .and_then(|bytes| bytes.checked_add(u64::try_from(reference_bytes).ok()?))
             .ok_or_else(|| {
                 DetectionError::invalid_sampler_compilation(
                     "compiled measurement-to-detection plan storage byte count overflowed",
@@ -244,7 +244,6 @@ impl PreparedMeasurementToDetection {
         measurement_planes: &mut [FrameLanes],
         sweep_planes: &[FrameLanes],
         shot_count: usize,
-        reference_sample: &[bool],
         detector_planes: &mut Vec<FrameLanes>,
         observable_planes: &mut Vec<FrameLanes>,
         correction_state: Option<&mut FrameBatchState<FrameLanes>>,
@@ -252,7 +251,10 @@ impl PreparedMeasurementToDetection {
         cancellation: &stab_model::Cancellation,
     ) -> DetectionResult<()> {
         self.validate_word_plane_widths(measurement_planes, sweep_planes)?;
-        reference::validate_reference_sample_len(reference_sample, self.measurement_count())?;
+        let reference_sample = self.reference_sample.sample();
+        if let Some(reference_sample) = reference_sample {
+            reference::validate_reference_sample_len(reference_sample, self.measurement_count())?;
+        }
         let active_mask = FrameLanes::active_mask(shot_count);
         let mut poll = WorkPoll::new(cancellation);
         for_chunks_mut_polled(
@@ -260,10 +262,9 @@ impl PreparedMeasurementToDetection {
             FRAME_LANES_PLANE_UNITS,
             &mut poll,
             |start, part| {
-                for (plane, reference_bit) in
-                    part.iter_mut().zip(reference_sample.iter().skip(start))
-                {
-                    if *reference_bit {
+                for (offset, plane) in part.iter_mut().enumerate() {
+                    if reference_sample.and_then(|sample| sample.get(start + offset)) == Some(true)
+                    {
                         *plane ^= active_mask;
                     }
                     *plane &= active_mask;

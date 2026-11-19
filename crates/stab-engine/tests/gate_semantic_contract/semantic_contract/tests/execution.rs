@@ -790,7 +790,10 @@ fn gate_surface_contract_classical_control_feedback() {
 fn gate_surface_contract_classical_control_no_sweep_data() {
     let text = "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n";
     assert_eq!(
-        circuit_reference_sample(&circuit(text)).expect("all-false sweep reference"),
+        circuit_reference_sample(&circuit(text))
+            .expect("all-false sweep reference")
+            .iter()
+            .collect::<Vec<_>>(),
         vec![false]
     );
     assert_all_semantic_surfaces_execute(text);
@@ -897,7 +900,10 @@ fn assert_all_semantic_surfaces_execute(text: &str) {
 fn assert_exact_reference_and_samples(text: &str, expected: &[bool]) {
     let circuit = circuit(text);
     assert_eq!(
-        circuit_reference_sample(&circuit).expect("reference sample"),
+        circuit_reference_sample(&circuit)
+            .expect("reference sample")
+            .iter()
+            .collect::<Vec<_>>(),
         expected
     );
     let sampler = SamplingFixture::compile(&circuit).expect("compile deterministic sampler");
@@ -919,7 +925,10 @@ fn assert_noiseless_reference_and_flipped_samples(
 ) {
     let circuit = circuit(text);
     assert_eq!(
-        circuit_reference_sample(&circuit).expect("reference sample"),
+        circuit_reference_sample(&circuit)
+            .expect("reference sample")
+            .iter()
+            .collect::<Vec<_>>(),
         expected_reference
     );
     let sampler = SamplingFixture::compile(&circuit).expect("compile deterministic sampler");
@@ -1091,7 +1100,10 @@ fn classical_control_baseline() -> String {
 fn assert_sweep_reference(text: &str, expected_false: &[bool], expected_true: &[bool]) {
     let circuit = circuit(text);
     assert_eq!(
-        circuit_reference_sample(&circuit).expect("false sweep reference"),
+        circuit_reference_sample(&circuit)
+            .expect("false sweep reference")
+            .iter()
+            .collect::<Vec<_>>(),
         expected_false,
         "false sweep: {text}"
     );
@@ -1112,7 +1124,7 @@ fn assert_sweep_reference(text: &str, expected_false: &[bool], expected_true: &[
 }
 
 fn test_reference_sample(circuit: &Circuit) -> TestResult<Vec<bool>> {
-    Ok(circuit_reference_sample(circuit)?)
+    Ok(circuit_reference_sample(circuit)?.iter().collect())
 }
 
 fn circuit(text: &str) -> Circuit {

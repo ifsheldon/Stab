@@ -3,6 +3,7 @@ use rand::Rng;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_model::{Circuit, MemoryBudget, ModelDialect};
+use stab_records::MeasurementWidth;
 
 #[cfg(test)]
 use self::execute::{ExecutionBuffers, ExecutionMode, execute_program};
@@ -24,6 +25,7 @@ mod reference_bits;
 mod reference_fold;
 mod reference_order;
 mod reference_run;
+mod reference_sample;
 mod reference_simulator;
 #[cfg(test)]
 mod stabilizer_frame;
@@ -38,6 +40,7 @@ pub(crate) use api::{session_cancellation, session_cancellation_slot};
 pub(crate) use local_tableau::LocalTableauTransform;
 pub(crate) use reference::{program_reference_sample, reference_work_storage_bytes};
 pub(crate) use reference_bits::ReferenceBits;
+pub use reference_sample::{ReferenceSample, SweepRecord};
 
 /// Sampling compiler descriptor consumed by facade capability aggregation.
 pub const COMPILATION_DESCRIPTOR: CompilationDescriptor = CompilationDescriptor::new(
@@ -71,17 +74,17 @@ impl SamplingPlan {
         )
     }
 
-    /// Computes the deterministic reference sample with bounded, fallible storage.
+    /// Returns the plan's deterministic all-false-sweep reference sample.
     ///
-    /// The sample is computed once per plan and reused by later calls and sessions.
-    pub fn try_reference_sample(&self) -> Result<Vec<bool>, SamplingExecutionError> {
-        self.inner
-            .cached_reference_sample()?
-            .to_bools("reference sample copy")
+    /// The sample is computed once per plan with bounded, fallible storage and reused by later
+    /// calls and sessions; every call returns a shared handle to the same packed bits.
+    pub fn try_reference_sample(&self) -> Result<ReferenceSample, SamplingExecutionError> {
+        self.inner.cached_reference_sample().cloned()
     }
 
-    pub(crate) fn sweep_bit_count(&self) -> usize {
-        self.inner.sweep_bit_count
+    /// The number of sweep bits a [`SweepRecord`] of this plan holds.
+    pub fn sweep_width(&self) -> MeasurementWidth {
+        MeasurementWidth::new(self.inner.sweep_bit_count)
     }
 
     /// Executes one shot on the generator-list stabilizer frame, the differential baseline of
@@ -151,7 +154,7 @@ pub(crate) fn validate_simulator_work_storage(
     Ok(())
 }
 
-/// Conservative scratch storage of one reference-simulator run, including its output record of
+/// Conservative scratch storage of one reference-simulator run, including its output sample of
 /// one bit per measurement.
 fn simulator_work_storage_bytes(
     qubit_count: usize,
@@ -163,9 +166,7 @@ fn simulator_work_storage_bytes(
         .saturating_mul(qubits)
         .saturating_mul(4)
         .saturating_add(qubits.saturating_mul(256))
-        .saturating_add(reference_bits::ReferenceBits::storage_bytes(
-            measurement_count,
-        ));
+        .saturating_add(ReferenceSample::storage_bytes(measurement_count));
     if include_reference_snapshot {
         base.saturating_add(reference_snapshot_admission_bytes(qubit_count))
     } else {
@@ -229,16 +230,10 @@ pub enum CircuitReferenceSampleError {
 /// Computes a circuit's deterministic reference sample with every sweep bit set to false.
 pub fn circuit_reference_sample(
     circuit: &Circuit,
-) -> Result<Vec<bool>, CircuitReferenceSampleError> {
-    let plan = SamplingCompiler::new().compile(circuit)?;
-    let mut sweep_record = api::try_bool_buffer(plan.sweep_bit_count(), "reference sweep record")?;
-    sweep_record.resize(plan.sweep_bit_count(), false);
-    let mut output = api::try_bool_buffer(
-        plan.measurement_width().get(),
-        "reference measurement output",
-    )?;
-    plan.reference_measurement_record_with_sweep_into(&sweep_record, &mut output)?;
-    Ok(output)
+) -> Result<ReferenceSample, CircuitReferenceSampleError> {
+    Ok(SamplingCompiler::new()
+        .compile(circuit)?
+        .try_reference_sample()?)
 }
 
 pub fn count_determined_measurements(

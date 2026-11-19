@@ -3,7 +3,8 @@
 use stab_model::{Circuit, RepeatNestingLimit};
 use thiserror::Error;
 
-use crate::{SamplingCompileError, SamplingCompiler, SamplingExecutionError};
+use crate::sampling::ReferenceBits;
+use crate::{ReferenceSample, SamplingCompileError, SamplingCompiler, SamplingExecutionError};
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum ReferenceSampleTreeError {
@@ -16,7 +17,7 @@ pub enum ReferenceSampleTreeError {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReferenceSampleTree {
-    prefix_bits: Vec<bool>,
+    prefix_bits: ReferenceSample,
     suffix_children: Vec<ReferenceSampleTree>,
     repetitions: u64,
     body_size: usize,
@@ -33,7 +34,7 @@ impl ReferenceSampleTree {
     /// Child trees must already have passed the same admission. Validation checks nesting before
     /// size arithmetic so callers get the first structural rejection deterministically.
     pub fn try_new(
-        prefix_bits: Vec<bool>,
+        prefix_bits: ReferenceSample,
         suffix_children: Vec<Self>,
         repetitions: u64,
     ) -> Result<Self, ReferenceSampleTreeError> {
@@ -82,24 +83,18 @@ impl ReferenceSampleTree {
         })
     }
 
+    /// A one-node tree holding a circuit's all-false-sweep reference sample.
     pub fn from_circuit_reference_sample(
         circuit: &Circuit,
     ) -> Result<Self, ReferenceSampleTreeError> {
-        let sampler = SamplingCompiler::new().compile(circuit)?;
-        let mut sweep_record = try_bool_buffer(
-            sampler.sweep_bit_count(),
-            "reference sample tree sweep record",
-        )?;
-        sweep_record.resize(sampler.sweep_bit_count(), false);
-        let mut prefix_bits = try_bool_buffer(
-            sampler.measurement_width().get(),
-            "reference sample tree prefix",
-        )?;
-        sampler.reference_measurement_record_with_sweep_into(&sweep_record, &mut prefix_bits)?;
+        let prefix_bits = SamplingCompiler::new()
+            .compile(circuit)?
+            .try_reference_sample()?;
         Self::try_new(prefix_bits, Vec::new(), 1)
     }
 
-    pub fn prefix_bits(&self) -> &[bool] {
+    /// The bits this node emits before its children on every repetition.
+    pub fn prefix_bits(&self) -> &ReferenceSample {
         &self.prefix_bits
     }
 
@@ -132,7 +127,7 @@ impl ReferenceSampleTree {
             }
             remaining %= node.body_size;
             if remaining < node.prefix_bits.len() {
-                return node.prefix_bits.get(remaining).copied();
+                return node.prefix_bits.get(remaining);
             }
             remaining -= node.prefix_bits.len();
 
@@ -148,44 +143,20 @@ impl ReferenceSampleTree {
         }
     }
 
-    /// Materializes all represented bits.
+    /// Materializes all represented bits into one packed reference sample.
     ///
     /// # Errors
     ///
-    /// Returns a typed execution-storage error when the destination or bounded traversal stack
-    /// cannot be allocated.
-    pub fn decompress(&self) -> Result<Vec<bool>, ReferenceSampleTreeError> {
-        let mut out = Vec::new();
-        self.decompress_into(&mut out)?;
-        Ok(out)
-    }
-
-    /// Appends all represented bits after reserving every required destination bit.
-    ///
-    /// The destination contents are unchanged when admission or allocation fails.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed execution-storage error when the final length overflows or when either
-    /// destination or traversal storage cannot be allocated.
-    pub fn decompress_into(&self, out: &mut Vec<bool>) -> Result<(), ReferenceSampleTreeError> {
+    /// Returns a typed execution-storage error when the packed destination or the bounded
+    /// traversal stack cannot be allocated.
+    pub fn decompress(&self) -> Result<ReferenceSample, ReferenceSampleTreeError> {
         if self.logical_size == 0 {
-            return Ok(());
+            return Ok(ReferenceSample::default());
         }
-
-        let final_len = out.len().checked_add(self.logical_size).ok_or_else(|| {
-            tree_storage_error(format!(
-                "reference sample tree destination length overflowed for {} existing and {} appended bits",
-                out.len(),
-                self.logical_size
-            ))
-        })?;
-        out.try_reserve_exact(self.logical_size).map_err(|error| {
-            tree_storage_error(format!(
-                "reference sample tree destination capacity {}: {error}",
-                self.logical_size
-            ))
-        })?;
+        let mut out = ReferenceBits::try_with_capacity(
+            self.logical_size,
+            "reference sample tree destination",
+        )?;
 
         let frame_capacity = self.nesting_depth.checked_add(1).ok_or_else(|| {
             tree_storage_error("reference sample tree traversal frame count overflowed")
@@ -204,7 +175,7 @@ impl ReferenceSampleTree {
                 continue;
             }
             if !frame.prefix_written {
-                out.extend_from_slice(&frame.tree.prefix_bits);
+                out.extend_from_bitslice(frame.tree.prefix_bits.as_bitslice());
                 frame.prefix_written = true;
                 continue;
             }
@@ -218,17 +189,18 @@ impl ReferenceSampleTree {
             frame.prefix_written = false;
         }
 
-        if out.len() != final_len {
+        if out.len() != self.logical_size {
             return Err(ReferenceSampleTreeError::SamplingExecution(
                 SamplingExecutionError::InternalInvariant {
                     message: format!(
-                        "reference sample tree materialized {} bits instead of admitted length {final_len}",
-                        out.len()
+                        "reference sample tree materialized {} bits instead of admitted length {}",
+                        out.len(),
+                        self.logical_size
                     ),
                 },
             ));
         }
-        Ok(())
+        Ok(out.into_sample())
     }
 
     /// Returns an equivalent tree with empty children removed and unary repetitions folded.
@@ -280,17 +252,13 @@ impl ReferenceSampleTree {
             return Ok(Self::default());
         }
 
-        Self::try_new(
-            try_clone_bits(&self.prefix_bits, "reference sample tree simplified prefix")?,
-            children,
-            self.repetitions,
-        )
+        Self::try_new(self.prefix_bits.clone(), children, self.repetitions)
     }
 
     pub fn stim_string(&self) -> String {
         let mut out = format!("{}*('", self.repetitions);
         for bit in &self.prefix_bits {
-            out.push(if *bit { '1' } else { '0' });
+            out.push(if bit { '1' } else { '0' });
         }
         out.push('\'');
         for child in &self.suffix_children {
@@ -320,26 +288,6 @@ impl<'a> DecompressionFrame<'a> {
     }
 }
 
-fn try_bool_buffer(
-    capacity: usize,
-    label: &'static str,
-) -> Result<Vec<bool>, ReferenceSampleTreeError> {
-    let mut buffer = Vec::new();
-    buffer
-        .try_reserve_exact(capacity)
-        .map_err(|error| tree_storage_error(format!("{label} capacity {capacity}: {error}")))?;
-    Ok(buffer)
-}
-
-fn try_clone_bits(
-    bits: &[bool],
-    label: &'static str,
-) -> Result<Vec<bool>, ReferenceSampleTreeError> {
-    let mut cloned = try_bool_buffer(bits.len(), label)?;
-    cloned.extend_from_slice(bits);
-    Ok(cloned)
-}
-
 fn tree_storage_error(message: impl Into<String>) -> ReferenceSampleTreeError {
     ReferenceSampleTreeError::SamplingExecution(SamplingExecutionError::SessionStorageAllocation {
         message: message.into(),
@@ -359,16 +307,26 @@ mod tests {
 
     use stab_model::Circuit;
 
+    use stab_bits::BitVec;
+
     use super::ReferenceSampleTree;
-    use crate::{ReferenceSampleTreeError, SamplingExecutionError};
+    use crate::{ReferenceSample, ReferenceSampleTreeError, SamplingExecutionError};
+
+    fn sample(bits: Vec<bool>) -> ReferenceSample {
+        ReferenceSample::from(BitVec::from_bits(bits))
+    }
 
     fn tree(
         prefix_bits: Vec<bool>,
         suffix_children: Vec<ReferenceSampleTree>,
         repetitions: u64,
     ) -> ReferenceSampleTree {
-        ReferenceSampleTree::try_new(prefix_bits, suffix_children, repetitions)
+        ReferenceSampleTree::try_new(sample(prefix_bits), suffix_children, repetitions)
             .expect("construct admitted reference sample tree")
+    }
+
+    fn decompressed(tree: &ReferenceSampleTree) -> Vec<bool> {
+        tree.decompress().expect("decompress tree").iter().collect()
     }
 
     #[test]
@@ -428,14 +386,14 @@ mod tests {
             true, true, false, true, true, true, true, true, true, true, true, false, true, true,
             true, true, true, true,
         ];
-        assert_eq!(tree.decompress().expect("decompress tree"), expected);
+        assert_eq!(decompressed(&tree), expected);
         for (index, bit) in expected.iter().copied().enumerate() {
             assert_eq!(tree.get(index), Some(bit), "index {index}");
         }
         assert_eq!(tree.get(expected.len()), None);
 
         let large = ReferenceSampleTree::try_new(
-            tree.prefix_bits().to_vec(),
+            tree.prefix_bits().clone(),
             tree.suffix_children().to_vec(),
             1_000_000,
         )
@@ -443,6 +401,31 @@ mod tests {
         assert_eq!(large.size(), 9_000_000);
         assert_eq!(large.get(8_999_999), Some(true));
         assert_eq!(large.get(9_000_000), None);
+    }
+
+    /// Decompression packs prefixes at every bit alignment; it must agree with random access,
+    /// which reads each node's prefix directly.
+    #[test]
+    fn packed_decompression_matches_random_access_across_word_boundaries() {
+        let pattern = |len: usize| {
+            (0..len)
+                .map(|index| index % 3 == 0 || index % 7 == 2)
+                .collect()
+        };
+        let tree = tree(
+            pattern(65),
+            vec![
+                tree(pattern(3), Vec::new(), 7),
+                tree(pattern(63), Vec::new(), 2),
+            ],
+            5,
+        );
+        let bits = decompressed(&tree);
+        assert_eq!(bits.len(), tree.size());
+        assert_eq!(tree.size(), (65 + 3 * 7 + 63 * 2) * 5);
+        for (index, bit) in bits.iter().copied().enumerate() {
+            assert_eq!(tree.get(index), Some(bit), "index {index}");
+        }
     }
 
     #[test]
@@ -471,7 +454,7 @@ mod tests {
             usize::try_from(maximal_repetitions).expect("test target fits repetitions")
         );
 
-        let error = ReferenceSampleTree::try_new(Vec::new(), vec![maximal], 2)
+        let error = ReferenceSampleTree::try_new(ReferenceSample::default(), vec![maximal], 2)
             .expect_err("logical size multiplication must reject overflow");
         match error {
             ReferenceSampleTreeError::SamplingExecution(
@@ -492,19 +475,13 @@ mod tests {
         }
         assert_eq!(deep.nesting_depth(), ReferenceSampleTree::MAX_NESTING);
         assert_eq!(deep.get(0), Some(true));
+        assert_eq!(decompressed(&deep), vec![true]);
         assert_eq!(
-            deep.decompress().expect("decompress maximum-depth tree"),
-            vec![true]
-        );
-        assert_eq!(
-            deep.simplified()
-                .expect("simplify maximum-depth tree")
-                .decompress()
-                .expect("decompress simplified tree"),
+            decompressed(&deep.simplified().expect("simplify maximum-depth tree")),
             vec![true]
         );
 
-        let error = ReferenceSampleTree::try_new(vec![true], vec![deep], u64::MAX)
+        let error = ReferenceSampleTree::try_new(sample(vec![true]), vec![deep], u64::MAX)
             .expect_err("first child beyond maximum depth must be rejected");
         match error {
             ReferenceSampleTreeError::SamplingExecution(
@@ -521,28 +498,6 @@ mod tests {
             }
             other => panic!("unexpected nesting rejection: {other:?}"),
         }
-    }
-
-    #[test]
-    fn fallible_decompression_rejects_before_mutating_destination() {
-        let maximal_repetitions = u64::try_from(usize::MAX).unwrap_or(u64::MAX);
-        let maximal = tree(vec![true], Vec::new(), maximal_repetitions);
-        let mut output = vec![false, true, false];
-        let original = output.clone();
-
-        let error = maximal
-            .decompress_into(&mut output)
-            .expect_err("destination length must reject before traversal");
-        match error {
-            ReferenceSampleTreeError::SamplingExecution(
-                SamplingExecutionError::SessionStorageAllocation { message },
-            ) => assert!(
-                message.contains("destination length overflowed"),
-                "unexpected destination rejection: {message}"
-            ),
-            other => panic!("unexpected decompression rejection: {other:?}"),
-        }
-        assert_eq!(output, original);
     }
 
     #[cfg(target_pointer_width = "64")]

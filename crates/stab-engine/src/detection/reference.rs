@@ -1,29 +1,24 @@
+use stab_bits::BitSlice;
 use stab_model::{Cancellation, Circuit, MemoryBudget};
 
-use super::buffers::try_false_vec;
 use super::error::{DetectionError, DetectionResourceLimitError, DetectionResult};
 use super::frame::CircuitProgram;
-use crate::ReferenceSampleLoopPolicy;
 use crate::sampling::{program_reference_sample, reference_work_storage_bytes};
+use crate::{ReferenceSample, ReferenceSampleLoopPolicy};
 
 #[derive(Clone, Debug)]
 pub(super) enum ReferenceSampleSource {
     Zero,
-    Static(Vec<bool>),
+    Static(ReferenceSample),
 }
 
 impl ReferenceSampleSource {
-    pub(super) fn fill(
-        &self,
-        measurement_count: usize,
-        output: &mut Vec<bool>,
-    ) -> DetectionResult<()> {
-        output.clear();
+    /// The reference sample a conversion XORs into every shot, or `None` for the all-zero one.
+    pub(super) const fn sample(&self) -> Option<&ReferenceSample> {
         match self {
-            Self::Zero => output.resize(measurement_count, false),
-            Self::Static(reference_sample) => output.extend_from_slice(reference_sample),
+            Self::Zero => None,
+            Self::Static(sample) => Some(sample),
         }
-        validate_reference_sample_len(output, measurement_count)
     }
 }
 
@@ -34,7 +29,7 @@ pub(super) fn static_reference_sample(
     measurement_count: usize,
     budget: MemoryBudget,
     cancellation: &Cancellation,
-) -> DetectionResult<Vec<bool>> {
+) -> DetectionResult<ReferenceSample> {
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     let loop_policy = ReferenceSampleLoopPolicy::Fold;
     let estimated_bytes = reference_work_storage_bytes(program, qubit_count, loop_policy, budget);
@@ -45,15 +40,12 @@ pub(super) fn static_reference_sample(
         )
         .into());
     }
-    let zero_sweeps = try_false_vec(
-        program.counts().sweep_bits,
-        "detection reference zero-sweep record",
-    )?;
+    // Sweep bits past the end of the empty record read as false.
     let reference_sample = program_reference_sample(
         program,
         qubit_count,
         loop_policy,
-        &zero_sweeps,
+        BitSlice::default(),
         budget,
         cancellation,
     )?;
@@ -62,7 +54,7 @@ pub(super) fn static_reference_sample(
 }
 
 pub(super) fn validate_reference_sample_len(
-    reference_sample: &[bool],
+    reference_sample: &ReferenceSample,
     measurement_count: usize,
 ) -> DetectionResult<()> {
     if reference_sample.len() == measurement_count {

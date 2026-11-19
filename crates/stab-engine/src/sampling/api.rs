@@ -9,7 +9,7 @@ use stab_model::{Cancellation, Circuit, MemoryBudget};
 use stab_records::{MeasurementSink, MeasurementWidth};
 use thiserror::Error;
 
-use super::reference_bits::ReferenceBits;
+use super::reference_sample::ReferenceSample;
 use super::{compile_program, sampler_rng};
 use crate::detection::frame::{
     CircuitProgram, DeliveryFailure, FrameBatchState, FrameLanes, LaneFrameBatch, PendingLanes,
@@ -29,9 +29,7 @@ use delivery::{
 pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
 #[cfg(test)]
 pub(super) use session_helpers::compute_stabilizer_frame_reference_sample;
-pub(super) use session_helpers::{
-    compute_reference_sample, try_bool_buffer, validate_reference_width,
-};
+pub(super) use session_helpers::{compute_reference_sample, validate_reference_width};
 use session_helpers::{validate_session_storage, validate_streaming_storage};
 
 /// Executable discriminator of the bit-plane Pauli frame, the only sampling executor.
@@ -251,7 +249,7 @@ const SAMPLING_BACKEND: SamplingBackend = SamplingBackend::Scalar;
 fn session_reference(
     plan: &SamplingPlan,
     uses_reference_sample: bool,
-) -> Result<Option<&ReferenceBits>, SamplingExecutionError> {
+) -> Result<Option<&ReferenceSample>, SamplingExecutionError> {
     if !uses_reference_sample {
         return Ok(None);
     }
@@ -565,7 +563,7 @@ pub(super) struct SamplingPlanInner {
     pub(super) reference_sample_loop_policy: ReferenceSampleLoopPolicy,
     /// The all-zero-sweep reference sample, packed one bit per measurement and computed at most
     /// once per successful plan.
-    reference_sample: OnceLock<ReferenceBits>,
+    reference_sample: OnceLock<ReferenceSample>,
     backend: SamplingBackend,
 }
 
@@ -573,14 +571,16 @@ impl SamplingPlanInner {
     /// Returns the plan's reference sample, computing it on first use.
     ///
     /// Failures are returned to the caller and not cached, so a later call retries.
-    pub(super) fn cached_reference_sample(&self) -> Result<&ReferenceBits, SamplingExecutionError> {
+    pub(super) fn cached_reference_sample(
+        &self,
+    ) -> Result<&ReferenceSample, SamplingExecutionError> {
         self.cached_reference_sample_with_budget(self.memory_budget)
     }
 
     pub(super) fn cached_reference_sample_with_budget(
         &self,
         memory_budget: MemoryBudget,
-    ) -> Result<&ReferenceBits, SamplingExecutionError> {
+    ) -> Result<&ReferenceSample, SamplingExecutionError> {
         if let Some(sample) = self.reference_sample.get() {
             return Ok(sample);
         }

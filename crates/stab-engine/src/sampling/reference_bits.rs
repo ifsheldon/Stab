@@ -1,8 +1,10 @@
 //! The packed record a reference run writes: one bit per measurement, not one byte.
 
+use stab_bits::{BitSlice, BitVec};
 use stab_model::MeasureRecordOffset;
 
 use super::api::SamplingExecutionError;
+use super::reference_sample::ReferenceSample;
 use crate::work_poll::{WORD_OP_UNITS, WorkPoll, chunk_units};
 
 const WORD_BITS: usize = u64::BITS as usize;
@@ -34,16 +36,12 @@ impl ReferenceBits {
         Ok(Self { words, len: 0 })
     }
 
-    /// Bytes `ReferenceBits` reserves for a record of `bits` bits.
-    pub(crate) const fn storage_bytes(bits: usize) -> u128 {
-        (bits.div_ceil(WORD_BITS) as u128) * (size_of::<u64>() as u128)
-    }
-
     pub(crate) const fn len(&self) -> usize {
         self.len
     }
 
     /// The record's words; bits at and past [`Self::len`] are zero.
+    #[cfg(test)]
     pub(crate) fn words(&self) -> &[u64] {
         &self.words
     }
@@ -182,24 +180,24 @@ impl ReferenceBits {
         Ok(())
     }
 
-    /// Unpacks the record into one flag per bit, for callers whose contract is a flag list.
-    pub(crate) fn to_bools(
-        &self,
-        label: &'static str,
-    ) -> Result<Vec<bool>, SamplingExecutionError> {
-        let mut bools = super::api::try_bool_buffer(self.len, label)?;
-        self.extend_bools_into(&mut bools);
-        Ok(bools)
-    }
-
-    /// Appends one flag per bit to `output`.
-    pub(crate) fn extend_bools_into(&self, output: &mut Vec<bool>) {
-        let mut remaining = self.len;
-        for word in &self.words {
+    /// Appends every bit of `bits`, one word-aligned chunk at a time.
+    pub(crate) fn extend_from_bitslice(&mut self, bits: BitSlice<'_>) {
+        let mut remaining = bits.len();
+        for &word in bits.words() {
             let count = remaining.min(WORD_BITS);
-            output.extend((0..count).map(|bit| (word >> bit) & 1 == 1));
+            let chunk = if count < WORD_BITS {
+                word & ((1_u64 << count) - 1)
+            } else {
+                word
+            };
+            self.append_chunk(chunk, count);
             remaining -= count;
         }
+    }
+
+    /// Freezes the record into the public shared value, moving its words without a copy.
+    pub(crate) fn into_sample(self) -> ReferenceSample {
+        ReferenceSample::from(BitVec::from_words_truncated(self.len, self.words))
     }
 }
 
@@ -215,9 +213,9 @@ mod tests {
     use crate::work_poll::test_hook;
 
     fn bits_of(record: &ReferenceBits) -> Vec<bool> {
-        let mut bools = Vec::new();
-        record.extend_bools_into(&mut bools);
-        bools
+        (0..record.len())
+            .map(|index| record.get(index).expect("in-range bit"))
+            .collect()
     }
 
     fn record_with(prefix: usize, pattern: usize) -> (ReferenceBits, Vec<bool>) {

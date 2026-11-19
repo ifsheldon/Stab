@@ -21,6 +21,7 @@ use super::frame::{
 };
 use super::streaming::DetectionWindow;
 use super::try_vec_with_capacity;
+use crate::ReferenceSample;
 use crate::work_poll::{WORD_OP_UNITS, WorkPoll};
 
 const WORD_BITS: usize = u64::BITS as usize;
@@ -111,11 +112,13 @@ impl WindowedConversion {
         plan: &ConversionPlan,
         measurements: MeasurementBatchView<'_>,
         shot_count: usize,
-        reference: &[bool],
+        reference: Option<&ReferenceSample>,
         cancellation: &Cancellation,
     ) -> DetectionResult<()> {
         let input = BatchColumns::new(measurements, shot_count)?;
-        if reference.len() != plan.measurement_count {
+        if let Some(reference) = reference
+            && reference.len() != plan.measurement_count
+        {
             return Err(DetectionError::invalid_result_format(format!(
                 "reference sample has {} bits but the plan converts {} measurements",
                 reference.len(),
@@ -143,8 +146,7 @@ impl WindowedConversion {
         let mut next = 0_usize;
         loop {
             let end = plan.measurement_count.min(next + self.window_planes);
-            let flips = reference.get(next..end).ok_or_else(window_escape)?;
-            input.append_planes(next, end, flips, active, &mut self.planes, &mut poll)?;
+            input.append_planes(next, end, reference, active, &mut self.planes, &mut poll)?;
             next = end;
             let last = next == plan.measurement_count;
             let released = consumer.consume(base, &self.planes, last, &mut poll)?;
@@ -205,14 +207,14 @@ impl<'a> BatchColumns<'a> {
         &self,
         start: usize,
         end: usize,
-        flips: &[bool],
+        reference: Option<&ReferenceSample>,
         active: FrameLanes,
         planes: &mut Vec<FrameLanes>,
         poll: &mut WorkPoll<'_>,
     ) -> DetectionResult<()> {
         let tile_units = WORD_BITS * BIT_BLOCK_WORDS * WORD_OP_UNITS;
         let mut tile_start = start;
-        let mut flips = flips.iter();
+        let mut flips = reference.map(|reference| reference.iter().skip(start));
         while tile_start < end {
             let tile_end = end.min(tile_start + WORD_BITS);
             poll.charge(tile_units)?;
@@ -247,7 +249,7 @@ impl<'a> BatchColumns<'a> {
                         .unwrap_or(0)
                 });
                 let mut plane = BitBlock::from_words(lanes) & active;
-                if flips.next().copied().unwrap_or(false) {
+                if flips.as_mut().and_then(Iterator::next) == Some(true) {
                     plane ^= active;
                 }
                 planes.push(plane);
@@ -285,8 +287,4 @@ fn block_rows<'a>(
 
 fn input_error(error: stab_records::FormatError) -> DetectionError {
     DetectionError::invalid_result_format(error.to_string())
-}
-
-fn window_escape() -> DetectionError {
-    DetectionError::invalid_sampler_compilation("a windowed conversion escaped its record")
 }

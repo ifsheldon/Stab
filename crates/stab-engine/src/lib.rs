@@ -48,10 +48,10 @@ pub use sampled_flow::{
 pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{
     CircuitReferenceSampleError, CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy,
-    ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingBackend,
+    ReferenceSample, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingBackend,
     SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
     SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
-    Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun, circuit_reference_sample,
+    Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun, SweepRecord, circuit_reference_sample,
     count_determined_measurements,
 };
 pub use sampling_estimate::estimate_sampling_request;

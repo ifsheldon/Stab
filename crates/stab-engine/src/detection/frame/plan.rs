@@ -6,12 +6,12 @@ use super::window::PlaneWindow;
 use super::word::FrameWord;
 use super::{BitPlaneDetectionFrame, FrameExecutionMode, FrameLanes};
 use crate::LaneWidth;
+use crate::ReferenceSample;
 use crate::detection::error::{
     DetectionError, DetectionResourceLimitError as ResourceLimitError, DetectionResult,
 };
 use crate::detection::try_vec_with_capacity;
 use crate::detection::{ConversionPlan, DetectionConversionLimits};
-use crate::sampling::ReferenceBits;
 use crate::work_poll::{WORD_OP_UNITS, WorkPoll, chunk_units};
 
 /// Shots in one frame batch of the widest lane word, [`FrameLanes`]: the default for circuit
@@ -395,7 +395,7 @@ impl<W: FrameWord> FrameBatchState<W> {
     /// for every chunk of 64-plane groups.
     pub(crate) fn xor_reference(
         &mut self,
-        reference: &ReferenceBits,
+        reference: &ReferenceSample,
         poll: &mut WorkPoll<'_>,
     ) -> DetectionResult<()> {
         if reference.len() != self.frame.measurements.len() {

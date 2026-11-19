@@ -125,8 +125,8 @@ impl MeasurementToDetectionPlan {
         }
     }
 
-    /// Conservative bytes retained by this compiled conversion plan and any sweep-correction
-    /// program it keeps.
+    /// Conservative bytes retained by this compiled conversion plan, any sweep-correction
+    /// program it keeps, and its packed reference sample.
     pub fn retained_bytes(&self) -> u64 {
         self.inner.retained_bytes
     }
@@ -177,7 +177,6 @@ fn detection_plane_view<'a, W: FrameWord>(
 /// Mutable reusable state for measurement-to-detection conversion.
 pub struct MeasurementToDetectionSession {
     plan: MeasurementToDetectionPlan,
-    reference_sample: Vec<bool>,
     storage: ConversionStorage,
     cancellation: OnceLock<Cancellation>,
     total_committed_shots: u64,
@@ -278,13 +277,6 @@ impl MeasurementToDetectionSession {
     ) -> Result<Self, DetectionExecutionError> {
         validate_conversion_session_storage(&plan, memory_budget)?;
         let converter = &plan.inner.converter;
-        let mut reference_sample = converter
-            .try_reusable_reference_sample()
-            .map_err(DetectionExecutionError::Conversion)?;
-        converter
-            .reference_sample
-            .fill(converter.measurement_count(), &mut reference_sample)
-            .map_err(DetectionExecutionError::Conversion)?;
         let storage = if converter.has_sweep_correction() {
             ConversionStorage::Planes(ConversionPlanes::try_new(
                 converter,
@@ -297,7 +289,6 @@ impl MeasurementToDetectionSession {
             )
         };
         Ok(Self {
-            reference_sample,
             storage,
             cancellation: session_cancellation_slot(converter.plan.limits.cancellation()),
             plan,
@@ -554,7 +545,7 @@ impl MeasurementToDetectionSession {
                         &converter.plan,
                         measurements,
                         shot_count,
-                        &self.reference_sample,
+                        converter.reference_sample.sample(),
                         cancellation,
                     )
                     .map_err(DetectionExecutionError::from);
@@ -583,7 +574,6 @@ impl MeasurementToDetectionSession {
                 &mut planes.measurement_planes,
                 &planes.sweep_planes,
                 shot_count,
-                &self.reference_sample,
                 &mut planes.detector_planes,
                 &mut planes.observable_planes,
                 planes.sweep_correction.as_mut(),

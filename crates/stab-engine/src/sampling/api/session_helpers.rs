@@ -1,3 +1,4 @@
+use stab_bits::BitSlice;
 use stab_model::MemoryBudget;
 
 use super::{ReferenceSampleMode, SamplingExecutionError, SamplingPlanInner, ShotCount};
@@ -5,6 +6,7 @@ use crate::LaneWidth;
 use crate::detection::frame::{ShotRecordTransposer, WindowShape, frame_state_storage_bytes};
 use crate::sampling::reference_bits::ReferenceBits;
 use crate::sampling::reference_run::ReferenceWorkspace;
+use crate::sampling::reference_sample::ReferenceSample;
 
 pub(super) fn validate_session_storage(
     plan: &SamplingPlanInner,
@@ -91,31 +93,18 @@ pub(super) fn streaming_storage_bytes(
 
 fn reference_storage_bytes(plan: &SamplingPlanInner, reference_mode: ReferenceSampleMode) -> u128 {
     if reference_mode == ReferenceSampleMode::UseReferenceSample {
-        ReferenceBits::storage_bytes(plan.measurement_count)
+        ReferenceSample::storage_bytes(plan.measurement_count)
     } else {
         0
     }
 }
 
-pub(in crate::sampling) fn try_bool_buffer(
-    capacity: usize,
-    label: &'static str,
-) -> Result<Vec<bool>, SamplingExecutionError> {
-    let mut buffer = Vec::new();
-    buffer.try_reserve_exact(capacity).map_err(|error| {
-        SamplingExecutionError::SessionStorageAllocation {
-            message: format!("{label} capacity {capacity}: {error}"),
-        }
-    })?;
-    Ok(buffer)
-}
-
 pub(in crate::sampling) fn compute_reference_sample(
     plan: &SamplingPlanInner,
     memory_budget: MemoryBudget,
-) -> Result<ReferenceBits, SamplingExecutionError> {
+) -> Result<ReferenceSample, SamplingExecutionError> {
     if plan.measurement_count == 0 {
-        return Ok(ReferenceBits::default());
+        return Ok(ReferenceSample::default());
     }
     let needs_snapshot = plan.uses_reference_state_snapshot_with_budget(memory_budget);
     crate::sampling::validate_simulator_work_storage(
@@ -129,12 +118,12 @@ pub(in crate::sampling) fn compute_reference_sample(
     ReferenceWorkspace::try_new(plan.qubit_count, needs_snapshot)?.run(
         &plan.program,
         plan.reference_sample_loop_policy,
-        &[],
+        BitSlice::default(),
         &mut output,
         &plan.cancellation,
     )?;
     validate_reference_width(output.len(), plan.measurement_count)?;
-    Ok(output)
+    Ok(output.into_sample())
 }
 
 pub(in crate::sampling) fn validate_reference_width(
@@ -163,8 +152,17 @@ pub(in crate::sampling) fn compute_stabilizer_frame_reference_sample(
     use crate::sampling::execute::{ExecutionBuffers, ExecutionMode, execute_program};
     use crate::sampling::stabilizer_frame::StabilizerFrame;
 
-    let mut record = try_bool_buffer(plan.measurement_count, "reference measurement record")?;
-    let mut output = try_bool_buffer(plan.measurement_count, "reference measurement output")?;
+    let try_bool_buffer = |label: &str| {
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(plan.measurement_count)
+            .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
+                message: format!("{label} capacity {}: {error}", plan.measurement_count),
+            })
+            .map(|()| buffer)
+    };
+    let mut record = try_bool_buffer("reference measurement record")?;
+    let mut output = try_bool_buffer("reference measurement output")?;
     let mut rng = SmallRng::seed_from_u64(0);
     let mut frame = StabilizerFrame::try_new(plan.qubit_count).map_err(|error| {
         SamplingExecutionError::SessionStorageAllocation {

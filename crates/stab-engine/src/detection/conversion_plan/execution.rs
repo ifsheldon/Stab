@@ -1,6 +1,7 @@
 use stab_model::{Cancellation, MeasureRecordOffset, RepeatNestingLimit};
-use std::ops::{BitXor, BitXorAssign};
+use std::ops::{BitXor, BitXorAssign, Not};
 
+use crate::ReferenceSample;
 use crate::detection::{DetectionError, DetectionResult};
 use crate::work_poll::{STEP_UNITS, WORD_OP_UNITS, WorkCountdown};
 
@@ -59,7 +60,8 @@ pub(super) struct ConversionIo<'a, 'b, Value> {
     pub(super) measurements: RecordValues<'a, Value>,
     /// Absolute measurement index of the first value of `measurements`.
     pub(super) measurement_base: usize,
-    pub(super) reference_sample: RecordValues<'a, Value>,
+    /// The reference sample XOR-ed into every parity, whose bits apply to every lane of a value.
+    pub(super) reference_sample: Option<&'a ReferenceSample>,
     /// Measurements below this absolute index are available.
     pub(super) available_measurements: usize,
     pub(super) detectors: &'b mut [Value],
@@ -99,7 +101,7 @@ impl ConversionRunner {
         cancellation: &Cancellation,
     ) -> DetectionResult<ConversionStop>
     where
-        Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+        Value: BitXor<Output = Value> + BitXorAssign + Copy + Default + Not<Output = Value>,
     {
         // The loop state lives in locals so the hot loop keeps it in registers; it is stored
         // back whenever the run returns, so a later call resumes where this one stopped.
@@ -259,14 +261,14 @@ impl ConversionRunner {
 pub(super) fn execute_program<Value>(
     program: &[ConversionOperation],
     measurements: RecordValues<'_, Value>,
-    reference_sample: RecordValues<'_, Value>,
+    reference_sample: Option<&ReferenceSample>,
     detectors: &mut [Value],
     observables: &mut [Value],
     cursor: &mut ConversionCursor,
     cancellation: &Cancellation,
 ) -> DetectionResult<()>
 where
-    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default + Not<Output = Value>,
 {
     let mut countdown = WorkCountdown::new();
     let mut repeat_stack = [RepeatExecutionFrame::EMPTY; RepeatNestingLimit::HARD_MAX];
@@ -439,12 +441,12 @@ fn charged_parity<Value>(
     measurement_cursor: usize,
     measurements: RecordValues<'_, Value>,
     measurement_base: usize,
-    reference_sample: RecordValues<'_, Value>,
+    reference_sample: Option<&ReferenceSample>,
     countdown: &mut WorkCountdown,
     cancellation: &Cancellation,
 ) -> DetectionResult<Value>
 where
-    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default + Not<Output = Value>,
 {
     if terms.len() > SHORT_PARITY_TERMS {
         return long_parity(
@@ -476,12 +478,12 @@ fn long_parity<Value>(
     measurement_cursor: usize,
     measurements: RecordValues<'_, Value>,
     measurement_base: usize,
-    reference_sample: RecordValues<'_, Value>,
+    reference_sample: Option<&ReferenceSample>,
     countdown: &mut WorkCountdown,
     cancellation: &Cancellation,
 ) -> DetectionResult<Value>
 where
-    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default + Not<Output = Value>,
 {
     let units = term_units::<Value>();
     let mut parity = Value::default();
@@ -513,22 +515,22 @@ fn parity_of_terms<Value>(
     measurement_cursor: usize,
     measurements: RecordValues<'_, Value>,
     measurement_base: usize,
-    reference_sample: RecordValues<'_, Value>,
+    reference_sample: Option<&ReferenceSample>,
 ) -> DetectionResult<Value>
 where
-    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default,
+    Value: BitXor<Output = Value> + BitXorAssign + Copy + Default + Not<Output = Value>,
 {
     let mut parity = Value::default();
+    let mut reference_parity = false;
     for offset in terms {
         let index = measurement_index_from_offset(measurement_cursor, *offset)?;
-        let reference = match reference_sample {
-            RecordValues::Values(record) => record.get(index).copied().ok_or_else(|| {
+        if let Some(reference) = reference_sample {
+            reference_parity ^= reference.get(index).ok_or_else(|| {
                 DetectionError::invalid_result_format(format!(
                     "reference sample index {index} is out of range"
                 ))
-            })?,
-            RecordValues::Zero => Value::default(),
-        };
+            })?;
+        }
         // An index below the base wraps past every slice length and reads as out of range.
         let measurement = match measurements {
             RecordValues::Values(record) => record
@@ -541,7 +543,8 @@ where
                 })?,
             RecordValues::Zero => Value::default(),
         };
-        parity ^= measurement ^ reference;
+        parity ^= measurement;
     }
-    Ok(parity)
+    // A reference bit is common to every shot, so an odd reference parity flips every lane.
+    Ok(if reference_parity { !parity } else { parity })
 }

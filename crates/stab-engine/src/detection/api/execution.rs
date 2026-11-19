@@ -174,16 +174,16 @@ pub(super) fn validate_conversion_session_storage(
     validate_session_storage(conversion_session_storage_bytes(plan), memory_budget)
 }
 
-/// Conservative reusable storage of a measurement-to-detection session: the reference sample
-/// at one byte per measurement and the storage of one batch. Without sweep correction that is
-/// a windowed conversion's planes and records; with it, one frame plane per measurement, sweep,
-/// detector, and observable bit, one transpose word per input bit, and the sweep-correction
-/// frame state.
+/// Conservative reusable storage of a measurement-to-detection session: the storage of one
+/// batch. Without sweep correction that is a windowed conversion's planes and records; with it,
+/// one frame plane per measurement, sweep, detector, and observable bit, one transpose word per
+/// input bit, and the sweep-correction frame state. The session reads the plan's packed
+/// reference sample in place, so it holds no copy of it.
 pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan) -> u128 {
     let converter = &plan.inner.converter;
     let measurements = plan.measurement_width().get() as u128;
     if !converter.has_sweep_correction() {
-        return measurements.saturating_add(WindowedConversion::storage_bytes(&converter.plan));
+        return WindowedConversion::storage_bytes(&converter.plan);
     }
     let sweeps = plan.sweep_width().get() as u128;
     let detectors = plan.detector_width().get() as u128;
@@ -192,8 +192,8 @@ pub(super) fn conversion_session_storage_bytes(plan: &MeasurementToDetectionPlan
         .saturating_add(sweeps)
         .saturating_add(detectors)
         .saturating_add(observables);
-    measurements
-        .saturating_add(planes.saturating_mul(size_of::<FrameLanes>() as u128))
+    planes
+        .saturating_mul(size_of::<FrameLanes>() as u128)
         .saturating_add(
             measurements
                 .max(sweeps)

@@ -42,15 +42,10 @@ pub fn circuit_reference_signs_with_limits(
         crate::ReferenceSampleMode::UseReferenceSample,
         limits,
     )?;
-    let mut reference_sample = prepared.try_reusable_reference_sample()?;
-    prepared
-        .reference_sample
-        .fill(prepared.measurement_count(), &mut reference_sample)?;
-
     let mut record: DetectionRecordBuffer = prepared.try_reusable_detection_record()?;
     prepared
         .plan
-        .reference_signs_into(&reference_sample, &mut record)?;
+        .reference_signs_into(prepared.reference_sample.sample(), &mut record)?;
     Ok(CircuitReferenceSigns {
         detector_signs: record.detectors,
         observable_signs: record.observables,

@@ -11,6 +11,7 @@ use super::frame::{TraversalEvent, visit_circuit};
 use super::{
     DetectionConversionLimits, DetectionRecordBuffer, UNSUPPORTED_SWEEP_DETECTION_MESSAGE,
 };
+use crate::ReferenceSample;
 use crate::work_poll::{WORD_OP_UNITS, WorkPoll};
 
 mod execution;
@@ -860,23 +861,26 @@ impl ConversionPlan {
             .ok_or_else(compilation_overflow)
     }
 
+    /// Writes the detector and observable parities of `reference_sample` alone, the all-zero
+    /// sample when it is `None`.
     pub(super) fn reference_signs_into(
         &self,
-        reference_sample: &[bool],
+        reference_sample: Option<&ReferenceSample>,
         record: &mut DetectionRecordBuffer,
     ) -> DetectionResult<()> {
-        super::reference::validate_reference_sample_len(reference_sample, self.measurement_count)?;
-        self.execute_record(
-            RecordValues::Zero,
-            RecordValues::Values(reference_sample),
-            record,
-        )
+        if let Some(reference_sample) = reference_sample {
+            super::reference::validate_reference_sample_len(
+                reference_sample,
+                self.measurement_count,
+            )?;
+        }
+        self.execute_record(RecordValues::Zero, reference_sample, record)
     }
 
     fn execute_record(
         &self,
         measurements: RecordValues<'_, bool>,
-        reference_sample: RecordValues<'_, bool>,
+        reference_sample: Option<&ReferenceSample>,
         record: &mut DetectionRecordBuffer,
     ) -> DetectionResult<()> {
         record.detectors.resize(self.detector_count, false);
@@ -910,7 +914,11 @@ impl ConversionPlan {
         cancellation: &Cancellation,
     ) -> DetectionResult<()>
     where
-        Plane: std::ops::BitXor<Output = Plane> + std::ops::BitXorAssign + Copy + Default,
+        Plane: std::ops::BitXor<Output = Plane>
+            + std::ops::BitXorAssign
+            + std::ops::Not<Output = Plane>
+            + Copy
+            + Default,
     {
         if measurement_planes.len() != self.measurement_count {
             return Err(DetectionError::invalid_result_format(format!(
@@ -941,7 +949,7 @@ impl ConversionPlan {
         execute_program(
             &self.program,
             RecordValues::Values(measurement_planes),
-            RecordValues::Zero,
+            None,
             detector_planes,
             observable_planes,
             &mut cursor,
@@ -993,12 +1001,16 @@ impl ConversionPlan {
         cancellation: &Cancellation,
     ) -> DetectionResult<ConversionStop>
     where
-        Plane: std::ops::BitXor<Output = Plane> + std::ops::BitXorAssign + Copy + Default,
+        Plane: std::ops::BitXor<Output = Plane>
+            + std::ops::BitXorAssign
+            + std::ops::Not<Output = Plane>
+            + Copy
+            + Default,
     {
         let mut io = ConversionIo {
             measurements: RecordValues::Values(measurements),
             measurement_base: base,
-            reference_sample: RecordValues::Zero,
+            reference_sample: None,
             available_measurements: base + measurements.len(),
             detectors,
             detector_base,

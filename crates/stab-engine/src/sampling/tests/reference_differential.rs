@@ -42,9 +42,11 @@ impl ReferencePaths {
                 .expect("folded generator-list reference");
         let (iterated, _) = reference_with_stats(&iterated_plan);
         let (folded, folded_stats) = reference_with_stats(&folded_plan);
-        let product = folded_plan
-            .try_reference_sample()
-            .expect("product reference sample");
+        let product = bits(
+            &folded_plan
+                .try_reference_sample()
+                .expect("product reference sample"),
+        );
         Self {
             baseline,
             baseline_folded,
@@ -416,8 +418,11 @@ fn inverse_tableau_matches_generator_baseline_above_one_thousand_qubits() {
     assert_eq!(plan.qubit_count(), qubits);
     super::super::reference_simulator::take_pivot_column_stats();
     assert_eq!(
-        plan.try_reference_sample()
-            .expect("inverse-tableau reference"),
+        bits(
+            &plan
+                .try_reference_sample()
+                .expect("inverse-tableau reference")
+        ),
         super::super::api::compute_stabilizer_frame_reference_sample(&plan.inner)
             .expect("generator-list reference"),
     );
@@ -524,7 +529,7 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
             let plan = SamplingCompiler::new()
                 .compile(&circuit)
                 .expect("compile detector circuit");
-            let reference = plan.try_reference_sample().expect("reference sample");
+            let reference = bits(&plan.try_reference_sample().expect("reference sample"));
             // Nesting the round loop must not change the measurement record.
             assert_eq!(
                 flat_reference.get_or_insert_with(|| reference.clone()),
@@ -618,7 +623,7 @@ fn sessions_share_the_plan_reference_instead_of_recomputing_it() {
         "the first session computes the reference"
     );
     let second = sample(&plan.clone());
-    let reference = plan.try_reference_sample().expect("reference");
+    let reference = bits(&plan.try_reference_sample().expect("reference"));
     assert_eq!(
         super::super::reference_run::reference_run_count(),
         runs_before + 1,

@@ -14,6 +14,7 @@ use super::*;
 use stab_analysis::{
     CodeDistance, RoundCount, SurfaceCodeParams, SurfaceCodeTask, generate_surface_code_circuit,
 };
+use stab_bits::{BitSlice, BitVec};
 use stab_model::{Gate, Probability};
 use stab_records::{MeasurementBatchView, MeasurementSink};
 use std::fmt::Write as _;
@@ -21,6 +22,11 @@ use std::fmt::Write as _;
 mod folded_tape;
 mod reference_differential;
 mod stored_expectations;
+
+/// The sample's bits in measurement order, for comparison with flag-list expectations.
+fn bits(sample: &ReferenceSample) -> Vec<bool> {
+    sample.iter().collect()
+}
 
 #[derive(Clone, Debug, PartialEq)]
 struct TestSampler {
@@ -67,7 +73,7 @@ impl TestSampler {
     }
 
     fn reference_sample(&self) -> Vec<bool> {
-        self.plan.try_reference_sample().expect("reference sample")
+        bits(&self.plan.try_reference_sample().expect("reference sample"))
     }
 }
 
@@ -116,8 +122,11 @@ fn reference_simulator_matches_generator_baseline_on_noisy_surface_and_feedback(
         .compile(generated.circuit())
         .expect("compile generated surface circuit");
     assert_eq!(
-        plan.try_reference_sample()
-            .expect("inverse-tableau reference"),
+        bits(
+            &plan
+                .try_reference_sample()
+                .expect("inverse-tableau reference")
+        ),
         super::api::compute_stabilizer_frame_reference_sample(&plan.inner)
             .expect("generator-list reference")
     );
@@ -128,7 +137,7 @@ fn reference_simulator_matches_generator_baseline_on_noisy_surface_and_feedback(
                 .expect("parse feedback circuit"),
         )
         .expect("compile feedback circuit");
-    let reference = feedback.try_reference_sample().expect("feedback reference");
+    let reference = bits(&feedback.try_reference_sample().expect("feedback reference"));
     assert_eq!(reference, vec![true, true, false, false]);
     assert_eq!(
         reference,
@@ -158,15 +167,13 @@ fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionSt
         .run(
             &plan.inner.program,
             plan.reference_sample_loop_policy(),
-            &[],
+            BitSlice::default(),
             &mut output,
             &stab_model::Cancellation::never(),
         )
         .expect("execute reference program");
     let stats = take_reference_execution_stats();
-    let mut bools = Vec::new();
-    output.extend_bools_into(&mut bools);
-    (bools, stats)
+    (bits(&output.into_sample()), stats)
 }
 
 #[test]
@@ -458,27 +465,71 @@ fn reset_and_measure_reset_use_their_measurement_basis() {
     }
 }
 
+/// A sweep record is checked against the plan it is built for and again against the plan that
+/// runs it, and the all-false record hands out the cached sample instead of a new run.
+#[test]
+fn sweep_records_are_width_checked_and_all_false_reuses_the_cached_sample() {
+    let compile = |text: &str| {
+        SamplingCompiler::new()
+            .compile(&Circuit::from_stim_str(text).expect("parse sweep circuit"))
+            .expect("compile sweep circuit")
+    };
+    let two = compile("CX sweep[1] 0\nM 0\nCX sweep[0] 1\nM 1 0\n");
+    let one = compile("CX sweep[0] 0\nM 0\n");
+    assert_eq!(two.sweep_width().get(), 2);
+    assert_matches!(
+        SweepRecord::try_for_plan(&two, BitVec::from_bits([true])),
+        Err(SamplingExecutionError::InvalidSweepRecordWidth {
+            expected: 2,
+            actual: 1
+        })
+    );
+    let foreign = SweepRecord::try_for_plan(&one, BitVec::from_bits([true])).expect("one bit");
+    assert_matches!(
+        two.try_reference_sample_with_sweep(&foreign),
+        Err(SamplingExecutionError::InvalidSweepRecordWidth {
+            expected: 2,
+            actual: 1
+        })
+    );
+
+    let swept = |values: [bool; 2]| {
+        let sweep = SweepRecord::try_for_plan(&two, BitVec::from_bits(values)).expect("two bits");
+        two.try_reference_sample_with_sweep(&sweep)
+            .expect("swept reference")
+    };
+    assert_eq!(bits(&swept([false, true])), vec![true, false, true]);
+    assert_eq!(bits(&swept([true, false])), vec![false, true, false]);
+    let cached = two.try_reference_sample().expect("cached reference");
+    assert_eq!(bits(&cached), vec![false; 3]);
+    assert_eq!(
+        cached.words().as_ptr(),
+        swept([false, false]).words().as_ptr()
+    );
+}
+
 #[test]
 fn active_feedback_crosses_inner_and_outer_repeat_boundaries() {
     let sweep_source = "R 0\nREPEAT 2 {\n    REPEAT 2 {\n        CX sweep[0] 0\n        M 0\n        R 0\n    }\n}\n";
     let sweep_folded = Circuit::from_stim_str(sweep_source).expect("parse nested sweep feedback");
     let sweep_unrolled =
         stab_analysis::flattened_circuit(&sweep_folded).expect("unroll nested sweep feedback");
-    for (sweep, expected) in [([false], vec![false; 4]), ([true], vec![true; 4])] {
-        let mut folded_record = Vec::new();
-        SamplingCompiler::new()
-            .compile(&sweep_folded)
-            .expect("compile folded sweep feedback")
-            .reference_measurement_record_with_sweep_into(&sweep, &mut folded_record)
-            .expect("execute folded sweep feedback");
-        let mut unrolled_record = Vec::new();
-        SamplingCompiler::new()
-            .compile(&sweep_unrolled)
-            .expect("compile unrolled sweep feedback")
-            .reference_measurement_record_with_sweep_into(&sweep, &mut unrolled_record)
-            .expect("execute unrolled sweep feedback");
+    for (sweep, expected) in [(false, vec![false; 4]), (true, vec![true; 4])] {
+        let reference = |circuit: &Circuit| {
+            let plan = SamplingCompiler::new()
+                .compile(circuit)
+                .expect("compile sweep feedback");
+            let sweep = SweepRecord::try_for_plan(&plan, BitVec::from_bits([sweep]))
+                .expect("one-bit sweep record");
+            bits(
+                &plan
+                    .try_reference_sample_with_sweep(&sweep)
+                    .expect("execute sweep feedback"),
+            )
+        };
+        let folded_record = reference(&sweep_folded);
         assert_eq!(folded_record, expected);
-        assert_eq!(folded_record, unrolled_record);
+        assert_eq!(folded_record, reference(&sweep_unrolled));
     }
 
     let record_source = "X 0\nM 0\nREPEAT 2 {\n    REPEAT 2 {\n        R 1\n        CX rec[-1] 1\n        M 1\n    }\n}\n";

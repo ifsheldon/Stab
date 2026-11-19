@@ -15,6 +15,13 @@ use stab_model::Circuit;
 
 use support::SamplingFixture;
 
+fn reference_bits(circuit: &Circuit) -> Vec<bool> {
+    circuit_reference_sample(circuit)
+        .expect("reference sample")
+        .iter()
+        .collect()
+}
+
 #[test]
 fn pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics() {
     let circuit = Circuit::from_stim_str(
@@ -39,21 +46,15 @@ fn pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics() {
 fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() {
     let empty_measurement_circuit = Circuit::from_stim_str("H 0\nCX 0 1\n").expect("parse");
     assert_eq!(
-        circuit_reference_sample(&empty_measurement_circuit).expect("reference sample"),
+        reference_bits(&empty_measurement_circuit),
         Vec::<bool>::new()
     );
 
     let simple_reference = Circuit::from_stim_str("X 0\nM 0\n").expect("parse");
-    assert_eq!(
-        circuit_reference_sample(&simple_reference).expect("reference sample"),
-        vec![true]
-    );
+    assert_eq!(reference_bits(&simple_reference), vec![true]);
 
     let sweep_controlled = Circuit::from_stim_str("X 0\nCX sweep[0] 0\nM 0\n").expect("parse");
-    assert_eq!(
-        circuit_reference_sample(&sweep_controlled).expect("reference sample"),
-        vec![true]
-    );
+    assert_eq!(reference_bits(&sweep_controlled), vec![true]);
 
     for source in ["X 0\nCX 0 sweep[0]\nM 0\n", "X 0\nCY 0 sweep[0]\nM 0\n"] {
         let invalid_sweep_order =
@@ -77,10 +78,7 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
         .reference_sample()
         .expect("compiled reference sample");
 
-    assert_eq!(
-        circuit_reference_sample(&circuit).expect("reference sample"),
-        expected
-    );
+    assert_eq!(reference_bits(&circuit), expected);
     assert_eq!(
         expected.len(),
         usize::try_from(circuit.count_measurements().expect("measurements"))
@@ -177,7 +175,9 @@ fn pf1_circuit_reference_determined_reference_sample_tree_decompresses_reference
     assert_eq!(
         repeated_tree
             .decompress()
-            .expect("decompress repeated reference sample tree"),
+            .expect("decompress repeated reference sample tree")
+            .iter()
+            .collect::<Vec<_>>(),
         vec![false, true, false, true, false, true]
     );
     assert_eq!(repeated_tree.size(), 6);
