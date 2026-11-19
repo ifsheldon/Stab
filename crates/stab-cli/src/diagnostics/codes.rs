@@ -44,6 +44,7 @@ pub(super) fn cli_error_code(error: &CliError) -> &'static str {
         CliError::UnsupportedDetectionFormat { .. } => "unsupported-detection-format",
         CliError::ConflictingObservableRouting => "conflicting-observable-routing",
         CliError::ReplayErrorRecordCountMismatch { .. } => "replay-record-count-mismatch",
+        CliError::ReplayInputNotRewindable { .. } => "replay-input-not-rewindable",
         CliError::InputTooLarge { .. } => "input-too-large",
         CliError::MissingRecordWidth => "missing-record-width",
         CliError::MissingRecordTypesForDets => "missing-record-types-for-dets",
@@ -53,9 +54,9 @@ pub(super) fn cli_error_code(error: &CliError) -> &'static str {
         CliError::IncompletePtb64OutputGroup { .. } => "incomplete-ptb64-output-group",
         CliError::UnknownHelpTopic { .. } => "unknown-help-topic",
         CliError::MeasurementCountOverflow => "measurement-count-overflow",
-        CliError::ConvertStorageBudget { .. } | CliError::OutputStorageBudget { .. } => {
-            "resource-limit-exceeded"
-        }
+        CliError::ConvertStorageBudget { .. }
+        | CliError::OutputStorageBudget { .. }
+        | CliError::InputStorageBudget { .. } => "resource-limit-exceeded",
         CliError::CommandMemoryBudget { source, .. } => cli_error_code(source),
     }
 }

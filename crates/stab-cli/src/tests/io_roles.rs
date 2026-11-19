@@ -195,6 +195,43 @@ fn special_output_files_are_streamed_without_regular_file_truncation() {
     );
 }
 
+/// Two output roles naming one character device are not an alias: `/dev/null` cannot be
+/// truncated through either role, so Stim's `--out /dev/null --obs_out /dev/null` is accepted on
+/// every command with more than one output role.
+#[test]
+fn output_roles_may_share_one_device() {
+    for command in [
+        CommandFixture::Detect,
+        CommandFixture::M2d,
+        CommandFixture::SampleDem,
+        CommandFixture::Convert,
+    ] {
+        let directory = tempdir().expect("temporary directory");
+        let mut fixture = Fixture::new(command, directory.path());
+        for role in roles(command)
+            .iter()
+            .filter(|role| matches!(**role, "--out" | "--obs_out" | "--err_out"))
+        {
+            replace_flag_value(&mut fixture.args, role, Path::new("/dev/null"));
+        }
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            fixture.args.iter().cloned(),
+            std::io::empty(),
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(
+            status,
+            0,
+            "{command:?}: {}",
+            String::from_utf8_lossy(&stderr)
+        );
+        assert_eq!(stdout, Vec::<u8>::new(), "{command:?}");
+    }
+}
+
 fn assert_alias_matrix(kind: AliasKind) {
     for &(command, first, second) in ROLE_PAIRS {
         let directory = tempdir().expect("temporary directory");

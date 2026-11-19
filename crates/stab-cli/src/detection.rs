@@ -12,7 +12,7 @@ use stab_engine::{
 use stab_records::{
     ByteSpan, DetectionBatchView, DetectionSink, FormatError, FormatErrorCode,
     MeasurementBatchView, PackedShotBatchView, RecordFormat, RecordFraming, RecordStreamReadError,
-    RecordStreamReader, validate_ptb64_shot_count,
+    RecordStreamReader, RecordStreamStorage, validate_ptb64_shot_count,
 };
 
 use crate::{
@@ -20,6 +20,7 @@ use crate::{
     batch_output::{DetectionBatchEncoder, DetectionObservableOutputMode},
     input::{read_limited_input_file, read_limited_stdin, record_stream_error},
     io_plan::{FileRole, InputFile, PendingIo, StandardStreams, StreamUse},
+    ledger::StageBudget,
     output_storage::{EncodedBatches, OutputStorage, admit_output_then_session},
     streaming::{FileOutputSink, OutputSink, flush_before_failure},
     streams_records,
@@ -58,6 +59,66 @@ const fn next_m2d_batch_records(records: usize) -> usize {
         next
     } else {
         M2D_BATCH_SHOTS
+    }
+}
+
+/// The batches of `m2d`'s measurement and sweep readers, admitted before either is allocated.
+#[derive(Clone, Copy, Debug)]
+struct M2dReaderStorage {
+    /// The most records one batch read requests from either reader.
+    batch_records: usize,
+    /// Both readers' batch, PTB64 group, first `r8` record, and packed-format transport buffer at
+    /// `batch_records`; a text transport buffer is bounded by the per-record text cap instead.
+    bytes: u64,
+}
+
+impl M2dReaderStorage {
+    /// Admits both readers at the largest power-of-two batch, up to [`M2D_BATCH_SHOTS`], whose
+    /// storage fits the stage budget, so a wide circuit under a small budget converts in smaller
+    /// batches instead of being refused; conversion is deterministic, so the batch size never
+    /// changes the output. Refuses only when one-record batches do not fit.
+    ///
+    /// The sweep reader requests at most the records of the measurement batch it pairs with, so
+    /// one batch size bounds both. A reader of a format that has no record decoder, such as
+    /// `stim`, is never allocated and fails at its first read, so it charges nothing here.
+    fn admit(
+        measurements: Option<(RecordFormat, usize)>,
+        sweeps: Option<(RecordFormat, usize)>,
+        stage: StageBudget,
+    ) -> Result<Self, CliError> {
+        let required = |batch_records: usize| {
+            [measurements, sweeps]
+                .into_iter()
+                .flatten()
+                .map(|(format, width)| {
+                    RecordStreamStorage::new(format, width, batch_records).bytes()
+                })
+                .fold(0_u128, u128::saturating_add)
+        };
+        let budget = stage.get();
+        let mut batch_records = 1_usize << M2D_BATCH_SHOTS.ilog2();
+        loop {
+            let bytes = required(batch_records);
+            match u64::try_from(bytes) {
+                Ok(bytes) if budget.admits(u128::from(bytes)) => {
+                    return Ok(Self {
+                        batch_records,
+                        bytes,
+                    });
+                }
+                _ if batch_records > 1 => batch_records /= 2,
+                // A requirement beyond `u64` is reported as the largest byte count, still a true
+                // lower bound for the refused storage.
+                _ => {
+                    return Err(stage.refusal(CliError::InputStorageBudget {
+                        command: "m2d",
+                        batch_records,
+                        required_bytes: u64::try_from(bytes).unwrap_or(u64::MAX),
+                        budget_bytes: budget.bytes(),
+                    }));
+                }
+            }
+        }
     }
 }
 
@@ -378,6 +439,17 @@ where
     .file_buffer(args.output.is_some())
     .file_buffer(args.obs_output.is_some())
     .admit(&mut ledger)?;
+    let reader_storage = M2dReaderStorage::admit(
+        args.in_format
+            .record_format()
+            .map(|format| (format, plan.measurement_width().get())),
+        sweep_input
+            .as_ref()
+            .and_then(|_| args.sweep_format.record_format())
+            .map(|format| (format, plan.sweep_width().get())),
+        ledger.stage(),
+    )?;
+    let _reader_hold = ledger.hold(reader_storage.bytes);
     let encoder = DetectionBatchEncoder::try_new(
         plan.detector_width().get(),
         plan.observable_width().get(),
@@ -423,9 +495,11 @@ where
         let mut delivery = session
             .start_transaction(&mut sink)
             .map_err(CliError::from)?;
-        let mut batch_records = first_m2d_batch_records(plan.measurement_width().get());
+        let max_records = reader_storage.batch_records;
+        let mut batch_records =
+            first_m2d_batch_records(plan.measurement_width().get()).min(max_records);
         while let Some(measurement_batch) = measurements.read_batch(batch_records)? {
-            batch_records = next_m2d_batch_records(batch_records);
+            batch_records = next_m2d_batch_records(batch_records).min(max_records);
             let shots = measurement_batch.shot_count();
             let Some(sweeps) = sweeps.as_mut() else {
                 write_m2d_batch(&mut delivery, measurement_batch, None)?;

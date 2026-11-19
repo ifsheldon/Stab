@@ -176,7 +176,7 @@ where
     // delivery decodes only the records after it; fixed-width binary files whose length already
     // proves `expected_shots` stream directly.
     let mut retained = None;
-    let mut resume = ReplayResume::START;
+    let mut delivery = ReplayDelivery::FromInput(ReplayResume::START);
     if let Some(replay_input) = io.input_mut(FileRole::ReplayErrorInput) {
         let replay_format = sample_dem_record_format(args.replay_err_in_format)?;
         if !preflight_fixed_width_replay_file(
@@ -186,7 +186,7 @@ where
             args.shots,
         )? {
             let mut store = plan.replay_record_store(&limits, shots);
-            resume = validate_replay_input(
+            delivery = validate_replay_input(
                 replay_input,
                 args.replay_err_in_format,
                 plan.error_count(),
@@ -258,7 +258,12 @@ where
                     .write_retained(retained)
                     .map_err(map_dem_run_error)?;
             }
-            if status.is_accepted() && resume.records < args.shots {
+            // A store that kept every record is the whole replay: the input is never read again,
+            // which is what lets a pipe replay without a rewind.
+            if let ReplayDelivery::FromInput(resume) = delivery
+                && status.is_accepted()
+                && resume.records < args.shots
+            {
                 ReplayInput::new(
                     input,
                     args.replay_err_in_format,
@@ -500,16 +505,38 @@ impl ReplayResume {
     };
 }
 
+/// Where the replay records that delivery hands the session come from.
+#[derive(Clone, Copy, Debug)]
+enum ReplayDelivery {
+    /// The store, when it holds any, and then the input from `resume`, which the input has
+    /// already been positioned at.
+    FromInput(ReplayResume),
+    /// The store alone: it kept every expected record, so the input is never read again.
+    StoreOnly,
+}
+
+/// What a validation pass decoded and kept.
+#[derive(Clone, Copy, Debug)]
+enum ReplayRetained {
+    /// The store holds every expected record.
+    All,
+    /// The store declined records from `resume.records` on, so delivery decodes them again from
+    /// the input.
+    Prefix(ReplayResume),
+}
+
 /// Checks that the replay file holds `expected_shots` well-formed records before any output
-/// file is activated, so a malformed replay produces no partial output, then seeks it to the
-/// first record the store does not hold.
+/// file is activated, so a malformed replay produces no partial output, and says where delivery
+/// takes its records from.
 ///
 /// This pass decodes into the reader's reusable batch and hands each batch to `retained`, which
-/// keeps dense and sparse records while they fit the budget the session leaves. Once a batch
-/// does not fit, the store keeps the whole batches before it, the remaining records are decoded
-/// and discarded, and delivery replays the kept prefix from the store and decodes only the
-/// records after it again. The seek happens whether or not records remain, so a non-seekable
-/// replay input fails here, before any output exists, exactly as a rewind would.
+/// keeps dense and sparse records while they fit the budget the session leaves. When it keeps
+/// every record, delivery reads the store alone and the input is never touched again, so a pipe
+/// replays as well as a file. Once a batch does not fit, the store keeps the whole batches before
+/// it, the remaining records are decoded and discarded, and the input is seeked back to the first
+/// record the store does not hold, so delivery replays the kept prefix from the store and decodes
+/// only the records after it again. A non-seekable input fails that seek here, before any output
+/// exists, with [`CliError::ReplayInputNotRewindable`].
 fn validate_replay_input(
     input: &mut InputFile,
     format: RecordFormatArg,
@@ -517,8 +544,8 @@ fn validate_replay_input(
     expected_shots: usize,
     max_record_bytes: usize,
     retained: &mut DemReplayRecordStore,
-) -> Result<ReplayResume, CliError> {
-    let resume = {
+) -> Result<ReplayDelivery, CliError> {
+    let kept = {
         let mut replay = ReplayInput::new(
             &mut *input,
             format,
@@ -528,12 +555,24 @@ fn validate_replay_input(
         )?;
         replay.retain_or_skip_all(retained)?
     };
+    let resume = match kept {
+        ReplayRetained::All => return Ok(ReplayDelivery::StoreOnly),
+        ReplayRetained::Prefix(resume) => resume,
+    };
     let offset =
         u64::try_from(resume.byte_offset).map_err(|_| CliError::InputByteOffsetOverflow {
             kind: REPLAY_TEXT_RECORD_KIND,
         })?;
-    input.seek_to(offset)?;
-    Ok(resume)
+    input.seek_to(offset).map_err(|error| match error {
+        CliError::ReadPath { path, source } => CliError::ReplayInputNotRewindable {
+            path,
+            retained_records: resume.records,
+            expected_records: expected_shots,
+            source,
+        },
+        error => error,
+    })?;
+    Ok(ReplayDelivery::FromInput(resume))
 }
 
 /// The sampled-error replay stream: exactly `expected_shots` records from the Records reader,
@@ -630,11 +669,12 @@ impl<'a> ReplayInput<'a> {
     }
 
     /// Decodes every expected record, keeping whole batches in `retained` while it admits them
-    /// and discarding the rest, and returns where delivery resumes after the kept prefix.
+    /// and discarding the rest, and reports whether it kept them all or where delivery resumes
+    /// after the kept prefix.
     fn retain_or_skip_all(
         &mut self,
         retained: &mut DemReplayRecordStore,
-    ) -> Result<ReplayResume, CliError> {
+    ) -> Result<ReplayRetained, CliError> {
         let mut decoded = 0_usize;
         let mut declined = None;
         while decoded < self.expected_shots && retained.is_retaining() {
@@ -694,7 +734,10 @@ impl<'a> ReplayInput<'a> {
         if decoded + skipped < self.expected_shots {
             return Err(self.shortfall_error(decoded + skipped));
         }
-        Ok(resume)
+        if resume.records >= self.expected_shots {
+            return Ok(ReplayRetained::All);
+        }
+        Ok(ReplayRetained::Prefix(resume))
     }
 
     fn shortfall_error(&self, actual: usize) -> CliError {

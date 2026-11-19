@@ -404,16 +404,28 @@ impl PendingIo {
     }
 }
 
+/// Whether two role paths name the same file that one role could truncate under another.
+///
+/// This pre-open check only spares an output from being created or opened when it would be
+/// refused anyway. A shared target that already exists and is not a regular file, such as
+/// `/dev/null` or a FIFO, cannot be truncated through either role, so it is not an alias; the
+/// authoritative comparison happens on the opened handles in [`PendingIo::with_outputs`], which
+/// takes the file type from the handle itself, so a path swapped to a regular file after this
+/// lookup is still refused before anything is truncated.
 fn paths_alias_without_creation(left: &Path, right: &Path) -> bool {
-    if left == right {
-        return true;
-    }
-    if lexical_absolute(left)
-        .is_some_and(|left| lexical_absolute(right).is_some_and(|right| left == right))
-    {
-        return true;
-    }
-    left.exists() && right.exists() && same_file::is_same_file(left, right).unwrap_or(false)
+    let aliases = left == right
+        || lexical_absolute(left)
+            .is_some_and(|left| lexical_absolute(right).is_some_and(|right| left == right))
+        || (left.exists()
+            && right.exists()
+            && same_file::is_same_file(left, right).unwrap_or(false));
+    aliases && !names_existing_non_regular_file(left)
+}
+
+/// Whether `path` resolves to an existing file that is not a regular file; a path that does not
+/// exist yet would be created as a regular file.
+fn names_existing_non_regular_file(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|metadata| !metadata.file_type().is_file())
 }
 
 fn lexical_absolute(path: &Path) -> Option<PathBuf> {
@@ -495,12 +507,15 @@ fn open_output(role: FileRole, path: &Path) -> Result<PendingOutput, CliError> {
     })
 }
 
+/// Refuses an output whose opened handle is the same regular file as an input. Two handles to
+/// one file share its type, so the output handle's type decides for both; a shared device or FIFO
+/// cannot be truncated and is allowed.
 fn reject_input_output_aliases(
     inputs: &[InputFile],
     outputs: &[PendingOutput],
 ) -> Result<(), CliError> {
     for input in inputs {
-        for output in outputs {
+        for output in outputs.iter().filter(|output| output.is_regular_file) {
             if output
                 .identity
                 .as_ref()
@@ -516,8 +531,14 @@ fn reject_input_output_aliases(
     Ok(())
 }
 
+/// Refuses two outputs whose opened handles are the same regular file, so activating one cannot
+/// truncate what the other wrote; two roles writing one device or FIFO, such as `/dev/null`, are
+/// allowed as Stim allows them.
 fn reject_output_aliases(outputs: &[PendingOutput]) -> Result<(), CliError> {
     for (index, output) in outputs.iter().enumerate() {
+        if !output.is_regular_file {
+            continue;
+        }
         for other in outputs.iter().skip(index + 1) {
             if output.identity == other.identity {
                 return Err(CliError::ConflictingFileRoles {

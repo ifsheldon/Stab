@@ -715,3 +715,97 @@ fn m2d_reads_input_path_and_writes_output_paths() {
     assert_eq!(scratch.read("detectors.dets"), b"shot D0\nshot\n");
     assert_eq!(scratch.read("observables.01"), b"1\n0\n");
 }
+
+/// `m2d` admits its measurement and sweep reader batches against the budget and shrinks them to
+/// what fits instead of growing them unadmitted: at the smallest budget that converts, one byte
+/// less is refused for one-record batches, and every batch cap converts to the same bytes.
+#[test]
+fn m2d_caps_admitted_reader_batches_without_changing_output() {
+    use stab_model::MemoryBudget;
+    use stab_records::RecordStreamStorage;
+
+    const WIDTH: usize = 4096;
+    const RECORDS: usize = 300;
+    let scratch = Scratch::new();
+    let mut circuit = String::from("CX sweep[0] 0\nM");
+    for qubit in 0..WIDTH {
+        circuit.push_str(&format!(" {qubit}"));
+    }
+    circuit.push_str("\nDETECTOR rec[-4096]\nDETECTOR rec[-1] rec[-2]\nDETECTOR rec[-7]\n");
+    circuit.push_str("OBSERVABLE_INCLUDE(0) rec[-3] rec[-4096]\n");
+    let circuit_path = scratch.file("wide.stim", &circuit);
+    let mut state = 0x9E37_79B9_7F4A_7C15_u64;
+    let measurements: Vec<u8> = (0..RECORDS * WIDTH / 8)
+        .map(|_| {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 56) as u8
+        })
+        .collect();
+    let measurement_path = scratch.file("wide.b8", &measurements);
+    let sweeps: String = (0..RECORDS)
+        .map(|record| if record % 3 == 0 { "1\n" } else { "0\n" })
+        .collect();
+    let sweep_path = scratch.file("sweep.01", &sweeps);
+    let convert = |budget: u64| {
+        let budget = format!("--memory-budget={budget}");
+        run(
+            &[
+                "stab",
+                "m2d",
+                "--circuit",
+                &circuit_path,
+                "--in",
+                &measurement_path,
+                "--in_format=b8",
+                "--sweep",
+                &sweep_path,
+                "--sweep_format=01",
+                "--out_format=dets",
+                "--append_observables",
+                "--skip_reference_sample",
+                &budget,
+            ],
+            b"",
+        )
+    };
+
+    let whole = convert(MemoryBudget::DEFAULT.bytes());
+    assert_eq!(whole.status, 0, "{}", whole.stderr_text());
+    assert_eq!(
+        whole.stdout_text().lines().count(),
+        RECORDS,
+        "one dets record per shot"
+    );
+    let (mut refused, mut smallest) = (0_u64, MemoryBudget::DEFAULT.bytes());
+    while refused + 1 < smallest {
+        let middle = refused + (smallest - refused) / 2;
+        if convert(middle).status == 0 {
+            smallest = middle;
+        } else {
+            refused = middle;
+        }
+    }
+    convert(smallest - 1).assert_err(&[
+        "m2d needs at least",
+        "bytes to read its input records in batches of 1,",
+    ]);
+
+    // Batches of `n` records need this many bytes beyond one-record batches.
+    let growth = |records: usize| {
+        let readers = |records| {
+            RecordStreamStorage::new(RecordFormat::B8, WIDTH, records).bytes()
+                + RecordStreamStorage::new(RecordFormat::ZeroOne, 1, records).bytes()
+        };
+        u64::try_from(readers(records) - readers(1)).expect("small storage")
+    };
+    assert!(
+        growth(256) > 0,
+        "full batches must cost more than the smallest budget leaves"
+    );
+    for records in [1, 8, 64] {
+        let capped = convert(smallest + growth(records));
+        capped.assert_ok(&whole.stdout);
+    }
+}

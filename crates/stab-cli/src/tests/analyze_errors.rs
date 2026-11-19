@@ -253,3 +253,48 @@ fn analyze_errors_reads_input_path_and_writes_output_path() {
 fn analyze_errors_empty_model_matches_stim_terminal_newline() {
     run(&["stab", "analyze_errors"], b"M[\xff] 0\n").assert_ok(b"\n");
 }
+
+/// A named `--out` file's write buffer is held beside the model the analysis returns, so the
+/// analysis that just fits a budget writing to stdout needs exactly one output buffer more to
+/// write the same model to a file.
+#[test]
+fn analyze_errors_charges_a_named_output_buffer_against_the_budget() {
+    use stab_model::MemoryBudget;
+
+    let circuit = b"REPEAT 40 {\n    X_ERROR(0.125) 0 1 2\n    CX 0 1 1 2\n    M 0 1 2\n    \
+DETECTOR rec[-1] rec[-2]\n    DETECTOR rec[-2] rec[-3]\n}\n";
+    let scratch = Scratch::new();
+    let out = scratch.path("model.dem");
+    let analyze = |budget: u64, named: bool| {
+        let budget = format!("--memory-budget={budget}");
+        let mut args = vec!["stab", "analyze_errors", budget.as_str()];
+        if named {
+            args.extend(["--out", out.as_str()]);
+        }
+        run(&args, circuit)
+    };
+    let (mut refused, mut smallest) = (0_u64, MemoryBudget::DEFAULT.bytes());
+    while refused + 1 < smallest {
+        let middle = refused + (smallest - refused) / 2;
+        if analyze(middle, false).status == 0 {
+            smallest = middle;
+        } else {
+            refused = middle;
+        }
+    }
+    let to_stdout = analyze(smallest, false);
+    assert_eq!(to_stdout.status, 0, "{}", to_stdout.stderr_text());
+
+    let buffer = crate::io_plan::OUTPUT_BUFFER_BYTES as u64;
+    scratch.file("model.dem", "sentinel\n");
+    let short = analyze(smallest + buffer - 1, true);
+    assert_eq!(short.status, 1, "a named output must charge its buffer");
+    short.assert_stderr_contains(&["-byte memory budget"]);
+    assert_eq!(
+        scratch.read("model.dem"),
+        b"sentinel\n",
+        "refusal truncated the output"
+    );
+    analyze(smallest + buffer, true).assert_ok(b"");
+    assert_eq!(scratch.read("model.dem"), to_stdout.stdout);
+}

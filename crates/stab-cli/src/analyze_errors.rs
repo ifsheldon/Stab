@@ -9,6 +9,7 @@ use crate::{
     CliError, MemoryBudgetArg, MemoryLedger,
     input::{read_limited_input_file, read_limited_stdin},
     io_plan::{FileRole, PendingIo, StandardStreams, StreamUse},
+    output_storage::{EncodedBatches, OutputStorage},
     streaming::OutputSink,
 };
 
@@ -85,6 +86,11 @@ where
         read_limited_stdin(input, input_cap, "analyze_errors input")?
     };
     let (circuit, circuit_hold) = ledger.parse_circuit(input_bytes)?;
+    // A named `--out` file's write buffer coexists with the model the analysis returns, so it is
+    // held before the analysis admits that model against what is left.
+    let _output_hold = OutputStorage::new("analyze_errors", EncodedBatches::ShotMajor, None)
+        .file_buffer(args.output.is_some())
+        .admit(&mut ledger)?;
     let analysis = ledger.stage();
     let dem = circuit_to_detector_error_model(
         &circuit,

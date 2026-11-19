@@ -143,6 +143,19 @@ pub(crate) enum CliError {
     #[error("replay error input has {actual} records but --shots requested {expected}")]
     ReplayErrorRecordCountMismatch { expected: usize, actual: usize },
 
+    /// A replay input the memory budget could not retain whole, and that cannot be rewound to
+    /// decode the rest again, such as a pipe.
+    #[error(
+        "cannot rewind --replay_err_in {path} to replay the records after the first {retained_records} of {expected_records} the memory budget retained: {source}; pass a regular file or raise --memory-budget so every record is retained"
+    )]
+    ReplayInputNotRewindable {
+        path: PathBuf,
+        retained_records: usize,
+        expected_records: usize,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error(
         "{kind} has more than {limit} bytes, exceeding the memory budget; raise it with --memory-budget"
     )]
@@ -192,6 +205,17 @@ pub(crate) enum CliError {
     )]
     OutputStorageBudget {
         command: &'static str,
+        required_bytes: u64,
+        budget_bytes: u64,
+    },
+
+    /// The record readers of a streaming command, admitted before any batch is allocated.
+    #[error(
+        "{command} needs at least {required_bytes} bytes to read its input records in batches of {batch_records}, exceeding the {budget_bytes}-byte memory budget; raise the memory budget to admit it"
+    )]
+    InputStorageBudget {
+        command: &'static str,
+        batch_records: usize,
         required_bytes: u64,
         budget_bytes: u64,
     },
@@ -413,6 +437,9 @@ fn cli_error_help(error: &CliError) -> Option<&'static str> {
     }
     match error {
         CliError::MissingRecordWidth => Some("Provide layout counts or `--bits_per_shot`."),
+        CliError::ReplayInputNotRewindable { .. } => Some(
+            "Pass `--replay_err_in` a regular file, or raise `--memory-budget` until the whole replay is retained.",
+        ),
         CliError::MissingConvertTypes => Some("Add `--types` with unique M, D, or L letters."),
         CliError::UnknownHelpTopic { .. } => Some("Run `stab help commands` to list help topics."),
         CliError::MissingInspectModelType | CliError::UnknownInspectModelType { .. } => {
@@ -490,6 +517,16 @@ fn cli_error_context(error: &CliError) -> Value {
             "expected_records": expected,
             "actual_records": actual,
         }),
+        CliError::ReplayInputNotRewindable {
+            path,
+            retained_records,
+            expected_records,
+            ..
+        } => json!({
+            "path": path.to_string_lossy(),
+            "retained_records": retained_records,
+            "expected_records": expected_records,
+        }),
         CliError::InputTooLarge { kind, limit } => json!({
             "input_kind": kind,
             "limit_bytes": limit,
@@ -527,6 +564,19 @@ fn cli_error_context(error: &CliError) -> Value {
             "resource": "materialized-bytes",
             "actual": required_bytes,
             "limit": budget_bytes,
+        }),
+        CliError::InputStorageBudget {
+            command,
+            batch_records,
+            required_bytes,
+            budget_bytes,
+        } => json!({
+            "operation": "record-input",
+            "command": command,
+            "resource": "materialized-bytes",
+            "actual": required_bytes,
+            "limit": budget_bytes,
+            "batch_records": batch_records,
         }),
         CliError::CommandMemoryBudget { source, .. } => cli_error_context(source),
     }

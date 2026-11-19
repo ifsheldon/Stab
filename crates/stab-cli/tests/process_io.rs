@@ -446,3 +446,149 @@ fn unaliased_and_unused_standard_streams_are_accepted() {
         .expect("run stab");
     assert!(zero_shots.success(), "zero shots: {zero_shots:?}");
 }
+
+/// Runs `sample_dem` with its replay piped through standard input as `--replay_err_in
+/// /dev/stdin`, or read from `replay_file` when given.
+fn sample_dem_replay(
+    dir: &Path,
+    args: &[&str],
+    replay: &[u8],
+    replay_file: Option<&str>,
+) -> Output {
+    let mut args = args.to_vec();
+    args.extend(["--replay_err_in", replay_file.unwrap_or("/dev/stdin")]);
+    let mut child = stab(dir, &args)
+        .stdin(if replay_file.is_some() {
+            Stdio::null()
+        } else {
+            Stdio::piped()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn stab");
+    if let Some(mut stdin) = child.stdin.take() {
+        std::io::Write::write_all(&mut stdin, replay).expect("write replay");
+    }
+    child.wait_with_output().expect("wait stab")
+}
+
+/// A replay the memory budget retains whole is delivered from the store without touching the
+/// input again, so a pipe replays exactly like a file in every replay format.
+#[test]
+fn piped_replay_input_matches_a_file_when_the_store_keeps_every_record() {
+    let dir = fixture();
+    let path = dir.path();
+    let replays: [(&str, &[u8]); 5] = [
+        ("01", b"00\n10\n11\n01\n"),
+        ("b8", &[0x00, 0x01, 0x03, 0x02]),
+        ("r8", &[2, 0, 1, 0, 0, 0, 1, 0]),
+        ("hits", b"\n0\n0,1\n1\n"),
+        ("dets", b"shot\nshot M0\nshot M0 M1\nshot M1\n"),
+    ];
+    let mut expected = None;
+    for (format, replay) in replays {
+        let file = format!("replay.{format}");
+        fs::write(path.join(&file), replay).expect("write replay file");
+        let format_arg = format!("--replay_err_in_format={format}");
+        let base = [
+            "sample_dem",
+            "--in",
+            "model.dem",
+            "--shots",
+            "4",
+            "--out_format",
+            "dets",
+            &format_arg,
+        ];
+        let from_file = sample_dem_replay(path, &base, replay, Some(&file));
+        let piped = sample_dem_replay(path, &base, replay, None);
+        for (source, output) in [("file", &from_file), ("pipe", &piped)] {
+            assert!(
+                output.status.success(),
+                "{format} {source}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        assert_eq!(piped.stdout, from_file.stdout, "{format}");
+        // Every format encodes the same four records, so all outputs agree.
+        let expected = expected.get_or_insert_with(|| from_file.stdout.clone());
+        assert_eq!(&from_file.stdout, expected, "{format}");
+    }
+    assert_eq!(
+        expected.expect("replayed outputs"),
+        b"shot\nshot D0\nshot D0 D1\nshot D1\n"
+    );
+}
+
+/// A replay whose records the budget does not retain must be decoded again after validation,
+/// which a pipe cannot rewind: the run fails before any output file exists and names the cause,
+/// while the same records from a file replay under the same budget.
+#[test]
+fn piped_replay_input_the_budget_cannot_retain_fails_before_creating_outputs() {
+    use stab_engine::{DemSamplerLimits, DemSamplingCompiler, ShotCount};
+    use stab_model::{DetectorErrorModel, MemoryBudget, ParseLimits};
+
+    const DEM: &str = "repeat 64 {\n    error(0.5) D0 L0\n    shift_detectors 1\n}\n";
+    const SHOTS: u64 = 130;
+    let (model, _) =
+        DetectorErrorModel::from_dem_bytes_admitted(DEM.as_bytes(), ParseLimits::default())
+            .expect("parse");
+    let plan = DemSamplingCompiler::new().compile(&model).expect("compile");
+    // The smallest whole-command budget whose store retains anything; the CLI's own holds leave
+    // the store less than this, so one byte below it the store keeps nothing.
+    let retains = |bytes: u64| {
+        plan.replay_record_store(
+            &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
+            ShotCount::new(SHOTS),
+        )
+        .is_retaining()
+    };
+    let (mut refused, mut retaining) = (0_u64, MemoryBudget::DEFAULT.bytes());
+    while refused + 1 < retaining {
+        let middle = refused + (retaining - refused) / 2;
+        if retains(middle) {
+            retaining = middle;
+        } else {
+            refused = middle;
+        }
+    }
+
+    let dir = fixture();
+    let path = dir.path();
+    fs::write(path.join("wide.dem"), DEM).expect("write model");
+    let replay = format!("{}\n", "01".repeat(32)).repeat(130);
+    fs::write(path.join("replay.01"), &replay).expect("write replay file");
+    let budget = format!("--memory-budget={refused}");
+    let shots = SHOTS.to_string();
+    let base = [
+        "sample_dem",
+        "--in",
+        "wide.dem",
+        "--shots",
+        &shots,
+        "--out",
+        "out.dets",
+        &budget,
+    ];
+    let from_file = sample_dem_replay(path, &base, replay.as_bytes(), Some("replay.01"));
+    assert!(
+        from_file.status.success(),
+        "file replay under {budget}: {}",
+        String::from_utf8_lossy(&from_file.stderr)
+    );
+    fs::remove_file(path.join("out.dets")).expect("remove file-replay output");
+
+    let piped = sample_dem_replay(path, &base, replay.as_bytes(), None);
+    assert_reported_failure(&piped, "piped replay under a small budget");
+    let stderr = String::from_utf8_lossy(&piped.stderr);
+    assert!(
+        stderr.contains("cannot rewind --replay_err_in /dev/stdin")
+            && stderr.contains("pass a regular file or raise --memory-budget"),
+        "{stderr}"
+    );
+    assert!(
+        !path.join("out.dets").exists(),
+        "a refused piped replay created its output"
+    );
+}

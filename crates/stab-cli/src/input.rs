@@ -164,8 +164,10 @@ where
             let probed = window.get(..read).ok_or_else(|| {
                 std::io::Error::other("input reader reported more bytes than its buffer holds")
             })?;
+            // `grown` already doubles the buffer, and an amortized reservation would double it
+            // again past `cap`, so the reservation is exact.
             let grown = input.capacity().max(CHUNK_BYTES).min(cap - input.len());
-            input.try_reserve(grown).map_err(out_of_memory)?;
+            input.try_reserve_exact(grown).map_err(out_of_memory)?;
             input.extend_from_slice(probed);
             continue;
         }
@@ -195,5 +197,28 @@ fn read_stream_error(path: Option<&Path>, source: std::io::Error) -> CliError {
             source,
         },
         None => CliError::ReadInput(source),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_bounded;
+
+    /// An input one byte past the cap, read without a size hint so storage grows geometrically,
+    /// must never reserve more than the `limit + 1` bytes the budget admitted, including on the
+    /// last growth step that the cap truncates.
+    #[test]
+    fn bounded_read_never_reserves_past_its_cap() {
+        for limit in [0_u64, 63, 64 * 1024, 100_000, 3 * 64 * 1024 + 17] {
+            let cap = usize::try_from(limit + 1).expect("small cap");
+            let source = vec![0xA5_u8; cap + 1];
+            let input = read_bounded(&mut source.as_slice(), limit, 0).expect("bounded read");
+            assert_eq!(input.len(), cap, "limit {limit}");
+            assert!(
+                input.capacity() <= cap,
+                "limit {limit}: reserved {} bytes past a {cap}-byte cap",
+                input.capacity()
+            );
+        }
     }
 }
