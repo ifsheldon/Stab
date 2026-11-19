@@ -460,15 +460,12 @@ fn represented_instruction_limit_accepts_exact_maximum_and_rejects_next() {
 }
 
 fn model_with_instruction_visits(instruction_count: usize) -> DetectorErrorModel {
-    let detector = DemInstruction::detector(
-        Vec::new(),
-        DemTarget::RelativeDetector(DemDetectorId::try_new(0).expect("D0")),
-        None,
-    )
-    .expect("detector annotation");
+    let detector =
+        DemInstruction::detector(Vec::new(), DemDetectorId::try_new(0).expect("D0"), None)
+            .expect("detector annotation");
     let error = DemInstruction::error(
         Probability::try_new(0.0).expect("zero probability"),
-        vec![DemTarget::RelativeDetector(
+        vec![DemTarget::from_detector(
             DemDetectorId::try_new(0).expect("D0"),
         )],
         None,

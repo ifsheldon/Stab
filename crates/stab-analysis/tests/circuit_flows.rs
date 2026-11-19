@@ -388,6 +388,25 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_marker_avoids_flow_observables
 }
 
 #[test]
+fn check_if_circuit_has_unsigned_stabilizer_flows_marker_skips_circuit_observables() {
+    // The circuit's own observables 0 and 1 must not be mistaken for the flows' tracking labels.
+    let circuit = circuit(
+        "
+        M 0
+        OBSERVABLE_INCLUDE(0) X0
+        OBSERVABLE_INCLUDE(1) rec[-1]
+        ",
+    );
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(
+            &circuit,
+            &[flow("Z -> rec[-1]"), flow("Z -> Z"), flow("X -> X")]
+        ),
+        vec![true, true, false]
+    );
+}
+
+#[test]
 fn check_if_circuit_has_unsigned_stabilizer_flows_marker_handles_max_observable() {
     let circuit = circuit(
         "

@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{AlgebraMemoryBudget, FlexPauliString, PauliBasis};
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, CircuitTick, DemDetectorId, DemTarget,
-    FoldedCircuitSummary, FoldedCount, FoldedWalkError, GateKind, MemoryBudget, ParseLimits,
-    QubitId, RepeatNestingLimit, Target, TargetKind,
+    DemTargetKind, FoldedCircuitSummary, FoldedCount, FoldedWalkError, GateKind, MemoryBudget,
+    ParseLimits, QubitId, RepeatNestingLimit, Target, TargetKind,
 };
 
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
@@ -52,7 +52,7 @@ pub fn circuit_detecting_regions(
             targets: options
                 .detectors
                 .into_iter()
-                .map(DemTarget::RelativeDetector)
+                .map(DemTarget::from_detector)
                 .collect(),
             ticks: options.ticks,
             ignore_anticommutation_errors: options.ignore_anticommutation_errors,
@@ -62,10 +62,7 @@ pub fn circuit_detecting_regions(
     )?;
     Ok(target_regions
         .into_iter()
-        .filter_map(|(target, regions)| match target {
-            DemTarget::RelativeDetector(detector) => Some((detector, regions)),
-            DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => None,
-        })
+        .filter_map(|(target, regions)| target.detector().map(|detector| (detector, regions)))
         .collect())
 }
 
@@ -885,8 +882,8 @@ fn validate_targets(
     observable_count: u64,
 ) -> AnalysisResult<()> {
     for target in targets {
-        match target {
-            DemTarget::RelativeDetector(detector) => {
+        match target.kind() {
+            DemTargetKind::RelativeDetector(detector) => {
                 if detector.get() >= detector_count {
                     return Err(AnalysisError::invalid_detector_error_model(format!(
                         "requested detector D{} but circuit only has {detector_count} detector(s)",
@@ -894,7 +891,7 @@ fn validate_targets(
                     )));
                 }
             }
-            DemTarget::LogicalObservable(observable) => {
+            DemTargetKind::LogicalObservable(observable) => {
                 if observable.get() >= observable_count {
                     return Err(AnalysisError::invalid_detector_error_model(format!(
                         "requested observable L{} but circuit only has {observable_count} observable(s)",
@@ -902,7 +899,7 @@ fn validate_targets(
                     )));
                 }
             }
-            DemTarget::Separator | DemTarget::Numeric(_) => {
+            DemTargetKind::Separator => {
                 return Err(AnalysisError::invalid_detector_error_model(format!(
                     "detecting-region target filters only supports detector and logical-observable targets, got {target}",
                 )));

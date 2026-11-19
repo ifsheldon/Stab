@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use stab_model::{DemTarget, Probability};
+use stab_model::{DemTarget, DemTargetKind, Probability};
 
 use crate::{AnalysisError, AnalysisResult};
 
@@ -116,16 +116,15 @@ fn known_graphlike_components<'a>(
 fn is_graphlike(targets: &[DemTarget]) -> bool {
     let mut detector_count = 0usize;
     for target in targets {
-        match target {
-            DemTarget::RelativeDetector(_) => {
+        match target.kind() {
+            DemTargetKind::RelativeDetector(_) => {
                 detector_count = detector_count.saturating_add(1);
                 if detector_count > 2 {
                     return false;
                 }
             }
-            DemTarget::LogicalObservable(_) => {}
-            DemTarget::Separator => detector_count = 0,
-            DemTarget::Numeric(_) => return false,
+            DemTargetKind::LogicalObservable(_) => {}
+            DemTargetKind::Separator => detector_count = 0,
         }
     }
     true
@@ -134,7 +133,7 @@ fn is_graphlike(targets: &[DemTarget]) -> bool {
 fn is_graphlike_component(targets: &[DemTarget]) -> bool {
     targets
         .iter()
-        .filter(|target| matches!(target, DemTarget::RelativeDetector(_)))
+        .filter(|target| target.is_detector())
         .take(3)
         .count()
         <= 2
@@ -178,8 +177,8 @@ fn observable_masks(problem: &[DemTarget]) -> AnalysisResult<(u64, u64)> {
     let mut observable_mask = 0_u64;
     let mut used_term_mask = 0_u64;
     for (index, target) in problem.iter().enumerate() {
-        match target {
-            DemTarget::LogicalObservable(id) => {
+        match target.kind() {
+            DemTargetKind::LogicalObservable(id) => {
                 let id = id.get();
                 if id >= 64 {
                     return Err(AnalysisError::invalid_detector_error_model(
@@ -189,10 +188,10 @@ fn observable_masks(problem: &[DemTarget]) -> AnalysisResult<(u64, u64)> {
                 observable_mask ^= 1_u64 << id;
                 used_term_mask |= 1_u64 << index;
             }
-            DemTarget::RelativeDetector(_) => {}
-            DemTarget::Separator | DemTarget::Numeric(_) => {
+            DemTargetKind::RelativeDetector(_) => {}
+            DemTargetKind::Separator => {
                 return Err(AnalysisError::invalid_detector_error_model(
-                    "error decomposition components cannot contain separators or numeric targets",
+                    "error decomposition components cannot contain separators",
                 ));
             }
         }
@@ -203,7 +202,7 @@ fn observable_masks(problem: &[DemTarget]) -> AnalysisResult<(u64, u64)> {
 fn observable_mask_of(targets: &[DemTarget]) -> u64 {
     let mut mask = 0_u64;
     for target in targets {
-        if let DemTarget::LogicalObservable(id) = target
+        if let Some(id) = target.observable()
             && id.get() < 64
         {
             mask ^= 1_u64 << id.get();
@@ -280,10 +279,10 @@ fn remnant_decomposition(
     }
     let mut done = problem
         .iter()
-        .map(|target| !matches!(target, DemTarget::RelativeDetector(_)))
+        .map(|target| !target.is_detector())
         .collect::<Vec<_>>();
     let mut sparse = SparseXor::default();
-    sparse.toggle_all(problem)?;
+    sparse.toggle_all(problem);
     let mut components = Vec::new();
 
     for k in 0..problem.len() {
@@ -301,7 +300,7 @@ fn remnant_decomposition(
                 set_done(&mut done, k);
                 set_done(&mut done, k2);
                 components.push(component.to_vec());
-                sparse.toggle_all(component)?;
+                sparse.toggle_all(component);
                 break;
             }
         }
@@ -315,7 +314,7 @@ fn remnant_decomposition(
         {
             set_done(&mut done, k);
             components.push(component.to_vec());
-            sparse.toggle_all(component)?;
+            sparse.toggle_all(component);
         }
         missed += usize::from(!done.get(k).copied().unwrap_or(true));
     }
@@ -343,23 +342,12 @@ struct SparseXor {
 }
 
 impl SparseXor {
-    fn toggle_all(&mut self, values: &[DemTarget]) -> AnalysisResult<()> {
+    fn toggle_all(&mut self, values: &[DemTarget]) {
         for value in values {
-            match value {
-                DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
-                    if !self.targets.insert(*value) {
-                        self.targets.remove(value);
-                    }
-                }
-                DemTarget::Separator => {}
-                DemTarget::Numeric(_) => {
-                    return Err(AnalysisError::invalid_detector_error_model(
-                        "error decomposition cannot use numeric DEM targets",
-                    ));
-                }
+            if !value.is_separator() && !self.targets.insert(*value) {
+                self.targets.remove(value);
             }
         }
-        Ok(())
     }
 
     fn into_targets(self) -> Vec<DemTarget> {
@@ -368,7 +356,7 @@ impl SparseXor {
 }
 
 fn split_components(targets: &[DemTarget]) -> impl Iterator<Item = &[DemTarget]> {
-    targets.split(|target| matches!(target, DemTarget::Separator))
+    targets.split(|target| target.is_separator())
 }
 
 /// The symptom key of a component with one or two detectors.
@@ -376,7 +364,7 @@ fn detector_key(targets: &[DemTarget]) -> Option<GraphlikeKey> {
     let mut detectors = targets
         .iter()
         .copied()
-        .filter(|target| matches!(target, DemTarget::RelativeDetector(_)));
+        .filter(|target| target.is_detector());
     let first = detectors.next()?;
     let second = detectors.next();
     if detectors.next().is_some() {
@@ -417,7 +405,7 @@ fn decomposition_failure_message(component: &[DemTarget], block_remnant_edges: b
 fn format_component(targets: &[DemTarget]) -> String {
     targets
         .iter()
-        .filter(|target| !matches!(target, DemTarget::Separator))
+        .filter(|target| !target.is_separator())
         .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(", ")

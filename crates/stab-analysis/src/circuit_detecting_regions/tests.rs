@@ -415,7 +415,6 @@ fn detecting_regions_target_api_rejects_invalid_targets() {
             "requested observable L0",
         ),
         (DemTarget::separator(), "only supports detector"),
-        (DemTarget::numeric(5), "only supports detector"),
     ] {
         let error = circuit_detecting_regions_for_targets(
             &circuit,

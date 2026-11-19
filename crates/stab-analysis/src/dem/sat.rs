@@ -9,7 +9,7 @@ use stab_model::advanced::{
 };
 use stab_model::{
     Cancellation, DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId,
-    DemRepeatBlock, DemTarget, DetectorErrorModel,
+    DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
 };
 
 mod instance;
@@ -41,14 +41,14 @@ impl SatTargetIndex {
             countdown.tick(cancellation)?;
             for target in &error.targets {
                 countdown.tick(cancellation)?;
-                match *target {
-                    DemTarget::RelativeDetector(detector) => {
+                match target.kind() {
+                    DemTargetKind::RelativeDetector(detector) => {
                         detectors.insert(detector);
                     }
-                    DemTarget::LogicalObservable(observable) => {
+                    DemTargetKind::LogicalObservable(observable) => {
                         observables.insert(observable);
                     }
-                    DemTarget::Separator | DemTarget::Numeric(_) => {}
+                    DemTargetKind::Separator => {}
                 }
             }
         }
@@ -114,8 +114,8 @@ fn preflight_sat_shape(
         }
         for target in &error.targets {
             countdown.tick(limits.cancellation())?;
-            let seen = match *target {
-                DemTarget::RelativeDetector(detector) => {
+            let seen = match target.kind() {
+                DemTargetKind::RelativeDetector(detector) => {
                     let slot = target_index.detector_slot(detector)?;
                     seen_detectors.get_mut(slot).ok_or_else(|| {
                         AnalysisError::invalid_detector_error_model(
@@ -123,7 +123,7 @@ fn preflight_sat_shape(
                         )
                     })?
                 }
-                DemTarget::LogicalObservable(observable) => {
+                DemTargetKind::LogicalObservable(observable) => {
                     let slot = target_index.observable_slot(observable)?;
                     seen_observables.get_mut(slot).ok_or_else(|| {
                         AnalysisError::invalid_detector_error_model(
@@ -131,7 +131,7 @@ fn preflight_sat_shape(
                         )
                     })?
                 }
-                DemTarget::Separator | DemTarget::Numeric(_) => continue,
+                DemTargetKind::Separator => continue,
             };
             target_occurrences = checked_sat_add(target_occurrences, 1, "target occurrence count")?;
             if *seen {
@@ -327,8 +327,8 @@ fn add_error_parity_terms(
 ) -> AnalysisResult<()> {
     for target in targets {
         countdown.tick(cancellation)?;
-        match *target {
-            DemTarget::RelativeDetector(detector) => {
+        match target.kind() {
+            DemTargetKind::RelativeDetector(detector) => {
                 let index = target_index.detector_slot(detector)?;
                 let current = detectors_activated.get(index).copied().ok_or_else(|| {
                     AnalysisError::invalid_detector_error_model(format!(
@@ -345,7 +345,7 @@ fn add_error_parity_terms(
                 };
                 *slot = next;
             }
-            DemTarget::LogicalObservable(observable) => {
+            DemTargetKind::LogicalObservable(observable) => {
                 let index = target_index.observable_slot(observable)?;
                 let current = observables_flipped.get(index).copied().ok_or_else(|| {
                     AnalysisError::invalid_detector_error_model(format!(
@@ -362,7 +362,7 @@ fn add_error_parity_terms(
                 };
                 *slot = next;
             }
-            DemTarget::Separator | DemTarget::Numeric(_) => {}
+            DemTargetKind::Separator => {}
         }
     }
     Ok(())
@@ -508,12 +508,7 @@ impl SatErrorVisitor<'_> {
         }
         let added_occurrences = targets
             .iter()
-            .filter(|target| {
-                matches!(
-                    target,
-                    DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_)
-                )
-            })
+            .filter(|target| !target.is_separator())
             .count();
         let next_target_occurrences = self
             .counts
@@ -550,7 +545,7 @@ impl SatErrorVisitor<'_> {
 
 fn validate_shifted_target_ids(targets: &[DemTarget], detector_offset: u64) -> AnalysisResult<()> {
     for target in targets {
-        if let DemTarget::RelativeDetector(detector) = *target {
+        if let Some(detector) = target.detector() {
             let _ = shifted_detector(detector, detector_offset)?;
         }
     }

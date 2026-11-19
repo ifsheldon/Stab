@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use std::ops::Bound;
 
 use stab_model::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemRepeatCount,
-    DemTarget, DetectorErrorModel, ModelResult, Probability,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
+    DemRepeatCount, DemTarget, DetectorErrorModel, ModelResult, Probability,
 };
 
 #[test]
@@ -41,7 +41,7 @@ fn pf1_dem_basic_programmatic_constructors_push_and_clone() {
     body.push_instruction(
         DemInstruction::detector(
             vec![1.0, 2.0],
-            DemTarget::relative_detector(0).expect("D0"),
+            DemDetectorId::try_new(0).expect("D0"),
             Some("inner".to_string()),
         )
         .expect("detector instruction"),
@@ -70,13 +70,10 @@ fn pf1_dem_basic_programmatic_constructors_push_and_clone() {
         body,
         Some("loop".to_string()),
     ));
-    dem.push_instruction(
-        DemInstruction::logical_observable(
-            DemTarget::logical_observable(4).expect("L4"),
-            Some("obs".to_string()),
-        )
-        .expect("logical observable"),
-    );
+    dem.push_instruction(DemInstruction::logical_observable(
+        DemObservableId::try_new(4).expect("L4"),
+        Some("obs".to_string()),
+    ));
 
     assert_eq!(
         dem.to_dem_string(),
@@ -119,31 +116,6 @@ fn pf1_dem_basic_rejects_multi_target_detector_and_logical_observable() {
             "unexpected error for {text:?}: {error}"
         );
     }
-
-    assert!(
-        DemInstruction::new(
-            DemInstructionKind::Detector,
-            Vec::new(),
-            vec![
-                DemTarget::relative_detector(0).expect("D0"),
-                DemTarget::relative_detector(1).expect("D1"),
-            ],
-            None,
-        )
-        .is_err()
-    );
-    assert!(
-        DemInstruction::new(
-            DemInstructionKind::LogicalObservable,
-            Vec::new(),
-            vec![
-                DemTarget::logical_observable(0).expect("L0"),
-                DemTarget::logical_observable(1).expect("L1"),
-            ],
-            None,
-        )
-        .is_err()
-    );
 }
 
 #[test]
@@ -214,9 +186,8 @@ fn pf4_dem_public_validation_rejects_malformed_inputs() {
         );
     }
 
-    let programmatic_error = DemInstruction::new(
-        DemInstructionKind::Error,
-        vec![0.25],
+    let programmatic_error = DemInstruction::error(
+        Probability::try_new(0.25).expect("probability"),
         vec![
             DemTarget::separator(),
             DemTarget::relative_detector(0).expect("D0"),
@@ -231,9 +202,8 @@ fn pf4_dem_public_validation_rejects_malformed_inputs() {
         "{programmatic_error}"
     );
 
-    let programmatic_separator_only = DemInstruction::new(
-        DemInstructionKind::Error,
-        vec![0.25],
+    let programmatic_separator_only = DemInstruction::error(
+        Probability::try_new(0.25).expect("probability"),
         vec![DemTarget::separator()],
         None,
     )
@@ -245,10 +215,9 @@ fn pf4_dem_public_validation_rejects_malformed_inputs() {
         "{programmatic_separator_only}"
     );
 
-    let programmatic_detector = DemInstruction::new(
-        DemInstructionKind::Detector,
+    let programmatic_detector = DemInstruction::detector(
         vec![f64::INFINITY],
-        vec![DemTarget::relative_detector(0).expect("D0")],
+        DemDetectorId::try_new(0).expect("D0"),
         None,
     )
     .expect_err("reject non-finite detector coordinates");

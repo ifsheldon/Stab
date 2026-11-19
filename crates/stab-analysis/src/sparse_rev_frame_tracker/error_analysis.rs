@@ -1,4 +1,4 @@
-use stab_model::{DemTarget, Pauli, QubitId};
+use stab_model::{DemTarget, DemTargetKind, Pauli, QubitId};
 
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
@@ -102,9 +102,7 @@ impl SparseReverseFrameTracker {
         if gauge.is_empty() {
             return Ok(());
         }
-        let has_observables = gauge
-            .iter()
-            .any(|target| matches!(target, DemTarget::LogicalObservable(_)));
+        let has_observables = gauge.iter().any(|target| target.is_observable());
         if self.eliminate_detector_gauges && !has_observables {
             self.eliminate_detector_gauge(&gauge)?;
             self.gauge_errors.push(gauge);
@@ -120,9 +118,7 @@ impl SparseReverseFrameTracker {
                 // allowed, and allowing gauge detectors suppresses only the
                 // detector line of the failure message.
                 let has_detectors = !self.eliminate_detector_gauges
-                    && gauge
-                        .iter()
-                        .any(|target| matches!(target, DemTarget::RelativeDetector(_)));
+                    && gauge.iter().any(|target| target.is_detector());
                 let mut message = String::new();
                 if has_observables {
                     message.push_str("The circuit contains non-deterministic observables.\n");
@@ -165,11 +161,9 @@ impl SparseReverseFrameTracker {
     fn eliminate_detector_gauge(&mut self, gauge: &TargetXorSet) -> AnalysisResult<()> {
         let Some(pivot) = gauge
             .iter()
-            .filter_map(|target| match target {
-                DemTarget::RelativeDetector(detector) => Some((*detector, *target)),
-                DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
-                    None
-                }
+            .filter_map(|target| match target.kind() {
+                DemTargetKind::RelativeDetector(detector) => Some((detector, *target)),
+                DemTargetKind::LogicalObservable(_) | DemTargetKind::Separator => None,
             })
             .max_by_key(|(detector, _)| *detector)
             .map(|(_, target)| target)

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Bound, ControlFlow, Range, RangeBounds};
 
 use crate::advanced::CancellationCountdown;
-use crate::{Cancellation, MemoryBudget, ModelError, ModelResult, Probability};
+use crate::{Cancellation, MemoryBudget, ModelError, ModelResult};
 
 use super::coordinate_scan::{
     MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
@@ -11,11 +11,10 @@ use super::coordinate_scan::{
 };
 use super::traversal::{
     CoordinateShifts, DemDetectorBounds, DemRepeatSelection, DemTraversalState, FoldedDemBlock,
-    FoldedDemItem, FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates, shifted_targets,
+    FoldedDemItem, FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates,
 };
 use super::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
-    DetectorErrorModel,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DetectorErrorModel,
 };
 
 /// Conservative retained bytes of one all-map detector entry, excluding its coordinate values:
@@ -97,16 +96,16 @@ impl DemFlattenedInstructionIter<'_> {
             })?;
             frame.index += 1;
             match item {
-                DemItem::Instruction(instruction) => match instruction.kind() {
-                    DemInstructionKind::ShiftDetectors => {
-                        apply_detector_shift(&mut self.detector_offset, instruction)?;
+                DemItem::Instruction(instruction) => match instruction.detector_shift() {
+                    Some(shift) => {
+                        apply_detector_shift(&mut self.detector_offset, shift)?;
                         add_coordinate_shift_mul(
                             &mut self.coordinate_shift,
                             instruction.args(),
                             1.0,
                         )?;
                     }
-                    _ => {
+                    None => {
                         return Ok(Some(flatten_instruction(
                             instruction,
                             self.detector_offset,
@@ -326,51 +325,6 @@ pub(super) fn coordinate_shift_of(model: &DetectorErrorModel) -> ModelResult<Vec
     FoldedDemTraversal::new(model)?.root().coordinate_shift()
 }
 
-impl DemInstruction {
-    /// Removes this instruction's tag without changing its validated semantic fields.
-    ///
-    /// This is a crate-private model primitive used by analysis transforms. Recursive tag
-    /// stripping remains owned by the analysis layer.
-    pub(crate) fn clear_tag(&mut self) {
-        self.tag = None;
-    }
-
-    /// Builds a validated error instruction from a borrowed target slice.
-    pub(crate) fn error_from_targets(
-        probability: Probability,
-        targets: &[DemTarget],
-        tag: Option<&[u8]>,
-    ) -> ModelResult<Self> {
-        let mut args = super::DemArgVec::new();
-        args.push(probability.get());
-        Self::from_parts(
-            DemInstructionKind::Error,
-            args,
-            super::DemTargetVec::from_slice(targets),
-            tag.and_then(super::DemTag::from_slice),
-        )
-    }
-
-    /// Subtracts `base` from every relative detector target in place.
-    ///
-    /// Fails with the first detector id below `base` and leaves the instruction unchanged.
-    /// Lowering detector ids keeps every validated instruction shape valid.
-    pub(crate) fn rebase_detectors(&mut self, base: u64) -> Result<(), u64> {
-        if let Some(detector) = self.targets.iter().find_map(|target| match target {
-            DemTarget::RelativeDetector(detector) if detector.get() < base => Some(detector.get()),
-            _ => None,
-        }) {
-            return Err(detector);
-        }
-        for target in &mut self.targets {
-            if let DemTarget::RelativeDetector(detector) = target {
-                *detector = DemDetectorId(detector.get() - base);
-            }
-        }
-        Ok(())
-    }
-}
-
 impl DetectorErrorModel {
     /// Mutable item storage for consumers that rebuild a model in place.
     ///
@@ -534,8 +488,12 @@ fn record_selected_detector_coordinates(
     detector_offset: u64,
     coordinate_shift: &[f64],
 ) -> ModelResult<()> {
-    for target in instruction.targets() {
-        if let DemTarget::RelativeDetector(detector) = target {
+    for detector in instruction
+        .targets()
+        .iter()
+        .filter_map(|target| target.detector())
+    {
+        {
             let detector =
                 DemDetectorId::try_new(detector_offset.checked_add(detector.get()).ok_or_else(
                     || ModelError::invalid_detector_error_model("relative detector id overflowed"),
@@ -585,7 +543,7 @@ fn find_selected_detector_coordinates_in_flat_repeat_body(
         match instruction.kind() {
             DemInstructionKind::Detector => {
                 for target in instruction.targets() {
-                    if let DemTarget::RelativeDetector(local_detector) = target {
+                    if let Some(local_detector) = target.detector() {
                         let local_detector = local_detector_offset
                             .checked_add(local_detector.get())
                             .ok_or_else(|| {
@@ -602,11 +560,13 @@ fn find_selected_detector_coordinates_in_flat_repeat_body(
                     }
                 }
             }
-            DemInstructionKind::ShiftDetectors => {
-                apply_detector_shift(&mut local_detector_offset, instruction)?;
-                add_coordinate_shift_mul(&mut local_coordinate_shift, instruction.args(), 1.0)?;
-            }
-            DemInstructionKind::Error | DemInstructionKind::LogicalObservable => {}
+            DemInstructionKind::ShiftDetectors
+            | DemInstructionKind::Error
+            | DemInstructionKind::LogicalObservable => {}
+        }
+        if let Some(shift) = instruction.detector_shift() {
+            apply_detector_shift(&mut local_detector_offset, shift)?;
+            add_coordinate_shift_mul(&mut local_coordinate_shift, instruction.args(), 1.0)?;
         }
     }
     for (detector, (_, detector_coordinates)) in scan.best {
@@ -852,12 +812,9 @@ fn count_errors_in(model: &DetectorErrorModel) -> ModelResult<u64> {
         .error_count()
 }
 
-pub(super) fn apply_detector_shift(
-    detector_offset: &mut u64,
-    instruction: &DemInstruction,
-) -> ModelResult<()> {
+pub(super) fn apply_detector_shift(detector_offset: &mut u64, shift: u64) -> ModelResult<()> {
     *detector_offset = detector_offset
-        .checked_add(instruction.detector_shift()?)
+        .checked_add(shift)
         .ok_or_else(|| ModelError::invalid_detector_error_model("detector shift overflowed"))?;
     Ok(())
 }
@@ -880,8 +837,7 @@ fn flatten_instruction(
         args.extend_from_slice(instruction.args());
         args
     };
-    let targets = shifted_targets(instruction.targets(), detector_offset)?;
-    DemInstruction::new_with_tag_bytes(instruction.kind(), args, targets, instruction.tag_bytes())
+    instruction.relocated(args, detector_offset)
 }
 
 pub(super) fn add_coordinate_shift_mul(

@@ -1,7 +1,7 @@
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemInstruction, DemInstructionKind, DemItem,
-    DemRepeatCount, DemTarget, DetectorErrorModel, GateKind, Pauli, Probability, QubitId,
-    RepeatCount, Target,
+    Circuit, CircuitInstruction, CircuitItem, DemDetectorId, DemInstruction, DemItem,
+    DemObservableId, DemRepeatCount, DemTarget, DetectorErrorModel, GateKind, Pauli, Probability,
+    QubitId, RepeatCount, Target,
 };
 
 use super::{
@@ -224,10 +224,9 @@ impl<'c> ReverseFoldAnalyzer<'c> {
             GateKind::DETECTOR => {
                 self.tracker.undo_instruction(instruction)?;
                 self.push_output_instruction(
-                    stab_model::advanced::dem_instruction_with_tag_bytes(
-                        DemInstructionKind::Detector,
+                    stab_model::advanced::dem_detector_instruction_with_tag_bytes(
                         instruction.args().to_vec(),
-                        vec![DemTarget::relative_detector(self.tracker.detector_count())?],
+                        DemDetectorId::try_new(self.tracker.detector_count())?,
                         instruction.tag_bytes(),
                     )?,
                 )?;
@@ -240,20 +239,17 @@ impl<'c> ReverseFoldAnalyzer<'c> {
                     )
                 })?;
                 self.push_output_instruction(
-                    stab_model::advanced::dem_instruction_with_tag_bytes(
-                        DemInstructionKind::LogicalObservable,
-                        Vec::new(),
-                        vec![DemTarget::logical_observable(observable.get())?],
+                    stab_model::advanced::dem_logical_observable_instruction_with_tag_bytes(
+                        DemObservableId::try_new(observable.get())?,
                         instruction.tag_bytes(),
-                    )?,
+                    ),
                 )?;
             }
             GateKind::SHIFT_COORDS => {
                 self.push_output_instruction(
-                    stab_model::advanced::dem_instruction_with_tag_bytes(
-                        DemInstructionKind::ShiftDetectors,
+                    stab_model::advanced::dem_shift_detectors_instruction_with_tag_bytes(
                         instruction.args().to_vec(),
-                        vec![DemTarget::numeric(0)],
+                        0,
                         instruction.tag_bytes(),
                     )?,
                 )?;
@@ -1081,19 +1077,14 @@ fn prepend_detector_shift(
 ) -> AnalysisResult<()> {
     let items = stab_model::advanced::dem_model_items_mut(model);
     if let Some(DemItem::Instruction(instruction)) = items.first_mut()
-        && instruction.kind() == DemInstructionKind::ShiftDetectors
+        && let Some(existing_shift) = instruction.detector_shift()
     {
-        let combined = stab_model::advanced::dem_instruction_detector_shift(instruction)?
-            .checked_add(detector_shift)
-            .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "folded analyzer detector shift overflowed",
-                )
-            })?;
-        *instruction = stab_model::advanced::dem_instruction_with_tag_bytes(
-            DemInstructionKind::ShiftDetectors,
+        let combined = existing_shift.checked_add(detector_shift).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model("folded analyzer detector shift overflowed")
+        })?;
+        *instruction = stab_model::advanced::dem_shift_detectors_instruction_with_tag_bytes(
             instruction.args().to_vec(),
-            vec![DemTarget::numeric(combined)],
+            combined,
             instruction.tag_bytes(),
         )?;
         return Ok(());

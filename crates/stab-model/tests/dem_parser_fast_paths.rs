@@ -8,15 +8,15 @@ use stab_model::{DemInstruction, DemItem, DemTarget, DetectorErrorModel};
 #[test]
 fn dem_model_layout_stays_bounded_for_large_parse_workloads() {
     assert!(
-        std::mem::size_of::<DemTarget>() <= 16,
+        std::mem::size_of::<DemTarget>() <= 8,
         "DEM target layout unexpectedly grew"
     );
     assert!(
-        std::mem::size_of::<DemInstruction>() <= 160,
+        std::mem::size_of::<DemInstruction>() <= 112,
         "DEM instruction layout unexpectedly grew"
     );
     assert!(
-        std::mem::size_of::<DemItem>() <= 160,
+        std::mem::size_of::<DemItem>() <= 112,
         "DEM item layout unexpectedly grew"
     );
 }

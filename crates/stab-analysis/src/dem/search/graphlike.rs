@@ -10,7 +10,9 @@ use std::hash::{Hash, Hasher};
 
 #[cfg(test)]
 use stab_model::DemItem;
-use stab_model::{DemDetectorId, DemInstruction, DemTarget, DetectorErrorModel, Probability};
+use stab_model::{
+    DemDetectorId, DemInstruction, DemTarget, DemTargetKind, DetectorErrorModel, Probability,
+};
 
 use super::{
     arena_index::ArenaIndex,
@@ -225,8 +227,8 @@ impl Graph {
         let mut detectors = Vec::new();
         let mut observables = ObservableMask::new();
         for target in targets {
-            match *target {
-                DemTarget::RelativeDetector(detector) => {
+            match target.kind() {
+                DemTargetKind::RelativeDetector(detector) => {
                     if detectors.len() == 2 {
                         if ignore_ungraphlike_errors {
                             return Ok(());
@@ -237,8 +239,8 @@ impl Graph {
                     }
                     detectors.push(detector);
                 }
-                DemTarget::LogicalObservable(observable) => observables.toggle(observable),
-                DemTarget::Separator | DemTarget::Numeric(_) => {}
+                DemTargetKind::LogicalObservable(observable) => observables.toggle(observable),
+                DemTargetKind::Separator => {}
             }
         }
 
@@ -264,7 +266,7 @@ impl Graph {
     ) -> AnalysisResult<()> {
         let mut start = 0;
         for (index, target) in targets.iter().enumerate() {
-            if matches!(target, DemTarget::Separator) {
+            if target.is_separator() {
                 if ignore_ungraphlike_errors {
                     return Ok(());
                 }

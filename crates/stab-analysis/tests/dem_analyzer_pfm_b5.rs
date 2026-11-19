@@ -7,7 +7,7 @@
 
 use stab_analysis::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
 use stab_model::{
-    Circuit, DemInstruction, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
+    Circuit, DemInstruction, DemInstructionKind, DemItem, DemTargetKind, DetectorErrorModel,
 };
 
 const NESTED_CIRCUIT: &str =
@@ -325,8 +325,8 @@ fn collect_semantic_instruction(
                 .expect("error instruction should have a probability");
             let mut targets = Vec::new();
             for target in instruction.targets() {
-                match *target {
-                    DemTarget::RelativeDetector(detector) => {
+                match target.kind() {
+                    DemTargetKind::RelativeDetector(detector) => {
                         targets.push(SemanticTarget::Detector(
                             state
                                 .detector_offset
@@ -334,11 +334,10 @@ fn collect_semantic_instruction(
                                 .expect("semantic detector id should fit"),
                         ));
                     }
-                    DemTarget::LogicalObservable(observable) => {
+                    DemTargetKind::LogicalObservable(observable) => {
                         targets.push(SemanticTarget::LogicalObservable(observable.get()));
                     }
-                    DemTarget::Separator => {}
-                    DemTarget::Numeric(_) => panic!("error target should not be numeric"),
+                    DemTargetKind::Separator => {}
                 }
             }
             result.errors.push(SemanticError {
@@ -348,7 +347,10 @@ fn collect_semantic_instruction(
             });
         }
         DemInstructionKind::Detector => {
-            let [DemTarget::RelativeDetector(detector)] = instruction.targets() else {
+            let Some(detector) = (match instruction.targets() {
+                [target] => target.detector(),
+                _ => None,
+            }) else {
                 panic!("detector declaration should have one detector target");
             };
             result.detectors.push(SemanticDetector {
@@ -362,7 +364,7 @@ fn collect_semantic_instruction(
         }
         DemInstructionKind::LogicalObservable => {
             for target in instruction.targets() {
-                let DemTarget::LogicalObservable(observable) = target else {
+                let Some(observable) = target.observable() else {
                     panic!("logical observable declaration should have observable targets");
                 };
                 result.logical_observables.push(observable.get());
@@ -370,12 +372,12 @@ fn collect_semantic_instruction(
         }
         DemInstructionKind::ShiftDetectors => {
             apply_coordinate_shift(&mut state.coordinate_shift, instruction.args());
-            let [DemTarget::Numeric(detector_shift)] = instruction.targets() else {
-                panic!("shift_detectors should have one numeric target");
-            };
+            let detector_shift = instruction
+                .detector_shift()
+                .expect("shift_detectors should have a detector shift");
             state.detector_offset = state
                 .detector_offset
-                .checked_add(*detector_shift)
+                .checked_add(detector_shift)
                 .expect("semantic detector offset should fit");
         }
     }

@@ -382,15 +382,12 @@ impl DemTraversalState {
     }
 
     fn apply_instruction(&mut self, instruction: &DemInstruction) -> ModelResult<()> {
-        if instruction.kind() == DemInstructionKind::ShiftDetectors {
-            self.detector_offset = self
-                .detector_offset
-                .checked_add(instruction.detector_shift()?)
-                .ok_or_else(|| {
-                    ModelError::invalid_detector_error_model(
-                        "folded traversal detector offset overflowed",
-                    )
-                })?;
+        if let Some(shift) = instruction.detector_shift() {
+            self.detector_offset = self.detector_offset.checked_add(shift).ok_or_else(|| {
+                ModelError::invalid_detector_error_model(
+                    "folded traversal detector offset overflowed",
+                )
+            })?;
             if let Some(coordinate_shift) = &mut self.coordinate_shift {
                 add_coordinate_shift_mul(coordinate_shift, instruction.args(), 1.0)?;
             }
@@ -576,12 +573,12 @@ fn summarize_detector_shift(items: &[FoldedDemItem<'_>]) -> ModelResult<u64> {
     let mut shift = 0_u64;
     for item in items {
         match item {
-            FoldedDemItem::Instruction(instruction)
-                if instruction.kind() == DemInstructionKind::ShiftDetectors =>
-            {
-                shift = shift
-                    .checked_add(instruction.detector_shift()?)
-                    .ok_or_else(|| detector_summary_error("detector shift overflowed"))?;
+            FoldedDemItem::Instruction(instruction) => {
+                if let Some(instruction_shift) = instruction.detector_shift() {
+                    shift = shift
+                        .checked_add(instruction_shift)
+                        .ok_or_else(|| detector_summary_error("detector shift overflowed"))?;
+                }
             }
             FoldedDemItem::Repeat { repeat, body } => {
                 shift = body
@@ -591,7 +588,6 @@ fn summarize_detector_shift(items: &[FoldedDemItem<'_>]) -> ModelResult<u64> {
                     .and_then(|repeated| shift.checked_add(repeated))
                     .ok_or_else(|| detector_summary_error("repeat detector shift overflowed"))?;
             }
-            FoldedDemItem::Instruction(_) => {}
         }
     }
     Ok(shift)
@@ -604,7 +600,7 @@ fn summarize_detector_count(items: &[FoldedDemItem<'_>]) -> ModelResult<u64> {
         match item {
             FoldedDemItem::Instruction(instruction) => {
                 for target in instruction.targets() {
-                    if let DemTarget::RelativeDetector(detector) = target {
+                    if let Some(detector) = target.detector() {
                         count = count.max(
                             offset
                                 .checked_add(detector.get())
@@ -615,9 +611,9 @@ fn summarize_detector_count(items: &[FoldedDemItem<'_>]) -> ModelResult<u64> {
                         );
                     }
                 }
-                if instruction.kind() == DemInstructionKind::ShiftDetectors {
+                if let Some(shift) = instruction.detector_shift() {
                     offset = offset
-                        .checked_add(instruction.detector_shift()?)
+                        .checked_add(shift)
                         .ok_or_else(|| detector_summary_error("detector shift overflowed"))?;
                 }
             }
@@ -652,7 +648,7 @@ fn summarize_observable_count(items: &[FoldedDemItem<'_>]) -> u64 {
         match item {
             FoldedDemItem::Instruction(instruction) => {
                 for target in instruction.targets() {
-                    if let DemTarget::LogicalObservable(observable) = target {
+                    if let Some(observable) = target.observable() {
                         count = count.max(observable.get().saturating_add(1));
                     }
                 }
@@ -700,7 +696,7 @@ fn summarize_detector_declaration_count(items: &[FoldedDemItem<'_>]) -> Option<u
                 let targets = instruction
                     .targets()
                     .iter()
-                    .filter(|target| matches!(target, DemTarget::RelativeDetector(_)))
+                    .filter(|target| target.is_detector())
                     .count();
                 let targets = u64::try_from(targets).ok()?;
                 count = count.checked_add(targets)?;
@@ -728,7 +724,7 @@ fn summarize_detector_declaration_bounds(
             FoldedDemItem::Instruction(instruction) => {
                 if instruction.kind() == DemInstructionKind::Detector {
                     for target in instruction.targets() {
-                        if let DemTarget::RelativeDetector(detector) = target {
+                        if let Some(detector) = target.detector() {
                             include_bound(
                                 &mut bounds,
                                 offset.checked_add(detector.get()).ok_or_else(|| {
@@ -738,9 +734,9 @@ fn summarize_detector_declaration_bounds(
                         }
                     }
                 }
-                if instruction.kind() == DemInstructionKind::ShiftDetectors {
+                if let Some(shift) = instruction.detector_shift() {
                     offset = offset
-                        .checked_add(instruction.detector_shift()?)
+                        .checked_add(shift)
                         .ok_or_else(|| detector_summary_error("detector shift overflowed"))?;
                 }
             }
@@ -823,15 +819,7 @@ pub fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> ModelResu
         .try_reserve_exact(targets.len())
         .map_err(|_| detector_summary_error("target allocation failed"))?;
     for target in targets {
-        let target = match *target {
-            DemTarget::RelativeDetector(detector) => {
-                DemTarget::RelativeDetector(shifted_detector(detector, detector_offset)?)
-            }
-            DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
-                *target
-            }
-        };
-        shifted.push(target);
+        shifted.push(target.shifted(detector_offset)?);
     }
     Ok(shifted)
 }

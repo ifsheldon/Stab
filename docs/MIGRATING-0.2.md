@@ -294,6 +294,26 @@ A reference sample is the packed, shared `stab_engine::ReferenceSample`, one bit
 
 `MeasurementToDetectionPlan::retained_bytes` now includes the plan's packed reference sample and `MeasurementToDetectionSession::retained_bytes` no longer includes a byte per measurement, so `m2d` needs about seven eighths of a byte less per measurement; a sampling session that uses the reference sample admits 48 more bytes for the shared handle.
 
+## Packed DEM Targets
+
+`stab_model::DemTarget` is an eight-byte value instead of a sixteen-byte enum, and the offset of `shift_detectors` is no longer a target.
+A target is a relative detector, a logical observable, or the `^` separator, and nothing else; its order, equality, and printed form are unchanged, so `.dem` text and `analyze_errors` output are byte for byte what they were.
+An instruction's kind is fixed by what it holds: a `detector` holds one detector, a `logical_observable` one observable, an `error` its targets, and a `shift_detectors` its offset, so a model that pairs a kind with targets it cannot have can no longer be built.
+
+| Removed or changed item | Replacement |
+| --- | --- |
+| Matching `DemTarget::{RelativeDetector, LogicalObservable, Separator}` | `DemTarget::kind()` returns the matchable `DemTargetKind`; `detector()`, `observable()`, `is_detector()`, `is_observable()`, and `is_separator()` answer the common questions directly |
+| `DemTarget::Numeric` and `DemTarget::numeric` | Removed; `DemInstruction::detector_shift()` returns the offset of a `shift_detectors` instruction, whose `targets()` is empty |
+| `DemInstruction::new(kind, args, targets, tag)` | The per-kind constructors, which cannot pair a kind with the wrong targets |
+| `DemInstruction::detector(coords, DemTarget, tag)` | `DemInstruction::detector(coords, DemDetectorId, tag)` |
+| `DemInstruction::logical_observable(DemTarget, tag)` returning `ModelResult` | `DemInstruction::logical_observable(DemObservableId, tag)`, which cannot fail |
+| `advanced::dem_instruction_with_tag_bytes` and `advanced::dem_instruction_detector_shift` | `advanced::{dem_detector_instruction_with_tag_bytes, dem_logical_observable_instruction_with_tag_bytes, dem_shift_detectors_instruction_with_tag_bytes}` and `DemInstruction::detector_shift` |
+| None | `DemTarget::{from_detector, from_observable, shifted, SEPARATOR}`, `From<DemDetectorId>`, `From<DemObservableId>`, and `From<DemTargetKind>` for `DemTarget`, and `Hash` on `DemTarget` |
+
+Every byte charge derived from a target's or an item's size shrinks with it, so parsing a detector error model, circuit-to-DEM analysis, and the DEM searches accept smaller memory budgets than before, and nothing that fit before is refused.
+A bare number in an `error` line is reported at the number itself instead of at the surrounding target region.
+Flow checking labels each flow with an observable id the circuit does not use instead of a numeric target, which changes no result.
+
 ## DEM Sampled-Error Streams
 
 Seeded `sample_dem` detector and observable output no longer depends on `--err_out`. A run that records sampled errors, through `--err_out` or `DemSamplingSession::run_with_sampled_errors`, now draws exactly the random streams of a run that does not, so its detector and observable records are byte-identical to the plain seeded run, and replaying its sampled-error file with `--replay_err_in` reproduces them. Pinned Stim's detector output is likewise independent of the flag.

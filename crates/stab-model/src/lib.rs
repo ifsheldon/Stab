@@ -32,7 +32,7 @@ pub use dem::{
     DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
     DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
     DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
-    DemRepeatBlock, DemTarget, DetectorErrorModel,
+    DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
 };
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,
@@ -60,10 +60,10 @@ pub mod advanced {
     use std::fmt::Display;
 
     use super::{
-        ByteSpan, Circuit, CircuitInstruction, DemInstruction, DemInstructionKind, DemRepeatBlock,
-        DemTarget, DetectorErrorModel, Gate, GateDecomposition, MeasureRecordOffset, ModelDialect,
-        ModelResult, ParseError, ParseErrorCode, ParseErrorContext, Probability, RepeatBlock,
-        RepeatCount, Target,
+        ByteSpan, Circuit, CircuitInstruction, DemDetectorId, DemInstruction, DemObservableId,
+        DemRepeatBlock, DemTarget, DetectorErrorModel, Gate, GateDecomposition,
+        MeasureRecordOffset, ModelDialect, ModelResult, ParseError, ParseErrorCode,
+        ParseErrorContext, Probability, RepeatBlock, RepeatCount, Target,
     };
     pub use crate::cancellation::CancellationCountdown;
     pub use crate::circuit::{FoldedCircuitEvent, FoldedVisitError, visit_folded_circuit};
@@ -196,14 +196,30 @@ pub mod advanced {
         model.try_reserve_items_exact(additional)
     }
 
-    /// Constructs a DEM instruction while preserving opaque tag bytes.
-    pub fn dem_instruction_with_tag_bytes(
-        kind: DemInstructionKind,
-        args: Vec<f64>,
-        targets: Vec<DemTarget>,
+    /// Constructs a DEM `detector` instruction while preserving opaque tag bytes.
+    pub fn dem_detector_instruction_with_tag_bytes(
+        coordinates: Vec<f64>,
+        detector: DemDetectorId,
         tag: Option<&[u8]>,
     ) -> ModelResult<DemInstruction> {
-        DemInstruction::new_with_tag_bytes(kind, args, targets, tag)
+        DemInstruction::detector_with_tag_bytes(coordinates, detector, tag)
+    }
+
+    /// Constructs a DEM `logical_observable` instruction while preserving opaque tag bytes.
+    pub fn dem_logical_observable_instruction_with_tag_bytes(
+        observable: DemObservableId,
+        tag: Option<&[u8]>,
+    ) -> DemInstruction {
+        DemInstruction::logical_observable_with_tag_bytes(observable, tag)
+    }
+
+    /// Constructs a DEM `shift_detectors` instruction while preserving opaque tag bytes.
+    pub fn dem_shift_detectors_instruction_with_tag_bytes(
+        coordinates: Vec<f64>,
+        detector_shift: u64,
+        tag: Option<&[u8]>,
+    ) -> ModelResult<DemInstruction> {
+        DemInstruction::shift_detectors_with_tag_bytes(coordinates, detector_shift, tag)
     }
 
     /// Constructs a DEM repeat block while preserving opaque tag bytes.
@@ -249,11 +265,6 @@ pub mod advanced {
     /// Removes the tag from a DEM instruction in place.
     pub fn dem_instruction_clear_tag(instruction: &mut DemInstruction) {
         instruction.clear_tag();
-    }
-
-    /// Returns the numeric detector shift carried by a shift instruction.
-    pub fn dem_instruction_detector_shift(instruction: &DemInstruction) -> ModelResult<u64> {
-        instruction.detector_shift()
     }
 
     /// Constructs a span after the caller has proved that the range does not overflow.

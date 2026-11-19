@@ -1,15 +1,20 @@
+use std::collections::BTreeSet;
+
 use stab_algebra::{
     AlgebraMemoryBudget, Flow, FlowMeasurementIndex, PauliBasis, PauliSign, PauliString,
     StabilizerError, Tableau,
 };
+use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
-    Cancellation, Circuit, CircuitItem, DemTarget, GateCategory, MemoryBudget, QubitId, Target,
+    Cancellation, Circuit, CircuitItem, DemTarget, GateCategory, MemoryBudget, ParseLimits,
+    QubitId, Target,
 };
 
 use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
 use crate::{
     AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceLimitError,
     ResourceOperation, circuit_to_tableau_with_options,
+    folded_walk::walk_folded,
     sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
 
@@ -473,13 +478,7 @@ fn pull_back_paulis_with_sparse_tracker(
         ResourceKind::LiveStateUnits,
         options.memory_budget,
     );
-    let targets = (0..paulis.len())
-        .map(|index| {
-            u64::try_from(index).map(DemTarget::numeric).map_err(|_| {
-                AnalysisError::invalid_detector_error_model("flow index does not fit u64")
-            })
-        })
-        .collect::<AnalysisResult<Vec<_>>>()?;
+    let targets = flow_labels(circuit, paulis.len(), &options.cancellation)?;
     for (pauli, target) in paulis.iter().zip(&targets) {
         seed_flow_pauli_output(&mut tracker, pauli, *target)?;
         tracker.check_live_budget()?;
@@ -635,11 +634,9 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
         options.memory_budget,
     );
 
+    let labels = flow_labels(circuit, flows.len(), &options.cancellation)?;
     let mut preliminary = Vec::with_capacity(flows.len());
-    for (flow_index, flow) in flows.iter().enumerate() {
-        let tracked_target = DemTarget::numeric(u64::try_from(flow_index).map_err(|_| {
-            AnalysisError::invalid_detector_error_model("flow index does not fit u64")
-        })?);
+    for (flow, &tracked_target) in flows.iter().zip(&labels) {
         match flow_record_indices(flow, measurement_count) {
             Ok(record_indices) => {
                 seed_flow_pauli_output(&mut tracker, flow.output(), tracked_target)?;
@@ -670,9 +667,9 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                 return Ok(UnsignedStabilizerFlowCheck::failed(failure));
             }
             tracker.check_cancelled()?;
-            let tracked_target = DemTarget::numeric(u64::try_from(flow_index).map_err(|_| {
-                AnalysisError::invalid_detector_error_model("flow index does not fit u64")
-            })?);
+            let tracked_target = *labels.get(flow_index).ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model("flow check lost a flow label")
+            })?;
             if tracker.target_anticommuted(tracked_target) {
                 return Ok(UnsignedStabilizerFlowCheck::failed(
                     UnsignedStabilizerFlowFailure::CollapseAnticommutation,
@@ -705,6 +702,58 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
             }
         })
         .collect()
+}
+
+/// Returns one reverse-tracker label per flow: the smallest observable ids that no
+/// `OBSERVABLE_INCLUDE` of `circuit` names.
+///
+/// A label therefore never meets a detector or observable the circuit itself adds, and, being an
+/// observable, it is never renumbered by the tracker's shifted-loop folding or chosen as a gauge
+/// pivot. The distinct ids collected are bounded by the circuit's own instruction count.
+fn flow_labels(
+    circuit: &Circuit,
+    flow_count: usize,
+    cancellation: &Cancellation,
+) -> AnalysisResult<Vec<DemTarget>> {
+    let mut included = BTreeSet::new();
+    walk_folded(
+        circuit,
+        ParseLimits::DEFAULT_REPEAT_NESTING,
+        cancellation,
+        |depth, limit| {
+            ResourceLimitError::fixed_operation(
+                ResourceOperation::FlowCheck,
+                ResourceKind::RepeatNesting,
+                depth,
+                limit,
+            )
+            .into()
+        },
+        |event| {
+            if let FoldedCircuitEvent::Instruction { instruction, .. } = event
+                && let Some(observable) = instruction.observable_id_argument()?
+            {
+                included.insert(observable.get());
+            }
+            Ok(())
+        },
+    )?;
+    let mut labels = Vec::with_capacity(flow_count);
+    let mut candidate = 0_u64;
+    while labels.len() < flow_count {
+        cancellation.check()?;
+        if !included.contains(&candidate) {
+            labels.push(DemTarget::logical_observable(candidate).map_err(|_| {
+                AnalysisError::invalid_detector_error_model(
+                    "the circuit's observables and the flows exceed the observable id range",
+                )
+            })?);
+        }
+        candidate = candidate.checked_add(1).ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model("flow label search overflowed")
+        })?;
+    }
+    Ok(labels)
 }
 
 fn flow_record_indices(flow: &Flow, measurement_count: usize) -> Result<Vec<usize>, i32> {

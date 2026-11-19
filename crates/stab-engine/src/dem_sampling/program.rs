@@ -1,7 +1,5 @@
-use stab_model::advanced::{
-    CancellationCountdown, FoldedDemBlock, FoldedDemItem, dem_instruction_detector_shift,
-};
-use stab_model::{Cancellation, DemInstruction, DemInstructionKind, DemTarget, MemoryBudget};
+use stab_model::advanced::{CancellationCountdown, FoldedDemBlock, FoldedDemItem};
+use stab_model::{Cancellation, DemInstruction, DemInstructionKind, DemTargetKind, MemoryBudget};
 
 use super::{DemError, DemResourceLimitError, DemResult};
 use crate::bernoulli::SparseBernoulli;
@@ -156,14 +154,12 @@ pub(super) fn compile_block(
         match item {
             FoldedDemItem::Instruction(instruction) => {
                 compile_instruction(instruction, current_shift, &mut block, meter)?;
-                if instruction.kind() == DemInstructionKind::ShiftDetectors {
-                    current_shift = current_shift
-                        .checked_add(dem_instruction_detector_shift(instruction)?)
-                        .ok_or_else(|| {
-                            DemError::invalid_sampler_compilation(
-                                "DEM sampler detector shift overflowed",
-                            )
-                        })?;
+                if let Some(shift) = instruction.detector_shift() {
+                    current_shift = current_shift.checked_add(shift).ok_or_else(|| {
+                        DemError::invalid_sampler_compilation(
+                            "DEM sampler detector shift overflowed",
+                        )
+                    })?;
                 }
             }
             FoldedDemItem::Repeat { repeat, body } => {
@@ -259,10 +255,12 @@ fn compile_instruction(
     let mut detector_cap = 0_usize;
     let mut observable_cap = 0_usize;
     for target in instruction.targets() {
-        match target {
-            DemTarget::RelativeDetector(_) => detector_cap = detector_cap.saturating_add(1),
-            DemTarget::LogicalObservable(_) => observable_cap = observable_cap.saturating_add(1),
-            DemTarget::Separator | DemTarget::Numeric(_) => {}
+        match target.kind() {
+            DemTargetKind::RelativeDetector(_) => detector_cap = detector_cap.saturating_add(1),
+            DemTargetKind::LogicalObservable(_) => {
+                observable_cap = observable_cap.saturating_add(1)
+            }
+            DemTargetKind::Separator => {}
         }
     }
     meter.commit(sample_error_heap_bytes(detector_cap, observable_cap))?;
@@ -271,22 +269,17 @@ fn compile_instruction(
     reserve_exact_dem(&mut detectors, detector_cap, "DEM error detectors")?;
     reserve_exact_dem(&mut observables, observable_cap, "DEM error observables")?;
     for target in instruction.targets() {
-        match target {
-            DemTarget::RelativeDetector(detector) => {
+        match target.kind() {
+            DemTargetKind::RelativeDetector(detector) => {
                 let shifted = detector_shift
                     .checked_add(detector.get())
                     .ok_or_else(|| detector_index_overflow_error("detector"))?;
                 detectors.push(shifted);
             }
-            DemTarget::LogicalObservable(observable) => {
+            DemTargetKind::LogicalObservable(observable) => {
                 observables.push(usize_from_u64(observable.get(), "observable index")?);
             }
-            DemTarget::Separator => {}
-            DemTarget::Numeric(_) => {
-                return Err(DemError::invalid_sampler_compilation(
-                    "error targets cannot include numeric DEM targets",
-                ));
-            }
+            DemTargetKind::Separator => {}
         }
     }
     let operation = DemSampleError::new(probability, detectors, observables);

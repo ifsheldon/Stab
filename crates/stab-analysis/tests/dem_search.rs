@@ -16,8 +16,7 @@ use stab_analysis::{
     shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{
-    Circuit, DemInstruction, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
-    Probability,
+    Circuit, DemInstructionKind, DemItem, DemTarget, DemTargetKind, DetectorErrorModel, Probability,
 };
 
 #[path = "support/sat_wcnf.rs"]
@@ -251,13 +250,9 @@ fn dem_search_rejects_nonzero_shift_repeat_bodies_beyond_expansion_limit() {
         );
     }
 
-    let error = DemInstruction::error(
-        Probability::try_new(0.1).unwrap(),
-        vec![DemTarget::numeric(5)],
-        None,
-    )
-    .expect_err("numeric error targets should stay rejected at the typed boundary")
-    .to_string();
+    let error = DetectorErrorModel::from_dem_str("error(0.1) 5\n")
+        .expect_err("numeric error targets should stay rejected at the text boundary")
+        .to_string();
     assert!(error.contains("raw numbers"), "{error}");
 }
 
@@ -728,10 +723,7 @@ fn source_mechanisms(
         }
         match shape {
             SourceMechanismShape::GraphlikeComponents => {
-                for component in instruction
-                    .targets()
-                    .split(|target| matches!(target, DemTarget::Separator))
-                {
+                for component in instruction.targets().split(|target| target.is_separator()) {
                     mechanisms.insert(CanonicalSearchTargets::from_source_targets(component));
                 }
             }
@@ -820,13 +812,13 @@ impl CanonicalSearchTargets {
         let mut observables = Vec::new();
         for target in targets {
             assert!(
-                !matches!(target, DemTarget::Separator | DemTarget::Numeric(_)),
+                !target.is_separator(),
                 "search output should use only detector and observable targets"
             );
-            match target {
-                DemTarget::RelativeDetector(detector) => detectors.push(detector.get()),
-                DemTarget::LogicalObservable(observable) => observables.push(observable.get()),
-                DemTarget::Separator | DemTarget::Numeric(_) => {}
+            match target.kind() {
+                DemTargetKind::RelativeDetector(detector) => detectors.push(detector.get()),
+                DemTargetKind::LogicalObservable(observable) => observables.push(observable.get()),
+                DemTargetKind::Separator => {}
             }
         }
         detectors.sort_unstable();
@@ -844,15 +836,14 @@ impl CanonicalSearchTargets {
         let mut detectors = BTreeSet::new();
         let mut observables = BTreeSet::new();
         for target in targets {
-            match *target {
-                DemTarget::RelativeDetector(detector) => {
+            match target.kind() {
+                DemTargetKind::RelativeDetector(detector) => {
                     toggle_parity(&mut detectors, detector.get());
                 }
-                DemTarget::LogicalObservable(observable) => {
+                DemTargetKind::LogicalObservable(observable) => {
                     toggle_parity(&mut observables, observable.get());
                 }
-                DemTarget::Separator => {}
-                DemTarget::Numeric(_) => panic!("error mechanism contains a numeric target"),
+                DemTargetKind::Separator => {}
             }
         }
         Self {

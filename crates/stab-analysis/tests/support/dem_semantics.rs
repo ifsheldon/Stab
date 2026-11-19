@@ -15,7 +15,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_model::{DemInstructionKind, DemItem, DemTarget, DetectorErrorModel};
+use stab_model::{DemInstructionKind, DemItem, DemTargetKind, DetectorErrorModel};
 
 /// One error-symptom target after detector offsets are resolved.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -83,19 +83,16 @@ impl ResolvedDem {
                     DemInstructionKind::Error => {
                         let mut components = vec![BTreeSet::new()];
                         for target in instruction.targets() {
-                            let symptom = match *target {
-                                DemTarget::RelativeDetector(detector) => {
+                            let symptom = match target.kind() {
+                                DemTargetKind::RelativeDetector(detector) => {
                                     Symptom::Detector(*offset + detector.get())
                                 }
-                                DemTarget::LogicalObservable(observable) => {
+                                DemTargetKind::LogicalObservable(observable) => {
                                     Symptom::Observable(observable.get())
                                 }
-                                DemTarget::Separator => {
+                                DemTargetKind::Separator => {
                                     components.push(BTreeSet::new());
                                     continue;
-                                }
-                                DemTarget::Numeric(value) => {
-                                    panic!("numeric error target {value}")
                                 }
                             };
                             let component = components.last_mut().expect("open component");
@@ -108,7 +105,7 @@ impl ResolvedDem {
                     }
                     DemInstructionKind::Detector => {
                         for target in instruction.targets() {
-                            let DemTarget::RelativeDetector(detector) = *target else {
+                            let Some(detector) = target.detector() else {
                                 panic!("detector declaration target {target:?}");
                             };
                             let coordinates = instruction
@@ -125,7 +122,7 @@ impl ResolvedDem {
                     }
                     DemInstructionKind::LogicalObservable => {
                         for target in instruction.targets() {
-                            let DemTarget::LogicalObservable(observable) = *target else {
+                            let Some(observable) = target.observable() else {
                                 panic!("observable declaration target {target:?}");
                             };
                             self.declared_observables.insert(observable.get());
@@ -138,9 +135,7 @@ impl ResolvedDem {
                         for (shift, amount) in coordinate_shift.iter_mut().zip(instruction.args()) {
                             *shift += amount;
                         }
-                        let [DemTarget::Numeric(shift)] = instruction.targets() else {
-                            panic!("shift_detectors targets {:?}", instruction.targets());
-                        };
+                        let shift = instruction.detector_shift().expect("detector shift");
                         *offset += shift;
                     }
                 },

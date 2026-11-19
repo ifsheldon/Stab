@@ -36,18 +36,18 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
     let mut involved_count = 0;
     for basis in basis_errors {
         for target in basis.as_ref() {
-            if let DemTarget::RelativeDetector(detector) = target
+            if let Some(detector) = target.detector()
                 && !involved_detectors
                     .iter()
                     .take(involved_count)
-                    .any(|seen| *seen == Some(*detector))
+                    .any(|seen| *seen == Some(detector))
             {
                 let slot = involved_detectors.get_mut(involved_count).ok_or_else(|| {
                     AnalysisError::invalid_detector_error_model(
                         "an error case in a composite error exceeded 16 detector symptoms",
                     )
                 })?;
-                *slot = Some(*detector);
+                *slot = Some(detector);
                 involved_count += 1;
             }
         }
@@ -63,11 +63,11 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
     for (slot, targets) in detector_masks.iter_mut().zip(combinations.iter()).skip(1) {
         let mut mask = 0_u64;
         for target in targets {
-            if let DemTarget::RelativeDetector(detector) = target {
+            if let Some(detector) = target.detector() {
                 let bit = involved_detectors
                     .iter()
                     .take(involved_count)
-                    .position(|seen| *seen == Some(*detector))
+                    .position(|seen| *seen == Some(detector))
                     .ok_or_else(|| {
                         AnalysisError::invalid_detector_error_model(
                             "composite error detector has no local mask",

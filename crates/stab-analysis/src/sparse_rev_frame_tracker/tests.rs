@@ -830,7 +830,7 @@ fn live_bytes_matches_recomputed_state_across_instruction_kinds() {
 #[test]
 fn wide_product_merge_is_refused_before_it_outgrows_the_budget() {
     const TERMS: usize = 2000;
-    const DETECTORS: u64 = 500;
+    const DETECTORS: u64 = 1000;
     const BUDGET: u64 = 1 << 20;
     const SLACK: u64 = 16 << 10;
 

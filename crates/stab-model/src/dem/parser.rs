@@ -1,6 +1,5 @@
 use super::{
-    DemArgVec, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTag, DemTarget, DemTargetVec,
-    DetectorErrorModel,
+    DemArgVec, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTag, DetectorErrorModel,
 };
 use crate::diagnostics::bounded_parse_diagnostic_text;
 use crate::model_parse::{line_error, unexpected_repeat_terminator, unterminated_repeat_block};
@@ -14,9 +13,11 @@ use crate::{
 mod fast;
 mod items;
 mod tag;
+mod targets;
 
 use items::{OpenDemRepeat, OpenDemRepeatHeader, ParsedDemItems};
 use tag::parse_optional_tag;
+use targets::{dem_validation_location, parse_dem_targets};
 
 const MAX_DEM_TEXT_INTEGER: u64 = (1_u64 << 60) - 1;
 const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
@@ -305,25 +306,26 @@ fn parse_dem_instruction(
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
     let (args, rest) =
         parse_optional_args(line_number, name.text(), rest, end_error_span, admission)?;
-    let targets = parse_dem_targets(line_number, name.text(), rest, end_error_span, admission)?;
-    if let Err(error) = super::validate_dem_instruction(kind, &args.values, &targets.values) {
-        let (code, span, context) = dem_validation_location(kind, name.text(), &args, &targets);
-        return Err(line_error(
-            ModelDialect::DetectorErrorModel,
-            line_number,
-            code,
-            dem_error_message(&error),
-            error.to_string(),
-            span,
-            context,
-        ));
+    let mut targets = parse_dem_targets(line_number, name.text(), rest, end_error_span, admission)?;
+    match targets.take_payload(kind, &args.values) {
+        Ok(payload) => Ok(DemInstruction::from_validated_parts(
+            args.values,
+            payload,
+            tag,
+        )),
+        Err(error) => {
+            let (code, span, context) = dem_validation_location(kind, name.text(), &args, &targets);
+            Err(line_error(
+                ModelDialect::DetectorErrorModel,
+                line_number,
+                code,
+                dem_error_message(&error),
+                error.to_string(),
+                span,
+                context,
+            ))
+        }
     }
-    Ok(DemInstruction::from_validated_parts(
-        kind,
-        args.values,
-        targets.values,
-        tag,
-    ))
 }
 
 fn parse_instruction_kind(
@@ -482,184 +484,6 @@ fn parse_optional_args<'a>(
     ))
 }
 
-struct ParsedDemTargets<'a> {
-    values: DemTargetVec,
-    source: SourceSlice<'a>,
-    region: ByteSpan,
-}
-
-fn parse_dem_targets<'a>(
-    line_number: usize,
-    instruction: &str,
-    rest: SourceSlice<'a>,
-    end_error_span: ByteSpan,
-    admission: &mut ParseAdmission,
-) -> ModelResult<ParsedDemTargets<'a>> {
-    if rest.text().is_empty() {
-        return Ok(ParsedDemTargets {
-            values: DemTargetVec::new(),
-            source: SourceSlice::new("", rest.byte_start()),
-            region: end_error_span,
-        });
-    }
-    if !starts_with_target_space(rest) {
-        return Err(target_syntax_error(
-            line_number,
-            instruction,
-            rest.text(),
-            first_character_span(rest),
-            "targets must be separated by spacing",
-        ));
-    }
-    let content = trim_target_space_start(rest);
-    if content.text().is_empty() {
-        return Ok(ParsedDemTargets {
-            values: DemTargetVec::new(),
-            source: content,
-            region: content.end_span(),
-        });
-    }
-
-    let mut values = DemTargetVec::new();
-    let mut cursor = 0;
-    let mut region_start = None;
-    let mut region_end = content.byte_start();
-    while cursor < content.text().len() {
-        while content
-            .text()
-            .as_bytes()
-            .get(cursor)
-            .is_some_and(|byte| is_target_space(*byte))
-        {
-            cursor += 1;
-        }
-        if cursor == content.text().len() {
-            break;
-        }
-        let start = cursor;
-        while content
-            .text()
-            .as_bytes()
-            .get(cursor)
-            .is_some_and(|byte| !is_target_space(*byte))
-        {
-            cursor += 1;
-        }
-        let token = content
-            .slice(start, cursor)
-            .ok_or_else(|| parse_line_error(line_number, "invalid DEM target"))?;
-        let target = parse_arbitrary_target(line_number, instruction, token)?;
-        admission.admit_target(line_number, token.span())?;
-        values.push(target);
-        region_start.get_or_insert(token.byte_start());
-        region_end = token.byte_end();
-    }
-    let region = region_start
-        .and_then(|start| ByteSpan::try_new(start, region_end.saturating_sub(start)))
-        .unwrap_or_else(|| content.end_span());
-    Ok(ParsedDemTargets {
-        values,
-        source: content,
-        region,
-    })
-}
-
-fn parse_arbitrary_target(
-    line_number: usize,
-    instruction: &str,
-    token: SourceSlice<'_>,
-) -> ModelResult<DemTarget> {
-    let Some(prefix) = token.text().as_bytes().first().copied() else {
-        return Err(target_syntax_error(
-            line_number,
-            instruction,
-            "",
-            token.end_span(),
-            "invalid DEM target",
-        ));
-    };
-    match prefix {
-        b'D' | b'd' => {
-            let number = token
-                .suffix(1)
-                .ok_or_else(|| parse_line_error(line_number, "invalid DEM target"))?;
-            let value = parse_source_uint60(number).map_err(|error| {
-                unsigned_target_error(
-                    line_number,
-                    instruction,
-                    token,
-                    number,
-                    "relative detector target",
-                    error,
-                )
-            })?;
-            DemTarget::relative_detector(value).map_err(|error| {
-                line_error(
-                    ModelDialect::DetectorErrorModel,
-                    line_number,
-                    ParseErrorCode::IntegerOutOfRange,
-                    dem_error_message(&error),
-                    error.to_string(),
-                    token.span(),
-                    target_context(instruction, token.text()),
-                )
-            })
-        }
-        b'L' | b'l' => {
-            let number = token
-                .suffix(1)
-                .ok_or_else(|| parse_line_error(line_number, "invalid DEM target"))?;
-            let value = parse_source_uint60(number).map_err(|error| {
-                unsigned_target_error(
-                    line_number,
-                    instruction,
-                    token,
-                    number,
-                    "logical observable target",
-                    error,
-                )
-            })?;
-            DemTarget::logical_observable(value).map_err(|error| {
-                line_error(
-                    ModelDialect::DetectorErrorModel,
-                    line_number,
-                    ParseErrorCode::IntegerOutOfRange,
-                    dem_error_message(&error),
-                    error.to_string(),
-                    token.span(),
-                    target_context(instruction, token.text()),
-                )
-            })
-        }
-        b'^' if token.text().len() == 1 => Ok(DemTarget::separator()),
-        b'0'..=b'9' => {
-            let value = parse_source_uint60(token).map_err(|error| {
-                unsigned_target_error(
-                    line_number,
-                    instruction,
-                    token,
-                    token,
-                    "numeric DEM target",
-                    error,
-                )
-            })?;
-            Ok(DemTarget::numeric(value))
-        }
-        _ => Err(line_error(
-            ModelDialect::DetectorErrorModel,
-            line_number,
-            ParseErrorCode::InvalidTargetSyntax,
-            "unrecognized DEM target prefix",
-            format!(
-                "invalid detector error model: invalid DEM target {:?}",
-                token.text()
-            ),
-            first_character_span(token),
-            target_context(instruction, token.text()),
-        )),
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum UnsignedSourceError {
     InvalidDigit { byte_offset: usize },
@@ -755,138 +579,6 @@ fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> ModelResult
             },
         )
     })
-}
-
-fn dem_validation_location(
-    kind: DemInstructionKind,
-    instruction: &str,
-    args: &ParsedDemArguments<'_>,
-    targets: &ParsedDemTargets<'_>,
-) -> (ParseErrorCode, ByteSpan, ParseErrorContext) {
-    match kind {
-        DemInstructionKind::Error if args.values.len() != 1 => (
-            ParseErrorCode::InvalidArgumentCount,
-            args.region,
-            ParseErrorContext::ArgumentCount {
-                dialect: ModelDialect::DetectorErrorModel,
-                instruction: bounded_parse_diagnostic_text(instruction),
-                expected: "exactly 1",
-                actual: args.values.len(),
-            },
-        ),
-        DemInstructionKind::Error
-            if args
-                .values
-                .first()
-                .is_some_and(|probability| !(0.0..=1.0).contains(probability)) =>
-        {
-            let token = argument_token_at(args.source, 0);
-            (
-                ParseErrorCode::InvalidArgument,
-                token.map_or(args.region, SourceSlice::span),
-                ParseErrorContext::Argument {
-                    dialect: ModelDialect::DetectorErrorModel,
-                    instruction: bounded_parse_diagnostic_text(instruction),
-                    argument: token.map_or_else(String::new, |token| {
-                        bounded_parse_diagnostic_text(token.text())
-                    }),
-                },
-            )
-        }
-        DemInstructionKind::Error => {
-            let invalid_index = targets
-                .values
-                .iter()
-                .enumerate()
-                .find_map(|(index, target)| {
-                    if !matches!(target, DemTarget::Separator) {
-                        return None;
-                    }
-                    let adjacent = index == 0
-                        || index + 1 == targets.values.len()
-                        || matches!(targets.values.get(index - 1), Some(DemTarget::Separator));
-                    adjacent.then_some(index)
-                });
-            let token = invalid_index.and_then(|index| target_token_at(targets.source, index));
-            (
-                ParseErrorCode::InvalidTarget,
-                token.map_or(targets.region, SourceSlice::span),
-                ParseErrorContext::Target {
-                    dialect: ModelDialect::DetectorErrorModel,
-                    instruction: bounded_parse_diagnostic_text(instruction),
-                    target: token.map_or_else(String::new, |token| {
-                        bounded_parse_diagnostic_text(token.text())
-                    }),
-                },
-            )
-        }
-        DemInstructionKind::LogicalObservable if !args.values.is_empty() => (
-            ParseErrorCode::InvalidArgumentCount,
-            args.region,
-            ParseErrorContext::ArgumentCount {
-                dialect: ModelDialect::DetectorErrorModel,
-                instruction: bounded_parse_diagnostic_text(instruction),
-                expected: "exactly 0",
-                actual: args.values.len(),
-            },
-        ),
-        DemInstructionKind::Detector
-        | DemInstructionKind::LogicalObservable
-        | DemInstructionKind::ShiftDetectors
-            if targets.values.len() != 1 =>
-        {
-            (
-                ParseErrorCode::InvalidTargetCount,
-                targets.region,
-                ParseErrorContext::TargetCount {
-                    dialect: ModelDialect::DetectorErrorModel,
-                    instruction: bounded_parse_diagnostic_text(instruction),
-                    actual: targets.values.len(),
-                },
-            )
-        }
-        DemInstructionKind::Detector
-            if !matches!(targets.values.first(), Some(DemTarget::RelativeDetector(_))) =>
-        {
-            invalid_dem_target_location(instruction, targets)
-        }
-        DemInstructionKind::LogicalObservable
-            if !matches!(
-                targets.values.first(),
-                Some(DemTarget::LogicalObservable(_))
-            ) =>
-        {
-            invalid_dem_target_location(instruction, targets)
-        }
-        DemInstructionKind::ShiftDetectors
-            if !matches!(targets.values.first(), Some(DemTarget::Numeric(_))) =>
-        {
-            invalid_dem_target_location(instruction, targets)
-        }
-        _ => (
-            ParseErrorCode::InvalidSyntax,
-            targets.region,
-            instruction_context(instruction),
-        ),
-    }
-}
-
-fn invalid_dem_target_location(
-    instruction: &str,
-    targets: &ParsedDemTargets<'_>,
-) -> (ParseErrorCode, ByteSpan, ParseErrorContext) {
-    let token = target_token_at(targets.source, 0);
-    (
-        ParseErrorCode::InvalidTarget,
-        token.map_or(targets.region, SourceSlice::span),
-        ParseErrorContext::Target {
-            dialect: ModelDialect::DetectorErrorModel,
-            instruction: bounded_parse_diagnostic_text(instruction),
-            target: token.map_or_else(String::new, |token| {
-                bounded_parse_diagnostic_text(token.text())
-            }),
-        },
-    )
 }
 
 fn argument_token_at(arguments: SourceSlice<'_>, wanted_index: usize) -> Option<SourceSlice<'_>> {

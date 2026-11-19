@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, DemTarget, QubitId, RepeatBlock, Target, TargetKind,
+    Circuit, CircuitInstruction, CircuitItem, DemTarget, DemTargetKind, QubitId, RepeatBlock,
+    Target, TargetKind,
 };
 
 use super::budget::slot_transform_bytes;
@@ -400,13 +401,13 @@ fn slot_target(slot: usize) -> AnalysisResult<DemTarget> {
 }
 
 fn slot_from_target(target: DemTarget) -> AnalysisResult<usize> {
-    match target {
-        DemTarget::LogicalObservable(slot) => usize::try_from(slot.get()).map_err(|_| {
+    match target.kind() {
+        DemTargetKind::LogicalObservable(slot) => usize::try_from(slot.get()).map_err(|_| {
             AnalysisError::invalid_detector_error_model(
                 "sparse reverse unitary repeat slot does not fit usize",
             )
         }),
-        DemTarget::RelativeDetector(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
+        DemTargetKind::RelativeDetector(_) | DemTargetKind::Separator => {
             Err(AnalysisError::invalid_detector_error_model(format!(
                 "unitary repeat basis tracker holds non-slot target {target}"
             )))

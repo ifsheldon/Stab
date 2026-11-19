@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 use std::collections::hash_map::RandomState;
-use std::hash::{BuildHasher, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 
 use hashbrown::HashTable;
 use stab_model::{DemTarget, MemoryBudget, Probability};
@@ -313,16 +313,7 @@ fn hash_with(hash_builder: &RandomState, targets: &[DemTarget], tag: TagId) -> u
     let mut hasher = hash_builder.build_hasher();
     hasher.write_u32(tag.0);
     hasher.write_usize(targets.len());
-    for target in targets {
-        let (kind, value) = match target {
-            DemTarget::RelativeDetector(detector) => (0, detector.get()),
-            DemTarget::LogicalObservable(observable) => (1, observable.get()),
-            DemTarget::Separator => (2, 0),
-            DemTarget::Numeric(value) => (3, *value),
-        };
-        hasher.write_u8(kind);
-        hasher.write_u64(value);
-    }
+    DemTarget::hash_slice(targets, &mut hasher);
     hasher.finish()
 }
 

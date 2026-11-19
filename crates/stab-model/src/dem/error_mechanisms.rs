@@ -7,7 +7,7 @@ use super::traversal::{
 };
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemRepeatBlock, DemTarget,
-    DetectorErrorModel,
+    DemTargetKind, DetectorErrorModel,
 };
 use crate::{ModelError, ModelResult, Probability};
 
@@ -54,15 +54,14 @@ impl Iterator for DemErrorTargetIter<'_> {
     type Item = ModelResult<DemErrorTarget>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.targets.next().map(|target| match *target {
-            DemTarget::RelativeDetector(detector) => {
+        self.targets.next().map(|target| match target.kind() {
+            DemTargetKind::RelativeDetector(detector) => {
                 shifted_detector(detector, self.detector_offset).map(DemErrorTarget::Detector)
             }
-            DemTarget::LogicalObservable(observable) => Ok(DemErrorTarget::Observable(observable)),
-            DemTarget::Separator => Ok(DemErrorTarget::Separator),
-            DemTarget::Numeric(value) => Err(ModelError::invalid_detector_error_model(format!(
-                "error mechanism contains invalid numeric target {value}"
-            ))),
+            DemTargetKind::LogicalObservable(observable) => {
+                Ok(DemErrorTarget::Observable(observable))
+            }
+            DemTargetKind::Separator => Ok(DemErrorTarget::Separator),
         })
     }
 

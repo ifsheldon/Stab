@@ -9,8 +9,8 @@ use stab_analysis::{
     flattened_detector_error_model, flattened_detector_error_model_with_limits,
 };
 use stab_model::{
-    DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget,
-    DetectorErrorModel, MemoryBudget,
+    DemInstruction, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
+    MemoryBudget,
 };
 
 fn budget(bytes: u64) -> DemFlattenLimits {
@@ -31,9 +31,8 @@ fn nested_repeat_model() -> DetectorErrorModel {
 fn single_error_model() -> DetectorErrorModel {
     let mut model = DetectorErrorModel::new();
     model.push_instruction(
-        DemInstruction::new(
-            DemInstructionKind::Error,
-            vec![0.125],
+        DemInstruction::error(
+            stab_model::Probability::try_new(0.125).expect("probability"),
             vec![DemTarget::relative_detector(0).expect("D0")],
             None,
         )

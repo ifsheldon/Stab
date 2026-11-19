@@ -43,18 +43,13 @@ fn cq2_dem_target_value_and_parse_contract_matches_stim() {
         DemTarget::relative_detector(4).expect("D4") < DemTarget::relative_detector(5).expect("D5")
     );
 
-    assert_eq!(
-        format!("{}", DemTarget::numeric(10)),
-        "10",
-        "numeric targets are the explicit Rust representation used by shift_detectors"
-    );
     assert!(
         "10".parse::<DemTarget>().is_err(),
         "Stim's standalone DemTarget text parser rejects bare numerics"
     );
     assert_eq!(
         DetectorErrorModel::from_dem_str("shift_detectors 10\n")
-            .expect("numeric target inside full DEM syntax")
+            .expect("detector offset inside full DEM syntax")
             .to_dem_string(),
         "shift_detectors 10\n"
     );
@@ -99,15 +94,14 @@ fn cq2_dem_instruction_value_validation_and_print_contract_matches_stim() {
     .expect("error instruction");
     let detector = DemInstruction::detector(
         vec![1.5, 2.5],
-        DemTarget::relative_detector(5).expect("D5"),
+        DemDetectorId::try_new(5).expect("D5"),
         Some("det".to_string()),
     )
     .expect("detector instruction");
     let logical = DemInstruction::logical_observable(
-        DemTarget::logical_observable(4).expect("L4"),
+        DemObservableId::try_new(4).expect("L4"),
         Some("obs".to_string()),
-    )
-    .expect("logical-observable instruction");
+    );
     let shift = DemInstruction::shift_detectors(vec![3.5], 7, Some("shift".to_string()))
         .expect("shift instruction");
 
@@ -141,60 +135,71 @@ fn cq2_dem_instruction_value_validation_and_print_contract_matches_stim() {
         )
     );
 
+    assert_eq!(shift.targets(), &[] as &[DemTarget]);
+    assert_eq!(shift.detector_shift(), Some(7));
+    assert_eq!(detector.detector_shift(), None);
     assert_eq!(
-        DemInstruction::new(
-            DemInstructionKind::ShiftDetectors,
-            vec![1.0, 2.0],
-            vec![DemTarget::numeric(3)],
-            None,
-        )
-        .expect("generic constructor"),
-        DemInstruction::shift_detectors(vec![1.0, 2.0], 3, None).expect("shift constructor")
+        detector.targets(),
+        &[DemTarget::relative_detector(5).expect("D5")]
     );
 
     let d0 = DemTarget::relative_detector(0).expect("D0");
     let l0 = DemTarget::logical_observable(0).expect("L0");
-    for (kind, args, targets) in [
-        (DemInstructionKind::Error, vec![], vec![d0]),
-        (DemInstructionKind::Error, vec![0.25, 0.5], vec![d0]),
-        (DemInstructionKind::Error, vec![-0.1], vec![d0]),
-        (DemInstructionKind::Error, vec![1.1], vec![d0]),
-        (
-            DemInstructionKind::Error,
-            vec![0.25],
-            vec![DemTarget::separator()],
-        ),
-        (
-            DemInstructionKind::Error,
-            vec![0.25],
-            vec![d0, DemTarget::separator()],
-        ),
-        (
-            DemInstructionKind::Error,
-            vec![0.25],
-            vec![d0, DemTarget::separator(), DemTarget::separator(), l0],
-        ),
-        (
-            DemInstructionKind::Error,
-            vec![0.25],
-            vec![DemTarget::numeric(3)],
-        ),
-        (DemInstructionKind::Detector, vec![], vec![l0]),
-        (DemInstructionKind::Detector, vec![], vec![d0, d0]),
-        (DemInstructionKind::Detector, vec![f64::INFINITY], vec![d0]),
-        (DemInstructionKind::LogicalObservable, vec![1.0], vec![l0]),
-        (DemInstructionKind::LogicalObservable, vec![], vec![d0]),
-        (DemInstructionKind::LogicalObservable, vec![], vec![l0, l0]),
-        (DemInstructionKind::ShiftDetectors, vec![], vec![d0]),
-        (
-            DemInstructionKind::ShiftDetectors,
-            vec![f64::NAN],
-            vec![DemTarget::numeric(1)],
-        ),
+    let probability = Probability::try_new(0.25).expect("probability");
+    for targets in [
+        vec![DemTarget::separator()],
+        vec![d0, DemTarget::separator()],
+        vec![d0, DemTarget::separator(), DemTarget::separator(), l0],
     ] {
         assert!(
-            DemInstruction::new(kind, args, targets, None).is_err(),
-            "expected invalid {kind:?} instruction"
+            DemInstruction::error(probability, targets.clone(), None).is_err(),
+            "expected invalid error targets {targets:?}"
+        );
+    }
+    assert!(
+        DemInstruction::detector(
+            vec![f64::INFINITY],
+            DemDetectorId::try_new(0).expect("D0"),
+            None
+        )
+        .is_err()
+    );
+    assert!(DemInstruction::shift_detectors(vec![f64::NAN], 1, None).is_err());
+
+    // Shapes the typed constructors cannot express are still rejected in DEM text.
+    for (text, expected) in [
+        (
+            "error(0.25) 3\n",
+            "error instructions cannot target raw numbers",
+        ),
+        (
+            "error(0.25) ^ 3\n",
+            "error target separators cannot be first or consecutive",
+        ),
+        ("detector L0\n", "detector received invalid target L0"),
+        ("detector 7\n", "detector received invalid target 7"),
+        ("detector D0 D0\n", "detector requires exactly one target"),
+        (
+            "logical_observable D0\n",
+            "logical_observable received invalid target D0",
+        ),
+        (
+            "logical_observable L0 L0\n",
+            "logical_observable requires exactly one target",
+        ),
+        (
+            "shift_detectors D0\n",
+            "shift_detectors requires exactly one numeric target",
+        ),
+        (
+            "shift_detectors 1 2\n",
+            "shift_detectors requires exactly one numeric target",
+        ),
+    ] {
+        let error = DetectorErrorModel::from_dem_str(text).expect_err("reject invalid DEM text");
+        assert!(
+            error.to_string().contains(expected),
+            "expected {expected:?} for {text:?}, got {error}"
         );
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use stab_model::{Circuit, CircuitItem, DemTarget};
+use stab_model::{Circuit, CircuitItem, DemTarget, DemTargetKind};
 
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
@@ -555,16 +555,14 @@ fn shift_target_set(targets: &mut TargetXorSet, detector_offset: i128) -> Analys
 }
 
 fn shifted_detector_target(target: DemTarget, detector_offset: i128) -> AnalysisResult<DemTarget> {
-    match target {
-        DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(add_signed_u64(
+    match target.kind() {
+        DemTargetKind::RelativeDetector(detector) => DemTarget::relative_detector(add_signed_u64(
             detector.get(),
             detector_offset,
             "detector id",
         )?)
         .map_err(Into::into),
-        DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => {
-            Ok(target)
-        }
+        DemTargetKind::LogicalObservable(_) | DemTargetKind::Separator => Ok(target),
     }
 }
 

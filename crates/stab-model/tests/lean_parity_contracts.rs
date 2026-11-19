@@ -488,19 +488,17 @@ fn dem_counts_coordinates_and_value_lifecycle_preserves_semantics() {
         assert!(DemTarget::from_str(malformed).is_err(), "{malformed:?}");
     }
     assert!(
-        DemInstruction::new(
-            DemInstructionKind::Error,
-            vec![0.25],
+        DemInstruction::error(
+            stab_model::Probability::try_new(0.25).expect("probability"),
             vec![DemTarget::separator()],
             None,
         )
         .is_err()
     );
     assert!(
-        DemInstruction::new(
-            DemInstructionKind::Detector,
+        DemInstruction::detector(
             vec![f64::INFINITY],
-            vec![DemTarget::relative_detector(0).expect("D0")],
+            DemDetectorId::try_new(0).expect("D0"),
             None,
         )
         .is_err()

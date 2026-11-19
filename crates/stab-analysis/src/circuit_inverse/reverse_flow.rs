@@ -2,8 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{Flow, PauliSign, PauliString};
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, FoldedCount, Gate, GateKind,
-    MeasureRecordOffset, MemoryBudget, ParseLimits, QubitId, Target, advanced::FoldedCircuitEvent,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, DemTargetKind, FoldedCount,
+    Gate, GateKind, MeasureRecordOffset, MemoryBudget, ParseLimits, QubitId, Target,
+    advanced::FoldedCircuitEvent,
 };
 
 use crate::{
@@ -598,12 +599,12 @@ impl ReverseFlowEngine {
             .detector_measurements
             .keys()
             .copied()
-            .filter(|target| match target {
-                DemTarget::LogicalObservable(observable) => {
+            .filter(|target| match target.kind() {
+                DemTargetKind::LogicalObservable(observable) => {
                     observable.get() < self.observable_count
                 }
-                DemTarget::RelativeDetector(_) => !active_targets.contains(target),
-                DemTarget::Separator | DemTarget::Numeric(_) => false,
+                DemTargetKind::RelativeDetector(_) => !active_targets.contains(target),
+                DemTargetKind::Separator => false,
             })
             .collect::<Vec<_>>();
         for target in ready {
@@ -619,8 +620,8 @@ impl ReverseFlowEngine {
                 })
                 .collect::<AnalysisResult<Vec<_>>>()?;
             let tag = self.target_tags.remove(&target).flatten();
-            match target {
-                DemTarget::RelativeDetector(_) => {
+            match target.kind() {
+                DemTargetKind::RelativeDetector(_) => {
                     let coordinates = self.target_coordinates.remove(&target).ok_or_else(|| {
                         reverse_error(format!(
                             "ready detector target {target} lost its coordinate mapping"
@@ -633,7 +634,7 @@ impl ReverseFlowEngine {
                         tag.as_deref(),
                     )?;
                 }
-                DemTarget::LogicalObservable(observable) => {
+                DemTargetKind::LogicalObservable(observable) => {
                     self.append_instruction(
                         GateKind::OBSERVABLE_INCLUDE.gate(),
                         vec![observable.get() as f64],
@@ -641,7 +642,7 @@ impl ReverseFlowEngine {
                         tag.as_deref(),
                     )?;
                 }
-                DemTarget::Separator | DemTarget::Numeric(_) => {
+                DemTargetKind::Separator => {
                     return Err(reverse_error(format!(
                         "unexpected reverse-flow target {target}"
                     )));

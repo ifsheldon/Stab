@@ -1,15 +1,14 @@
 use std::collections::HashSet;
 
 use stab_model::advanced::{
-    dem_instruction_detector_shift, dem_instruction_rebase_detectors, dem_model_items_mut,
-    dem_repeat_block_body_mut,
+    dem_instruction_rebase_detectors, dem_model_items_mut, dem_repeat_block_body_mut,
 };
 use stab_model::{DemInstruction, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel};
 
 use crate::{AnalysisError, AnalysisResult};
 
-/// Error symptoms already emitted, keyed by a target's kind and id.
-pub(super) type SeenTargets = HashSet<(u8, u64)>;
+/// Error symptoms already emitted.
+pub(super) type SeenTargets = HashSet<DemTarget>;
 
 /// Restores forward order to a model built in reverse, rebasing detector ids in place.
 ///
@@ -83,7 +82,11 @@ fn unreverse_instruction(
 ) -> AnalysisResult<bool> {
     match instruction.kind() {
         DemInstructionKind::ShiftDetectors => {
-            let detector_shift = dem_instruction_detector_shift(instruction)?;
+            let detector_shift = instruction.detector_shift().ok_or_else(|| {
+                AnalysisError::invalid_detector_error_model(
+                    "shift_detectors instruction has no detector shift",
+                )
+            })?;
             *base_detector_id = base_detector_id
                 .checked_add(detector_shift)
                 .ok_or_else(|| {
@@ -94,7 +97,7 @@ fn unreverse_instruction(
             Ok(true)
         }
         DemInstructionKind::Error => {
-            seen.extend(instruction.targets().iter().map(seen_key));
+            seen.extend(instruction.targets().iter().copied());
             rebase(instruction, *base_detector_id)?;
             Ok(true)
         }
@@ -102,7 +105,7 @@ fn unreverse_instruction(
             let target_is_seen = instruction
                 .targets()
                 .first()
-                .is_some_and(|target| seen.contains(&seen_key(target)));
+                .is_some_and(|target| seen.contains(target));
             let keep = !instruction.args().is_empty()
                 || instruction.tag_bytes().is_some()
                 || !target_is_seen;
@@ -120,13 +123,4 @@ fn rebase(instruction: &mut DemInstruction, base_detector_id: u64) -> AnalysisRe
             "folded analyzer detector D{detector} precedes base D{base_detector_id}"
         ))
     })
-}
-
-fn seen_key(target: &DemTarget) -> (u8, u64) {
-    match target {
-        DemTarget::RelativeDetector(detector) => (0, detector.get()),
-        DemTarget::LogicalObservable(observable) => (1, observable.get()),
-        DemTarget::Separator => (2, 0),
-        DemTarget::Numeric(value) => (3, *value),
-    }
 }

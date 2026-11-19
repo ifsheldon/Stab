@@ -66,7 +66,7 @@ fn dem_count_detectors_rejects_shifted_detector_count_overflow() {
     model.push_instruction(
         DemInstruction::detector(
             Vec::new(),
-            DemTarget::relative_detector(0).expect("detector target"),
+            stab_model::DemDetectorId::try_new(0).expect("detector id"),
             None,
         )
         .expect("detector instruction"),

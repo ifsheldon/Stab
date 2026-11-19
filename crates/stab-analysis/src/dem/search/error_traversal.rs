@@ -6,7 +6,9 @@ use stab_model::advanced::{
     DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
     FoldedDemVisitor,
 };
-use stab_model::{DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget};
+use stab_model::{
+    DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget, DemTargetKind,
+};
 
 use super::budget::LogicalErrorSearchLimits;
 use crate::resources::LogicalErrorSearchResource;
@@ -280,12 +282,11 @@ fn update_search_instruction_count(
             let mut has_search_target = false;
             for target in instruction.targets() {
                 has_any_target = true;
-                match target {
-                    DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
+                match target.kind() {
+                    DemTargetKind::RelativeDetector(_) | DemTargetKind::LogicalObservable(_) => {
                         has_search_target = true;
                     }
-                    DemTarget::Numeric(_) => return Ok(None),
-                    DemTarget::Separator => {}
+                    DemTargetKind::Separator => {}
                 }
             }
             if !has_search_target && has_any_target {
@@ -300,9 +301,7 @@ fn update_search_instruction_count(
                 )
             })
         }
-        DemInstructionKind::ShiftDetectors
-            if stab_model::advanced::dem_instruction_detector_shift(instruction)? == 0 =>
-        {
+        DemInstructionKind::ShiftDetectors if instruction.detector_shift() == Some(0) => {
             Ok(Some(count))
         }
         DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => Ok(Some(count)),
@@ -356,17 +355,13 @@ fn include_graphlike_error_targets(
     context: &'static str,
     counts: &mut DemErrorTargetCounts,
 ) -> AnalysisResult<()> {
-    if ignore_ungraphlike_errors
-        && targets
-            .iter()
-            .any(|target| matches!(target, DemTarget::Separator))
-    {
+    if ignore_ungraphlike_errors && targets.iter().any(|target| target.is_separator()) {
         return Ok(());
     }
 
     let mut start = 0;
     for (index, target) in targets.iter().enumerate() {
-        if matches!(target, DemTarget::Separator) {
+        if target.is_separator() {
             let component = targets.get(start..index).ok_or_else(|| {
                 AnalysisError::invalid_detector_error_model(
                     "graphlike target component range is invalid",
@@ -403,7 +398,7 @@ fn include_graphlike_target_component(
 ) -> AnalysisResult<()> {
     let mut detectors = Vec::new();
     for target in targets {
-        if let DemTarget::RelativeDetector(detector) = *target {
+        if let Some(detector) = target.detector() {
             if detectors.len() == 2 {
                 if ignore_ungraphlike_errors {
                     return Ok(());
@@ -431,19 +426,14 @@ fn include_hypergraph_error_targets(
 ) -> AnalysisResult<()> {
     let mut detectors = BTreeSet::new();
     for target in targets {
-        match *target {
-            DemTarget::RelativeDetector(detector) => {
+        match target.kind() {
+            DemTargetKind::RelativeDetector(detector) => {
                 let detector = shifted_detector(detector, detector_offset)?;
                 if !detectors.insert(detector) {
                     detectors.remove(&detector);
                 }
             }
-            DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
-            DemTarget::Numeric(_) => {
-                return Err(AnalysisError::invalid_detector_error_model(
-                    "hypergraph error targets cannot include numeric targets",
-                ));
-            }
+            DemTargetKind::LogicalObservable(_) | DemTargetKind::Separator => {}
         }
     }
 

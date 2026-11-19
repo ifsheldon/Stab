@@ -1,6 +1,6 @@
+use super::super::instruction::{DemPayload, validate_dem_args, validate_error_targets};
 use super::super::{
     DemArgVec, DemInstruction, DemInstructionKind, DemTag, DemTarget, DemTargetVec,
-    validate_dem_instruction,
 };
 use super::{MAX_DEM_TEXT_INTEGER, MAX_STIM_NUMBER_TOKEN_BYTES};
 // Kept out of line: inlined into the parse loop it measurably slows every line.
@@ -22,11 +22,12 @@ pub(super) fn parse_canonical_instruction(line: &str) -> Option<DemInstruction> 
 
     let (tag, rest) = parse_canonical_tag(rest)?;
     let (args, rest) = parse_canonical_args(kind, rest)?;
-    let targets = parse_canonical_targets(kind, rest)?;
-    validate_dem_instruction(kind, &args, &targets).ok()?;
-    Some(DemInstruction::from_validated_parts(
-        kind, args, targets, tag,
-    ))
+    let payload = parse_canonical_payload(kind, rest)?;
+    validate_dem_args(kind, &args).ok()?;
+    if let DemPayload::Error(targets) = &payload {
+        validate_error_targets(targets).ok()?;
+    }
+    Some(DemInstruction::from_validated_parts(args, payload, tag))
 }
 
 pub(super) fn parse_canonical_repeat_header(header: &str) -> Option<(u64, Option<DemTag>)> {
@@ -102,21 +103,45 @@ fn parse_canonical_args(kind: DemInstructionKind, rest: &str) -> Option<(DemArgV
     Some((args, body.get(close + 1..)?))
 }
 
-fn parse_canonical_targets(kind: DemInstructionKind, rest: &str) -> Option<DemTargetVec> {
-    if rest.is_empty() {
-        return Some(DemTargetVec::new());
-    }
-    let raw_targets = rest.strip_prefix(' ')?;
-    if raw_targets.is_empty() {
-        return None;
-    }
-
-    let mut targets = DemTargetVec::new();
-    let mut token_start = 0;
-    loop {
-        if kind != DemInstructionKind::Error && !targets.is_empty() {
+fn parse_canonical_payload(kind: DemInstructionKind, rest: &str) -> Option<DemPayload> {
+    let raw_targets = if rest.is_empty() {
+        ""
+    } else {
+        let raw_targets = rest.strip_prefix(' ')?;
+        if raw_targets.is_empty() {
             return None;
         }
+        raw_targets
+    };
+    match kind {
+        DemInstructionKind::Error => {
+            parse_canonical_error_targets(raw_targets).map(DemPayload::Error)
+        }
+        // A single-target instruction holds exactly one token, so a space means extra targets.
+        _ if raw_targets.is_empty() || raw_targets.contains(' ') => None,
+        DemInstructionKind::Detector => {
+            DemTarget::relative_detector(parse_prefixed_id(raw_targets, b'D')?)
+                .ok()
+                .map(DemPayload::Detector)
+        }
+        DemInstructionKind::LogicalObservable => {
+            DemTarget::logical_observable(parse_prefixed_id(raw_targets, b'L')?)
+                .ok()
+                .map(DemPayload::LogicalObservable)
+        }
+        DemInstructionKind::ShiftDetectors => {
+            parse_canonical_uint60(raw_targets).map(DemPayload::ShiftDetectors)
+        }
+    }
+}
+
+fn parse_canonical_error_targets(raw_targets: &str) -> Option<DemTargetVec> {
+    let mut targets = DemTargetVec::new();
+    if raw_targets.is_empty() {
+        return Some(targets);
+    }
+    let mut token_start = 0;
+    loop {
         let relative_end = raw_targets
             .as_bytes()
             .get(token_start..)?
@@ -128,19 +153,7 @@ fn parse_canonical_targets(kind: DemInstructionKind, rest: &str) -> Option<DemTa
         if token.is_empty() {
             return None;
         }
-        let target = match kind {
-            DemInstructionKind::Error => parse_error_target(token)?,
-            DemInstructionKind::Detector => {
-                DemTarget::relative_detector(parse_prefixed_id(token, b'D')?).ok()?
-            }
-            DemInstructionKind::LogicalObservable => {
-                DemTarget::logical_observable(parse_prefixed_id(token, b'L')?).ok()?
-            }
-            DemInstructionKind::ShiftDetectors => {
-                DemTarget::numeric(parse_canonical_uint60(token)?)
-            }
-        };
-        targets.push(target);
+        targets.push(parse_error_target(token)?);
         if token_end == raw_targets.len() {
             break;
         }
@@ -154,7 +167,7 @@ fn parse_canonical_targets(kind: DemInstructionKind, rest: &str) -> Option<DemTa
 
 fn parse_error_target(token: &str) -> Option<DemTarget> {
     if token == "^" {
-        return Some(DemTarget::separator());
+        return Some(DemTarget::SEPARATOR);
     }
     match token.as_bytes().first().copied()? {
         b'D' => DemTarget::relative_detector(parse_prefixed_id(token, b'D')?).ok(),

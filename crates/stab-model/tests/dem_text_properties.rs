@@ -476,18 +476,20 @@ fn assert_model_matches(model: &DetectorErrorModel, expected: &[GenDem], context
                         tag,
                     ),
                     GenDem::Shift {
-                        tag,
-                        coordinates,
-                        shift,
-                        ..
+                        tag, coordinates, ..
                     } => (
                         DemInstructionKind::ShiftDetectors,
                         coordinates.clone(),
-                        vec![DemTarget::numeric(*shift)],
+                        Vec::new(),
                         tag,
                     ),
                     GenDem::Repeat { .. } => panic!("{context}: parsed instruction for repeat"),
                 };
+                let expected_shift = match generated {
+                    GenDem::Shift { shift, .. } => Some(*shift),
+                    _ => None,
+                };
+                assert_eq!(instruction.detector_shift(), expected_shift, "{context}");
                 assert_eq!(instruction.kind(), kind, "{context}");
                 assert_bitwise_args(instruction.args(), &args, &context);
                 assert_eq!(instruction.targets(), targets.as_slice(), "{context}");
@@ -678,20 +680,17 @@ fn build_text_tagged(items: &[GenDem]) -> Option<DetectorErrorModel> {
             } => model.push_instruction(
                 stab_model::DemInstruction::detector(
                     coordinates.clone(),
-                    DemTarget::relative_detector(*detector).expect("valid id"),
+                    stab_model::DemDetectorId::try_new(*detector).expect("valid id"),
                     text_tag(tag)?,
                 )
                 .expect("valid detector"),
             ),
             GenDem::Observable {
                 tag, observable, ..
-            } => model.push_instruction(
-                stab_model::DemInstruction::logical_observable(
-                    DemTarget::logical_observable(u64::from(*observable)).expect("valid id"),
-                    text_tag(tag)?,
-                )
-                .expect("valid observable"),
-            ),
+            } => model.push_instruction(stab_model::DemInstruction::logical_observable(
+                stab_model::DemObservableId::try_new(u64::from(*observable)).expect("valid id"),
+                text_tag(tag)?,
+            )),
             GenDem::Shift {
                 tag,
                 coordinates,

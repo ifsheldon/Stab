@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTarget, FoldedCircuitSummary,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTargetKind, FoldedCircuitSummary,
     FoldedWalkError, Gate, GateCategory, GateKind, MeasureRecordOffset, MemoryBudget, ParseLimits,
     Pauli, QubitId, RepeatBlock, RepeatCount, Target,
     advanced::{
@@ -215,20 +215,20 @@ impl WithoutFeedbackHelper {
             .tracker
             .absolute_record_index_from_offset(record.get())?;
         for target in sensitivity {
-            match target {
-                DemTarget::RelativeDetector(detector) => {
+            match target.kind() {
+                DemTargetKind::RelativeDetector(detector) => {
                     toggle_value(
                         self.detector_changes.entry(detector.get()).or_default(),
                         absolute_record,
                     );
                 }
-                DemTarget::LogicalObservable(observable) => {
+                DemTargetKind::LogicalObservable(observable) => {
                     toggle_value(
                         self.observable_changes.entry(observable.get()).or_default(),
                         record,
                     );
                 }
-                DemTarget::Separator | DemTarget::Numeric(_) => {
+                DemTargetKind::Separator => {
                     return Err(AnalysisError::invalid_detector_error_model(format!(
                         "feedback sensitivity unexpectedly contained DEM target {target}"
                     )));

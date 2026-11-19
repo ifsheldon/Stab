@@ -2,8 +2,8 @@ use arrayvec::ArrayVec;
 use sha2::{Digest as _, Sha256};
 
 use crate::{
-    Circuit, CircuitItem, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, ModelDialect,
-    Pauli, RepeatNestingLimit, Target, TargetKind,
+    Circuit, CircuitItem, DemInstructionKind, DemItem, DemTarget, DemTargetKind,
+    DetectorErrorModel, ModelDialect, Pauli, RepeatNestingLimit, Target, TargetKind,
 };
 
 const MODEL_FINGERPRINT_DOMAIN: &[u8] = b"stab:model-fingerprint\0";
@@ -173,9 +173,16 @@ impl StructuralEncoder {
                     };
                     self.hasher.update([1, kind]);
                     self.floats(instruction.args());
-                    self.len(instruction.targets().len());
-                    for target in instruction.targets() {
-                        self.dem_target(target);
+                    if let Some(shift) = instruction.detector_shift() {
+                        // Schema v1 hashed the offset as a one-element numeric target list.
+                        self.len(1);
+                        let [b0, b1, b2, b3, b4, b5, b6, b7] = shift.to_be_bytes();
+                        self.hasher.update([4, b0, b1, b2, b3, b4, b5, b6, b7]);
+                    } else {
+                        self.len(instruction.targets().len());
+                        for target in instruction.targets() {
+                            self.dem_target(*target);
+                        }
                     }
                     self.optional_bytes(instruction.tag_bytes());
                 }
@@ -191,21 +198,17 @@ impl StructuralEncoder {
     }
 
     #[inline(always)]
-    fn dem_target(&mut self, target: &DemTarget) {
-        match target {
-            DemTarget::RelativeDetector(id) => {
+    fn dem_target(&mut self, target: DemTarget) {
+        match target.kind() {
+            DemTargetKind::RelativeDetector(id) => {
                 let [b0, b1, b2, b3, b4, b5, b6, b7] = id.get().to_be_bytes();
                 self.hasher.update([1, b0, b1, b2, b3, b4, b5, b6, b7]);
             }
-            DemTarget::LogicalObservable(id) => {
+            DemTargetKind::LogicalObservable(id) => {
                 let [b0, b1, b2, b3, b4, b5, b6, b7] = id.get().to_be_bytes();
                 self.hasher.update([2, b0, b1, b2, b3, b4, b5, b6, b7]);
             }
-            DemTarget::Separator => self.byte(3),
-            DemTarget::Numeric(value) => {
-                let [b0, b1, b2, b3, b4, b5, b6, b7] = value.to_be_bytes();
-                self.hasher.update([4, b0, b1, b2, b3, b4, b5, b6, b7]);
-            }
+            DemTargetKind::Separator => self.byte(3),
         }
     }
 

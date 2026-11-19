@@ -7,7 +7,7 @@ use super::api::{
     coordinate_shift_with_repeat, detector_offset_with_repeat,
 };
 use super::traversal::{CoordinateShifts, FoldedDemBlock, FoldedDemItem};
-use super::{DemDetectorId, DemInstructionKind, DemRepeatBlock, DemTarget};
+use super::{DemDetectorId, DemInstructionKind, DemRepeatBlock};
 
 pub(super) const MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS: u64 = 1_000_000;
 
@@ -90,10 +90,13 @@ fn record_flattened_detector_declarations(
     loop {
         let frame = frames.last_mut().ok_or_else(lost_scan_frame)?;
         match frame.items.next() {
-            Some(FoldedDemItem::Instruction(instruction)) => match instruction.kind() {
-                DemInstructionKind::Detector => {
+            Some(FoldedDemItem::Instruction(instruction)) => {
+                if let Some(shift) = instruction.detector_shift() {
+                    apply_detector_shift(&mut frame.detector_offset, shift)?;
+                    add_coordinate_shift_mul(&mut frame.coordinate_shift, instruction.args(), 1.0)?;
+                } else if instruction.kind() == DemInstructionKind::Detector {
                     for target in instruction.targets() {
-                        if let DemTarget::RelativeDetector(detector) = target {
+                        if let Some(detector) = target.detector() {
                             let local_detector = frame
                                 .detector_offset
                                 .checked_add(detector.get())
@@ -116,12 +119,7 @@ fn record_flattened_detector_declarations(
                         }
                     }
                 }
-                DemInstructionKind::ShiftDetectors => {
-                    apply_detector_shift(&mut frame.detector_offset, instruction)?;
-                    add_coordinate_shift_mul(&mut frame.coordinate_shift, instruction.args(), 1.0)?;
-                }
-                DemInstructionKind::Error | DemInstructionKind::LogicalObservable => {}
-            },
+            }
             Some(FoldedDemItem::Repeat { repeat, body }) => {
                 let body_count = flattened_detector_declaration_count_up_to(body, 1)?.unwrap_or(2);
                 if body_count == 0 {

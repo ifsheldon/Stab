@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use stab_model::{
-    DemDetectorId, DemInstruction, DemItem, DemTarget, DetectorErrorModel, Probability,
+    DemDetectorId, DemInstruction, DemItem, DemTarget, DemTargetKind, DetectorErrorModel,
+    Probability,
 };
 
 use super::{
@@ -687,19 +688,14 @@ fn toggled_dem_targets(
     let mut countdown = stab_model::advanced::CancellationCountdown::new();
     for target in targets {
         countdown.tick(cancellation)?;
-        match *target {
-            DemTarget::RelativeDetector(detector) => {
+        match target.kind() {
+            DemTargetKind::RelativeDetector(detector) => {
                 if !detectors.insert(detector) {
                     detectors.remove(&detector);
                 }
             }
-            DemTarget::LogicalObservable(observable) => observables.toggle(observable),
-            DemTarget::Separator => {}
-            DemTarget::Numeric(_) => {
-                return Err(AnalysisError::invalid_detector_error_model(
-                    "hypergraph error targets cannot include numeric targets",
-                ));
-            }
+            DemTargetKind::LogicalObservable(observable) => observables.toggle(observable),
+            DemTargetKind::Separator => {}
         }
     }
     Ok((detectors, observables))

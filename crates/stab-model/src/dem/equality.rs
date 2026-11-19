@@ -11,10 +11,7 @@ pub(super) fn models_approx_equal(
     tolerance: AbsoluteTolerance,
 ) -> bool {
     compare_models(left, right, |left, right| {
-        left.kind == right.kind
-            && left.targets == right.targets
-            && left.tag == right.tag
-            && arguments_approx_equal(&left.args, &right.args, tolerance)
+        left.same_except_args(right) && arguments_approx_equal(left.args(), right.args(), tolerance)
     })
 }
 
