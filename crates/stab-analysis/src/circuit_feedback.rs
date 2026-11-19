@@ -13,7 +13,7 @@ use stab_model::{
 use crate::folded_walk::walk_folded;
 use crate::{
     AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
 /// The unrolled reversed buffer and the rebuilt output circuit each retain the expansion.
 const FEEDBACK_RETAINED_COPIES: u64 = 2;
@@ -80,7 +80,7 @@ pub fn circuit_with_inlined_feedback_with_limits(
         stab_model::advanced::circuit_simulated_qubit_count(circuit),
         measurement_count,
         detector_count,
-        false,
+        AnticommutationPolicy::Fail,
     );
     tracker.set_cancellation(limits.cancellation().clone());
     tracker.set_memory_budget(

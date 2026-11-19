@@ -5,6 +5,24 @@ use crate::{AnalysisError, AnalysisResult};
 /// Pinned Stim assigns each detector of a composite error one bit of a 16-bit local mask.
 const MAX_LOCAL_DETECTORS: usize = 16;
 
+/// Composite channels combine at most four basis errors, so at most sixteen combinations.
+const MAX_COMBINATIONS: usize = 1 << super::MAX_COMBINATION_BASES;
+const _: () = assert!(MAX_COMBINATIONS <= u16::BITS as usize);
+
+/// A set of combination indexes, iterated in ascending order.
+#[derive(Clone, Copy, Debug, Default)]
+struct CombinationSet(u16);
+
+impl CombinationSet {
+    fn insert(&mut self, index: usize) {
+        self.0 |= 1 << index;
+    }
+
+    fn iter(self) -> impl Iterator<Item = usize> {
+        (0..MAX_COMBINATIONS).filter(move |&index| (self.0 >> index) & 1 == 1)
+    }
+}
+
 /// Rewrites composite-error combinations as graphlike components where the basis errors allow.
 ///
 /// `joined` is a reused buffer; each rewritten combination swaps storage with it.
@@ -35,7 +53,13 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
         }
     }
 
-    let mut detector_masks = vec![0_u64; combinations.len()];
+    if combinations.len() > MAX_COMBINATIONS {
+        return Err(AnalysisError::invalid_detector_error_model(format!(
+            "composite error has {} combinations, more than the {MAX_COMBINATIONS} supported",
+            combinations.len()
+        )));
+    }
+    let mut detector_masks = [0_u64; MAX_COMBINATIONS];
     for (slot, targets) in detector_masks.iter_mut().zip(combinations.iter()).skip(1) {
         let mut mask = 0_u64;
         for target in targets {
@@ -55,16 +79,14 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
         *slot = mask;
     }
 
-    let detector_counts = detector_masks
-        .iter()
-        .map(|mask| mask.count_ones())
-        .collect::<Vec<_>>();
-    let mut solved = vec![false; combinations.len()];
+    let detector_counts = detector_masks.map(u64::count_ones);
+    let mut solved = [false; MAX_COMBINATIONS];
     let mut single_detector_union = 0_u64;
     for ((detector_count, detector_mask), solved_slot) in detector_counts
         .iter()
         .zip(&detector_masks)
         .zip(&mut solved)
+        .take(combinations.len())
         .skip(1)
     {
         if *detector_count == 1 {
@@ -72,16 +94,17 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
             *solved_slot = true;
         }
     }
-    let mut irreducible_pairs = Vec::new();
+    let mut irreducible_pairs = CombinationSet::default();
     for (index, ((detector_count, detector_mask), solved_slot)) in detector_counts
         .iter()
         .zip(&detector_masks)
         .zip(&mut solved)
         .enumerate()
+        .take(combinations.len())
         .skip(1)
     {
         if *detector_count == 2 && *detector_mask & !single_detector_union != 0 {
-            irreducible_pairs.push(index);
+            irreducible_pairs.insert(index);
             *solved_slot = true;
         }
     }
@@ -102,7 +125,7 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
             goal
         } else {
             let mut contained_pair = None;
-            for &pair in &irreducible_pairs {
+            for pair in irreducible_pairs.iter() {
                 let pair_mask = *indexed(
                     &detector_masks,
                     pair,
@@ -123,7 +146,7 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
             } else if let Some((left, right)) = find_two_disjoint_pairs(
                 goal,
                 single_detector_union,
-                &irreducible_pairs,
+                irreducible_pairs,
                 &detector_masks,
             )? {
                 let left_component = indexed(combinations, left, "left composite error pair")?;
@@ -190,11 +213,11 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
 fn find_two_disjoint_pairs(
     goal: u64,
     single_detector_union: u64,
-    pairs: &[usize],
+    pairs: CombinationSet,
     masks: &[u64],
 ) -> AnalysisResult<Option<(usize, usize)>> {
-    for (position, &left) in pairs.iter().enumerate() {
-        for &right in pairs.iter().skip(position + 1) {
+    for left in pairs.iter() {
+        for right in pairs.iter().filter(|&right| right > left) {
             let left_mask = *indexed(masks, left, "left irreducible detector mask")?;
             let right_mask = *indexed(masks, right, "right irreducible detector mask")?;
             if left_mask & right_mask == 0

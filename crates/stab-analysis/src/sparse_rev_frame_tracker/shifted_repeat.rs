@@ -418,7 +418,7 @@ pub(super) fn is_shifted_copy(
             &other.anticommutations,
             detector_offset,
         )
-        && tracker.fail_on_anticommute == other.fail_on_anticommute
+        && tracker.anticommutation_policy == other.anticommutation_policy
         && tracker.error_analysis_mode == other.error_analysis_mode
         && tracker.eliminate_detector_gauges == other.eliminate_detector_gauges
 }

@@ -587,6 +587,46 @@ fn with_inlined_feedback_rejects_synthesized_negative_zero_detector_target() {
     assert!(error.to_string().contains("rec[-0]"));
 }
 
+/// Pinned Stim's `WithoutFeedbackHelper` tracks with `fail_on_anticommute`, so a detector or
+/// observable that a collapse randomizes is refused instead of being silently rewritten.
+#[test]
+fn with_inlined_feedback_rejects_non_deterministic_detectors_and_observables() {
+    for (text, target) in [
+        ("R 0\nH 0\nM 0\nDETECTOR rec[-1]\n", "D0"),
+        ("M 0\nOBSERVABLE_INCLUDE(0) Y0\n", "L0"),
+        (
+            "R 0 1\nH 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1]\n",
+            "D0",
+        ),
+    ] {
+        let error = circuit(text)
+            .with_inlined_feedback()
+            .expect_err("Stim refuses non-deterministic detectors while inlining feedback");
+
+        assert_matches!(
+            error,
+            AnalysisError::InvalidDetectorErrorModel { .. },
+            "{text}"
+        );
+        assert!(error.to_string().contains(target), "{text}: {error}");
+    }
+}
+
+#[test]
+fn with_inlined_feedback_accepts_feedback_that_restores_determinism() {
+    let input = circuit("R 0 1\nH 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n");
+
+    let inlined = input
+        .with_inlined_feedback()
+        .expect("the detector is deterministic once feedback is accounted for");
+
+    assert_no_measurement_feedback_controls(&inlined);
+    assert_eq!(
+        inlined.to_stim_string(),
+        "R 0 1\nH 0\nM 0 1\nDETECTOR rec[-1]\n"
+    );
+}
+
 #[test]
 fn with_inlined_feedback_preserves_mpp_detector_error_model() {
     let input = circuit(

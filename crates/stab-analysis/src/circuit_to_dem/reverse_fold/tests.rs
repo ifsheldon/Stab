@@ -141,3 +141,111 @@ fn analyzer_repeat_nesting_boundary_is_exact_with_and_without_folding() {
         .join()
         .expect("nesting boundary thread");
 }
+
+/// A wide reset, a CX fan-out onto qubit 0, one measurement, and `detectors` coordinate-heavy
+/// detectors on it: the retained output is large before the reverse fan-out copies qubit 0's
+/// sensitivity set onto every other qubit.
+fn fan_out_after_heavy_output(qubits: u32, detectors: usize) -> Circuit {
+    let targets = (0..qubits).map(|q| q.to_string()).collect::<Vec<_>>();
+    let fan_out = (1..qubits).map(|q| format!("{q} 0")).collect::<Vec<_>>();
+    let coordinates = vec!["1"; 32].join(",");
+    let mut text = format!(
+        "R {}\nX_ERROR(0.125) {}\nCX {}\nM 0\n",
+        targets.join(" "),
+        targets.join(" "),
+        fan_out.join(" ")
+    );
+    for _ in 0..detectors {
+        text.push_str(&format!("DETECTOR({coordinates}) rec[-1]\n"));
+    }
+    Circuit::from_stim_str(&text).expect("valid fan-out circuit")
+}
+
+/// The reverse tracker grows against the budget less the output and error classes already held,
+/// so a refusal inside an instruction reports a need within one set growth of the budget instead
+/// of discovering the overrun, by up to the whole held output, at the end of the instruction.
+#[test]
+fn tracker_growth_is_refused_against_the_bytes_the_analyzer_already_holds() {
+    const DETECTORS: usize = 2_000;
+    let circuit = fan_out_after_heavy_output(40, DETECTORS);
+    let options = |bytes| ErrorAnalyzerOptions {
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..ErrorAnalyzerOptions::default()
+    };
+    let one_set_growth = 2 * DETECTORS as u64 * size_of::<stab_model::DemTarget>() as u64;
+    for budget in [1_000_000, 1_200_000, 1_400_000] {
+        let error = try_analyze(&circuit, options(budget)).expect_err("the fan-out does not fit");
+        let resource = error.resource_limit_error().expect("typed budget refusal");
+        assert_eq!(resource.limit(), budget);
+        assert!(
+            resource.actual() <= budget + one_set_growth,
+            "refusal needs {} bytes against a {budget}-byte budget",
+            resource.actual()
+        );
+    }
+}
+
+/// When the fold search's two tracker clones do not fit, `--fold_loops` falls back to unrolling
+/// instead of refusing a circuit that the unfolded run completes under the same budget.
+#[test]
+fn fold_search_that_does_not_fit_falls_back_to_unrolling() {
+    let qubits = (0..40).map(|q| q.to_string()).collect::<Vec<_>>().join(" ");
+    let fan_out = (1..40)
+        .map(|q| format!("{q} 0"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut text =
+        format!("R {qubits}\nREPEAT 10 {{\n    X_ERROR(0.001) 100\n}}\nCX {fan_out}\nM 0\n");
+    for _ in 0..2_000 {
+        text.push_str("DETECTOR rec[-1]\n");
+    }
+    let circuit = Circuit::from_stim_str(&text).expect("valid fold-budget circuit");
+    let options = |fold_loops, bytes| ErrorAnalyzerOptions {
+        fold_loops,
+        memory_budget: MemoryBudget::from_bytes(bytes),
+        ..ErrorAnalyzerOptions::default()
+    };
+    // The smallest budget the unfolded run admits.
+    let (mut low, mut high) = (0_u64, 1 << 24);
+    let unfolded = try_analyze(&circuit, options(false, high)).expect("unfolded analysis");
+    while low < high {
+        let middle = low + (high - low) / 2;
+        if try_analyze(&circuit, options(false, middle)).is_ok() {
+            high = middle;
+        } else {
+            low = middle + 1;
+        }
+    }
+
+    let folded = try_analyze(&circuit, options(true, low))
+        .expect("the fold search gives up and unrolls within the unfolded budget");
+    assert_eq!(folded, unfolded);
+    let error = try_analyze(&circuit, options(true, low - 1))
+        .expect_err("a genuine shortage still resurfaces from the unrolled run");
+    assert_eq!(
+        error.resource_limit_error().map(|error| error.limit()),
+        Some(low - 1)
+    );
+}
+
+/// Pinned Stim saturates its tick count, so more than `2^64` ticks is not an error. Expected
+/// output is the pinned Stim v1.16.0 `analyze_errors --fold_loops` capture.
+#[test]
+fn folded_analysis_accepts_more_ticks_than_fit_in_u64() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 1000000000000 {\n    REPEAT 1000000000000 {\n        TICK\n    }\n}\nR 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n",
+    )
+    .expect("valid tick circuit");
+    let model = try_analyze(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("tick count does not limit analysis");
+    assert_eq!(
+        model.to_dem_string(),
+        "repeat 1000000000000 {\n    repeat 1000000000000 {\n\n    }\n}\nerror(0.1000000000000000055511151231257827) D0\n"
+    );
+}

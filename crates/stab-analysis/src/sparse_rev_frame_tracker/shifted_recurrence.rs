@@ -16,7 +16,30 @@ pub(crate) enum ShiftedRecurrenceSearch {
     Exhausted,
 }
 
+/// Searches for a state after which every further `step` reproduces an earlier state shifted
+/// by a fixed number of measurements and detectors.
+///
+/// The search holds two clones of `initial` beside it. When they do not fit the tracker's
+/// memory budget the search gives up with [`ShiftedRecurrenceSearch::Exhausted`] after dropping
+/// both, so the caller unrolls instead and any genuine shortage resurfaces there with its real
+/// numbers. Cancellation and every other error propagate.
 pub(crate) fn search_shifted_recurrence<F>(
+    initial: &SparseReverseFrameTracker,
+    max_iterations: u64,
+    step: F,
+) -> AnalysisResult<ShiftedRecurrenceSearch>
+where
+    F: FnMut(&mut SparseReverseFrameTracker) -> AnalysisResult<()>,
+{
+    match run_search(initial, max_iterations, step) {
+        Err(AnalysisError::ResourceLimit(error)) if error.is_memory_budget() => {
+            Ok(ShiftedRecurrenceSearch::Exhausted)
+        }
+        result => result,
+    }
+}
+
+fn run_search<F>(
     initial: &SparseReverseFrameTracker,
     max_iterations: u64,
     mut step: F,

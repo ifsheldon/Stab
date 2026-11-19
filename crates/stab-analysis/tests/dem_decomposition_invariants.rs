@@ -178,3 +178,83 @@ fn global_decomposition_merges_into_existing_classes_in_stim_order() {
         );
     }
 }
+
+/// A gauge chain whose start-of-circuit gauge error is one component of `rounds - 1` detectors,
+/// each of which is a known single-detector error.
+fn long_gauge_component(rounds: u64) -> Circuit {
+    Circuit::from_stim_str(&format!(
+        "M 2\nMRX(0.125) 0\nREPEAT {rounds} {{\n    DETECTOR rec[-1] rec[-2]\n    MY 0\n    MRX(0.003) 1\n}}\n"
+    ))
+    .expect("circuit")
+}
+
+/// Pinned Stim v1.16.0 shifts a plain `int` in `brute_force_decomp_helper`, so a component with
+/// 32 or more terms loses terms (`D33` is dropped from this 33-term case). Stab's search mask is
+/// 64 bits wide, so every printed component XORs back to the undecomposed error.
+#[test]
+fn decomposition_of_components_past_32_terms_preserves_every_term() {
+    for fold_loops in [false, true] {
+        let context = format!("fold_loops={fold_loops}");
+        let base = ErrorAnalyzerOptions {
+            fold_loops,
+            allow_gauge_detectors: true,
+            ..ErrorAnalyzerOptions::default()
+        };
+        let circuit = long_gauge_component(34);
+        let plain = circuit_to_detector_error_model(&circuit, base.clone()).expect("plain");
+        let decomposed = circuit_to_detector_error_model(
+            &circuit,
+            ErrorAnalyzerOptions {
+                decompose_errors: true,
+                ..base.clone()
+            },
+        )
+        .expect("decomposed");
+
+        let view = ResolvedDem::new(&decomposed);
+        assert_same_distribution(
+            &view.symptom_distribution(),
+            &ResolvedDem::new(&plain).symptom_distribution(),
+            1e-12,
+            &context,
+        );
+        let widest = view
+            .errors
+            .iter()
+            .map(|error| {
+                error
+                    .components
+                    .iter()
+                    .fold(BTreeSet::new(), |mut sum, component| {
+                        for symptom in component {
+                            if !sum.remove(symptom) {
+                                sum.insert(*symptom);
+                            }
+                        }
+                        sum
+                    })
+                    .len()
+            })
+            .max();
+        assert_eq!(
+            widest,
+            Some(33),
+            "{context}: the 33-detector error lost terms"
+        );
+
+        // Past the 64-bit mask, Stab refuses exactly as pinned Stim does instead of guessing.
+        let error = circuit_to_detector_error_model(
+            &long_gauge_component(70),
+            ErrorAnalyzerOptions {
+                decompose_errors: true,
+                ignore_decomposition_failures: true,
+                ..base
+            },
+        )
+        .expect_err("components of 64 or more terms are not decomposed");
+        assert!(
+            matches!(&error, AnalysisError::InvalidDetectorErrorModel { message } if message.contains("more than 64 terms")),
+            "{context}: {error}"
+        );
+    }
+}

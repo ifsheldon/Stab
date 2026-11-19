@@ -20,7 +20,7 @@ fn measurement_record_count(circuit: &Circuit) -> AnalysisResult<usize> {
 }
 
 fn tracker_from_pauli_text(text: &str) -> SparseReverseFrameTracker {
-    let mut tracker = SparseReverseFrameTracker::new(text.len(), 0, 0, true);
+    let mut tracker = SparseReverseFrameTracker::new(text.len(), 0, 0, AnticommutationPolicy::Fail);
     let sensitivity = [DemTarget::logical_observable(0).unwrap()];
     for (index, character) in text.chars().enumerate() {
         let qubit = QubitId::new(u32::try_from(index).unwrap()).unwrap();
@@ -96,7 +96,8 @@ fn detector_set(id: u64) -> TargetXorSet {
 fn sparse_rev_frame_tracker_allocates_only_active_qubit_entries() {
     const HIGH_QUBIT: u32 = 1_000_000;
     let target = DemTarget::logical_observable(0).unwrap();
-    let mut tracker = SparseReverseFrameTracker::new(HIGH_QUBIT as usize + 1, 0, 0, true);
+    let mut tracker =
+        SparseReverseFrameTracker::new(HIGH_QUBIT as usize + 1, 0, 0, AnticommutationPolicy::Fail);
 
     assert!(tracker.xs.is_empty());
     assert!(tracker.zs.is_empty());
@@ -445,7 +446,7 @@ fn sparse_rev_frame_tracker_pair_measurements_subset() {
 
 #[test]
 fn sparse_rev_frame_tracker_mpp_measurements_subset() {
-    let mut actual = SparseReverseFrameTracker::new(6, 2, 0, true);
+    let mut actual = SparseReverseFrameTracker::new(6, 2, 0, AnticommutationPolicy::Fail);
     actual.rec_bits.insert(0, single_pauli_set(0));
     actual.rec_bits.insert(1, single_pauli_set(1));
     actual
@@ -464,7 +465,7 @@ fn sparse_rev_frame_tracker_mpp_measurements_subset() {
 
 #[test]
 fn sparse_rev_frame_tracker_rejects_anti_hermitian_mpp_products() {
-    let mut actual = SparseReverseFrameTracker::new(1, 1, 0, true);
+    let mut actual = SparseReverseFrameTracker::new(1, 1, 0, AnticommutationPolicy::Fail);
     let error = actual
         .undo_instruction(&instruction("MPP X0*Z0\n"))
         .unwrap_err();
@@ -486,11 +487,11 @@ fn sparse_rev_frame_tracker_undo_circuit_feedback_subset() {
         circuit.count_qubits(),
         measurement_record_count(&circuit).unwrap(),
         1,
-        true,
+        AnticommutationPolicy::Fail,
     );
     actual.undo_circuit(&circuit).unwrap();
 
-    let mut expected = SparseReverseFrameTracker::new(1, 0, 0, true);
+    let mut expected = SparseReverseFrameTracker::new(1, 0, 0, AnticommutationPolicy::Fail);
     expected
         .zs
         .entry(qid(0))
@@ -512,7 +513,7 @@ fn sparse_rev_frame_tracker_tracks_anticommutation_when_requested() {
         circuit.count_qubits(),
         measurement_record_count(&circuit).unwrap(),
         1,
-        false,
+        AnticommutationPolicy::Record,
     );
     tracker.undo_circuit(&circuit).unwrap();
 
@@ -541,14 +542,14 @@ fn sparse_rev_frame_tracker_fails_anticommutation_by_default() {
         circuit.count_qubits(),
         measurement_record_count(&circuit).unwrap(),
         1,
-        true,
+        AnticommutationPolicy::Fail,
     );
     assert!(tracker.undo_circuit(&circuit).is_err());
 }
 
 #[test]
 fn sparse_rev_frame_tracker_observable_include_paulis_subset() {
-    let mut tracker = SparseReverseFrameTracker::new(4, 4, 4, true);
+    let mut tracker = SparseReverseFrameTracker::new(4, 4, 4, AnticommutationPolicy::Fail);
     tracker
         .undo_circuit(&circuit("OBSERVABLE_INCLUDE(5) X1 Y2 Z3 rec[-1]\n"))
         .unwrap();
@@ -578,8 +579,8 @@ fn sparse_rev_frame_tracker_observable_include_paulis_subset() {
 
 #[test]
 fn sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets() {
-    let mut actual = SparseReverseFrameTracker::new(10, 200, 300, true);
-    let mut expected = SparseReverseFrameTracker::new(10, 2000, 3000, true);
+    let mut actual = SparseReverseFrameTracker::new(10, 200, 300, AnticommutationPolicy::Fail);
+    let mut expected = SparseReverseFrameTracker::new(10, 2000, 3000, AnticommutationPolicy::Fail);
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
     actual.rec_bits.insert(195, single_pauli_set(2));
@@ -694,7 +695,12 @@ fn sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period() {
         ",
     );
 
-    let mut folded = SparseReverseFrameTracker::new(20, 5_000_000_000_000, 4_000_000_000_000, true);
+    let mut folded = SparseReverseFrameTracker::new(
+        20,
+        5_000_000_000_000,
+        4_000_000_000_000,
+        AnticommutationPolicy::Fail,
+    );
     let mut unrolled = folded.clone();
     shifted_repeat::undo_loop(&mut folded, &body, 500).unwrap();
     shifted_repeat::undo_loop_by_unrolling(&mut unrolled, &body, 500).unwrap();
@@ -723,11 +729,11 @@ fn sparse_rev_frame_tracker_repeat_blocks_track_measurements_and_detectors() {
         circuit.count_qubits(),
         measurement_record_count(&circuit).unwrap(),
         2,
-        true,
+        AnticommutationPolicy::Fail,
     );
     tracker.undo_circuit(&circuit).unwrap();
 
-    let mut expected = SparseReverseFrameTracker::new(1, 0, 0, true);
+    let mut expected = SparseReverseFrameTracker::new(1, 0, 0, AnticommutationPolicy::Fail);
     expected.zs.insert(qid(0), detector_set(0));
     expected
         .zs
@@ -799,7 +805,7 @@ fn live_bytes_matches_recomputed_state_across_instruction_kinds() {
         anticommuting.count_qubits(),
         measurement_record_count(&anticommuting).unwrap(),
         anticommuting.count_detectors().unwrap(),
-        false,
+        AnticommutationPolicy::Record,
     );
     for item in anticommuting.items().iter().rev() {
         let CircuitItem::Instruction(inst) = item else {
@@ -837,7 +843,8 @@ fn wide_product_merge_is_refused_before_it_outgrows_the_budget() {
     let product = instruction(&text);
     let detector = instruction("DETECTOR rec[-1]\n");
     let prepared = |budget: Option<MemoryBudget>| {
-        let mut tracker = SparseReverseFrameTracker::new(TERMS, 1, DETECTORS, true);
+        let mut tracker =
+            SparseReverseFrameTracker::new(TERMS, 1, DETECTORS, AnticommutationPolicy::Fail);
         if let Some(budget) = budget {
             tracker.set_memory_budget(
                 ResourceOperation::DetectingRegions,

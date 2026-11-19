@@ -118,8 +118,12 @@ fn output_bounded_expansions_honor_a_set_signal() {
     let limits = CircuitFlattenLimits::default().with_cancellation(cancelled());
     assert_cancelled(flattened_circuit_with_limits(&fixture, limits.clone()));
     assert_cancelled(flattened_circuit_operations_with_limits(&fixture, limits));
+    // Inlining refuses non-deterministic detectors, so its fixture resets before measuring.
+    let deterministic = circuit(
+        "REPEAT 100000 {\n    R 0\n    M 0\n    CX rec[-1] 1\n    TICK\n    DETECTOR rec[-1]\n}\n",
+    );
     assert_cancelled(circuit_with_inlined_feedback_with_limits(
-        &fixture,
+        &deterministic,
         FeedbackInliningLimits::default().with_cancellation(cancelled()),
     ));
     let measurements = circuit("REPEAT 100000 {\n    H 0\n    M 0\n}\n");

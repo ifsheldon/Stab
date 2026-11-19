@@ -12,7 +12,7 @@ use crate::{
         UnsignedFlowCheckOptions, check_unsigned_flows_with_sparse_tracker, stops_flow_check,
         transitions::ReverseFlowTransition,
     },
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
 
 use super::{TimeReversedForFlowsOptions, reversed_target_groups};
@@ -62,8 +62,12 @@ pub(super) fn reverse_flows(
     let observable_count = circuit.count_observables()?;
     let qubit_count = flow_aware_qubit_count(circuit, flows)?;
     let flow_states = reverse_flow_states(observable_count, measurement_count, flows)?;
-    let mut tracker =
-        SparseReverseFrameTracker::new(qubit_count, measurement_count, detector_count, true);
+    let mut tracker = SparseReverseFrameTracker::new(
+        qubit_count,
+        measurement_count,
+        detector_count,
+        AnticommutationPolicy::Fail,
+    );
     tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
         ResourceOperation::TimeReversal,

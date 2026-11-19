@@ -10,7 +10,7 @@ use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
 use crate::{
     AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceLimitError,
     ResourceOperation, circuit_to_tableau_with_options,
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
 
 /// Options for the unsigned stabilizer flow checks, such as
@@ -465,7 +465,8 @@ fn pull_back_paulis_with_sparse_tracker(
         stab_model::advanced::circuit_simulated_qubit_count(circuit),
         usize::max,
     );
-    let mut tracker = SparseReverseFrameTracker::new(qubit_count, 0, 0, false);
+    let mut tracker =
+        SparseReverseFrameTracker::new(qubit_count, 0, 0, AnticommutationPolicy::Record);
     tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
         ResourceOperation::FlowCheck,
@@ -621,8 +622,12 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
         .unwrap_or(0);
     let qubit_count =
         stab_model::advanced::circuit_simulated_qubit_count(circuit).max(flow_qubit_count);
-    let mut tracker =
-        SparseReverseFrameTracker::new(qubit_count, measurement_count, detector_count, false);
+    let mut tracker = SparseReverseFrameTracker::new(
+        qubit_count,
+        measurement_count,
+        detector_count,
+        AnticommutationPolicy::Record,
+    );
     tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
         ResourceOperation::FlowCheck,

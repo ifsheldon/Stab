@@ -10,7 +10,7 @@ use stab_model::{
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
 use crate::{
     AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
 
 /// Conservative retained bytes of one live tracker-state unit (one sparse map entry).
@@ -79,7 +79,11 @@ pub fn circuit_detecting_regions_for_targets(
         options.ticks.len(),
     )?;
     validate_supported_subset(circuit)?;
-    let fail_on_anticommute = !options.ignore_anticommutation_errors;
+    let anticommutation_policy = if options.ignore_anticommutation_errors {
+        AnticommutationPolicy::Record
+    } else {
+        AnticommutationPolicy::Fail
+    };
     let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
     let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
     // One folded walk supplies every whole-circuit count the extraction needs.
@@ -103,7 +107,7 @@ pub fn circuit_detecting_regions_for_targets(
         qubit_count,
         measurement_count,
         detector_count,
-        fail_on_anticommute,
+        anticommutation_policy,
     );
     tracker.set_cancellation(options.cancellation);
     tracker.set_memory_budget(

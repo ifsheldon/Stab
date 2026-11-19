@@ -67,7 +67,7 @@ pub(crate) struct SparseReverseFrameTracker {
     measurement_count: usize,
     detector_count: u64,
     observable_effects: TargetSets<u64>,
-    fail_on_anticommute: bool,
+    anticommutation_policy: AnticommutationPolicy,
     error_analysis_mode: bool,
     eliminate_detector_gauges: bool,
     gauge_errors: Vec<TargetXorSet>,
@@ -98,7 +98,7 @@ impl SparseReverseFrameTracker {
         qubit_count: usize,
         measurement_count: usize,
         detector_count: u64,
-        fail_on_anticommute: bool,
+        anticommutation_policy: AnticommutationPolicy,
     ) -> Self {
         Self {
             xs: BTreeMap::new(),
@@ -108,7 +108,7 @@ impl SparseReverseFrameTracker {
             measurement_count,
             detector_count,
             observable_effects: BTreeMap::new(),
-            fail_on_anticommute,
+            anticommutation_policy,
             error_analysis_mode: false,
             eliminate_detector_gauges: false,
             gauge_errors: Vec::new(),
@@ -378,8 +378,8 @@ impl SparseReverseFrameTracker {
                     self.undo_two_qubit_tableau(instruction)
                 } else {
                     let action = single_qubit_action(instruction.gate())?;
-                    for qubit in qubits_reversed(instruction)? {
-                        self.apply_single_qubit_action(action, qubit)?;
+                    for qubit in qubits_reversed(instruction) {
+                        self.apply_single_qubit_action(action, qubit?)?;
                         self.check_live_budget()?;
                     }
                     Ok(())
@@ -435,12 +435,15 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
-        let qubits = qubits_reversed(instruction)?;
-        self.ensure_measurements_available(qubits.len(), instruction.gate().canonical_name())?;
+        self.ensure_measurements_available(
+            instruction.targets().len(),
+            instruction.gate().canonical_name(),
+        )?;
         // Vendor ErrorAnalyzer::undo_MR* resolves each target completely (reset gauge, clear,
         // record merge) before the previous target; the post-merge measurement gauge check is
         // vacuous because the cleared frame only holds the measured basis.
-        for qubit in qubits {
+        for qubit in qubits_reversed(instruction) {
+            let qubit = qubit?;
             self.check_reset_gauge(qubit, basis)?;
             self.clear_qubit(qubit)?;
             self.undo_measurement_target(qubit, basis)?;
@@ -454,12 +457,15 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
-        let qubits = qubits_reversed(instruction)?;
-        self.ensure_measurements_available(qubits.len(), instruction.gate().canonical_name())?;
+        self.ensure_measurements_available(
+            instruction.targets().len(),
+            instruction.gate().canonical_name(),
+        )?;
         // Vendor ErrorAnalyzer::undo_M*_with_context merges each target's record before
         // checking that target for a gauge, one target at a time in reverse, so each check sees
         // the merged records and eliminated gauges of the targets after it.
-        for qubit in qubits {
+        for qubit in qubits_reversed(instruction) {
+            let qubit = qubit?;
             self.undo_measurement_target(qubit, basis)?;
             self.check_measurement_gauge(qubit, basis)?;
             self.check_live_budget()?;
@@ -583,8 +589,8 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
-        let qubits = qubits_reversed(instruction)?;
-        for qubit in qubits {
+        for qubit in qubits_reversed(instruction) {
+            let qubit = qubit?;
             self.check_reset_gauge(qubit, basis)?;
             self.clear_qubit(qubit)?;
         }
@@ -1059,6 +1065,15 @@ impl SparseReverseFrameTracker {
             )
         })
     }
+}
+
+/// What the tracker does when a collapse anticommutes with a tracked detector or observable.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum AnticommutationPolicy {
+    /// Refuses the circuit with a validation error naming the anticommuting targets.
+    Fail,
+    /// Records the anticommutation and keeps going, for callers that report them.
+    Record,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

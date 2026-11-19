@@ -141,7 +141,7 @@ impl Clone for SparseReverseFrameTracker {
             measurement_count: self.measurement_count,
             detector_count: self.detector_count,
             observable_effects: self.observable_effects.clone(),
-            fail_on_anticommute: self.fail_on_anticommute,
+            anticommutation_policy: self.anticommutation_policy,
             error_analysis_mode: self.error_analysis_mode,
             eliminate_detector_gauges: self.eliminate_detector_gauges,
             gauge_errors: self.gauge_errors.clone(),

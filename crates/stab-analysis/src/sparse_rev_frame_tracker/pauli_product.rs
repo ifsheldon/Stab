@@ -6,20 +6,21 @@ use crate::{AnalysisError, AnalysisResult};
 
 use super::TrackerBasis;
 
-pub(super) fn qubits_reversed(instruction: &CircuitInstruction) -> AnalysisResult<Vec<QubitId>> {
-    instruction
-        .targets()
-        .iter()
-        .rev()
-        .map(|target| {
-            target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {target} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
-            })
+/// The instruction's qubit targets, last first, without collecting them.
+///
+/// Measurement and reset targets are qubits by construction, so a non-qubit target is reported
+/// when it is reached rather than before the first target is undone.
+pub(super) fn qubits_reversed(
+    instruction: &CircuitInstruction,
+) -> impl Iterator<Item = AnalysisResult<QubitId>> {
+    instruction.targets().iter().rev().map(|target| {
+        target.qubit_id().ok_or_else(|| {
+            AnalysisError::invalid_detector_error_model(format!(
+                "{} target {target} is not a qubit",
+                instruction.gate().canonical_name()
+            ))
         })
-        .collect()
+    })
 }
 
 pub(super) fn pair_measurement_terms_reversed(

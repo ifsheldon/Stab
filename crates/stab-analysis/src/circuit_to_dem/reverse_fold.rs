@@ -54,10 +54,11 @@ pub(super) fn try_analyze(
     ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)
 }
 
-struct ReverseFoldAnalyzer {
+/// Holds `'c`, the analyzed circuit, so the pending `ELSE_CORRELATED_ERROR` chain borrows its
+/// instructions instead of copying them.
+struct ReverseFoldAnalyzer<'c> {
     options: ErrorAnalyzerOptions,
     tracker: SparseReverseFrameTracker,
-    ticks_left: u64,
     reversed_model: DetectorErrorModel,
     errors: ErrorAccumulator,
     scratch: AnalyzerScratch,
@@ -65,10 +66,10 @@ struct ReverseFoldAnalyzer {
     output_bytes: u64,
     /// ELSE_CORRELATED_ERROR instructions seen (in reverse) since the last
     /// unrelated instruction, awaiting their leading E (error_analyzer.cc:673).
-    stacked_else_correlated: Vec<CircuitInstruction>,
+    stacked_else_correlated: Vec<&'c CircuitInstruction>,
 }
 
-impl ReverseFoldAnalyzer {
+impl<'c> ReverseFoldAnalyzer<'c> {
     fn new(circuit: &Circuit, options: ErrorAnalyzerOptions) -> AnalysisResult<Self> {
         let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
             AnalysisError::invalid_detector_error_model(
@@ -92,7 +93,6 @@ impl ReverseFoldAnalyzer {
         Ok(Self {
             options,
             tracker,
-            ticks_left: circuit.count_ticks()?,
             reversed_model: DetectorErrorModel::new(),
             errors,
             scratch: AnalyzerScratch::default(),
@@ -101,9 +101,15 @@ impl ReverseFoldAnalyzer {
         })
     }
 
+    /// Gives the error accumulator and the tracker each the bytes the other side and the
+    /// retained output hold, so either one refuses growth as soon as the total would not fit.
     fn sync_error_budget_base(&mut self) {
         self.errors
             .set_base_bytes(self.output_bytes.saturating_add(self.tracker.live_bytes()));
+        self.tracker.set_base_bytes(
+            self.output_bytes
+                .saturating_add(self.errors.admitted_bytes()),
+        );
     }
 
     /// Charges `bytes` of retained output against the caller's budget before retaining them.
@@ -141,7 +147,7 @@ impl ReverseFoldAnalyzer {
         Ok(())
     }
 
-    fn analyze(mut self, circuit: &Circuit) -> AnalysisResult<DetectorErrorModel> {
+    fn analyze(mut self, circuit: &'c Circuit) -> AnalysisResult<DetectorErrorModel> {
         self.undo_circuit(circuit)?;
         self.tracker.undo_implicit_rz_at_start_of_circuit()?;
         // Vendor post_check_initialization reports start-of-circuit gauges untagged.
@@ -155,7 +161,7 @@ impl ReverseFoldAnalyzer {
         Ok(model)
     }
 
-    fn undo_circuit(&mut self, circuit: &Circuit) -> AnalysisResult<()> {
+    fn undo_circuit(&mut self, circuit: &'c Circuit) -> AnalysisResult<()> {
         self.tracker.poll_cancellation()?;
         for item in circuit.items().iter().rev() {
             match item {
@@ -174,7 +180,7 @@ impl ReverseFoldAnalyzer {
         self.require_no_pending_else_chain()
     }
 
-    fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
+    fn undo_instruction(&mut self, instruction: &'c CircuitInstruction) -> AnalysisResult<()> {
         self.tracker.poll_cancellation()?;
         self.sync_error_budget_base();
         let kind = instruction.gate().kind();
@@ -191,7 +197,7 @@ impl ReverseFoldAnalyzer {
             GateKind::PAULI_CHANNEL_2 => self.record_pauli_channel2(instruction)?,
             GateKind::E => self.record_correlated_error_block(instruction)?,
             GateKind::ELSE_CORRELATED_ERROR => {
-                self.stacked_else_correlated.push(instruction.clone());
+                self.stacked_else_correlated.push(instruction);
             }
             GateKind::HERALDED_ERASE => self.record_heralded_erase(instruction)?,
             GateKind::HERALDED_PAULI_CHANNEL_1 => {
@@ -252,14 +258,8 @@ impl ReverseFoldAnalyzer {
                     )?,
                 )?;
             }
-            GateKind::TICK => {
-                self.ticks_left = self.ticks_left.checked_sub(1).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "tick count underflowed during folded error analysis",
-                    )
-                })?;
-            }
-            GateKind::QUBIT_COORDS
+            GateKind::TICK
+            | GateKind::QUBIT_COORDS
             | GateKind::REPEAT
             | GateKind::RX
             | GateKind::RY
@@ -389,14 +389,14 @@ impl ReverseFoldAnalyzer {
             };
             return self.record_correlated_error(leading, probability);
         }
-        let stacked = std::mem::take(&mut self.stacked_else_correlated);
+        let mut stacked = std::mem::take(&mut self.stacked_else_correlated);
         let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
             return Err(AnalysisError::invalid_detector_error_model(
                 "ELSE_CORRELATED_ERROR requires approximate_disjoint_errors during error analysis",
             ));
         };
         let mut remaining = 1.0_f64;
-        for instruction in std::iter::once(leading).chain(stacked.iter().rev()) {
+        for &instruction in std::iter::once(&leading).chain(stacked.iter().rev()) {
             let Some(probability) = instruction.probability_argument()? else {
                 continue;
             };
@@ -415,6 +415,8 @@ impl ReverseFoldAnalyzer {
             })?;
             self.record_correlated_error(instruction, actual)?;
         }
+        stacked.clear();
+        self.stacked_else_correlated = stacked;
         Ok(())
     }
 
@@ -895,7 +897,7 @@ impl ReverseFoldAnalyzer {
 
     fn run_loop(
         &mut self,
-        body: &Circuit,
+        body: &'c Circuit,
         repeat_count: RepeatCount,
         tag: Option<&[u8]>,
     ) -> AnalysisResult<()> {
@@ -964,7 +966,7 @@ impl ReverseFoldAnalyzer {
 
     fn capture_repeated_period(
         &mut self,
-        body: &Circuit,
+        body: &'c Circuit,
         period: u64,
         period_repetitions: u64,
         hare: &SparseReverseFrameTracker,
@@ -1048,7 +1050,7 @@ impl ReverseFoldAnalyzer {
         Ok(())
     }
 
-    fn undo_loop_by_unrolling(&mut self, body: &Circuit, iterations: u64) -> AnalysisResult<()> {
+    fn undo_loop_by_unrolling(&mut self, body: &'c Circuit, iterations: u64) -> AnalysisResult<()> {
         for _ in 0..iterations {
             self.undo_circuit(body)?;
         }

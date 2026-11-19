@@ -3,7 +3,10 @@ use stab_model::{DemTarget, Pauli, QubitId};
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
-use super::{Anticommutation, SparseReverseFrameTracker, TrackerBasis, TrackerLocation};
+use super::{
+    Anticommutation, AnticommutationPolicy, SparseReverseFrameTracker, TrackerBasis,
+    TrackerLocation,
+};
 
 impl SparseReverseFrameTracker {
     pub(crate) fn new_for_error_analysis(
@@ -16,7 +19,11 @@ impl SparseReverseFrameTracker {
             qubit_count,
             measurement_count,
             detector_count,
-            !allow_gauge_detectors,
+            if allow_gauge_detectors {
+                AnticommutationPolicy::Record
+            } else {
+                AnticommutationPolicy::Fail
+            },
         );
         tracker.error_analysis_mode = true;
         tracker.eliminate_detector_gauges = allow_gauge_detectors;
@@ -104,7 +111,9 @@ impl SparseReverseFrameTracker {
             self.sync_live_bytes();
             return Ok(());
         }
-        if self.fail_on_anticommute || self.eliminate_detector_gauges {
+        if self.anticommutation_policy == AnticommutationPolicy::Fail
+            || self.eliminate_detector_gauges
+        {
             if self.error_analysis_mode {
                 // Vendor check_for_gauge (error_analyzer.cc:408-437): gauge
                 // observables are never eliminated even with gauge detectors

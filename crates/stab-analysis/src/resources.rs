@@ -365,6 +365,11 @@ impl ResourceLimitError {
         "resource-limit-exceeded"
     }
 
+    /// Whether this refusal is a caller-selected memory budget rather than a fixed limit.
+    pub(crate) const fn is_memory_budget(self) -> bool {
+        matches!(self.cause, ResourceLimitCause::MemoryBudget { .. })
+    }
+
     pub const fn operation(self) -> ResourceOperation {
         match self.cause {
             ResourceLimitCause::MemoryBudget { operation, .. } => operation,

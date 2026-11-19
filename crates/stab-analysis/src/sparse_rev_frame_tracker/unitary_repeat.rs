@@ -5,7 +5,9 @@ use stab_model::{
 };
 
 use super::budget::slot_transform_bytes;
-use super::{SparseReverseFrameTracker, TargetXorSet, qubit_index, replace_qubit_set};
+use super::{
+    AnticommutationPolicy, SparseReverseFrameTracker, TargetXorSet, qubit_index, replace_qubit_set,
+};
 use crate::{AnalysisError, AnalysisResult, gate_has_tableau, single_qubit_clifford_for_gate};
 
 /// One supported unitary repeat being folded into a qubit-slot transform.
@@ -43,7 +45,8 @@ impl<'a> UnitaryFold<'a> {
         })?;
         // Every seeded slot holds one target and one map entry.
         parent.check_live_budget_with_extra(super::budget::seeded_slot_bytes(slot_count))?;
-        let mut basis = SparseReverseFrameTracker::new(parent.qubit_count, 0, 0, true);
+        let mut basis =
+            SparseReverseFrameTracker::new(parent.qubit_count, 0, 0, AnticommutationPolicy::Fail);
         basis.cancellation = parent.cancellation.clone();
         basis.meter.policy = parent.meter.policy;
         basis.meter.base_bytes = parent.meter.base_bytes;
@@ -467,7 +470,8 @@ mod tests {
     }
 
     fn tracker_from_pauli_text(text: &str) -> SparseReverseFrameTracker {
-        let mut tracker = SparseReverseFrameTracker::new(text.len(), 0, 0, true);
+        let mut tracker =
+            SparseReverseFrameTracker::new(text.len(), 0, 0, AnticommutationPolicy::Fail);
         let sensitivity = [DemTarget::logical_observable(0).unwrap()];
         for (index, character) in text.chars().enumerate() {
             let qubit = QubitId::new(u32::try_from(index).unwrap()).unwrap();
@@ -706,7 +710,12 @@ mod tests {
         const HIGH_QUBIT: u32 = 65_535;
         let repeat = repeat("REPEAT 1000001 {\n    H 0\n}\n");
         let target = DemTarget::logical_observable(0).unwrap();
-        let mut tracker = SparseReverseFrameTracker::new(HIGH_QUBIT as usize + 1, 0, 0, true);
+        let mut tracker = SparseReverseFrameTracker::new(
+            HIGH_QUBIT as usize + 1,
+            0,
+            0,
+            AnticommutationPolicy::Fail,
+        );
         tracker
             .toggle_xs(QubitId::new(HIGH_QUBIT).unwrap(), &[target])
             .unwrap();
@@ -731,7 +740,12 @@ mod tests {
         const HIGH_QUBIT: u32 = 65_535;
         let repeat = repeat(&format!("REPEAT 1000001 {{\n    H {HIGH_QUBIT}\n}}\n"));
         let target = DemTarget::logical_observable(0).unwrap();
-        let mut tracker = SparseReverseFrameTracker::new(HIGH_QUBIT as usize + 1, 0, 0, true);
+        let mut tracker = SparseReverseFrameTracker::new(
+            HIGH_QUBIT as usize + 1,
+            0,
+            0,
+            AnticommutationPolicy::Fail,
+        );
         tracker
             .toggle_xs(QubitId::new(HIGH_QUBIT).unwrap(), &[target])
             .unwrap();
@@ -753,7 +767,7 @@ mod tests {
 
     #[test]
     fn unitary_repeat_folding_declines_non_unitary_and_unsupported_gates() {
-        let mut tracker = SparseReverseFrameTracker::new(2, 0, 0, true);
+        let mut tracker = SparseReverseFrameTracker::new(2, 0, 0, AnticommutationPolicy::Fail);
         assert!(
             !try_undo_supported_unitary_repeat(
                 &mut tracker,
