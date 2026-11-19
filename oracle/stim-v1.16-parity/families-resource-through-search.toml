@@ -86,12 +86,12 @@ name = "circuit_to_dem::reverse_fold::tests::analyzer_output_is_admitted_against
 [[families]]
 id = "resource-safety.cli-file-hardlink-identities"
 area = "resource-safety"
-contract = "Explicit CLI input and output aliases through hardlinks are rejected before truncation across every active file-role pairing."
+contract = "Explicit CLI input and output aliases through hardlinks are rejected before truncation across every active file-role pairing on a regular file."
 stim_refs = ["src/stim/cmd/command_sample.test.cc"]
 status = "divergence"
 owner = "stab-cli"
 divergence_kind = "stab-extension"
-rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing. Roles that share a device or FIFO such as /dev/null cannot truncate one another and are accepted, as Stim accepts them."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -102,12 +102,12 @@ name = "tests::io_roles::hardlink_file_role_aliases_fail_without_truncation"
 [[families]]
 id = "resource-safety.cli-file-lexical-identities"
 area = "resource-safety"
-contract = "Explicit CLI input and output aliases using the same lexical path are rejected before truncation across every active file-role pairing."
+contract = "Explicit CLI input and output aliases using the same lexical path are rejected before truncation across every active file-role pairing on a regular file."
 stim_refs = ["src/stim/cmd/command_sample.test.cc"]
 status = "divergence"
 owner = "stab-cli"
 divergence_kind = "stab-extension"
-rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing. Roles that share a device or FIFO such as /dev/null cannot truncate one another and are accepted, as Stim accepts them."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -118,12 +118,12 @@ name = "tests::io_roles::explicit_direct_file_role_aliases_fail_without_truncati
 [[families]]
 id = "resource-safety.cli-file-normalized-identities"
 area = "resource-safety"
-contract = "Explicit CLI input and output aliases using normalized relative paths are rejected before truncation across every active file-role pairing."
+contract = "Explicit CLI input and output aliases using normalized relative paths are rejected before truncation across every active file-role pairing on a regular file."
 stim_refs = ["src/stim/cmd/command_sample.test.cc"]
 status = "divergence"
 owner = "stab-cli"
 divergence_kind = "stab-extension"
-rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing. Roles that share a device or FIFO such as /dev/null cannot truncate one another and are accepted, as Stim accepts them."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -134,12 +134,12 @@ name = "tests::io_roles::normalized_relative_file_role_aliases_fail_without_trun
 [[families]]
 id = "resource-safety.cli-file-symlink-identities"
 area = "resource-safety"
-contract = "Explicit CLI input and output aliases through symlinks are rejected before truncation across every active file-role pairing."
+contract = "Explicit CLI input and output aliases through symlinks are rejected before truncation across every active file-role pairing on a regular file."
 stim_refs = ["src/stim/cmd/command_sample.test.cc"]
 status = "divergence"
 owner = "stab-cli"
 divergence_kind = "stab-extension"
-rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing."
+rationale = "Stab adds command-wide same-file protection to prevent destructive explicit path aliasing. Roles that share a device or FIFO such as /dev/null cannot truncate one another and are accepted, as Stim accepts them."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -419,6 +419,23 @@ target = "resource_contracts"
 name = "packed_streaming_allocations_follow_width_not_record_count"
 
 [[families]]
+id = "resource-safety.sample-dem-replay-rewind"
+area = "resource-safety"
+contract = "sample_dem replays a non-seekable --replay_err_in when the memory budget retains every record, and otherwise refuses it before any output file is created."
+stim_refs = ["src/stim/cmd/command_sample_dem.cc"]
+status = "divergence"
+owner = "stab-cli"
+divergence_kind = "resource-limit"
+rationale = "Stim streams the replay and can leave partial output when a late record is malformed. Stab validates the whole replay before the first output byte, so records the memory budget cannot retain are decoded a second time, which needs a rewind; a pipe is accepted whenever no second pass is needed."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-cli"
+kind = "test"
+target = "process_io"
+name = "piped_replay_input_the_budget_cannot_retain_fails_before_creating_outputs"
+
+[[families]]
 id = "resource-safety.sampling-memory-budget"
 area = "resource-safety"
 contract = "Circuit sampling admits its compiled program, session storage, and reference-simulator scratch against the caller's memory budget, admits the exact budget, and refuses the first excess byte before RNG or sink use; expanded work is not capped."
@@ -497,7 +514,7 @@ coverage = ["route:convert-observable-output/ptb64"]
 status = "divergence"
 owner = "stab-cli"
 divergence_kind = "stim-bug"
-rationale = "Pinned Stim advertises PTB64 observable output but rejects it as incompatible with SingleMeasurementRecord; Stab implements the documented grouped encoding."
+rationale = "Pinned Stim advertises PTB64 observable output but rejects it as incompatible with SingleMeasurementRecord; Stab implements the documented grouped encoding. Conversion streams, so the complete groups before a trailing partial group are already written when that group is refused."
 [families.evidence]
 status = "verified"
 [families.evidence.test]
@@ -519,7 +536,7 @@ coverage = ["route:convert-output/ptb64"]
 status = "divergence"
 owner = "stab-cli"
 divergence_kind = "stim-bug"
-rationale = "Pinned Stim advertises PTB64 primary output but rejects it as incompatible with SingleMeasurementRecord; Stab implements the documented grouped encoding."
+rationale = "Pinned Stim advertises PTB64 primary output but rejects it as incompatible with SingleMeasurementRecord; Stab implements the documented grouped encoding. Conversion streams, so the complete groups before a trailing partial group are already written when that group is refused."
 [families.evidence]
 status = "verified"
 [families.evidence.test]

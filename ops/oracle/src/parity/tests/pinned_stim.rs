@@ -435,3 +435,35 @@ fn run_pinned_stim_circuit_probe(name: &str, source: &[u8]) {
         result.stderr.render_for_diagnostics()
     );
 }
+
+#[test]
+#[ignore = "builds and executes the pinned Stim CLI"]
+fn pinned_stim_decomposition_drops_terms_from_components_past_32_terms() {
+    let root = RepoRoot::resolve(
+        &Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("workspace root"),
+    )
+    .expect("repository root");
+    let stim = ensure_stim_binary(&root, false).expect("pinned Stim binary");
+    // One gauge error flips detectors D1 through D33, so its decomposition has 33 components.
+    let circuit = b"M 2\nMRX(0.125) 0\nREPEAT 34 {\n    DETECTOR rec[-1] rec[-2]\n    MY 0\n    MRX(0.003) 1\n}\n";
+    let args = [
+        "analyze_errors",
+        "--allow_gauge_detectors",
+        "--decompose_errors",
+    ]
+    .into_iter()
+    .map(OsString::from)
+    .collect::<Vec<_>>();
+    let output = run_process(&stim, &args, circuit, &root.path).expect("execute reproduction");
+    assert!(output.success());
+    let stdout = String::from_utf8_lossy(&output.stdout.bytes);
+    let widest = stdout
+        .lines()
+        .find(|line| line.starts_with("error(0.5) D1 ^ D2 "))
+        .expect("the 33-detector gauge error");
+    assert!(widest.ends_with("^ D31 ^ D32"), "{widest}");
+    assert!(!widest.contains("D33"), "{widest}");
+}

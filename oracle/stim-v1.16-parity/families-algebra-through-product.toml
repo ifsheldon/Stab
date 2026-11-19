@@ -135,6 +135,28 @@ target = "consolidation_matrix"
 name = "circuit_to_dem_error_decomposition_contract_matches_stim"
 
 [[families]]
+id = "analysis.circuit-to-dem-error-decomposition-past-32-terms"
+area = "analysis"
+contract = "Circuit-to-DEM decomposition of an error with 32 to 63 components keeps every component, so the printed components combine back to the undecomposed error."
+stim_refs = ["src/stim/simulators/error_analyzer.cc"]
+status = "divergence"
+owner = "stab-analysis"
+divergence_kind = "stim-bug"
+rationale = "Pinned Stim's brute_force_decomp_helper builds its used-term mask by shifting a plain int, so from the 32nd component on the mask is wrong and components are dropped from the printed error. Stab's mask is 64 bits wide; both refuse 64 or more components."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-analysis"
+kind = "test"
+target = "dem_decomposition_invariants"
+name = "decomposition_of_components_past_32_terms_preserves_every_term"
+[families.evidence.stim_reproduction]
+package = "stab-oracle"
+kind = "bin"
+target = "stab-oracle"
+name = "parity::tests::pinned_stim::pinned_stim_decomposition_drops_terms_from_components_past_32_terms"
+
+[[families]]
 id = "analysis.circuit-to-dem-feedback-record-lookback"
 area = "analysis"
 contract = "Circuit-to-DEM analysis rejects a classically controlled Pauli whose measurement-record control looks back before the first measurement, in both fold modes, while accepting lookbacks that reach an earlier measurement."

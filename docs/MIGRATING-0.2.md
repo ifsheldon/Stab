@@ -265,6 +265,20 @@ The CLI's `sample`, `detect`, and `m2d` admit their record encoders' scratch and
 `convert` charges the 64 KiB write buffer of each named `--out` and `--obs_out` file as well: record conversions add it to the record-conversion storage they already admit, and a circuit-to-circuit conversion admits it beside the parsed circuit and reports the output-storage diagnostic, so a budget within 64 KiB per named file of the old minimum is now refused before any output file is activated.
 `stab_bits::BitMatrix::zeros_chunked` and `stab_records::PackedShotBatch::zeros_chunked` build the same storage as `zeros` in bounded chunks, calling a fallible callback before each chunk, and creating a streaming sampling or detection run now polls the plan's cancellation signal while zeroing its records and can return the existing `Cancelled` error.
 
+## Feedback Inlining, Replay Input, And Budget Corrections
+
+`stab_analysis::circuit_with_inlined_feedback` and `circuit_with_inlined_feedback_with_limits` refuse a circuit in which a reset or measurement randomizes a detector or observable, as Stim's `with_inlined_feedback` does; earlier builds returned a circuit that kept the undefined detector, and `m2d --ran_without_feedback` now exits 1 on such a circuit.
+Circuit-to-DEM analysis charges the reverse tracker's growth against the bytes the analyzer already holds for its output and accumulated errors, so a circuit near the memory budget is refused when the growth is requested instead of at the end of the instruction, and some circuits that completed only because of that late check are now refused.
+`analyze_errors --fold_loops` unrolls a repeat when the period search's two extra tracker copies do not fit the budget instead of refusing, so folding never needs a larger budget than not folding.
+Circuit-to-DEM analysis no longer counts the circuit's ticks, so a circuit with more than `u64::MAX` ticks is analyzed, as Stim analyzes it, instead of being refused with a count overflow.
+`sample_dem --replay_err_in` accepts a pipe or other non-seekable input whenever the memory budget retains every replay record, and otherwise fails before creating any output with the new `replay-input-not-rewindable` diagnostic, where earlier builds failed on every non-seekable input with a bare seek error.
+Two file roles may name the same device or FIFO, such as `--out /dev/null --obs_out /dev/null`; the same-file refusal now applies only to regular files.
+`m2d` admits the batches of its measurement and `--sweep` readers before opening any output and reads in smaller batches when the full 256-record batch does not fit, and `analyze_errors` admits the 64 KiB buffer of a named `--out` file, so a budget too small for one-record reader batches, or within 64 KiB of the old `analyze_errors` minimum, is now refused.
+A `CliffordString` is charged its six packed planes and nothing else: `identity_with_budget`, `random_with_budget`, `from_gates_with_budget`, `concat_with_budget`, and `repeat_with_budget` no longer add one byte per gate, so they accept a budget smaller by the string's length, and concatenation and repetition build the result in that storage with fallible reservations only.
+`stab_algebra::Flow::set_input_term` replaces one input term in place.
+Creating a measurement-to-detection session with sweep correction polls the plan's cancellation signal while zeroing its planes and can return the existing `Cancelled` error.
+A `sample_dem` replay session sizes its planes for one 64-record batch instead of 1,024 shots, so a replay needs less of the budget and retains more records under the same budget.
+
 ## DEM Sampled-Error Streams
 
 Seeded `sample_dem` detector and observable output no longer depends on `--err_out`. A run that records sampled errors, through `--err_out` or `DemSamplingSession::run_with_sampled_errors`, now draws exactly the random streams of a run that does not, so its detector and observable records are byte-identical to the plain seeded run, and replaying its sampled-error file with `--replay_err_in` reproduces them. Pinned Stim's detector output is likewise independent of the flag.
