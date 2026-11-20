@@ -268,7 +268,7 @@ name = "circuit_flow_generators_admit_owned_rows_and_report_typed_limits"
 [[families]]
 id = "resource-safety.generation-memory-budget"
 area = "resource-safety"
-contract = "Built-in circuit generation admits its projected size, 2048 bytes per physical qubit, against the caller's memory budget before materialization and writes nothing when refused."
+contract = "Built-in circuit generation admits its projected size, one mebibyte plus 768 bytes per physical qubit, against the caller's memory budget before materialization and writes nothing when refused."
 stim_refs = ["src/stim/gen/gen_rep_code.test.cc", "src/stim/gen/gen_surface_code.test.cc", "src/stim/gen/gen_color_code.test.cc"]
 status = "divergence"
 owner = "stab-analysis"

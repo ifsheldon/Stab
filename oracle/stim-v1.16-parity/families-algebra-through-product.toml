@@ -4,7 +4,7 @@ area = "algebra"
 contract = "Array, state-vector, and arbitrary-unitary conversion products include Python or NumPy interchange and tableau-to-unitary export."
 stim_refs = ["doc/stim.pyi", "src/stim/stabilizers/tableau.pybind.cc", "src/stim/simulators/vector_simulator.h"]
 status = "deferred"
-rationale = "Python or NumPy interchange, state-vector products, arbitrary-unitary import or export, and tableau_to_unitary are outside the selected Rust product; the bounded Rust unitary_to_tableau subset keeps its own semantic owner."
+rationale = "Python or NumPy interchange, state-vector products, arbitrary-unitary import or export, and tableau_to_unitary are outside the selected Rust product; the bounded Rust Tableau::from_unitary subset keeps its own semantic owner."
 
 [[families]]
 id = "algebra.clifford-values"
@@ -103,6 +103,23 @@ package = "stab-algebra"
 kind = "test"
 target = "lean_parity_contracts"
 name = "tableaux_preserve_generators_composition_inversion_and_actions"
+
+[[families]]
+id = "algebra.unitary-to-tableau-acceptance"
+area = "algebra"
+contract = "Unitary-to-tableau conversion snaps entries with Stim's threshold relative to the largest first-column entry, verifies every column exactly against the identified Clifford, and refuses a matrix whose columns are not unit length."
+stim_refs = ["src/stim/util_top/stabilizers_vs_amplitudes.inl"]
+status = "divergence"
+owner = "stab-algebra"
+divergence_kind = "stab-extension"
+rationale = "Pinned Stim has no unitarity check, so it accepts a scaled matrix such as 2*I as the identity. By design Stab keeps a column-norm check and reports such a matrix as not unitary; near-Clifford snapping otherwise follows Stim, so RX(0.3) is accepted and RX(0.35) is refused by both."
+[families.evidence]
+status = "verified"
+[families.evidence.test]
+package = "stab-algebra"
+kind = "lib"
+target = "stab_algebra"
+name = "unitary::tests::hostile_entries_are_reported_as_not_unitary"
 
 [[families]]
 id = "analysis.circuit-to-dem-common-generated-qec"
