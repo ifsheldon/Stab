@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+use stab_bits::{BitError, BitVec};
+
 use super::{StabilizerError, StabilizerResult};
 
 const GIB: u64 = 1 << 30;
@@ -112,6 +114,36 @@ pub(crate) fn pauli_rows_bytes(rows: u128, num_qubits: usize) -> u128 {
 /// Bytes of an `num_qubits`-qubit Tableau: `2n` packed signed rows.
 pub(crate) fn tableau_bytes(num_qubits: usize) -> u128 {
     pauli_rows_bytes(2 * num_qubits as u128, num_qubits)
+}
+
+/// Builds a zeroed `bits`-bit vector with fallibly reserved words, reporting allocation failure
+/// against `resource`.
+pub(crate) fn try_zeroed_bits(
+    resource: StabilizerResource,
+    bits: usize,
+) -> StabilizerResult<BitVec> {
+    BitVec::try_zeros(bits).map_err(|error| bit_allocation_failed(resource, error))
+}
+
+/// Resizes `bits` to `len` bits, zero-filling any new words, which are reserved fallibly.
+pub(crate) fn try_resize_zeroed_bits(
+    resource: StabilizerResource,
+    bits: &mut BitVec,
+    len: usize,
+) -> StabilizerResult<()> {
+    bits.try_resize_zeros(len)
+        .map_err(|error| bit_allocation_failed(resource, error))
+}
+
+/// Reports a `stab-bits` storage failure as an allocation failure of `resource`, keeping any other
+/// bit error.
+fn bit_allocation_failed(resource: StabilizerResource, error: BitError) -> StabilizerError {
+    match error {
+        BitError::StorageAllocationFailed { words } => {
+            allocation_failed(resource, words.saturating_mul(size_of::<u64>()))
+        }
+        other => StabilizerError::Bit(other),
+    }
 }
 
 /// Reserves exactly `len` zeroed words, reporting allocation failure as a typed error.

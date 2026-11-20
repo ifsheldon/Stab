@@ -10,9 +10,9 @@ use rand::rngs::StdRng;
 use rand::{Rng as _, SeedableRng as _};
 use stab_algebra::{
     AlgebraMemoryBudget, CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow,
-    PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,
-    StabilizerError, StabilizerResource, StabilizerResult, Tableau, TableauIterator,
-    stabilizers_to_tableau_with_budget,
+    PauliBasis, PauliIterationBases, PauliPhase, PauliSign, PauliString, PauliStringIterator,
+    SignIteration, SingleQubitClifford, StabilizerError, StabilizerResource, StabilizerResult,
+    StabilizerTableauOptions, Tableau, TableauIterator,
 };
 
 #[test]
@@ -200,17 +200,25 @@ fn stabilizer_solver_admission_is_exact_and_precedes_allocation() {
         .collect::<Vec<_>>();
     for inverse in [false, true] {
         assert_exact_boundary(StabilizerResource::StabilizerSolve, |budget| {
-            stabilizers_to_tableau_with_budget(&stabilizers, false, false, inverse, budget)
+            Tableau::from_stabilizers_with_budget(
+                &stabilizers,
+                StabilizerTableauOptions {
+                    inverse,
+                    ..StabilizerTableauOptions::default()
+                },
+                budget,
+            )
         });
     }
     // A single compact stabilizer cannot request an unbounded underconstrained completion.
     let wide = PauliString::identity(100_000).expect("wide stabilizer");
     refused_bytes(
-        stabilizers_to_tableau_with_budget(
+        Tableau::from_stabilizers_with_budget(
             std::slice::from_ref(&wide),
-            false,
-            true,
-            false,
+            StabilizerTableauOptions {
+                allow_underconstrained: true,
+                ..StabilizerTableauOptions::default()
+            },
             AlgebraMemoryBudget::DEFAULT,
         ),
         StabilizerResource::StabilizerSolve,
@@ -228,7 +236,7 @@ fn iterator_widths_keep_their_representation_invariants() {
         Some(StabilizerError::InvalidCommutingPauliIteratorQubitCount { num_qubits: 64 })
     );
     assert_eq!(
-        TableauIterator::new(64, false).err(),
+        TableauIterator::new(64, SignIteration::Unsigned).err(),
         Some(StabilizerError::InvalidTableauIteratorQubitCount { num_qubits: 64 })
     );
 }
@@ -311,7 +319,7 @@ fn caller_budgets_govern_requested_string_widths() {
     });
     assert_eq!(
         assert_exact_boundary(StabilizerResource::PauliString, |budget| {
-            PauliStringIterator::new_with_budget(n, 1, 1, true, true, true, budget)
+            PauliStringIterator::new_with_budget(n, 1..=1, PauliIterationBases::ALL, budget)
         }),
         pauli + width * (size_of::<usize>() + size_of::<PauliBasis>()) as u64
     );

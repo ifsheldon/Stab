@@ -503,30 +503,33 @@ impl Tableau {
         result.to_pauli(0)
     }
 
-    pub fn x_output_pauli_xyz(
+    /// The basis of the image of `X_input_index` on qubit `output_index`, ignoring its sign.
+    pub fn x_output_basis(
         &self,
         input_index: usize,
         output_index: usize,
-    ) -> StabilizerResult<u8> {
-        self.output_pauli_xyz(self.x_row(input_index)?, output_index)
+    ) -> StabilizerResult<PauliBasis> {
+        self.output_basis(self.x_row(input_index)?, output_index)
     }
 
-    pub fn y_output_pauli_xyz(
+    /// The basis of the image of `Y_input_index` on qubit `output_index`, ignoring its sign.
+    pub fn y_output_basis(
         &self,
         input_index: usize,
         output_index: usize,
-    ) -> StabilizerResult<u8> {
+    ) -> StabilizerResult<PauliBasis> {
         let x = self.output_bits(self.x_row(input_index)?, output_index)?;
         let z = self.output_bits(self.z_row(input_index)?, output_index)?;
-        Ok(pauli_xyz(PauliBasis::from_xz(x.0 ^ z.0, x.1 ^ z.1)))
+        Ok(PauliBasis::from_xz(x.0 ^ z.0, x.1 ^ z.1))
     }
 
-    pub fn z_output_pauli_xyz(
+    /// The basis of the image of `Z_input_index` on qubit `output_index`, ignoring its sign.
+    pub fn z_output_basis(
         &self,
         input_index: usize,
         output_index: usize,
-    ) -> StabilizerResult<u8> {
-        self.output_pauli_xyz(self.z_row(input_index)?, output_index)
+    ) -> StabilizerResult<PauliBasis> {
+        self.output_basis(self.z_row(input_index)?, output_index)
     }
 
     /// Checks the canonical symplectic commutation relations in `O(n^3 / 64)` word operations.
@@ -592,9 +595,9 @@ impl Tableau {
         self.rows.bits(row, output_index)
     }
 
-    fn output_pauli_xyz(&self, row: usize, output_index: usize) -> StabilizerResult<u8> {
+    fn output_basis(&self, row: usize, output_index: usize) -> StabilizerResult<PauliBasis> {
         let (x, z) = self.output_bits(row, output_index)?;
-        Ok(pauli_xyz(PauliBasis::from_xz(x, z)))
+        Ok(PauliBasis::from_xz(x, z))
     }
 }
 
@@ -740,15 +743,6 @@ fn validate_tableau_targets(
         }
     }
     Ok(())
-}
-
-pub(crate) fn pauli_xyz(basis: PauliBasis) -> u8 {
-    match basis {
-        PauliBasis::I => 0,
-        PauliBasis::X => 1,
-        PauliBasis::Y => 2,
-        PauliBasis::Z => 3,
-    }
 }
 
 fn sign_from_bit(negative: bool) -> PauliSign {

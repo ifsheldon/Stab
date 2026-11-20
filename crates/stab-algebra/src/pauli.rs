@@ -3,206 +3,18 @@ use std::str::FromStr;
 
 use rand::{Rng, RngExt as _};
 
-use super::{StabilizerError, StabilizerResource, StabilizerResult};
-use crate::budget::{AlgebraMemoryBudget, pauli_bytes, try_reserve_one, try_zeroed_words};
-use crate::kernels::pauli_right_multiply_words;
+use super::{StabilizerError, StabilizerResource, StabilizerResult, TextExcerpt};
+use crate::budget::{
+    AlgebraMemoryBudget, pauli_bytes, try_reserve_one, try_resize_zeroed_bits, try_zeroed_bits,
+};
+use crate::kernels::{PauliPlanes, PauliPlanesMut, pauli_right_multiply_words};
 use stab_bits::{BitError, BitVec};
 
+mod scalars;
+
+pub use scalars::{PauliBasis, PauliPhase, PauliSign};
+
 const WORD_BITS: usize = 64;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PauliSign {
-    Plus,
-    Minus,
-}
-
-impl PauliSign {
-    pub fn is_negative(self) -> bool {
-        matches!(self, Self::Minus)
-    }
-
-    pub(crate) fn to_phase(self) -> PauliPhase {
-        match self {
-            Self::Plus => PauliPhase::Plus,
-            Self::Minus => PauliPhase::Minus,
-        }
-    }
-
-    fn flipped(self) -> Self {
-        match self {
-            Self::Plus => Self::Minus,
-            Self::Minus => Self::Plus,
-        }
-    }
-}
-
-impl Display for PauliSign {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Plus => f.write_str("+"),
-            Self::Minus => f.write_str("-"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PauliPhase {
-    Plus,
-    PlusI,
-    Minus,
-    MinusI,
-}
-
-impl PauliPhase {
-    pub fn is_real(self) -> bool {
-        matches!(self, Self::Plus | Self::Minus)
-    }
-
-    pub fn is_imaginary(self) -> bool {
-        !self.is_real()
-    }
-
-    pub fn is_negative(self) -> bool {
-        matches!(self, Self::Minus | Self::MinusI)
-    }
-
-    pub fn sign(self) -> PauliSign {
-        match self {
-            Self::Plus | Self::PlusI => PauliSign::Plus,
-            Self::Minus | Self::MinusI => PauliSign::Minus,
-        }
-    }
-
-    pub(crate) fn from_sign_and_imaginary(sign: PauliSign, imaginary: bool) -> Self {
-        match (sign, imaginary) {
-            (PauliSign::Plus, false) => Self::Plus,
-            (PauliSign::Plus, true) => Self::PlusI,
-            (PauliSign::Minus, false) => Self::Minus,
-            (PauliSign::Minus, true) => Self::MinusI,
-        }
-    }
-
-    fn exponent(self) -> u8 {
-        match self {
-            Self::Plus => 0,
-            Self::PlusI => 1,
-            Self::Minus => 2,
-            Self::MinusI => 3,
-        }
-    }
-
-    pub(crate) fn from_exponent(exponent: u8) -> Self {
-        match exponent & 3 {
-            0 => Self::Plus,
-            1 => Self::PlusI,
-            2 => Self::Minus,
-            _ => Self::MinusI,
-        }
-    }
-
-    /// Multiplies two Pauli phases.
-    pub fn multiply(self, rhs: Self) -> Self {
-        Self::from_exponent(self.exponent().wrapping_add(rhs.exponent()))
-    }
-}
-
-impl Display for PauliPhase {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Plus => f.write_str("+"),
-            Self::PlusI => f.write_str("+i"),
-            Self::Minus => f.write_str("-"),
-            Self::MinusI => f.write_str("-i"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PauliBasis {
-    I,
-    X,
-    Y,
-    Z,
-}
-
-impl PauliBasis {
-    pub fn from_xz(x: bool, z: bool) -> Self {
-        match (x, z) {
-            (false, false) => Self::I,
-            (true, false) => Self::X,
-            (true, true) => Self::Y,
-            (false, true) => Self::Z,
-        }
-    }
-
-    pub fn x_bit(self) -> bool {
-        matches!(self, Self::X | Self::Y)
-    }
-
-    pub fn z_bit(self) -> bool {
-        matches!(self, Self::Y | Self::Z)
-    }
-
-    pub fn log_i_scalar_byproduct(self, rhs: Self) -> u8 {
-        match (self, rhs) {
-            (Self::X, Self::Y) | (Self::Y, Self::Z) | (Self::Z, Self::X) => 1,
-            (Self::X, Self::Z) | (Self::Y, Self::X) | (Self::Z, Self::Y) => 3,
-            _ => 0,
-        }
-    }
-
-    pub fn multiply(self, rhs: Self) -> (Self, PauliPhase) {
-        let basis = Self::from_xz(self.x_bit() ^ rhs.x_bit(), self.z_bit() ^ rhs.z_bit());
-        let phase = PauliPhase::from_exponent(self.log_i_scalar_byproduct(rhs));
-        (basis, phase)
-    }
-
-    fn from_dense_char(
-        character: char,
-        offset: usize,
-        allow_lowercase: bool,
-    ) -> StabilizerResult<Self> {
-        match character {
-            'I' | '_' => Ok(Self::I),
-            'X' => Ok(Self::X),
-            'Y' => Ok(Self::Y),
-            'Z' => Ok(Self::Z),
-            'x' if allow_lowercase => Ok(Self::X),
-            'y' if allow_lowercase => Ok(Self::Y),
-            'z' if allow_lowercase => Ok(Self::Z),
-            _ => Err(StabilizerError::InvalidPauliCharacter { character, offset }),
-        }
-    }
-
-    fn dense_char(self) -> char {
-        match self {
-            Self::I => '_',
-            Self::X => 'X',
-            Self::Y => 'Y',
-            Self::Z => 'Z',
-        }
-    }
-
-    fn sparse_char(self) -> Option<char> {
-        match self {
-            Self::I => None,
-            Self::X => Some('X'),
-            Self::Y => Some('Y'),
-            Self::Z => Some('Z'),
-        }
-    }
-}
-
-impl Display for PauliBasis {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::I => f.write_str("_"),
-            Self::X => f.write_str("X"),
-            Self::Y => f.write_str("Y"),
-            Self::Z => f.write_str("Z"),
-        }
-    }
-}
 
 /// What a Pauli string knows about whether any of its terms is not the identity.
 ///
@@ -269,22 +81,21 @@ impl PauliString {
         budget: AlgebraMemoryBudget,
     ) -> StabilizerResult<Self> {
         budget.admit(StabilizerResource::PauliString, pauli_bytes(num_qubits))?;
-        let words = num_qubits.div_ceil(WORD_BITS);
+        Self::try_identity_admitted(num_qubits)
+    }
+
+    /// Creates an all-identity string after the caller has admitted its two packed planes,
+    /// reserving them fallibly.
+    pub(crate) fn try_identity_admitted(num_qubits: usize) -> StabilizerResult<Self> {
         Ok(Self {
             sign: PauliSign::Plus,
-            xs: BitVec::from_words_truncated(
-                num_qubits,
-                try_zeroed_words(StabilizerResource::PauliString, words)?,
-            ),
-            zs: BitVec::from_words_truncated(
-                num_qubits,
-                try_zeroed_words(StabilizerResource::PauliString, words)?,
-            ),
+            xs: try_zeroed_bits(StabilizerResource::PauliString, num_qubits)?,
+            zs: try_zeroed_bits(StabilizerResource::PauliString, num_qubits)?,
             terms: TermPresence::Absent,
         })
     }
 
-    pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
+    pub(crate) fn identity_unbudgeted(num_qubits: usize) -> Self {
         Self {
             sign: PauliSign::Plus,
             xs: BitVec::zeros(num_qubits),
@@ -348,37 +159,48 @@ impl PauliString {
             try_reserve_one(StabilizerResource::PauliString, &mut collected)?;
             collected.push(basis);
         }
-        Ok(Self::from_bases_unchecked(sign, collected))
+        let xs = try_zeroed_bits(StabilizerResource::PauliString, collected.len())?;
+        let zs = try_zeroed_bits(StabilizerResource::PauliString, collected.len())?;
+        Ok(Self::pack_bases(sign, &collected, xs, zs))
     }
 
-    pub(crate) fn from_bases_unchecked(
+    /// Builds a string from `bases` without a budget admission; the caller has already admitted
+    /// their two packed planes.
+    pub(crate) fn from_bases_unbudgeted(
         sign: PauliSign,
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> Self {
         let bases = bases.into_iter().collect::<Vec<_>>();
-        let mut x_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
-        let mut z_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
+        let len = bases.len();
+        Self::pack_bases(sign, &bases, BitVec::zeros(len), BitVec::zeros(len))
+    }
+
+    /// Writes `bases` into the zeroed planes `xs` and `zs`, which hold `bases.len()` bits each.
+    fn pack_bases(sign: PauliSign, bases: &[PauliBasis], mut xs: BitVec, mut zs: BitVec) -> Self {
         let mut has_terms = false;
-        for (index, basis) in bases.iter().copied().enumerate() {
-            has_terms |= basis != PauliBasis::I;
-            let word = index / WORD_BITS;
-            let bit = index % WORD_BITS;
-            let mask = 1_u64 << bit;
-            if basis.x_bit()
-                && let Some(word) = x_words.get_mut(word)
-            {
-                *word |= mask;
-            }
-            if basis.z_bit()
-                && let Some(word) = z_words.get_mut(word)
-            {
-                *word |= mask;
+        {
+            let mut x_words = xs.words_mut();
+            let mut z_words = zs.words_mut();
+            for (index, basis) in bases.iter().copied().enumerate() {
+                has_terms |= basis != PauliBasis::I;
+                let word = index / WORD_BITS;
+                let mask = 1_u64 << (index % WORD_BITS);
+                if basis.x_bit()
+                    && let Some(word) = x_words.get_mut(word)
+                {
+                    *word |= mask;
+                }
+                if basis.z_bit()
+                    && let Some(word) = z_words.get_mut(word)
+                {
+                    *word |= mask;
+                }
             }
         }
         Self {
             sign,
-            xs: BitVec::from_words_truncated(bases.len(), x_words),
-            zs: BitVec::from_words_truncated(bases.len(), z_words),
+            xs,
+            zs,
             terms: TermPresence::known(has_terms),
         }
     }
@@ -506,30 +328,32 @@ impl PauliString {
         }
     }
 
-    pub fn intersects(&self, rhs: &Self) -> StabilizerResult<bool> {
-        Ok(self
-            .xs
+    /// Whether some qubit holds a non-identity term in both strings; a shorter string is padded
+    /// with identities.
+    pub fn intersects(&self, rhs: &Self) -> bool {
+        self.xs
             .words()
             .iter()
             .zip(self.zs.words())
             .zip(rhs.xs.words().iter().zip(rhs.zs.words()))
             .any(|((left_x, left_z), (right_x, right_z))| {
                 (left_x | left_z) & (right_x | right_z) != 0
-            }))
+            })
     }
 
-    pub fn commutes(&self, rhs: &Self) -> StabilizerResult<bool> {
-        Ok(self.symplectic_product(rhs) == 0)
+    /// Whether the two strings commute; a shorter string is padded with identities.
+    pub fn commutes(&self, rhs: &Self) -> bool {
+        self.symplectic_product(rhs) == 0
     }
 
-    pub fn log_i_scalar_byproduct(&self, rhs: &Self) -> StabilizerResult<u8> {
-        let mut log_i = 0_u8;
-        for index in 0..self.len().max(rhs.len()) {
+    /// The phase that the termwise products contribute to `self * rhs`, ignoring both signs; a
+    /// shorter string is padded with identities.
+    pub fn log_i_scalar_byproduct(&self, rhs: &Self) -> PauliPhase {
+        (0..self.len().max(rhs.len())).fold(PauliPhase::Plus, |phase, index| {
             let left = self.get_or_identity(index);
             let right = rhs.get_or_identity(index);
-            log_i = log_i.wrapping_add(left.log_i_scalar_byproduct(right));
-        }
-        Ok(log_i & 3)
+            phase.multiply(left.log_i_scalar_byproduct(right))
+        })
     }
 
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<FlexPauliString> {
@@ -543,12 +367,14 @@ impl PauliString {
                 terms: self.terms,
             }
         };
-        let log_i = value.right_multiply_in_place_returning_log_i_scalar(rhs)?;
-        let imaginary = log_i & 1 != 0;
-        if log_i & 2 != 0 {
+        let phase = value.right_multiply_in_place_returning_log_i_scalar(rhs)?;
+        if phase.is_negative() {
             value.sign = value.sign.flipped();
         }
-        Ok(FlexPauliString { value, imaginary })
+        Ok(FlexPauliString {
+            value,
+            imaginary: phase.is_imaginary(),
+        })
     }
 
     pub fn multiply_real(&self, rhs: &Self) -> StabilizerResult<Self> {
@@ -558,18 +384,18 @@ impl PauliString {
 
     /// Right-multiplies `rhs` into this Pauli string and returns the missing scalar byproduct.
     ///
-    /// The X/Z bits and real sign stored in this value are updated in place, except that the
-    /// returned base-`i` exponent still needs to be applied by the caller. For example, a return
-    /// value of `1` means the in-place result must still be multiplied by `i`, and a return value
-    /// of `2` means the caller should apply an additional `-1` scalar.
+    /// The X/Z bits stored in this value are updated in place and its sign is kept; the returned
+    /// phase, which includes `rhs`'s sign, still needs to be applied by the caller. For example,
+    /// [`PauliPhase::PlusI`] means the in-place result must still be multiplied by `i`, and
+    /// [`PauliPhase::Minus`] means the caller should apply an additional `-1` scalar.
     #[inline]
     pub fn right_multiply_in_place_returning_log_i_scalar(
         &mut self,
         rhs: &Self,
-    ) -> StabilizerResult<u8> {
-        self.ensure_len(rhs.len());
+    ) -> StabilizerResult<PauliPhase> {
+        self.ensure_len(rhs.len())?;
         if rhs.has_no_pauli_terms() {
-            return Ok(u8::from(rhs.sign.is_negative()) << 1);
+            return Ok(rhs.sign.to_phase());
         }
 
         let rhs_word_count = rhs.xs.word_count();
@@ -600,11 +426,19 @@ impl PauliString {
                     left: left_len,
                     right: right_len,
                 })?;
-        let product = pauli_right_multiply_words(left_x, left_z, rhs.xs.words(), rhs.zs.words())?;
+        let product = pauli_right_multiply_words(
+            PauliPlanesMut {
+                x: left_x,
+                z: left_z,
+            },
+            PauliPlanes {
+                x: rhs.xs.words(),
+                z: rhs.zs.words(),
+            },
+        )?;
         self.terms = TermPresence::known(trailing_has_terms || product.has_terms);
 
-        let log_i = product.log_i ^ (u8::from(rhs.sign.is_negative()) << 1);
-        Ok(log_i & 3)
+        Ok(PauliPhase::from_log_i(product.log_i).multiply(rhs.sign.to_phase()))
     }
 
     pub fn sparse_string(&self) -> String {
@@ -688,17 +522,26 @@ impl PauliString {
     }
 
     #[inline]
-    fn ensure_len(&mut self, len: usize) {
+    fn ensure_len(&mut self, len: usize) -> StabilizerResult<()> {
         if len <= self.len() {
-            return;
+            return Ok(());
         }
-        self.grow_len(len);
+        self.grow_len(len)
     }
 
+    /// Pads both planes with identities up to `len` qubits, reserving the new words fallibly; on
+    /// failure the string may have its X plane grown but keeps its old length.
     #[cold]
-    fn grow_len(&mut self, len: usize) {
-        self.xs = BitVec::from_words_truncated(len, self.xs.words().to_vec());
-        self.zs = BitVec::from_words_truncated(len, self.zs.words().to_vec());
+    fn grow_len(&mut self, len: usize) -> StabilizerResult<()> {
+        let old_len = self.len();
+        try_resize_zeroed_bits(StabilizerResource::PauliString, &mut self.xs, len)?;
+        if let Err(error) =
+            try_resize_zeroed_bits(StabilizerResource::PauliString, &mut self.zs, len)
+        {
+            self.xs.resize_zeros(old_len);
+            return Err(error);
+        }
+        Ok(())
     }
 
     fn get_or_identity(&self, index: usize) -> PauliBasis {
@@ -856,7 +699,7 @@ impl FlexPauliString {
         if basis == PauliBasis::I {
             return Ok(());
         }
-        self.value.ensure_len(index.saturating_add(1));
+        self.value.ensure_len(index.saturating_add(1))?;
         let old_basis = self.value.get_or_error(index)?;
         let (new_basis, phase) = old_basis.multiply(basis);
         let phase = self.phase().multiply(phase);
@@ -916,7 +759,7 @@ impl FlexPauliString {
                 'I' | 'X' | 'Y' | 'Z' | 'x' | 'y' | 'z' => {
                     if current_basis.is_some() {
                         return Err(StabilizerError::InvalidSparsePauliString {
-                            text: original_text.to_owned(),
+                            excerpt: TextExcerpt::new(original_text),
                         });
                     }
                     current_basis = Some(PauliBasis::from_dense_char(character, 0, true)?);
@@ -924,12 +767,12 @@ impl FlexPauliString {
                 '0'..='9' => {
                     if current_basis.is_none() {
                         return Err(StabilizerError::InvalidSparsePauliString {
-                            text: original_text.to_owned(),
+                            excerpt: TextExcerpt::new(original_text),
                         });
                     }
                     let digit = character.to_digit(10).ok_or_else(|| {
                         StabilizerError::InvalidSparsePauliString {
-                            text: original_text.to_owned(),
+                            excerpt: TextExcerpt::new(original_text),
                         }
                     })?;
                     let next = current_index
@@ -937,13 +780,13 @@ impl FlexPauliString {
                         .checked_mul(10)
                         .and_then(|value| value.checked_add(digit as usize))
                         .ok_or_else(|| StabilizerError::InvalidSparsePauliString {
-                            text: original_text.to_owned(),
+                            excerpt: TextExcerpt::new(original_text),
                         })?;
                     current_index = Some(next);
                 }
                 _ => {
                     return Err(StabilizerError::InvalidSparsePauliString {
-                        text: original_text.to_owned(),
+                        excerpt: TextExcerpt::new(original_text),
                     });
                 }
             }
@@ -1005,7 +848,7 @@ fn sparse_size_if_sparse(text: &str) -> StabilizerResult<usize> {
                 .checked_mul(10)
                 .and_then(|value| value.checked_add(digit as usize))
                 .ok_or_else(|| StabilizerError::InvalidSparsePauliString {
-                    text: text.to_owned(),
+                    excerpt: TextExcerpt::new(text),
                 })?;
             current_index = Some(next);
         } else if let Some(index) = current_index.take() {
@@ -1026,17 +869,17 @@ fn flush_sparse_term(
 ) -> StabilizerResult<()> {
     let Some(basis) = basis.take() else {
         return Err(StabilizerError::InvalidSparsePauliString {
-            text: original_text.to_owned(),
+            excerpt: TextExcerpt::new(original_text),
         });
     };
     let Some(index) = index.take() else {
         return Err(StabilizerError::InvalidSparsePauliString {
-            text: original_text.to_owned(),
+            excerpt: TextExcerpt::new(original_text),
         });
     };
     if index >= result.len() {
         return Err(StabilizerError::InvalidSparsePauliString {
-            text: original_text.to_owned(),
+            excerpt: TextExcerpt::new(original_text),
         });
     }
     result.right_mul_basis(index, basis)
@@ -1074,11 +917,11 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_returns_missing_i_scalar() {
-        let mut left = PauliString::from_bases_unchecked(
+        let mut left = PauliString::from_bases_unbudgeted(
             PauliSign::Plus,
             [PauliBasis::X, PauliBasis::Y, PauliBasis::Z, PauliBasis::I],
         );
-        let right = PauliString::from_bases_unchecked(
+        let right = PauliString::from_bases_unbudgeted(
             PauliSign::Plus,
             [PauliBasis::Y, PauliBasis::Z, PauliBasis::X, PauliBasis::Z],
         );
@@ -1087,17 +930,17 @@ mod tests {
             .right_multiply_in_place_returning_log_i_scalar(&right)
             .unwrap();
 
-        assert_eq!(log_i, 3);
+        assert_eq!(log_i, PauliPhase::MinusI);
         assert_eq!(left.to_string(), "+ZXYZ");
     }
 
     #[test]
     fn multiply_uses_in_place_core_without_losing_phase() {
-        let left = PauliString::from_bases_unchecked(
+        let left = PauliString::from_bases_unbudgeted(
             PauliSign::Plus,
             [PauliBasis::X, PauliBasis::Y, PauliBasis::Z, PauliBasis::I],
         );
-        let right = PauliString::from_bases_unchecked(
+        let right = PauliString::from_bases_unbudgeted(
             PauliSign::Plus,
             [PauliBasis::Y, PauliBasis::Z, PauliBasis::X, PauliBasis::Z],
         );
@@ -1109,8 +952,8 @@ mod tests {
 
     #[test]
     fn negative_identity_contributes_minus_one_scalar() {
-        let mut left = PauliString::identity_unchecked(4);
-        let right = PauliString::from_bases_unchecked(
+        let mut left = PauliString::identity_unbudgeted(4);
+        let right = PauliString::from_bases_unbudgeted(
             PauliSign::Minus,
             std::iter::repeat_n(PauliBasis::I, 4),
         );
@@ -1119,27 +962,27 @@ mod tests {
             .right_multiply_in_place_returning_log_i_scalar(&right)
             .unwrap();
 
-        assert_eq!(log_i, 2);
+        assert_eq!(log_i, PauliPhase::Minus);
         assert_eq!(left.to_string(), "+____");
     }
 
     #[test]
     fn right_multiply_in_place_extends_for_longer_identity_rhs() {
-        let mut left = PauliString::from_bases_unchecked(PauliSign::Plus, [PauliBasis::X]);
-        let right = PauliString::identity_unchecked(3);
+        let mut left = PauliString::from_bases_unbudgeted(PauliSign::Plus, [PauliBasis::X]);
+        let right = PauliString::identity_unbudgeted(3);
 
         let log_i = left
             .right_multiply_in_place_returning_log_i_scalar(&right)
             .unwrap();
 
-        assert_eq!(log_i, 0);
+        assert_eq!(log_i, PauliPhase::Plus);
         assert_eq!(left.to_string(), "+X__");
     }
 
     #[test]
     fn clearing_terms_keeps_identity_detection_exact() {
         let width = 1_000;
-        let mut value = PauliString::from_bases_unchecked(
+        let mut value = PauliString::from_bases_unbudgeted(
             PauliSign::Plus,
             [PauliBasis::X, PauliBasis::Y, PauliBasis::Z]
                 .into_iter()
@@ -1153,14 +996,14 @@ mod tests {
         }
         value.set(width / 2, PauliBasis::I).unwrap();
         assert!(value.has_no_pauli_terms());
-        assert_eq!(value, PauliString::identity_unchecked(width));
+        assert_eq!(value, PauliString::identity_unbudgeted(width));
 
         // An identity right operand reached by clearing still takes the identity fast path.
-        let mut left = PauliString::from_bases_unchecked(PauliSign::Plus, [PauliBasis::Y; 3]);
+        let mut left = PauliString::from_bases_unbudgeted(PauliSign::Plus, [PauliBasis::Y; 3]);
         assert_eq!(
             left.right_multiply_in_place_returning_log_i_scalar(&value)
                 .unwrap(),
-            0
+            PauliPhase::Plus
         );
         assert_eq!(left.to_string(), format!("+YYY{}", "_".repeat(width - 3)));
 

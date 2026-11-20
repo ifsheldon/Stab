@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use clap::ValueEnum;
 use serde::Serialize;
 use serde_json::{Value, json};
-use stab_analysis::{AnalysisError, ResourceLimitError as AnalysisResourceLimitError};
+use stab_analysis::{
+    AnalysisError, ResourceLimitError as AnalysisResourceLimitError, UnknownCodeTask,
+};
 use stab_engine::{
     DemError, DemResourceKind, DemResourceLimitError, DemSamplingExecutionError,
     DetectionCompileError, DetectionError, DetectionExecutionError, DetectionResourceKind,
@@ -115,16 +117,8 @@ pub(crate) enum CliError {
     #[error("{kind} byte offset overflowed")]
     InputByteOffsetOverflow { kind: &'static str },
 
-    #[error("unsupported repetition_code task {task:?}; expected memory")]
-    UnsupportedRepetitionTask { task: String },
-
-    #[error(
-        "unsupported surface_code task {task:?}; expected rotated_memory_x, rotated_memory_z, unrotated_memory_x, or unrotated_memory_z"
-    )]
-    UnsupportedSurfaceTask { task: String },
-
-    #[error("unsupported color_code task {task:?}; expected memory_xyz")]
-    UnsupportedColorTask { task: String },
+    #[error(transparent)]
+    UnsupportedGenTask(#[from] UnknownCodeTask),
 
     #[error(
         "unsupported conversion; supported conversions are result formats 01, b8, r8, hits, dets, and ptb64 with explicit layout information, plus stim input to stim output"
@@ -496,10 +490,8 @@ fn cli_error_context(error: &CliError) -> Value {
         CliError::InputByteOffsetOverflow { kind } => json!({
             "input_kind": kind,
         }),
-        CliError::UnsupportedRepetitionTask { task }
-        | CliError::UnsupportedSurfaceTask { task }
-        | CliError::UnsupportedColorTask { task } => json!({
-            "task": task,
+        CliError::UnsupportedGenTask(error) => json!({
+            "task": error.task(),
         }),
         CliError::UnsupportedConversion
         | CliError::ConflictingObservableRouting

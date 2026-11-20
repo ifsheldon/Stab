@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
-use stab_model::advanced::{
-    dem_instruction_rebase_detectors, dem_model_items_mut, dem_repeat_block_body_mut,
-};
+use stab_model::advanced::dem_instruction_rebase_detectors;
 use stab_model::{DemInstruction, DemInstructionView, DemItem, DemTarget, DetectorErrorModel};
 
 use crate::{AnalysisError, AnalysisResult};
@@ -19,59 +17,43 @@ pub(super) fn unreverse_model(
     base_detector_id: &mut u64,
     seen: &mut SeenTargets,
 ) -> AnalysisResult<()> {
-    let items = dem_model_items_mut(model);
-    items.reverse();
-    let mut kept = 0_usize;
-    for read in 0..items.len() {
-        let item = items.get_mut(read).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
-                "folded analyzer un-reversal index is out of range",
-            )
-        })?;
-        let keep = match item {
-            DemItem::Instruction(instruction) => {
-                unreverse_instruction(instruction, base_detector_id, seen)?
-            }
-            DemItem::RepeatBlock(repeat) => {
-                let repeat_count = repeat.repeat_count().get();
-                if repeat_count != 0 {
-                    let old_base = *base_detector_id;
-                    unreverse_model(dem_repeat_block_body_mut(repeat), base_detector_id, seen)?;
-                    let one_body_shift =
-                        base_detector_id.checked_sub(old_base).ok_or_else(|| {
+    model.reverse_items();
+    model.try_retain_items_mut(|item| match item {
+        DemItem::Instruction(instruction) => {
+            unreverse_instruction(instruction, base_detector_id, seen)
+        }
+        DemItem::RepeatBlock(repeat) => {
+            let repeat_count = repeat.repeat_count().get();
+            if repeat_count != 0 {
+                let old_base = *base_detector_id;
+                unreverse_model(repeat.body_mut(), base_detector_id, seen)?;
+                let one_body_shift = base_detector_id.checked_sub(old_base).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model(
+                        "folded analyzer repeat detector shift underflowed",
+                    )
+                })?;
+                let extra_repetitions = repeat_count.checked_sub(1).ok_or_else(|| {
+                    AnalysisError::invalid_detector_error_model(
+                        "folded analyzer repeat count underflowed",
+                    )
+                })?;
+                *base_detector_id = base_detector_id
+                    .checked_add(one_body_shift.checked_mul(extra_repetitions).ok_or_else(
+                        || {
                             AnalysisError::invalid_detector_error_model(
-                                "folded analyzer repeat detector shift underflowed",
+                                "folded analyzer repeat detector shift overflowed",
                             )
-                        })?;
-                    let extra_repetitions = repeat_count.checked_sub(1).ok_or_else(|| {
+                        },
+                    )?)
+                    .ok_or_else(|| {
                         AnalysisError::invalid_detector_error_model(
-                            "folded analyzer repeat count underflowed",
+                            "folded analyzer detector base overflowed",
                         )
                     })?;
-                    *base_detector_id = base_detector_id
-                        .checked_add(one_body_shift.checked_mul(extra_repetitions).ok_or_else(
-                            || {
-                                AnalysisError::invalid_detector_error_model(
-                                    "folded analyzer repeat detector shift overflowed",
-                                )
-                            },
-                        )?)
-                        .ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
-                                "folded analyzer detector base overflowed",
-                            )
-                        })?;
-                }
-                true
             }
-        };
-        if keep {
-            items.swap(kept, read);
-            kept += 1;
+            Ok(true)
         }
-    }
-    items.truncate(kept);
-    Ok(())
+    })
 }
 
 /// Rebases one instruction and reports whether the forward model keeps it.

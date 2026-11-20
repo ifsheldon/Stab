@@ -10,9 +10,9 @@ use num_complex::Complex32;
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use stab_algebra::{
-    CommutingPauliStringIterator, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
-    SingleQubitClifford, StabilizerError, Tableau, TableauIterator, stabilizers_to_tableau,
-    unitary_to_tableau,
+    CommutingPauliStringIterator, Endianness, FlexPauliString, PauliBasis, PauliPhase, PauliSign,
+    PauliString, SignIteration, SingleQubitClifford, StabilizerError, StabilizerTableauOptions,
+    Tableau, TableauIterator,
 };
 
 #[test]
@@ -65,14 +65,9 @@ fn pauli_values_preserve_text_indexing_and_scalar_algebra() {
                 expected_bases,
                 "width {width}"
             );
+            assert_eq!(left.commutes(&right), expected_commutes, "width {width}");
             assert_eq!(
-                left.commutes(&right).expect("equal-width commutation"),
-                expected_commutes,
-                "width {width}"
-            );
-            assert_eq!(
-                left.log_i_scalar_byproduct(&right)
-                    .expect("equal-width scalar byproduct"),
+                left.log_i_scalar_byproduct(&right).log_i(),
                 expected_byproduct,
                 "width {width}"
             );
@@ -172,27 +167,28 @@ fn tableaux_preserve_generators_composition_inversion_and_actions() {
     assert_eq!(cnot.y_output(0).expect("Y0 output").to_string(), "+YX");
     assert_eq!(cnot.z_output(1).expect("Z1 output").to_string(), "+ZZ");
     assert!(cnot.x_output(2).is_err());
-    let x_rows = [[1, 1], [0, 1]];
-    let y_rows = [[2, 1], [3, 2]];
-    let z_rows = [[3, 0], [3, 3]];
+    let (i, x, y, z) = (PauliBasis::I, PauliBasis::X, PauliBasis::Y, PauliBasis::Z);
+    let x_rows = [[x, x], [i, x]];
+    let y_rows = [[y, x], [z, y]];
+    let z_rows = [[z, i], [z, z]];
     for input in 0..2 {
         for output in 0..2 {
             assert_eq!(
-                cnot.x_output_pauli_xyz(input, output),
+                cnot.x_output_basis(input, output),
                 Ok(x_rows[input][output])
             );
             assert_eq!(
-                cnot.y_output_pauli_xyz(input, output),
+                cnot.y_output_basis(input, output),
                 Ok(y_rows[input][output])
             );
             assert_eq!(
-                cnot.z_output_pauli_xyz(input, output),
+                cnot.z_output_basis(input, output),
                 Ok(z_rows[input][output])
             );
         }
     }
     assert!(cnot.y_output(2).is_err());
-    assert!(cnot.z_output_pauli_xyz(0, 2).is_err());
+    assert!(cnot.z_output_basis(0, 2).is_err());
 
     assert!(Tableau::gate1("+X", "+X").is_err());
     assert_eq!(
@@ -326,7 +322,15 @@ fn tableaux_preserve_generators_composition_inversion_and_actions() {
     assert_eq!(commuting.next(), None);
 
     for signed in [false, true] {
-        let mut empty = TableauIterator::new(0, signed).expect("zero-qubit tableau iterator");
+        let mut empty = TableauIterator::new(
+            0,
+            if signed {
+                SignIteration::AllSigns
+            } else {
+                SignIteration::Unsigned
+            },
+        )
+        .expect("zero-qubit tableau iterator");
         assert_eq!(
             empty.next(),
             Some(Tableau::identity(0).expect("empty tableau"))
@@ -336,7 +340,7 @@ fn tableaux_preserve_generators_composition_inversion_and_actions() {
         assert_eq!(empty.count(), 1);
     }
 
-    let mut tableaus = TableauIterator::new(1, true).expect("tableau iterator");
+    let mut tableaus = TableauIterator::new(1, SignIteration::AllSigns).expect("tableau iterator");
     let first = tableaus.next().expect("first tableau");
     let mut tableaus_clone = tableaus.clone();
     assert_eq!(tableaus.next(), tableaus_clone.next());
@@ -395,7 +399,7 @@ fn algebra_owned_representation_conversions_preserve_values() {
             let output = tableau.apply(&input).expect("Clifford tableau action");
             assert_eq!(
                 output.get(0).expect("one output basis"),
-                clifford.apply_basis(basis).expect("Clifford basis action"),
+                clifford.apply_basis(basis),
                 "{} acting on {basis:?}",
                 clifford.canonical_name()
             );
@@ -438,23 +442,24 @@ fn algebra_owned_representation_conversions_preserve_values() {
         &[(0.0, 0.0), (0.0, 0.0), (1.0, 0.0), (0.0, 0.0)],
     ]);
     assert_eq!(
-        unitary_to_tableau(&hadamard, true).expect("Hadamard unitary"),
+        Tableau::from_unitary(&hadamard, Endianness::Little).expect("Hadamard unitary"),
         Tableau::gate1("+Z", "+X").expect("Hadamard tableau")
     );
     assert_eq!(
-        unitary_to_tableau(&cnot, true).expect("little-endian reversed CNOT unitary"),
+        Tableau::from_unitary(&cnot, Endianness::Little)
+            .expect("little-endian reversed CNOT unitary"),
         Tableau::gate2("+X_", "+ZZ", "+XX", "+_Z").expect("reversed CNOT tableau")
     );
     assert_eq!(
-        unitary_to_tableau(&cnot, false).expect("big-endian CNOT unitary"),
+        Tableau::from_unitary(&cnot, Endianness::Big).expect("big-endian CNOT unitary"),
         Tableau::gate2("+XX", "+Z_", "+_X", "+ZZ").expect("CNOT tableau")
     );
     assert_eq!(
-        unitary_to_tableau(&[], true),
+        Tableau::from_unitary(&[], Endianness::Little),
         Err(StabilizerError::UnitaryMatrixHeightNotPowerOfTwo { height: 0 })
     );
     assert_eq!(
-        unitary_to_tableau(&[vec![], vec![]], true),
+        Tableau::from_unitary(&[vec![], vec![]], Endianness::Little),
         Err(StabilizerError::UnitaryMatrixRowWidthMismatch {
             row: 0,
             width: 0,
@@ -462,17 +467,17 @@ fn algebra_owned_representation_conversions_preserve_values() {
         })
     );
     assert_eq!(
-        unitary_to_tableau(
+        Tableau::from_unitary(
             &[
                 vec![Complex32::new(1.0, 0.0), Complex32::new(0.0, 0.0)],
                 vec![Complex32::new(0.0, 0.0), Complex32::new(0.0, 0.0)],
             ],
-            true,
+            Endianness::Little
         ),
         Err(StabilizerError::MatrixNotUnitary)
     );
     assert_eq!(
-        unitary_to_tableau(
+        Tableau::from_unitary(
             &[
                 vec![Complex32::new(1.0, 0.0), Complex32::new(0.0, 0.0)],
                 vec![
@@ -480,7 +485,7 @@ fn algebra_owned_representation_conversions_preserve_values() {
                     Complex32::new(FRAC_1_SQRT_2, FRAC_1_SQRT_2),
                 ],
             ],
-            true,
+            Endianness::Little
         ),
         Err(StabilizerError::UnitaryMatrixNotClifford)
     );
@@ -492,8 +497,9 @@ fn algebra_owned_representation_conversions_preserve_values() {
             let stabilizers = (0..width)
                 .map(|index| source.z_output(index).expect("Z generator"))
                 .collect::<Vec<_>>();
-            let recovered = stabilizers_to_tableau(&stabilizers, false, false, false)
-                .expect("stabilizers to tableau");
+            let recovered =
+                Tableau::from_stabilizers(&stabilizers, StabilizerTableauOptions::default())
+                    .expect("stabilizers to tableau");
             for index in 0..width {
                 assert_eq!(
                     recovered.z_output(index).expect("recovered generator"),

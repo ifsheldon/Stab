@@ -9,10 +9,9 @@ use std::assert_matches;
 use std::collections::BTreeSet;
 
 use stab_analysis::{
-    AnalysisResult, CodeDistance, ErrorAnalyzerOptions, RepetitionCodeParams, RepetitionCodeTask,
-    RoundCount, SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
-    find_undetectable_logical_error, generate_repetition_code_circuit,
-    generate_surface_code_circuit, likeliest_error_sat_problem, shortest_error_sat_problem,
+    AnalysisResult, CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions,
+    RepetitionCodeTask, RoundCount, SurfaceCodeTask, circuit_to_detector_error_model,
+    find_undetectable_logical_error, likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{
@@ -576,27 +575,27 @@ fn generated_rotated_surface_code_dem_with_options(
     options: ErrorAnalyzerOptions,
 ) -> AnalysisResult<DetectorErrorModel> {
     let probability = Probability::try_new(0.001)?;
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(5)?,
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryX),
         CodeDistance::try_new(5)?,
-        SurfaceCodeTask::RotatedMemoryX,
+        RoundCount::try_new(5)?,
     )?
     .with_after_clifford_depolarization(probability)
     .with_before_measure_flip_probability(probability)
     .with_after_reset_flip_probability(probability)
     .with_before_round_data_depolarization(probability);
-    let generated = generate_surface_code_circuit(&params)?;
+    let generated = params.generate()?;
     circuit_to_detector_error_model(generated.circuit(), options)
 }
 
 fn generated_repetition_code_dem() -> AnalysisResult<DetectorErrorModel> {
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(10)?,
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
         CodeDistance::try_new(7)?,
-        RepetitionCodeTask::Memory,
+        RoundCount::try_new(10)?,
     )?
     .with_before_round_data_depolarization(Probability::try_new(0.01)?);
-    let generated = generate_repetition_code_circuit(&params)?;
+    let generated = params.generate()?;
     circuit_to_detector_error_model(
         generated.circuit(),
         ErrorAnalyzerOptions {

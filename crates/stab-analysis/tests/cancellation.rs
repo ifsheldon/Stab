@@ -16,11 +16,11 @@ use std::time::{Duration, Instant};
 use stab_algebra::{Flow, PauliString};
 use stab_analysis::{
     AnalysisError, CircuitFlattenLimits, CircuitPass, CircuitPassContext, CircuitPassError,
-    CircuitPassInput, CircuitPassOutput, CircuitPassResources, CodeDistance, DemFlattenLimits,
-    DetectingRegionOptions, ErrorAnalyzerOptions, FeedbackInliningLimits, FlowGeneratorOptions,
-    LogicalErrorSearchLimits, MissingDetectorOptions, PauliConjugationOptions, RoundCount,
-    SatMaterializationLimits, SurfaceCodeParams, SurfaceCodeTask, TimeReversedForFlowsOptions,
-    UnsignedFlowCheckOptions, WithoutNoiseOptions, WithoutNoisePass,
+    CircuitPassInput, CircuitPassOutput, CircuitPassResources, CodeCircuitParams, CodeDistance,
+    CodeTask, DemFlattenLimits, DetectingRegionOptions, ErrorAnalyzerOptions,
+    FeedbackInliningLimits, FlowGeneratorOptions, LogicalErrorSearchLimits, MissingDetectorOptions,
+    PauliConjugationOptions, RoundCount, SatMaterializationLimits, SurfaceCodeTask,
+    TimeReversedForFlowsOptions, UnsignedFlowCheckOptions, WithoutNoiseOptions, WithoutNoisePass,
     check_if_circuit_has_unsigned_stabilizer_flows_with_options,
     check_unsigned_stabilizer_flows_with_diagnostics_with_options, circuit_detecting_regions,
     circuit_flow_generators_with_options, circuit_has_all_unsigned_stabilizer_flows_with_options,
@@ -28,9 +28,9 @@ use stab_analysis::{
     circuit_time_reversed_for_flows_with_options, circuit_to_detector_error_model,
     circuit_with_inlined_feedback_with_limits, find_undetectable_logical_error_with_limits,
     flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
-    flattened_detector_error_model_with_limits, generate_surface_code_circuit,
-    likeliest_error_sat_problem_with_limits, missing_detectors, pauli_after_circuit_with_options,
-    pauli_before_circuit_with_options, run_circuit_pass, shortest_error_sat_problem_with_limits,
+    flattened_detector_error_model_with_limits, likeliest_error_sat_problem_with_limits,
+    missing_detectors, pauli_after_circuit_with_options, pauli_before_circuit_with_options,
+    run_circuit_pass, shortest_error_sat_problem_with_limits,
     shortest_graphlike_undetectable_logical_error_with_limits,
 };
 use stab_model::advanced::CancellationCountdown;
@@ -301,15 +301,15 @@ fn circuit_passes_report_the_context_signal() {
 
 fn surface_code_model(distance: u32) -> DetectorErrorModel {
     let noise = Probability::try_new(0.001).expect("probability");
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(u64::from(distance)).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ),
         CodeDistance::try_new(distance).expect("distance"),
-        SurfaceCodeTask::RotatedMemoryZ,
+        RoundCount::try_new(u64::from(distance)).expect("rounds"),
     )
     .expect("surface code parameters")
     .with_after_clifford_depolarization(noise)
     .with_before_measure_flip_probability(noise);
-    let generated = generate_surface_code_circuit(&params).expect("surface code circuit");
+    let generated = params.generate().expect("surface code circuit");
     circuit_to_detector_error_model(
         generated.circuit(),
         ErrorAnalyzerOptions {

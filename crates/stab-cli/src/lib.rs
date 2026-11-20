@@ -10,7 +10,6 @@
 )]
 
 use std::ffi::OsString;
-use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
@@ -20,6 +19,7 @@ mod batch_output;
 mod convert;
 mod detection;
 mod diagnostics;
+mod generate; // `gen` is a reserved keyword in edition 2024.
 mod help;
 mod input;
 mod io_plan;
@@ -36,24 +36,20 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use convert::{ConvertArgs, run_convert};
 use detection::{DetectArgs, M2dArgs, run_detect, run_m2d};
 use diagnostics::{CliError, ErrorFormatArg, probe_error_format, write_cli_error};
+use generate::{GenArgs, run_gen};
 use help::{HelpArgs, run_help};
 use input::{read_limited_input_file, read_limited_stdin};
 use io_plan::{FileRole, PendingIo, StandardStreams, StreamUse};
 use ledger::{MemoryLedger, StageBudget};
 use output_storage::{EncodedBatches, OutputStorage, admit_output_then_session};
 use sample_dem::{SampleDemArgs, run_sample_dem};
-use stab_analysis::{
-    CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
-    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
-    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
-};
 use stab_engine::{
     LaneWidth, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
     SamplingCompiler, SamplingSession, Seed, ShotCount, StreamingSamplingRun,
 };
 use stab_model::{
     Cancellation, Circuit, FoldedCircuitSummary, FoldedCount, GateKind, MemoryBudget,
-    MemoryBudgetParseError, ModelResult, ParseLimits, Probability,
+    MemoryBudgetParseError, ParseLimits,
 };
 use stab_records::{
     BitIndex, DetsResultType, MeasurementBatchView, MeasurementSink, RecordBatchPart,
@@ -177,72 +173,6 @@ enum Command {
     /// Samples detection events from a detector error model.
     #[command(name = "sample_dem")]
     SampleDem(SampleDemArgs),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-enum GeneratedCodeArg {
-    #[value(name = "repetition_code")]
-    Repetition,
-    #[value(name = "surface_code")]
-    Surface,
-    #[value(name = "color_code")]
-    Color,
-}
-
-impl GeneratedCodeArg {
-    fn as_stim_name(self) -> &'static str {
-        match self {
-            Self::Repetition => "repetition_code",
-            Self::Surface => "surface_code",
-            Self::Color => "color_code",
-        }
-    }
-}
-
-#[derive(Debug, Args)]
-struct GenArgs {
-    /// Error-correcting code family to generate.
-    #[arg(long, value_enum)]
-    code: GeneratedCodeArg,
-
-    /// Generated circuit task name.
-    #[arg(long)]
-    task: String,
-
-    /// Code distance.
-    #[arg(long)]
-    distance: u32,
-
-    /// Measurement rounds.
-    #[arg(long, value_parser = parse_stim_u64)]
-    rounds: u64,
-
-    /// Depolarizing noise after Clifford gates.
-    #[arg(long = "after_clifford_depolarization", default_value_t = 0.0)]
-    after_clifford_depolarization: f64,
-
-    /// Flip probability after reset gates.
-    #[arg(long = "after_reset_flip_probability", default_value_t = 0.0)]
-    after_reset_flip_probability: f64,
-
-    /// Flip probability before measurement gates.
-    #[arg(long = "before_measure_flip_probability", default_value_t = 0.0)]
-    before_measure_flip_probability: f64,
-
-    /// Depolarizing noise before each round starts.
-    #[arg(long = "before_round_data_depolarization", default_value_t = 0.0)]
-    before_round_data_depolarization: f64,
-
-    /// Output path. Defaults to stdout.
-    #[arg(long = "out")]
-    output: Option<PathBuf>,
-
-    #[command(flatten)]
-    memory: MemoryBudgetArg,
-
-    /// Accepted for Stim compatibility and ignored by `stim gen`.
-    #[arg(long = "in", hide = true)]
-    _input: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -497,204 +427,6 @@ fn error_chain_is_broken_pipe(error: &CliError) -> bool {
         source = current.source();
     }
     false
-}
-
-fn run_gen<W>(args: GenArgs, stdout: &mut W) -> Result<(), CliError>
-where
-    W: Write,
-{
-    let (header, generated) = generate_circuit(&args)?;
-    // The circuit text streams to its destination instead of being rendered into a `String`
-    // first, which for large codes held one or two extra copies of the whole text. Output opens
-    // only after generation succeeds, so a rejected request never creates or truncates `--out`.
-    let write = |out: &mut dyn Write| write_generated_circuit(out, &args, header, &generated);
-    if let Some(path) = args.output.as_ref() {
-        let write_path_error = |source| CliError::WritePath {
-            path: path.clone(),
-            source,
-        };
-        let mut file = io_plan::buffered_output(File::create(path).map_err(write_path_error)?);
-        write(&mut file)
-            .and_then(|()| file.flush())
-            .map_err(write_path_error)
-    } else {
-        write(stdout).map_err(CliError::WriteOutput)
-    }
-}
-
-/// The parsed `gen` parameters the output header echoes.
-#[derive(Clone, Copy, Debug)]
-struct GenHeader {
-    rounds: RoundCount,
-    distance: CodeDistance,
-    probabilities: GeneratorProbabilities,
-}
-
-fn generate_circuit(args: &GenArgs) -> Result<(GenHeader, GeneratedCircuit), CliError> {
-    let rounds = RoundCount::try_new(args.rounds)?;
-    let distance = CodeDistance::try_new(args.distance)?;
-    let probabilities = GeneratorProbabilities::from_args(args)?;
-    let generated = match args.code {
-        GeneratedCodeArg::Repetition => {
-            let params = probabilities
-                .apply_repetition(RepetitionCodeParams::new(
-                    rounds,
-                    distance,
-                    parse_repetition_task(&args.task)?,
-                )?)
-                .with_memory_budget(args.memory.get());
-            generate_repetition_code_circuit(&params)?
-        }
-        GeneratedCodeArg::Surface => {
-            let params = probabilities
-                .apply_surface(SurfaceCodeParams::new(
-                    rounds,
-                    distance,
-                    parse_surface_task(&args.task)?,
-                )?)
-                .with_memory_budget(args.memory.get());
-            generate_surface_code_circuit(&params)?
-        }
-        GeneratedCodeArg::Color => {
-            let params = probabilities
-                .apply_color(ColorCodeParams::new(
-                    rounds,
-                    distance,
-                    parse_color_task(&args.task)?,
-                )?)
-                .with_memory_budget(args.memory.get());
-            generate_color_code_circuit(&params)?
-        }
-    };
-    Ok((
-        GenHeader {
-            rounds,
-            distance,
-            probabilities,
-        },
-        generated,
-    ))
-}
-
-#[derive(Clone, Copy, Debug)]
-struct GeneratorProbabilities {
-    before_round_data_depolarization: Probability,
-    before_measure_flip_probability: Probability,
-    after_reset_flip_probability: Probability,
-    after_clifford_depolarization: Probability,
-}
-
-impl GeneratorProbabilities {
-    fn from_args(args: &GenArgs) -> Result<Self, CliError> {
-        Ok(Self {
-            before_round_data_depolarization: probability_arg(
-                args.before_round_data_depolarization,
-            )?,
-            before_measure_flip_probability: probability_arg(args.before_measure_flip_probability)?,
-            after_reset_flip_probability: probability_arg(args.after_reset_flip_probability)?,
-            after_clifford_depolarization: probability_arg(args.after_clifford_depolarization)?,
-        })
-    }
-
-    fn apply_repetition(self, params: RepetitionCodeParams) -> RepetitionCodeParams {
-        params
-            .with_before_round_data_depolarization(self.before_round_data_depolarization)
-            .with_before_measure_flip_probability(self.before_measure_flip_probability)
-            .with_after_reset_flip_probability(self.after_reset_flip_probability)
-            .with_after_clifford_depolarization(self.after_clifford_depolarization)
-    }
-
-    fn apply_surface(self, params: SurfaceCodeParams) -> SurfaceCodeParams {
-        params
-            .with_before_round_data_depolarization(self.before_round_data_depolarization)
-            .with_before_measure_flip_probability(self.before_measure_flip_probability)
-            .with_after_reset_flip_probability(self.after_reset_flip_probability)
-            .with_after_clifford_depolarization(self.after_clifford_depolarization)
-    }
-
-    fn apply_color(self, params: ColorCodeParams) -> ColorCodeParams {
-        params
-            .with_before_round_data_depolarization(self.before_round_data_depolarization)
-            .with_before_measure_flip_probability(self.before_measure_flip_probability)
-            .with_after_reset_flip_probability(self.after_reset_flip_probability)
-            .with_after_clifford_depolarization(self.after_clifford_depolarization)
-    }
-}
-
-fn write_generated_circuit(
-    out: &mut dyn Write,
-    args: &GenArgs,
-    header: GenHeader,
-    generated: &GeneratedCircuit,
-) -> std::io::Result<()> {
-    let GenHeader {
-        rounds,
-        distance,
-        probabilities,
-    } = header;
-    writeln!(out, "# Generated {} circuit.", args.code.as_stim_name())?;
-    writeln!(out, "# task: {}", args.task)?;
-    writeln!(out, "# rounds: {}", rounds.get())?;
-    writeln!(out, "# distance: {}", distance.get())?;
-    for (name, value) in [
-        (
-            "before_round_data_depolarization",
-            probabilities.before_round_data_depolarization,
-        ),
-        (
-            "before_measure_flip_probability",
-            probabilities.before_measure_flip_probability,
-        ),
-        (
-            "after_reset_flip_probability",
-            probabilities.after_reset_flip_probability,
-        ),
-        (
-            "after_clifford_depolarization",
-            probabilities.after_clifford_depolarization,
-        ),
-    ] {
-        writeln!(out, "# {name}: {}", value.stim_text())?;
-    }
-    out.write_all(b"# layout:\n")?;
-    out.write_all(generated.layout_text().as_bytes())?;
-    out.write_all(generated.hint_text().as_bytes())?;
-    let mut out = out;
-    generated.circuit().write_stim_io(&mut out)
-}
-
-fn parse_repetition_task(task: &str) -> Result<RepetitionCodeTask, CliError> {
-    match task {
-        "memory" => Ok(RepetitionCodeTask::Memory),
-        _ => Err(CliError::UnsupportedRepetitionTask {
-            task: task.to_string(),
-        }),
-    }
-}
-
-fn parse_surface_task(task: &str) -> Result<SurfaceCodeTask, CliError> {
-    match task {
-        "rotated_memory_x" => Ok(SurfaceCodeTask::RotatedMemoryX),
-        "rotated_memory_z" => Ok(SurfaceCodeTask::RotatedMemoryZ),
-        "unrotated_memory_x" => Ok(SurfaceCodeTask::UnrotatedMemoryX),
-        "unrotated_memory_z" => Ok(SurfaceCodeTask::UnrotatedMemoryZ),
-        _ => Err(CliError::UnsupportedSurfaceTask {
-            task: task.to_string(),
-        }),
-    }
-}
-
-fn parse_color_task(task: &str) -> Result<ColorCodeTask, CliError> {
-    match task {
-        "memory_xyz" => Ok(ColorCodeTask::MemoryXyz),
-        _ => Err(CliError::UnsupportedColorTask {
-            task: task.to_string(),
-        }),
-    }
-}
-
-fn probability_arg(value: f64) -> ModelResult<Probability> {
-    Probability::try_new(value)
 }
 
 pub(crate) fn write_output<W>(

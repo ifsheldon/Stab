@@ -6,8 +6,8 @@
 use std::str::FromStr as _;
 
 use stab_algebra::{
-    PauliBasis, PauliString, SingleQubitClifford, StabilizerError, Tableau, TableauIterator,
-    stabilizers_to_tableau,
+    PauliBasis, PauliString, SignIteration, SingleQubitClifford, StabilizerError,
+    StabilizerTableauOptions, Tableau, TableauIterator,
 };
 
 #[test]
@@ -16,7 +16,8 @@ fn tableau_semantic_surface_matches_stim() {
         assert_stable_surface(&clifford.tableau());
     }
 
-    let tableaus = TableauIterator::new(2, false).expect("two-qubit Tableau iterator");
+    let tableaus =
+        TableauIterator::new(2, SignIteration::Unsigned).expect("two-qubit Tableau iterator");
     let mut count = 0;
     for tableau in tableaus {
         assert_stable_surface(&tableau);
@@ -200,7 +201,7 @@ fn assert_local_append_matches_full_composition() {
         .then(&phase.embedded(4, &[2]).expect("embedded S"))
         .expect("parent phase");
 
-    let mut local_actions = TableauIterator::new(2, false)
+    let mut local_actions = TableauIterator::new(2, SignIteration::Unsigned)
         .expect("unsigned two-qubit Tableaus")
         .collect::<Vec<_>>();
     local_actions.push(signed);
@@ -250,14 +251,17 @@ fn assert_local_append_matches_full_composition() {
 }
 
 fn assert_canonical_stabilizers() {
-    let source = stabilizers_to_tableau(&[pauli("+ZZ"), pauli("+XX")], false, false, false)
-        .expect("Bell stabilizers");
+    let source = Tableau::from_stabilizers(
+        &[pauli("+ZZ"), pauli("+XX")],
+        StabilizerTableauOptions::default(),
+    )
+    .expect("Bell stabilizers");
     let canonical = source
         .canonical_stabilizers()
         .expect("canonical Bell stabilizers");
     assert_eq!(canonical, [pauli("+XX"), pauli("+ZZ")]);
 
-    let reconstructed = stabilizers_to_tableau(&canonical, false, false, false)
+    let reconstructed = Tableau::from_stabilizers(&canonical, StabilizerTableauOptions::default())
         .expect("reconstruct canonical stabilizers");
     assert_eq!(
         reconstructed
@@ -266,16 +270,14 @@ fn assert_canonical_stabilizers() {
         canonical
     );
 
-    let four_qubit = stabilizers_to_tableau(
+    let four_qubit = Tableau::from_stabilizers(
         &[
             pauli("+XXXX"),
             pauli("+YYYY"),
             pauli("+YYZZ"),
             pauli("+XXZZ"),
         ],
-        false,
-        false,
-        false,
+        StabilizerTableauOptions::default(),
     )
     .expect("four-qubit Stim canonicalization fixture");
     assert_eq!(
@@ -326,8 +328,9 @@ fn assert_stable_surface(tableau: &Tableau) {
     } else {
         canonical.clone()
     };
-    let reconstructed = stabilizers_to_tableau(&alternative_generators, false, false, false)
-        .expect("reconstruct stabilizer state from an equivalent generator basis");
+    let reconstructed =
+        Tableau::from_stabilizers(&alternative_generators, StabilizerTableauOptions::default())
+            .expect("reconstruct stabilizer state from an equivalent generator basis");
     assert_eq!(
         reconstructed
             .canonical_stabilizers()

@@ -14,28 +14,36 @@ mod unitary;
 
 pub use budget::{AlgebraMemoryBudget, StabilizerResource};
 pub use clifford::{CliffordString, SingleQubitClifford};
-pub use conversions::{stabilizers_to_tableau, stabilizers_to_tableau_with_budget};
-pub use error::{StabilizerError, StabilizerResult};
+pub use conversions::StabilizerTableauOptions;
+pub use error::{StabilizerError, StabilizerResult, TextExcerpt};
 pub use flow::{Flow, FlowMeasurementIndex};
-pub use iter::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator};
+pub use iter::{
+    CommutingPauliStringIterator, PauliIterationBases, PauliStringIterator, SignIteration,
+    TableauIterator,
+};
 pub use pauli::{FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString};
 pub use tableau::{Tableau, TableauAppender};
-pub use unitary::unitary_to_tableau;
+pub use unitary::Endianness;
 
 /// Low-level constructors for algorithms that have already performed resource and shape admission.
+///
+/// Both skip only the memory-budget admission that [`PauliString::identity_with_budget`] and
+/// [`PauliString::from_bases_with_budget`] perform; they are safe and still bounds-check.
 pub mod advanced {
     use super::{PauliBasis, PauliSign, PauliString};
 
-    /// Creates an identity Pauli string after the caller has admitted `num_qubits`.
-    pub fn pauli_identity_unchecked(num_qubits: usize) -> PauliString {
-        PauliString::identity_unchecked(num_qubits)
+    /// Creates an identity Pauli string without a budget admission, after the caller has
+    /// admitted `num_qubits`.
+    pub fn pauli_identity_unbudgeted(num_qubits: usize) -> PauliString {
+        PauliString::identity_unbudgeted(num_qubits)
     }
 
-    /// Creates a Pauli string after the caller has admitted the supplied basis count.
-    pub fn pauli_from_bases_unchecked(
+    /// Creates a Pauli string without a budget admission, after the caller has admitted the
+    /// supplied basis count.
+    pub fn pauli_from_bases_unbudgeted(
         sign: PauliSign,
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> PauliString {
-        PauliString::from_bases_unchecked(sign, bases)
+        PauliString::from_bases_unbudgeted(sign, bases)
     }
 }

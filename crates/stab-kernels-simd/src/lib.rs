@@ -127,50 +127,61 @@ pub fn clifford_right_multiply_words(
     Ok(dispatch!(level, simd => clifford_right_multiply_words_simd(simd, left, right)))
 }
 
+/// Borrowed packed X and Z planes of a Pauli string, one bit per qubit in each plane.
+#[derive(Clone, Copy, Debug)]
+pub struct PauliPlanes<'a> {
+    pub x: &'a [u64],
+    pub z: &'a [u64],
+}
+
+/// Mutably borrowed packed X and Z planes of a Pauli string.
+#[derive(Debug)]
+pub struct PauliPlanesMut<'a> {
+    pub x: &'a mut [u64],
+    pub z: &'a mut [u64],
+}
+
 /// Phase exponent and non-identity status of an in-place Pauli word product.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PauliWordProduct {
+    /// The exponent `k` of the product's scalar `i^k`, in `0..4`.
     pub log_i: u8,
     pub has_terms: bool,
 }
 
-/// Right-multiplies `(right_x, right_z)` into `(left_x, left_z)` qubit by qubit.
+/// Right-multiplies `right` into `left` qubit by qubit.
 ///
 /// Returns the base-`i` exponent of the product's scalar and whether any product qubit is not
 /// identity.
 ///
 /// # Errors
 ///
-/// Returns [`WordLengthMismatch`] without modifying `left_x` or `left_z` when any of the four
-/// planes differs in length from `left_x`.
+/// Returns [`WordLengthMismatch`] without modifying `left` when any of the four planes differs
+/// in length from `left.x`.
 #[inline]
 pub fn pauli_right_multiply_words(
-    left_x: &mut [u64],
-    left_z: &mut [u64],
-    right_x: &[u64],
-    right_z: &[u64],
+    left: PauliPlanesMut<'_>,
+    right: PauliPlanes<'_>,
 ) -> Result<PauliWordProduct, WordLengthMismatch> {
-    pauli_right_multiply::<true>(left_x, left_z, right_x, right_z)
+    pauli_right_multiply::<true>(left, right)
 }
 
-/// Right-multiplies `(right_x, right_z)` into `(left_x, left_z)` qubit by qubit and returns only
-/// the base-`i` exponent of the product's scalar.
+/// Right-multiplies `right` into `left` qubit by qubit and returns only the base-`i` exponent of
+/// the product's scalar, in `0..4`.
 ///
 /// This is [`pauli_right_multiply_words`] without the non-identity tracking, for callers such as
 /// tableau row products that do not need it.
 ///
 /// # Errors
 ///
-/// Returns [`WordLengthMismatch`] without modifying `left_x` or `left_z` when any of the four
-/// planes differs in length from `left_x`.
+/// Returns [`WordLengthMismatch`] without modifying `left` when any of the four planes differs
+/// in length from `left.x`.
 #[inline]
 pub fn pauli_right_multiply_words_log_i(
-    left_x: &mut [u64],
-    left_z: &mut [u64],
-    right_x: &[u64],
-    right_z: &[u64],
+    left: PauliPlanesMut<'_>,
+    right: PauliPlanes<'_>,
 ) -> Result<u8, WordLengthMismatch> {
-    pauli_right_multiply::<false>(left_x, left_z, right_x, right_z).map(|product| product.log_i)
+    pauli_right_multiply::<false>(left, right).map(|product| product.log_i)
 }
 
 /// Checks the plane lengths, multiplies empty and single-word planes inline, and dispatches longer
@@ -179,11 +190,17 @@ pub fn pauli_right_multiply_words_log_i(
 /// `has_terms` is only computed when `TRACK_NONZERO` is set and is `false` otherwise.
 #[inline(always)]
 fn pauli_right_multiply<const TRACK_NONZERO: bool>(
-    left_x: &mut [u64],
-    left_z: &mut [u64],
-    right_x: &[u64],
-    right_z: &[u64],
+    left: PauliPlanesMut<'_>,
+    right: PauliPlanes<'_>,
 ) -> Result<PauliWordProduct, WordLengthMismatch> {
+    let PauliPlanesMut {
+        x: left_x,
+        z: left_z,
+    } = left;
+    let PauliPlanes {
+        x: right_x,
+        z: right_z,
+    } = right;
     let expected = left_x.len();
     for actual in [left_z.len(), right_x.len(), right_z.len()] {
         ensure_len(expected, actual)?;
@@ -396,14 +413,14 @@ fn count_ones(words: &[u64]) -> usize {
 }
 
 /// The four planes of an in-place Pauli product; callers guarantee equal lengths.
-struct PauliPlanes<'l, 'r> {
+struct PauliProductPlanes<'l, 'r> {
     left_x: &'l mut [u64],
     left_z: &'l mut [u64],
     right_x: &'r [u64],
     right_z: &'r [u64],
 }
 
-impl<'l, 'r> PauliPlanes<'l, 'r> {
+impl<'l, 'r> PauliProductPlanes<'l, 'r> {
     /// Calls `body` on each aligned group of `chunk` words of all four planes and returns the
     /// planes' unprocessed remainders.
     #[inline(always)]
@@ -453,8 +470,8 @@ impl PhaseCounters<u64> {
 
     /// Multiplies the planes one word at a time.
     #[inline(always)]
-    fn words<const TRACK_NONZERO: bool>(&mut self, planes: PauliPlanes<'_, '_>) {
-        let PauliPlanes {
+    fn words<const TRACK_NONZERO: bool>(&mut self, planes: PauliProductPlanes<'_, '_>) {
+        let PauliProductPlanes {
             left_x,
             left_z,
             right_x,
@@ -470,8 +487,8 @@ impl PhaseCounters<u64> {
     fn vectors<'l, 'r, S, V, const TRACK_NONZERO: bool>(
         &mut self,
         simd: S,
-        planes: PauliPlanes<'l, 'r>,
-    ) -> PauliPlanes<'l, 'r>
+        planes: PauliProductPlanes<'l, 'r>,
+    ) -> PauliProductPlanes<'l, 'r>
     where
         S: Simd,
         V: SimdBase<S, Element = u64> + BitAnd<Output = V> + BitOr<Output = V> + BitXor<Output = V>,
@@ -588,7 +605,7 @@ fn pauli_right_multiply_words_simd<S: Simd, const TRACK_NONZERO: bool>(
     if S::u64s::LEN < u64x4::<S>::LEN && left_x.len() >= MIXED_MIN_WORDS {
         return pauli_mixed_blocks_simd::<S, TRACK_NONZERO>(simd, left_x, left_z, right_x, right_z);
     }
-    let planes = PauliPlanes {
+    let planes = PauliProductPlanes {
         left_x,
         left_z,
         right_x,
@@ -630,7 +647,7 @@ fn pauli_mixed_blocks_simd<S: Simd, const TRACK_NONZERO: bool>(
     right_x: &[u64],
     right_z: &[u64],
 ) -> PauliWordProduct {
-    let planes = PauliPlanes {
+    let planes = PauliProductPlanes {
         left_x,
         left_z,
         right_x,
@@ -644,7 +661,7 @@ fn pauli_mixed_blocks_simd<S: Simd, const TRACK_NONZERO: bool>(
         let (rx_v, rx_s) = rx.split_at(u64x4::<S>::LEN);
         let (rz_v, rz_s) = rz.split_at(u64x4::<S>::LEN);
         vector.multiply_slices::<S, TRACK_NONZERO>(simd, lx_v, lz_v, rx_v, rz_v);
-        counters.words::<TRACK_NONZERO>(PauliPlanes {
+        counters.words::<TRACK_NONZERO>(PauliProductPlanes {
             left_x: lx_s,
             left_z: lz_s,
             right_x: rx_s,

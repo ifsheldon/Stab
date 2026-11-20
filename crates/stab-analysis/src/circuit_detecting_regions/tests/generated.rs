@@ -1,7 +1,6 @@
 use super::*;
 use crate::{
-    CodeDistance, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams,
-    SurfaceCodeTask, generate_repetition_code_circuit, generate_surface_code_circuit,
+    CodeCircuitParams, CodeDistance, CodeTask, RepetitionCodeTask, RoundCount, SurfaceCodeTask,
 };
 
 pub(super) fn assert_generated_code_regions() {
@@ -12,13 +11,13 @@ pub(super) fn assert_generated_code_regions() {
 }
 
 fn assert_generated_repetition_code_filters_and_regions() {
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(3).unwrap(),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
         CodeDistance::try_new(3).unwrap(),
-        RepetitionCodeTask::Memory,
+        RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = generate_repetition_code_circuit(&params).unwrap();
+    let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit).unwrap();
@@ -58,13 +57,13 @@ fn assert_generated_repetition_code_filters_and_regions() {
 }
 
 fn assert_generated_rotated_surface_code_filters_and_regions() {
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(3).unwrap(),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ),
         CodeDistance::try_new(3).unwrap(),
-        SurfaceCodeTask::RotatedMemoryZ,
+        RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = generate_surface_code_circuit(&params).unwrap();
+    let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit).unwrap();
@@ -157,13 +156,13 @@ fn assert_generated_rotated_surface_code_filters_and_regions() {
 }
 
 fn assert_generated_unrotated_surface_code_filters_and_regions() {
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(3).unwrap(),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::UnrotatedMemoryZ),
         CodeDistance::try_new(3).unwrap(),
-        SurfaceCodeTask::UnrotatedMemoryZ,
+        RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = generate_surface_code_circuit(&params).unwrap();
+    let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit).unwrap();
@@ -342,13 +341,13 @@ fn assert_surface_code_regions(
     expected_target_count: usize,
     expected_regions: &[(DemTarget, [&str; 6])],
 ) {
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(3).unwrap(),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(task),
         CodeDistance::try_new(3).unwrap(),
-        task,
+        RoundCount::try_new(3).unwrap(),
     )
     .unwrap();
-    let generated = generate_surface_code_circuit(&params).unwrap();
+    let generated = params.generate().unwrap();
     let circuit = generated.circuit();
 
     let all_targets = all_detecting_region_targets(circuit).unwrap();

@@ -49,7 +49,7 @@ pub(super) fn simple_measurement_flows(
                         PauliSign::Plus
                     },
                 ),
-                stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
+                stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count),
                 [record_index],
                 [],
             )
@@ -145,8 +145,8 @@ pub(super) fn duplicate_measure_reset_flows(
         } else {
             flows.push(
                 Flow::new(
-                    stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
-                    stab_algebra::advanced::pauli_from_bases_unchecked(
+                    stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count),
+                    stab_algebra::advanced::pauli_from_bases_unbudgeted(
                         if inverted ^ final_inverted {
                             PauliSign::Minus
                         } else {
@@ -206,7 +206,7 @@ pub(super) fn simple_pair_measurement_flows(
                         PauliSign::Plus
                     },
                 ),
-                stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
+                stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count),
                 [record_index],
                 [],
             )

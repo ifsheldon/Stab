@@ -6,6 +6,7 @@
 //! `num_qubits / 64`.
 
 use crate::budget::{StabilizerResource, try_zeroed_words, words_for_bits};
+use crate::kernels::{PauliPlanes, PauliPlanesMut};
 use crate::{PauliSign, PauliString, StabilizerError, StabilizerResult};
 use stab_bits::BitVec;
 
@@ -347,21 +348,26 @@ pub(crate) fn multiply_row_into(
 ) -> StabilizerResult<u8> {
     let target_len = target.len();
     let source_len = source.len();
-    let (target_x, target_z) =
-        target
-            .split_at_mut_checked(half_words)
-            .ok_or_else(|| StabilizerError::LengthMismatch {
-                left: target_len,
-                right: 2 * half_words,
-            })?;
-    let (source_x, source_z) =
-        source
-            .split_at_checked(half_words)
-            .ok_or_else(|| StabilizerError::LengthMismatch {
-                left: source_len,
-                right: 2 * half_words,
-            })?;
-    crate::kernels::pauli_right_multiply_words_log_i(target_x, target_z, source_x, source_z)
+    let mismatch = |actual_words| StabilizerError::PlaneWordCountMismatch {
+        expected_words: 2 * half_words,
+        actual_words,
+    };
+    let (target_x, target_z) = target
+        .split_at_mut_checked(half_words)
+        .ok_or_else(|| mismatch(target_len))?;
+    let (source_x, source_z) = source
+        .split_at_checked(half_words)
+        .ok_or_else(|| mismatch(source_len))?;
+    crate::kernels::pauli_right_multiply_words_log_i(
+        PauliPlanesMut {
+            x: target_x,
+            z: target_z,
+        },
+        PauliPlanes {
+            x: source_x,
+            z: source_z,
+        },
+    )
 }
 
 /// The parity of the symplectic inner product of two packed rows.

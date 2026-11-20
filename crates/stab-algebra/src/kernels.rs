@@ -1,28 +1,12 @@
+//! Thin wrappers over the `stab-kernels-simd` word kernels that report their length checks as
+//! stabilizer errors.
+
+pub(crate) use stab_kernels_simd::{
+    CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, PauliPlanes, PauliPlanesMut,
+    PauliWordProduct,
+};
+
 use crate::{StabilizerError, StabilizerResult};
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) struct CliffordNonIdentityCounts {
-    pub(crate) before: usize,
-    pub(crate) after: usize,
-}
-
-pub(crate) struct CliffordPlanes<'a> {
-    pub(crate) z_signs: &'a [u64],
-    pub(crate) x_signs: &'a [u64],
-    pub(crate) inv_x2x: &'a [u64],
-    pub(crate) x2z: &'a [u64],
-    pub(crate) z2x: &'a [u64],
-    pub(crate) inv_z2z: &'a [u64],
-}
-
-pub(crate) struct CliffordPlanesMut<'a> {
-    pub(crate) z_signs: &'a mut [u64],
-    pub(crate) x_signs: &'a mut [u64],
-    pub(crate) inv_x2x: &'a mut [u64],
-    pub(crate) x2z: &'a mut [u64],
-    pub(crate) z2x: &'a mut [u64],
-    pub(crate) inv_z2z: &'a mut [u64],
-}
 
 /// Right-multiplies `right` into `left` and returns the non-identity counts before and after.
 ///
@@ -31,87 +15,45 @@ pub(crate) struct CliffordPlanesMut<'a> {
 /// A plane-length disagreement is reported as
 /// [`StabilizerError::InconsistentCliffordStringMetadata`]: callers build every plane from the same
 /// Clifford string word count, so a mismatch means the string's planes are out of sync.
+#[inline]
 pub(crate) fn clifford_right_multiply_words(
     left: CliffordPlanesMut<'_>,
     right: CliffordPlanes<'_>,
 ) -> StabilizerResult<CliffordNonIdentityCounts> {
-    let CliffordPlanesMut {
-        z_signs,
-        x_signs,
-        inv_x2x,
-        x2z,
-        z2x,
-        inv_z2z,
-    } = left;
-    let left = stab_kernels_simd::CliffordPlanesMut {
-        z_signs,
-        x_signs,
-        inv_x2x,
-        x2z,
-        z2x,
-        inv_z2z,
-    };
-    let CliffordPlanes {
-        z_signs,
-        x_signs,
-        inv_x2x,
-        x2z,
-        z2x,
-        inv_z2z,
-    } = right;
-    let right = stab_kernels_simd::CliffordPlanes {
-        z_signs,
-        x_signs,
-        inv_x2x,
-        x2z,
-        z2x,
-        inv_z2z,
-    };
-    let stab_kernels_simd::CliffordNonIdentityCounts { before, after } =
-        stab_kernels_simd::clifford_right_multiply_words(left, right)
-            .map_err(|_mismatch| StabilizerError::InconsistentCliffordStringMetadata)?;
-    Ok(CliffordNonIdentityCounts { before, after })
+    stab_kernels_simd::clifford_right_multiply_words(left, right)
+        .map_err(|_mismatch| StabilizerError::InconsistentCliffordStringMetadata)
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) struct PauliWordProduct {
-    pub(crate) log_i: u8,
-    pub(crate) has_terms: bool,
-}
-
+/// Right-multiplies `right` into `left` and returns the product's phase exponent and whether any
+/// of its terms is not the identity.
+///
+/// # Errors
+///
+/// Callers pass planes of one word count, so a disagreement is the internal
+/// [`StabilizerError::PlaneWordCountMismatch`].
 #[inline]
 pub(crate) fn pauli_right_multiply_words(
-    left_x: &mut [u64],
-    left_z: &mut [u64],
-    right_x: &[u64],
-    right_z: &[u64],
+    left: PauliPlanesMut<'_>,
+    right: PauliPlanes<'_>,
 ) -> StabilizerResult<PauliWordProduct> {
-    let stab_kernels_simd::PauliWordProduct { log_i, has_terms } =
-        stab_kernels_simd::pauli_right_multiply_words(left_x, left_z, right_x, right_z).map_err(
-            |mismatch| StabilizerError::LengthMismatch {
-                left: mismatch.expected,
-                right: mismatch.actual,
-            },
-        )?;
-    Ok(PauliWordProduct { log_i, has_terms })
+    stab_kernels_simd::pauli_right_multiply_words(left, right).map_err(word_count_mismatch)
 }
 
-/// Right-multiplies `(right_x, right_z)` into `(left_x, left_z)` and returns only the base-`i`
-/// exponent of the product's scalar, skipping the non-identity tracking of
-/// [`pauli_right_multiply_words`].
+/// Right-multiplies `right` into `left` and returns only the base-`i` exponent of the product's
+/// scalar, skipping the non-identity tracking of [`pauli_right_multiply_words`].
 #[inline]
 pub(crate) fn pauli_right_multiply_words_log_i(
-    left_x: &mut [u64],
-    left_z: &mut [u64],
-    right_x: &[u64],
-    right_z: &[u64],
+    left: PauliPlanesMut<'_>,
+    right: PauliPlanes<'_>,
 ) -> StabilizerResult<u8> {
-    stab_kernels_simd::pauli_right_multiply_words_log_i(left_x, left_z, right_x, right_z).map_err(
-        |mismatch| StabilizerError::LengthMismatch {
-            left: mismatch.expected,
-            right: mismatch.actual,
-        },
-    )
+    stab_kernels_simd::pauli_right_multiply_words_log_i(left, right).map_err(word_count_mismatch)
+}
+
+const fn word_count_mismatch(mismatch: stab_kernels_simd::WordLengthMismatch) -> StabilizerError {
+    StabilizerError::PlaneWordCountMismatch {
+        expected_words: mismatch.expected,
+        actual_words: mismatch.actual,
+    }
 }
 
 /// XORs one generator row `(x, z)` into the accumulated product `(acc_x, acc_z)` and returns the
@@ -339,15 +281,28 @@ mod tests {
             let mut simd_z = lz.clone();
             let scalar_prod =
                 scalar_pauli_right_multiply_words(&mut scalar_x, &mut scalar_z, &rx, &rz);
-            let simd_prod = pauli_right_multiply_words(&mut simd_x, &mut simd_z, &rx, &rz).unwrap();
+            let simd_prod = pauli_right_multiply_words(
+                PauliPlanesMut {
+                    x: &mut simd_x,
+                    z: &mut simd_z,
+                },
+                PauliPlanes { x: &rx, z: &rz },
+            )
+            .unwrap();
             assert_eq!(simd_x, scalar_x, "word_count={word_count}");
             assert_eq!(simd_z, scalar_z, "word_count={word_count}");
             assert_eq!(simd_prod, scalar_prod, "word_count={word_count}");
 
             let mut phase_x = lx;
             let mut phase_z = lz;
-            let log_i =
-                pauli_right_multiply_words_log_i(&mut phase_x, &mut phase_z, &rx, &rz).unwrap();
+            let log_i = pauli_right_multiply_words_log_i(
+                PauliPlanesMut {
+                    x: &mut phase_x,
+                    z: &mut phase_z,
+                },
+                PauliPlanes { x: &rx, z: &rz },
+            )
+            .unwrap();
             assert_eq!(phase_x, scalar_x, "phase only, word_count={word_count}");
             assert_eq!(phase_z, scalar_z, "phase only, word_count={word_count}");
             assert_eq!(

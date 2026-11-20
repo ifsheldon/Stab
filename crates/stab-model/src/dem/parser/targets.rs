@@ -1,9 +1,10 @@
 //! Target-list parsing and the target checks that turn parsed tokens into an instruction payload.
 
 use super::super::instruction::{
-    DemPayload, validate_dem_args, validate_error_separator_prefix, validate_error_targets,
+    DemPayload, error_probability, validate_coordinates, validate_error_separator_prefix,
+    validate_error_targets, validate_no_args,
 };
-use super::super::{DemInstructionKind, DemTarget, DemTargetVec};
+use super::super::{DemArgVec, DemInstructionKind, DemTarget, DemTargetVec};
 use super::{
     ParsedDemArguments, argument_token_at, first_character_span, is_target_space, parse_line_error,
     parse_source_uint60, starts_with_target_space, target_context, target_syntax_error,
@@ -45,16 +46,17 @@ impl ParsedDemTargets<'_> {
         self.values.get(..end).unwrap_or(&self.values)
     }
 
-    /// Checks the parsed targets against `kind` and `args` and builds the instruction payload,
-    /// leaving the targets in place when they are invalid so the error can be located.
+    /// Checks `args` and the parsed targets against `kind` and builds the instruction payload,
+    /// leaving the arguments and targets in place when they are invalid so the error can be
+    /// located. The arguments are checked first.
     pub(super) fn take_payload(
         &mut self,
         kind: DemInstructionKind,
-        args: &[f64],
+        args: &mut DemArgVec,
     ) -> ModelResult<DemPayload> {
-        validate_dem_args(kind, args)?;
         match kind {
             DemInstructionKind::Error => {
+                let probability = error_probability(args)?;
                 validate_error_separator_prefix(self.before_numeric())?;
                 if self.numeric.is_some() {
                     return Err(ModelError::invalid_detector_error_model(
@@ -62,22 +64,33 @@ impl ParsedDemTargets<'_> {
                     ));
                 }
                 validate_error_targets(&self.values)?;
-                Ok(DemPayload::Error(std::mem::take(&mut self.values)))
+                Ok(DemPayload::Error {
+                    probability,
+                    targets: std::mem::take(&mut self.values),
+                })
             }
             DemInstructionKind::Detector => {
+                validate_coordinates(kind, args)?;
                 let detector = self.single_target("detector", DemTarget::detector)?;
-                Ok(DemPayload::detector(detector))
+                Ok(DemPayload::detector(std::mem::take(args), detector))
             }
             DemInstructionKind::LogicalObservable => {
+                validate_no_args(args)?;
                 let observable = self.single_target("logical_observable", DemTarget::observable)?;
                 Ok(DemPayload::logical_observable(observable))
             }
-            DemInstructionKind::ShiftDetectors => match (self.token_count, self.numeric) {
-                (1, Some(numeric)) => Ok(DemPayload::ShiftDetectors(numeric.value)),
-                _ => Err(ModelError::invalid_detector_error_model(
-                    "shift_detectors requires exactly one numeric target",
-                )),
-            },
+            DemInstructionKind::ShiftDetectors => {
+                validate_coordinates(kind, args)?;
+                match (self.token_count, self.numeric) {
+                    (1, Some(numeric)) => Ok(DemPayload::ShiftDetectors {
+                        coordinates: std::mem::take(args),
+                        shift: numeric.value,
+                    }),
+                    _ => Err(ModelError::invalid_detector_error_model(
+                        "shift_detectors requires exactly one numeric target",
+                    )),
+                }
+            }
         }
     }
 

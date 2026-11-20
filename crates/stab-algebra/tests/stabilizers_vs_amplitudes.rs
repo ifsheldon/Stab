@@ -5,7 +5,7 @@
 )]
 
 use num_complex::Complex32;
-use stab_algebra::{Tableau, unitary_to_tableau};
+use stab_algebra::{Endianness, Tableau};
 
 #[test]
 fn unitary_to_tableau_matches_known_gate_data_like_stim() {
@@ -16,14 +16,14 @@ fn unitary_to_tableau_matches_known_gate_data_like_stim() {
     for case in cases {
         let expected = case.expected_tableau();
         assert_eq!(
-            unitary_to_tableau(&case.matrix, true).expect(case.name),
+            Tableau::from_unitary(&case.matrix, Endianness::Little).expect(case.name),
             expected,
             "{}",
             case.name
         );
         if case.matrix.len() == 2 {
             assert_eq!(
-                unitary_to_tableau(&case.matrix, false).expect(case.name),
+                Tableau::from_unitary(&case.matrix, Endianness::Big).expect(case.name),
                 expected,
                 "{}",
                 case.name
@@ -107,12 +107,12 @@ fn unitary_to_tableau_handles_controlled_gate_endianness_like_stim() {
     ] {
         let matrix = matrix_from_rows(matrix);
         assert_eq!(
-            unitary_to_tableau(&matrix, true).expect(gate),
+            Tableau::from_unitary(&matrix, Endianness::Little).expect(gate),
             expected_little,
             "{gate} little endian"
         );
         assert_eq!(
-            unitary_to_tableau(&matrix, false).expect(gate),
+            Tableau::from_unitary(&matrix, Endianness::Big).expect(gate),
             expected_big,
             "{gate} big endian"
         );
@@ -124,31 +124,31 @@ fn unitary_to_tableau_rejects_non_clifford_or_malformed_matrices_like_stim() {
     // Adapted from Stim v1.16.0 src/stim/util_top/stabilizers_vs_amplitudes.test.cc.
     let eighth_turn_phase = f32::sqrt(0.5);
     assert!(
-        unitary_to_tableau(
+        Tableau::from_unitary(
             &[
                 vec![c(1.0, 0.0), c(0.0, 0.0)],
                 vec![c(0.0, 0.0), c(eighth_turn_phase, eighth_turn_phase)],
             ],
-            false,
+            Endianness::Big
         )
         .is_err()
     );
 
     assert!(
-        unitary_to_tableau(
+        Tableau::from_unitary(
             &[
                 vec![c(1.0, 0.0), c(0.0, 0.0), c(0.0, 0.0), c(0.0, 0.0)],
                 vec![c(0.0, 0.0), c(1.0, 0.0), c(0.0, 0.0), c(0.0, 0.0)],
                 vec![c(0.0, 0.0), c(0.0, 0.0), c(1.0, 0.0), c(0.0, 0.0)],
                 vec![c(0.0, 0.0), c(0.0, 0.0), c(0.0, 0.0), c(0.0, 1.0)],
             ],
-            false,
+            Endianness::Big
         )
         .is_err()
     );
 
     assert!(
-        unitary_to_tableau(
+        Tableau::from_unitary(
             &[
                 vec![
                     c(1.0, 0.0),
@@ -231,12 +231,14 @@ fn unitary_to_tableau_rejects_non_clifford_or_malformed_matrices_like_stim() {
                     c(0.0, 0.0),
                 ],
             ],
-            false,
+            Endianness::Big
         )
         .is_err()
     );
 
-    assert!(unitary_to_tableau(&[vec![c(1.0, 0.0)], vec![c(0.0, 0.0)]], false).is_err());
+    assert!(
+        Tableau::from_unitary(&[vec![c(1.0, 0.0)], vec![c(0.0, 0.0)]], Endianness::Big).is_err()
+    );
 }
 
 #[test]
@@ -249,7 +251,8 @@ fn unitary_to_tableau_snaps_near_clifford_phases_like_stim() {
         &[(0.0, 0.0), (theta.cos(), theta.sin())],
     ]);
     assert_eq!(
-        unitary_to_tableau(&near_identity_phase, true).expect("near identity phase"),
+        Tableau::from_unitary(&near_identity_phase, Endianness::Little)
+            .expect("near identity phase"),
         Tableau::identity(1).expect("Tableau identity")
     );
 
@@ -258,7 +261,7 @@ fn unitary_to_tableau_snaps_near_clifford_phases_like_stim() {
         &[(1.0, 0.0), (0.0, 0.0)],
         &[(0.0, 0.0), (theta.cos(), theta.sin())],
     ]);
-    assert!(unitary_to_tableau(&non_clifford_phase, true).is_err());
+    assert!(Tableau::from_unitary(&non_clifford_phase, Endianness::Little).is_err());
 }
 
 #[derive(Clone, Copy)]

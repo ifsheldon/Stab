@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::resource_limit::admit_detector_coordinate_map;
 use crate::{
-    CircuitDetectorId, Gate, ModelError, ModelResult, QubitId, RepeatCount, ValidationError,
+    CircuitDetectorId, Gate, MemoryBudget, ModelDialect, ModelError, ModelResult, QubitId,
+    RepeatCount, ValidationError,
 };
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
@@ -203,8 +205,32 @@ impl Circuit {
         Ok(coordinates)
     }
 
+    /// Materializes every detector's coordinates within the default memory budget.
     pub fn detector_coordinates(&self) -> ModelResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
+        self.detector_coordinates_with_memory_budget(MemoryBudget::DEFAULT)
+    }
+
+    /// Materializes every detector's coordinates after admitting the conservative map size
+    /// against `budget`.
+    ///
+    /// A map beyond `budget` is refused with a [`crate::ResourceLimitError`] of kind
+    /// [`crate::ResourceKind::MaterializedBytes`] before anything is allocated, so a huge
+    /// `REPEAT` cannot force an allocation proportional to its detector count. Use
+    /// [`Self::detector_coordinates_for`] to look up selected detectors without this charge.
+    pub fn detector_coordinates_with_memory_budget(
+        &self,
+        budget: MemoryBudget,
+    ) -> ModelResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
         let detector_count = self.count_detectors()?;
+        let max_coordinates = max_operation_property(self, |instruction| {
+            Ok((instruction.gate() == Gate::DETECTOR).then(|| instruction.args().len() as u64))
+        })?;
+        admit_detector_coordinate_map(
+            ModelDialect::StimCircuit,
+            detector_count,
+            usize::try_from(max_coordinates).unwrap_or(usize::MAX),
+            budget,
+        )?;
         let detectors = (0..detector_count)
             .map(CircuitDetectorId::new)
             .collect::<BTreeSet<_>>();

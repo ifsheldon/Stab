@@ -25,7 +25,7 @@ pub(super) fn apply_local_tableau_to_global_pauli(
     local_tableau: &Tableau,
     qubit_count: usize,
 ) -> AnalysisResult<PauliString> {
-    let local = stab_algebra::advanced::pauli_from_bases_unchecked(
+    let local = stab_algebra::advanced::pauli_from_bases_unbudgeted(
         input.sign(),
         targets
             .iter()
@@ -48,7 +48,7 @@ pub(super) fn apply_local_tableau_to_global_pauli(
         };
         *slot = basis;
     }
-    Ok(stab_algebra::advanced::pauli_from_bases_unchecked(
+    Ok(stab_algebra::advanced::pauli_from_bases_unbudgeted(
         transformed.sign(),
         bases,
     ))
@@ -174,7 +174,7 @@ pub(super) fn input_measurement_flow(
 ) -> AnalysisResult<Flow> {
     Flow::new(
         single_pauli(qubit_count, qubit, basis),
-        stab_algebra::advanced::pauli_from_bases_unchecked(record_sign, []),
+        stab_algebra::advanced::pauli_from_bases_unbudgeted(record_sign, []),
         [record_index_i32(record_index)?],
         [],
     )
@@ -183,8 +183,8 @@ pub(super) fn input_measurement_flow(
 
 pub(super) fn positive_record_flow(record_index: usize) -> AnalysisResult<Flow> {
     Flow::new(
-        stab_algebra::advanced::pauli_identity_unchecked(0),
-        stab_algebra::advanced::pauli_identity_unchecked(0),
+        stab_algebra::advanced::pauli_identity_unbudgeted(0),
+        stab_algebra::advanced::pauli_identity_unbudgeted(0),
         [record_index_i32(record_index)?],
         [],
     )
@@ -193,8 +193,8 @@ pub(super) fn positive_record_flow(record_index: usize) -> AnalysisResult<Flow> 
 
 pub(super) fn negative_record_flow(record_index: usize) -> AnalysisResult<Flow> {
     Flow::new(
-        stab_algebra::advanced::pauli_identity_unchecked(0),
-        stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Minus, []),
+        stab_algebra::advanced::pauli_identity_unbudgeted(0),
+        stab_algebra::advanced::pauli_from_bases_unbudgeted(PauliSign::Minus, []),
         [record_index_i32(record_index)?],
         [],
     )

@@ -1,4 +1,6 @@
-use super::super::instruction::{DemPayload, validate_dem_args, validate_error_targets};
+use super::super::instruction::{
+    DemPayload, error_probability, validate_coordinates, validate_error_targets,
+};
 use super::super::{
     DemArgVec, DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemTag,
     DemTarget, DemTargetVec,
@@ -23,12 +25,8 @@ pub(super) fn parse_canonical_instruction(line: &str) -> Option<DemInstruction> 
 
     let (tag, rest) = parse_canonical_tag(rest)?;
     let (args, rest) = parse_canonical_args(kind, rest)?;
-    let payload = parse_canonical_payload(kind, rest)?;
-    validate_dem_args(kind, &args).ok()?;
-    if let DemPayload::Error(targets) = &payload {
-        validate_error_targets(targets).ok()?;
-    }
-    Some(DemInstruction::from_validated_parts(args, payload, tag))
+    let payload = parse_canonical_payload(kind, args, rest)?;
+    Some(DemInstruction::from_validated_parts(payload, tag))
 }
 
 pub(super) fn parse_canonical_repeat_header(header: &str) -> Option<(u64, Option<DemTag>)> {
@@ -104,7 +102,12 @@ fn parse_canonical_args(kind: DemInstructionKind, rest: &str) -> Option<(DemArgV
     Some((args, body.get(close + 1..)?))
 }
 
-fn parse_canonical_payload(kind: DemInstructionKind, rest: &str) -> Option<DemPayload> {
+/// Parses the targets of `kind` and checks them together with the already parsed `args`.
+fn parse_canonical_payload(
+    kind: DemInstructionKind,
+    args: DemArgVec,
+    rest: &str,
+) -> Option<DemPayload> {
     let raw_targets = if rest.is_empty() {
         ""
     } else {
@@ -116,14 +119,20 @@ fn parse_canonical_payload(kind: DemInstructionKind, rest: &str) -> Option<DemPa
     };
     match kind {
         DemInstructionKind::Error => {
-            parse_canonical_error_targets(raw_targets).map(DemPayload::Error)
+            let targets = parse_canonical_error_targets(raw_targets)?;
+            let probability = error_probability(&args).ok()?;
+            validate_error_targets(&targets).ok()?;
+            Some(DemPayload::Error {
+                probability,
+                targets,
+            })
         }
         // A single-target instruction holds exactly one token, so a space means extra targets.
         _ if raw_targets.is_empty() || raw_targets.contains(' ') => None,
         DemInstructionKind::Detector => {
-            DemDetectorId::try_new(parse_prefixed_id(raw_targets, b'D')?)
-                .ok()
-                .map(DemPayload::detector)
+            let detector = DemDetectorId::try_new(parse_prefixed_id(raw_targets, b'D')?).ok()?;
+            validate_coordinates(kind, &args).ok()?;
+            Some(DemPayload::detector(args, detector))
         }
         DemInstructionKind::LogicalObservable => {
             DemObservableId::try_new(parse_prefixed_id(raw_targets, b'L')?)
@@ -131,7 +140,12 @@ fn parse_canonical_payload(kind: DemInstructionKind, rest: &str) -> Option<DemPa
                 .map(DemPayload::logical_observable)
         }
         DemInstructionKind::ShiftDetectors => {
-            parse_canonical_uint60(raw_targets).map(DemPayload::ShiftDetectors)
+            let shift = parse_canonical_uint60(raw_targets)?;
+            validate_coordinates(kind, &args).ok()?;
+            Some(DemPayload::ShiftDetectors {
+                coordinates: args,
+                shift,
+            })
         }
     }
 }

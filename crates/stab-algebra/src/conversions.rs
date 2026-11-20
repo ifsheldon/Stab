@@ -59,45 +59,68 @@ pub(crate) fn canonicalize_stabilizers(
     (0..next_pivot).map(|row| rows.to_pauli(row)).collect()
 }
 
-/// Synthesizes a tableau whose Z outputs are the independent `stabilizers`, admitted against
-/// [`AlgebraMemoryBudget::DEFAULT`].
+/// How [`Tableau::from_stabilizers`] treats degenerate generator sets, and which direction of the
+/// synthesized tableau it returns.
 ///
-/// See [`stabilizers_to_tableau_with_budget`].
-pub fn stabilizers_to_tableau(
+/// The default matches Stim's `stabilizers_to_tableau` defaults: redundant and underconstrained
+/// sets are refused and the forward tableau is returned.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct StabilizerTableauOptions {
+    /// Skip generators that the earlier ones already generate, instead of refusing them.
+    pub allow_redundant: bool,
+    /// Complete fewer than `n` independent generators with chosen ones, instead of refusing them.
+    pub allow_underconstrained: bool,
+    /// Return the elimination tableau `E`, which maps the stabilizers to `Z_k`, instead of `E^-1`.
+    pub inverse: bool,
+}
+
+impl Tableau {
+    /// Synthesizes a tableau whose Z outputs are the independent `stabilizers`, admitted against
+    /// [`AlgebraMemoryBudget::DEFAULT`].
+    ///
+    /// See [`Self::from_stabilizers_with_budget`].
+    pub fn from_stabilizers(
+        stabilizers: &[PauliString],
+        options: StabilizerTableauOptions,
+    ) -> StabilizerResult<Self> {
+        Self::from_stabilizers_with_budget(stabilizers, options, AlgebraMemoryBudget::DEFAULT)
+    }
+
+    /// Synthesizes a tableau from commuting stabilizer generators, as Stim's
+    /// `stabilizers_to_tableau`.
+    ///
+    /// The stabilizers are padded to the widest one's `n` qubits. Gaussian elimination over the
+    /// transposed stabilizers, one packed row per qubit, applies `H`, `H_YZ`, `XCX`, `XCY`, `XCZ`,
+    /// `SWAP`, and `X` gates until stabilizer `k` becomes `+Z_k`. The same gates update the
+    /// tableau `E` of that elimination circuit, held transposed beside the stabilizers so each
+    /// gate is one word-parallel pass, and the result is `E^-1`, which maps `Z_k` to the `k`-th
+    /// independent stabilizer and matches Stim's destabilizers and completions exactly;
+    /// [`StabilizerTableauOptions::inverse`] returns `E`. Redundant generators are skipped only
+    /// with [`StabilizerTableauOptions::allow_redundant`], and fewer than `n` independent
+    /// generators are completed only with [`StabilizerTableauOptions::allow_underconstrained`];
+    /// anticommuting and contradictory generators are refused like Stim. The working rows, the
+    /// output, and the inversion scratch are admitted against `budget` before allocation.
+    /// Elimination costs `O(n m (m + n) / 64)` word operations for `m` stabilizers, plus one
+    /// `O(n^3 / 64)` inversion.
+    pub fn from_stabilizers_with_budget(
+        stabilizers: &[PauliString],
+        options: StabilizerTableauOptions,
+        budget: AlgebraMemoryBudget,
+    ) -> StabilizerResult<Self> {
+        stabilizers_to_tableau(stabilizers, options, budget)
+    }
+}
+
+fn stabilizers_to_tableau(
     stabilizers: &[PauliString],
-    allow_redundant: bool,
-    allow_underconstrained: bool,
-    inverse: bool,
+    options: StabilizerTableauOptions,
+    budget: AlgebraMemoryBudget,
 ) -> StabilizerResult<Tableau> {
-    stabilizers_to_tableau_with_budget(
-        stabilizers,
+    let StabilizerTableauOptions {
         allow_redundant,
         allow_underconstrained,
         inverse,
-        AlgebraMemoryBudget::DEFAULT,
-    )
-}
-
-/// Synthesizes a tableau from commuting stabilizer generators, as Stim's `stabilizers_to_tableau`.
-///
-/// The stabilizers are padded to the widest one's `n` qubits. Gaussian elimination over the
-/// transposed stabilizers, one packed row per qubit, applies `H`, `H_YZ`, `XCX`, `XCY`, `XCZ`,
-/// `SWAP`, and `X` gates until stabilizer `k` becomes `+Z_k`. The same gates update the tableau
-/// `E` of that elimination circuit, held transposed beside the stabilizers so each gate is one
-/// word-parallel pass, and the result is `E^-1`, which maps `Z_k` to the `k`-th independent
-/// stabilizer and matches Stim's destabilizers and completions exactly; `inverse` returns `E`.
-/// Redundant generators are skipped only when `allow_redundant` is set, and fewer than `n`
-/// independent generators are completed only when `allow_underconstrained` is set; anticommuting
-/// and contradictory generators are refused like Stim. The working rows, the output, and the
-/// inversion scratch are admitted against `budget` before allocation. Elimination costs
-/// `O(n m (m + n) / 64)` word operations for `m` stabilizers, plus one `O(n^3 / 64)` inversion.
-pub fn stabilizers_to_tableau_with_budget(
-    stabilizers: &[PauliString],
-    allow_redundant: bool,
-    allow_underconstrained: bool,
-    inverse: bool,
-    budget: AlgebraMemoryBudget,
-) -> StabilizerResult<Tableau> {
+    } = options;
     let num_qubits = stabilizers.iter().map(PauliString::len).max().unwrap_or(0);
     budget.admit(
         StabilizerResource::StabilizerSolve,
@@ -105,7 +128,7 @@ pub fn stabilizers_to_tableau_with_budget(
     )?;
     let mut solver = Solver::new(stabilizers, num_qubits)?;
     let mut used = 0;
-    for (index, stabilizer) in stabilizers.iter().enumerate() {
+    for index in 0..stabilizers.len() {
         for qubit in 0..used {
             if solver.x_bit(qubit, index)? {
                 return Err(first_anticommuting_pair(stabilizers));
@@ -120,14 +143,10 @@ pub fn stabilizers_to_tableau_with_budget(
         }
         let Some(pivot) = pivot else {
             if solver.sign(index)? {
-                return Err(StabilizerError::InconsistentStabilizer {
-                    stabilizer: stabilizer.to_string(),
-                });
+                return Err(StabilizerError::InconsistentStabilizer { stabilizer: index });
             }
             if !allow_redundant {
-                return Err(StabilizerError::RedundantStabilizer {
-                    stabilizer: stabilizer.to_string(),
-                });
+                return Err(StabilizerError::RedundantStabilizer { stabilizer: index });
             }
             continue;
         };
@@ -404,11 +423,11 @@ const fn overflow(num_qubits: usize) -> StabilizerError {
 /// proves some pair anticommutes.
 fn first_anticommuting_pair(stabilizers: &[PauliString]) -> StabilizerError {
     for (first, left) in stabilizers.iter().enumerate() {
-        for right in stabilizers.iter().skip(first + 1) {
-            if !left.commutes(right).unwrap_or(true) {
+        for (second, right) in stabilizers.iter().enumerate().skip(first + 1) {
+            if !left.commutes(right) {
                 return StabilizerError::AntiCommutingStabilizer {
-                    stabilizer: right.to_string(),
-                    conflict: left.to_string(),
+                    stabilizer: second,
+                    conflict: first,
                 };
             }
         }
@@ -428,7 +447,7 @@ fn multiply_signed_row_into(
     let log_i = multiply_row_into(target_words, source_words, half_words)?;
     if log_i & 1 != 0 {
         return Err(StabilizerError::ImaginaryProduct {
-            phase: PauliPhase::from_exponent(log_i),
+            phase: PauliPhase::from_log_i(log_i),
         });
     }
     let negative = rows.sign(target)? ^ source_sign ^ (log_i == 2);

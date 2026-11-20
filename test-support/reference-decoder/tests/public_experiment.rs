@@ -4,8 +4,8 @@
 )]
 
 use stab_analysis::{
-    CodeDistance, ErrorAnalyzerOptions, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    circuit_to_detector_error_model, generate_repetition_code_circuit,
+    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
+    RoundCount, circuit_to_detector_error_model,
 };
 use stab_decoder::{DecodeBatchError, DecodeBatchStatus, DecoderInputBatchView, decode_batch};
 use stab_engine::{
@@ -51,17 +51,17 @@ fn public_sample_detect_decode_experiment_is_seeded_and_partition_invariant() {
 
 fn run_experiment(partitions: &[u64]) -> ExperimentReport {
     assert!(partitions.iter().sum::<u64>() > 0);
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(3).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
         CodeDistance::try_new(3).expect("distance"),
-        RepetitionCodeTask::Memory,
+        RoundCount::try_new(3).expect("rounds"),
     )
     .expect("repetition parameters")
     .with_before_round_data_depolarization(probability(0.05))
     .with_before_measure_flip_probability(probability(0.025))
     .with_after_reset_flip_probability(probability(0.0125))
     .with_after_clifford_depolarization(probability(0.00625));
-    let generated = generate_repetition_code_circuit(&params).expect("generate repetition circuit");
+    let generated = params.generate().expect("generate repetition circuit");
     let circuit = generated.circuit();
     let model = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())
         .expect("lower detector-error model");

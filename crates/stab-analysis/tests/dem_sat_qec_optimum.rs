@@ -10,10 +10,9 @@
 //! first cross-checked against exhaustive enumeration on an instance small enough to enumerate.
 
 use stab_analysis::{
-    CodeDistance, ErrorAnalyzerOptions, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
-    find_undetectable_logical_error, generate_repetition_code_circuit,
-    generate_surface_code_circuit, likeliest_error_sat_problem, shortest_error_sat_problem,
+    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
+    RoundCount, SurfaceCodeTask, circuit_to_detector_error_model, find_undetectable_logical_error,
+    likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::{Circuit, DetectorErrorModel, Probability};
@@ -26,15 +25,16 @@ fn probability(value: f64) -> Probability {
 }
 
 fn repetition_code(distance: u32, rounds: u64) -> Circuit {
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(rounds).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
         CodeDistance::try_new(distance).expect("distance"),
-        RepetitionCodeTask::Memory,
+        RoundCount::try_new(rounds).expect("rounds"),
     )
     .expect("repetition params")
     .with_before_round_data_depolarization(probability(0.01))
     .with_before_measure_flip_probability(probability(0.02));
-    generate_repetition_code_circuit(&params)
+    params
+        .generate()
         .expect("repetition circuit")
         .circuit()
         .clone()
@@ -42,17 +42,18 @@ fn repetition_code(distance: u32, rounds: u64) -> Circuit {
 
 fn rotated_surface_code(rounds: u64) -> Circuit {
     let noise = probability(0.001);
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(rounds).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryX),
         CodeDistance::try_new(3).expect("distance"),
-        SurfaceCodeTask::RotatedMemoryX,
+        RoundCount::try_new(rounds).expect("rounds"),
     )
     .expect("surface params")
     .with_after_clifford_depolarization(noise)
     .with_before_measure_flip_probability(noise)
     .with_after_reset_flip_probability(noise)
     .with_before_round_data_depolarization(noise);
-    generate_surface_code_circuit(&params)
+    params
+        .generate()
         .expect("surface circuit")
         .circuit()
         .clone()

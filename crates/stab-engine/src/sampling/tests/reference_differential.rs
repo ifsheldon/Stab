@@ -7,10 +7,7 @@
 //! measurement, and Pauli product in the catalog.
 
 use rand::RngExt as _;
-use stab_analysis::{
-    ColorCodeParams, ColorCodeTask, RepetitionCodeParams, RepetitionCodeTask,
-    generate_color_code_circuit, generate_repetition_code_circuit,
-};
+use stab_analysis::{ColorCodeTask, RepetitionCodeTask};
 use stab_model::GateTargetGroupKind;
 
 use super::*;
@@ -161,13 +158,13 @@ fn folded_references_match_iteration_on_sign_changing_periodic_and_entangled_loo
 
 #[test]
 fn folded_reference_matches_iteration_on_surface_code_with_inserted_paulis() {
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(25).expect("valid round count"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ),
         CodeDistance::try_new(3).expect("valid code distance"),
-        SurfaceCodeTask::RotatedMemoryZ,
+        RoundCount::try_new(25).expect("valid round count"),
     )
     .expect("valid surface-code parameters");
-    let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+    let generated = params.generate().expect("generate surface circuit");
     let text = generated.circuit().to_stim_string();
     let baseline = ReferencePaths::compute(generated.circuit());
     baseline.assert_agree("surface code");
@@ -494,26 +491,35 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
         SurfaceCodeTask::UnrotatedMemoryX,
         SurfaceCodeTask::UnrotatedMemoryZ,
     ] {
-        let params = SurfaceCodeParams::new(rounds, distance, task).expect("surface parameters");
+        let params = CodeCircuitParams::try_new(CodeTask::Surface(task), distance, rounds)
+            .expect("surface parameters");
         circuits.push(
-            generate_surface_code_circuit(&params)
+            params
+                .generate()
                 .expect("generate surface circuit")
                 .circuit()
                 .to_stim_string(),
         );
     }
     let color =
-        ColorCodeParams::new(rounds, distance, ColorCodeTask::MemoryXyz).expect("color parameters");
+        CodeCircuitParams::try_new(CodeTask::Color(ColorCodeTask::MemoryXyz), distance, rounds)
+            .expect("color parameters");
     circuits.push(
-        generate_color_code_circuit(&color)
+        color
+            .generate()
             .expect("generate color circuit")
             .circuit()
             .to_stim_string(),
     );
-    let repetition = RepetitionCodeParams::new(rounds, distance, RepetitionCodeTask::Memory)
-        .expect("repetition parameters");
+    let repetition = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
+        distance,
+        rounds,
+    )
+    .expect("repetition parameters");
     circuits.push(
-        generate_repetition_code_circuit(&repetition)
+        repetition
+            .generate()
             .expect("generate repetition circuit")
             .circuit()
             .to_stim_string(),
@@ -599,14 +605,14 @@ fn detector_parities(circuit: &Circuit, record: &[bool]) -> Vec<bool> {
 
 #[test]
 fn sessions_share_the_plan_reference_instead_of_recomputing_it() {
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(5).expect("valid round count"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryX),
         CodeDistance::try_new(5).expect("valid code distance"),
-        SurfaceCodeTask::RotatedMemoryX,
+        RoundCount::try_new(5).expect("valid round count"),
     )
     .expect("valid surface-code parameters")
     .with_before_measure_flip_probability(Probability::try_new(0.01).expect("probability"));
-    let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+    let generated = params.generate().expect("generate surface circuit");
     let plan = SamplingCompiler::new()
         .compile(generated.circuit())
         .expect("compile surface circuit");
@@ -648,14 +654,14 @@ fn memory_experiment_rounds_fold_once_the_state_recurs() {
         SurfaceCodeTask::RotatedMemoryX,
         SurfaceCodeTask::RotatedMemoryZ,
     ] {
-        let params = SurfaceCodeParams::new(
-            RoundCount::try_new(60).expect("valid round count"),
+        let params = CodeCircuitParams::try_new(
+            CodeTask::Surface(task),
             CodeDistance::try_new(5).expect("valid code distance"),
-            task,
+            RoundCount::try_new(60).expect("valid round count"),
         )
         .expect("valid surface-code parameters")
         .with_after_clifford_depolarization(probability);
-        let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+        let generated = params.generate().expect("generate surface circuit");
         let paths = ReferencePaths::compute(generated.circuit());
         paths.assert_agree(&format!("{task:?}"));
         // The round's Clifford does not return the preparing tableau to itself, so this fold
@@ -837,14 +843,14 @@ fn fold_probes_are_skipped_when_the_saved_iterations_cannot_repay_them() {
     // costs less than a snapshot and comparison, while a long one folds.
     let probability = Probability::try_new(0.001).expect("valid generated-circuit noise");
     for (rounds, folds) in [(3, false), (200, true)] {
-        let params = SurfaceCodeParams::new(
-            RoundCount::try_new(rounds).expect("valid round count"),
+        let params = CodeCircuitParams::try_new(
+            CodeTask::Surface(SurfaceCodeTask::RotatedMemoryX),
             CodeDistance::try_new(9).expect("valid code distance"),
-            SurfaceCodeTask::RotatedMemoryX,
+            RoundCount::try_new(rounds).expect("valid round count"),
         )
         .expect("valid surface-code parameters")
         .with_after_clifford_depolarization(probability);
-        let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+        let generated = params.generate().expect("generate surface circuit");
         let paths = ReferencePaths::compute(generated.circuit());
         paths.assert_agree(&format!("{rounds} rounds"));
         assert_eq!(

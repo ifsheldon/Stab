@@ -19,57 +19,72 @@ const COLUMN_NORM_EPSILON: f64 = 1e-4;
 /// Snapped cell code for a zero ratio; codes `0..4` are the exponent `k` of `i^k`.
 const ZERO_CELL: u8 = 4;
 
-/// Converts a Clifford unitary matrix into the corresponding tableau, up to global phase.
-///
-/// `matrix` is a list of rows. When `little_endian` is true, qubit 0 corresponds to the least
-/// significant amplitude bit. When it is false, qubit 0 corresponds to the most significant
-/// amplitude bit, matching Stim's `unitary_to_tableau` convention.
-///
-/// # Acceptance contract
-///
-/// Let `d = 2^n` be the dimension and `β` the largest-magnitude entry of column 0 (the first one
-/// on ties). The matrix is accepted, and the tableau `T` returned, exactly when:
-///
-/// 1. every entry is finite;
-/// 2. every column's squared norm is within `1e-4` of 1;
-/// 3. every ratio `M[r][c] / β` lies within squared distance `0.125` of a value `s[r][c]` in
-///    `{0, 1, -1, i, -i}`, which is Stim v1.16.0's stabilizer-state smoothing threshold; and
-/// 4. the snapped matrix `s` is exactly a scalar multiple of the unitary of the Clifford tableau
-///    `T`, checked on every entry.
-///
-/// Condition 4 is decided in exact arithmetic on the snapped matrix: the image of each generator
-/// is read from column 0 of `s P s†` and from the `n` columns `2^p`, and every column `j` of `s`
-/// is then checked to equal the image of `X^j` applied to column 0, which must itself be
-/// stabilized by every image of `Z`. Like Stim, a matrix within the snapping tolerance of a
-/// Clifford is accepted without a separate per-entry unitarity check, so a near-Clifford matrix
-/// whose columns have unit norm but are not exactly orthogonal is accepted.
-///
-/// # Errors
-///
-/// - A height that is zero or not a power of two, or a row whose width differs from the height,
-///   is a shape error, checked before any entry is read.
-/// - A non-finite entry, or a column 0 whose entries are all zero, is
-///   [`StabilizerError::MatrixNotUnitary`].
-/// - Any other rejected matrix is classified by the full Gram check: it is
-///   [`StabilizerError::MatrixNotUnitary`] when some entry of `M M†` differs from the identity
-///   by more than `1e-4`, and [`StabilizerError::UnitaryMatrixNotClifford`] otherwise.
-///
-/// # Cost
-///
-/// Accepting costs `O(n K d + d^2)`, where `K <= d` is the number of nonzero entries in a column
-/// of the Clifford, and allocates one byte per entry, reserved fallibly, besides `O(d)` scratch.
-/// Only a rejected matrix pays the `O(d^3)` Gram check. Any power-of-two dimension is accepted,
-/// like Stim; the CPU time is the caller's.
-pub fn unitary_to_tableau(
-    matrix: &[Vec<Complex32>],
-    little_endian: bool,
-) -> StabilizerResult<Tableau> {
-    let num_qubits = validate_matrix_shape(matrix)?;
-    if let Some(tableau) = clifford_tableau(matrix, num_qubits, little_endian)? {
-        return Ok(tableau);
+/// Which amplitude bit of a unitary or state vector belongs to qubit 0.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Endianness {
+    /// Qubit 0 is the least significant amplitude bit.
+    Little,
+    /// Qubit 0 is the most significant amplitude bit.
+    Big,
+}
+
+impl Tableau {
+    /// Converts a Clifford unitary matrix into the corresponding tableau, up to global phase.
+    ///
+    /// `matrix` is a list of rows. With [`Endianness::Little`], qubit 0 corresponds to the least
+    /// significant amplitude bit. With [`Endianness::Big`], qubit 0 corresponds to the most
+    /// significant amplitude bit, matching Stim's `unitary_to_tableau` default.
+    ///
+    /// # Acceptance contract
+    ///
+    /// Let `d = 2^n` be the dimension and `β` the largest-magnitude entry of column 0 (the first
+    /// one on ties). The matrix is accepted, and the tableau `T` returned, exactly when:
+    ///
+    /// 1. every entry is finite;
+    /// 2. every column's squared norm is within `1e-4` of 1;
+    /// 3. every ratio `M[r][c] / β` lies within squared distance `0.125` of a value `s[r][c]`
+    ///    in `{0, 1, -1, i, -i}`, which is Stim v1.16.0's stabilizer-state smoothing threshold;
+    ///    and
+    /// 4. the snapped matrix `s` is exactly a scalar multiple of the unitary of the Clifford
+    ///    tableau `T`, checked on every entry.
+    ///
+    /// Condition 4 is decided in exact arithmetic on the snapped matrix: the image of each
+    /// generator is read from column 0 of `s P s†` and from the `n` columns `2^p`, and every
+    /// column `j` of `s` is then checked to equal the image of `X^j` applied to column 0, which
+    /// must itself be stabilized by every image of `Z`. Like Stim, a matrix within the snapping
+    /// tolerance of a Clifford is accepted without a separate per-entry unitarity check, so a
+    /// near-Clifford matrix whose columns have unit norm but are not exactly orthogonal is
+    /// accepted.
+    ///
+    /// # Errors
+    ///
+    /// - A height that is zero or not a power of two, or a row whose width differs from the
+    ///   height, is a shape error, checked before any entry is read.
+    /// - A non-finite entry, or a column 0 whose entries are all zero, is
+    ///   [`StabilizerError::MatrixNotUnitary`].
+    /// - Any other rejected matrix is classified by the full Gram check: it is
+    ///   [`StabilizerError::MatrixNotUnitary`] when some entry of `M M†` differs from the
+    ///   identity by more than `1e-4`, and [`StabilizerError::UnitaryMatrixNotClifford`]
+    ///   otherwise.
+    ///
+    /// # Cost
+    ///
+    /// Accepting costs `O(n K d + d^2)`, where `K <= d` is the number of nonzero entries in a
+    /// column of the Clifford, and allocates one byte per entry, reserved fallibly, besides `O(d)`
+    /// scratch. Only a rejected matrix pays the `O(d^3)` Gram check. Any power-of-two dimension is
+    /// accepted, like Stim; the CPU time is the caller's.
+    pub fn from_unitary(
+        matrix: &[Vec<Complex32>],
+        endianness: Endianness,
+    ) -> StabilizerResult<Self> {
+        let little_endian = endianness == Endianness::Little;
+        let num_qubits = validate_matrix_shape(matrix)?;
+        if let Some(tableau) = clifford_tableau(matrix, num_qubits, little_endian)? {
+            return Ok(tableau);
+        }
+        ensure_unitary(matrix)?;
+        Err(StabilizerError::UnitaryMatrixNotClifford)
     }
-    ensure_unitary(matrix)?;
-    Err(StabilizerError::UnitaryMatrixNotClifford)
 }
 
 /// Returns the tableau when the matrix satisfies the acceptance contract, `None` when it must
@@ -324,7 +339,7 @@ impl PauliImage {
         } else {
             PauliSign::Plus
         };
-        PauliString::from_bases_unchecked(
+        PauliString::from_bases_unbudgeted(
             sign,
             (0..num_qubits).map(|qubit| {
                 let mask = 1_usize << amplitude_bit(qubit, num_qubits, little_endian);

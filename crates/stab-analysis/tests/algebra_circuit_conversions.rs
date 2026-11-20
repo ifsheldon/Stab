@@ -7,7 +7,7 @@
 use std::assert_matches;
 use std::str::FromStr;
 
-use stab_algebra::{PauliBasis, PauliString, Tableau, TableauIterator};
+use stab_algebra::{PauliBasis, PauliString, SignIteration, Tableau, TableauIterator};
 use stab_analysis::{
     circuit_to_tableau, pauli_after_circuit, pauli_before_circuit, tableau_to_circuit,
 };
@@ -18,12 +18,16 @@ fn algebra_circuit_conversions_match_stim() {
     let empty = Tableau::identity(0).expect("empty tableau");
     assert_synthesis_round_trip(&empty);
 
-    for tableau in TableauIterator::new(1, true).expect("signed one-qubit tableaus") {
+    for tableau in
+        TableauIterator::new(1, SignIteration::AllSigns).expect("signed one-qubit tableaus")
+    {
         assert_synthesis_round_trip(&tableau);
     }
 
     let mut signed_two_qubit_count = 0;
-    for tableau in TableauIterator::new(2, true).expect("signed two-qubit tableaus") {
+    for tableau in
+        TableauIterator::new(2, SignIteration::AllSigns).expect("signed two-qubit tableaus")
+    {
         assert_synthesis_round_trip(&tableau);
         signed_two_qubit_count += 1;
     }

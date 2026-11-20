@@ -173,7 +173,8 @@ fn tracker_growth_is_refused_against_the_bytes_the_analyzer_already_holds() {
         ..ErrorAnalyzerOptions::default()
     };
     let one_set_growth = 2 * DETECTORS as u64 * size_of::<stab_model::DemTarget>() as u64;
-    for budget in [1_000_000, 1_200_000, 1_400_000] {
+    // The analysis needs 1_393_842 bytes with 88-byte DEM items, so every budget is refused.
+    for budget in [950_000, 1_150_000, 1_350_000] {
         let error = try_analyze(&circuit, options(budget)).expect_err("the fan-out does not fit");
         let resource = error.resource_limit_error().expect("typed budget refusal");
         assert_eq!(resource.limit(), budget);

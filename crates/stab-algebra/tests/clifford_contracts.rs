@@ -165,7 +165,6 @@ fn cq2_algebra_clifford_string_contract_covers_growth_and_composition() {
         .map(|index| {
             contract[index % contract.len()]
                 .multiply(contract[1 + (index / contract.len()) % (contract.len() - 1)])
-                .expect("single-qubit Clifford product")
         })
         .collect::<Vec<_>>();
     cycle_left
@@ -283,13 +282,22 @@ fn stabilizers_clifford_string_known_identities_match_stim() {
 }
 
 #[test]
-fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
+fn stabilizers_single_qubit_clifford_products_and_inverses_match_tableaus() {
     let gates = contract_gates().collect::<Vec<_>>();
     let tableaus = contract_tableaus();
 
     for (left_index, left) in gates.iter().copied().enumerate() {
+        let inverse = left.inverse();
+        assert_eq!(left * inverse, SingleQubitClifford::I);
+        assert_eq!(inverse * left, SingleQubitClifford::I);
+        assert_eq!(
+            inverse.tableau(),
+            tableaus[left_index].inverse().expect("Tableau inverse"),
+            "inverse of {}",
+            left.canonical_name()
+        );
         for (middle_index, middle) in gates.iter().copied().enumerate() {
-            let product = left.multiply(middle).expect("Clifford product");
+            let product = left * middle;
             let product_index = gates
                 .iter()
                 .position(|candidate| *candidate == product)
@@ -305,15 +313,7 @@ fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
             );
 
             for right in gates.iter().copied() {
-                let lhs = left
-                    .multiply(middle)
-                    .expect("left middle")
-                    .multiply(right)
-                    .expect("(left middle) right");
-                let rhs = left
-                    .multiply(middle.multiply(right).expect("middle right"))
-                    .expect("left (middle right)");
-                assert_eq!(lhs, rhs);
+                assert_eq!((left * middle) * right, left * (middle * right));
             }
         }
     }

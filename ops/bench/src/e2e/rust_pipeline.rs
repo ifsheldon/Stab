@@ -4,8 +4,8 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use stab_analysis::{
-    CodeDistance, ErrorAnalyzerOptions, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    circuit_to_detector_error_model, generate_repetition_code_circuit,
+    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
+    RoundCount, circuit_to_detector_error_model,
 };
 use stab_decoder::{DecodeBatchStatus, DecoderInputBatchView, decode_batch};
 use stab_engine::{
@@ -42,18 +42,17 @@ pub(super) fn execute(
         return Err("start barrier must be one newline".to_string());
     }
 
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(3).map_err(|source| source.to_string())?,
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
         CodeDistance::try_new(3).map_err(|source| source.to_string())?,
-        RepetitionCodeTask::Memory,
+        RoundCount::try_new(3).map_err(|source| source.to_string())?,
     )
     .map_err(|source| source.to_string())?
     .with_before_round_data_depolarization(probability(0.05)?)
     .with_before_measure_flip_probability(probability(0.025)?)
     .with_after_reset_flip_probability(probability(0.0125)?)
     .with_after_clifford_depolarization(probability(0.00625)?);
-    let generated =
-        generate_repetition_code_circuit(&params).map_err(|source| source.to_string())?;
+    let generated = params.generate().map_err(|source| source.to_string())?;
     let circuit = generated.circuit();
     let model = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())
         .map_err(|source| source.to_string())?;

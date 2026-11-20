@@ -1,6 +1,6 @@
 //! Stable diagnostic codes of CLI errors and the library errors they wrap.
 
-use stab_analysis::AnalysisError;
+use stab_analysis::{AnalysisError, CodeFamily};
 use stab_engine::{
     DemError, DemSamplingExecutionError, DetectionCompileError, DetectionError,
     DetectionExecutionError, RunError, SamplingCompileError, SamplingExecutionError,
@@ -36,9 +36,11 @@ pub(super) fn cli_error_code(error: &CliError) -> &'static str {
         CliError::Dem(error) => dem_error_code(error),
         CliError::DemSamplingExecution(error) => dem_execution_error_code(error),
         CliError::InputByteOffsetOverflow { .. } => "input-byte-offset-overflow",
-        CliError::UnsupportedRepetitionTask { .. } => "unsupported-repetition-task",
-        CliError::UnsupportedSurfaceTask { .. } => "unsupported-surface-task",
-        CliError::UnsupportedColorTask { .. } => "unsupported-color-task",
+        CliError::UnsupportedGenTask(error) => match error.family() {
+            CodeFamily::Repetition => "unsupported-repetition-task",
+            CodeFamily::Surface => "unsupported-surface-task",
+            CodeFamily::Color => "unsupported-color-task",
+        },
         CliError::UnsupportedConversion => "unsupported-conversion",
         CliError::UnsupportedStimConversionOption { .. } => "unsupported-stim-conversion-option",
         CliError::UnsupportedDetectionFormat { .. } => "unsupported-detection-format",

@@ -6,8 +6,8 @@
 use std::assert_matches;
 
 use stab_algebra::{
-    AlgebraMemoryBudget, PauliBasis, PauliSign, PauliStringIterator, StabilizerError,
-    StabilizerResource, StabilizerResult,
+    AlgebraMemoryBudget, PauliBasis, PauliIterationBases, PauliSign, PauliStringIterator,
+    StabilizerError, StabilizerResource, StabilizerResult,
 };
 use thiserror::Error;
 
@@ -58,10 +58,10 @@ fn cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference() -
     // The former 1,048,576-qubit count cap is gone; width is admitted in bytes instead, and a
     // width whose state cannot fit the default budget is refused before allocation.
     let wide = 1_048_577;
-    let accepted = PauliStringIterator::new(wide, 1, 1, true, true, true)?;
+    let accepted = PauliStringIterator::new(wide, 1..=1, PauliIterationBases::ALL)?;
     assert_eq!(accepted.result().len(), wide);
     assert_matches!(
-        PauliStringIterator::new(usize::MAX / 2, 1, 1, true, true, true),
+        PauliStringIterator::new(usize::MAX / 2, 1..=1, PauliIterationBases::ALL),
         Err(StabilizerError::MemoryBudgetExceeded {
             resource: StabilizerResource::PauliString,
             budget_bytes,
@@ -125,11 +125,12 @@ impl IteratorSpec {
     fn build(self) -> StabilizerResult<PauliStringIterator> {
         PauliStringIterator::new(
             self.num_qubits,
-            self.min_weight,
-            self.max_weight,
-            self.allow_x,
-            self.allow_y,
-            self.allow_z,
+            self.min_weight..=self.max_weight,
+            PauliIterationBases {
+                x: self.allow_x,
+                y: self.allow_y,
+                z: self.allow_z,
+            },
         )
     }
 

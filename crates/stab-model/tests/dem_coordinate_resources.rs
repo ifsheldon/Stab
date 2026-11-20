@@ -5,7 +5,9 @@
 
 use std::collections::BTreeMap;
 
-use stab_model::{DemDetectorId, DetectorErrorModel, MemoryBudget};
+use stab_model::{
+    DemDetectorId, DetectorErrorModel, MemoryBudget, ResourceKind, ResourceOperation,
+};
 
 #[test]
 fn dem_coordinate_all_map_is_admitted_against_the_memory_budget_but_selected_queries_are_not() {
@@ -21,6 +23,14 @@ fn dem_coordinate_all_map_is_admitted_against_the_memory_budget_but_selected_que
         .detector_coordinates()
         .expect_err("reject an all-detector map beyond the default budget before allocating");
     assert!(error.to_string().contains("memory budget"), "{error}");
+    let resource = error
+        .resource_limit_error()
+        .expect("typed resource refusal");
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+    assert_eq!(
+        resource.operation(),
+        ResourceOperation::DetectorErrorModelDetectorCoordinates
+    );
 
     let small = DetectorErrorModel::from_dem_str(
         "repeat 3 {\n\

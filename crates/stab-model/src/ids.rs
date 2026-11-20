@@ -137,6 +137,11 @@ impl DemRepeatCount {
 pub struct Probability(f64);
 
 impl Probability {
+    /// The impossible event, `0`.
+    pub const ZERO: Self = Self(0.0);
+    /// The certain event, `1`.
+    pub const ONE: Self = Self(1.0);
+
     #[inline(always)]
     pub fn try_new(value: f64) -> ModelResult<Self> {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
@@ -146,15 +151,14 @@ impl Probability {
     }
 
     #[inline(always)]
-    pub(crate) fn from_valid_probability(value: f64) -> Self {
-        debug_assert!(value.is_finite());
-        debug_assert!((0.0..=1.0).contains(&value));
-        Self(value)
-    }
-
-    #[inline(always)]
     pub fn get(self) -> f64 {
         self.0
+    }
+
+    /// Borrows the stored value, so a model can lend it as a one-element argument slice.
+    #[inline(always)]
+    pub(crate) const fn as_f64_ref(&self) -> &f64 {
+        &self.0
     }
 
     /// Formats this probability exactly as pinned Stim prints doubles in

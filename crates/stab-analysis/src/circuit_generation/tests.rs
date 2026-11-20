@@ -2,12 +2,16 @@ use crate::{AnalysisResult, CodeDistance, RoundCount};
 use stab_model::{Circuit, GateKind, Probability};
 
 use super::{
-    CircuitGenParams, append_begin_round_tick, append_measure, append_measure_reset, append_reset,
-    append_unitary_1, append_unitary_2,
+    CodeCircuitParams, CodeTask, RepetitionCodeTask, append_begin_round_tick, append_measure,
+    append_measure_reset, append_reset, append_unitary_1, append_unitary_2,
 };
 
-fn base_params() -> AnalysisResult<CircuitGenParams> {
-    CircuitGenParams::new(RoundCount::try_new(3)?, CodeDistance::try_new(5)?)
+fn base_params() -> AnalysisResult<CodeCircuitParams> {
+    CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
+        CodeDistance::try_new(5)?,
+        RoundCount::try_new(3)?,
+    )
 }
 
 fn assert_circuit_text(circuit: &Circuit, expected: &str) {

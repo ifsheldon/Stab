@@ -3,12 +3,11 @@ use std::fmt::{Display, Formatter};
 use rand::{Rng, RngExt as _};
 
 use super::{
-    PauliBasis, PauliPhase, PauliSign, StabilizerError, StabilizerResource, StabilizerResult,
-    Tableau,
+    PauliBasis, PauliSign, StabilizerError, StabilizerResource, StabilizerResult, Tableau,
 };
 use crate::bit_runs::{extend_periodic, or_bits_at};
 use crate::budget::{
-    AlgebraMemoryBudget, clifford_bytes, try_reserve_one, try_zeroed_words, words_for_bits,
+    AlgebraMemoryBudget, clifford_bytes, try_reserve_one, try_resize_zeroed_bits, try_zeroed_bits,
 };
 use crate::kernels::{
     CliffordNonIdentityCounts, CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words,
@@ -24,27 +23,6 @@ struct SignedPauli {
 impl SignedPauli {
     const fn new(sign: PauliSign, basis: PauliBasis) -> Self {
         Self { sign, basis }
-    }
-
-    fn try_from_phase_and_basis(phase: PauliPhase, basis: PauliBasis) -> StabilizerResult<Self> {
-        if phase.is_imaginary() {
-            Err(StabilizerError::ImaginaryProduct { phase })
-        } else {
-            Ok(Self {
-                sign: phase.sign(),
-                basis,
-            })
-        }
-    }
-
-    fn multiply(self, rhs: Self) -> (PauliBasis, PauliPhase) {
-        let (basis, basis_phase) = self.basis.multiply(rhs.basis);
-        let phase = self
-            .sign
-            .to_phase()
-            .multiply(rhs.sign.to_phase())
-            .multiply(basis_phase);
-        (basis, phase)
     }
 }
 
@@ -178,21 +156,17 @@ impl SingleQubitClifford {
         }
     }
 
-    pub fn multiply(self, rhs: Self) -> StabilizerResult<Self> {
-        let x_output = self.apply_signed(rhs.x_output())?;
-        let z_output = self.apply_signed(rhs.z_output())?;
-        Self::from_outputs(x_output, z_output)
-            .ok_or(StabilizerError::InvalidSingleQubitCliffordProduct)
+    /// Returns the Clifford that applies `rhs` first and then `self`.
+    ///
+    /// Its X and Z images are `self`'s images of `rhs`'s images. The 24 single-qubit Cliffords
+    /// form a group, so this is a lookup in a table built and checked at compile time.
+    pub fn multiply(self, rhs: Self) -> Self {
+        *lookup(lookup(&PRODUCTS, self), rhs)
     }
 
-    /// Returns the inverse Clifford.
-    pub fn inverse(self) -> StabilizerResult<Self> {
-        for candidate in Self::all() {
-            if self.multiply(candidate)? == Self::I && candidate.multiply(self)? == Self::I {
-                return Ok(candidate);
-            }
-        }
-        Err(StabilizerError::InvalidSingleQubitCliffordProduct)
+    /// Returns the inverse Clifford, the one whose product with `self` in either order is `I`.
+    pub fn inverse(self) -> Self {
+        *lookup(&INVERSES, self)
     }
 
     /// Returns the one-qubit tableau represented by this Clifford.
@@ -210,29 +184,19 @@ impl SingleQubitClifford {
         ))
     }
 
-    /// Applies this Clifford to one Pauli basis.
-    pub fn apply_basis(self, basis: PauliBasis) -> StabilizerResult<PauliBasis> {
-        Ok(self
-            .apply_signed(SignedPauli::new(PauliSign::Plus, basis))?
-            .basis)
+    /// Applies this Clifford to one Pauli basis, dropping the sign of the image.
+    pub fn apply_basis(self, basis: PauliBasis) -> PauliBasis {
+        let x = self.x_output().basis;
+        let z = self.z_output().basis;
+        match basis {
+            PauliBasis::I => PauliBasis::I,
+            PauliBasis::X => x,
+            PauliBasis::Z => z,
+            PauliBasis::Y => PauliBasis::from_xz(x.x_bit() ^ z.x_bit(), x.z_bit() ^ z.z_bit()),
+        }
     }
 
-    fn from_outputs(x_output: SignedPauli, z_output: SignedPauli) -> Option<Self> {
-        let bits = [
-            z_output.sign == PauliSign::Minus,
-            x_output.sign == PauliSign::Minus,
-            !x_output.basis.x_bit(),
-            x_output.basis.z_bit(),
-            z_output.basis.x_bit(),
-            !z_output.basis.z_bit(),
-        ];
-        let index = bits.iter().enumerate().fold(0_u8, |index, (offset, bit)| {
-            index | (u8::from(*bit) << offset)
-        });
-        Self::from_table_index(index)
-    }
-
-    fn from_table_index(index: u8) -> Option<Self> {
+    const fn from_table_index(index: u8) -> Option<Self> {
         match index {
             0 => Some(Self::I),
             1 => Some(Self::X),
@@ -262,7 +226,7 @@ impl SingleQubitClifford {
         }
     }
 
-    fn table_index(self) -> u8 {
+    const fn table_index(self) -> u8 {
         match self {
             Self::I => 0,
             Self::X => 1,
@@ -306,21 +270,171 @@ impl SingleQubitClifford {
             PauliBasis::from_xz(index & 0b1_0000 != 0, index & 0b10_0000 == 0),
         )
     }
+}
 
-    fn y_output(self) -> StabilizerResult<SignedPauli> {
-        let (basis, phase) = self.x_output().multiply(self.z_output());
-        SignedPauli::try_from_phase_and_basis(PauliPhase::PlusI.multiply(phase), basis)
+/// A signed single-qubit Pauli packed as `x | z << 1 | negative << 2`, for the compile-time tables.
+type PackedImage = u8;
+
+const IMAGE_NEGATIVE: PackedImage = 0b100;
+
+/// `PRODUCTS[a][b]` is `a.multiply(b)`, indexed by declaration order.
+const PRODUCTS: [[SingleQubitClifford; 24]; 24] = product_table();
+
+/// `INVERSES[a]` is `a.inverse()`, indexed by declaration order.
+const INVERSES: [SingleQubitClifford; 24] = inverse_table();
+
+/// Reads the entry of `gate` in a table indexed by declaration order.
+#[expect(
+    clippy::indexing_slicing,
+    reason = "a SingleQubitClifford discriminant is its position among the 24 variants, which \
+              check_declaration_order confirms at compile time, so it is always below 24"
+)]
+fn lookup<T>(table: &[T; 24], gate: SingleQubitClifford) -> &T {
+    &table[gate as usize]
+}
+
+/// The packed X image of the gate with table index `code`.
+const fn packed_x_image(code: u8) -> PackedImage {
+    let x = (code >> 2 & 1) ^ 1;
+    let z = code >> 3 & 1;
+    let negative = code >> 1 & 1;
+    x | z << 1 | negative << 2
+}
+
+/// The packed Z image of the gate with table index `code`.
+const fn packed_z_image(code: u8) -> PackedImage {
+    let x = code >> 4 & 1;
+    let z = (code >> 5 & 1) ^ 1;
+    let negative = code & 1;
+    x | z << 1 | negative << 2
+}
+
+/// The base-`i` exponent of `P_left P_right / P_(left ^ right)` for single-qubit Paulis coded with
+/// X at bit 0 and Z at bit 1.
+const fn basis_product_log_i(left: u8, right: u8) -> u8 {
+    let (x1, z1) = (left & 1, left >> 1 & 1);
+    let (x2, z2) = (right & 1, right >> 1 & 1);
+    // Aaronson and Gottesman's g, plus four to stay non-negative.
+    let shifted = match (x1, z1) {
+        (0, 0) => 4,
+        (1, 1) => 4 + z2 - x2,
+        (1, 0) => 4 + 2 * z2 * x2 - z2,
+        _ => 4 + x2 - 2 * x2 * z2,
+    };
+    shifted & 3
+}
+
+/// The packed image of the packed Pauli `input` under the gate with table index `code`.
+const fn packed_apply(code: u8, input: PackedImage) -> PackedImage {
+    let sign = input & IMAGE_NEGATIVE;
+    let output = match input & 0b11 {
+        0 => 0,
+        0b01 => packed_x_image(code),
+        0b10 => packed_z_image(code),
+        _ => {
+            // Y = i X Z, so its image is i X' Z', which is Hermitian because X' and Z'
+            // anticommute.
+            let x = packed_x_image(code);
+            let z = packed_z_image(code);
+            let log_i = 1 + basis_product_log_i(x & 0b11, z & 0b11);
+            assert!(log_i.is_multiple_of(2), "the image of Y is Hermitian");
+            let negative = (log_i / 2 % 2) ^ (x >> 2) ^ (z >> 2);
+            ((x ^ z) & 0b11) | negative << 2
+        }
+    };
+    output ^ sign
+}
+
+/// The table index of the gate whose X and Z images are `x` and `z`.
+const fn code_from_images(x: PackedImage, z: PackedImage) -> u8 {
+    (z >> 2)
+        | (x >> 2) << 1
+        | ((x & 1) ^ 1) << 2
+        | (x >> 1 & 1) << 3
+        | (z & 1) << 4
+        | ((z >> 1 & 1) ^ 1) << 5
+}
+
+/// Confirms that each variant's discriminant is its position in [`SINGLE_QUBIT_CLIFFORDS`].
+#[expect(
+    clippy::indexing_slicing,
+    reason = "evaluated only at compile time, where an out-of-range index fails the build"
+)]
+const fn check_declaration_order() {
+    let mut index = 0;
+    while index < SINGLE_QUBIT_CLIFFORDS.len() {
+        assert!(
+            SINGLE_QUBIT_CLIFFORDS[index] as usize == index,
+            "SINGLE_QUBIT_CLIFFORDS lists the variants in declaration order"
+        );
+        index += 1;
     }
+}
 
-    fn apply_signed(self, input: SignedPauli) -> StabilizerResult<SignedPauli> {
-        let output = match input.basis {
-            PauliBasis::I => SignedPauli::new(PauliSign::Plus, PauliBasis::I),
-            PauliBasis::X => self.x_output(),
-            PauliBasis::Y => self.y_output()?,
-            PauliBasis::Z => self.z_output(),
-        };
-        let phase = input.sign.to_phase().multiply(output.sign.to_phase());
-        SignedPauli::try_from_phase_and_basis(phase, output.basis)
+#[expect(
+    clippy::indexing_slicing,
+    clippy::panic,
+    reason = "evaluated only at compile time, where an out-of-range index or a product outside \
+              the group fails the build"
+)]
+const fn product_table() -> [[SingleQubitClifford; 24]; 24] {
+    check_declaration_order();
+    let mut table = [[SingleQubitClifford::I; 24]; 24];
+    let mut left = 0;
+    while left < 24 {
+        let mut right = 0;
+        while right < 24 {
+            let outer = SINGLE_QUBIT_CLIFFORDS[left].table_index();
+            let inner = SINGLE_QUBIT_CLIFFORDS[right].table_index();
+            let x = packed_apply(outer, packed_x_image(inner));
+            let z = packed_apply(outer, packed_z_image(inner));
+            table[left][right] = match SingleQubitClifford::from_table_index(code_from_images(x, z))
+            {
+                Some(product) => product,
+                None => panic!("the single-qubit Cliffords are closed under products"),
+            };
+            right += 1;
+        }
+        left += 1;
+    }
+    table
+}
+
+#[expect(
+    clippy::indexing_slicing,
+    reason = "evaluated only at compile time, where an out-of-range index fails the build"
+)]
+const fn inverse_table() -> [SingleQubitClifford; 24] {
+    let mut table = [SingleQubitClifford::I; 24];
+    let mut gate = 0;
+    while gate < 24 {
+        let mut candidate = 0;
+        let mut found = false;
+        while candidate < 24 {
+            let identity = SingleQubitClifford::I as usize;
+            if PRODUCTS[gate][candidate] as usize == identity {
+                assert!(
+                    PRODUCTS[candidate][gate] as usize == identity,
+                    "a left inverse is a right inverse"
+                );
+                assert!(!found, "each Clifford has one inverse");
+                table[gate] = SINGLE_QUBIT_CLIFFORDS[candidate];
+                found = true;
+            }
+            candidate += 1;
+        }
+        assert!(found, "every single-qubit Clifford has an inverse");
+        gate += 1;
+    }
+    table
+}
+
+impl std::ops::Mul for SingleQubitClifford {
+    type Output = Self;
+
+    /// See [`SingleQubitClifford::multiply`].
+    fn mul(self, rhs: Self) -> Self {
+        self.multiply(rhs)
     }
 }
 
@@ -355,17 +469,12 @@ impl CliffordString {
         budget: AlgebraMemoryBudget,
     ) -> StabilizerResult<Self> {
         admit_clifford_planes(budget, num_qubits, 0)?;
-        Ok(Self::from_plane_words(
-            num_qubits,
-            zeroed_planes(num_qubits)?,
-            0,
-        ))
+        Ok(Self::from_planes(zeroed_planes(num_qubits)?, 0))
     }
 
-    /// Wraps six planes of `len` bits, in table-index bit order, whose tail bits are zero.
-    fn from_plane_words(len: usize, planes: [Vec<u64>; 6], non_identity_count: usize) -> Self {
-        let [z_signs, x_signs, inv_x2x, x2z, z2x, inv_z2z] =
-            planes.map(|words| BitVec::from_words_truncated(len, words));
+    /// Wraps six planes of one length, in table-index bit order.
+    fn from_planes(planes: [BitVec; 6], non_identity_count: usize) -> Self {
+        let [z_signs, x_signs, inv_x2x, x2z, z2x, inv_z2z] = planes;
         Self {
             z_signs,
             x_signs,
@@ -389,7 +498,8 @@ impl CliffordString {
         ]
     }
 
-    pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
+    #[cfg(test)]
+    pub(crate) fn identity_unbudgeted(num_qubits: usize) -> Self {
         Self {
             z_signs: BitVec::zeros(num_qubits),
             x_signs: BitVec::zeros(num_qubits),
@@ -433,6 +543,7 @@ impl CliffordString {
     /// Packs `gates` straight into fallibly reserved planes.
     fn from_gate_slice(gates: &[SingleQubitClifford]) -> StabilizerResult<Self> {
         let mut planes = zeroed_planes(gates.len())?;
+        let mut words = planes.each_mut().map(BitVec::words_mut);
         let mut non_identity_count = 0_usize;
         for (word_index, chunk) in gates.chunks(u64::BITS as usize).enumerate() {
             let mut packed = [0_u64; 6];
@@ -443,7 +554,7 @@ impl CliffordString {
                     *word |= u64::from((code >> plane_bit) & 1) << bit_index;
                 }
             }
-            for (plane, word) in planes.iter_mut().zip(packed) {
+            for (plane, word) in words.iter_mut().zip(packed) {
                 *plane.get_mut(word_index).ok_or(StabilizerError::Bit(
                     BitError::BitIndexOutOfRange {
                         index: word_index * u64::BITS as usize,
@@ -452,11 +563,8 @@ impl CliffordString {
                 ))? = word;
             }
         }
-        Ok(Self::from_plane_words(
-            gates.len(),
-            planes,
-            non_identity_count,
-        ))
+        drop(words);
+        Ok(Self::from_planes(planes, non_identity_count))
     }
 
     /// Creates a random string of independent single-qubit Clifford gates.
@@ -598,10 +706,11 @@ impl CliffordString {
             .iter_mut()
             .zip(self.planes().into_iter().zip(rhs.planes()))
         {
-            or_bits_at(target, 0, left.words(), self.len())?;
-            or_bits_at(target, self.len(), right.words(), rhs.len())?;
+            let mut target = target.words_mut();
+            or_bits_at(&mut target, 0, left.words(), self.len())?;
+            or_bits_at(&mut target, self.len(), right.words(), rhs.len())?;
         }
-        Ok(Self::from_plane_words(new_len, planes, non_identity_count))
+        Ok(Self::from_planes(planes, non_identity_count))
     }
 
     /// Repeats this string, admitting the result against [`AlgebraMemoryBudget::DEFAULT`].
@@ -619,7 +728,7 @@ impl CliffordString {
         budget: AlgebraMemoryBudget,
     ) -> StabilizerResult<Self> {
         if repetitions == 0 || self.is_empty() {
-            return Ok(Self::identity_unchecked(0));
+            return Ok(Self::from_planes(zeroed_planes(0)?, 0));
         }
         let new_len =
             self.len()
@@ -636,10 +745,11 @@ impl CliffordString {
             .ok_or(StabilizerError::InconsistentCliffordStringMetadata)?;
         let mut planes = zeroed_planes(new_len)?;
         for (target, source) in planes.iter_mut().zip(self.planes()) {
-            or_bits_at(target, 0, source.words(), self.len())?;
-            extend_periodic(target, self.len(), new_len)?;
+            let mut target = target.words_mut();
+            or_bits_at(&mut target, 0, source.words(), self.len())?;
+            extend_periodic(&mut target, self.len(), new_len)?;
         }
-        Ok(Self::from_plane_words(new_len, planes, non_identity_count))
+        Ok(Self::from_planes(planes, non_identity_count))
     }
 
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<Self> {
@@ -691,16 +801,31 @@ impl CliffordString {
         Ok(())
     }
 
+    /// Pads every plane with identities up to `len` gates, reserving the new words fallibly; on
+    /// failure every plane keeps its old length.
     fn ensure_len(&mut self, len: usize) -> StabilizerResult<()> {
-        if len > self.len() {
-            self.z_signs.resize_zeros(len);
-            self.x_signs.resize_zeros(len);
-            self.inv_x2x.resize_zeros(len);
-            self.x2z.resize_zeros(len);
-            self.z2x.resize_zeros(len);
-            self.inv_z2z.resize_zeros(len);
+        let old_len = self.len();
+        if len <= old_len {
+            return Ok(());
         }
-        Ok(())
+        let mut planes = [
+            &mut self.z_signs,
+            &mut self.x_signs,
+            &mut self.inv_x2x,
+            &mut self.x2z,
+            &mut self.z2x,
+            &mut self.inv_z2z,
+        ];
+        let grown = planes.iter_mut().try_for_each(|plane| {
+            try_resize_zeroed_bits(StabilizerResource::CliffordString, plane, len)
+        });
+        if grown.is_err() {
+            // Shrinking keeps the reserved words, so it cannot fail.
+            for plane in &mut planes {
+                plane.resize_zeros(old_len);
+            }
+        }
+        grown
     }
 
     fn write_gate_bits(&mut self, index: usize, gate: SingleQubitClifford) -> StabilizerResult<()> {
@@ -729,13 +854,8 @@ fn admit_clifford_planes(
 
 /// Reserves six zeroed planes of `num_qubits` bits fallibly; these are the only storage a string
 /// holds, so they are exactly what [`admit_clifford_planes`] charged.
-fn zeroed_planes(num_qubits: usize) -> StabilizerResult<[Vec<u64>; 6]> {
-    let plane = || {
-        try_zeroed_words(
-            StabilizerResource::CliffordString,
-            words_for_bits(num_qubits),
-        )
-    };
+fn zeroed_planes(num_qubits: usize) -> StabilizerResult<[BitVec; 6]> {
+    let plane = || try_zeroed_bits(StabilizerResource::CliffordString, num_qubits);
     Ok([plane()?, plane()?, plane()?, plane()?, plane()?, plane()?])
 }
 
@@ -796,15 +916,9 @@ mod tests {
         ])
         .unwrap();
         let expected = CliffordString::from_gates([
-            SingleQubitClifford::H
-                .multiply(SingleQubitClifford::S)
-                .unwrap(),
-            SingleQubitClifford::S
-                .multiply(SingleQubitClifford::H)
-                .unwrap(),
-            SingleQubitClifford::I
-                .multiply(SingleQubitClifford::SqrtX)
-                .unwrap(),
+            SingleQubitClifford::H.multiply(SingleQubitClifford::S),
+            SingleQubitClifford::S.multiply(SingleQubitClifford::H),
+            SingleQubitClifford::I.multiply(SingleQubitClifford::SqrtX),
         ])
         .unwrap();
 
@@ -818,7 +932,7 @@ mod tests {
         let width = 257;
         for left_gate in SingleQubitClifford::all() {
             for right_gate in SingleQubitClifford::all() {
-                let expected_gate = left_gate.multiply(right_gate).unwrap();
+                let expected_gate = left_gate * right_gate;
                 let mut left =
                     CliffordString::from_gates(std::iter::repeat_n(left_gate, width)).unwrap();
                 let right =
@@ -855,7 +969,7 @@ mod tests {
     #[test]
     fn right_multiply_in_place_extends_for_longer_identity_rhs() {
         let mut left = CliffordString::from_gates([SingleQubitClifford::H]).unwrap();
-        let right = CliffordString::identity_unchecked(3);
+        let right = CliffordString::identity_unbudgeted(3);
 
         left.right_multiply_in_place(&right).unwrap();
 
@@ -868,16 +982,14 @@ mod tests {
     #[test]
     fn right_multiply_in_place_preserves_left_tail_across_word_boundaries() {
         for (left_len, right_len, tail_index) in [(63, 17, 62), (65, 63, 64), (129, 65, 128)] {
-            let mut left = CliffordString::identity_unchecked(left_len);
+            let mut left = CliffordString::identity_unbudgeted(left_len);
             left.set_gate_at(0, SingleQubitClifford::H).unwrap();
             left.set_gate_at(tail_index, SingleQubitClifford::S)
                 .unwrap();
-            let mut right = CliffordString::identity_unchecked(right_len);
+            let mut right = CliffordString::identity_unbudgeted(right_len);
             right.set_gate_at(0, SingleQubitClifford::SqrtX).unwrap();
 
-            let expected_head = SingleQubitClifford::H
-                .multiply(SingleQubitClifford::SqrtX)
-                .unwrap();
+            let expected_head = SingleQubitClifford::H.multiply(SingleQubitClifford::SqrtX);
             left.right_multiply_in_place(&right).unwrap();
 
             assert_eq!(left.gate_at(0), Some(expected_head), "left_len={left_len}");
@@ -906,7 +1018,7 @@ mod tests {
 
     #[test]
     fn clearing_last_gate_restores_identity_metadata() {
-        let mut right = CliffordString::identity_unchecked(257);
+        let mut right = CliffordString::identity_unbudgeted(257);
         right.set_gate_at(256, SingleQubitClifford::SqrtY).unwrap();
         assert_eq!(right.non_identity_count, 1);
 
@@ -937,7 +1049,7 @@ mod tests {
             value.set_gate_at(index, SingleQubitClifford::I).unwrap();
             assert_eq!(value.non_identity_count, width - index - 1);
         }
-        assert_eq!(value, CliffordString::identity_unchecked(width));
+        assert_eq!(value, CliffordString::identity_unbudgeted(width));
     }
 
     fn random_gates(len: usize, rng: &mut SmallRng) -> Vec<SingleQubitClifford> {
@@ -1033,7 +1145,7 @@ mod tests {
     #[test]
     fn randomize_reuses_packed_plane_storage_without_allocating() {
         let width = 65_537;
-        let mut value = CliffordString::identity_unchecked(width);
+        let mut value = CliffordString::identity_unbudgeted(width);
         let mut rng = SmallRng::seed_from_u64(0xc11f_f07d);
 
         let allocations = allocation_counter::measure(|| value.randomize(&mut rng));

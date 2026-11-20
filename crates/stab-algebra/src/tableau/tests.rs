@@ -16,7 +16,7 @@ use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 
 use super::{Tableau, TableauAppender, reference};
-use crate::{StabilizerError, TableauIterator};
+use crate::{SignIteration, StabilizerError, TableauIterator};
 
 const WIDTHS: [usize; 10] = [1, 2, 3, 63, 64, 65, 127, 128, 129, 200];
 /// Widths at which every two-qubit gate is also checked alone on one fixed base tableau,
@@ -24,7 +24,9 @@ const WIDTHS: [usize; 10] = [1, 2, 3, 63, 64, 65, 127, 128, 129, 200];
 const EXHAUSTIVE_PREPEND_WIDTHS: [usize; 3] = [2, 3, 5];
 
 fn all_gates(num_qubits: usize) -> Vec<Tableau> {
-    TableauIterator::new(num_qubits, true).unwrap().collect()
+    TableauIterator::new(num_qubits, SignIteration::AllSigns)
+        .unwrap()
+        .collect()
 }
 
 fn random_targets(rng: &mut SmallRng, count: usize, num_qubits: usize) -> Vec<usize> {

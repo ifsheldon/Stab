@@ -6,8 +6,8 @@
 use std::collections::BTreeMap;
 
 use stab_model::{
-    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, QubitId, RepeatBlock, RepeatCount,
-    RepeatNestingLimit,
+    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, MemoryBudget, QubitId,
+    RepeatBlock, RepeatCount, RepeatNestingLimit, ResourceKind, ResourceOperation,
 };
 
 fn single_item(input: &str) -> CircuitItem {
@@ -371,6 +371,70 @@ fn pf1_circuit_detector_coords_include_empty_and_shifted_coordinates() {
             (detector(1), vec![1.0, 2.0, 3.0]),
             (detector(3), vec![142.0])
         ])
+    );
+}
+
+/// A small circuit whose `REPEAT` declares 10^12 detectors cannot make the all-detector query
+/// allocate per detector: the map is admitted against the memory budget first, exactly like the
+/// DEM query, while selected lookups stay cheap.
+#[test]
+fn circuit_detector_coordinate_map_is_admitted_against_the_memory_budget() {
+    let huge = Circuit::from_stim_str(
+        "M 0\n\
+         REPEAT 1000000000000 {\n\
+             DETECTOR(1, 2) rec[-1]\n\
+             SHIFT_COORDS(3, 4)\n\
+         }\n",
+    )
+    .expect("parse huge-repeat circuit");
+    let measured = allocation_counter::measure(|| {
+        let error = huge
+            .detector_coordinates()
+            .expect_err("an all-detector map beyond the default budget is refused");
+        let resource = error
+            .resource_limit_error()
+            .expect("typed resource refusal");
+        assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+        assert_eq!(
+            resource.operation(),
+            ResourceOperation::CircuitDetectorCoordinates
+        );
+        assert_eq!(resource.limit(), MemoryBudget::DEFAULT.bytes());
+        assert_eq!(resource.actual(), 1_000_000_000_000 * (96 + 2 * 8));
+    });
+    assert!(measured.bytes_max < 4096, "{measured:?}");
+    assert_eq!(
+        huge.coordinates_of_detector(detector(1))
+            .expect("selected huge-repeat coordinates"),
+        vec![4.0, 6.0]
+    );
+
+    let small = Circuit::from_stim_str(
+        "M 0\n\
+         REPEAT 3 {\n\
+             DETECTOR(1, 2) rec[-1]\n\
+             SHIFT_COORDS(3, 4)\n\
+         }\n",
+    )
+    .expect("parse small circuit");
+    // Three entries of 96 bytes plus two coordinate scalars each fit exactly 336 bytes.
+    let exact = MemoryBudget::from_bytes(3 * (96 + 2 * 8));
+    assert_eq!(
+        small
+            .detector_coordinates_with_memory_budget(exact)
+            .expect("exact budget admits the map")
+            .len(),
+        3
+    );
+    let excess = MemoryBudget::from_bytes(exact.bytes() - 1);
+    let error = small
+        .detector_coordinates_with_memory_budget(excess)
+        .expect_err("one byte below the requirement is refused");
+    assert_eq!(
+        error
+            .resource_limit_error()
+            .map(|resource| resource.actual()),
+        Some(exact.bytes())
     );
 }
 

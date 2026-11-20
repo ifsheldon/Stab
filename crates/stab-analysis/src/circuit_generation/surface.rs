@@ -11,28 +11,18 @@ use crate::{AnalysisError, AnalysisResult};
 use stab_model::{Circuit, GateKind};
 
 use super::{
-    CircuitGenParams, GeneratedCircuit, SurfaceCodeParams, SurfaceCodeTask,
-    append_begin_round_tick, append_circuit, append_instruction, append_measure,
-    append_measure_reset, append_repeated_body, append_reset, append_unitary_1, append_unitary_2,
-    layout_text, qubit_targets, rec_target, rec_targets, validate_surface_generation_size,
+    CodeCircuitParams, GeneratedCircuit, SurfaceCodeTask, append_begin_round_tick, append_circuit,
+    append_instruction, append_measure, append_measure_reset, append_repeated_body, append_reset,
+    append_unitary_1, append_unitary_2, layout_text, qubit_targets, rec_target, rec_targets,
 };
 
-/// Generates Stim-compatible rotated and unrotated surface-code memory circuits.
-///
-/// Returns an error before materialization if the projected circuit exceeds the parameters'
-/// memory budget.
-pub fn generate_surface_code_circuit(
-    params: &SurfaceCodeParams,
+/// Generates Stim's rotated and unrotated surface-code memory circuits; the caller has admitted
+/// their size.
+pub(super) fn generate(
+    params: &CodeCircuitParams,
+    task: SurfaceCodeTask,
 ) -> AnalysisResult<GeneratedCircuit> {
-    validate_surface_generation_size(
-        params.distance().get(),
-        matches!(
-            params.task,
-            SurfaceCodeTask::RotatedMemoryX | SurfaceCodeTask::RotatedMemoryZ
-        ),
-        params.memory_budget(),
-    )?;
-    match params.task {
+    match task {
         SurfaceCodeTask::RotatedMemoryX => generate_rotated_surface_code_circuit(params, true),
         SurfaceCodeTask::RotatedMemoryZ => generate_rotated_surface_code_circuit(params, false),
         SurfaceCodeTask::UnrotatedMemoryX => generate_unrotated_surface_code_circuit(params, true),
@@ -61,7 +51,7 @@ impl SurfaceCoord {
 }
 
 fn generate_rotated_surface_code_circuit(
-    params: &SurfaceCodeParams,
+    params: &CodeCircuitParams,
     is_memory_x: bool,
 ) -> AnalysisResult<GeneratedCircuit> {
     let distance = params.distance().get();
@@ -121,7 +111,7 @@ fn generate_rotated_surface_code_circuit(
         data_coords,
         x_measure_coords,
         z_measure_coords,
-        params.common(),
+        params,
         &x_order,
         &z_order,
         x_observable,
@@ -131,7 +121,7 @@ fn generate_rotated_surface_code_circuit(
 }
 
 fn generate_unrotated_surface_code_circuit(
-    params: &SurfaceCodeParams,
+    params: &CodeCircuitParams,
     is_memory_x: bool,
 ) -> AnalysisResult<GeneratedCircuit> {
     let distance = params.distance().get();
@@ -174,7 +164,7 @@ fn generate_unrotated_surface_code_circuit(
         data_coords,
         x_measure_coords,
         z_measure_coords,
-        params.common(),
+        params,
         &order,
         &order,
         x_observable,
@@ -192,7 +182,7 @@ fn finish_surface_code_circuit(
     data_coords: BTreeSet<SurfaceCoord>,
     x_measure_coords: BTreeSet<SurfaceCoord>,
     z_measure_coords: BTreeSet<SurfaceCoord>,
-    params: &CircuitGenParams,
+    params: &CodeCircuitParams,
     x_order: &[SurfaceCoord; 4],
     z_order: &[SurfaceCoord; 4],
     x_observable: Vec<SurfaceCoord>,

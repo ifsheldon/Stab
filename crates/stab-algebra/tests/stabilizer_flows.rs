@@ -1,11 +1,12 @@
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     reason = "M6 Flow parity tests use direct assertions to mirror compact upstream examples"
 )]
 
 use std::str::FromStr;
 
-use stab_algebra::{Flow, PauliString, StabilizerError};
+use stab_algebra::{FlexPauliString, Flow, PauliString, StabilizerError, TextExcerpt};
 
 #[test]
 fn flows_preserve_values_text_multiplication_and_typed_failures() {
@@ -48,13 +49,13 @@ fn flow_from_str_matches_stim_examples() {
         "X -> obs[ 5]",
         "X -> rec[]",
     ] {
-        assert_eq!(
-            Flow::from_str(text),
-            Err(StabilizerError::InvalidFlowText {
-                text: text.to_owned(),
-            }),
-            "{text:?}"
-        );
+        match Flow::from_str(text) {
+            Err(StabilizerError::InvalidFlowText { excerpt }) => {
+                assert_eq!(excerpt.as_str(), text);
+                assert!(!excerpt.is_truncated(), "{text:?}");
+            }
+            other => panic!("{text:?} gave {other:?}"),
+        }
     }
 
     assert_eq!(
@@ -257,10 +258,7 @@ fn flow_multiplication_matches_stim_examples() {
     for (left, right) in [("1 -> X", "1 -> Y"), ("1 -> Y", "1 -> X")] {
         assert_eq!(
             flow(left).multiply(&flow(right)),
-            Err(StabilizerError::InvalidFlowProduct {
-                left: left.to_owned(),
-                right: right.to_owned(),
-            })
+            Err(StabilizerError::InvalidFlowProduct)
         );
     }
     assert_eq!(
@@ -310,4 +308,26 @@ fn new_flow(
 
 fn flow(text: &str) -> Flow {
     Flow::from_str(text).expect("parse Flow")
+}
+
+#[test]
+fn rejected_text_errors_keep_a_bounded_excerpt() {
+    let long_flow = format!("X -> {}?", "X".repeat(1_000_000));
+    let long_sparse = format!("X0*{}", "Y1".repeat(500_000));
+    let errors = [
+        Flow::from_str(&long_flow).expect_err("trailing garbage"),
+        FlexPauliString::from_str(&long_sparse).expect_err("missing separator"),
+    ];
+    for error in errors {
+        let excerpt = match &error {
+            StabilizerError::InvalidFlowText { excerpt }
+            | StabilizerError::InvalidSparsePauliString { excerpt } => excerpt,
+            other => panic!("unexpected error {other:?}"),
+        };
+        assert!(excerpt.is_truncated());
+        assert_eq!(excerpt.as_str().chars().count(), TextExcerpt::MAX_CHARS);
+        let message = error.to_string();
+        assert!(message.len() < 200, "{message}");
+        assert!(message.ends_with("..."), "{message}");
+    }
 }

@@ -3,6 +3,7 @@ use std::io::{self, Write};
 
 use super::tag::DemTag;
 use super::target::{DetectorTarget, ObservableTarget};
+use super::traversal::shifted_coordinates;
 use super::{
     DemArgVec, DemDetectorId, DemObservableId, DemTarget, DemTargetVec, normalize_tag,
     write_indent, write_indent_io, write_optional_tag, write_optional_tag_io,
@@ -77,70 +78,151 @@ impl DemInstructionView<'_> {
     }
 }
 
-/// What an instruction applies to: the targets of an `error`, the single detector or observable
-/// it declares, or the detector offset of a `shift_detectors`.
+/// The validated data of one instruction, stored per kind.
 ///
+/// Each variant holds exactly what its kind declares: an `error` keeps its checked probability
+/// beside its targets, `detector` and `shift_detectors` keep their finite coordinates, and
 /// `Detector` and `LogicalObservable` hold targets that are a detector and an observable by
-/// construction.
+/// construction. No variant carries fields another kind uses, so reading one needs no fallible
+/// follow-up.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum DemPayload {
-    Error(DemTargetVec),
-    Detector(DetectorTarget),
-    LogicalObservable(ObservableTarget),
-    ShiftDetectors(u64),
+    Error {
+        probability: Probability,
+        targets: DemTargetVec,
+    },
+    Detector {
+        coordinates: DemArgVec,
+        detector: DetectorTarget,
+    },
+    LogicalObservable {
+        observable: ObservableTarget,
+    },
+    ShiftDetectors {
+        coordinates: DemArgVec,
+        shift: u64,
+    },
 }
 
 impl DemPayload {
     pub(super) fn kind(&self) -> DemInstructionKind {
         match self {
-            Self::Error(_) => DemInstructionKind::Error,
-            Self::Detector(_) => DemInstructionKind::Detector,
-            Self::LogicalObservable(_) => DemInstructionKind::LogicalObservable,
-            Self::ShiftDetectors(_) => DemInstructionKind::ShiftDetectors,
+            Self::Error { .. } => DemInstructionKind::Error,
+            Self::Detector { .. } => DemInstructionKind::Detector,
+            Self::LogicalObservable { .. } => DemInstructionKind::LogicalObservable,
+            Self::ShiftDetectors { .. } => DemInstructionKind::ShiftDetectors,
         }
     }
 
-    pub(super) fn detector(detector: DemDetectorId) -> Self {
-        Self::Detector(DetectorTarget::new(detector))
+    pub(super) fn detector(coordinates: DemArgVec, detector: DemDetectorId) -> Self {
+        Self::Detector {
+            coordinates,
+            detector: DetectorTarget::new(detector),
+        }
     }
 
     pub(super) fn logical_observable(observable: DemObservableId) -> Self {
-        Self::LogicalObservable(ObservableTarget::new(observable))
+        Self::LogicalObservable {
+            observable: ObservableTarget::new(observable),
+        }
+    }
+
+    fn args(&self) -> &[f64] {
+        match self {
+            Self::Error { probability, .. } => std::slice::from_ref(probability.as_f64_ref()),
+            Self::Detector { coordinates, .. } | Self::ShiftDetectors { coordinates, .. } => {
+                coordinates
+            }
+            Self::LogicalObservable { .. } => &[],
+        }
     }
 
     fn targets(&self) -> &[DemTarget] {
         match self {
-            Self::Error(targets) => targets,
-            Self::Detector(target) => std::slice::from_ref(target.as_target()),
-            Self::LogicalObservable(target) => std::slice::from_ref(target.as_target()),
-            Self::ShiftDetectors(_) => &[],
+            Self::Error { targets, .. } => targets,
+            Self::Detector { detector, .. } => std::slice::from_ref(detector.as_target()),
+            Self::LogicalObservable { observable } => std::slice::from_ref(observable.as_target()),
+            Self::ShiftDetectors { .. } => &[],
+        }
+    }
+
+    /// Compares kind, targets, and detector shift exactly, ignoring every argument.
+    fn same_except_args(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Error { targets: left, .. }, Self::Error { targets: right, .. }) => {
+                left == right
+            }
+            (
+                Self::Detector { detector: left, .. },
+                Self::Detector {
+                    detector: right, ..
+                },
+            ) => left == right,
+            (
+                Self::LogicalObservable { observable: left },
+                Self::LogicalObservable { observable: right },
+            ) => left == right,
+            (
+                Self::ShiftDetectors { shift: left, .. },
+                Self::ShiftDetectors { shift: right, .. },
+            ) => left == right,
+            _ => false,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DemInstruction {
-    args: DemArgVec,
     payload: DemPayload,
     pub(super) tag: Option<DemTag>,
 }
 
 impl DemInstruction {
-    fn from_parts(args: DemArgVec, payload: DemPayload, tag: Option<DemTag>) -> ModelResult<Self> {
-        validate_dem_args(payload.kind(), &args)?;
-        if let DemPayload::Error(targets) = &payload {
-            validate_error_targets(targets)?;
-        }
-        Ok(Self::from_validated_parts(args, payload, tag))
+    /// Assembles an instruction whose payload the caller already validated.
+    pub(super) fn from_validated_parts(payload: DemPayload, tag: Option<DemTag>) -> Self {
+        Self { payload, tag }
     }
 
-    /// Assembles an instruction whose arguments and payload the caller already validated.
-    pub(super) fn from_validated_parts(
-        args: DemArgVec,
-        payload: DemPayload,
+    fn error_with_tag(
+        probability: Probability,
+        targets: DemTargetVec,
         tag: Option<DemTag>,
-    ) -> Self {
-        Self { args, payload, tag }
+    ) -> ModelResult<Self> {
+        validate_error_targets(&targets)?;
+        Ok(Self::from_validated_parts(
+            DemPayload::Error {
+                probability,
+                targets,
+            },
+            tag,
+        ))
+    }
+
+    fn detector_with_tag(
+        coordinates: Vec<f64>,
+        detector: DemDetectorId,
+        tag: Option<DemTag>,
+    ) -> ModelResult<Self> {
+        validate_coordinates(DemInstructionKind::Detector, &coordinates)?;
+        Ok(Self::from_validated_parts(
+            DemPayload::detector(DemArgVec::from_vec(coordinates), detector),
+            tag,
+        ))
+    }
+
+    fn shift_detectors_with_tag(
+        coordinates: Vec<f64>,
+        shift: u64,
+        tag: Option<DemTag>,
+    ) -> ModelResult<Self> {
+        validate_coordinates(DemInstructionKind::ShiftDetectors, &coordinates)?;
+        Ok(Self::from_validated_parts(
+            DemPayload::ShiftDetectors {
+                coordinates: DemArgVec::from_vec(coordinates),
+                shift,
+            },
+            tag,
+        ))
     }
 
     pub fn error(
@@ -148,9 +230,9 @@ impl DemInstruction {
         targets: Vec<DemTarget>,
         tag: Option<String>,
     ) -> ModelResult<Self> {
-        Self::from_parts(
-            probability_args(probability),
-            DemPayload::Error(DemTargetVec::from_vec(targets)),
+        Self::error_with_tag(
+            probability,
+            DemTargetVec::from_vec(targets),
             normalize_tag(tag),
         )
     }
@@ -160,16 +242,11 @@ impl DemInstruction {
         detector: DemDetectorId,
         tag: Option<String>,
     ) -> ModelResult<Self> {
-        Self::from_parts(
-            DemArgVec::from_vec(coordinates),
-            DemPayload::detector(detector),
-            normalize_tag(tag),
-        )
+        Self::detector_with_tag(coordinates, detector, normalize_tag(tag))
     }
 
     pub fn logical_observable(observable: DemObservableId, tag: Option<String>) -> Self {
         Self::from_validated_parts(
-            DemArgVec::new(),
             DemPayload::logical_observable(observable),
             normalize_tag(tag),
         )
@@ -180,11 +257,7 @@ impl DemInstruction {
         detector_shift: u64,
         tag: Option<String>,
     ) -> ModelResult<Self> {
-        Self::from_parts(
-            DemArgVec::from_vec(coordinates),
-            DemPayload::ShiftDetectors(detector_shift),
-            normalize_tag(tag),
-        )
+        Self::shift_detectors_with_tag(coordinates, detector_shift, normalize_tag(tag))
     }
 
     /// Builds a validated error instruction from a borrowed target slice.
@@ -193,9 +266,9 @@ impl DemInstruction {
         targets: &[DemTarget],
         tag: Option<&[u8]>,
     ) -> ModelResult<Self> {
-        Self::from_parts(
-            probability_args(probability),
-            DemPayload::Error(DemTargetVec::from_slice(targets)),
+        Self::error_with_tag(
+            probability,
+            DemTargetVec::from_slice(targets),
             tag.and_then(DemTag::from_slice),
         )
     }
@@ -205,11 +278,7 @@ impl DemInstruction {
         detector: DemDetectorId,
         tag: Option<&[u8]>,
     ) -> ModelResult<Self> {
-        Self::from_parts(
-            DemArgVec::from_vec(coordinates),
-            DemPayload::detector(detector),
-            tag.and_then(DemTag::from_slice),
-        )
+        Self::detector_with_tag(coordinates, detector, tag.and_then(DemTag::from_slice))
     }
 
     pub(crate) fn logical_observable_with_tag_bytes(
@@ -217,7 +286,6 @@ impl DemInstruction {
         tag: Option<&[u8]>,
     ) -> Self {
         Self::from_validated_parts(
-            DemArgVec::new(),
             DemPayload::logical_observable(observable),
             tag.and_then(DemTag::from_slice),
         )
@@ -228,18 +296,25 @@ impl DemInstruction {
         detector_shift: u64,
         tag: Option<&[u8]>,
     ) -> ModelResult<Self> {
-        Self::from_parts(
-            DemArgVec::from_vec(coordinates),
-            DemPayload::ShiftDetectors(detector_shift),
+        Self::shift_detectors_with_tag(
+            coordinates,
+            detector_shift,
             tag.and_then(DemTag::from_slice),
         )
     }
 
     /// Returns a copy with every relative detector raised by `detector_offset` and, for a
-    /// `detector`, its coordinates replaced by `args`; the tag is kept.
-    pub(super) fn relocated(&self, args: Vec<f64>, detector_offset: u64) -> ModelResult<Self> {
+    /// `detector`, its coordinates shifted by `coordinate_shift`; the tag is kept.
+    pub(super) fn relocated(
+        &self,
+        detector_offset: u64,
+        coordinate_shift: &[f64],
+    ) -> ModelResult<Self> {
         let payload = match &self.payload {
-            DemPayload::Error(targets) => {
+            DemPayload::Error {
+                probability,
+                targets,
+            } => {
                 let mut shifted = DemTargetVec::new();
                 shifted.try_reserve_exact(targets.len()).map_err(|_| {
                     ModelError::invalid_detector_error_model("target allocation failed")
@@ -247,14 +322,40 @@ impl DemInstruction {
                 for target in targets {
                     shifted.push(target.shifted(detector_offset)?);
                 }
-                DemPayload::Error(shifted)
+                DemPayload::Error {
+                    probability: *probability,
+                    targets: shifted,
+                }
             }
-            DemPayload::Detector(target) => DemPayload::Detector(target.shifted(detector_offset)?),
-            DemPayload::LogicalObservable(_) | DemPayload::ShiftDetectors(_) => {
-                self.payload.clone()
+            DemPayload::Detector {
+                coordinates,
+                detector,
+            } => {
+                let coordinates = shifted_coordinates(coordinates, coordinate_shift)?;
+                validate_coordinates(DemInstructionKind::Detector, &coordinates)?;
+                DemPayload::Detector {
+                    coordinates: DemArgVec::from_vec(coordinates),
+                    detector: detector.shifted(detector_offset)?,
+                }
+            }
+            DemPayload::LogicalObservable { observable } => DemPayload::LogicalObservable {
+                observable: *observable,
+            },
+            DemPayload::ShiftDetectors { coordinates, shift } => {
+                let mut copied = DemArgVec::new();
+                copied.try_reserve_exact(coordinates.len()).map_err(|_| {
+                    ModelError::invalid_detector_error_model(
+                        "flattened instruction argument allocation failed",
+                    )
+                })?;
+                copied.extend_from_slice(coordinates);
+                DemPayload::ShiftDetectors {
+                    coordinates: copied,
+                    shift: *shift,
+                }
             }
         };
-        Self::from_parts(DemArgVec::from_vec(args), payload, self.tag.clone())
+        Ok(Self::from_validated_parts(payload, self.tag.clone()))
     }
 
     pub fn kind(&self) -> DemInstructionKind {
@@ -265,26 +366,37 @@ impl DemInstruction {
     /// that kind holds.
     pub fn view(&self) -> DemInstructionView<'_> {
         match &self.payload {
-            DemPayload::Error(targets) => DemInstructionView::Error {
-                probability: error_probability(&self.args),
+            DemPayload::Error {
+                probability,
+                targets,
+            } => DemInstructionView::Error {
+                probability: *probability,
                 targets,
             },
-            DemPayload::Detector(detector) => DemInstructionView::Detector {
-                coordinates: &self.args,
+            DemPayload::Detector {
+                coordinates,
+                detector,
+            } => DemInstructionView::Detector {
+                coordinates,
                 detector: detector.id(),
             },
-            DemPayload::LogicalObservable(observable) => DemInstructionView::LogicalObservable {
+            DemPayload::LogicalObservable { observable } => DemInstructionView::LogicalObservable {
                 observable: observable.id(),
             },
-            DemPayload::ShiftDetectors(detector_shift) => DemInstructionView::ShiftDetectors {
-                coordinate_shift: &self.args,
-                detector_shift: *detector_shift,
-            },
+            DemPayload::ShiftDetectors { coordinates, shift } => {
+                DemInstructionView::ShiftDetectors {
+                    coordinate_shift: coordinates,
+                    detector_shift: *shift,
+                }
+            }
         }
     }
 
+    /// Returns the parenthesized arguments: the one probability of an `error`, the coordinates of
+    /// a `detector`, the coordinate shift of a `shift_detectors`, and nothing for a
+    /// `logical_observable`.
     pub fn args(&self) -> &[f64] {
-        &self.args
+        self.payload.args()
     }
 
     /// Returns the targets of an `error`, or the single target a `detector` or
@@ -304,7 +416,7 @@ impl DemInstruction {
     /// instruction kind.
     pub fn detector_shift(&self) -> Option<u64> {
         match self.payload {
-            DemPayload::ShiftDetectors(shift) => Some(shift),
+            DemPayload::ShiftDetectors { shift, .. } => Some(shift),
             _ => None,
         }
     }
@@ -324,7 +436,7 @@ impl DemInstruction {
 
     /// Compares kind, targets, detector shift, and tag exactly, leaving arguments to the caller.
     pub(super) fn same_except_args(&self, other: &Self) -> bool {
-        self.payload == other.payload && self.tag == other.tag
+        self.payload.same_except_args(&other.payload) && self.tag == other.tag
     }
 
     /// Removes this instruction's tag without changing its validated semantic fields.
@@ -349,19 +461,19 @@ impl DemInstruction {
             return Err(detector.get());
         }
         match &mut self.payload {
-            DemPayload::Error(targets) => {
+            DemPayload::Error { targets, .. } => {
                 for target in targets.iter_mut() {
                     if let Some(lowered) = target.detector().and_then(|id| id.checked_sub(base)) {
                         *target = DemTarget::from_detector(lowered);
                     }
                 }
             }
-            DemPayload::Detector(target) => {
-                if let Some(lowered) = target.id().checked_sub(base) {
-                    *target = DetectorTarget::new(lowered);
+            DemPayload::Detector { detector, .. } => {
+                if let Some(lowered) = detector.id().checked_sub(base) {
+                    *detector = DetectorTarget::new(lowered);
                 }
             }
-            DemPayload::LogicalObservable(_) | DemPayload::ShiftDetectors(_) => {}
+            DemPayload::LogicalObservable { .. } | DemPayload::ShiftDetectors { .. } => {}
         }
         Ok(())
     }
@@ -370,9 +482,9 @@ impl DemInstruction {
         write_indent(out, indent);
         out.push_str(self.kind().canonical_name());
         write_optional_tag(out, self.tag.as_ref());
-        write_args(out, &self.args, floats);
+        write_args(out, self.args(), floats);
         let mut digits = NumBuffer::new();
-        if let DemPayload::ShiftDetectors(shift) = self.payload {
+        if let DemPayload::ShiftDetectors { shift, .. } = self.payload {
             out.push(' ');
             out.push_str(shift.format_into(&mut digits));
         }
@@ -394,9 +506,9 @@ impl DemInstruction {
         write_indent_io(out, indent)?;
         out.write_all(self.kind().canonical_name().as_bytes())?;
         write_optional_tag_io(out, self.tag.as_ref())?;
-        write_args_io(out, &self.args, floats)?;
+        write_args_io(out, self.args(), floats)?;
         let mut digits = NumBuffer::new();
-        if let DemPayload::ShiftDetectors(shift) = self.payload {
+        if let DemPayload::ShiftDetectors { shift, .. } = self.payload {
             out.write_all(b" ")?;
             out.write_all(shift.format_into(&mut digits).as_bytes())?;
         }
@@ -410,46 +522,37 @@ impl DemInstruction {
     }
 }
 
-/// The probability of an `error` instruction's `args`.
-///
-/// Every constructor validates an `error` with [`validate_dem_args`], which admits exactly one
-/// probability, and the arguments are never changed afterwards, so any other shape is a broken
-/// model invariant rather than an input error.
-fn error_probability(args: &[f64]) -> Probability {
-    match args {
-        [probability] => Probability::from_valid_probability(*probability),
-        _ => unreachable!("a validated error instruction holds exactly one probability"),
+/// Checks the arguments of an `error`: exactly one probability.
+pub(super) fn error_probability(args: &[f64]) -> ModelResult<Probability> {
+    let [probability] = args else {
+        return Err(ModelError::invalid_detector_error_model(
+            "error instructions require exactly one probability argument",
+        ));
+    };
+    Probability::try_new(*probability)
+}
+
+/// Checks the coordinates of a `detector` or `shift_detectors`: every one is finite.
+pub(super) fn validate_coordinates(kind: DemInstructionKind, args: &[f64]) -> ModelResult<()> {
+    for arg in args {
+        if !arg.is_finite() {
+            return Err(ModelError::invalid_detector_error_model(format!(
+                "{} argument {arg} is not finite",
+                kind.canonical_name()
+            )));
+        }
     }
+    Ok(())
 }
 
-fn probability_args(probability: Probability) -> DemArgVec {
-    let mut args = DemArgVec::new();
-    args.push(probability.get());
-    args
-}
-
-/// Checks the arguments an instruction of `kind` takes.
-pub(super) fn validate_dem_args(kind: DemInstructionKind, args: &[f64]) -> ModelResult<()> {
-    match kind {
-        DemInstructionKind::Error => {
-            let [probability] = args else {
-                return Err(ModelError::invalid_detector_error_model(
-                    "error instructions require exactly one probability argument",
-                ));
-            };
-            Probability::try_new(*probability).map(|_| ())
-        }
-        DemInstructionKind::Detector => validate_finite_args("detector", args),
-        DemInstructionKind::LogicalObservable => {
-            if args.is_empty() {
-                Ok(())
-            } else {
-                Err(ModelError::invalid_detector_error_model(
-                    "logical_observable instructions do not take arguments",
-                ))
-            }
-        }
-        DemInstructionKind::ShiftDetectors => validate_finite_args("shift_detectors", args),
+/// Checks the arguments of a `logical_observable`: there are none.
+pub(super) fn validate_no_args(args: &[f64]) -> ModelResult<()> {
+    if args.is_empty() {
+        Ok(())
+    } else {
+        Err(ModelError::invalid_detector_error_model(
+            "logical_observable instructions do not take arguments",
+        ))
     }
 }
 
@@ -477,17 +580,6 @@ pub(super) fn validate_error_separator_prefix(targets: &[DemTarget]) -> ModelRes
             previous_was_separator = true;
         } else {
             previous_was_separator = false;
-        }
-    }
-    Ok(())
-}
-
-fn validate_finite_args(kind: &'static str, args: &[f64]) -> ModelResult<()> {
-    for arg in args {
-        if !arg.is_finite() {
-            return Err(ModelError::invalid_detector_error_model(format!(
-                "{kind} argument {arg} is not finite"
-            )));
         }
     }
     Ok(())

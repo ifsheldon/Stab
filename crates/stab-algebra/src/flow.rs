@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use super::{
     AlgebraMemoryBudget, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
-    StabilizerError, StabilizerResult,
+    StabilizerError, StabilizerResult, TextExcerpt,
 };
 
 /// Measurement-record term inside a stabilizer flow.
@@ -140,10 +140,7 @@ impl Flow {
             .multiply(inverse_phase(self.output.phase()));
         let phase_ratio = output_phase_delta.multiply(inverse_phase(input_phase_delta));
         if phase_ratio.is_imaginary() {
-            return Err(StabilizerError::InvalidFlowProduct {
-                left: self.to_string(),
-                right: rhs.to_string(),
-            });
+            return Err(StabilizerError::InvalidFlowProduct);
         }
 
         // Stim keeps the left input sign as the representation anchor and transfers only the
@@ -231,7 +228,7 @@ impl Flow {
         let mut tokens = output_text.split_whitespace();
         let first_output = tokens.next().ok_or_else(|| invalid_flow_text(text))?;
 
-        let mut output = PauliString::identity_unchecked(0);
+        let mut output = PauliString::identity_unbudgeted(0);
         let mut output_is_imaginary = false;
         let mut measurements = Vec::new();
         let mut observables = Vec::new();
@@ -385,14 +382,14 @@ fn parse_flow_pauli(
     budget: AlgebraMemoryBudget,
 ) -> StabilizerResult<(PauliString, bool)> {
     match text {
-        "1" | "+1" => Ok((PauliString::identity_unchecked(0), false)),
+        "1" | "+1" => Ok((PauliString::identity_unbudgeted(0), false)),
         "-1" => Ok((
-            PauliString::from_bases_unchecked(PauliSign::Minus, []),
+            PauliString::from_bases_unbudgeted(PauliSign::Minus, []),
             false,
         )),
-        "i" | "+i" => Ok((PauliString::identity_unchecked(0), true)),
+        "i" | "+i" => Ok((PauliString::identity_unbudgeted(0), true)),
         "-i" => Ok((
-            PauliString::from_bases_unchecked(PauliSign::Minus, []),
+            PauliString::from_bases_unbudgeted(PauliSign::Minus, []),
             true,
         )),
         "" => Err(invalid_flow_text(original_text)),
@@ -445,7 +442,7 @@ fn bracket_body<'a>(
 
 fn invalid_flow_text(text: &str) -> StabilizerError {
     StabilizerError::InvalidFlowText {
-        text: text.to_owned(),
+        excerpt: TextExcerpt::new(text),
     }
 }
 
@@ -523,7 +520,7 @@ fn inverse_phase(phase: PauliPhase) -> PauliPhase {
 
 fn unsigned_pauli_from_flex(flex: &FlexPauliString) -> PauliString {
     let bases = (0..flex.len()).map(|index| flex.get(index).unwrap_or(PauliBasis::I));
-    PauliString::from_bases_unchecked(PauliSign::Plus, bases)
+    PauliString::from_bases_unbudgeted(PauliSign::Plus, bases)
 }
 
 fn xor_sort<T: Copy + Ord>(values: &mut Vec<T>) {

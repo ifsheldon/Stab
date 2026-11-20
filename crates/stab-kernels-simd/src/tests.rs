@@ -278,14 +278,28 @@ fn public_kernels_match_reference_at_the_detected_level() {
         let (exp_x, exp_z, exp_prod) = reference_pauli_multiply(&lx, &lz, &rx, &rz);
         let mut act_x = lx.clone();
         let mut act_z = lz.clone();
-        let prod = pauli_right_multiply_words(&mut act_x, &mut act_z, &rx, &rz).unwrap();
+        let prod = pauli_right_multiply_words(
+            PauliPlanesMut {
+                x: &mut act_x,
+                z: &mut act_z,
+            },
+            PauliPlanes { x: &rx, z: &rz },
+        )
+        .unwrap();
         assert_eq!(act_x, exp_x, "words={word_count}");
         assert_eq!(act_z, exp_z, "words={word_count}");
         assert_eq!(prod, exp_prod, "words={word_count}");
 
         let mut act_x = lx;
         let mut act_z = lz;
-        let log_i = pauli_right_multiply_words_log_i(&mut act_x, &mut act_z, &rx, &rz).unwrap();
+        let log_i = pauli_right_multiply_words_log_i(
+            PauliPlanesMut {
+                x: &mut act_x,
+                z: &mut act_z,
+            },
+            PauliPlanes { x: &rx, z: &rz },
+        )
+        .unwrap();
         assert_eq!(act_x, exp_x, "phase only, words={word_count}");
         assert_eq!(act_z, exp_z, "phase only, words={word_count}");
         assert_eq!(log_i, exp_prod.log_i, "phase only, words={word_count}");
@@ -300,9 +314,22 @@ fn pauli_length_mismatch_in_any_plane_is_rejected_without_writing() {
         let [mut lx, mut lz, rx, rz] = planes;
         let orig_x = lx.clone();
         let orig_z = lz.clone();
-        let phase_only_error =
-            pauli_right_multiply_words_log_i(&mut lx, &mut lz, &rx, &rz).unwrap_err();
-        let error = pauli_right_multiply_words(&mut lx, &mut lz, &rx, &rz).unwrap_err();
+        let phase_only_error = pauli_right_multiply_words_log_i(
+            PauliPlanesMut {
+                x: &mut lx,
+                z: &mut lz,
+            },
+            PauliPlanes { x: &rx, z: &rz },
+        )
+        .unwrap_err();
+        let error = pauli_right_multiply_words(
+            PauliPlanesMut {
+                x: &mut lx,
+                z: &mut lz,
+            },
+            PauliPlanes { x: &rx, z: &rz },
+        )
+        .unwrap_err();
         assert_eq!(phase_only_error, error, "plane={short_plane}");
         let expected = if short_plane == 0 {
             WordLengthMismatch {

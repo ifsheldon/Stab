@@ -14,7 +14,7 @@ pub(super) fn measured_pauli_product(
     qubit_count: usize,
     targets: &[Target],
 ) -> AnalysisResult<PauliString> {
-    let mut product = stab_algebra::advanced::pauli_identity_unchecked(qubit_count);
+    let mut product = stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count);
     for target in targets {
         if target.is_combiner() {
             continue;
@@ -148,8 +148,8 @@ pub(super) fn add_pauli_product_measurement_flow(
     if measured_product.has_no_pauli_terms() {
         flows.push(
             Flow::new(
-                stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
-                stab_algebra::advanced::pauli_from_bases_unchecked(
+                stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count),
+                stab_algebra::advanced::pauli_from_bases_unbudgeted(
                     measured_product.sign(),
                     vec![PauliBasis::I; qubit_count],
                 ),
@@ -164,7 +164,7 @@ pub(super) fn add_pauli_product_measurement_flow(
     flows.push(
         Flow::new(
             measured_product.clone(),
-            stab_algebra::advanced::pauli_identity_unchecked(qubit_count),
+            stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count),
             [record_index],
             [],
         )
@@ -306,7 +306,7 @@ pub(super) fn pair_pauli(
     basis: PauliBasis,
     sign: PauliSign,
 ) -> PauliString {
-    stab_algebra::advanced::pauli_from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unbudgeted(
         sign,
         (0..qubit_count).map(|qubit| {
             if qubit == left || qubit == right {
@@ -324,7 +324,7 @@ pub(super) fn single_pauli_with_sign(
     basis: PauliBasis,
     sign: PauliSign,
 ) -> PauliString {
-    stab_algebra::advanced::pauli_from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unbudgeted(
         sign,
         (0..len).map(|candidate| {
             if candidate == index {
@@ -337,7 +337,7 @@ pub(super) fn single_pauli_with_sign(
 }
 
 pub(super) fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
-    stab_algebra::advanced::pauli_from_bases_unchecked(
+    stab_algebra::advanced::pauli_from_bases_unbudgeted(
         PauliSign::Plus,
         (0..len).map(|candidate| {
             if candidate == index {

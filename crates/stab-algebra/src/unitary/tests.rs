@@ -10,7 +10,7 @@ use num_complex::Complex32;
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 
-use super::{PauliImage, amplitude_bit, unitary_to_tableau};
+use super::{Endianness, PauliImage, amplitude_bit};
 use crate::{PauliSign, PauliString, StabilizerError, Tableau};
 
 type Matrix = Vec<Vec<Complex32>>;
@@ -168,7 +168,15 @@ fn random_clifford_unitaries_round_trip_in_both_endiannesses() {
                 let phase = Complex32::from_polar(1.0, rng.random_range(0.0..TAU));
                 let matrix = scaled(&tableau_unitary(&tableau, little_endian), phase);
                 assert_eq!(
-                    unitary_to_tableau(&matrix, little_endian).expect("Clifford unitary"),
+                    Tableau::from_unitary(
+                        &matrix,
+                        if little_endian {
+                            Endianness::Little
+                        } else {
+                            Endianness::Big
+                        }
+                    )
+                    .expect("Clifford unitary"),
                     tableau,
                     "{num_qubits} qubits, little endian {little_endian}"
                 );
@@ -207,8 +215,8 @@ fn composing_with_a_pauli_flips_exactly_the_anticommuting_output_signs() {
                     .collect()
             })
             .collect();
-        let after_x = unitary_to_tableau(&times_x, true).expect("U X");
-        let after_z = unitary_to_tableau(&times_z, true).expect("U Z");
+        let after_x = Tableau::from_unitary(&times_x, Endianness::Little).expect("U X");
+        let after_z = Tableau::from_unitary(&times_z, Endianness::Little).expect("U Z");
         for other in 0..num_qubits {
             let x = tableau.x_output(other).expect("x");
             let z = tableau.z_output(other).expect("z");
@@ -243,7 +251,7 @@ fn perturbations_inside_the_snap_tolerance_are_accepted() {
     // norm unchanged; a relative magnitude error of 1e-6 stays inside the norm tolerance.
     matrix[row][column] *= Complex32::from_polar(1.0 + 1e-6, 0.05);
     assert_eq!(
-        unitary_to_tableau(&matrix, true).expect("near Clifford"),
+        Tableau::from_unitary(&matrix, Endianness::Little).expect("near Clifford"),
         tableau
     );
 }
@@ -255,7 +263,7 @@ fn perturbations_outside_the_tolerance_are_rejected_by_class() {
     // Squared ratio distance 2 - 2 cos(0.6) is about 0.35, past the 0.125 threshold.
     phase_error[0][1] *= Complex32::from_polar(1.0, 0.6);
     assert_eq!(
-        unitary_to_tableau(&phase_error, true),
+        Tableau::from_unitary(&phase_error, Endianness::Little),
         Err(StabilizerError::MatrixNotUnitary)
     );
 
@@ -263,14 +271,14 @@ fn perturbations_outside_the_tolerance_are_rejected_by_class() {
     // The ratio still snaps, but column 1's squared norm moves by about 0.005.
     magnitude_error[0][1] *= 1.01;
     assert_eq!(
-        unitary_to_tableau(&magnitude_error, true),
+        Tableau::from_unitary(&magnitude_error, Endianness::Little),
         Err(StabilizerError::MatrixNotUnitary)
     );
 
     let mut diagonal_phase = identity(4);
     diagonal_phase[3][3] = Complex32::from_polar(1.0, 0.6);
     assert_eq!(
-        unitary_to_tableau(&diagonal_phase, true),
+        Tableau::from_unitary(&diagonal_phase, Endianness::Little),
         Err(StabilizerError::UnitaryMatrixNotClifford)
     );
 }
@@ -289,11 +297,11 @@ fn small_rotations_snap_to_the_identity_like_stim() {
     // sin(0.3) / cos(0.3) is within the snapping threshold of zero.
     let matrix = kron(&x_rotation(0.3), &identity(2));
     assert_eq!(
-        unitary_to_tableau(&matrix, true).expect("snapped rotation"),
+        Tableau::from_unitary(&matrix, Endianness::Little).expect("snapped rotation"),
         Tableau::identity(2).expect("identity")
     );
     assert_eq!(
-        unitary_to_tableau(&x_rotation(0.35), true),
+        Tableau::from_unitary(&x_rotation(0.35), Endianness::Little),
         Err(StabilizerError::UnitaryMatrixNotClifford)
     );
 }
@@ -307,7 +315,7 @@ fn non_clifford_unitaries_are_rejected_as_not_clifford() {
     for (name, gate) in [("T", t_gate), ("RX(0.5)", x_rotation(0.5))] {
         let matrix = kron(&kron(&gate, &identity(2)), &identity(2));
         assert_eq!(
-            unitary_to_tableau(&matrix, true),
+            Tableau::from_unitary(&matrix, Endianness::Little),
             Err(StabilizerError::UnitaryMatrixNotClifford),
             "{name}"
         );
@@ -323,14 +331,14 @@ fn every_column_is_verified_beyond_the_probed_ones() {
         row[7] = row[3];
     }
     assert_eq!(
-        unitary_to_tableau(&duplicated, true),
+        Tableau::from_unitary(&duplicated, Endianness::Little),
         Err(StabilizerError::MatrixNotUnitary)
     );
 
     let mut controlled_controlled_s = identity(8);
     controlled_controlled_s[7][7] = c(0.0, 1.0);
     assert_eq!(
-        unitary_to_tableau(&controlled_controlled_s, true),
+        Tableau::from_unitary(&controlled_controlled_s, Endianness::Little),
         Err(StabilizerError::UnitaryMatrixNotClifford)
     );
 }
@@ -341,7 +349,7 @@ fn hostile_entries_are_reported_as_not_unitary() {
         let mut matrix = identity(2);
         matrix[1][0] = c(0.0, value);
         assert_eq!(
-            unitary_to_tableau(&matrix, true),
+            Tableau::from_unitary(&matrix, Endianness::Little),
             Err(StabilizerError::MatrixNotUnitary)
         );
     }
@@ -350,19 +358,19 @@ fn hostile_entries_are_reported_as_not_unitary() {
         vec![c(0.0, 0.0), c(0.0, 0.0)],
     ];
     assert_eq!(
-        unitary_to_tableau(&zero_first_column, true),
+        Tableau::from_unitary(&zero_first_column, Endianness::Little),
         Err(StabilizerError::MatrixNotUnitary)
     );
     assert_eq!(
-        unitary_to_tableau(&scaled(&identity(4), c(2.0, 0.0)), true),
+        Tableau::from_unitary(&scaled(&identity(4), c(2.0, 0.0)), Endianness::Little),
         Err(StabilizerError::MatrixNotUnitary)
     );
     assert_eq!(
-        unitary_to_tableau(&[vec![c(0.5, 0.0)]], true),
+        Tableau::from_unitary(&[vec![c(0.5, 0.0)]], Endianness::Little),
         Err(StabilizerError::MatrixNotUnitary)
     );
     assert_eq!(
-        unitary_to_tableau(&[vec![c(0.0, 1.0)]], true).expect("scalar phase"),
+        Tableau::from_unitary(&[vec![c(0.0, 1.0)]], Endianness::Little).expect("scalar phase"),
         Tableau::identity(0).expect("empty tableau")
     );
 }

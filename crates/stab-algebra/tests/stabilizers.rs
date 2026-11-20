@@ -11,8 +11,8 @@ use proptest::test_runner::{Config as ProptestConfig, RngAlgorithm, RngSeed};
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_algebra::{
-    CommutingPauliStringIterator, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
-    PauliStringIterator, Tableau, TableauIterator,
+    CommutingPauliStringIterator, FlexPauliString, PauliBasis, PauliIterationBases, PauliPhase,
+    PauliSign, PauliString, PauliStringIterator, SignIteration, Tableau, TableauIterator,
 };
 
 #[test]
@@ -76,53 +76,28 @@ fn stabilizers_pauli_scalar_byproduct_table_matches_stim() {
     let y = pauli("Y");
     let z = pauli("Z");
 
-    assert_eq!(i.log_i_scalar_byproduct(&i).expect("byproduct"), 0);
-    assert_eq!(i.log_i_scalar_byproduct(&x).expect("byproduct"), 0);
-    assert_eq!(i.log_i_scalar_byproduct(&y).expect("byproduct"), 0);
-    assert_eq!(i.log_i_scalar_byproduct(&z).expect("byproduct"), 0);
-    assert_eq!(x.log_i_scalar_byproduct(&i).expect("byproduct"), 0);
-    assert_eq!(x.log_i_scalar_byproduct(&x).expect("byproduct"), 0);
-    assert_eq!(x.log_i_scalar_byproduct(&y).expect("byproduct"), 1);
-    assert_eq!(x.log_i_scalar_byproduct(&z).expect("byproduct"), 3);
-    assert_eq!(y.log_i_scalar_byproduct(&i).expect("byproduct"), 0);
-    assert_eq!(y.log_i_scalar_byproduct(&x).expect("byproduct"), 3);
-    assert_eq!(y.log_i_scalar_byproduct(&y).expect("byproduct"), 0);
-    assert_eq!(y.log_i_scalar_byproduct(&z).expect("byproduct"), 1);
-    assert_eq!(z.log_i_scalar_byproduct(&i).expect("byproduct"), 0);
-    assert_eq!(z.log_i_scalar_byproduct(&x).expect("byproduct"), 1);
-    assert_eq!(z.log_i_scalar_byproduct(&y).expect("byproduct"), 3);
-    assert_eq!(z.log_i_scalar_byproduct(&z).expect("byproduct"), 0);
+    assert_eq!(i.log_i_scalar_byproduct(&i).log_i(), 0);
+    assert_eq!(i.log_i_scalar_byproduct(&x).log_i(), 0);
+    assert_eq!(i.log_i_scalar_byproduct(&y).log_i(), 0);
+    assert_eq!(i.log_i_scalar_byproduct(&z).log_i(), 0);
+    assert_eq!(x.log_i_scalar_byproduct(&i).log_i(), 0);
+    assert_eq!(x.log_i_scalar_byproduct(&x).log_i(), 0);
+    assert_eq!(x.log_i_scalar_byproduct(&y).log_i(), 1);
+    assert_eq!(x.log_i_scalar_byproduct(&z).log_i(), 3);
+    assert_eq!(y.log_i_scalar_byproduct(&i).log_i(), 0);
+    assert_eq!(y.log_i_scalar_byproduct(&x).log_i(), 3);
+    assert_eq!(y.log_i_scalar_byproduct(&y).log_i(), 0);
+    assert_eq!(y.log_i_scalar_byproduct(&z).log_i(), 1);
+    assert_eq!(z.log_i_scalar_byproduct(&i).log_i(), 0);
+    assert_eq!(z.log_i_scalar_byproduct(&x).log_i(), 1);
+    assert_eq!(z.log_i_scalar_byproduct(&y).log_i(), 3);
+    assert_eq!(z.log_i_scalar_byproduct(&z).log_i(), 0);
 
-    assert_eq!(
-        pauli("XX")
-            .log_i_scalar_byproduct(&pauli("XY"))
-            .expect("byproduct"),
-        1
-    );
-    assert_eq!(
-        pauli("XX")
-            .log_i_scalar_byproduct(&pauli("ZY"))
-            .expect("byproduct"),
-        0
-    );
-    assert_eq!(
-        pauli("XX")
-            .log_i_scalar_byproduct(&pauli("YY"))
-            .expect("byproduct"),
-        2
-    );
-    assert_eq!(
-        pauli("X_")
-            .log_i_scalar_byproduct(&pauli("ZZ"))
-            .expect("byproduct"),
-        3
-    );
-    assert_eq!(
-        pauli("X")
-            .log_i_scalar_byproduct(&pauli("_Z"))
-            .expect("byproduct"),
-        0
-    );
+    assert_eq!(pauli("XX").log_i_scalar_byproduct(&pauli("XY")).log_i(), 1);
+    assert_eq!(pauli("XX").log_i_scalar_byproduct(&pauli("ZY")).log_i(), 0);
+    assert_eq!(pauli("XX").log_i_scalar_byproduct(&pauli("YY")).log_i(), 2);
+    assert_eq!(pauli("X_").log_i_scalar_byproduct(&pauli("ZZ")).log_i(), 3);
+    assert_eq!(pauli("X").log_i_scalar_byproduct(&pauli("_Z")).log_i(), 0);
 }
 
 #[test]
@@ -215,11 +190,11 @@ fn stabilizers_pauli_ref_weight_intersection_and_active_terms_match_stim() {
     assert!(pauli("+II").has_no_pauli_terms());
     assert!(!pauli("+IX").has_no_pauli_terms());
 
-    assert!(!pauli("_").intersects(&pauli("_")).expect("intersects"));
-    assert!(!pauli("_").intersects(&pauli("X")).expect("intersects"));
-    assert!(pauli("X").intersects(&pauli("Y")).expect("intersects"));
-    assert!(pauli("_Z").intersects(&pauli("ZZ")).expect("intersects"));
-    assert!(!pauli("__").intersects(&pauli("XZ")).expect("intersects"));
+    assert!(!pauli("_").intersects(&pauli("_")));
+    assert!(!pauli("_").intersects(&pauli("X")));
+    assert!(pauli("X").intersects(&pauli("Y")));
+    assert!(pauli("_Z").intersects(&pauli("ZZ")));
+    assert!(!pauli("__").intersects(&pauli("XZ")));
     assert_eq!(
         pauli("X____________________Y")
             .active_terms()
@@ -319,7 +294,16 @@ fn stabilizers_pauli_string_iter_empty_and_restart_cases_match_stim() {
         Vec::<String>::new()
     );
 
-    let mut iter = PauliStringIterator::new(2, 1, 1, true, false, false).expect("Pauli iterator");
+    let mut iter = PauliStringIterator::new(
+        2,
+        1..=1,
+        PauliIterationBases {
+            x: true,
+            y: false,
+            z: false,
+        },
+    )
+    .expect("Pauli iterator");
     assert_eq!(
         iter.by_ref()
             .map(|pauli| pauli.to_string())
@@ -335,7 +319,16 @@ fn stabilizers_pauli_string_iter_empty_and_restart_cases_match_stim() {
 
 #[test]
 fn stabilizers_pauli_string_iter_borrowed_result_matches_stim_order() {
-    let mut iter = PauliStringIterator::new(3, 1, 2, true, false, true).expect("Pauli iterator");
+    let mut iter = PauliStringIterator::new(
+        3,
+        1..=2,
+        PauliIterationBases {
+            x: true,
+            y: false,
+            z: true,
+        },
+    )
+    .expect("Pauli iterator");
     let mut results = Vec::new();
     while iter.iter_next() {
         results.push(iter.result().to_string());
@@ -734,25 +727,31 @@ fn stabilizers_tableau_iter_commuting_pauli_iterator_constraints_match_stim() {
 
 #[test]
 fn stabilizers_tableau_iter_counts_match_stim() {
-    let iter0 = TableauIterator::new(0, false).expect("0q unsigned tableau iterator");
+    let iter0 =
+        TableauIterator::new(0, SignIteration::Unsigned).expect("0q unsigned tableau iterator");
     assert_eq!(iter0.count(), 1);
 
-    let iter0_signs = TableauIterator::new(0, true).expect("0q signed tableau iterator");
+    let iter0_signs =
+        TableauIterator::new(0, SignIteration::AllSigns).expect("0q signed tableau iterator");
     assert_eq!(iter0_signs.count(), 1);
 
-    let iter1 = TableauIterator::new(1, false).expect("1q unsigned tableau iterator");
+    let iter1 =
+        TableauIterator::new(1, SignIteration::Unsigned).expect("1q unsigned tableau iterator");
     assert_eq!(iter1.count(), 6);
 
-    let iter1_signs = TableauIterator::new(1, true).expect("1q signed tableau iterator");
+    let iter1_signs =
+        TableauIterator::new(1, SignIteration::AllSigns).expect("1q signed tableau iterator");
     assert_eq!(iter1_signs.count(), 24);
 
-    let iter2 = TableauIterator::new(2, false).expect("2q unsigned tableau iterator");
+    let iter2 =
+        TableauIterator::new(2, SignIteration::Unsigned).expect("2q unsigned tableau iterator");
     assert_eq!(iter2.count(), 720);
 }
 
 #[test]
 fn stabilizers_tableau_iter_signed_2q_tableaus_are_distinct() {
-    let iter = TableauIterator::new(2, true).expect("2q signed tableau iterator");
+    let iter =
+        TableauIterator::new(2, SignIteration::AllSigns).expect("2q signed tableau iterator");
     let seen = iter
         .map(|tableau| tableau.to_string())
         .collect::<std::collections::BTreeSet<_>>();
@@ -761,8 +760,8 @@ fn stabilizers_tableau_iter_signed_2q_tableaus_are_distinct() {
 
 #[test]
 fn stabilizers_tableau_iter_clone_continues_from_same_state() {
-    let mut iter1 = TableauIterator::new(3, false).expect("3q tableau iterator");
-    let mut iter2 = TableauIterator::new(2, true).expect("2q tableau iterator");
+    let mut iter1 = TableauIterator::new(3, SignIteration::Unsigned).expect("3q tableau iterator");
+    let mut iter2 = TableauIterator::new(2, SignIteration::AllSigns).expect("2q tableau iterator");
     assert!(iter2.next().is_some());
     iter2 = iter1.clone();
     assert!(iter2.next().is_some());
@@ -821,7 +820,7 @@ proptest! {
         let left = pauli(&left);
         let right = pauli(&right);
         let expected = scalar_commutes(&left, &right);
-        prop_assert_eq!(left.commutes(&right).expect("commutes"), expected);
+        prop_assert_eq!(left.commutes(&right), expected);
     }
 }
 
@@ -846,7 +845,13 @@ fn collect_pauli_iter(
     allow_z: bool,
 ) -> Vec<String> {
     PauliStringIterator::new(
-        num_qubits, min_weight, max_weight, allow_x, allow_y, allow_z,
+        num_qubits,
+        min_weight..=max_weight,
+        PauliIterationBases {
+            x: allow_x,
+            y: allow_y,
+            z: allow_z,
+        },
     )
     .expect("Pauli iterator")
     .map(|pauli| pauli.to_string())
@@ -854,10 +859,7 @@ fn collect_pauli_iter(
 }
 
 fn assert_commutes(left: &str, right: &str, expected: bool) {
-    assert_eq!(
-        pauli(left).commutes(&pauli(right)).expect("commutes"),
-        expected
-    );
+    assert_eq!(pauli(left).commutes(&pauli(right)), expected);
 }
 
 fn bare_pauli_body_strategy(max_len: usize) -> impl Strategy<Value = String> {
@@ -912,8 +914,7 @@ fn assert_exhaustive_short_in_place_pauli_products() {
                     );
                     let expected_phase = left_basis
                         .log_i_scalar_byproduct(right_basis)
-                        .wrapping_add(u8::from(right_sign.is_negative()) << 1)
-                        & 3;
+                        .multiply(right_sign.into());
                     let phase = actual
                         .right_multiply_in_place_returning_log_i_scalar(&right)
                         .expect("short in-place product");
@@ -941,18 +942,16 @@ fn assert_qualified_in_place_pauli_product(width: usize) {
         .iter()
         .copied()
         .zip(right_bases.iter().copied())
-        .fold(2_u8, |phase, (left, right)| {
-            phase.wrapping_add(left.log_i_scalar_byproduct(right))
-        })
-        & 3;
+        .fold(PauliPhase::Minus, |phase, (left, right)| {
+            phase.multiply(left.log_i_scalar_byproduct(right))
+        });
     let expected_second_phase = expected_bases
         .iter()
         .copied()
         .zip(right_bases.iter().copied())
-        .fold(2_u8, |phase, (left, right)| {
-            phase.wrapping_add(left.log_i_scalar_byproduct(right))
-        })
-        & 3;
+        .fold(PauliPhase::Minus, |phase, (left, right)| {
+            phase.multiply(left.log_i_scalar_byproduct(right))
+        });
 
     let original = PauliString::from_bases(PauliSign::Plus, left_bases).expect("left fixture");
     let expected =

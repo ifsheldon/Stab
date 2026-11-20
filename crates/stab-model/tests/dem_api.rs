@@ -36,6 +36,65 @@ fn pf1_dem_basic_mutation_and_append() {
     assert_eq!(dem.to_dem_string(), "");
 }
 
+/// The in-place rebuild operations replace raw item storage access: a fallible retain stops at
+/// the first error with the failing item and every later one kept unvisited, and an insertion
+/// past the end is refused without changing the model.
+#[test]
+fn dem_in_place_item_rebuild_keeps_order_and_reports_failures_without_losing_items() {
+    let mut dem = DetectorErrorModel::from_dem_str(
+        "error(0.125) D0\n\
+         detector D1\n\
+         logical_observable L0\n\
+         detector D2\n",
+    )
+    .expect("parse DEM");
+    let unchanged = dem.clone();
+
+    let mut visited = 0;
+    let failure = dem.try_retain_items_mut(|item| {
+        visited += 1;
+        match item {
+            DemItem::Instruction(instruction) => match instruction.kind() {
+                DemInstructionKind::LogicalObservable => Err("stop"),
+                kind => Ok(kind != DemInstructionKind::Detector),
+            },
+            DemItem::RepeatBlock(_) => Ok(true),
+        }
+    });
+    assert_eq!(failure, Err("stop"));
+    assert_eq!(visited, 3, "visiting stops at the first error");
+    assert_eq!(
+        dem.to_string(),
+        "error(0.125) D0\nlogical_observable L0\ndetector D2\n"
+    );
+
+    dem.reverse_items();
+    assert_eq!(
+        dem.to_string(),
+        "detector D2\nlogical_observable L0\nerror(0.125) D0\n"
+    );
+    let shift =
+        DemItem::Instruction(DemInstruction::shift_detectors(Vec::new(), 1, None).expect("shift"));
+    let before = dem.clone();
+    assert!(dem.insert_item(4, shift.clone()).is_err());
+    assert_eq!(
+        dem, before,
+        "a refused insertion leaves the model unchanged"
+    );
+    dem.insert_item(3, shift).expect("append through insertion");
+    assert!(matches!(
+        dem.item_mut(3),
+        Some(DemItem::Instruction(instruction)) if instruction.detector_shift() == Some(1)
+    ));
+    assert!(dem.item_mut(4).is_none());
+
+    let mut all_kept = unchanged.clone();
+    all_kept
+        .try_retain_items_mut(|_| Ok::<_, ()>(true))
+        .expect("keep every item");
+    assert_eq!(all_kept, unchanged);
+}
+
 #[test]
 fn pf1_dem_basic_programmatic_constructors_push_and_clone() {
     let mut body = DetectorErrorModel::new();

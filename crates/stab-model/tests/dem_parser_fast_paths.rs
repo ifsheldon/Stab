@@ -12,11 +12,11 @@ fn dem_model_layout_stays_bounded_for_large_parse_workloads() {
         "DEM target layout unexpectedly grew"
     );
     assert!(
-        std::mem::size_of::<DemInstruction>() <= 112,
+        std::mem::size_of::<DemInstruction>() <= 88,
         "DEM instruction layout unexpectedly grew"
     );
     assert!(
-        std::mem::size_of::<DemItem>() <= 112,
+        std::mem::size_of::<DemItem>() <= 88,
         "DEM item layout unexpectedly grew"
     );
 }

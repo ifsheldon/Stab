@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use super::{
     AlgebraMemoryBudget, PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResult,
     Tableau,
@@ -70,17 +72,17 @@ impl CommutingPauliStringIterator {
             let mask = 1_u64 << index;
             PauliBasis::from_xz((x_bits & mask) != 0, (z_bits & mask) != 0)
         });
-        PauliString::from_bases_unchecked(PauliSign::Plus, bases)
+        PauliString::from_bases_unbudgeted(PauliSign::Plus, bases)
     }
 
     fn candidate_matches_constraints(&self, candidate: &PauliString) -> bool {
         self.commutators
             .iter()
-            .all(|commutator| matches!(candidate.commutes(commutator), Ok(true)))
+            .all(|commutator| candidate.commutes(commutator))
             && self
                 .anticommutators
                 .iter()
-                .all(|anticommutator| matches!(candidate.commutes(anticommutator), Ok(false)))
+                .all(|anticommutator| !candidate.commutes(anticommutator))
     }
 
     fn advance_high_bits(&mut self, bit_limit: u64) {
@@ -118,10 +120,19 @@ impl Iterator for CommutingPauliStringIterator {
     }
 }
 
+/// Which signs [`TableauIterator`] yields for each unsigned tableau.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SignIteration {
+    /// Only the tableau whose generator images all have a plus sign.
+    Unsigned,
+    /// Every assignment of signs to the generator images.
+    AllSigns,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TableauIterator {
     num_qubits: usize,
-    also_iter_signs: bool,
+    signs: SignIteration,
     columns: Vec<PauliString>,
     pauli_iterators: Vec<CommutingPauliStringIterator>,
     cur_level: Option<usize>,
@@ -131,7 +142,7 @@ pub struct TableauIterator {
 }
 
 impl TableauIterator {
-    pub fn new(num_qubits: usize, also_iter_signs: bool) -> StabilizerResult<Self> {
+    pub fn new(num_qubits: usize, signs: SignIteration) -> StabilizerResult<Self> {
         if num_qubits >= 64 {
             return Err(StabilizerError::InvalidTableauIteratorQubitCount { num_qubits });
         }
@@ -142,7 +153,7 @@ impl TableauIterator {
         }
         let mut result = Self {
             num_qubits,
-            also_iter_signs,
+            signs,
             columns: Vec::with_capacity(total_columns),
             pauli_iterators,
             cur_level: if total_columns == 0 { None } else { Some(0) },
@@ -273,7 +284,7 @@ impl Iterator for TableauIterator {
                 return Some(signed);
             }
             let unsigned = self.next_unsigned()?;
-            if self.also_iter_signs {
+            if self.signs == SignIteration::AllSigns {
                 self.pending_unsigned = Some(unsigned);
                 self.next_sign_mask = Some(self.max_sign_mask());
                 continue;
@@ -288,7 +299,7 @@ pub struct PauliStringIterator {
     num_qubits: usize,
     min_weight: usize,
     max_weight: usize,
-    allowed: AllowedPaulis,
+    allowed: PauliIterationBases,
     current_weight: usize,
     positions: Vec<usize>,
     active_bases: Vec<PauliBasis>,
@@ -302,34 +313,25 @@ impl PauliStringIterator {
     /// See [`Self::new_with_budget`].
     pub fn new(
         num_qubits: usize,
-        min_weight: usize,
-        max_weight: usize,
-        allow_x: bool,
-        allow_y: bool,
-        allow_z: bool,
+        weights: RangeInclusive<usize>,
+        bases: PauliIterationBases,
     ) -> StabilizerResult<Self> {
-        Self::new_with_budget(
-            num_qubits,
-            min_weight,
-            max_weight,
-            allow_x,
-            allow_y,
-            allow_z,
-            AlgebraMemoryBudget::DEFAULT,
-        )
+        Self::new_with_budget(num_qubits, weights, bases, AlgebraMemoryBudget::DEFAULT)
     }
 
     /// Creates reusable iterator state after admitting its result string and position buffers
     /// against `budget`.
+    ///
+    /// The iterator yields every `num_qubits`-qubit string whose weight lies in `weights` and
+    /// whose non-identity terms all use `bases`, in increasing weight; an empty range, or one
+    /// that starts above `num_qubits`, yields nothing.
     pub fn new_with_budget(
         num_qubits: usize,
-        min_weight: usize,
-        max_weight: usize,
-        allow_x: bool,
-        allow_y: bool,
-        allow_z: bool,
+        weights: RangeInclusive<usize>,
+        bases: PauliIterationBases,
         budget: AlgebraMemoryBudget,
     ) -> StabilizerResult<Self> {
+        let (min_weight, max_weight) = weights.into_inner();
         let buffers =
             num_qubits as u128 * (size_of::<usize>() as u128 + size_of::<PauliBasis>() as u128);
         budget.admit(
@@ -340,15 +342,11 @@ impl PauliStringIterator {
             num_qubits,
             min_weight,
             max_weight: max_weight.min(num_qubits),
-            allowed: AllowedPaulis {
-                allow_x,
-                allow_y,
-                allow_z,
-            },
+            allowed: bases,
             current_weight: min_weight,
             positions: Vec::new(),
             active_bases: Vec::new(),
-            result: PauliString::identity_unchecked(num_qubits),
+            result: PauliString::try_identity_admitted(num_qubits)?,
             state: PauliStringIteratorState::Done,
         };
         result.restart();
@@ -528,20 +526,28 @@ enum PauliStringIteratorState {
     Done,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct AllowedPaulis {
-    allow_x: bool,
-    allow_y: bool,
-    allow_z: bool,
+/// The non-identity bases [`PauliStringIterator`] may place on a qubit.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct PauliIterationBases {
+    pub x: bool,
+    pub y: bool,
+    pub z: bool,
 }
 
-impl AllowedPaulis {
+impl PauliIterationBases {
+    /// All three of X, Y and Z.
+    pub const ALL: Self = Self {
+        x: true,
+        y: true,
+        z: true,
+    };
+
     fn first(self) -> Option<PauliBasis> {
-        if self.allow_x {
+        if self.x {
             Some(PauliBasis::X)
-        } else if self.allow_y {
+        } else if self.y {
             Some(PauliBasis::Y)
-        } else if self.allow_z {
+        } else if self.z {
             Some(PauliBasis::Z)
         } else {
             None
@@ -552,16 +558,16 @@ impl AllowedPaulis {
         match basis {
             PauliBasis::I => self.first(),
             PauliBasis::X => {
-                if self.allow_y {
+                if self.y {
                     Some(PauliBasis::Y)
-                } else if self.allow_z {
+                } else if self.z {
                     Some(PauliBasis::Z)
                 } else {
                     None
                 }
             }
             PauliBasis::Y => {
-                if self.allow_z {
+                if self.z {
                     Some(PauliBasis::Z)
                 } else {
                     None

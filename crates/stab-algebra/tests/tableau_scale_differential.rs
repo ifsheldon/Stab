@@ -17,8 +17,8 @@ use std::assert_matches;
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use stab_algebra::{
-    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, Tableau,
-    stabilizers_to_tableau,
+    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
+    StabilizerTableauOptions, Tableau,
 };
 
 /// Wider than 1000 qubits and not a multiple of 64, so every packed row has a partial word.
@@ -210,7 +210,8 @@ fn stabilizer_solver_reproduces_stabilizers_beyond_1000_qubits() {
         .map(|row| source.z_output(row).expect("stabilizer"))
         .collect::<Vec<_>>();
 
-    let solved = stabilizers_to_tableau(&stabilizers, false, false, false).expect("solve");
+    let solved = Tableau::from_stabilizers(&stabilizers, StabilizerTableauOptions::default())
+        .expect("solve");
     for (row, stabilizer) in stabilizers.iter().enumerate() {
         assert_eq!(
             &solved.z_output(row).expect("solved Z"),
@@ -222,14 +223,21 @@ fn stabilizer_solver_reproduces_stabilizers_beyond_1000_qubits() {
         let destabilizer = solved.x_output(row).expect("destabilizer");
         for (other, stabilizer) in stabilizers.iter().enumerate() {
             assert_eq!(
-                destabilizer.commutes(stabilizer).expect("commutation"),
+                destabilizer.commutes(stabilizer),
                 other != row,
                 "X_{row} against Z_{other}"
             );
         }
     }
     assert_eq!(
-        stabilizers_to_tableau(&stabilizers, false, false, true).expect("inverse solve"),
+        Tableau::from_stabilizers(
+            &stabilizers,
+            StabilizerTableauOptions {
+                inverse: true,
+                ..StabilizerTableauOptions::default()
+            }
+        )
+        .expect("inverse solve"),
         solved.inverse().expect("inverse of solved")
     );
 
@@ -240,7 +248,14 @@ fn stabilizer_solver_reproduces_stabilizers_beyond_1000_qubits() {
     let mut redundant = stabilizers.clone();
     redundant.insert(701, product.clone());
     assert_eq!(
-        stabilizers_to_tableau(&redundant, true, false, false).expect("redundant solve"),
+        Tableau::from_stabilizers(
+            &redundant,
+            StabilizerTableauOptions {
+                allow_redundant: true,
+                ..StabilizerTableauOptions::default()
+            }
+        )
+        .expect("redundant solve"),
         solved
     );
     // Error paths stop at the offending generator, so keep it early.
@@ -250,7 +265,7 @@ fn stabilizer_solver_reproduces_stabilizers_beyond_1000_qubits() {
         .expect("commuting product");
     early.insert(8, early_product.clone());
     assert_matches!(
-        stabilizers_to_tableau(&early, false, false, false),
+        Tableau::from_stabilizers(&early, StabilizerTableauOptions::default()),
         Err(StabilizerError::RedundantStabilizer { .. })
     );
     early[8] = early_product.with_sign(match early_product.sign() {
@@ -258,22 +273,35 @@ fn stabilizer_solver_reproduces_stabilizers_beyond_1000_qubits() {
         PauliSign::Minus => PauliSign::Plus,
     });
     assert_matches!(
-        stabilizers_to_tableau(&early, true, false, false),
+        Tableau::from_stabilizers(
+            &early,
+            StabilizerTableauOptions {
+                allow_redundant: true,
+                ..StabilizerTableauOptions::default()
+            }
+        ),
         Err(StabilizerError::InconsistentStabilizer { .. })
     );
     // Like Stim, the first anticommuting pair in input order is reported, later member first.
     early[8] = solved.x_output(10).expect("destabilizer of Z_10");
     assert_eq!(
-        stabilizers_to_tableau(&early, false, false, false),
+        Tableau::from_stabilizers(&early, StabilizerTableauOptions::default()),
         Err(StabilizerError::AntiCommutingStabilizer {
-            stabilizer: stabilizers[10].to_string(),
-            conflict: early[8].to_string(),
+            stabilizer: 11,
+            conflict: 8,
         })
     );
 
     // Too few generators are completed only on request, keeping the given ones in order.
     let kept = &stabilizers[..WIDTH - 5];
-    let completed = stabilizers_to_tableau(kept, false, true, false).expect("completion");
+    let completed = Tableau::from_stabilizers(
+        kept,
+        StabilizerTableauOptions {
+            allow_underconstrained: true,
+            ..StabilizerTableauOptions::default()
+        },
+    )
+    .expect("completion");
     for row in SAMPLE_ROWS.into_iter().filter(|row| *row < WIDTH - 5) {
         assert_eq!(&completed.z_output(row).expect("completed Z"), &kept[row]);
     }
@@ -281,7 +309,7 @@ fn stabilizer_solver_reproduces_stabilizers_beyond_1000_qubits() {
         let completion = completed.z_output(row).expect("completion Z");
         assert!(
             kept.iter()
-                .all(|stabilizer| completion.commutes(stabilizer).expect("commutes"))
+                .all(|stabilizer| completion.commutes(stabilizer))
         );
     }
 }

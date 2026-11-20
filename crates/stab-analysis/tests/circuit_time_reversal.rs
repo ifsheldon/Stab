@@ -10,11 +10,11 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use stab_algebra::Flow;
 use stab_analysis::{
-    CodeDistance, DetectingRegionTargetOptions, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
-    TimeReversedForFlowsOptions, all_detecting_region_targets, all_detecting_region_ticks,
-    circuit_detecting_regions_for_targets, circuit_flow_generators,
+    CodeCircuitParams, CodeDistance, CodeTask, DetectingRegionTargetOptions, RoundCount,
+    SurfaceCodeTask, TimeReversedForFlowsOptions, all_detecting_region_targets,
+    all_detecting_region_ticks, circuit_detecting_regions_for_targets, circuit_flow_generators,
     circuit_has_all_unsigned_stabilizer_flows, circuit_time_reversed_for_flows,
-    circuit_time_reversed_for_flows_with_options, generate_surface_code_circuit,
+    circuit_time_reversed_for_flows_with_options,
 };
 use stab_model::{Circuit, CircuitTick, DemTarget};
 
@@ -23,13 +23,13 @@ const GENERATED_REVERSAL_SEED: [u8; 32] = [0xB1; 32];
 
 #[test]
 fn time_reversal_preserves_generated_surface_code_regions() {
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(2).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryX),
         CodeDistance::try_new(3).expect("distance"),
-        SurfaceCodeTask::RotatedMemoryX,
+        RoundCount::try_new(2).expect("rounds"),
     )
     .expect("surface-code parameters");
-    let generated = generate_surface_code_circuit(&params).expect("generate surface code");
+    let generated = params.generate().expect("generate surface code");
     let input = generated.circuit();
 
     let targets = all_detecting_region_targets(input).expect("input targets");

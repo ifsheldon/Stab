@@ -146,24 +146,14 @@ fn derive_single_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<2>> {
             "sparse reverse frame tracker does not support tableau gate {name}"
         ))
     })?;
-    let inverse = clifford.inverse().map_err(|error| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "failed to invert single-qubit Clifford {name} during sparse reverse tracking: {error}"
-        ))
-    })?;
+    let inverse = clifford.inverse();
     let image = |basis| {
-        inverse
-            .apply_basis(basis)
-            .map(|output: PauliBasis| [output.x_bit(), output.z_bit()])
-            .map_err(|error| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "failed to apply inverse single-qubit Clifford {name} during sparse reverse tracking: {error}"
-                ))
-            })
+        let output = inverse.apply_basis(basis);
+        [output.x_bit(), output.z_bit()]
     };
     Ok(CliffordAction::from_images([
-        image(PauliBasis::X)?,
-        image(PauliBasis::Z)?,
+        image(PauliBasis::X),
+        image(PauliBasis::Z),
     ]))
 }
 
@@ -343,10 +333,10 @@ mod tests {
         for gate in Gate::all() {
             let name = gate.canonical_name();
             if let Ok(clifford) = single_qubit_clifford_for_gate(gate) {
-                let inverse = clifford.inverse().expect("catalog Clifford inverts");
+                let inverse = clifford.inverse();
                 let action = single_qubit_action(gate).expect("single-qubit action");
                 for basis in [PauliBasis::X, PauliBasis::Y, PauliBasis::Z] {
-                    let expected = inverse.apply_basis(basis).expect("apply inverse");
+                    let expected = inverse.apply_basis(basis);
                     let actual = action.apply_bits([basis.x_bit(), basis.z_bit()]);
                     assert_eq!(
                         actual,
@@ -361,7 +351,7 @@ mod tests {
                 assert_eq!(Some(action), derive_two_qubit_action(gate).ok(), "{name}");
                 for left in BASES {
                     for right in BASES {
-                        let input = stab_algebra::advanced::pauli_from_bases_unchecked(
+                        let input = stab_algebra::advanced::pauli_from_bases_unbudgeted(
                             PauliSign::Plus,
                             [left, right],
                         );

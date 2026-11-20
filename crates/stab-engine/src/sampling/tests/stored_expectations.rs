@@ -14,10 +14,7 @@
 
 use rand::RngExt as _;
 use sha2::{Digest as _, Sha256};
-use stab_analysis::{
-    ColorCodeParams, ColorCodeTask, RepetitionCodeParams, RepetitionCodeTask,
-    generate_color_code_circuit, generate_repetition_code_circuit,
-};
+use stab_analysis::{ColorCodeTask, RepetitionCodeTask};
 
 use super::reference_differential::random_clifford_circuit;
 use super::*;
@@ -83,33 +80,41 @@ fn corpus() -> Vec<String> {
         SurfaceCodeTask::RotatedMemoryZ,
         SurfaceCodeTask::UnrotatedMemoryX,
     ] {
-        let params = SurfaceCodeParams::new(rounds, distance, task)
+        let params = CodeCircuitParams::try_new(CodeTask::Surface(task), distance, rounds)
             .expect("surface parameters")
             .with_before_round_data_depolarization(probability)
             .with_before_measure_flip_probability(probability)
             .with_after_reset_flip_probability(probability)
             .with_after_clifford_depolarization(probability);
         circuits.push(
-            generate_surface_code_circuit(&params)
+            params
+                .generate()
                 .expect("surface circuit")
                 .circuit()
                 .to_stim_string(),
         );
     }
-    let color = ColorCodeParams::new(rounds, distance, ColorCodeTask::MemoryXyz)
-        .expect("color parameters")
-        .with_after_clifford_depolarization(probability);
+    let color =
+        CodeCircuitParams::try_new(CodeTask::Color(ColorCodeTask::MemoryXyz), distance, rounds)
+            .expect("color parameters")
+            .with_after_clifford_depolarization(probability);
     circuits.push(
-        generate_color_code_circuit(&color)
+        color
+            .generate()
             .expect("color circuit")
             .circuit()
             .to_stim_string(),
     );
-    let repetition = RepetitionCodeParams::new(rounds, distance, RepetitionCodeTask::Memory)
-        .expect("repetition parameters")
-        .with_before_measure_flip_probability(probability);
+    let repetition = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
+        distance,
+        rounds,
+    )
+    .expect("repetition parameters")
+    .with_before_measure_flip_probability(probability);
     circuits.push(
-        generate_repetition_code_circuit(&repetition)
+        repetition
+            .generate()
             .expect("repetition circuit")
             .circuit()
             .to_stim_string(),

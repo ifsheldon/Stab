@@ -8,8 +8,8 @@ use std::assert_matches;
 use std::ops::ControlFlow;
 
 use stab_analysis::{
-    CodeDistance, ErrorAnalyzerOptions, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    circuit_to_detector_error_model, generate_repetition_code_circuit,
+    CodeCircuitParams, CodeDistance, CodeTask, ErrorAnalyzerOptions, RepetitionCodeTask,
+    RoundCount, circuit_to_detector_error_model,
 };
 use stab_model::{
     DemErrorMechanismTraversalLimits, DemErrorMechanismView, DemErrorMechanismVisitor,
@@ -93,16 +93,16 @@ fn diagnostic_model(detector_count: usize, mechanism_count: usize) -> DetectorEr
 }
 
 fn generated_repetition_model(distance: u32) -> DetectorErrorModel {
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(2).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
         CodeDistance::try_new(distance).expect("distance"),
-        RepetitionCodeTask::Memory,
+        RoundCount::try_new(2).expect("rounds"),
     )
     .expect("repetition parameters")
     .with_before_round_data_depolarization(probability(0.03125))
     .with_before_measure_flip_probability(probability(0.015625))
     .with_after_reset_flip_probability(probability(0.0078125));
-    let generated = generate_repetition_code_circuit(&params).expect("generate repetition circuit");
+    let generated = params.generate().expect("generate repetition circuit");
     circuit_to_detector_error_model(generated.circuit(), ErrorAnalyzerOptions::default())
         .expect("lower repetition circuit")
 }

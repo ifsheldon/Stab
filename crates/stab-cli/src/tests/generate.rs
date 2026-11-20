@@ -88,11 +88,12 @@ fn gen_rejects_invalid_arguments_like_arg_parse_test() {
 
 #[test]
 fn gen_admits_generated_size_against_the_memory_budget_before_writing() {
-    // At 2048 conservative bytes per physical qubit, a 256 MiB budget admits exactly the
-    // 131,072 qubits the retired fixed cap admitted.
+    // At 1 MiB plus 768 bytes per physical qubit, a 256 MiB budget admits at most 348,160 qubits:
+    // rotated distance 417 (347,777 qubits) and unrotated distance 295 (346,921) fit, and the next
+    // distances are refused.
     for (task, distance, projected_qubits) in [
-        ("rotated_memory_z", "257", "132097"),
-        ("unrotated_memory_z", "182", "131769"),
+        ("rotated_memory_z", "418", "349447"),
+        ("unrotated_memory_z", "296", "349281"),
     ] {
         run(
             &[
@@ -128,7 +129,7 @@ fn gen_admits_generated_size_against_the_memory_budget_before_writing() {
             "--task",
             "memory_xyz",
             "--distance",
-            "343",
+            "557",
             "--rounds",
             "2",
             "--out",
@@ -137,13 +138,14 @@ fn gen_admits_generated_size_against_the_memory_budget_before_writing() {
         ],
         b"",
     )
-    .assert_err(&["132355 physical qubits", "268435456-byte memory budget"]);
+    .assert_err(&["349030 physical qubits", "-byte memory budget"]);
     assert!(
         !scratch.exists("oversized.stim"),
         "rejection must not create a partial output"
     );
 
-    // The default budget admits the distance the retired cap refused.
+    // 256 MiB admits rotated distance 257 (132,097 qubits), which the former 2048-byte-per-qubit
+    // projection refused, and the default 1 GiB budget refuses distance 836 (1,397,791 qubits).
     let admitted = run(
         &[
             "stab",
@@ -156,10 +158,27 @@ fn gen_admits_generated_size_against_the_memory_budget_before_writing() {
             "257",
             "--rounds",
             "1",
+            "--memory-budget=256MiB",
         ],
         b"",
     );
     assert_eq!(admitted.status, 0, "{}", admitted.stderr_text());
+    run(
+        &[
+            "stab",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "836",
+            "--rounds",
+            "1",
+        ],
+        b"",
+    )
+    .assert_err(&["1397791 physical qubits", "1073741824-byte memory budget"]);
 }
 
 /// Pinned Stim narrows generator probabilities to `float` and echoes `-0` in
@@ -262,4 +281,102 @@ fn gen_streams_its_text_and_reports_write_failures() {
     run(&[REPETITION, &["--out", &output]].concat(), b"")
         .assert_err(&["failed to write", "generated.stim"]);
     assert!(!scratch.exists("missing-directory"));
+}
+
+/// A named `--out` file's write buffer is held beside the generated circuit, so the generation
+/// that just fits a budget writing to stdout needs exactly one output buffer more to write the
+/// same circuit to a file, and the refusal leaves an existing output untouched.
+#[test]
+fn gen_charges_a_named_output_buffer_against_the_budget() {
+    use stab_model::MemoryBudget;
+
+    let scratch = Scratch::new();
+    let out = scratch.path("generated.stim");
+    let generate = |budget: u64, named: bool| {
+        let budget = format!("--memory-budget={budget}");
+        let mut args = REPETITION.to_vec();
+        args.push(budget.as_str());
+        if named {
+            args.extend(["--out", out.as_str()]);
+        }
+        run(&args, b"")
+    };
+    let (mut refused, mut smallest) = (0_u64, MemoryBudget::DEFAULT.bytes());
+    while refused + 1 < smallest {
+        let middle = refused + (smallest - refused) / 2;
+        if generate(middle, false).status == 0 {
+            smallest = middle;
+        } else {
+            refused = middle;
+        }
+    }
+    let to_stdout = generate(smallest, false);
+    assert_eq!(to_stdout.status, 0, "{}", to_stdout.stderr_text());
+
+    let buffer = crate::io_plan::OUTPUT_BUFFER_BYTES as u64;
+    scratch.file("generated.stim", "sentinel\n");
+    let short = generate(smallest + buffer - 1, true);
+    assert_eq!(short.status, 1, "a named output must charge its buffer");
+    short.assert_stderr_contains(&["-byte memory budget"]);
+    assert_eq!(
+        scratch.read("generated.stim"),
+        b"sentinel\n",
+        "refusal truncated the output"
+    );
+    generate(smallest + buffer, true).assert_ok(b"");
+    assert_eq!(scratch.read("generated.stim"), to_stdout.stdout);
+}
+
+/// A task is looked up among its `--code` family's tasks, whose names `stab-analysis` owns, and
+/// the refusal keeps one diagnostic code per family. Arguments are checked in pinned Stim's
+/// order, so an invalid round count is reported before an unknown task, and an unknown task
+/// before the color code's shape constraints.
+#[test]
+fn gen_rejects_tasks_outside_the_code_family_in_stim_order() {
+    let gen_args = |code: &'static str, task: &'static str, distance: &'static str, rounds| {
+        vec![
+            "stab",
+            "gen",
+            "--error-format=json",
+            "--code",
+            code,
+            "--task",
+            task,
+            "--distance",
+            distance,
+            "--rounds",
+            rounds,
+        ]
+    };
+    for (code, task, diagnostic, expected) in [
+        (
+            "repetition_code",
+            "rotated_memory_x",
+            "unsupported-repetition-task",
+            "unsupported repetition_code task \\\"rotated_memory_x\\\"; expected memory",
+        ),
+        (
+            "surface_code",
+            "memory",
+            "unsupported-surface-task",
+            "expected rotated_memory_x, rotated_memory_z, unrotated_memory_x, or unrotated_memory_z",
+        ),
+        (
+            "color_code",
+            "bogus",
+            "unsupported-color-task",
+            "unsupported color_code task \\\"bogus\\\"; expected memory_xyz",
+        ),
+    ] {
+        run(&gen_args(code, task, "2", "1"), b"").assert_err(&[
+            &format!("\"code\":\"{diagnostic}\""),
+            expected,
+            &format!("\"task\":\"{task}\""),
+        ]);
+    }
+    run(&gen_args("surface_code", "bogus", "1", "0"), b"").assert_err(&["round count"]);
+    run(&gen_args("color_code", "memory_xyz", "2", "1"), b"")
+        .assert_err(&["color code round count"]);
+    run(&gen_args("color_code", "memory_xyz", "4", "2"), b"")
+        .assert_err(&["color code distance value 4"]);
 }

@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Bound, ControlFlow, Range, RangeBounds};
 
 use crate::advanced::CancellationCountdown;
-use crate::{Cancellation, MemoryBudget, ModelError, ModelResult};
+use crate::resource_limit::admit_detector_coordinate_map;
+use crate::{Cancellation, MemoryBudget, ModelDialect, ModelError, ModelResult};
 
 use super::coordinate_scan::{
     MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
@@ -17,9 +18,6 @@ use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DetectorErrorModel,
 };
 
-/// Conservative retained bytes of one all-map detector entry, excluding its coordinate values:
-/// a selected-detector set node plus a result-map node holding a vector header.
-const COORDINATE_MAP_ENTRY_BYTES: u64 = 96;
 /// Conservative retained bytes of one selected repeat-iteration candidate set node.
 const SELECTED_COORDINATE_CANDIDATE_BYTES: u64 = 48;
 /// Candidate iterations retained by one selected-coordinate query within the default budget.
@@ -224,21 +222,21 @@ impl DetectorErrorModel {
 
     /// Materializes every detector's coordinates after admitting the conservative map size
     /// against `budget`.
+    ///
+    /// A map beyond `budget` is refused with a [`crate::ResourceLimitError`] of kind
+    /// [`crate::ResourceKind::MaterializedBytes`] before anything is allocated.
     pub fn detector_coordinates_with_memory_budget(
         &self,
         budget: MemoryBudget,
     ) -> ModelResult<BTreeMap<DemDetectorId, Vec<f64>>> {
         let traversal = FoldedDemTraversal::new(self)?;
         let count = traversal.root().summary().detector_count()?;
-        let entry_bytes = u128::from(COORDINATE_MAP_ENTRY_BYTES)
-            + (max_instruction_argument_count(self) as u128).saturating_mul(8);
-        let required = u128::from(count).saturating_mul(entry_bytes);
-        if !budget.admits(required) {
-            return Err(ModelError::invalid_detector_error_model(format!(
-                "DEM detector_coordinates needs at least {required} bytes for {count} detectors, exceeding the {}-byte memory budget; raise the memory budget or use detector_coordinates_for for selected detectors",
-                budget.bytes()
-            )));
-        }
+        admit_detector_coordinate_map(
+            ModelDialect::DetectorErrorModel,
+            count,
+            max_instruction_argument_count(self),
+            budget,
+        )?;
         let detectors = (0..count)
             .map(DemDetectorId::try_new)
             .collect::<ModelResult<BTreeSet<_>>>()?;
@@ -325,18 +323,72 @@ pub(super) fn coordinate_shift_of(model: &DetectorErrorModel) -> ModelResult<Vec
     FoldedDemTraversal::new(model)?.root().coordinate_shift()
 }
 
+/// In-place rebuilding of a model's top-level items.
+///
+/// Items carry no cross-item invariants and every item is valid by construction, so each of
+/// these operations leaves a valid model; the item storage itself stays private.
 impl DetectorErrorModel {
-    /// Mutable item storage for consumers that rebuild a model in place.
+    /// Reverses the order of the top-level items; repeat bodies keep their own order.
+    pub fn reverse_items(&mut self) {
+        self.items.reverse();
+    }
+
+    /// Returns the top-level item at `index`, or `None` past the end.
+    pub fn item_mut(&mut self, index: usize) -> Option<&mut DemItem> {
+        self.items.get_mut(index)
+    }
+
+    /// Inserts `item` before the top-level item at `index`, where `index == self.len()` appends.
     ///
-    /// Items carry no cross-item invariants, so any sequence of valid items is a valid model.
-    pub(crate) fn items_mut(&mut self) -> &mut Vec<DemItem> {
-        &mut self.items
+    /// # Errors
+    ///
+    /// Refuses an `index` past the end or a failed allocation, leaving the model unchanged.
+    pub fn insert_item(&mut self, index: usize, item: DemItem) -> ModelResult<()> {
+        if index > self.items.len() {
+            return Err(dem_item_range_error(format!(
+                "insertion index {index} outside top-level item length {}",
+                self.items.len()
+            )));
+        }
+        self.items.try_reserve(1).map_err(|_| {
+            ModelError::invalid_detector_error_model("DEM item insertion allocation failed")
+        })?;
+        self.items.insert(index, item);
+        Ok(())
+    }
+
+    /// Visits the top-level items in order, lets `keep` change each one in place, and removes
+    /// those for which it returns `Ok(false)`, keeping the order of the rest.
+    ///
+    /// # Errors
+    ///
+    /// Stops at the first error from `keep` and returns it. Items visited before it have been
+    /// filtered; the failing item and every later one are kept unvisited.
+    pub fn try_retain_items_mut<E>(
+        &mut self,
+        mut keep: impl FnMut(&mut DemItem) -> Result<bool, E>,
+    ) -> Result<(), E> {
+        let mut failure = None;
+        self.items.retain_mut(|item| {
+            if failure.is_some() {
+                return true;
+            }
+            match keep(item) {
+                Ok(keep) => keep,
+                Err(error) => {
+                    failure = Some(error);
+                    true
+                }
+            }
+        });
+        failure.map_or(Ok(()), Err)
     }
 }
 
 impl DemRepeatBlock {
-    /// Mutable access to the repeated body.
-    pub(crate) fn body_mut(&mut self) -> &mut DetectorErrorModel {
+    /// Mutable access to the repeated body, which keeps every model invariant through the model's
+    /// own operations.
+    pub fn body_mut(&mut self) -> &mut DetectorErrorModel {
         &mut self.body
     }
 }
@@ -824,20 +876,7 @@ fn flatten_instruction(
     detector_offset: u64,
     coordinate_shift: &[f64],
 ) -> ModelResult<DemInstruction> {
-    let args = if instruction.kind() == DemInstructionKind::Detector {
-        shifted_coordinates(instruction.args(), coordinate_shift)?
-    } else {
-        let mut args = Vec::new();
-        args.try_reserve_exact(instruction.args().len())
-            .map_err(|_| {
-                ModelError::invalid_detector_error_model(
-                    "flattened instruction argument allocation failed",
-                )
-            })?;
-        args.extend_from_slice(instruction.args());
-        args
-    };
-    instruction.relocated(args, detector_offset)
+    instruction.relocated(detector_offset, coordinate_shift)
 }
 
 pub(super) fn add_coordinate_shift_mul(

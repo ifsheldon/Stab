@@ -7,9 +7,8 @@
 )]
 
 use stab_analysis::{
-    AnalysisError, CodeDistance, ColorCodeParams, ColorCodeTask, RepetitionCodeParams,
-    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
-    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
+    AnalysisError, CodeCircuitParams, CodeDistance, CodeFamily, CodeTask, ColorCodeTask,
+    RepetitionCodeTask, RoundCount, SurfaceCodeTask,
 };
 use stab_model::Probability;
 
@@ -50,133 +49,121 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     assert_eq!(maximum_rounds.get(), u64::MAX);
     assert_invalid_domain_value(RoundCount::try_new(0), "round count", "0");
 
-    let repetition_task = RepetitionCodeTask::Memory;
-
-    let surface_tasks = [
-        SurfaceCodeTask::RotatedMemoryX,
-        SurfaceCodeTask::RotatedMemoryZ,
-        SurfaceCodeTask::UnrotatedMemoryX,
-        SurfaceCodeTask::UnrotatedMemoryZ,
-    ];
-    for (index, task) in surface_tasks.iter().enumerate() {
-        for distinct in surface_tasks.iter().skip(index + 1) {
-            assert_ne!(task, distinct);
-        }
-    }
-
-    let color_task = ColorCodeTask::MemoryXyz;
-
     let before_round = probability(0.0625);
     let before_measure = probability(0.125);
     let after_reset = probability(0.25);
     let after_clifford = probability(0.5);
     let zero = probability(0.0);
 
-    let repetition_defaults = RepetitionCodeParams::new(
-        RoundCount::try_new(3).expect("rounds"),
-        CodeDistance::try_new(5).expect("distance"),
-        repetition_task,
-    )
-    .expect("repetition parameters");
-    assert_default_generation_probabilities(
-        repetition_defaults.before_round_data_depolarization(),
-        repetition_defaults.before_measure_flip_probability(),
-        repetition_defaults.after_reset_flip_probability(),
-        repetition_defaults.after_clifford_depolarization(),
-        zero,
-    );
-    let repetition = repetition_defaults
-        .clone()
-        .with_before_round_data_depolarization(before_round)
-        .with_before_measure_flip_probability(before_measure)
-        .with_after_reset_flip_probability(after_reset)
-        .with_after_clifford_depolarization(after_clifford);
-    assert_eq!(repetition.rounds().get(), 3);
-    assert_eq!(repetition.distance().get(), 5);
-    assert_eq!(repetition.task(), RepetitionCodeTask::Memory);
-    assert_eq!(repetition.before_round_data_depolarization(), before_round);
-    assert_eq!(repetition.before_measure_flip_probability(), before_measure);
-    assert_eq!(repetition.after_reset_flip_probability(), after_reset);
-    assert_eq!(repetition.after_clifford_depolarization(), after_clifford);
-    assert_eq!(repetition_defaults.before_round_data_depolarization(), zero);
-
-    let surface_defaults = SurfaceCodeParams::new(
-        RoundCount::try_new(7).expect("rounds"),
-        CodeDistance::try_new(9).expect("distance"),
-        SurfaceCodeTask::UnrotatedMemoryX,
-    )
-    .expect("surface parameters");
-    assert_default_generation_probabilities(
-        surface_defaults.before_round_data_depolarization(),
-        surface_defaults.before_measure_flip_probability(),
-        surface_defaults.after_reset_flip_probability(),
-        surface_defaults.after_clifford_depolarization(),
-        zero,
-    );
-    let surface = surface_defaults
-        .clone()
-        .with_before_round_data_depolarization(before_round)
-        .with_before_measure_flip_probability(before_measure)
-        .with_after_reset_flip_probability(after_reset)
-        .with_after_clifford_depolarization(after_clifford);
-    assert_eq!(surface.rounds().get(), 7);
-    assert_eq!(surface.distance().get(), 9);
-    assert_eq!(surface.task(), SurfaceCodeTask::UnrotatedMemoryX);
-    assert_eq!(surface.before_round_data_depolarization(), before_round);
-    assert_eq!(surface.before_measure_flip_probability(), before_measure);
-    assert_eq!(surface.after_reset_flip_probability(), after_reset);
-    assert_eq!(surface.after_clifford_depolarization(), after_clifford);
-    assert_eq!(surface_defaults.before_round_data_depolarization(), zero);
-
-    let color_defaults = ColorCodeParams::new(
-        RoundCount::try_new(11).expect("rounds"),
-        CodeDistance::try_new(13).expect("distance"),
-        color_task,
-    )
-    .expect("color parameters");
-    assert_default_generation_probabilities(
-        color_defaults.before_round_data_depolarization(),
-        color_defaults.before_measure_flip_probability(),
-        color_defaults.after_reset_flip_probability(),
-        color_defaults.after_clifford_depolarization(),
-        zero,
-    );
-    let color = color_defaults
-        .clone()
-        .with_before_round_data_depolarization(before_round)
-        .with_before_measure_flip_probability(before_measure)
-        .with_after_reset_flip_probability(after_reset)
-        .with_after_clifford_depolarization(after_clifford);
-    assert_eq!(color.rounds().get(), 11);
-    assert_eq!(color.distance().get(), 13);
-    assert_eq!(color.task(), ColorCodeTask::MemoryXyz);
-    assert_eq!(color.before_round_data_depolarization(), before_round);
-    assert_eq!(color.before_measure_flip_probability(), before_measure);
-    assert_eq!(color.after_reset_flip_probability(), after_reset);
-    assert_eq!(color.after_clifford_depolarization(), after_clifford);
-    assert_eq!(color_defaults.before_round_data_depolarization(), zero);
+    for (task, distance, rounds) in [
+        (CodeTask::Repetition(RepetitionCodeTask::Memory), 5, 3),
+        (CodeTask::Surface(SurfaceCodeTask::UnrotatedMemoryX), 9, 7),
+        (CodeTask::Color(ColorCodeTask::MemoryXyz), 13, 11),
+    ] {
+        let defaults = CodeCircuitParams::try_new(
+            task,
+            CodeDistance::try_new(distance).expect("distance"),
+            RoundCount::try_new(rounds).expect("rounds"),
+        )
+        .expect("parameters");
+        for default in [
+            defaults.before_round_data_depolarization(),
+            defaults.before_measure_flip_probability(),
+            defaults.after_reset_flip_probability(),
+            defaults.after_clifford_depolarization(),
+        ] {
+            assert_eq!(default, zero, "{task:?}");
+        }
+        let noisy = defaults
+            .clone()
+            .with_before_round_data_depolarization(before_round)
+            .with_before_measure_flip_probability(before_measure)
+            .with_after_reset_flip_probability(after_reset)
+            .with_after_clifford_depolarization(after_clifford);
+        assert_eq!(noisy.task(), task);
+        assert_eq!(noisy.distance().get(), distance);
+        assert_eq!(noisy.rounds().get(), rounds);
+        assert_eq!(noisy.before_round_data_depolarization(), before_round);
+        assert_eq!(noisy.before_measure_flip_probability(), before_measure);
+        assert_eq!(noisy.after_reset_flip_probability(), after_reset);
+        assert_eq!(noisy.after_clifford_depolarization(), after_clifford);
+        assert_eq!(defaults.before_round_data_depolarization(), zero);
+    }
 }
 
-fn assert_default_generation_probabilities(
-    before_round: Probability,
-    before_measure: Probability,
-    after_reset: Probability,
-    after_clifford: Probability,
-    zero: Probability,
-) {
-    assert_eq!(before_round, zero);
-    assert_eq!(before_measure, zero);
-    assert_eq!(after_reset, zero);
-    assert_eq!(after_clifford, zero);
+/// Code and task names are Stim's `--code` and `--task` spellings, owned by the task types, and a
+/// task name is looked up only among its own family's tasks.
+#[test]
+fn cq2_generation_code_and_task_names_round_trip_stim_spellings() {
+    let families = CodeFamily::ALL.map(CodeFamily::as_str);
+    assert_eq!(families, ["repetition_code", "surface_code", "color_code"]);
+    for family in CodeFamily::ALL {
+        assert_eq!(family.as_str().parse::<CodeFamily>(), Ok(family));
+        for name in family.task_names() {
+            let task = family.parse_task(name).expect("own task");
+            assert_eq!(task.family(), family);
+            assert_eq!(task.as_str(), *name);
+            assert_eq!(task.to_string(), *name);
+        }
+    }
+    assert_eq!(
+        SurfaceCodeTask::ALL
+            .iter()
+            .map(|task| task.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "rotated_memory_x",
+            "rotated_memory_z",
+            "unrotated_memory_x",
+            "unrotated_memory_z"
+        ]
+    );
+    assert_eq!(
+        "memory_xyz".parse::<ColorCodeTask>(),
+        Ok(ColorCodeTask::MemoryXyz)
+    );
+    assert_eq!(
+        "memory".parse::<RepetitionCodeTask>(),
+        Ok(RepetitionCodeTask::Memory)
+    );
+
+    let unknown_family = "toric_code"
+        .parse::<CodeFamily>()
+        .expect_err("unknown code");
+    assert_eq!(unknown_family.name(), "toric_code");
+
+    // Each family's message lists exactly its own tasks, in Stim's order.
+    for (family, name, message) in [
+        (
+            CodeFamily::Repetition,
+            "rotated_memory_x",
+            "unsupported repetition_code task \"rotated_memory_x\"; expected memory",
+        ),
+        (
+            CodeFamily::Surface,
+            "memory",
+            "unsupported surface_code task \"memory\"; expected rotated_memory_x, rotated_memory_z, unrotated_memory_x, or unrotated_memory_z",
+        ),
+        (
+            CodeFamily::Color,
+            "Memory_XYZ",
+            "unsupported color_code task \"Memory_XYZ\"; expected memory_xyz",
+        ),
+    ] {
+        let error = family.parse_task(name).expect_err("foreign task");
+        assert_eq!(error.family(), family);
+        assert_eq!(error.task(), name);
+        assert_eq!(error.to_string(), message);
+    }
 }
 
 #[test]
 fn cq2_generation_repetition_matches_complete_pinned_stim_case() {
     // Adapted from Stim v1.16.0 src/stim/gen/gen_rep_code.test.cc.
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(5000).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
         CodeDistance::try_new(4).expect("distance"),
-        RepetitionCodeTask::Memory,
+        RoundCount::try_new(5000).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(Probability::try_new(0.125).expect("probability"))
@@ -184,7 +171,7 @@ fn cq2_generation_repetition_matches_complete_pinned_stim_case() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = generate_repetition_code_circuit(&params).expect("generate repetition code");
+    let generated = params.generate().expect("generate repetition code");
 
     assert_eq!(generated.layout_text(), "# L0 Z1 d2 Z3 d4 Z5 d6\n");
     assert_eq!(
@@ -245,10 +232,10 @@ fn cq2_generation_surface_matches_complete_pinned_stim_cases() {
 
 fn assert_unrotated_surface_code_matches_stim() {
     // Adapted from Stim v1.16.0 src/stim/gen/gen_surface_code.test.cc.
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(5).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::UnrotatedMemoryZ),
         CodeDistance::try_new(2).expect("distance"),
-        SurfaceCodeTask::UnrotatedMemoryZ,
+        RoundCount::try_new(5).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(Probability::try_new(0.125).expect("probability"))
@@ -256,7 +243,7 @@ fn assert_unrotated_surface_code_matches_stim() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = generate_surface_code_circuit(&params).expect("generate surface code");
+    let generated = params.generate().expect("generate surface code");
 
     assert_eq!(
         generated.layout_text(),
@@ -345,17 +332,17 @@ fn assert_unrotated_surface_code_matches_stim() {
         )
     );
 
-    let memory_x = SurfaceCodeParams::new(
-        RoundCount::try_new(1).expect("rounds"),
+    let memory_x = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::UnrotatedMemoryX),
         CodeDistance::try_new(2).expect("distance"),
-        SurfaceCodeTask::UnrotatedMemoryX,
+        RoundCount::try_new(1).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(probability(0.125))
     .with_after_reset_flip_probability(probability(0.25))
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
-    let generated = generate_surface_code_circuit(&memory_x).expect("generate unrotated memory X");
+    let generated = memory_x.generate().expect("generate unrotated memory X");
     assert_eq!(
         generated.layout_text(),
         concat!("# L6 X7 d8\n", "# Z3 d4 Z5\n", "# L0 X1 d2\n")
@@ -412,10 +399,10 @@ fn assert_unrotated_surface_code_matches_stim() {
 
 fn assert_rotated_surface_code_matches_stim() {
     // Adapted from Stim v1.16.0 src/stim/gen/gen_surface_code.test.cc.
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(5).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ),
         CodeDistance::try_new(2).expect("distance"),
-        SurfaceCodeTask::RotatedMemoryZ,
+        RoundCount::try_new(5).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(Probability::try_new(0.125).expect("probability"))
@@ -423,7 +410,7 @@ fn assert_rotated_surface_code_matches_stim() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = generate_surface_code_circuit(&params).expect("generate surface code");
+    let generated = params.generate().expect("generate surface code");
 
     assert_eq!(
         generated.layout_text(),
@@ -509,18 +496,19 @@ fn assert_rotated_surface_code_matches_stim() {
         )
     );
 
-    let distance_four = SurfaceCodeParams::new(
-        RoundCount::try_new(5).expect("rounds"),
+    let distance_four = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ),
         CodeDistance::try_new(4).expect("distance"),
-        SurfaceCodeTask::RotatedMemoryZ,
+        RoundCount::try_new(5).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(probability(0.125))
     .with_after_reset_flip_probability(probability(0.25))
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
-    let generated =
-        generate_surface_code_circuit(&distance_four).expect("generate distance-four surface code");
+    let generated = distance_four
+        .generate()
+        .expect("generate distance-four surface code");
     assert_eq!(
         generated.layout_text(),
         concat!(
@@ -536,18 +524,19 @@ fn assert_rotated_surface_code_matches_stim() {
         )
     );
 
-    let distance_five = SurfaceCodeParams::new(
-        RoundCount::try_new(5).expect("rounds"),
+    let distance_five = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ),
         CodeDistance::try_new(5).expect("distance"),
-        SurfaceCodeTask::RotatedMemoryZ,
+        RoundCount::try_new(5).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(probability(0.125))
     .with_after_reset_flip_probability(probability(0.25))
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
-    let generated =
-        generate_surface_code_circuit(&distance_five).expect("generate distance-five surface code");
+    let generated = distance_five
+        .generate()
+        .expect("generate distance-five surface code");
     assert_eq!(
         generated.layout_text(),
         concat!(
@@ -569,18 +558,19 @@ fn assert_rotated_surface_code_matches_stim() {
 #[test]
 fn cq2_generation_color_matches_complete_pinned_stim_case() {
     // Adapted from Stim v1.16.0 src/stim/gen/gen_color_code.test.cc.
-    let distance_five = ColorCodeParams::new(
-        RoundCount::try_new(100).expect("rounds"),
+    let distance_five = CodeCircuitParams::try_new(
+        CodeTask::Color(ColorCodeTask::MemoryXyz),
         CodeDistance::try_new(5).expect("distance"),
-        ColorCodeTask::MemoryXyz,
+        RoundCount::try_new(100).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(probability(0.125))
     .with_after_reset_flip_probability(probability(0.25))
     .with_before_measure_flip_probability(probability(0.375))
     .with_before_round_data_depolarization(probability(0.0625));
-    let generated =
-        generate_color_code_circuit(&distance_five).expect("generate distance-five color code");
+    let generated = distance_five
+        .generate()
+        .expect("generate distance-five color code");
     assert_eq!(
         generated.layout_text(),
         concat!(
@@ -594,10 +584,10 @@ fn cq2_generation_color_matches_complete_pinned_stim_case() {
         )
     );
 
-    let params = ColorCodeParams::new(
-        RoundCount::try_new(100).expect("rounds"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Color(ColorCodeTask::MemoryXyz),
         CodeDistance::try_new(3).expect("distance"),
-        ColorCodeTask::MemoryXyz,
+        RoundCount::try_new(100).expect("rounds"),
     )
     .expect("params")
     .with_after_clifford_depolarization(Probability::try_new(0.125).expect("probability"))
@@ -605,7 +595,7 @@ fn cq2_generation_color_matches_complete_pinned_stim_case() {
     .with_before_measure_flip_probability(Probability::try_new(0.375).expect("probability"))
     .with_before_round_data_depolarization(Probability::try_new(0.0625).expect("probability"));
 
-    let generated = generate_color_code_circuit(&params).expect("generate color code");
+    let generated = params.generate().expect("generate color code");
 
     assert_eq!(
         generated.layout_text(),
@@ -708,44 +698,43 @@ fn cq2_generation_color_matches_complete_pinned_stim_case() {
     );
 }
 
+/// The color code's shape constraints are checked when the parameters are built, so no
+/// `CodeCircuitParams` holds an invalid combination.
 #[test]
 fn cq2_generation_color_rejects_invalid_family_parameters() {
-    let too_few_rounds = ColorCodeParams::new(
-        RoundCount::try_new(1).expect("rounds"),
-        CodeDistance::try_new(3).expect("distance"),
-        ColorCodeTask::MemoryXyz,
-    )
-    .expect("params");
-    let even_distance = ColorCodeParams::new(
-        RoundCount::try_new(2).expect("rounds"),
-        CodeDistance::try_new(4).expect("distance"),
-        ColorCodeTask::MemoryXyz,
-    )
-    .expect("params");
-    let distance_two = ColorCodeParams::new(
-        RoundCount::try_new(2).expect("rounds"),
-        CodeDistance::try_new(2).expect("distance"),
-        ColorCodeTask::MemoryXyz,
-    )
-    .expect("params");
-    let minimum = ColorCodeParams::new(
-        RoundCount::try_new(2).expect("rounds"),
-        CodeDistance::try_new(3).expect("distance"),
-        ColorCodeTask::MemoryXyz,
-    )
-    .expect("params");
-
-    assert_invalid_domain_value(
-        generate_color_code_circuit(&too_few_rounds),
-        "color code round count",
-        "1",
-    );
-    for params in [&distance_two, &even_distance] {
+    let color = |distance: u32, rounds: u64| {
+        CodeCircuitParams::try_new(
+            CodeTask::Color(ColorCodeTask::MemoryXyz),
+            CodeDistance::try_new(distance).expect("distance"),
+            RoundCount::try_new(rounds).expect("rounds"),
+        )
+    };
+    assert_invalid_domain_value(color(3, 1), "color code round count", "1");
+    // The round count is checked first, as Stim does.
+    assert_invalid_domain_value(color(2, 1), "color code round count", "1");
+    for distance in [2, 4, 2046] {
         assert_invalid_domain_value(
-            generate_color_code_circuit(params),
+            color(distance, 2),
             "color code distance",
-            &params.distance().get().to_string(),
+            &distance.to_string(),
         );
     }
-    generate_color_code_circuit(&minimum).expect("minimum color-code shape must generate");
+    color(3, 2)
+        .expect("minimum color-code shape")
+        .generate()
+        .expect("minimum color-code shape must generate");
+    // The other families accept every typed distance and round count.
+    for task in [
+        CodeTask::Repetition(RepetitionCodeTask::Memory),
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryX),
+    ] {
+        CodeCircuitParams::try_new(
+            task,
+            CodeDistance::try_new(2).expect("distance"),
+            RoundCount::try_new(1).expect("rounds"),
+        )
+        .expect("non-color shape")
+        .generate()
+        .expect("non-color minimum shape must generate");
+    }
 }

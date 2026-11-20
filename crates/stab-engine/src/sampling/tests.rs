@@ -11,9 +11,7 @@ use super::reference_run::{
     take_reference_execution_stats,
 };
 use super::*;
-use stab_analysis::{
-    CodeDistance, RoundCount, SurfaceCodeParams, SurfaceCodeTask, generate_surface_code_circuit,
-};
+use stab_analysis::{CodeCircuitParams, CodeDistance, CodeTask, RoundCount, SurfaceCodeTask};
 use stab_bits::{BitSlice, BitVec};
 use stab_model::{Gate, Probability};
 use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
@@ -107,17 +105,17 @@ impl MeasurementSink for RecordSink {
 #[test]
 fn reference_simulator_matches_generator_baseline_on_noisy_surface_and_feedback() {
     let probability = Probability::try_new(0.001).expect("valid generated-circuit noise");
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(20).expect("valid round count"),
+    let params = CodeCircuitParams::try_new(
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryZ),
         CodeDistance::try_new(7).expect("valid code distance"),
-        SurfaceCodeTask::RotatedMemoryZ,
+        RoundCount::try_new(20).expect("valid round count"),
     )
     .expect("valid surface-code parameters")
     .with_before_round_data_depolarization(probability)
     .with_before_measure_flip_probability(probability)
     .with_after_reset_flip_probability(probability)
     .with_after_clifford_depolarization(probability);
-    let generated = generate_surface_code_circuit(&params).expect("generate surface circuit");
+    let generated = params.generate().expect("generate surface circuit");
     let plan = SamplingCompiler::new()
         .compile(generated.circuit())
         .expect("compile generated surface circuit");

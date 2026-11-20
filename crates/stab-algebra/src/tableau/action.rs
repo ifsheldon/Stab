@@ -95,7 +95,7 @@ pub(super) fn apply_words(
     exponent = exponent.wrapping_sub(output_y) & 3;
     if exponent & 1 != 0 {
         return Err(StabilizerError::ImaginaryProduct {
-            phase: PauliPhase::from_exponent((exponent & 3) as u8),
+            phase: PauliPhase::from_log_i((exponent & 3) as u8),
         });
     }
     Ok(exponent == 2)
@@ -246,7 +246,7 @@ impl BlockAction {
                 & 3;
             if exponent & 1 != 0 {
                 return Err(StabilizerError::ImaginaryProduct {
-                    phase: PauliPhase::from_exponent((exponent & 3) as u8),
+                    phase: PauliPhase::from_log_i((exponent & 3) as u8),
                 });
             }
             *negative = exponent == 2;

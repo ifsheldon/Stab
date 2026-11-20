@@ -287,8 +287,7 @@ fn prepend_detector_shift(
     model: &mut DetectorErrorModel,
     detector_shift: u64,
 ) -> AnalysisResult<()> {
-    let items = stab_model::advanced::dem_model_items_mut(model);
-    if let Some(DemItem::Instruction(instruction)) = items.first_mut()
+    if let Some(DemItem::Instruction(instruction)) = model.item_mut(0)
         && let Some(existing_shift) = instruction.detector_shift()
     {
         let combined = existing_shift.checked_add(detector_shift).ok_or_else(|| {
@@ -301,14 +300,14 @@ fn prepend_detector_shift(
         )?;
         return Ok(());
     }
-    items.insert(
+    model.insert_item(
         0,
         DemItem::Instruction(DemInstruction::shift_detectors(
             Vec::new(),
             detector_shift,
             None,
         )?),
-    );
+    )?;
     Ok(())
 }
 

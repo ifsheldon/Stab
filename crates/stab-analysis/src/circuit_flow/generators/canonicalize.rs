@@ -150,7 +150,7 @@ fn flow_with_final_sign_and_trimmed_identities(flow: &Flow) -> AnalysisResult<Fl
 
 fn trimmed_pauli_with_sign(pauli: &PauliString, sign: PauliSign) -> PauliString {
     if pauli.has_no_pauli_terms() {
-        stab_algebra::advanced::pauli_from_bases_unchecked(sign, [])
+        stab_algebra::advanced::pauli_from_bases_unbudgeted(sign, [])
     } else {
         pauli.with_sign(sign)
     }

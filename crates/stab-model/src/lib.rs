@@ -253,16 +253,6 @@ pub mod advanced {
         instruction.rebase_detectors(base)
     }
 
-    /// Returns a model's item storage for consumers that rebuild a model in place.
-    pub fn dem_model_items_mut(model: &mut DetectorErrorModel) -> &mut Vec<crate::DemItem> {
-        model.items_mut()
-    }
-
-    /// Returns a repeat block's body for consumers that rebuild a model in place.
-    pub fn dem_repeat_block_body_mut(repeat: &mut DemRepeatBlock) -> &mut DetectorErrorModel {
-        repeat.body_mut()
-    }
-
     /// Removes the tag from a DEM instruction in place.
     pub fn dem_instruction_clear_tag(instruction: &mut DemInstruction) {
         instruction.clear_tag();
@@ -302,11 +292,6 @@ pub mod advanced {
     /// Returns the schema-one fingerprint discriminator for a model dialect.
     pub const fn model_dialect_fingerprint_discriminator(dialect: ModelDialect) -> u8 {
         dialect.fingerprint_discriminator()
-    }
-
-    /// Constructs a probability after the caller has proved its domain.
-    pub fn probability_from_valid(value: f64) -> Probability {
-        Probability::from_valid_probability(value)
     }
 
     /// Preserves Stim's parsed `rec[-0]` spelling.

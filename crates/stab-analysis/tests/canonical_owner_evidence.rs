@@ -8,7 +8,7 @@ use std::assert_matches;
 use std::collections::{BTreeMap, BTreeSet};
 
 use num_complex::Complex32;
-use stab_algebra::{Flow, unitary_to_tableau};
+use stab_algebra::{Endianness, Flow, Tableau};
 use stab_analysis::{
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_tableau, circuit_without_noise,
     decomposed_circuit, flattened_circuit, gate_decomposition_to_circuit, gate_flows,
@@ -176,7 +176,7 @@ fn cq2_gate_unitary_matrix_contract() {
             "{gate_name} unitary metadata entry count"
         );
         assert_eq!(
-            unitary_to_tableau(&matrix_rows, true).expect("unitary tableau"),
+            Tableau::from_unitary(&matrix_rows, Endianness::Little).expect("unitary tableau"),
             gate_tableau(gate).expect("gate tableau"),
             "{gate_name} unitary matrix should convert to the gate tableau"
         );
@@ -196,8 +196,8 @@ fn cq2_gate_unitary_matrix_contract() {
 
     let cx = Gate::from_name("CX").expect("CX");
     let cx_matrix_rows = gate_unitary_matrix(cx).expect("CX matrix").to_vecs();
-    let wrong_endian_tableau =
-        unitary_to_tableau(&cx_matrix_rows, false).expect("wrong-endian CX is still Clifford");
+    let wrong_endian_tableau = Tableau::from_unitary(&cx_matrix_rows, Endianness::Big)
+        .expect("wrong-endian CX is still Clifford");
     assert_ne!(
         wrong_endian_tableau,
         gate_tableau(cx).expect("CX tableau"),

@@ -150,7 +150,7 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
                             PauliSign::Plus
                         },
                     ),
-                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
                     [record_index],
                     [],
                 )
@@ -204,7 +204,7 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
                 self.flows.push(
                     Flow::new(
                         single_pauli(self.qubit_count, qubit, basis),
-                        stab_algebra::advanced::pauli_from_bases_unchecked(
+                        stab_algebra::advanced::pauli_from_bases_unbudgeted(
                             if inverted {
                                 PauliSign::Minus
                             } else {
@@ -220,8 +220,8 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
             } else {
                 self.flows.push(
                     Flow::new(
-                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
-                        stab_algebra::advanced::pauli_from_bases_unchecked(
+                        stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
+                        stab_algebra::advanced::pauli_from_bases_unbudgeted(
                             if inverted ^ final_inverted {
                                 PauliSign::Minus
                             } else {
@@ -275,7 +275,7 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
                             PauliSign::Plus
                         },
                     ),
-                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
                     [record_index],
                     [],
                 )
@@ -322,8 +322,8 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
             match target.qubit_id().map(|id| id.get()) {
                 Some(0) => self.flows.push(
                     Flow::new(
-                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
-                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                        stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
+                        stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
                         [record_index],
                         [],
                     )
@@ -331,8 +331,8 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
                 ),
                 Some(1) => self.flows.push(
                     Flow::new(
-                        stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
-                        stab_algebra::advanced::pauli_from_bases_unchecked(
+                        stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
+                        stab_algebra::advanced::pauli_from_bases_unbudgeted(
                             PauliSign::Minus,
                             vec![PauliBasis::I; self.qubit_count],
                         ),
@@ -366,8 +366,8 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
             }
             self.flows.push(
                 Flow::new(
-                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
-                    stab_algebra::advanced::pauli_identity_unchecked(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
+                    stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
                     [record_index],
                     [],
                 )

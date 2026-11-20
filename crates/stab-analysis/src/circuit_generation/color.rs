@@ -11,33 +11,16 @@ use crate::{AnalysisError, AnalysisResult};
 use stab_model::{Circuit, GateKind};
 
 use super::{
-    ColorCodeParams, ColorCodeTask, GeneratedCircuit, append_begin_round_tick, append_circuit,
+    CodeCircuitParams, GeneratedCircuit, append_begin_round_tick, append_circuit,
     append_instruction, append_measure, append_measure_reset, append_repeated_body, append_reset,
     append_unitary_1, append_unitary_2, layout_text, qubit_targets, rec_targets,
-    validate_color_generation_size,
 };
 
-/// Generates Stim-compatible triangular color-code memory circuits.
-///
-/// Returns an error before materialization if the projected circuit exceeds the parameters'
-/// memory budget.
-pub fn generate_color_code_circuit(params: &ColorCodeParams) -> AnalysisResult<GeneratedCircuit> {
-    let ColorCodeTask::MemoryXyz = params.task;
-    if params.rounds().get() < 2 {
-        return Err(AnalysisError::invalid_domain_value(
-            "color code round count",
-            params.rounds().get(),
-        ));
-    }
-    if params.distance().get() < 3 || params.distance().get().is_multiple_of(2) {
-        return Err(AnalysisError::invalid_domain_value(
-            "color code distance",
-            params.distance().get(),
-        ));
-    }
-
+/// Generates Stim's triangular color-code `memory_xyz` circuit; the caller has admitted its size,
+/// and [`CodeCircuitParams::try_new`] has checked its odd distance of at least 3 and its round
+/// count of at least 2.
+pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCircuit> {
     let distance = params.distance().get();
-    validate_color_generation_size(distance, params.memory_budget())?;
     let width = distance + (distance - 1) / 2;
     let mut data_coords = BTreeSet::new();
     let mut measure_coords = BTreeSet::new();
@@ -105,16 +88,15 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> AnalysisResult<G
         }
     }
 
-    let common = params.common();
     let mut cycle_actions = Circuit::new();
-    append_begin_round_tick(common, &mut cycle_actions, &data_qubits)?;
-    append_unitary_1(common, &mut cycle_actions, GateKind::C_XYZ, &data_qubits)?;
+    append_begin_round_tick(params, &mut cycle_actions, &data_qubits)?;
+    append_unitary_1(params, &mut cycle_actions, GateKind::C_XYZ, &data_qubits)?;
     for targets in &cnot_targets {
         append_instruction(&mut cycle_actions, GateKind::TICK, Vec::new(), Vec::new())?;
-        append_unitary_2(common, &mut cycle_actions, GateKind::CX, targets)?;
+        append_unitary_2(params, &mut cycle_actions, GateKind::CX, targets)?;
     }
     append_instruction(&mut cycle_actions, GateKind::TICK, Vec::new(), Vec::new())?;
-    append_measure_reset(common, &mut cycle_actions, &measurement_qubits, 'Z')?;
+    append_measure_reset(params, &mut cycle_actions, &measurement_qubits, 'Z')?;
 
     let mut head = Circuit::new();
     for qubit in &all_qubits {
@@ -125,7 +107,7 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> AnalysisResult<G
             qubit_targets(&[*qubit])?,
         )?;
     }
-    append_reset(common, &mut head, &all_qubits, 'Z')?;
+    append_reset(params, &mut head, &all_qubits, 'Z')?;
     append_repeated_body(&mut head, cycle_actions.clone(), 2)?;
 
     let measurement_count = u32::try_from(measurement_qubits.len()).map_err(|_| {
@@ -172,7 +154,7 @@ pub fn generate_color_code_circuit(params: &ColorCodeParams) -> AnalysisResult<G
         1 => 'X',
         _ => 'Y',
     };
-    append_measure(common, &mut tail, &data_qubits, tail_basis)?;
+    append_measure(params, &mut tail, &data_qubits, tail_basis)?;
     let data_count = u32::try_from(data_qubits.len())
         .map_err(|_| AnalysisError::invalid_domain_value("data qubit count", data_qubits.len()))?;
     for measurement_qubit in &measurement_qubits {

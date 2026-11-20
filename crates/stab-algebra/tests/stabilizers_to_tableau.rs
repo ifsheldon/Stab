@@ -10,8 +10,8 @@ use std::str::FromStr;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_algebra::{
-    PauliBasis, PauliSign, PauliString, StabilizerError, Tableau, TableauIterator,
-    stabilizers_to_tableau,
+    PauliBasis, PauliSign, PauliString, SignIteration, StabilizerError, StabilizerTableauOptions,
+    Tableau, TableauIterator,
 };
 
 #[test]
@@ -33,30 +33,60 @@ fn stabilizers_to_tableau_bell_pair_matches_stim() {
     let mut input = vec![pauli("XX"), pauli("ZZ")];
     let expected = Tableau::gate2("+Z_", "+XX", "+_X", "+ZZ").expect("expected Bell tableau");
 
-    let actual = stabilizers_to_tableau(&input, false, false, false).expect("convert Bell pair");
+    let actual = Tableau::from_stabilizers(&input, StabilizerTableauOptions::default())
+        .expect("convert Bell pair");
     assert_eq!(actual, expected);
     assert!(actual.satisfies_invariants().expect("invariants"));
 
     input.push(pauli("-YY"));
-    assert!(stabilizers_to_tableau(&input, false, false, false).is_err());
+    assert!(Tableau::from_stabilizers(&input, StabilizerTableauOptions::default()).is_err());
     assert_eq!(
-        stabilizers_to_tableau(&input, true, false, false).expect("ignore redundant stabilizer"),
+        Tableau::from_stabilizers(
+            &input,
+            StabilizerTableauOptions {
+                allow_redundant: true,
+                ..StabilizerTableauOptions::default()
+            }
+        )
+        .expect("ignore redundant stabilizer"),
         expected
     );
 
     input[2] = pauli("+YY");
-    assert!(stabilizers_to_tableau(&input, true, true, false).is_err());
+    assert!(
+        Tableau::from_stabilizers(
+            &input,
+            StabilizerTableauOptions {
+                allow_redundant: true,
+                allow_underconstrained: true,
+                ..StabilizerTableauOptions::default()
+            }
+        )
+        .is_err()
+    );
 
     input[2] = pauli("+Z_");
-    assert!(stabilizers_to_tableau(&input, true, true, false).is_err());
+    assert!(
+        Tableau::from_stabilizers(
+            &input,
+            StabilizerTableauOptions {
+                allow_redundant: true,
+                allow_underconstrained: true,
+                ..StabilizerTableauOptions::default()
+            }
+        )
+        .is_err()
+    );
 
     // Adapted from the `stim.Tableau.from_stabilizers` examples in Stim v1.16.0 doc/stim.pyi:
     // the destabilizers and the completion of an underconstrained input match Stim exactly.
-    let completed = stabilizers_to_tableau(
+    let completed = Tableau::from_stabilizers(
         &[pauli("XX_"), pauli("ZZ_"), pauli("-YY_"), pauli("")],
-        true,
-        true,
-        false,
+        StabilizerTableauOptions {
+            allow_redundant: true,
+            allow_underconstrained: true,
+            ..StabilizerTableauOptions::default()
+        },
     )
     .expect("complete redundant underconstrained input");
     assert_eq!(
@@ -71,31 +101,39 @@ fn stabilizers_to_tableau_bell_pair_matches_stim() {
 
 fn stabilizers_to_tableau_detects_anticommutation() {
     let input = vec![pauli("YY"), pauli("YX")];
-    assert!(stabilizers_to_tableau(&input, false, false, false).is_err());
+    assert!(Tableau::from_stabilizers(&input, StabilizerTableauOptions::default()).is_err());
 }
 
 fn stabilizers_to_tableau_reports_typed_errors_across_word_boundaries() {
     assert_eq!(
-        stabilizers_to_tableau(&[pauli("+X"), pauli("+Z")], false, false, false),
+        Tableau::from_stabilizers(
+            &[pauli("+X"), pauli("+Z")],
+            StabilizerTableauOptions::default()
+        ),
         Err(StabilizerError::AntiCommutingStabilizer {
-            stabilizer: "+Z".to_owned(),
-            conflict: "+X".to_owned(),
+            stabilizer: 1,
+            conflict: 0,
         })
     );
     assert_eq!(
-        stabilizers_to_tableau(&[pauli("+Z"), pauli("+Z")], false, false, false),
-        Err(StabilizerError::RedundantStabilizer {
-            stabilizer: "+Z".to_owned(),
-        })
+        Tableau::from_stabilizers(
+            &[pauli("+Z"), pauli("+Z")],
+            StabilizerTableauOptions::default()
+        ),
+        Err(StabilizerError::RedundantStabilizer { stabilizer: 1 })
     );
     assert_eq!(
-        stabilizers_to_tableau(&[pauli("+Z"), pauli("-Z")], true, false, false),
-        Err(StabilizerError::InconsistentStabilizer {
-            stabilizer: "-Z".to_owned(),
-        })
+        Tableau::from_stabilizers(
+            &[pauli("+Z"), pauli("-Z")],
+            StabilizerTableauOptions {
+                allow_redundant: true,
+                ..StabilizerTableauOptions::default()
+            }
+        ),
+        Err(StabilizerError::InconsistentStabilizer { stabilizer: 1 })
     );
     assert_eq!(
-        stabilizers_to_tableau(&[pauli("+Z_")], false, false, false),
+        Tableau::from_stabilizers(&[pauli("+Z_")], StabilizerTableauOptions::default()),
         Err(StabilizerError::UnderconstrainedStabilizers {
             independent: 1,
             num_qubits: 2,
@@ -104,21 +142,22 @@ fn stabilizers_to_tableau_reports_typed_errors_across_word_boundaries() {
 
     let distant_x = pauli(&format!("+X{}", "_".repeat(500)));
     assert_matches!(
-        stabilizers_to_tableau(&[pauli("+Z"), distant_x], false, false, false),
+        Tableau::from_stabilizers(
+            &[pauli("+Z"), distant_x],
+            StabilizerTableauOptions::default()
+        ),
         Err(StabilizerError::AntiCommutingStabilizer { .. })
     );
     let distant_zx = pauli(&format!("+Z{}X", "_".repeat(500)));
     assert_matches!(
-        stabilizers_to_tableau(
+        Tableau::from_stabilizers(
             &[pauli("+Z_"), pauli("-_Z"), distant_zx.clone(), pauli("+ZZ")],
-            false,
-            false,
-            false,
+            StabilizerTableauOptions::default()
         ),
         Err(StabilizerError::InconsistentStabilizer { .. })
     );
     assert_matches!(
-        stabilizers_to_tableau(
+        Tableau::from_stabilizers(
             &[
                 pauli("-Z_"),
                 distant_zx,
@@ -126,9 +165,7 @@ fn stabilizers_to_tableau_reports_typed_errors_across_word_boundaries() {
                 pauli("+_Z_"),
                 pauli("+Z_Z"),
             ],
-            false,
-            false,
-            false,
+            StabilizerTableauOptions::default()
         ),
         Err(StabilizerError::RedundantStabilizer { .. })
     );
@@ -152,11 +189,17 @@ fn stabilizers_to_tableau_preserves_overconstrained_generator_order() {
         }
 
         assert_matches!(
-            stabilizers_to_tableau(&stabilizers, false, false, false),
+            Tableau::from_stabilizers(&stabilizers, StabilizerTableauOptions::default()),
             Err(StabilizerError::RedundantStabilizer { .. })
         );
-        let actual = stabilizers_to_tableau(&stabilizers, true, false, false)
-            .expect("ignore dependent stabilizers");
+        let actual = Tableau::from_stabilizers(
+            &stabilizers,
+            StabilizerTableauOptions {
+                allow_redundant: true,
+                ..StabilizerTableauOptions::default()
+            },
+        )
+        .expect("ignore dependent stabilizers");
         for index in 0..num_qubits {
             let expected_index = index + 1 + usize::from(index > 3);
             assert_eq!(
@@ -174,8 +217,15 @@ fn stabilizers_to_tableau_handles_size_affecting_redundancy() {
         input.push(pauli("__"));
     }
 
-    let tableau =
-        stabilizers_to_tableau(&input, true, true, false).expect("convert redundant input");
+    let tableau = Tableau::from_stabilizers(
+        &input,
+        StabilizerTableauOptions {
+            allow_redundant: true,
+            allow_underconstrained: true,
+            ..StabilizerTableauOptions::default()
+        },
+    )
+    .expect("convert redundant input");
     assert_eq!(tableau.len(), 2);
     assert_eq!(tableau.z_output(0).expect("z0"), pauli("X_"));
     assert_eq!(tableau.z_output(1).expect("z1"), pauli("_X"));
@@ -184,27 +234,42 @@ fn stabilizers_to_tableau_handles_size_affecting_redundancy() {
 
 fn stabilizers_to_tableau_underconstrained_requires_opt_in_and_can_invert() {
     let input = vec![pauli("Z_")];
-    assert!(stabilizers_to_tableau(&input, false, false, false).is_err());
+    assert!(Tableau::from_stabilizers(&input, StabilizerTableauOptions::default()).is_err());
 
-    let actual = stabilizers_to_tableau(&input, false, true, false).expect("underconstrained");
+    let actual = Tableau::from_stabilizers(
+        &input,
+        StabilizerTableauOptions {
+            allow_underconstrained: true,
+            ..StabilizerTableauOptions::default()
+        },
+    )
+    .expect("underconstrained");
     assert_eq!(actual.z_output(0).expect("z0"), pauli("Z_"));
     assert!(actual.satisfies_invariants().expect("invariants"));
 
-    let inverted = stabilizers_to_tableau(&input, false, true, true).expect("inverse");
+    let inverted = Tableau::from_stabilizers(
+        &input,
+        StabilizerTableauOptions {
+            allow_underconstrained: true,
+            inverse: true,
+            ..StabilizerTableauOptions::default()
+        },
+    )
+    .expect("inverse");
     assert_eq!(actual.inverse().expect("actual inverse"), inverted);
 }
 
 fn stabilizers_to_tableau_preserves_z_outputs_from_valid_tableaus() {
     // Deterministic miniature of Stim's stabilizers_to_tableau_fuzz coverage.
-    for source in TableauIterator::new(2, true)
+    for source in TableauIterator::new(2, SignIteration::AllSigns)
         .expect("tableau iterator")
         .take(50)
     {
         let stabilizers = (0..source.len())
             .map(|index| source.z_output(index).expect("source z"))
             .collect::<Vec<_>>();
-        let actual =
-            stabilizers_to_tableau(&stabilizers, false, false, false).expect("convert stabilizers");
+        let actual = Tableau::from_stabilizers(&stabilizers, StabilizerTableauOptions::default())
+            .expect("convert stabilizers");
 
         for index in 0..source.len() {
             assert_eq!(
@@ -224,8 +289,8 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
         let stabilizers = (0..source.len())
             .map(|index| source.z_output(index).expect("source z"))
             .collect::<Vec<_>>();
-        let actual =
-            stabilizers_to_tableau(&stabilizers, false, false, false).expect("convert stabilizers");
+        let actual = Tableau::from_stabilizers(&stabilizers, StabilizerTableauOptions::default())
+            .expect("convert stabilizers");
 
         for index in 0..source.len() {
             assert_eq!(
@@ -237,9 +302,15 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
 
         for skipped in 1..num_qubits.min(4) {
             let kept = &stabilizers[..num_qubits - skipped];
-            assert!(stabilizers_to_tableau(kept, false, false, false).is_err());
-            let completed = stabilizers_to_tableau(kept, false, true, false)
-                .expect("complete partial stabilizers");
+            assert!(Tableau::from_stabilizers(kept, StabilizerTableauOptions::default()).is_err());
+            let completed = Tableau::from_stabilizers(
+                kept,
+                StabilizerTableauOptions {
+                    allow_underconstrained: true,
+                    ..StabilizerTableauOptions::default()
+                },
+            )
+            .expect("complete partial stabilizers");
             for (index, expected) in kept.iter().enumerate() {
                 assert_eq!(completed.z_output(index).expect("completed z"), *expected);
             }
@@ -249,8 +320,15 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
                     .expect("completed invariants")
             );
             assert_eq!(
-                stabilizers_to_tableau(kept, false, true, true)
-                    .expect("inverse partial completion"),
+                Tableau::from_stabilizers(
+                    kept,
+                    StabilizerTableauOptions {
+                        allow_underconstrained: true,
+                        inverse: true,
+                        ..StabilizerTableauOptions::default()
+                    }
+                )
+                .expect("inverse partial completion"),
                 completed.inverse().expect("expected completed inverse")
             );
         }
@@ -258,7 +336,8 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
 }
 
 fn stabilizers_to_tableau_empty_input_is_empty_identity() {
-    let actual = stabilizers_to_tableau(&[], false, false, false).expect("empty conversion");
+    let actual = Tableau::from_stabilizers(&[], StabilizerTableauOptions::default())
+        .expect("empty conversion");
     assert_eq!(actual, Tableau::identity(0).expect("Tableau identity"));
 }
 
@@ -267,7 +346,8 @@ fn stabilizers_to_tableau_accepts_inputs_past_iterator_limit() {
         .map(|index| single_pauli(70, index, PauliBasis::Z))
         .collect::<Vec<_>>();
 
-    let actual = stabilizers_to_tableau(&input, false, false, false).expect("large conversion");
+    let actual = Tableau::from_stabilizers(&input, StabilizerTableauOptions::default())
+        .expect("large conversion");
     assert_eq!(actual.len(), 70);
     assert_eq!(
         actual.x_output(69).expect("x69"),

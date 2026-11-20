@@ -50,9 +50,8 @@ pub use circuit_flow::{
     circuit_has_unsigned_stabilizer_flow_with_options, solve_for_flow_measurements,
 };
 pub use circuit_generation::{
-    CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
-    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
-    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
+    CodeCircuitParams, CodeDistance, CodeFamily, CodeTask, ColorCodeTask, GeneratedCircuit,
+    RepetitionCodeTask, RoundCount, SurfaceCodeTask, UnknownCodeFamily, UnknownCodeTask,
 };
 pub use circuit_inverse::{
     InverseQecOptions, TimeReversedForFlowsOptions, circuit_inverse_qec,

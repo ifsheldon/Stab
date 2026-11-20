@@ -311,15 +311,11 @@ fn parse_dem_instruction(
         )
     })?;
     let (tag, rest) = parse_optional_tag(line_number, name.text(), rest, end_error_span)?;
-    let (args, rest) =
+    let (mut args, rest) =
         parse_optional_args(line_number, name.text(), rest, end_error_span, admission)?;
     let mut targets = parse_dem_targets(line_number, name.text(), rest, end_error_span, admission)?;
-    match targets.take_payload(kind, &args.values) {
-        Ok(payload) => Ok(DemInstruction::from_validated_parts(
-            args.values,
-            payload,
-            tag,
-        )),
+    match targets.take_payload(kind, &mut args.values) {
+        Ok(payload) => Ok(DemInstruction::from_validated_parts(payload, tag)),
         Err(error) => {
             let (code, span, context) = dem_validation_location(kind, name.text(), &args, &targets);
             Err(line_error(

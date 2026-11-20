@@ -9,7 +9,7 @@
 //! Pauli through the gate's own rows. Either way a gate costs `O(n)` row visits.
 
 use super::action::{apply_words, generator_phases};
-use super::{PauliRows, Tableau, pauli_xyz};
+use super::{PauliRows, Tableau};
 use crate::budget::{StabilizerResource, try_zeroed_words};
 use crate::{PauliBasis, PauliPhase, StabilizerError, StabilizerResult};
 
@@ -38,6 +38,16 @@ impl LocalPauliImage {
         phase: PauliPhase::Plus,
         bases: [PauliBasis::I; 2],
     };
+}
+
+/// The local image table index of `basis`: 0 to 3 for I, X, Y, Z.
+fn pauli_xyz(basis: PauliBasis) -> u8 {
+    match basis {
+        PauliBasis::I => 0,
+        PauliBasis::X => 1,
+        PauliBasis::Y => 2,
+        PauliBasis::Z => 3,
+    }
 }
 
 fn append_small(rows: &mut PauliRows, gate: &Tableau, targets: &[usize]) -> StabilizerResult<()> {

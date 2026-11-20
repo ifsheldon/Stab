@@ -438,7 +438,7 @@ fn report_unitary_mismatches_as_outputs(
                     xor_region(&mut bases, image, &options.cancellation)?;
                     UnsignedStabilizerFlowFailure::OutputMismatch {
                         expected_output: unsigned_pauli(flow.output()),
-                        actual_output: stab_algebra::advanced::pauli_from_bases_unchecked(
+                        actual_output: stab_algebra::advanced::pauli_from_bases_unbudgeted(
                             PauliSign::Plus,
                             bases,
                         ),
@@ -689,7 +689,8 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                 remaining -= step;
             }
             xor_region(&mut bases, region_pauli, &options.cancellation)?;
-            let actual = stab_algebra::advanced::pauli_from_bases_unchecked(PauliSign::Plus, bases);
+            let actual =
+                stab_algebra::advanced::pauli_from_bases_unbudgeted(PauliSign::Plus, bases);
             if paulis_match_unsigned_polled(&actual, flow.input(), &options.cancellation)? {
                 Ok(UnsignedStabilizerFlowCheck::passed())
             } else {

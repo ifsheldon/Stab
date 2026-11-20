@@ -458,12 +458,9 @@ impl StabilizerGenerator {
 
     fn multiply_single_assign(&mut self, qubit: usize, basis: PauliBasis) {
         let left = self.basis(qubit);
-        let log_i = sign_log_i(self.negative).wrapping_add(left.log_i_scalar_byproduct(basis));
-        self.set_basis(
-            qubit,
-            PauliBasis::from_xz(left.x_bit() ^ basis.x_bit(), left.z_bit() ^ basis.z_bit()),
-        );
-        self.negative = (log_i & 2) != 0;
+        let (product, phase) = left.multiply(basis);
+        self.set_basis(qubit, product);
+        self.negative ^= phase.is_negative();
     }
 
     #[inline(always)]
