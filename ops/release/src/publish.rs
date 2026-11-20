@@ -37,12 +37,23 @@ pub(crate) fn publish_reviewed(
 
     for package in &report.packages {
         cancellation.check("reviewed package publication")?;
+        let crate_name = registry::CrateName::try_new(&package.name)?;
+        let crate_version = registry::CrateVersion::try_new(&package.version)?;
         if registry::require_absent_or_matching(
             &registry,
             &package.name,
             &package.version,
             &package.sha256,
         )? {
+            // A recovered run may have stopped before the index caught up; the
+            // next crate's packaging resolves this one through the sparse index.
+            registry::wait_for_matching_checksum(
+                &registry,
+                &cancellation,
+                &crate_name,
+                &crate_version,
+                &package.sha256,
+            )?;
             println!(
                 "[stab-release] crates.io already has reviewed {} {} ({})",
                 package.name, package.version, package.sha256
@@ -105,8 +116,8 @@ pub(crate) fn publish_reviewed(
         registry::wait_for_matching_checksum(
             &registry,
             &cancellation,
-            &package.name,
-            &package.version,
+            &crate_name,
+            &crate_version,
             &package.sha256,
         )?;
         work.revalidate()?;

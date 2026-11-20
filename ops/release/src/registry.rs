@@ -10,13 +10,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ReleaseError, archive, cancellation::ReleaseCancellation, safe_fs};
 
+mod index;
+pub(crate) use index::{CrateName, CrateVersion};
+
 const CRATES_IO_HOST: &str = "https://crates.io";
+const CRATES_IO_INDEX_HOST: &str = "https://index.crates.io";
+const USER_AGENT: &str = "stab-release/0.2.0";
 const MAX_REGISTRY_RESPONSE_BYTES: u64 = 1 << 20;
+const MAX_INDEX_RESPONSE_BYTES: u64 = 8 << 20;
 pub(crate) const MAX_REGISTRY_METADATA_BYTES: u64 = 1 << 20;
 const MAX_README_BYTES: u64 = 2 << 20;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-const VISIBILITY_TIMEOUT: Duration = Duration::from_secs(10 * 60);
-const VISIBILITY_POLL: Duration = Duration::from_secs(10);
+const CRATES_IO_VISIBILITY: VisibilityPolicy = VisibilityPolicy {
+    timeout: Duration::from_secs(10 * 60),
+    poll: Duration::from_secs(10),
+};
 
 pub(crate) trait RegistryLookup {
     fn version(
@@ -24,6 +32,21 @@ pub(crate) trait RegistryLookup {
         package: &str,
         version: &str,
     ) -> Result<Option<RegistryVersion>, ReleaseError>;
+}
+
+/// The sparse index Cargo resolves registry dependencies through.
+pub(crate) trait SparseIndexLookup {
+    fn index_version(
+        &self,
+        package: &CrateName,
+        version: &CrateVersion,
+    ) -> Result<Option<RegistryVersion>, ReleaseError>;
+}
+
+#[derive(Clone, Copy, Debug)]
+struct VisibilityPolicy {
+    timeout: Duration,
+    poll: Duration,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -36,6 +59,7 @@ pub(crate) struct RegistryVersion {
 pub(crate) struct CratesIo {
     agent: ureq::Agent,
     host: String,
+    index_host: String,
     cancellation: ReleaseCancellation,
 }
 
@@ -75,10 +99,14 @@ impl std::fmt::Debug for CratesIoToken {
 
 impl CratesIo {
     pub(crate) fn new(cancellation: ReleaseCancellation) -> Self {
-        Self::with_host(CRATES_IO_HOST.to_string(), cancellation)
+        Self::with_hosts(
+            CRATES_IO_HOST.to_string(),
+            CRATES_IO_INDEX_HOST.to_string(),
+            cancellation,
+        )
     }
 
-    fn with_host(host: String, cancellation: ReleaseCancellation) -> Self {
+    fn with_hosts(host: String, index_host: String, cancellation: ReleaseCancellation) -> Self {
         let config = ureq::Agent::config_builder()
             .timeout_global(Some(REQUEST_TIMEOUT))
             .http_status_as_error(false)
@@ -86,6 +114,7 @@ impl CratesIo {
         Self {
             agent: config.into(),
             host,
+            index_host,
             cancellation,
         }
     }
@@ -137,7 +166,7 @@ impl RegistryLookup for CratesIo {
             .agent
             .get(&url)
             .header("Accept", "application/json")
-            .header("User-Agent", "stab-release/0.2.0")
+            .header("User-Agent", USER_AGENT)
             .call()
             .map_err(|error| {
                 ReleaseError::Registry(format!("failed to query {package} {version}: {error}"))
@@ -164,6 +193,55 @@ impl RegistryLookup for CratesIo {
             })?;
         self.cancellation.check("crates.io checksum query")?;
         parse_version(&body, package, version).map(Some)
+    }
+}
+
+impl SparseIndexLookup for CratesIo {
+    fn index_version(
+        &self,
+        package: &CrateName,
+        version: &CrateVersion,
+    ) -> Result<Option<RegistryVersion>, ReleaseError> {
+        self.cancellation.check("crates.io sparse index query")?;
+        let url = format!("{}/{}", self.index_host, package.sparse_index_path());
+        let mut response = self
+            .agent
+            .get(&url)
+            .header("User-Agent", USER_AGENT)
+            .call()
+            .map_err(|error| {
+                ReleaseError::Registry(format!(
+                    "failed to query the sparse index for {package} {version}: {error}"
+                ))
+            })?;
+        self.cancellation.check("crates.io sparse index query")?;
+        // Cargo treats these statuses as "no such crate yet" for sparse registries.
+        if matches!(
+            response.status(),
+            ureq::http::StatusCode::NOT_FOUND
+                | ureq::http::StatusCode::GONE
+                | ureq::http::StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS
+        ) {
+            return Ok(None);
+        }
+        if !response.status().is_success() {
+            return Err(ReleaseError::Registry(format!(
+                "failed to query the sparse index for {package} {version}: HTTP {}",
+                response.status()
+            )));
+        }
+        let body = response
+            .body_mut()
+            .with_config()
+            .limit(MAX_INDEX_RESPONSE_BYTES)
+            .read_to_string()
+            .map_err(|error| {
+                ReleaseError::Registry(format!(
+                    "failed to read the sparse index for {package} {version}: {error}"
+                ))
+            })?;
+        self.cancellation.check("crates.io sparse index query")?;
+        index::parse_index_file(&body, package, version)
     }
 }
 
@@ -240,7 +318,21 @@ pub(crate) fn require_absent_or_matching(
     version: &str,
     expected: &str,
 ) -> Result<bool, ReleaseError> {
-    match registry.version(package, version)? {
+    require_absent_or_matching_version(
+        registry.version(package, version)?,
+        package,
+        version,
+        expected,
+    )
+}
+
+fn require_absent_or_matching_version(
+    found: Option<RegistryVersion>,
+    package: &str,
+    version: &str,
+    expected: &str,
+) -> Result<bool, ReleaseError> {
+    match found {
         None => Ok(false),
         Some(actual) if actual.yanked => Err(ReleaseError::RegistryYanked {
             package: package.to_string(),
@@ -256,38 +348,52 @@ pub(crate) fn require_absent_or_matching(
     }
 }
 
+/// Waits until both the crates.io API and the sparse index Cargo resolves
+/// through expose the reviewed checksum, so the next crate can be packaged.
 pub(crate) fn wait_for_matching_checksum(
-    registry: &impl RegistryLookup,
+    registry: &(impl RegistryLookup + SparseIndexLookup),
     cancellation: &ReleaseCancellation,
-    package: &str,
-    version: &str,
+    package: &CrateName,
+    version: &CrateVersion,
     expected: &str,
 ) -> Result<(), ReleaseError> {
+    wait_for_visibility(
+        registry,
+        cancellation,
+        package,
+        version,
+        expected,
+        CRATES_IO_VISIBILITY,
+    )
+}
+
+fn wait_for_visibility(
+    registry: &(impl RegistryLookup + SparseIndexLookup),
+    cancellation: &ReleaseCancellation,
+    package: &CrateName,
+    version: &CrateVersion,
+    expected: &str,
+    policy: VisibilityPolicy,
+) -> Result<(), ReleaseError> {
+    let (name, number) = (package.as_str(), version.as_str());
     let started = Instant::now();
-    while started.elapsed() < VISIBILITY_TIMEOUT {
+    while started.elapsed() < policy.timeout {
         cancellation.check("crates.io visibility polling")?;
-        match registry.version(package, version)? {
-            Some(actual) if actual.yanked => {
-                return Err(ReleaseError::RegistryYanked {
-                    package: package.to_string(),
-                    version: version.to_string(),
-                });
-            }
-            Some(actual) if actual.checksum == expected => return Ok(()),
-            Some(actual) => {
-                return Err(ReleaseError::RegistryChecksum {
-                    package: package.to_string(),
-                    version: version.to_string(),
-                    expected: expected.to_string(),
-                    actual: actual.checksum,
-                });
-            }
-            None => cancellation.sleep(VISIBILITY_POLL, "crates.io visibility polling")?,
+        if require_absent_or_matching(registry, name, number, expected)?
+            && require_absent_or_matching_version(
+                registry.index_version(package, version)?,
+                name,
+                number,
+                expected,
+            )?
+        {
+            return Ok(());
         }
+        cancellation.sleep(policy.poll, "crates.io visibility polling")?;
     }
     Err(ReleaseError::RegistryVisibility {
-        package: package.to_string(),
-        version: version.to_string(),
+        package: name.to_string(),
+        version: number.to_string(),
         checksum: expected.to_string(),
     })
 }
@@ -392,13 +498,7 @@ fn parse_version(
             response.version.crate_name, response.version.number
         )));
     }
-    if response.version.checksum.len() != 64
-        || !response
-            .version
-            .checksum
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
-    {
+    if !is_sha256_hex(&response.version.checksum) {
         return Err(ReleaseError::Registry(format!(
             "crates.io returned an invalid checksum for {package} {version}"
         )));
@@ -407,6 +507,10 @@ fn parse_version(
         checksum: response.version.checksum,
         yanked: response.version.yanked,
     })
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn validate_identifier(value: &str) -> Result<(), ReleaseError> {
@@ -679,8 +783,11 @@ mod tests {
             .write_all(b"reviewed-archive")
             .expect("archive bytes");
         (&archive).seek(SeekFrom::Start(0)).expect("rewind");
-        let registry =
-            CratesIo::with_host(format!("http://{address}"), ReleaseCancellation::for_test());
+        let registry = CratesIo::with_hosts(
+            format!("http://{address}"),
+            format!("http://{address}/unused-index"),
+            ReleaseCancellation::for_test(),
+        );
         registry
             .publish_reviewed(
                 &metadata_fixture(),
@@ -703,14 +810,23 @@ mod tests {
                 Ok(None)
             }
         }
+        impl SparseIndexLookup for Missing {
+            fn index_version(
+                &self,
+                _package: &CrateName,
+                _version: &CrateVersion,
+            ) -> Result<Option<RegistryVersion>, ReleaseError> {
+                Ok(None)
+            }
+        }
         let cancellation = ReleaseCancellation::for_test();
         cancellation.cancel();
         assert_matches!(
             wait_for_matching_checksum(
                 &Missing,
                 &cancellation,
-                "stab-core",
-                "0.2.0",
+                &crate_name(),
+                &crate_version(),
                 &"a".repeat(64),
             ),
             Err(ReleaseError::OperationInterrupted { .. })
@@ -727,6 +843,192 @@ mod tests {
         ) -> Result<Option<RegistryVersion>, ReleaseError> {
             Ok(self.0.clone())
         }
+    }
+
+    impl SparseIndexLookup for FixedRegistry {
+        fn index_version(
+            &self,
+            _package: &CrateName,
+            _version: &CrateVersion,
+        ) -> Result<Option<RegistryVersion>, ReleaseError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    fn crate_name() -> CrateName {
+        CrateName::try_new("stab-core").expect("crate name")
+    }
+
+    fn crate_version() -> CrateVersion {
+        CrateVersion::try_new("0.2.0").expect("crate version")
+    }
+
+    /// The API already serves the upload; the index serves `index` in order, then repeats the last.
+    struct LaggingIndex {
+        api: RegistryVersion,
+        index: Vec<Option<RegistryVersion>>,
+        index_queries: std::cell::Cell<usize>,
+    }
+
+    impl RegistryLookup for LaggingIndex {
+        fn version(
+            &self,
+            _package: &str,
+            _version: &str,
+        ) -> Result<Option<RegistryVersion>, ReleaseError> {
+            Ok(Some(self.api.clone()))
+        }
+    }
+
+    impl SparseIndexLookup for LaggingIndex {
+        fn index_version(
+            &self,
+            _package: &CrateName,
+            _version: &CrateVersion,
+        ) -> Result<Option<RegistryVersion>, ReleaseError> {
+            let query = self.index_queries.get();
+            self.index_queries.set(query + 1);
+            Ok(self
+                .index
+                .get(query)
+                .or(self.index.last())
+                .cloned()
+                .flatten())
+        }
+    }
+
+    const FAST_VISIBILITY: VisibilityPolicy = VisibilityPolicy {
+        timeout: Duration::from_millis(200),
+        poll: Duration::from_millis(1),
+    };
+
+    #[test]
+    fn visibility_wait_requires_the_sparse_index_cargo_reads() {
+        let expected = "c".repeat(64);
+        let visible = registry_version(expected.clone(), false);
+        let lagging = LaggingIndex {
+            api: visible.clone(),
+            index: vec![None, None, Some(visible.clone())],
+            index_queries: std::cell::Cell::new(0),
+        };
+        wait_for_visibility(
+            &lagging,
+            &ReleaseCancellation::for_test(),
+            &crate_name(),
+            &crate_version(),
+            &expected,
+            FAST_VISIBILITY,
+        )
+        .expect("index catches up");
+        assert_eq!(lagging.index_queries.get(), 3);
+
+        let never_indexed = LaggingIndex {
+            api: visible,
+            index: vec![None],
+            index_queries: std::cell::Cell::new(0),
+        };
+        assert_matches!(
+            wait_for_visibility(
+                &never_indexed,
+                &ReleaseCancellation::for_test(),
+                &crate_name(),
+                &crate_version(),
+                &expected,
+                FAST_VISIBILITY,
+            ),
+            Err(ReleaseError::RegistryVisibility { .. })
+        );
+        assert!(never_indexed.index_queries.get() > 1);
+    }
+
+    #[test]
+    fn visibility_wait_rejects_a_divergent_or_yanked_index_entry() {
+        let expected = "c".repeat(64);
+        for (index, rejected_as_yanked) in [
+            (registry_version("d".repeat(64), false), false),
+            (registry_version(expected.clone(), true), true),
+        ] {
+            let registry = LaggingIndex {
+                api: registry_version(expected.clone(), false),
+                index: vec![Some(index)],
+                index_queries: std::cell::Cell::new(0),
+            };
+            let result = wait_for_visibility(
+                &registry,
+                &ReleaseCancellation::for_test(),
+                &crate_name(),
+                &crate_version(),
+                &expected,
+                FAST_VISIBILITY,
+            );
+            if rejected_as_yanked {
+                assert_matches!(result, Err(ReleaseError::RegistryYanked { .. }));
+            } else {
+                assert_matches!(result, Err(ReleaseError::RegistryChecksum { .. }));
+            }
+        }
+    }
+
+    #[test]
+    fn sparse_index_query_reads_the_cargo_index_file() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+        let address = listener.local_addr().expect("address");
+        let checksum = "e".repeat(64);
+        let index_body = format!(
+            "{{\"name\":\"stab-core\",\"vers\":\"0.2.0\",\"deps\":[],\"cksum\":\"{checksum}\",\"features\":{{}},\"yanked\":false}}\n"
+        );
+        let server = thread::spawn(move || {
+            for status in ["200 OK", "404 Not Found"] {
+                let (mut stream, _) = listener.accept().expect("index request");
+                let headers = read_headers(&mut stream).to_ascii_lowercase();
+                assert!(
+                    headers.starts_with("get /index/st/ab/stab-core http/1.1\r\n"),
+                    "{headers}"
+                );
+                assert!(headers.contains("user-agent: stab-release/0.2.0\r\n"));
+                assert!(!headers.contains("authorization"));
+                let body = if status == "200 OK" {
+                    index_body.as_str()
+                } else {
+                    ""
+                };
+                write!(
+                    stream,
+                    "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .expect("response");
+            }
+        });
+        let registry = CratesIo::with_hosts(
+            format!("http://{address}/unused-api"),
+            format!("http://{address}/index"),
+            ReleaseCancellation::for_test(),
+        );
+        assert_eq!(
+            registry
+                .index_version(&crate_name(), &crate_version())
+                .expect("indexed version"),
+            Some(registry_version(checksum, false))
+        );
+        assert_eq!(
+            registry
+                .index_version(&crate_name(), &crate_version())
+                .expect("missing index file"),
+            None
+        );
+        server.join().expect("server");
+    }
+
+    fn read_headers(stream: &mut std::net::TcpStream) -> String {
+        let mut request = Vec::new();
+        let mut buffer = [0_u8; 1024];
+        while find_subslice(&request, b"\r\n\r\n").is_none() {
+            let read = stream.read(&mut buffer).expect("request bytes");
+            assert_ne!(read, 0, "request ended before its headers");
+            request.extend_from_slice(buffer.get(..read).expect("read buffer prefix"));
+        }
+        String::from_utf8(request).expect("UTF-8 request headers")
     }
 
     fn registry_version(checksum: String, yanked: bool) -> RegistryVersion {
@@ -771,8 +1073,8 @@ mod tests {
             wait_for_matching_checksum(
                 &FixedRegistry(Some(registry_version(expected.clone(), true))),
                 &ReleaseCancellation::for_test(),
-                "stab-core",
-                "0.2.0",
+                &crate_name(),
+                &crate_version(),
                 &expected,
             ),
             Err(ReleaseError::RegistryYanked { .. })

@@ -435,6 +435,65 @@ mod tests {
         run_probe("cargo::tests::probe_without_registry_token");
     }
 
+    /// Cargo discovers `.cargo/config.toml` in its working directory and every
+    /// ancestor, plus `$CARGO_HOME`. The repository's config sets a three-day
+    /// `registry.global-min-publish-age`, which would hide sibling crates
+    /// published minutes earlier in the same release from the next packaging
+    /// step, so no release-time Cargo invocation may be able to discover it.
+    #[test]
+    fn release_cargo_cannot_discover_the_repository_cargo_config() {
+        let repository_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("repository root");
+        let repository_config = repository_root.join(".cargo/config.toml");
+        assert!(
+            fs::read_to_string(&repository_config)
+                .expect("repository Cargo config")
+                .contains("global-min-publish-age"),
+            "the repository cooldown this test guards against moved"
+        );
+
+        let work = repository_root.join("target/releases/.publish-test");
+        let fixture = EnvironmentFixture::new(&work);
+        let mut command = Command::new("cargo");
+        configure_command(&mut command, &fixture.request());
+
+        let working_directory = command
+            .get_current_dir()
+            .expect("release Cargo must pin its working directory");
+        assert!(working_directory.is_absolute());
+        for ancestor in working_directory.ancestors() {
+            assert!(
+                !ancestor.starts_with(&repository_root),
+                "release Cargo runs inside the repository at {}",
+                working_directory.display()
+            );
+            for name in ["config", "config.toml"] {
+                let candidate = ancestor.join(".cargo").join(name);
+                assert!(
+                    fs::symlink_metadata(&candidate).is_err(),
+                    "release Cargo would discover {}",
+                    candidate.display()
+                );
+            }
+        }
+
+        let cargo_home = command
+            .get_envs()
+            .find_map(|(key, value)| (key == "CARGO_HOME").then_some(value))
+            .flatten()
+            .expect("release Cargo must use a private CARGO_HOME");
+        assert_eq!(Path::new(cargo_home), fixture.cargo_home);
+        assert_ne!(Path::new(cargo_home).join("config.toml"), repository_config);
+        assert!(
+            !std::str::from_utf8(CARGO_CONFIG)
+                .expect("UTF-8 config")
+                .contains("min-publish-age"),
+            "the private release config must not reintroduce a publish-age cooldown"
+        );
+    }
+
     #[test]
     fn private_config_explicitly_selects_cargo_token() {
         let config = std::str::from_utf8(CARGO_CONFIG).expect("UTF-8 config");
