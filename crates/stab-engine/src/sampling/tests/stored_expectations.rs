@@ -161,8 +161,8 @@ fn determined_measurement_counts_match_the_pre_e3_stored_digest() {
     let mut hasher = Sha256::new();
     for text in corpus() {
         let circuit = Circuit::from_stim_str(&text).expect("parse corpus circuit");
-        for unknown_input in [false, true] {
-            let outcome = match count_determined_measurements(&circuit, unknown_input) {
+        for initial_state in [InitialState::Zero, InitialState::Unknown] {
+            let outcome = match count_determined_measurements(&circuit, initial_state) {
                 Ok(count) => format!("ok:{count}"),
                 Err(error) => format!("err:{error}"),
             };
@@ -179,8 +179,10 @@ fn determined_measurement_counts_match_the_pre_e3_stored_digest() {
 fn unknown_input_counts_equal_known_input_counts_after_full_resets() {
     for (index, text) in corpus().into_iter().enumerate().skip(1).take(6) {
         let circuit = Circuit::from_stim_str(&text).expect("parse generated circuit");
-        let known = count_determined_measurements(&circuit, false).expect("known-input count");
-        let unknown = count_determined_measurements(&circuit, true).expect("unknown-input count");
+        let known =
+            count_determined_measurements(&circuit, InitialState::Zero).expect("known-input count");
+        let unknown = count_determined_measurements(&circuit, InitialState::Unknown)
+            .expect("unknown-input count");
         assert!(known > 0, "corpus circuit {index}");
         assert_eq!(unknown, known, "corpus circuit {index}:\n{text}");
     }

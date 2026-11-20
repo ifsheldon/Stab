@@ -15,6 +15,17 @@ impl ResourceAmount {
         }
     }
 
+    /// The exact amount when it fits `u64`, otherwise `u64::MAX` as a lower bound.
+    pub(crate) fn saturating_from_u128(value: u128) -> Self {
+        u64::try_from(value).map_or(
+            Self {
+                value: u64::MAX,
+                lower_bound: true,
+            },
+            Self::exact,
+        )
+    }
+
     pub const fn value(self) -> u64 {
         self.value
     }

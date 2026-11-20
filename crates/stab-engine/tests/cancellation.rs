@@ -24,8 +24,8 @@ use stab_engine::{
 };
 use stab_model::{Cancellation, Cancelled, Circuit, DetectorErrorModel};
 use stab_records::{
-    DemSampleBatchView, DemSampleSink, DetectionBatchView, DetectionSink, MeasurementBatchView,
-    MeasurementSink, PackedShotBatch,
+    BitIndex, DemSampleBatchView, DemSampleSink, DetectionBatchView, DetectionSink,
+    MeasurementBatchView, MeasurementSink, PackedShotBatch, ShotIndex,
 };
 
 const HANG_GUARD: Duration = Duration::from_secs(120);
@@ -310,7 +310,11 @@ impl MeasurementSink for RecordingSink {
         for shot in 0..batch.shot_count() {
             self.0.push(
                 (0..batch.width().get())
-                    .map(|bit| batch.get(shot, bit).expect("measurement bit"))
+                    .map(|bit| {
+                        batch
+                            .get(ShotIndex(shot), BitIndex(bit))
+                            .expect("measurement bit")
+                    })
                     .collect(),
             );
         }

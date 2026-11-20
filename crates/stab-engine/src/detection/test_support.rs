@@ -7,7 +7,9 @@ use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 
 use stab_model::Circuit;
-use stab_records::{DetectionBatchView, DetectionSink, MeasurementBatchView, PackedShotBatch};
+use stab_records::{
+    BitIndex, DetectionBatchView, DetectionSink, MeasurementBatchView, PackedShotBatch, ShotIndex,
+};
 
 use super::{DetectionRecordBuffer, DetectionSamplingCompiler, MeasurementToDetectionCompiler};
 use crate::{RandomPolicy, ReferenceSampleMode, Seed, ShotCount};
@@ -131,7 +133,7 @@ impl DetectionSink for CollectSink {
                 .map(|bit_index| {
                     batch
                         .detectors()
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("declared detector bit")
                 })
                 .collect();
@@ -139,7 +141,7 @@ impl DetectionSink for CollectSink {
                 .map(|bit_index| {
                     batch
                         .observables()
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("declared observable bit")
                 })
                 .collect();

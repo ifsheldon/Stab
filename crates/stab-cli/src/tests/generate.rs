@@ -1,6 +1,7 @@
 //! `stab gen` behavior not covered by the pinned-Stim exact-output manifest rows.
 
-use super::support::{Scratch, run};
+use super::support::{CountingWriter, FailAfterOneWrite, Scratch, run};
+use crate::run_from;
 
 const REPETITION: &[&str] = &[
     "stab",
@@ -211,4 +212,54 @@ fn gen_keeps_double_precision_parameters_and_validates_before_writing() {
         "{}",
         unsupported.stdout_text()
     );
+}
+
+/// Generated text streams through the output buffer instead of being rendered whole first, so a
+/// large circuit reaches standard output in several buffer spills and a failure on a later
+/// spill still exits non-zero with the write diagnostic. A named output that cannot be created
+/// reports its path, exactly as the former one-call write did.
+#[test]
+fn gen_streams_its_text_and_reports_write_failures() {
+    let args = [
+        "stab",
+        "gen",
+        "--code",
+        "surface_code",
+        "--task",
+        "rotated_memory_x",
+        "--distance",
+        "25",
+        "--rounds",
+        "3",
+    ];
+    let mut stdout = crate::io_plan::buffered_output(CountingWriter::default());
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"".as_slice(), &mut stdout, &mut stderr);
+    assert_eq!(status, 0, "{}", String::from_utf8_lossy(&stderr));
+    let streamed = stdout.get_ref();
+    assert!(
+        streamed.bytes > 2 * crate::io_plan::OUTPUT_BUFFER_BYTES,
+        "{}",
+        streamed.bytes
+    );
+    assert!(streamed.nonempty_writes > 1, "text was written in one call");
+
+    let mut inner = FailAfterOneWrite::default();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"".as_slice(),
+        crate::io_plan::buffered_output(&mut inner),
+        &mut stderr,
+    );
+    assert_eq!(status, 1);
+    assert!(inner.writes >= 2);
+    let stderr = String::from_utf8(stderr).expect("UTF-8 stderr");
+    assert!(stderr.contains("failed to write output"), "{stderr}");
+
+    let scratch = Scratch::new();
+    let output = scratch.path("missing-directory/generated.stim");
+    run(&[REPETITION, &["--out", &output]].concat(), b"")
+        .assert_err(&["failed to write", "generated.stim"]);
+    assert!(!scratch.exists("missing-directory"));
 }

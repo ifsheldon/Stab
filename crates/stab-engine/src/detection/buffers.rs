@@ -14,7 +14,7 @@ pub(super) fn validate_vector_capacity<T>(
 ) -> DetectionResult<()> {
     let element_size = std::mem::size_of::<T>().max(1);
     if len > (isize::MAX as usize) / element_size {
-        return Err(DetectionError::invalid_sampler_compilation(format!(
+        return Err(DetectionError::storage_allocation(format!(
             "{context} exceeds the platform vector capacity"
         )));
     }
@@ -28,7 +28,7 @@ pub(super) fn try_vec_with_capacity<T>(
     validate_vector_capacity::<T>(len, context)?;
     let mut values = Vec::new();
     values.try_reserve_exact(len).map_err(|error| {
-        DetectionError::invalid_sampler_compilation(format!(
+        DetectionError::storage_allocation(format!(
             "unable to reserve {len} values for {context}: {error}"
         ))
     })?;

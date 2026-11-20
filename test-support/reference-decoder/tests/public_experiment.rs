@@ -12,7 +12,10 @@ use stab_engine::{
     MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, Seed, ShotCount,
 };
 use stab_model::{Cancellation, Probability};
-use stab_records::{CorrectionWidth, DetectionBatchView, DetectionSink, ObservablePredictionBatch};
+use stab_records::{
+    BitIndex, CorrectionWidth, DetectionBatchView, DetectionSink, ObservablePredictionBatch,
+    ShotIndex,
+};
 use stab_reference_decoder::{ExactMlDecodeError, ExactMlDecoderSession};
 use thiserror::Error;
 
@@ -149,20 +152,21 @@ impl DetectionSink for LogicalFailureSink<'_> {
             });
         }
         for shot_index in 0..batch.shot_count() {
-            let predicted = self.predictions.records().get(shot_index, 0).ok_or(
-                ExperimentSinkError::MissingBit {
+            let predicted = self
+                .predictions
+                .records()
+                .get(ShotIndex(shot_index), BitIndex(0))
+                .ok_or(ExperimentSinkError::MissingBit {
                     kind: "prediction",
                     shot_index,
-                },
-            )?;
-            let actual =
-                batch
-                    .observables()
-                    .get(shot_index, 0)
-                    .ok_or(ExperimentSinkError::MissingBit {
-                        kind: "observable truth",
-                        shot_index,
-                    })?;
+                })?;
+            let actual = batch
+                .observables()
+                .get(ShotIndex(shot_index), BitIndex(0))
+                .ok_or(ExperimentSinkError::MissingBit {
+                    kind: "observable truth",
+                    shot_index,
+                })?;
             self.report.logical_failures += u64::from(predicted != actual);
         }
         self.report.shots += u64::try_from(batch.shot_count()).map_err(|_| {

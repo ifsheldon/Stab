@@ -4,6 +4,7 @@
     reason = "contract tests use direct assertions for impossible canonical metadata states"
 )]
 
+use stab_records::{BitIndex, ShotIndex};
 use std::assert_matches;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::Infallible;
@@ -103,7 +104,7 @@ impl MeasurementSink for MeasurementCollector {
                 (0..batch.width().get())
                     .map(|bit| {
                         batch
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated semantic batch coordinate")
                     })
                     .collect(),

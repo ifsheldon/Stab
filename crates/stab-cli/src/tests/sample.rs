@@ -3,7 +3,8 @@
 use std::ffi::OsString;
 
 use stab_records::{
-    BitPlaneBatch, MeasurementBatchView, MeasurementSink, RecordEncoder, RecordFormat,
+    BitIndex, BitPlaneBatch, MeasurementBatchView, MeasurementSink, RecordEncoder, RecordFormat,
+    ShotIndex,
 };
 use tempfile::tempdir;
 
@@ -17,7 +18,7 @@ fn warmed_cli_sample_encoding_has_no_record_count_dependent_allocation() {
         for shot_index in 0..batch.shot_count() {
             if (shot_index + bit_index) % 64 != 0 {
                 batch
-                    .set(bit_index, shot_index, true)
+                    .set(ShotIndex(shot_index), BitIndex(bit_index), true)
                     .expect("populate plane");
             }
         }

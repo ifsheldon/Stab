@@ -24,10 +24,14 @@ pub enum DemReplayRetention {
     Released,
 }
 
+/// Where a [`DemReplayRecordStore`] is in its lifecycle.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum StoreState {
+pub enum DemReplayStoreState {
+    /// The store holds every batch offered to it and accepts more.
     Retaining,
+    /// The store keeps the whole batches it retained and declines every later one.
     Full,
+    /// The store holds no records and accepts no more.
     Released,
 }
 
@@ -90,7 +94,7 @@ pub struct DemReplayRecordStore {
     layout: StoreLayout,
     shot_count: u64,
     budget: MemoryBudget,
-    state: StoreState,
+    state: DemReplayStoreState,
 }
 
 impl DemReplayRecordStore {
@@ -108,7 +112,7 @@ impl DemReplayRecordStore {
             layout: StoreLayout::Empty,
             shot_count: 0,
             budget,
-            state: StoreState::Retaining,
+            state: DemReplayStoreState::Retaining,
         };
         if !session_fits {
             store.release();
@@ -206,14 +210,9 @@ impl DemReplayRecordStore {
         Ok(DemReplayRetention::Retained)
     }
 
-    /// Whether the store still holds every batch offered to it and accepts more.
-    pub const fn is_retaining(&self) -> bool {
-        matches!(self.state, StoreState::Retaining)
-    }
-
-    /// Whether the store was released and holds no records.
-    pub const fn is_released(&self) -> bool {
-        matches!(self.state, StoreState::Released)
+    /// Where the store is in its lifecycle.
+    pub const fn state(&self) -> DemReplayStoreState {
+        self.state
     }
 
     /// Records held by the store.
@@ -547,16 +546,16 @@ impl DemReplayRecordStore {
     fn release(&mut self) -> DemReplayRetention {
         self.layout = StoreLayout::Empty;
         self.shot_count = 0;
-        self.state = StoreState::Released;
+        self.state = DemReplayStoreState::Released;
         DemReplayRetention::Released
     }
 
     /// The outcome every batch offered to a full or released store receives.
     const fn declined(&self) -> Option<DemReplayRetention> {
         match self.state {
-            StoreState::Retaining => None,
-            StoreState::Full => Some(DemReplayRetention::Full),
-            StoreState::Released => Some(DemReplayRetention::Released),
+            DemReplayStoreState::Retaining => None,
+            DemReplayStoreState::Full => Some(DemReplayRetention::Full),
+            DemReplayStoreState::Released => Some(DemReplayRetention::Released),
         }
     }
 
@@ -591,7 +590,7 @@ impl DemReplayRecordStore {
             }
         }
         self.shot_count = mark.shot_count;
-        self.state = StoreState::Full;
+        self.state = DemReplayStoreState::Full;
         Ok(DemReplayRetention::Full)
     }
 }

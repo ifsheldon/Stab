@@ -11,7 +11,7 @@
 use stab_bits::{BIT_BLOCK_WORDS, BitBlock, transpose_bit_tile};
 use stab_model::Cancellation;
 use stab_records::{
-    BitPlaneBatchView, DetectionBatchView, MeasurementBatchView, PackedShotBatchView,
+    BitPlaneBatchView, DetectionBatchView, MeasurementBatchView, PackedShotBatchView, RecordLayout,
 };
 
 use super::conversion_plan::{ConversionPlan, ConversionRunner};
@@ -190,15 +190,10 @@ impl<'a> BatchColumns<'a> {
                 batch.shot_count()
             )));
         }
-        if let Some(planes) = batch.bit_planes() {
-            return Ok(Self::Planes(planes));
+        match batch.layout() {
+            RecordLayout::BitPlanes(planes) => Ok(Self::Planes(planes)),
+            RecordLayout::ShotMajor(records) => Ok(Self::Rows(block_rows(records, shot_count)?)),
         }
-        let records = batch.shot_major_records().ok_or_else(|| {
-            DetectionError::invalid_result_format(
-                "measurement batch has no recognized storage representation",
-            )
-        })?;
-        Ok(Self::Rows(block_rows(records, shot_count)?))
     }
 
     /// Appends the planes of measurements `start..end` (`start` a multiple of 64) to `planes`,

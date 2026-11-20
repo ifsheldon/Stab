@@ -12,7 +12,7 @@ use stab_engine::{
     DemSamplingRunError, RandomPolicy, Seed, ShotCount,
 };
 use stab_model::{DetectorErrorModel, MemoryBudget};
-use stab_records::{DemSampleBatchView, DemSampleSink, RecordBatchView};
+use stab_records::{BitIndex, DemSampleBatchView, DemSampleSink, RecordBatchView, ShotIndex};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct TestDetectionRecord {
@@ -238,7 +238,7 @@ fn collect_row(records: RecordBatchView<'_>, shot_index: usize) -> Result<Vec<bo
     (0..records.bits_per_shot())
         .map(|bit_index| {
             records
-                .get(shot_index, bit_index)
+                .get(ShotIndex(shot_index), BitIndex(bit_index))
                 .ok_or(SinkFailure("batch-bit-out-of-range"))
         })
         .collect()
@@ -275,14 +275,14 @@ impl DemSampleSink for WitnessSink {
 }
 
 fn witness(records: RecordBatchView<'_>, shot_count: usize) -> u64 {
-    let first = records.get(0, 0).unwrap_or(false) as u64;
+    let first = records.get(ShotIndex(0), BitIndex(0)).unwrap_or(false) as u64;
     let last = shot_count
         .checked_sub(1)
         .and_then(|shot| {
             records
                 .bits_per_shot()
                 .checked_sub(1)
-                .and_then(|bit| records.get(shot, bit))
+                .and_then(|bit| records.get(ShotIndex(shot), BitIndex(bit)))
         })
         .unwrap_or(false) as u64;
     first | (last << 1) | ((shot_count as u64) << 2)

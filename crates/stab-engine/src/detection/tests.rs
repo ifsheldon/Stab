@@ -99,6 +99,49 @@ fn compact_body_materialization_grows_operation_storage_amortized() {
 }
 
 #[test]
+fn detector_terms_share_one_exactly_charged_arena() {
+    let mut text = String::from("M 0 1 2\n");
+    for _ in 0..4_096 {
+        text.push_str("DETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(1) rec[-3]\n");
+    }
+    // One detector past the 64-term short-parity bound takes the wide variant, which reads
+    // the same arena.
+    text.push_str("DETECTOR");
+    for _ in 0..65 {
+        text.push_str(" rec[-1]");
+    }
+    text.push('\n');
+    let circuit = Circuit::from_stim_str(&text).expect("parse many-detector fixture");
+    let limits = DetectionConversionLimits::default();
+    let admission = ConversionPlan::admission_from_circuit_with_limits(&circuit, limits)
+        .expect("admit many-detector fixture");
+    let admitted_bytes = admission.compiled_storage_bytes().expect("admitted bytes");
+
+    let measured = allocation_counter::measure(|| {
+        let plan = ConversionPlan::materialize_circuit_from_admission(&circuit, admission)
+            .expect("materialize many-detector fixture");
+        // The retained storage is charged exactly what admission charged, with no slack per
+        // detector.
+        assert_eq!(
+            plan.compiled_storage_bytes().expect("materialized bytes"),
+            admitted_bytes
+        );
+        assert_eq!(plan.max_record_lookback(), 3);
+        std::hint::black_box(plan);
+    });
+    assert!(measured.count_total < 16, "{measured:?}");
+
+    // Measurements 0, 1, 2 read 1, 0, 1: each short detector is rec[-1] ^ rec[-2] = 1, the
+    // wide one reads rec[-1] 65 times, and observable 1 is rec[-3] 4,096 times.
+    let detection = convert(&text, &[&[true, false, true]], true);
+    let record = &detection.records[0];
+    assert_eq!(record.detectors.len(), 4_097);
+    assert!(record.detectors[..4_096].iter().all(|bit| *bit));
+    assert!(record.detectors[4_096]);
+    assert_eq!(record.observables, vec![false, false]);
+}
+
+#[test]
 fn conversion_materialization_rejects_admission_drift() {
     let circuit = Circuit::from_stim_str("M 0\n").expect("parse measurement fixture");
     let measurement = circuit
@@ -946,4 +989,42 @@ fn detection_sampling_handles_gauge_detectors_structurally() {
         (350..=650).contains(&hits),
         "expected gauge detector to produce random-looking events, got {hits}"
     );
+}
+
+/// A measurement-sampling refusal that reaches detection or DEM code keeps its resource
+/// classification: a budget refusal stays a typed resource limit and an allocator refusal stays
+/// a storage-allocation failure, instead of both becoming an invalid-compilation error.
+#[test]
+fn execution_refusals_keep_their_resource_classification_across_conversions() {
+    let converted = DetectionError::from(crate::SamplingExecutionError::SessionStorageLimit {
+        estimated_bytes: u128::from(u64::MAX) + 1,
+        limit_bytes: 4096,
+    });
+    assert!(
+        matches!(
+            &converted,
+            DetectionError::ResourceLimit(limit)
+                if limit.kind() == DetectionResourceKind::SessionStorageBytes
+                    && limit.limit() == 4096
+                    && limit.actual() == u64::MAX
+                    && limit.actual_is_lower_bound()
+        ),
+        "a session budget refusal must stay a resource limit, got {converted:?}"
+    );
+    assert!(converted.to_string().contains("4096-byte memory budget"));
+
+    let allocation = || crate::SamplingExecutionError::SessionStorageAllocation {
+        message: "reference folding output".to_owned(),
+    };
+    assert!(matches!(
+        DetectionError::from(allocation()),
+        DetectionError::StorageAllocation { message } if message.contains("reference folding")
+    ));
+    let dem_allocation = crate::DemSamplingExecutionError::SessionStorageAllocation {
+        message: "DEM detector planes".to_owned(),
+    };
+    assert!(matches!(
+        dem_allocation.into_dem_error(),
+        crate::DemError::StorageAllocation { message } if message.contains("DEM detector planes")
+    ));
 }

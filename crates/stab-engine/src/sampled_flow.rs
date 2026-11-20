@@ -7,7 +7,7 @@ use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind,
     MeasureRecordOffset, MemoryBudget, QubitId, Target, TargetKind,
 };
-use stab_records::{MeasurementBatchView, MeasurementSink};
+use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
 use thiserror::Error;
 
 use crate::{
@@ -233,12 +233,12 @@ impl MeasurementSink for SampledFlowWitnessSink {
 
     fn write_batch(&mut self, batch: MeasurementBatchView<'_>) -> Result<(), Self::Error> {
         for shot_index in 0..batch.shot_count() {
-            let witness = batch.get(shot_index, self.witness_index).ok_or_else(|| {
-                SamplingExecutionError::InternalInvariant {
+            let witness = batch
+                .get(ShotIndex(shot_index), BitIndex(self.witness_index))
+                .ok_or_else(|| SamplingExecutionError::InternalInvariant {
                     message: "sampled flow witness measurement was missing from augmented circuit"
                         .to_owned(),
-                }
-            })?;
+                })?;
             self.passed &= !witness;
         }
         Ok(())

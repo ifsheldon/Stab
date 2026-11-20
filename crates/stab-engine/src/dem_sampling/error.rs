@@ -83,6 +83,10 @@ pub enum DemError {
     #[error(transparent)]
     ResourceLimit(#[from] DemResourceLimitError),
 
+    /// The allocator refused storage that admission had already accepted.
+    #[error("cannot compile DEM sampler: {message}")]
+    StorageAllocation { message: String },
+
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
 }
@@ -96,6 +100,12 @@ impl DemError {
 
     pub(crate) fn invalid_result_format(message: impl Into<String>) -> Self {
         Self::InvalidResultFormat {
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn storage_allocation(message: impl Into<String>) -> Self {
+        Self::StorageAllocation {
             message: message.into(),
         }
     }

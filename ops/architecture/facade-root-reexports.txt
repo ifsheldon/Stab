@@ -6,6 +6,7 @@
 # implementation types belong in their owning component namespaces or crates.
 stab_model::AbsoluteTolerance
 stab_algebra::AlgebraMemoryBudget
+stab_records::BitIndex
 stab_records::BitPlaneBatch
 stab_records::BitPlaneBatchView
 stab_model::ByteSpan
@@ -98,12 +99,14 @@ stab_model::QubitId
 stab_records::RecordBatchView
 stab_records::RecordEncoding
 stab_records::RecordFormat
+stab_records::RecordLayout
 stab_model::RepeatBlock
 stab_model::RepeatCount
 stab_model::RepeatNestingLimit
 stab_model::RepeatNestingLimitError
 stab_model::ResourceEstimate
 stab_records::SampledErrorWidth
+stab_records::ShotIndex
 stab_algebra::SingleQubitClifford
 stab_algebra::StabilizerError
 stab_algebra::StabilizerResource

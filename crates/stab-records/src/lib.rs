@@ -4,6 +4,7 @@ mod batches;
 mod diagnostics;
 mod encoder;
 mod estimate;
+mod index;
 mod record_stream;
 mod result_formats;
 mod result_packed;
@@ -14,13 +15,14 @@ mod widths;
 pub use batches::{
     BitPlaneBatch, BitPlaneBatchView, DemSampleBatchView, DetectionBatchView, MeasurementBatchView,
     ObservablePredictionBatch, ObservablePredictionBatchViewMut, PackedShotBatch,
-    PackedShotBatchView, RecordBatchView,
+    PackedShotBatchView, RecordBatchView, RecordLayout,
 };
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, FormatError, FormatErrorCode, FormatErrorContext,
 };
 pub use encoder::{RecordBatchPart, RecordEncoder, RecordPart, RecordWriteError};
 pub use estimate::EncodedSizeEstimate;
+pub use index::{BitIndex, ShotIndex};
 pub use record_stream::{
     HitsDuplicates, RecordFraming, RecordStreamReadError, RecordStreamReader, RecordStreamStorage,
 };

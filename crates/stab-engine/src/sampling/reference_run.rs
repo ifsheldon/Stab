@@ -4,7 +4,7 @@ use stab_algebra::PauliBasis;
 use stab_bits::BitSlice;
 use stab_model::{Cancellation, RepeatNestingLimit};
 
-use super::api::{ReferenceSampleLoopPolicy, SamplingExecutionError};
+use super::api::{InitialState, ReferenceSampleLoopPolicy, SamplingExecutionError};
 use super::reference_bits::ReferenceBits;
 use super::reference_fold::{FoldProbe, ProbeStep, SnapshotSlot};
 use super::reference_order::collapse_fused_group;
@@ -553,16 +553,17 @@ fn clifford_arity(clifford: &ReferenceClifford) -> usize {
 
 /// Counts the measurements of `program` whose outcome is determined by earlier operations.
 ///
-/// With `unknown_input`, each qubit starts maximally entangled with a private reference qubit
+/// With [`InitialState::Unknown`], each qubit starts maximally entangled with a private reference qubit
 /// that no operation touches, so a measurement is determined only by the circuit's own earlier
 /// measurements and resets. Flip probabilities and noise never matter, matching Stim, which
 /// strips instruction arguments before counting.
 pub(super) fn count_determined_measurements(
     program: &CircuitProgram,
     qubit_count: usize,
-    unknown_input: bool,
+    initial_state: InitialState,
     cancellation: &Cancellation,
 ) -> Result<u64, SamplingExecutionError> {
+    let unknown_input = initial_state == InitialState::Unknown;
     let simulated = if unknown_input {
         qubit_count
             .checked_mul(2)

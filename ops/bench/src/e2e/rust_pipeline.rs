@@ -12,7 +12,10 @@ use stab_engine::{
     MeasurementToDetectionCompiler, RandomPolicy, SamplingCompiler, Seed, ShotCount,
 };
 use stab_model::{Cancellation, Probability};
-use stab_records::{CorrectionWidth, DetectionBatchView, DetectionSink, ObservablePredictionBatch};
+use stab_records::{
+    BitIndex, CorrectionWidth, DetectionBatchView, DetectionSink, ObservablePredictionBatch,
+    ShotIndex,
+};
 use stab_reference_decoder::ExactMlDecoderSession;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -185,11 +188,11 @@ impl DetectionSink for LogicalFailureSink<'_> {
             let predicted = self
                 .predictions
                 .records()
-                .get(shot_index, 0)
+                .get(ShotIndex(shot_index), BitIndex(0))
                 .ok_or_else(|| format!("prediction bit is missing for shot {shot_index}"))?;
             let actual = batch
                 .observables()
-                .get(shot_index, 0)
+                .get(ShotIndex(shot_index), BitIndex(0))
                 .ok_or_else(|| format!("observable bit is missing for shot {shot_index}"))?;
             self.report.logical_failures = self
                 .report

@@ -26,7 +26,7 @@ use delivery::{
     SamplingBatchSource, SamplingDeliveryError, StreamingDelivery, StreamingFrame, deliver_lanes,
 };
 
-pub use compile_error::{SamplingCompileError, SamplingCompileErrorCode};
+pub use compile_error::SamplingCompileError;
 #[cfg(test)]
 pub(super) use session_helpers::compute_stabilizer_frame_reference_sample;
 pub(super) use session_helpers::{compute_reference_sample, validate_reference_width};
@@ -112,6 +112,17 @@ impl RandomPolicy {
             Self::Seeded(seed) => Some(seed),
         }
     }
+}
+
+/// The state the qubits start in when counting determined measurements.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum InitialState {
+    /// Every qubit starts in `|0>`, as in an ordinary run.
+    #[default]
+    Zero,
+    /// Every qubit starts maximally entangled with a private reference qubit, so only the
+    /// circuit's own measurements and resets can determine a measurement.
+    Unknown,
 }
 
 /// Whether sampling uses Stim's reference sample.

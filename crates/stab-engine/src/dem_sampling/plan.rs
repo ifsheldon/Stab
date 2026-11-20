@@ -68,15 +68,30 @@ impl DemSamplingCompiler {
                 observable_count,
                 operations,
                 retained_bytes: meter.retained_bytes(),
+                limits: self.limits.clone(),
             }),
         })
     }
 }
 
 /// Immutable, shareable lowered detector-error-model sampling program.
-#[derive(Clone, PartialEq)]
+///
+/// The plan keeps the memory budget and cancellation signal it was compiled with, and
+/// [`Self::session`] and [`Self::replay_session`] run under them; the `_with_limits` forms take
+/// other limits instead. Two plans are equal when they lower the same program, whatever limits
+/// they carry.
+#[derive(Clone)]
 pub struct DemSamplingPlan {
     pub(super) inner: Arc<DemSamplingPlanInner>,
+}
+
+impl PartialEq for DemSamplingPlan {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.detector_count == other.inner.detector_count
+            && self.inner.observable_count == other.inner.observable_count
+            && self.inner.operations == other.inner.operations
+            && self.inner.retained_bytes == other.inner.retained_bytes
+    }
 }
 
 impl fmt::Debug for DemSamplingPlan {
@@ -120,11 +135,18 @@ impl DemSamplingPlan {
         self.inner.retained_bytes
     }
 
+    /// The memory budget and cancellation signal the plan was compiled with, which its default
+    /// sessions inherit.
+    pub fn limits(&self) -> &DemSamplerLimits {
+        &self.inner.limits
+    }
+
+    /// Creates a sampling session under the plan's compile limits.
     pub fn session(
         &self,
         random_policy: RandomPolicy,
     ) -> Result<DemSamplingSession, DemSamplingExecutionError> {
-        self.session_with_limits(random_policy, DemSamplerLimits::default())
+        self.session_with_limits(random_policy, self.inner.limits.clone())
     }
 
     pub fn session_with_limits(
@@ -135,12 +157,13 @@ impl DemSamplingPlan {
         DemSamplingSession::new(self.clone(), random_policy, limits)
     }
 
-    /// Creates owned mutable state for one incremental sampled-error replay.
+    /// Creates owned mutable state for one incremental sampled-error replay, under the plan's
+    /// compile limits.
     pub fn replay_session(
         &self,
         expected_shots: ShotCount,
     ) -> Result<DemReplaySession, DemSamplingExecutionError> {
-        self.replay_session_with_limits(expected_shots, DemSamplerLimits::default())
+        self.replay_session_with_limits(expected_shots, self.inner.limits.clone())
     }
 
     /// Creates an owned replay session under explicit caller-selected resource limits.
@@ -282,10 +305,11 @@ impl DemSamplingPlan {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub(super) struct DemSamplingPlanInner {
     pub(super) detector_count: usize,
     pub(super) observable_count: usize,
     pub(super) operations: DemSampleBlock,
     pub(super) retained_bytes: u64,
+    pub(super) limits: DemSamplerLimits,
 }

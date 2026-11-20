@@ -10,7 +10,7 @@ use std::io::{self, Write};
 use stab_bits::BitSlice;
 use thiserror::Error;
 
-use crate::batches::RecordBatchStorage;
+use crate::batches::RecordLayout;
 use crate::{
     DetsResultType, FormatError, FormatErrorCode, FormatErrorContext, PackedShotBatch,
     RecordBatchView, RecordFormat, RecordResult,
@@ -290,7 +290,7 @@ impl RecordEncoder {
         let shot_count = self.validate_batch(parts)?;
         let all_shot_major = parts
             .iter()
-            .all(|part| part.records.shot_major_records().is_some());
+            .all(|part| matches!(part.records.layout(), RecordLayout::ShotMajor(_)));
         if all_shot_major && self.format != RecordFormat::Ptb64 {
             return self.write_shot_major_records(parts, shot_count, out);
         }
@@ -324,9 +324,9 @@ impl RecordEncoder {
         for shot_index in 0..shot_count {
             self.begin_record();
             for part in parts {
-                let row = match part.records.storage() {
-                    RecordBatchStorage::ShotMajor(records) => records.shot(shot_index)?,
-                    RecordBatchStorage::BitPlanes(_) => {
+                let row = match part.records.layout() {
+                    RecordLayout::ShotMajor(records) => records.shot(shot_index)?,
+                    RecordLayout::BitPlanes(_) => {
                         return Err(FormatError::invalid_data(
                             "a shot-major batch part changed layout while it was encoded",
                         )
@@ -358,11 +358,11 @@ impl RecordEncoder {
             for block_shot in 0..block_shots {
                 self.begin_record();
                 for (part, rows) in parts.iter().zip(&plane_rows) {
-                    let row = match part.records.storage() {
-                        RecordBatchStorage::ShotMajor(records) => {
+                    let row = match part.records.layout() {
+                        RecordLayout::ShotMajor(records) => {
                             records.shot(block_start + block_shot)?
                         }
-                        RecordBatchStorage::BitPlanes(_) => rows.shot(block_shot)?,
+                        RecordLayout::BitPlanes(_) => rows.shot(block_shot)?,
                     };
                     self.encode_part_draining(part.namespace, row.words(), row.len(), out)?;
                 }
@@ -384,9 +384,9 @@ impl RecordEncoder {
         plane_rows: &mut Vec<PackedShotBatch>,
     ) -> Result<(), RecordWriteError> {
         for (index, part) in parts.iter().enumerate() {
-            let width = match part.records.storage() {
-                RecordBatchStorage::BitPlanes(_) => part.records.bits_per_shot(),
-                RecordBatchStorage::ShotMajor(_) => 0,
+            let width = match part.records.layout() {
+                RecordLayout::BitPlanes(_) => part.records.bits_per_shot(),
+                RecordLayout::ShotMajor(_) => 0,
             };
             match plane_rows.get(index) {
                 Some(rows) if rows.bits_per_shot() == width => {}
@@ -399,7 +399,7 @@ impl RecordEncoder {
                     }
                 }
             }
-            let RecordBatchStorage::BitPlanes(planes) = part.records.storage() else {
+            let RecordLayout::BitPlanes(planes) = part.records.layout() else {
                 continue;
             };
             let rows = plane_rows.get_mut(index).ok_or_else(|| {
@@ -424,11 +424,11 @@ impl RecordEncoder {
             let planes = self.ptb64_planes.get_mut(offset..end).ok_or_else(|| {
                 FormatError::invalid_data("ptb64 column group escaped the encoder's declared width")
             })?;
-            match part.records.storage() {
-                RecordBatchStorage::ShotMajor(records) => {
+            match part.records.layout() {
+                RecordLayout::ShotMajor(records) => {
                     records.copy_rows_into_bit_plane_words(block_start, WORD_BITS, planes)?;
                 }
-                RecordBatchStorage::BitPlanes(bit_planes) => {
+                RecordLayout::BitPlanes(bit_planes) => {
                     bit_planes.copy_word_column_into(block_start / WORD_BITS, planes)?;
                 }
             }

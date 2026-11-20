@@ -3,14 +3,14 @@
     reason = "prediction-view tests use compact checked fixtures"
 )]
 
-use stab_records::{CorrectionWidth, ObservablePredictionBatch};
+use stab_records::{BitIndex, CorrectionWidth, ObservablePredictionBatch, ShotIndex};
 
 #[test]
 fn mutable_prediction_prefix_updates_only_admitted_records() {
     let mut predictions =
         ObservablePredictionBatch::zeros(4, CorrectionWidth::new(2)).expect("prediction storage");
     predictions
-        .records_mut()
+        .view_mut()
         .copy_shot_from_bools(3, &[true, true])
         .expect("suffix sentinel");
 
@@ -20,26 +20,34 @@ fn mutable_prediction_prefix_updates_only_admitted_records() {
             .expect("three-shot mutable prefix");
         assert_eq!(prefix.shot_count(), 3);
         assert_eq!(prefix.correction_width(), CorrectionWidth::new(2));
-        assert_eq!(prefix.get(0, 0), Some(false));
+        assert_eq!(prefix.get(ShotIndex(0), BitIndex(0)), Some(false));
 
-        prefix.set(1, 0, true).expect("set admitted bit");
+        prefix
+            .set(ShotIndex(1), BitIndex(0), true)
+            .expect("set admitted bit");
         prefix
             .copy_shot_from_bools(2, &[false, true])
             .expect("replace admitted prediction");
 
-        assert!(prefix.set(3, 0, false).is_err());
+        assert!(prefix.set(ShotIndex(3), BitIndex(0), false).is_err());
         assert!(prefix.copy_shot_from_bools(0, &[true]).is_err());
-        assert_eq!(prefix.get(3, 0), None);
-        assert_eq!(prefix.view().get(2, 1), Some(true));
+        assert_eq!(prefix.get(ShotIndex(3), BitIndex(0)), None);
+        assert_eq!(prefix.view().get(ShotIndex(2), BitIndex(1)), Some(true));
     }
 
     let prefix = predictions.view_prefix(3).expect("immutable prefix");
     assert_eq!(prefix.shot_count(), 3);
-    assert_eq!(prefix.get(1, 0), Some(true));
-    assert_eq!(prefix.get(2, 1), Some(true));
-    assert_eq!(prefix.get(3, 0), None);
-    assert_eq!(predictions.records().get(3, 0), Some(true));
-    assert_eq!(predictions.records().get(3, 1), Some(true));
+    assert_eq!(prefix.get(ShotIndex(1), BitIndex(0)), Some(true));
+    assert_eq!(prefix.get(ShotIndex(2), BitIndex(1)), Some(true));
+    assert_eq!(prefix.get(ShotIndex(3), BitIndex(0)), None);
+    assert_eq!(
+        predictions.records().get(ShotIndex(3), BitIndex(0)),
+        Some(true)
+    );
+    assert_eq!(
+        predictions.records().get(ShotIndex(3), BitIndex(1)),
+        Some(true)
+    );
     assert!(predictions.view_prefix(5).is_err());
     assert!(predictions.view_prefix_mut(5).is_err());
 }

@@ -118,11 +118,11 @@ fn impossible_batch_syndrome_fails_before_any_prediction_mutation() {
     let mut output =
         ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("predictions");
     output
-        .records_mut()
+        .view_mut()
         .copy_shot_from_bools(0, &[false])
         .expect("sentinel zero");
     output
-        .records_mut()
+        .view_mut()
         .copy_shot_from_bools(1, &[true])
         .expect("sentinel one");
     let before = output.clone();
@@ -159,7 +159,7 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
     let mut output =
         ObservablePredictionBatch::zeros(1, CorrectionWidth::new(1)).expect("predictions");
     output
-        .records_mut()
+        .view_mut()
         .copy_shot_from_bools(0, &[true])
         .expect("sentinel");
     let before = output.clone();
@@ -202,7 +202,7 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
     let mut too_short =
         ObservablePredictionBatch::zeros(1, CorrectionWidth::new(1)).expect("short predictions");
     too_short
-        .records_mut()
+        .view_mut()
         .copy_shot_from_bools(0, &[true])
         .expect("short sentinel");
     let before = too_short.clone();
@@ -226,7 +226,7 @@ fn exact_ml_obeys_canonical_preflight_and_pre_cancellation() {
         ObservablePredictionBatch::zeros(2, CorrectionWidth::new(1)).expect("cancelled output");
     for shot in 0..2 {
         cancelled_output
-            .records_mut()
+            .view_mut()
             .copy_shot_from_bools(shot, &[true])
             .expect("cancelled sentinel");
     }

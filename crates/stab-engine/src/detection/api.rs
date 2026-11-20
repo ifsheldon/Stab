@@ -9,7 +9,7 @@ use rand::rngs::SmallRng;
 use stab_model::{Cancellation, Circuit, MemoryBudget};
 use stab_records::{
     DetectionBatchView, DetectionSink, DetectorWidth, MeasurementBatchView, MeasurementWidth,
-    ObservableWidth,
+    ObservableWidth, RecordLayout,
 };
 
 use super::conversion_window::WindowedConversion;
@@ -645,14 +645,11 @@ fn copy_batch_into_frame_planes(
     for (word_index, row_start) in (0..batch.shot_count()).step_by(64).enumerate() {
         let row_count = (batch.shot_count() - row_start).min(64);
         poll.charge(width.saturating_mul(WORD_OP_UNITS))?;
-        let copied = if let Some(records) = batch.shot_major_records() {
-            records.copy_rows_into_bit_plane_words(row_start, row_count, column)
-        } else if let Some(planes) = batch.bit_planes() {
-            planes.copy_word_column_into(word_index, column)
-        } else {
-            return Err(DetectionExecutionError::InternalInvariant {
-                message: "measurement batch has no recognized storage representation".to_owned(),
-            });
+        let copied = match batch.layout() {
+            RecordLayout::ShotMajor(records) => {
+                records.copy_rows_into_bit_plane_words(row_start, row_count, column)
+            }
+            RecordLayout::BitPlanes(planes) => planes.copy_word_column_into(word_index, column),
         };
         copied.map_err(invariant_error)?;
         let column = &*column;

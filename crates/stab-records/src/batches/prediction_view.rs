@@ -1,5 +1,5 @@
 use super::{ObservablePredictionBatch, PackedShotBatch, PackedShotBatchView};
-use crate::{CorrectionWidth, FormatError, RecordResult};
+use crate::{BitIndex, CorrectionWidth, FormatError, RecordResult, ShotIndex};
 
 /// Mutable correction-typed borrow over a checked prefix of prediction records.
 ///
@@ -21,16 +21,16 @@ impl ObservablePredictionBatchViewMut<'_> {
         self.width
     }
 
-    pub fn get(&self, shot_index: usize, bit_index: usize) -> Option<bool> {
-        if shot_index >= self.shot_count {
+    pub fn get(&self, shot: ShotIndex, bit: BitIndex) -> Option<bool> {
+        if shot.0 >= self.shot_count {
             return None;
         }
-        self.records.get(shot_index, bit_index)
+        self.records.get(shot, bit)
     }
 
-    pub fn set(&mut self, shot_index: usize, bit_index: usize, value: bool) -> RecordResult<()> {
-        self.ensure_shot(shot_index)?;
-        self.records.set(shot_index, bit_index, value)
+    pub fn set(&mut self, shot: ShotIndex, bit: BitIndex, value: bool) -> RecordResult<()> {
+        self.ensure_shot(shot.0)?;
+        self.records.set(shot, bit, value)
     }
 
     pub fn copy_shot_from_bools(&mut self, shot_index: usize, record: &[bool]) -> RecordResult<()> {
@@ -60,6 +60,15 @@ impl ObservablePredictionBatch {
     /// Borrows a checked immutable prefix without resizing the reusable owned storage.
     pub fn view_prefix(&self, shot_count: usize) -> RecordResult<PackedShotBatchView<'_>> {
         self.records.view_prefix(shot_count)
+    }
+
+    /// Borrows every record mutably, through a view that keeps the batch's correction width.
+    pub fn view_mut(&mut self) -> ObservablePredictionBatchViewMut<'_> {
+        ObservablePredictionBatchViewMut {
+            shot_count: self.records.shot_count(),
+            records: &mut self.records,
+            width: self.width,
+        }
     }
 
     /// Borrows a checked mutable prefix without exposing reusable suffix records.

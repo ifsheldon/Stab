@@ -13,8 +13,8 @@ pub(super) const SHORT_PARITY_TERMS: usize = 64;
 const LONG_PARITY_TERMS: usize = 1 << 12;
 
 use super::{
-    ConversionOperation, compilation_overflow, compilation_shape_mismatch,
-    measurement_index_from_offset, repeated_usize_total,
+    CompactProgram, ConversionOperation, compilation_overflow, compilation_shape_mismatch,
+    repeated_usize_total, unavailable_measurement,
 };
 
 #[derive(Clone, Copy)]
@@ -96,7 +96,7 @@ impl ConversionRunner {
     /// Runs `program` from where it last stopped until it ends or needs what `io` lacks.
     pub(super) fn run<Value>(
         &mut self,
-        program: &[ConversionOperation],
+        program: &CompactProgram,
         io: &mut ConversionIo<'_, '_, Value>,
         cancellation: &Cancellation,
     ) -> DetectionResult<ConversionStop>
@@ -110,8 +110,10 @@ impl ConversionRunner {
         let mut cursor = self.cursor;
         let mut countdown = self.countdown;
         let repeat_stack = &mut self.repeat_stack;
+        let operations = program.operations.as_slice();
+        let arena = program.arena();
         let result = (|| {
-            while let Some(operation) = program.get(program_counter) {
+            while let Some(operation) = operations.get(program_counter) {
                 match operation {
                     ConversionOperation::AdvanceMeasurements(count) => {
                         cursor.measurement = cursor
@@ -138,7 +140,7 @@ impl ConversionRunner {
                             return Ok(ConversionStop::DetectorWindowFull);
                         };
                         *detector = charged_parity(
-                            terms,
+                            arena.terms(*terms)?,
                             cursor.measurement,
                             io.measurements,
                             io.measurement_base,
@@ -157,7 +159,7 @@ impl ConversionRunner {
                             return Ok(ConversionStop::NeedsMeasurements);
                         }
                         let value = charged_parity(
-                            terms,
+                            arena.terms(*terms)?,
                             cursor.measurement,
                             io.measurements,
                             io.measurement_base,
@@ -180,7 +182,7 @@ impl ConversionRunner {
                         detector_count,
                         requires_iteration: false,
                     } => {
-                        validate_repeat_marker(program, program_counter, *body_end)?;
+                        validate_repeat_marker(operations, program_counter, *body_end)?;
                         cursor.measurement = repeated_usize_total(
                             cursor.measurement,
                             *measurement_count,
@@ -201,7 +203,7 @@ impl ConversionRunner {
                         requires_iteration: true,
                         ..
                     } => {
-                        validate_repeat_marker(program, program_counter, *body_end)?;
+                        validate_repeat_marker(operations, program_counter, *body_end)?;
                         if *count == 0 {
                             program_counter = next_program_counter(*body_end)?;
                             continue;
@@ -259,7 +261,7 @@ impl ConversionRunner {
 /// state; materializing sessions and measurement-to-detection conversion run it per batch, and
 /// routing them through the resumable runner measured 5 to 10 percent slower on detection.
 pub(super) fn execute_program<Value>(
-    program: &[ConversionOperation],
+    program: &CompactProgram,
     measurements: RecordValues<'_, Value>,
     reference_sample: Option<&ReferenceSample>,
     detectors: &mut [Value],
@@ -274,7 +276,9 @@ where
     let mut repeat_stack = [RepeatExecutionFrame::EMPTY; RepeatNestingLimit::HARD_MAX];
     let mut repeat_depth = 0_usize;
     let mut program_counter = 0_usize;
-    while let Some(operation) = program.get(program_counter) {
+    let operations = program.operations.as_slice();
+    let arena = program.arena();
+    while let Some(operation) = operations.get(program_counter) {
         match operation {
             ConversionOperation::AdvanceMeasurements(count) => {
                 cursor.measurement = cursor
@@ -285,8 +289,13 @@ where
             }
             ConversionOperation::Detector(terms) => {
                 countdown.charge(short_parity_units::<Value>(), cancellation)?;
-                let value =
-                    parity_of_terms(terms, cursor.measurement, measurements, 0, reference_sample)?;
+                let value = parity_of_terms(
+                    arena.terms(*terms)?,
+                    cursor.measurement,
+                    measurements,
+                    0,
+                    reference_sample,
+                )?;
                 let detector = detectors.get_mut(cursor.detector).ok_or_else(|| {
                     DetectionError::invalid_sampler_compilation(format!(
                         "compact conversion detector index {} is out of range",
@@ -302,7 +311,7 @@ where
             }
             ConversionOperation::WideDetector(terms) => {
                 let value = long_parity(
-                    terms,
+                    arena.terms(*terms)?,
                     cursor.measurement,
                     measurements,
                     0,
@@ -325,7 +334,7 @@ where
             }
             ConversionOperation::Observable { id, terms } => {
                 let value = charged_parity(
-                    terms,
+                    arena.terms(*terms)?,
                     cursor.measurement,
                     measurements,
                     0,
@@ -348,7 +357,7 @@ where
                 detector_count,
                 requires_iteration: false,
             } => {
-                validate_repeat_marker(program, program_counter, *body_end)?;
+                validate_repeat_marker(operations, program_counter, *body_end)?;
                 cursor.measurement = repeated_usize_total(
                     cursor.measurement,
                     *measurement_count,
@@ -369,7 +378,7 @@ where
                 requires_iteration: true,
                 ..
             } => {
-                validate_repeat_marker(program, program_counter, *body_end)?;
+                validate_repeat_marker(operations, program_counter, *body_end)?;
                 if *count == 0 {
                     program_counter = next_program_counter(*body_end)?;
                     continue;
@@ -510,6 +519,19 @@ const fn term_units<Value>() -> usize {
     WORD_OP_UNITS * size_of::<Value>().div_ceil(size_of::<u64>())
 }
 
+/// The absolute index of the measurement `offset` reads when `measurement_cursor` measurements
+/// precede the reader.
+///
+/// An offset is negative by construction, so the index exists exactly when the offset does not
+/// reach before the first measurement, and it is then below the cursor: one checked subtraction
+/// decides what the plan's signed offset arithmetic decides, on the hottest path of conversion.
+#[inline(always)]
+fn term_index(measurement_cursor: usize, offset: MeasureRecordOffset) -> DetectionResult<usize> {
+    measurement_cursor
+        .checked_sub(crate::detection::frame::lookback_distance(offset))
+        .ok_or_else(|| unavailable_measurement(offset))
+}
+
 fn parity_of_terms<Value>(
     terms: &[MeasureRecordOffset],
     measurement_cursor: usize,
@@ -523,7 +545,7 @@ where
     let mut parity = Value::default();
     let mut reference_parity = false;
     for offset in terms {
-        let index = measurement_index_from_offset(measurement_cursor, *offset)?;
+        let index = term_index(measurement_cursor, *offset)?;
         if let Some(reference) = reference_sample {
             reference_parity ^= reference.get(index).ok_or_else(|| {
                 DetectionError::invalid_result_format(format!(

@@ -1,6 +1,8 @@
 //! The packed record a reference run writes: one bit per measurement, not one byte.
 
-use stab_bits::{BitSlice, BitVec};
+use std::num::NonZeroUsize;
+
+use stab_bits::{BitSlice, BitVec, fill_periodic_words};
 use stab_model::MeasureRecordOffset;
 
 use super::api::SamplingExecutionError;
@@ -109,75 +111,75 @@ impl ReferenceBits {
         self.len += count;
     }
 
-    /// The `count <= 64` bits starting at `start`, which must lie inside the record.
-    fn chunk_at(&self, start: usize, count: usize) -> u64 {
-        let word = |index: usize| self.words.get(index).copied().unwrap_or(0);
-        let shift = start % WORD_BITS;
-        let first = start / WORD_BITS;
-        let mut chunk = word(first) >> shift;
-        if shift != 0 {
-            chunk |= word(first + 1) << (WORD_BITS - shift);
-        }
-        if count < WORD_BITS {
-            chunk &= (1_u64 << count) - 1;
-        }
-        chunk
-    }
-
     /// Appends `repetitions` copies of the bits from `start` to the current end.
     ///
-    /// Every appended bit equals the bit one copy distance back, where the distance is a
-    /// multiple of the pattern length no longer than the record already written past `start`.
-    /// The distance doubles until it reaches a word, after which every step copies a whole word
-    /// at a fixed shift, so a short pattern repeated many times costs one step per output word.
-    /// The copy charges `poll` per chunk of words, so a fold of any length polls cancellation.
+    /// The storage is reserved fallibly up front and the copy is
+    /// [`stab_bits::fill_periodic_words`], run in ranges of a bounded number of words with `poll`
+    /// charged before each, so a fold of any length polls cancellation. On an error the record is
+    /// left as it was before the call.
     pub(crate) fn append_repeated(
         &mut self,
         start: usize,
         repetitions: u64,
         poll: &mut WorkPoll<'_>,
     ) -> Result<(), SamplingExecutionError> {
-        let pattern_len = self.len.saturating_sub(start);
-        if pattern_len == 0 || repetitions == 0 {
+        let Some(period) = NonZeroUsize::new(self.len.saturating_sub(start)) else {
+            return Ok(());
+        };
+        if repetitions == 0 {
             return Ok(());
         }
+        let overflow = || SamplingExecutionError::InternalInvariant {
+            message: "reference folding output length overflowed".to_owned(),
+        };
         let appended = usize::try_from(repetitions)
             .ok()
-            .and_then(|repetitions| repetitions.checked_mul(pattern_len))
-            .ok_or_else(|| SamplingExecutionError::InternalInvariant {
-                message: "reference folding output length overflowed".to_owned(),
-            })?;
-        let total_bits = self.len.checked_add(appended).ok_or_else(|| {
-            SamplingExecutionError::InternalInvariant {
-                message: "reference folding output length overflowed".to_owned(),
-            }
-        })?;
+            .and_then(|repetitions| repetitions.checked_mul(period.get()))
+            .ok_or_else(overflow)?;
+        let total_bits = self.len.checked_add(appended).ok_or_else(overflow)?;
         let total_words = total_bits.div_ceil(WORD_BITS);
         self.words
             .try_reserve(total_words.saturating_sub(self.words.len()))
             .map_err(|error| SamplingExecutionError::SessionStorageAllocation {
                 message: format!("reference folding output capacity {total_bits} bits: {error}"),
             })?;
-        let steps_per_charge = (chunk_units() / WORD_OP_UNITS).max(1);
-        let mut distance = pattern_len;
-        let mut remaining = appended;
-        while remaining > 0 {
-            poll.charge(steps_per_charge.saturating_mul(WORD_OP_UNITS))?;
-            for _ in 0..steps_per_charge {
-                if remaining == 0 {
-                    break;
-                }
-                let count = remaining.min(distance).min(WORD_BITS);
-                let chunk = self.chunk_at(self.len - distance, count);
-                self.append_chunk(chunk, count);
-                remaining -= count;
-                if distance < WORD_BITS {
-                    // The record past `start` now holds twice `distance` periodic bits.
-                    distance *= 2;
-                }
+        // Within the reserved capacity, so this never reallocates.
+        self.words.resize(total_words, 0);
+        let words_per_charge = (chunk_units() / WORD_OP_UNITS).max(1);
+        let bits_per_charge = words_per_charge.saturating_mul(WORD_BITS);
+        let mut position = self.len;
+        while position < total_bits {
+            let stop = position.saturating_add(bits_per_charge).min(total_bits);
+            let step = poll
+                .charge(words_per_charge.saturating_mul(WORD_OP_UNITS))
+                .map_err(SamplingExecutionError::from)
+                .and_then(|()| {
+                    fill_periodic_words(&mut self.words, start, period, position, stop).map_err(
+                        |error| SamplingExecutionError::InternalInvariant {
+                            message: format!("reference folding copy failed: {error}"),
+                        },
+                    )
+                });
+            if let Err(error) = step {
+                self.truncate_words();
+                return Err(error);
             }
+            position = stop;
         }
+        self.len = total_bits;
         Ok(())
+    }
+
+    /// Drops the words past [`Self::len`] and zeroes the last word's unused bits, restoring the
+    /// record's invariant after a partial write past its end.
+    fn truncate_words(&mut self) {
+        self.words.truncate(self.len.div_ceil(WORD_BITS));
+        let tail = self.len % WORD_BITS;
+        if tail != 0
+            && let Some(last) = self.words.last_mut()
+        {
+            *last &= (1_u64 << tail) - 1;
+        }
     }
 
     /// Appends every bit of `bits`, one word-aligned chunk at a time.

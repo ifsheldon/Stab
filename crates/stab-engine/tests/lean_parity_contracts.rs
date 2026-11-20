@@ -14,7 +14,8 @@ use stab_engine::{
 };
 use stab_model::Circuit;
 use stab_records::{
-    DetectionBatchView, DetectionSink, MeasurementBatchView, MeasurementSink, PackedShotBatch,
+    BitIndex, DetectionBatchView, DetectionSink, MeasurementBatchView, MeasurementSink,
+    PackedShotBatch, ShotIndex,
 };
 
 const SEED: u64 = 0x5eed;
@@ -35,7 +36,11 @@ impl MeasurementSink for MeasurementCollector {
         for shot in 0..batch.shot_count() {
             self.records.push(
                 (0..batch.width().get())
-                    .map(|bit| batch.get(shot, bit).expect("valid measurement coordinate"))
+                    .map(|bit| {
+                        batch
+                            .get(ShotIndex(shot), BitIndex(bit))
+                            .expect("valid measurement coordinate")
+                    })
                     .collect(),
             );
         }
@@ -96,7 +101,7 @@ impl DetectionSink for DetectionCollector {
                     .map(|bit| {
                         batch
                             .detectors()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("valid detector coordinate")
                     })
                     .collect(),
@@ -106,7 +111,7 @@ impl DetectionSink for DetectionCollector {
                     .map(|bit| {
                         batch
                             .observables()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("valid observable coordinate")
                     })
                     .collect(),

@@ -9,7 +9,7 @@
 use std::assert_matches;
 
 use super::*;
-use crate::{FormatErrorCode, read_records, write_records};
+use crate::{BitIndex, FormatErrorCode, ShotIndex, read_records, write_records};
 
 const TEST_TEXT_LIMIT: usize = 1024 * 1024;
 
@@ -468,7 +468,7 @@ fn ptb64_group_reads_and_packed_skips_avoid_transposed_row_allocations() {
         for shot in 0..64 {
             unpacked.push(
                 (0..width)
-                    .map(|bit| planes.get(bit, shot).unwrap())
+                    .map(|bit| planes.get(ShotIndex(shot), BitIndex(bit)).unwrap())
                     .collect::<Vec<bool>>(),
             );
         }
@@ -493,7 +493,7 @@ fn ptb64_group_reads_and_packed_skips_avoid_transposed_row_allocations() {
         .read_ptb64_group()
         .expect("third group")
         .expect("group exists");
-    assert_eq!(tail.get(0, 0), Some(records[128][0]));
+    assert_eq!(tail.get(ShotIndex(0), BitIndex(0)), Some(records[128][0]));
 
     let b8 = write_records(&records, RecordFormat::B8).expect("encode b8");
     let mut skip_b8 =

@@ -15,7 +15,9 @@ use stab_engine::{
     validate_detection_sampling_circuit_with_limits,
 };
 use stab_model::{Circuit, MemoryBudget};
-use stab_records::{DetectionBatchView, DetectionSink, MeasurementBatchView, PackedShotBatch};
+use stab_records::{
+    BitIndex, DetectionBatchView, DetectionSink, MeasurementBatchView, PackedShotBatch, ShotIndex,
+};
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit fixture")
@@ -46,7 +48,7 @@ impl DetectionSink for DetectionWitnessSink {
                     .map(|bit| {
                         batch
                             .detectors()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated detection coordinate")
                     })
                     .collect(),

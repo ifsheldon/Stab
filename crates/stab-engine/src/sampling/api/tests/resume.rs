@@ -5,7 +5,9 @@
 //! interrupts deterministic: the polls of each batch are counted on an identical session first.
 
 use stab_model::Circuit;
-use stab_records::{DetectionBatchView, DetectionSink, MeasurementBatchView, MeasurementSink};
+use stab_records::{
+    BitIndex, DetectionBatchView, DetectionSink, MeasurementBatchView, MeasurementSink, ShotIndex,
+};
 
 use crate::work_poll::test_hook;
 use crate::{
@@ -49,7 +51,11 @@ impl MeasurementSink for Shots {
         for shot in 0..batch.shot_count() {
             self.0.push(
                 (0..batch.width().get())
-                    .map(|bit| batch.get(shot, bit).expect("measurement bit"))
+                    .map(|bit| {
+                        batch
+                            .get(ShotIndex(shot), BitIndex(bit))
+                            .expect("measurement bit")
+                    })
                     .collect(),
             );
         }
@@ -66,10 +72,18 @@ impl DetectionSink for Shots {
 
     fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
         for shot in 0..batch.shot_count() {
-            let detectors = (0..batch.detector_width().get())
-                .map(|bit| batch.detectors().get(shot, bit).expect("detector bit"));
-            let observables = (0..batch.observable_width().get())
-                .map(|bit| batch.observables().get(shot, bit).expect("observable bit"));
+            let detectors = (0..batch.detector_width().get()).map(|bit| {
+                batch
+                    .detectors()
+                    .get(ShotIndex(shot), BitIndex(bit))
+                    .expect("detector bit")
+            });
+            let observables = (0..batch.observable_width().get()).map(|bit| {
+                batch
+                    .observables()
+                    .get(ShotIndex(shot), BitIndex(bit))
+                    .expect("observable bit")
+            });
             self.0.push(detectors.chain(observables).collect());
         }
         Ok(())

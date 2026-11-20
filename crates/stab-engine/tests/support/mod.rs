@@ -9,13 +9,14 @@ use std::fmt::{Display, Formatter};
 
 use stab_engine::{
     DetectionCompileError, DetectionConversionLimits, DetectionExecutionError, DetectionRunError,
-    DetectionSamplingCompiler, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode,
-    SamplingCompileError, SamplingCompiler, SamplingExecutionError, SamplingPlan, Seed, ShotCount,
+    DetectionSamplingCompiler, InitialState, MeasurementToDetectionCompiler, RandomPolicy,
+    ReferenceSampleMode, SamplingCompileError, SamplingCompiler, SamplingExecutionError,
+    SamplingPlan, Seed, ShotCount,
 };
 use stab_model::Circuit;
 use stab_records::{
-    DetectionBatchView, DetectionSink, FormatError, MeasurementBatchView, MeasurementSink,
-    PackedShotBatch,
+    BitIndex, DetectionBatchView, DetectionSink, FormatError, MeasurementBatchView,
+    MeasurementSink, PackedShotBatch, ShotIndex,
 };
 
 #[derive(Debug)]
@@ -40,9 +41,9 @@ impl SamplingFixture {
 
     pub(super) fn count_determined_measurements(
         &self,
-        unknown_input: bool,
+        initial_state: InitialState,
     ) -> Result<u64, SamplingExecutionError> {
-        self.plan.try_count_determined_measurements(unknown_input)
+        self.plan.try_count_determined_measurements(initial_state)
     }
 
     pub(super) fn sample_zero_one(&self, shots: usize) -> Vec<Vec<bool>> {
@@ -100,7 +101,7 @@ impl MeasurementSink for MeasurementCollector {
                 (0..batch.width().get())
                     .map(|bit| {
                         batch
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated fixture batch coordinate")
                     })
                     .collect(),
@@ -248,7 +249,7 @@ impl DetectionSink for DetectionCollector {
                     .map(|bit| {
                         batch
                             .detectors()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated detector coordinate")
                     })
                     .collect(),
@@ -256,7 +257,7 @@ impl DetectionSink for DetectionCollector {
                     .map(|bit| {
                         batch
                             .observables()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated observable coordinate")
                     })
                     .collect(),

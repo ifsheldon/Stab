@@ -16,7 +16,7 @@ use stab_analysis::{
 };
 use stab_bits::{BitSlice, BitVec};
 use stab_model::{Gate, Probability};
-use stab_records::{MeasurementBatchView, MeasurementSink};
+use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
 use std::fmt::Write as _;
 
 mod folded_tape;
@@ -90,7 +90,7 @@ impl MeasurementSink for RecordSink {
             let record = (0..batch.width().get())
                 .map(|bit_index| {
                     batch
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("validated batch dimensions")
                 })
                 .collect();
@@ -153,9 +153,9 @@ fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {
         .sample_zero_one_with_seed(shots, None)
 }
 
-fn count_determined(input: &str, unknown_input: bool) -> u64 {
+fn count_determined(input: &str, initial_state: InitialState) -> u64 {
     let circuit = Circuit::from_stim_str(input).expect("parse circuit");
-    count_determined_measurements(&circuit, unknown_input).expect("count determined measurements")
+    count_determined_measurements(&circuit, initial_state).expect("count determined measurements")
 }
 
 fn reference_with_stats(plan: &SamplingPlan) -> (Vec<bool>, ReferenceExecutionStats) {
@@ -366,7 +366,6 @@ fn compiled_program_bytes_are_admitted_against_the_budget_before_materialization
     };
     assert_eq!(budget, 0);
     assert!(required > 0);
-    assert_eq!(error.code(), SamplingCompileErrorCode::ResourceLimit);
     let crate::DetectionError::ResourceLimit(detection_limit) = crate::DetectionError::from(error)
     else {
         panic!("detection sampling must preserve the typed refusal");
@@ -728,10 +727,13 @@ fn rejects_feedback_that_reads_missing_measurements() {
 
 #[test]
 fn count_determined_measurements_matches_unknown_input_subset() {
-    assert_eq!(count_determined("MZZ 0 1", false), 1);
-    assert_eq!(count_determined("MZZ 0 1", true), 0);
-    assert_eq!(count_determined("MPP Z0*Z1 X2*X3", false), 1);
-    assert_eq!(count_determined("MPP Z0*Z1 X2*X3", true), 0);
+    assert_eq!(count_determined("MZZ 0 1", InitialState::Zero), 1);
+    assert_eq!(count_determined("MZZ 0 1", InitialState::Unknown), 0);
+    assert_eq!(count_determined("MPP Z0*Z1 X2*X3", InitialState::Zero), 1);
+    assert_eq!(
+        count_determined("MPP Z0*Z1 X2*X3", InitialState::Unknown),
+        0
+    );
     assert_eq!(
         count_determined(
             "
@@ -739,7 +741,7 @@ fn count_determined_measurements_matches_unknown_input_subset() {
             TICK
             MPP Z0*Z1 X2*X3
             ",
-            true,
+            InitialState::Unknown,
         ),
         2
     );
@@ -750,7 +752,7 @@ fn count_determined_measurements_matches_unknown_input_subset() {
             TICK
             MPP Z0*Z1 X2*X3
             ",
-            false,
+            InitialState::Zero,
         ),
         3
     );
@@ -773,7 +775,11 @@ fn count_determined_measurements_matches_basis_measurement_subset() {
         ("RX 0\nMZ 0", 0),
         ("RX 0\nMRZ 0", 0),
     ] {
-        assert_eq!(count_determined(input, false), expected, "{input}");
+        assert_eq!(
+            count_determined(input, InitialState::Zero),
+            expected,
+            "{input}"
+        );
     }
 }
 
@@ -795,7 +801,11 @@ fn count_determined_measurements_matches_pair_and_mpp_subset() {
         ("RX 0\nRY 1\nRZ 2\nMPP X0*Y1*Z2", 1),
         ("RX 0\nRX 1\nRZ 2\nMPP X0*Y1*Z2", 0),
     ] {
-        assert_eq!(count_determined(input, false), expected, "{input}");
+        assert_eq!(
+            count_determined(input, InitialState::Zero),
+            expected,
+            "{input}"
+        );
     }
 }
 
@@ -819,7 +829,11 @@ fn count_determined_measurements_matches_convergence_subset() {
         ("MYY 0 1\nMY 0 1", 1),
         ("RX 0 1\nMZZ 0 1\nMZ 0 1", 1),
     ] {
-        assert_eq!(count_determined(input, false), expected, "{input}");
+        assert_eq!(
+            count_determined(input, InitialState::Zero),
+            expected,
+            "{input}"
+        );
     }
 }
 
@@ -834,7 +848,11 @@ fn count_determined_measurements_ignores_flip_arguments_like_stim() {
         ("MXX(0.25) 0 1 0 1", 1),
         ("H 0\nM(1) 0", 0),
     ] {
-        assert_eq!(count_determined(input, false), expected, "{input}");
+        assert_eq!(
+            count_determined(input, InitialState::Zero),
+            expected,
+            "{input}"
+        );
     }
 }
 
@@ -849,7 +867,7 @@ fn count_determined_measurements_rejects_pad_and_heralded_records_like_stim() {
         "HERALDED_PAULI_CHANNEL_1(0.1, 0.05, 0, 0) 0",
     ] {
         let circuit = Circuit::from_stim_str(input).expect("parse circuit");
-        let error = count_determined_measurements(&circuit, false)
+        let error = count_determined_measurements(&circuit, InitialState::Zero)
             .expect_err("pad and heralded records must be rejected");
         assert_matches!(
             error,

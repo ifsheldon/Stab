@@ -8,7 +8,7 @@
 use stab_bits::{BIT_BLOCK_WORDS, BitBlock, BitSlice};
 
 use super::{PackedShotBatch, PackedShotBatchView, batch_width_mismatch, bit_storage_error};
-use crate::{FormatError, RecordResult};
+use crate::{BitIndex, FormatError, RecordResult, ShotIndex};
 
 const WORD_BITS: usize = u64::BITS as usize;
 
@@ -68,11 +68,16 @@ impl BitPlaneBatch {
         self.bits_per_shot
     }
 
-    pub fn get(&self, bit_index: usize, shot_index: usize) -> Option<bool> {
-        self.view().get(bit_index, shot_index)
+    pub fn get(&self, shot: ShotIndex, bit: BitIndex) -> Option<bool> {
+        self.view().get(shot, bit)
     }
 
-    pub fn set(&mut self, bit_index: usize, shot_index: usize, value: bool) -> RecordResult<()> {
+    pub fn set(
+        &mut self,
+        ShotIndex(shot_index): ShotIndex,
+        BitIndex(bit_index): BitIndex,
+        value: bool,
+    ) -> RecordResult<()> {
         if shot_index >= self.shot_count {
             return Err(FormatError::invalid_data(format!(
                 "bit-plane shot index {shot_index} is out of range for {} records",
@@ -104,7 +109,7 @@ impl BitPlaneBatch {
             ));
         }
         for (bit_index, value) in record.iter().copied().enumerate() {
-            self.set(bit_index, shot_index, value)?;
+            self.set(ShotIndex(shot_index), BitIndex(bit_index), value)?;
         }
         Ok(())
     }
@@ -226,7 +231,11 @@ impl<'a> BitPlaneBatchView<'a> {
     }
 
     #[inline]
-    pub fn get(self, bit_index: usize, shot_index: usize) -> Option<bool> {
+    pub fn get(
+        self,
+        ShotIndex(shot_index): ShotIndex,
+        BitIndex(bit_index): BitIndex,
+    ) -> Option<bool> {
         if shot_index >= self.shot_count {
             return None;
         }

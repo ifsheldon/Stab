@@ -1,6 +1,6 @@
 use stab_records::{
-    DetectionBatchView, DetectorWidth, ObservablePredictionBatchViewMut, PackedShotBatchView,
-    RecordBatchView, RecordResult,
+    BitIndex, DetectionBatchView, DetectorWidth, ObservablePredictionBatchViewMut,
+    PackedShotBatchView, RecordBatchView, RecordResult, ShotIndex,
 };
 
 use crate::DecoderLayout;
@@ -42,7 +42,8 @@ impl<'a> DecoderInputBatchView<'a> {
     }
 
     pub fn detector(self, shot_index: usize, detector_index: usize) -> Option<bool> {
-        self.detectors.get(shot_index, detector_index)
+        self.detectors
+            .get(ShotIndex(shot_index), BitIndex(detector_index))
     }
 }
 
@@ -87,7 +88,8 @@ impl<'input, 'output> ValidatedDecodeBatch<'input, 'output> {
     }
 
     pub fn prediction(&self, shot_index: usize, observable_index: usize) -> Option<bool> {
-        self.predictions.get(shot_index, observable_index)
+        self.predictions
+            .get(ShotIndex(shot_index), BitIndex(observable_index))
     }
 
     pub fn set_prediction(
@@ -96,7 +98,8 @@ impl<'input, 'output> ValidatedDecodeBatch<'input, 'output> {
         observable_index: usize,
         value: bool,
     ) -> RecordResult<()> {
-        self.predictions.set(shot_index, observable_index, value)
+        self.predictions
+            .set(ShotIndex(shot_index), BitIndex(observable_index), value)
     }
 
     pub fn copy_prediction_from_bools(

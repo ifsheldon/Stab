@@ -11,7 +11,7 @@ use stab_engine::{
     SamplingRunStatus, Seed, ShotCount, SinkFailurePhase,
 };
 use stab_model::Circuit;
-use stab_records::{MeasurementBatchView, MeasurementSink};
+use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
 
 #[derive(Debug, Eq, PartialEq)]
 enum TestSinkError {
@@ -47,7 +47,7 @@ impl MeasurementSink for ProbeSink {
             let record = (0..batch.width().get())
                 .map(|bit_index| {
                     batch
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("batch coordinates are within the reported dimensions")
                 })
                 .collect();

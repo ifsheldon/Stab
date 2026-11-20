@@ -630,6 +630,7 @@ fn model_error(error: &CliError) -> Option<&ModelError> {
             SamplingCompileError::Analysis(error) => model_error_from_analysis(error),
             SamplingCompileError::InvalidCircuit { .. }
             | SamplingCompileError::CompiledBytesLimit { .. }
+            | SamplingCompileError::StorageAllocation { .. }
             | SamplingCompileError::Cancelled(_) => None,
         },
         CliError::Detection(error) => model_error_from_detection(error),
@@ -751,9 +752,9 @@ fn sampling_compile_error_context(error: &SamplingCompileError) -> Value {
     match error {
         SamplingCompileError::Model(error) => model_error_context(error),
         SamplingCompileError::Analysis(error) => analysis_error_context(error),
-        SamplingCompileError::InvalidCircuit { .. } | SamplingCompileError::Cancelled(_) => {
-            json!({})
-        }
+        SamplingCompileError::InvalidCircuit { .. }
+        | SamplingCompileError::StorageAllocation { .. }
+        | SamplingCompileError::Cancelled(_) => json!({}),
         SamplingCompileError::CompiledBytesLimit { required, budget } => json!({
             "resource": "materialized-bytes",
             "actual": required.to_string(),
@@ -974,6 +975,7 @@ fn detection_resource_context(error: &DetectionResourceLimitError) -> Value {
     let resource = match error.kind() {
         DetectionResourceKind::RepeatNesting => "repeat-nesting",
         DetectionResourceKind::CompiledBytes => "materialized-bytes",
+        DetectionResourceKind::SessionStorageBytes => "session-storage-bytes",
     };
     let subject: Option<&str> = None;
     let operation = "detection-conversion";

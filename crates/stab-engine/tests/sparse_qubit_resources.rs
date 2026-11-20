@@ -6,8 +6,8 @@
 use std::assert_matches;
 
 use stab_engine::{
-    DetectionSamplingCompiler, MeasurementToDetectionCompiler, RandomPolicy, ReferenceSampleMode,
-    SamplingCompiler, SamplingExecutionError, Seed,
+    DetectionSamplingCompiler, InitialState, MeasurementToDetectionCompiler, RandomPolicy,
+    ReferenceSampleMode, SamplingCompiler, SamplingExecutionError, Seed,
 };
 use stab_model::Circuit;
 
@@ -44,9 +44,9 @@ fn maximum_id_sampling_work_is_rejected_before_allocation() {
         plan.try_reference_sample()
             .expect_err("reference sample must reject quadratic storage"),
     );
-    for unknown_input in [false, true] {
+    for initial_state in [InitialState::Zero, InitialState::Unknown] {
         assert_storage_limit(
-            plan.try_count_determined_measurements(unknown_input)
+            plan.try_count_determined_measurements(initial_state)
                 .expect_err("determined count must reject quadratic storage"),
         );
     }
@@ -102,7 +102,7 @@ fn sparse_reference_simulator_work_is_rejected_before_allocation() {
     for error in [
         plan.try_reference_sample()
             .expect_err("reference sample must reject quadratic storage"),
-        plan.try_count_determined_measurements(false)
+        plan.try_count_determined_measurements(InitialState::Zero)
             .expect_err("determined count must reject quadratic storage"),
     ] {
         assert_storage_limit(error);

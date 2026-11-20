@@ -13,7 +13,7 @@ mod session;
 pub use error::{DemError, DemResourceKind, DemResourceLimitError};
 pub use limits::DemSamplerLimits;
 pub use plan::{DemSamplingCompiler, DemSamplingPlan};
-pub use replay_store::{DemReplayRecordStore, DemReplayRetention};
+pub use replay_store::{DemReplayRecordStore, DemReplayRetention, DemReplayStoreState};
 pub use session::{
     DemReplayBatchStatus, DemReplaySession, DemReplayTransaction, DemSamplingExecutionError,
     DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus, DemSamplingRunSummary,

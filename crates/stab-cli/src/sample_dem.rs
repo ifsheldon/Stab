@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 use stab_engine::{
     DemReplayBatchStatus, DemReplayRecordStore, DemReplayRetention, DemReplaySession,
-    DemReplayTransaction, DemSamplerLimits, DemSamplingCompiler, DemSamplingPlan,
-    DemSamplingRunError, DemSamplingSession, RandomPolicy, Seed, ShotCount,
+    DemReplayStoreState, DemReplayTransaction, DemSamplerLimits, DemSamplingCompiler,
+    DemSamplingPlan, DemSamplingRunError, DemSamplingSession, RandomPolicy, Seed, ShotCount,
 };
 use stab_records::{
     DemSampleBatchView, DemSampleSink, FormatError, FormatErrorCode as RecordFormatErrorCode,
@@ -385,8 +385,9 @@ impl ReplayReaderStorage {
             });
         }
         // Every other format is line-framed text, whose transport buffer follows its cap.
-        let text_record_bytes =
-            RecordStreamStorage::max_text_record_bytes(u128::from(free / TEXT_BUFFER_SHARE));
+        let text_record_bytes = RecordStreamStorage::max_text_record_bytes(u128::from(
+            free.bytes() / TEXT_BUFFER_SHARE,
+        ));
         // Admitting the whole reader again also refuses the one-byte buffer of a zero cap when
         // nothing is left for it.
         let bytes = fixed.saturating_add(saturating(RecordStreamStorage::text_transport_bytes(
@@ -677,7 +678,7 @@ impl<'a> ReplayInput<'a> {
     ) -> Result<ReplayRetained, CliError> {
         let mut decoded = 0_usize;
         let mut declined = None;
-        while decoded < self.expected_shots && retained.is_retaining() {
+        while decoded < self.expected_shots && retained.state() == DemReplayStoreState::Retaining {
             let byte_offset = self
                 .reader
                 .consumed_offset()

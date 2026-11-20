@@ -273,7 +273,7 @@ impl ProgramArena {
 
 fn reserve<T>(pool: &mut Vec<T>, capacity: usize, context: &str) -> DetectionResult<()> {
     pool.try_reserve_exact(capacity).map_err(|error| {
-        DetectionError::invalid_sampler_compilation(format!(
+        DetectionError::storage_allocation(format!(
             "unable to reserve {capacity} {context}: {error}"
         ))
     })

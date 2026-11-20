@@ -10,7 +10,7 @@ use std::convert::Infallible;
 
 use stab_engine::{DemSamplingCompiler, DemSamplingPlan, RandomPolicy, Seed, ShotCount};
 use stab_model::DetectorErrorModel;
-use stab_records::{DemSampleBatchView, DemSampleSink, RecordBatchView};
+use stab_records::{BitIndex, DemSampleBatchView, DemSampleSink, RecordBatchView, ShotIndex};
 
 /// Models covering every way the detector stream treats an error: sampled directly, inside a
 /// repeat that cannot fire, inside a deterministic repeat applied once or cancelled, inside a
@@ -57,7 +57,11 @@ impl DemSampleSink for Rows {
 
 fn row(records: RecordBatchView<'_>, shot: usize) -> Vec<bool> {
     (0..records.bits_per_shot())
-        .map(|bit| records.get(shot, bit).expect("record bit"))
+        .map(|bit| {
+            records
+                .get(ShotIndex(shot), BitIndex(bit))
+                .expect("record bit")
+        })
         .collect()
 }
 

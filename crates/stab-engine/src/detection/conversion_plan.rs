@@ -21,18 +21,33 @@ use self::execution::{
 };
 pub(super) use self::execution::{ConversionRunner, ConversionStop};
 
+/// A run of consecutive measurement references in a [`CompactProgram`]'s term arena.
+///
+/// Spans are cut only by [`CompactProgram::span_since`], so `start <= end <= terms.len()`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct TermSpan {
+    start: usize,
+    end: usize,
+}
+
+impl TermSpan {
+    const fn len(self) -> usize {
+        self.end - self.start
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ConversionOperation {
     AdvanceMeasurements(usize),
     /// A detector of at most [`execution::SHORT_PARITY_TERMS`] terms, charged to the work poll
     /// as one constant step.
-    Detector(Vec<MeasureRecordOffset>),
+    Detector(TermSpan),
     /// A detector with more terms, charged in proportion to them; lowering picks the variant so
     /// the common detector's hot loop never compares its length.
-    WideDetector(Vec<MeasureRecordOffset>),
+    WideDetector(TermSpan),
     Observable {
         id: usize,
-        terms: Vec<MeasureRecordOffset>,
+        terms: TermSpan,
     },
     Repeat {
         count: u64,
@@ -42,6 +57,61 @@ enum ConversionOperation {
         requires_iteration: bool,
     },
     EndRepeat,
+}
+
+/// The operations of a compact conversion and the one arena holding every detector and
+/// observable term, so a circuit of millions of detectors reserves one term vector instead of
+/// one per detector.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct CompactProgram {
+    operations: Vec<ConversionOperation>,
+    terms: Vec<MeasureRecordOffset>,
+}
+
+impl CompactProgram {
+    /// The term arena, borrowed once per run so the hot loop keeps its bounds in registers
+    /// instead of reloading them through the program after every detector store.
+    fn arena(&self) -> TermArena<'_> {
+        TermArena(&self.terms)
+    }
+
+    /// Appends `offset` within the term reservation admission sized exactly.
+    fn push_term(&mut self, offset: MeasureRecordOffset) -> DetectionResult<()> {
+        if self.terms.len() == self.terms.capacity() {
+            return Err(compilation_shape_mismatch());
+        }
+        self.terms.push(offset);
+        Ok(())
+    }
+
+    /// The span of the terms pushed since the arena held `start` terms.
+    fn span_since(&self, start: usize) -> DetectionResult<TermSpan> {
+        let end = self.terms.len();
+        if start > end {
+            return Err(compilation_shape_mismatch());
+        }
+        Ok(TermSpan { start, end })
+    }
+}
+
+/// A borrowed [`CompactProgram`] term arena.
+#[derive(Clone, Copy)]
+struct TermArena<'a>(&'a [MeasureRecordOffset]);
+
+impl<'a> TermArena<'a> {
+    /// The terms of `span`.
+    #[inline(always)]
+    fn terms(self, span: TermSpan) -> DetectionResult<&'a [MeasureRecordOffset]> {
+        self.0
+            .get(span.start..span.end)
+            .ok_or_else(terms_escaped_arena)
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn terms_escaped_arena() -> DetectionError {
+    DetectionError::invalid_sampler_compilation("compact conversion terms escaped their arena")
 }
 
 /// A compact measurement-to-detection program.
@@ -55,9 +125,8 @@ pub(super) struct ConversionPlan {
     pub(super) sweep_bit_count: usize,
     pub(super) detector_count: usize,
     pub(super) observable_count: usize,
-    program: Vec<ConversionOperation>,
+    program: CompactProgram,
     compiled_term_count: u64,
-    retained_term_capacity: u64,
     compact_operation_count: u64,
     iteration_operation_count: u64,
     collect_program: bool,
@@ -127,14 +196,34 @@ impl ConversionPlan {
         let mut plan = Self::new(admission.limits.clone(), true);
         let operation_count = usize::try_from(admission.compact_operation_count)
             .map_err(|_| compilation_overflow())?;
+        let term_count =
+            usize::try_from(admission.compiled_term_count).map_err(|_| compilation_overflow())?;
+        // Both reservations are admitted before either is made: admission counted them exactly.
+        plan.admit_bytes(
+            compiled_storage_bytes(
+                admission.compact_operation_count,
+                admission.compiled_term_count,
+            )?
+            .checked_add(plan.record_storage_bytes()?)
+            .ok_or_else(compilation_overflow)?,
+        )?;
         plan.program
+            .operations
             .try_reserve_exact(operation_count)
             .map_err(|error| {
-                DetectionError::invalid_sampler_compilation(format!(
+                DetectionError::storage_allocation(format!(
                     "unable to reserve {operation_count} compact conversion operations: {error}"
                 ))
             })?;
-        plan.validate_materialized_storage_with_terms(admission.compiled_term_count)?;
+        plan.program
+            .terms
+            .try_reserve_exact(term_count)
+            .map_err(|error| {
+                DetectionError::storage_allocation(format!(
+                    "unable to reserve {term_count} detection conversion measurement references: {error}"
+                ))
+            })?;
+        plan.validate_compiled_bytes()?;
         visit(&mut plan)?;
         plan.validate_against_admission(&admission)?;
         plan.validate_compiled_shape()?;
@@ -148,9 +237,8 @@ impl ConversionPlan {
             sweep_bit_count: 0,
             detector_count: 0,
             observable_count: 0,
-            program: Vec::new(),
+            program: CompactProgram::default(),
             compiled_term_count: 0,
-            retained_term_capacity: 0,
             compact_operation_count: 0,
             iteration_operation_count: 0,
             collect_program,
@@ -201,9 +289,10 @@ impl ConversionPlan {
             compact_operation_count: self.compact_operation_count,
             iteration_operation_count: self.iteration_operation_count,
         };
-        let marker_index = if self.collect_program && self.program.len() < self.program.capacity() {
-            let index = self.program.len();
-            self.program.push(ConversionOperation::Repeat {
+        let operations = &mut self.program.operations;
+        let marker_index = if self.collect_program && operations.len() < operations.capacity() {
+            let index = operations.len();
+            operations.push(ConversionOperation::Repeat {
                 count: 0,
                 body_end: 0,
                 measurement_count: 0,
@@ -252,10 +341,13 @@ impl ConversionPlan {
             .ok_or_else(compilation_overflow)?;
         if body_operation_count == 0 {
             if let Some(index) = marker_index {
-                if index.checked_add(1) != Some(self.program.len()) {
+                if index.checked_add(1) != Some(self.program.operations.len()) {
                     return Err(compilation_shape_mismatch());
                 }
-                self.program.pop().ok_or_else(compilation_shape_mismatch)?;
+                self.program
+                    .operations
+                    .pop()
+                    .ok_or_else(compilation_shape_mismatch)?;
             }
             return Ok(());
         }
@@ -265,6 +357,7 @@ impl ConversionPlan {
             self.try_push_operation(ConversionOperation::EndRepeat)?;
             let body_end = self
                 .program
+                .operations
                 .len()
                 .checked_sub(1)
                 .ok_or_else(compilation_shape_mismatch)?;
@@ -272,6 +365,7 @@ impl ConversionPlan {
                 self.iteration_operation_count > snapshot.iteration_operation_count;
             let marker = self
                 .program
+                .operations
                 .get_mut(index)
                 .ok_or_else(compilation_shape_mismatch)?;
             *marker = ConversionOperation::Repeat {
@@ -403,17 +497,7 @@ impl ConversionPlan {
         self.detector_count = next_detector_count;
         self.validate_compiled_bytes()?;
 
-        let mut terms = Vec::new();
-        if self.collect_program {
-            terms
-                .try_reserve_exact(instruction.targets().len())
-                .map_err(|error| {
-                    DetectionError::invalid_sampler_compilation(format!(
-                        "unable to reserve {} detector measurement references: {error}",
-                        instruction.targets().len()
-                    ))
-                })?;
-        }
+        let start = self.program.terms.len();
         for target in instruction.targets() {
             let offset = target.measurement_record_offset().ok_or_else(|| {
                 DetectionError::invalid_result_format(format!(
@@ -422,21 +506,16 @@ impl ConversionPlan {
             })?;
             self.validate_measurement_offset(offset)?;
             if self.collect_program {
-                terms.push(offset);
+                self.program.push_term(offset)?;
             }
         }
         self.add_compiled_terms(resource_amount(
             instruction.targets().len(),
             "detector measurement-reference count",
         )?)?;
-        if self.collect_program {
-            self.add_retained_term_capacity(resource_amount(
-                terms.capacity(),
-                "detector measurement-reference capacity",
-            )?)?;
-        }
         self.add_root_operation(true)?;
         if self.collect_program {
+            let terms = self.program.span_since(start)?;
             let operation = if terms.len() > execution::SHORT_PARITY_TERMS {
                 ConversionOperation::WideDetector(terms)
             } else {
@@ -498,19 +577,12 @@ impl ConversionPlan {
             .iter()
             .filter(|target| target.measurement_record_offset().is_some())
             .count();
-        let mut terms = Vec::new();
-        if self.collect_program {
-            terms.try_reserve_exact(term_count).map_err(|error| {
-                DetectionError::invalid_sampler_compilation(format!(
-                    "unable to reserve {term_count} observable measurement references: {error}"
-                ))
-            })?;
-        }
+        let start = self.program.terms.len();
         for target in instruction.targets() {
             if let Some(offset) = target.measurement_record_offset() {
                 self.validate_measurement_offset(offset)?;
                 if self.collect_program {
-                    terms.push(offset);
+                    self.program.push_term(offset)?;
                 }
             } else if !target.is_pauli_target() {
                 return Err(DetectionError::invalid_result_format(format!(
@@ -525,14 +597,9 @@ impl ConversionPlan {
             term_count,
             "observable measurement-reference count",
         )?)?;
-        if self.collect_program {
-            self.add_retained_term_capacity(resource_amount(
-                terms.capacity(),
-                "observable measurement-reference capacity",
-            )?)?;
-        }
         self.add_root_operation(true)?;
         if self.collect_program {
+            let terms = self.program.span_since(start)?;
             self.try_push_operation(ConversionOperation::Observable {
                 id: observable_id,
                 terms,
@@ -602,29 +669,22 @@ impl ConversionPlan {
     }
 
     fn try_push_operation(&mut self, operation: ConversionOperation) -> DetectionResult<()> {
-        if self.program.len() == self.program.capacity() {
-            self.program.try_reserve(1).map_err(|error| {
-                DetectionError::invalid_sampler_compilation(format!(
+        let operations = &mut self.program.operations;
+        if operations.len() == operations.capacity() {
+            operations.try_reserve(1).map_err(|error| {
+                DetectionError::storage_allocation(format!(
                     "unable to reserve compact conversion operation: {error}"
                 ))
             })?;
             self.validate_compiled_bytes()?;
         }
-        self.program.push(operation);
+        self.program.operations.push(operation);
         Ok(())
     }
 
     fn add_compiled_terms(&mut self, count: u64) -> DetectionResult<()> {
         self.compiled_term_count = self
             .compiled_term_count
-            .checked_add(count)
-            .ok_or_else(compilation_overflow)?;
-        self.validate_compiled_bytes()
-    }
-
-    fn add_retained_term_capacity(&mut self, count: u64) -> DetectionResult<()> {
-        self.retained_term_capacity = self
-            .retained_term_capacity
             .checked_add(count)
             .ok_or_else(compilation_overflow)?;
         self.validate_compiled_bytes()
@@ -721,7 +781,7 @@ impl ConversionPlan {
 
     fn validate_materialized_program(&self) -> DetectionResult<()> {
         let retained_operations = resource_amount(
-            self.program.len(),
+            self.program.operations.len(),
             "materialized compact conversion operation count",
         )?;
         if retained_operations != self.compact_operation_count {
@@ -732,17 +792,17 @@ impl ConversionPlan {
             ));
         }
 
-        let mut retained_terms = 0_u64;
-        let mut retained_term_capacity = 0_u64;
+        // Every span is cut in order from the one arena, so the spans tile it exactly.
+        let mut next_term = 0_usize;
         let mut repeat_ends = [None; RepeatNestingLimit::HARD_MAX];
         let mut repeat_depth = 0_usize;
-        for (index, operation) in self.program.iter().enumerate() {
+        for (index, operation) in self.program.operations.iter().enumerate() {
             let terms = match operation {
                 ConversionOperation::Detector(terms)
                 | ConversionOperation::WideDetector(terms)
-                | ConversionOperation::Observable { terms, .. } => Some(terms),
+                | ConversionOperation::Observable { terms, .. } => Some(*terms),
                 ConversionOperation::Repeat { body_end, .. } => {
-                    validate_repeat_marker(&self.program, index, *body_end)?;
+                    validate_repeat_marker(&self.program.operations, index, *body_end)?;
                     let slot = repeat_ends
                         .get_mut(repeat_depth)
                         .ok_or_else(compilation_shape_mismatch)?;
@@ -769,32 +829,22 @@ impl ConversionPlan {
                 ConversionOperation::AdvanceMeasurements(_) => None,
             };
             if let Some(terms) = terms {
-                retained_terms = retained_terms
-                    .checked_add(resource_amount(terms.len(), "retained conversion terms")?)
-                    .ok_or_else(compilation_overflow)?;
-                retained_term_capacity = retained_term_capacity
-                    .checked_add(resource_amount(
-                        terms.capacity(),
-                        "retained conversion term capacity",
-                    )?)
-                    .ok_or_else(compilation_overflow)?;
+                if terms.start != next_term {
+                    return Err(compilation_shape_mismatch());
+                }
+                next_term = terms.end;
             }
         }
-        if repeat_depth != 0 {
+        if repeat_depth != 0 || next_term != self.program.terms.len() {
             return Err(compilation_shape_mismatch());
         }
+        let retained_terms =
+            resource_amount(self.program.terms.len(), "retained conversion terms")?;
         if retained_terms != self.compiled_term_count {
             return Err(compilation_admission_mismatch(
                 "retained compiled term count",
                 self.compiled_term_count,
                 retained_terms,
-            ));
-        }
-        if retained_term_capacity != self.retained_term_capacity {
-            return Err(compilation_admission_mismatch(
-                "retained compiled term capacity",
-                self.retained_term_capacity,
-                retained_term_capacity,
             ));
         }
         Ok(())
@@ -831,30 +881,20 @@ impl ConversionPlan {
         })
     }
 
-    fn validate_materialized_storage_with_terms(&self, term_count: u64) -> DetectionResult<()> {
-        let operation_count = resource_amount(
-            self.program.capacity(),
-            "compact conversion operation capacity",
-        )?;
-        let bytes = compiled_storage_bytes(operation_count, term_count)?
-            .checked_add(self.record_storage_bytes()?)
-            .ok_or_else(compilation_overflow)?;
-        self.admit_bytes(bytes)
-    }
-
     pub(super) fn compiled_storage_bytes(&self) -> DetectionResult<u64> {
-        let operation_count = if self.collect_program {
-            resource_amount(
-                self.program.capacity(),
-                "compact conversion operation capacity",
-            )?
+        let (operation_count, term_count) = if self.collect_program {
+            (
+                resource_amount(
+                    self.program.operations.capacity(),
+                    "compact conversion operation capacity",
+                )?,
+                resource_amount(
+                    self.program.terms.capacity(),
+                    "detection conversion measurement-reference capacity",
+                )?,
+            )
         } else {
-            self.compact_operation_count
-        };
-        let term_count = if self.collect_program {
-            self.retained_term_capacity
-        } else {
-            self.compiled_term_count
+            (self.compact_operation_count, self.compiled_term_count)
         };
         compiled_storage_bytes(operation_count, term_count)?
             .checked_add(self.record_storage_bytes()?)
@@ -968,16 +1008,10 @@ impl ConversionPlan {
 impl ConversionPlan {
     /// The most measurements back from the current one that any detector or observable reads.
     pub(super) fn max_record_lookback(&self) -> usize {
+        // The arena holds exactly the terms of every detector and observable.
         self.program
+            .terms
             .iter()
-            .flat_map(|operation| match operation {
-                ConversionOperation::Detector(terms)
-                | ConversionOperation::WideDetector(terms)
-                | ConversionOperation::Observable { terms, .. } => terms.as_slice(),
-                ConversionOperation::AdvanceMeasurements(_)
-                | ConversionOperation::Repeat { .. }
-                | ConversionOperation::EndRepeat => &[],
-            })
             .map(|offset| super::frame::lookback_distance(*offset))
             .max()
             .unwrap_or(0)
@@ -1048,6 +1082,7 @@ fn measurement_index_from_offset(
     Ok(index)
 }
 
+#[cold]
 fn unavailable_measurement(offset: MeasureRecordOffset) -> DetectionError {
     DetectionError::invalid_result_format(format!(
         "measurement record target rec[{}] is not available",

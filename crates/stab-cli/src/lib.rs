@@ -10,6 +10,7 @@
 )]
 
 use std::ffi::OsString;
+use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
@@ -55,8 +56,8 @@ use stab_model::{
     MemoryBudgetParseError, ModelResult, ParseLimits, Probability,
 };
 use stab_records::{
-    DetsResultType, MeasurementBatchView, MeasurementSink, RecordBatchPart, RecordEncoder,
-    RecordFormat, RecordPart, validate_ptb64_shot_count,
+    BitIndex, DetsResultType, MeasurementBatchView, MeasurementSink, RecordBatchPart,
+    RecordEncoder, RecordFormat, RecordPart, ShotIndex, validate_ptb64_shot_count,
 };
 
 /// Stab-native admission budget shared by every command that reads, compiles, executes, or
@@ -502,11 +503,34 @@ fn run_gen<W>(args: GenArgs, stdout: &mut W) -> Result<(), CliError>
 where
     W: Write,
 {
-    let circuit_text = generated_circuit_text(&args)?;
-    write_output(args.output.as_ref(), stdout, circuit_text.as_bytes())
+    let (header, generated) = generate_circuit(&args)?;
+    // The circuit text streams to its destination instead of being rendered into a `String`
+    // first, which for large codes held one or two extra copies of the whole text. Output opens
+    // only after generation succeeds, so a rejected request never creates or truncates `--out`.
+    let write = |out: &mut dyn Write| write_generated_circuit(out, &args, header, &generated);
+    if let Some(path) = args.output.as_ref() {
+        let write_path_error = |source| CliError::WritePath {
+            path: path.clone(),
+            source,
+        };
+        let mut file = io_plan::buffered_output(File::create(path).map_err(write_path_error)?);
+        write(&mut file)
+            .and_then(|()| file.flush())
+            .map_err(write_path_error)
+    } else {
+        write(stdout).map_err(CliError::WriteOutput)
+    }
 }
 
-fn generated_circuit_text(args: &GenArgs) -> Result<String, CliError> {
+/// The parsed `gen` parameters the output header echoes.
+#[derive(Clone, Copy, Debug)]
+struct GenHeader {
+    rounds: RoundCount,
+    distance: CodeDistance,
+    probabilities: GeneratorProbabilities,
+}
+
+fn generate_circuit(args: &GenArgs) -> Result<(GenHeader, GeneratedCircuit), CliError> {
     let rounds = RoundCount::try_new(args.rounds)?;
     let distance = CodeDistance::try_new(args.distance)?;
     let probabilities = GeneratorProbabilities::from_args(args)?;
@@ -542,13 +566,13 @@ fn generated_circuit_text(args: &GenArgs) -> Result<String, CliError> {
             generate_color_code_circuit(&params)?
         }
     };
-    Ok(format_generated_circuit(
-        args.code.as_stim_name(),
-        &args.task,
-        rounds,
-        distance,
-        probabilities,
-        &generated,
+    Ok((
+        GenHeader {
+            rounds,
+            distance,
+            probabilities,
+        },
+        generated,
     ))
 }
 
@@ -597,52 +621,46 @@ impl GeneratorProbabilities {
     }
 }
 
-fn format_generated_circuit(
-    code_name: &str,
-    task: &str,
-    rounds: RoundCount,
-    distance: CodeDistance,
-    probabilities: GeneratorProbabilities,
+fn write_generated_circuit(
+    out: &mut dyn Write,
+    args: &GenArgs,
+    header: GenHeader,
     generated: &GeneratedCircuit,
-) -> String {
-    let mut out = String::new();
-    out.push_str("# Generated ");
-    out.push_str(code_name);
-    out.push_str(" circuit.\n");
-    out.push_str("# task: ");
-    out.push_str(task);
-    out.push('\n');
-    out.push_str("# rounds: ");
-    out.push_str(&rounds.get().to_string());
-    out.push('\n');
-    out.push_str("# distance: ");
-    out.push_str(&distance.get().to_string());
-    out.push('\n');
-    write_probability_header(
-        &mut out,
-        "before_round_data_depolarization",
-        probabilities.before_round_data_depolarization,
-    );
-    write_probability_header(
-        &mut out,
-        "before_measure_flip_probability",
-        probabilities.before_measure_flip_probability,
-    );
-    write_probability_header(
-        &mut out,
-        "after_reset_flip_probability",
-        probabilities.after_reset_flip_probability,
-    );
-    write_probability_header(
-        &mut out,
-        "after_clifford_depolarization",
-        probabilities.after_clifford_depolarization,
-    );
-    out.push_str("# layout:\n");
-    out.push_str(generated.layout_text());
-    out.push_str(generated.hint_text());
-    out.push_str(&generated.circuit().to_stim_string());
-    out
+) -> std::io::Result<()> {
+    let GenHeader {
+        rounds,
+        distance,
+        probabilities,
+    } = header;
+    writeln!(out, "# Generated {} circuit.", args.code.as_stim_name())?;
+    writeln!(out, "# task: {}", args.task)?;
+    writeln!(out, "# rounds: {}", rounds.get())?;
+    writeln!(out, "# distance: {}", distance.get())?;
+    for (name, value) in [
+        (
+            "before_round_data_depolarization",
+            probabilities.before_round_data_depolarization,
+        ),
+        (
+            "before_measure_flip_probability",
+            probabilities.before_measure_flip_probability,
+        ),
+        (
+            "after_reset_flip_probability",
+            probabilities.after_reset_flip_probability,
+        ),
+        (
+            "after_clifford_depolarization",
+            probabilities.after_clifford_depolarization,
+        ),
+    ] {
+        writeln!(out, "# {name}: {}", value.stim_text())?;
+    }
+    out.write_all(b"# layout:\n")?;
+    out.write_all(generated.layout_text().as_bytes())?;
+    out.write_all(generated.hint_text().as_bytes())?;
+    let mut out = out;
+    generated.circuit().write_stim_io(&mut out)
 }
 
 fn parse_repetition_task(task: &str) -> Result<RepetitionCodeTask, CliError> {
@@ -677,14 +695,6 @@ fn parse_color_task(task: &str) -> Result<ColorCodeTask, CliError> {
 
 fn probability_arg(value: f64) -> ModelResult<Probability> {
     Probability::try_new(value)
-}
-
-fn write_probability_header(out: &mut String, name: &str, value: Probability) {
-    out.push_str("# ");
-    out.push_str(name);
-    out.push_str(": ");
-    out.push_str(&value.stim_text().to_string());
-    out.push('\n');
 }
 
 pub(crate) fn write_output<W>(
@@ -958,12 +968,14 @@ where
             self.filtered_record.clear();
             self.filtered_record.resize(indices.len().div_ceil(64), 0);
             for (output_index, index) in indices.iter().enumerate() {
-                let bit = batch.get(shot_index, *index).ok_or_else(|| {
-                    std::io::Error::other(format!(
-                        "internal sample layout index {index} exceeded record width {}",
-                        batch.width().get()
-                    ))
-                })?;
+                let bit = batch
+                    .get(ShotIndex(shot_index), BitIndex(*index))
+                    .ok_or_else(|| {
+                        std::io::Error::other(format!(
+                            "internal sample layout index {index} exceeded record width {}",
+                            batch.width().get()
+                        ))
+                    })?;
                 if bit && let Some(word) = self.filtered_record.get_mut(output_index / 64) {
                     *word |= 1 << (output_index % 64);
                 }

@@ -22,12 +22,20 @@ impl DetectionSink for DetectionBits {
     fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
         for shot in 0..batch.shot_count() {
             for bit in 0..batch.detector_width().get() {
-                self.bits
-                    .push(batch.detectors().get(shot, bit).expect("detector bit"));
+                self.bits.push(
+                    batch
+                        .detectors()
+                        .get(ShotIndex(shot), BitIndex(bit))
+                        .expect("detector bit"),
+                );
             }
             for bit in 0..batch.observable_width().get() {
-                self.bits
-                    .push(batch.observables().get(shot, bit).expect("observable bit"));
+                self.bits.push(
+                    batch
+                        .observables()
+                        .get(ShotIndex(shot), BitIndex(bit))
+                        .expect("observable bit"),
+                );
             }
         }
         Ok(())
@@ -177,11 +185,11 @@ fn folded_and_unrolled_repeats_execute_identically_on_every_program_walker() {
             detection_stream(&unrolled_circuit, seed),
             "{label}"
         );
-        for unknown_input in [false, true] {
+        for initial_state in [InitialState::Zero, InitialState::Unknown] {
             // Heralded noise makes Stim's count reject the circuit; both forms must agree.
             assert_eq!(
-                folded_plan.try_count_determined_measurements(unknown_input),
-                unrolled_plan.try_count_determined_measurements(unknown_input),
+                folded_plan.try_count_determined_measurements(initial_state),
+                unrolled_plan.try_count_determined_measurements(initial_state),
                 "{label}"
             );
         }

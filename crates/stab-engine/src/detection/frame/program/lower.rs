@@ -246,7 +246,7 @@ impl CircuitProgram {
         entries
             .try_reserve_exact(admission.entry_count)
             .map_err(|error| {
-                DetectionError::invalid_sampler_compilation(format!(
+                DetectionError::storage_allocation(format!(
                     "unable to reserve {} compact detector-frame entries: {error}",
                     admission.entry_count
                 ))
@@ -255,7 +255,7 @@ impl CircuitProgram {
         repeat_markers
             .try_reserve_exact(RepeatNestingLimit::HARD_MAX)
             .map_err(|error| {
-                DetectionError::invalid_sampler_compilation(format!(
+                DetectionError::storage_allocation(format!(
                     "unable to reserve detector-frame repeat markers: {error}"
                 ))
             })?;

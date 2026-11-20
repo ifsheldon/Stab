@@ -9,7 +9,7 @@
 use std::assert_matches;
 use std::convert::Infallible;
 
-use stab_records::{MeasurementSink, PackedShotBatch};
+use stab_records::{BitIndex, MeasurementSink, PackedShotBatch, ShotIndex};
 
 use super::super::test_support::convert_measurements_to_detection_events_with_sweep;
 use super::*;
@@ -39,7 +39,7 @@ impl DetectionSink for CollectSink {
                 .map(|bit_index| {
                     batch
                         .detectors()
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("detector bit")
                 })
                 .collect();
@@ -47,7 +47,7 @@ impl DetectionSink for CollectSink {
                 .map(|bit_index| {
                     batch
                         .observables()
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("observable bit")
                 })
                 .collect();
@@ -125,8 +125,8 @@ impl DetectionSink for NullSink {
 
     fn write_batch(&mut self, batch: DetectionBatchView<'_>) -> Result<(), Self::Error> {
         self.shots += batch.shot_count();
-        std::hint::black_box(batch.detectors().get(0, 0));
-        std::hint::black_box(batch.observables().get(0, 0));
+        std::hint::black_box(batch.detectors().get(ShotIndex(0), BitIndex(0)));
+        std::hint::black_box(batch.observables().get(ShotIndex(0), BitIndex(0)));
         Ok(())
     }
 

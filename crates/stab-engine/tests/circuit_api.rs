@@ -8,8 +8,9 @@ mod support;
 use std::assert_matches;
 
 use stab_engine::{
-    DetectionError, ReferenceSampleTree, circuit_reference_sample, circuit_reference_signs,
-    count_determined_measurements, detection_record_width, measurement_record_count,
+    DetectionError, InitialState, ReferenceSampleTree, circuit_reference_sample,
+    circuit_reference_signs, count_determined_measurements, detection_record_width,
+    measurement_record_count,
 };
 use stab_model::Circuit;
 
@@ -134,8 +135,35 @@ fn circuit_reference_signs_match_stim_ordering_and_reference_semantics() {
     for (name, source, expected_detectors, expected_observables) in cases {
         let circuit = Circuit::from_stim_str(source).expect("parse reference-sign case");
         let signs = circuit_reference_signs(&circuit).expect("compute reference-sign case");
-        assert_eq!(signs.detector_signs(), *expected_detectors, "{name}");
-        assert_eq!(signs.observable_signs(), *expected_observables, "{name}");
+        let detectors = signs.detector_signs().iter().collect::<Vec<_>>();
+        let observables = signs.observable_signs().iter().collect::<Vec<_>>();
+        assert_eq!(detectors, *expected_detectors, "{name}");
+        assert_eq!(observables, *expected_observables, "{name}");
+    }
+
+    // Signs straddling word boundaries pack in declaration order with a masked tail word.
+    let mut wide = String::new();
+    for qubit in 0..130 {
+        if qubit % 3 == 0 {
+            wide.push_str(&format!("X {qubit}\n"));
+        }
+        wide.push_str(&format!(
+            "M {qubit}\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE({qubit}) rec[-1]\n"
+        ));
+    }
+    let circuit = Circuit::from_stim_str(&wide).expect("parse word-straddling case");
+    let signs = circuit_reference_signs(&circuit).expect("compute word-straddling case");
+    let expected = (0..130).map(|qubit| qubit % 3 == 0).collect::<Vec<_>>();
+    for slice in [signs.detector_signs(), signs.observable_signs()] {
+        assert_eq!(slice.len(), 130);
+        assert_eq!(slice.iter().collect::<Vec<_>>(), expected);
+        assert_eq!(slice.words().len(), 3);
+        assert_eq!(slice.popcount(), 44);
+        assert_eq!(
+            slice.words().last().map(|word| word >> 2),
+            Some(0),
+            "bits past the last sign stay clear"
+        );
     }
 
     let invalid =
@@ -192,7 +220,7 @@ fn pf1_circuit_reference_determined_count_determined_measurements_matches_public
     )
     .expect("parse tagged circuit");
     assert_eq!(
-        count_determined_measurements(&tagged, false).expect("count determined"),
+        count_determined_measurements(&tagged, InitialState::Zero).expect("count determined"),
         1
     );
 
@@ -203,23 +231,25 @@ fn pf1_circuit_reference_determined_count_determined_measurements_matches_public
     )
     .expect("parse unknown-input circuit");
     assert_eq!(
-        count_determined_measurements(&unknown_input, true).expect("count with unknown input"),
+        count_determined_measurements(&unknown_input, InitialState::Unknown)
+            .expect("count with unknown input"),
         2
     );
     assert_eq!(
-        count_determined_measurements(&unknown_input, false).expect("count with known zero input"),
+        count_determined_measurements(&unknown_input, InitialState::Zero)
+            .expect("count with known zero input"),
         3
     );
 
     let sweep_controlled =
         Circuit::from_stim_str("X 0\nCX sweep[0] 0\nM 0\n").expect("parse sweep circuit");
     assert_eq!(
-        count_determined_measurements(&sweep_controlled, false)
+        count_determined_measurements(&sweep_controlled, InitialState::Zero)
             .expect("count deterministic sweep circuit"),
         1
     );
     assert_eq!(
-        count_determined_measurements(&sweep_controlled, true)
+        count_determined_measurements(&sweep_controlled, InitialState::Unknown)
             .expect("count unknown-input sweep circuit"),
         0
     );

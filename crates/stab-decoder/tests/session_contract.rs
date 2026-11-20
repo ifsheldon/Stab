@@ -123,7 +123,7 @@ fn filled_predictions(
     let record = vec![value; correction_width];
     for shot in 0..shot_capacity {
         predictions
-            .records_mut()
+            .view_mut()
             .copy_shot_from_bools(shot, &record)
             .expect("prediction sentinel");
     }

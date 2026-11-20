@@ -6,7 +6,6 @@ mod descriptor;
 mod detection;
 mod fingerprint;
 mod lane_width;
-mod probability;
 mod reference_sample_tree;
 mod resource_amount;
 mod sampled_flow;
@@ -16,10 +15,10 @@ mod work_poll;
 
 pub use dem_sampling::{
     DEM_SAMPLING_COMPILATION_DESCRIPTOR, DemError, DemReplayBatchStatus, DemReplayRecordStore,
-    DemReplayRetention, DemReplaySession, DemReplayTransaction, DemResourceKind,
-    DemResourceLimitError, DemSamplerLimits, DemSamplingCompiler, DemSamplingExecutionError,
-    DemSamplingPlan, DemSamplingRunError, DemSamplingRunProgress, DemSamplingRunStatus,
-    DemSamplingRunSummary, DemSamplingSession,
+    DemReplayRetention, DemReplaySession, DemReplayStoreState, DemReplayTransaction,
+    DemResourceKind, DemResourceLimitError, DemSamplerLimits, DemSamplingCompiler,
+    DemSamplingExecutionError, DemSamplingPlan, DemSamplingRunError, DemSamplingRunProgress,
+    DemSamplingRunStatus, DemSamplingRunSummary, DemSamplingSession,
 };
 pub use descriptor::CompilationDescriptor;
 pub(crate) use detection::DetectionRecordBuffer;
@@ -38,7 +37,6 @@ pub use detection::{
 };
 pub use fingerprint::{CompilationOperation, CompilationRequestFingerprint};
 pub use lane_width::LaneWidth;
-pub use probability::biased_randomize_bits;
 pub use reference_sample_tree::{ReferenceSampleTree, ReferenceSampleTreeError};
 pub use resource_amount::ResourceAmount;
 pub use sampled_flow::{
@@ -47,11 +45,11 @@ pub use sampled_flow::{
 };
 pub use sampling::COMPILATION_DESCRIPTOR;
 pub use sampling::{
-    CircuitReferenceSampleError, CountDeterminedMeasurementsError, PlanFingerprint, RandomPolicy,
-    ReferenceSample, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError, SamplingBackend,
-    SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler, SamplingExecutionError,
-    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
-    Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun, SweepRecord, circuit_reference_sample,
+    CircuitReferenceSampleError, CountDeterminedMeasurementsError, InitialState, PlanFingerprint,
+    RandomPolicy, ReferenceSample, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
+    SamplingBackend, SamplingCompileError, SamplingCompiler, SamplingExecutionError, SamplingPlan,
+    SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession, Seed, ShotCount,
+    SinkFailurePhase, StreamingSamplingRun, SweepRecord, circuit_reference_sample,
     count_determined_measurements,
 };
 pub use sampling_estimate::estimate_sampling_request;

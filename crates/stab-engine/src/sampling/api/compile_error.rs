@@ -1,24 +1,5 @@
 use thiserror::Error;
 
-/// Stable code classifying a sampling compilation failure.
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum SamplingCompileErrorCode {
-    InvalidCircuit,
-    ResourceLimit,
-    Cancelled,
-}
-
-impl SamplingCompileErrorCode {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::InvalidCircuit => "invalid-circuit",
-            Self::ResourceLimit => "resource-limit",
-            Self::Cancelled => "cancelled",
-        }
-    }
-}
-
 /// Failure to compile an immutable sampling plan.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum SamplingCompileError {
@@ -36,6 +17,10 @@ pub enum SamplingCompileError {
     )]
     CompiledBytesLimit { required: u64, budget: u64 },
 
+    /// The allocator refused storage that admission had already accepted.
+    #[error("cannot compile circuit sampler: {message}")]
+    StorageAllocation { message: String },
+
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
 }
@@ -44,16 +29,6 @@ impl SamplingCompileError {
     pub(crate) fn invalid_circuit(message: impl Into<String>) -> Self {
         Self::InvalidCircuit {
             message: message.into(),
-        }
-    }
-
-    pub const fn code(&self) -> SamplingCompileErrorCode {
-        match self {
-            Self::CompiledBytesLimit { .. } => SamplingCompileErrorCode::ResourceLimit,
-            Self::Cancelled(_) => SamplingCompileErrorCode::Cancelled,
-            Self::Model(_) | Self::Analysis(_) | Self::InvalidCircuit { .. } => {
-                SamplingCompileErrorCode::InvalidCircuit
-            }
         }
     }
 }

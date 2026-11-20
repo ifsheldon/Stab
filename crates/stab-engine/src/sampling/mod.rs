@@ -31,10 +31,10 @@ mod reference_simulator;
 mod stabilizer_frame;
 
 pub use api::{
-    PlanFingerprint, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode, RunError,
-    SamplingBackend, SamplingCompileError, SamplingCompileErrorCode, SamplingCompiler,
-    SamplingExecutionError, SamplingPlan, SamplingRunProgress, SamplingRunStatus,
-    SamplingRunSummary, SamplingSession, Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun,
+    InitialState, PlanFingerprint, RandomPolicy, ReferenceSampleLoopPolicy, ReferenceSampleMode,
+    RunError, SamplingBackend, SamplingCompileError, SamplingCompiler, SamplingExecutionError,
+    SamplingPlan, SamplingRunProgress, SamplingRunStatus, SamplingRunSummary, SamplingSession,
+    Seed, ShotCount, SinkFailurePhase, StreamingSamplingRun,
 };
 pub(crate) use api::{session_cancellation, session_cancellation_slot};
 pub(crate) use local_tableau::LocalTableauTransform;
@@ -55,7 +55,7 @@ impl SamplingPlan {
     /// Counts deterministic measurements after admitting and allocating bounded analysis storage.
     pub fn try_count_determined_measurements(
         &self,
-        unknown_input: bool,
+        initial_state: InitialState,
     ) -> Result<u64, SamplingExecutionError> {
         if self.inner.measurement_count == 0 {
             return Ok(0);
@@ -69,7 +69,7 @@ impl SamplingPlan {
         reference_run::count_determined_measurements(
             &self.inner.program,
             self.inner.qubit_count,
-            unknown_input,
+            initial_state,
             &self.inner.cancellation,
         )
     }
@@ -200,11 +200,18 @@ fn sampling_compile_error(error: DetectionError) -> SamplingCompileError {
                 "repeat nesting exceeds sampler limit {}",
                 stab_model::RepeatNestingLimit::HARD_MAX
             )),
-            DetectionResourceKind::CompiledBytes => SamplingCompileError::CompiledBytesLimit {
-                required: limit.actual(),
-                budget: limit.limit(),
-            },
+            // Lowering refuses only compiled bytes; a session-storage refusal is still a budget
+            // refusal, so it keeps the resource classification.
+            DetectionResourceKind::CompiledBytes | DetectionResourceKind::SessionStorageBytes => {
+                SamplingCompileError::CompiledBytesLimit {
+                    required: limit.actual(),
+                    budget: limit.limit(),
+                }
+            }
         },
+        DetectionError::StorageAllocation { message } => {
+            SamplingCompileError::StorageAllocation { message }
+        }
         DetectionError::Cancelled(cancelled) => SamplingCompileError::Cancelled(cancelled),
     }
 }
@@ -238,11 +245,11 @@ pub fn circuit_reference_sample(
 
 pub fn count_determined_measurements(
     circuit: &Circuit,
-    unknown_input: bool,
+    initial_state: InitialState,
 ) -> Result<u64, CountDeterminedMeasurementsError> {
     Ok(SamplingCompiler::new()
         .compile(circuit)?
-        .try_count_determined_measurements(unknown_input)?)
+        .try_count_determined_measurements(initial_state)?)
 }
 
 fn sampler_rng(seed: Option<u64>) -> SmallRng {

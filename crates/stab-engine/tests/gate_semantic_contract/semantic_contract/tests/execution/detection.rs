@@ -8,7 +8,7 @@ use crate::{
         ReferenceSampleMode, Seed, ShotCount,
     },
 };
-use stab_records::PackedShotBatch;
+use stab_records::{BitIndex, PackedShotBatch, ShotIndex};
 
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
@@ -40,7 +40,7 @@ impl DetectionSink for DetectionCollector {
                     .map(|bit| {
                         batch
                             .detectors()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated detector coordinate")
                     })
                     .collect(),
@@ -48,7 +48,7 @@ impl DetectionSink for DetectionCollector {
                     .map(|bit| {
                         batch
                             .observables()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated observable coordinate")
                     })
                     .collect(),

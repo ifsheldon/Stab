@@ -7,7 +7,7 @@ use std::convert::Infallible;
 
 use stab_engine::{DemSamplingCompiler, DemSamplingPlan, RandomPolicy, Seed, ShotCount};
 use stab_model::DetectorErrorModel;
-use stab_records::{DemSampleBatchView, DemSampleSink};
+use stab_records::{BitIndex, DemSampleBatchView, DemSampleSink, ShotIndex};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct SampleRecord {
@@ -36,7 +36,7 @@ impl DemSampleSink for CollectSamples {
                     .map(|bit| {
                         detection
                             .detectors()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated detector coordinate")
                     })
                     .collect(),
@@ -44,7 +44,7 @@ impl DemSampleSink for CollectSamples {
                     .map(|bit| {
                         detection
                             .observables()
-                            .get(shot, bit)
+                            .get(ShotIndex(shot), BitIndex(bit))
                             .expect("validated observable coordinate")
                     })
                     .collect(),

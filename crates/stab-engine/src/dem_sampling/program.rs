@@ -107,9 +107,7 @@ impl<'a> DemCompileMeter<'a> {
 
 fn reserve_exact_dem<T>(vec: &mut Vec<T>, additional: usize, kind: &'static str) -> DemResult<()> {
     vec.try_reserve_exact(additional).map_err(|error| {
-        DemError::invalid_sampler_compilation(format!(
-            "unable to reserve {additional} {kind}: {error}"
-        ))
+        DemError::storage_allocation(format!("unable to reserve {additional} {kind}: {error}"))
     })
 }
 

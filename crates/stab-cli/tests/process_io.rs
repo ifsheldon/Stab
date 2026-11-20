@@ -542,7 +542,8 @@ fn piped_replay_input_the_budget_cannot_retain_fails_before_creating_outputs() {
             &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
             ShotCount::new(SHOTS),
         )
-        .is_retaining()
+        .state()
+            == stab_engine::DemReplayStoreState::Retaining
     };
     let (mut refused, mut retaining) = (0_u64, MemoryBudget::DEFAULT.bytes());
     while refused + 1 < retaining {

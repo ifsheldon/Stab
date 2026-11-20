@@ -82,6 +82,9 @@ fn model_error_code(error: &ModelError) -> &'static str {
 /// a never-cancelled signal, so only a library caller embedding these diagnostics observes it.
 const CANCELLED_CODE: &str = "cancelled";
 
+/// Stable diagnostic code of a memory-budget refusal or of an allocation the allocator refused.
+const RESOURCE_LIMIT_CODE: &str = "resource-limit-exceeded";
+
 fn analysis_error_code(error: &AnalysisError) -> &'static str {
     match error {
         AnalysisError::Model(error) => model_error_code(error),
@@ -100,7 +103,8 @@ fn sampling_compile_error_code(error: &SamplingCompileError) -> &'static str {
         SamplingCompileError::Model(error) => model_error_code(error),
         SamplingCompileError::Analysis(error) => analysis_error_code(error),
         SamplingCompileError::InvalidCircuit { .. } => "invalid-sampler-compilation",
-        SamplingCompileError::CompiledBytesLimit { .. } => "resource-limit-exceeded",
+        SamplingCompileError::CompiledBytesLimit { .. }
+        | SamplingCompileError::StorageAllocation { .. } => RESOURCE_LIMIT_CODE,
         SamplingCompileError::Cancelled(_) => CANCELLED_CODE,
     }
 }
@@ -108,6 +112,8 @@ fn sampling_compile_error_code(error: &SamplingCompileError) -> &'static str {
 fn sampling_execution_error_code(error: &SamplingExecutionError) -> &'static str {
     match error {
         SamplingExecutionError::InvalidSweepRecordWidth { .. } => "invalid-result-format",
+        SamplingExecutionError::SessionStorageLimit { .. }
+        | SamplingExecutionError::SessionStorageAllocation { .. } => RESOURCE_LIMIT_CODE,
         SamplingExecutionError::Cancelled(_) => CANCELLED_CODE,
         _ => "sampling-execution-failed",
     }
@@ -119,7 +125,9 @@ fn detection_error_code(error: &DetectionError) -> &'static str {
         DetectionError::Analysis(error) => analysis_error_code(error),
         DetectionError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
         DetectionError::InvalidResultFormat { .. } => "invalid-result-format",
-        DetectionError::ResourceLimit(_) => "resource-limit-exceeded",
+        DetectionError::ResourceLimit(_) | DetectionError::StorageAllocation { .. } => {
+            RESOURCE_LIMIT_CODE
+        }
         DetectionError::Cancelled(_) => CANCELLED_CODE,
     }
 }
@@ -134,6 +142,8 @@ fn detection_execution_error_code(error: &DetectionExecutionError) -> &'static s
     match error {
         DetectionExecutionError::Conversion(error) => detection_error_code(error),
         DetectionExecutionError::Sampling(error) => sampling_execution_error_code(error),
+        DetectionExecutionError::SessionStorageLimit { .. }
+        | DetectionExecutionError::SessionStorageAllocation { .. } => RESOURCE_LIMIT_CODE,
         DetectionExecutionError::Cancelled(_) => CANCELLED_CODE,
         _ => "detection-execution-failed",
     }
@@ -144,7 +154,7 @@ fn dem_error_code(error: &DemError) -> &'static str {
         DemError::Model(error) => model_error_code(error),
         DemError::InvalidSamplerCompilation { .. } => "invalid-sampler-compilation",
         DemError::InvalidResultFormat { .. } => "invalid-result-format",
-        DemError::ResourceLimit(_) => "resource-limit-exceeded",
+        DemError::ResourceLimit(_) | DemError::StorageAllocation { .. } => RESOURCE_LIMIT_CODE,
         DemError::Cancelled(_) => CANCELLED_CODE,
     }
 }
@@ -152,6 +162,7 @@ fn dem_error_code(error: &DemError) -> &'static str {
 fn dem_execution_error_code(error: &DemSamplingExecutionError) -> &'static str {
     match error {
         DemSamplingExecutionError::InvalidRequest(error) => dem_error_code(error),
+        DemSamplingExecutionError::SessionStorageAllocation { .. } => RESOURCE_LIMIT_CODE,
         _ => "dem-sampling-execution-failed",
     }
 }

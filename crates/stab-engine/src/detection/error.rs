@@ -11,6 +11,9 @@ pub(crate) type DetectionResult<T> = Result<T, DetectionError>;
 pub enum DetectionResourceKind {
     RepeatNesting,
     CompiledBytes,
+    /// Bounded storage of a measurement-sampling session or reference run that a detection
+    /// operation creates.
+    SessionStorageBytes,
 }
 
 /// Typed resource-admission failure owned by the detection engine.
@@ -34,6 +37,14 @@ impl DetectionResourceLimitError {
         Self {
             kind: DetectionResourceKind::CompiledBytes,
             actual: ResourceAmount::exact(actual),
+            limit,
+        }
+    }
+
+    pub(crate) fn session_storage_bytes(actual: u128, limit: u64) -> Self {
+        Self {
+            kind: DetectionResourceKind::SessionStorageBytes,
+            actual: ResourceAmount::saturating_from_u128(actual),
             limit,
         }
     }
@@ -68,6 +79,11 @@ impl Display for DetectionResourceLimitError {
                 "cannot compile circuit sampler: the compiled plan and its records need at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
                 self.actual, self.limit
             ),
+            DetectionResourceKind::SessionStorageBytes => write!(
+                formatter,
+                "sampling session needs an estimated {} bytes of bounded storage, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+                self.actual, self.limit
+            ),
         }
     }
 }
@@ -92,6 +108,10 @@ pub enum DetectionError {
     #[error(transparent)]
     ResourceLimit(#[from] DetectionResourceLimitError),
 
+    /// The allocator refused storage that admission had already accepted.
+    #[error("cannot compile circuit sampler: {message}")]
+    StorageAllocation { message: String },
+
     #[error(transparent)]
     Cancelled(#[from] stab_model::Cancelled),
 }
@@ -108,6 +128,12 @@ impl DetectionError {
             message: message.into(),
         }
     }
+
+    pub(crate) fn storage_allocation(message: impl Into<String>) -> Self {
+        Self::StorageAllocation {
+            message: message.into(),
+        }
+    }
 }
 
 impl From<SamplingCompileError> for DetectionError {
@@ -121,6 +147,9 @@ impl From<SamplingCompileError> for DetectionError {
             SamplingCompileError::CompiledBytesLimit { required, budget } => Self::ResourceLimit(
                 DetectionResourceLimitError::detection_compiled_bytes(required, budget),
             ),
+            SamplingCompileError::StorageAllocation { message } => {
+                Self::StorageAllocation { message }
+            }
             SamplingCompileError::Cancelled(cancelled) => Self::Cancelled(cancelled),
         }
     }
@@ -135,6 +164,16 @@ impl From<SamplingExecutionError> for DetectionError {
                 ))
             }
             SamplingExecutionError::Cancelled(cancelled) => Self::Cancelled(cancelled),
+            SamplingExecutionError::SessionStorageLimit {
+                estimated_bytes,
+                limit_bytes,
+            } => Self::ResourceLimit(DetectionResourceLimitError::session_storage_bytes(
+                estimated_bytes,
+                limit_bytes,
+            )),
+            error @ SamplingExecutionError::SessionStorageAllocation { .. } => {
+                Self::storage_allocation(error.to_string())
+            }
             other => Self::invalid_sampler_compilation(other.to_string()),
         }
     }

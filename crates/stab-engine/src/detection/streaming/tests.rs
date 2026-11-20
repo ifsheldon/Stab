@@ -10,7 +10,9 @@ use std::fmt::Write as _;
 use rand::rngs::SmallRng;
 use rand::{RngExt as _, SeedableRng as _};
 use stab_model::{Circuit, MemoryBudget};
-use stab_records::{DetectionBatchView, DetectionSink, MeasurementBatchView, MeasurementSink};
+use stab_records::{
+    BitIndex, DetectionBatchView, DetectionSink, MeasurementBatchView, MeasurementSink, ShotIndex,
+};
 
 use crate::detection::frame::with_window_planes;
 use crate::{
@@ -28,7 +30,11 @@ impl MeasurementSink for Records {
         for shot in 0..batch.shot_count() {
             self.0.push(
                 (0..batch.width().get())
-                    .map(|bit| batch.get(shot, bit).expect("bit inside the batch"))
+                    .map(|bit| {
+                        batch
+                            .get(ShotIndex(shot), BitIndex(bit))
+                            .expect("bit inside the batch")
+                    })
                     .collect(),
             );
         }
@@ -47,11 +53,14 @@ impl DetectionSink for Records {
         let detectors = batch.detectors();
         let observables = batch.observables();
         for shot in 0..batch.shot_count() {
-            let detector_bits = (0..detectors.bits_per_shot())
-                .map(|bit| detectors.get(shot, bit).expect("detector inside the batch"));
+            let detector_bits = (0..detectors.bits_per_shot()).map(|bit| {
+                detectors
+                    .get(ShotIndex(shot), BitIndex(bit))
+                    .expect("detector inside the batch")
+            });
             let observable_bits = (0..observables.bits_per_shot()).map(|bit| {
                 observables
-                    .get(shot, bit)
+                    .get(ShotIndex(shot), BitIndex(bit))
                     .expect("observable inside the batch")
             });
             self.0.push(detector_bits.chain(observable_bits).collect());

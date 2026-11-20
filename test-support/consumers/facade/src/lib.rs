@@ -5,8 +5,8 @@ use std::error::Error;
 
 use stab_core::execution::{RandomPolicy, SamplingCompiler, Seed, ShotCount};
 use stab_core::{
-    Circuit, CliffordString, DecoderLayout, DetectorWidth, MeasurementBatchView, MeasurementSink,
-    ObservableWidth, SingleQubitClifford,
+    BitIndex, Circuit, CliffordString, DecoderLayout, DetectorWidth, MeasurementBatchView,
+    MeasurementSink, ObservableWidth, ShotIndex, SingleQubitClifford,
 };
 
 #[derive(Default)]
@@ -22,7 +22,8 @@ impl MeasurementSink for CountingSink {
         self.shots += batch.shot_count();
         for shot in 0..batch.shot_count() {
             for bit in 0..batch.width().get() {
-                self.set_bits += usize::from(batch.get(shot, bit) == Some(true));
+                self.set_bits +=
+                    usize::from(batch.get(ShotIndex(shot), BitIndex(bit)) == Some(true));
             }
         }
         Ok(())

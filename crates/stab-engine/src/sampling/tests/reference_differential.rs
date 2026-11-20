@@ -539,7 +539,11 @@ fn reference_samples_satisfy_every_deterministic_detector_with_folded_and_nested
             let expected = detector_parities(&circuit, &reference);
             assert!(!expected.is_empty(), "{variant}");
             let signs = crate::circuit_reference_signs(&circuit).expect("reference signs");
-            assert_eq!(signs.detector_signs(), expected.as_slice(), "{variant}");
+            assert_eq!(
+                signs.detector_signs().iter().collect::<Vec<_>>(),
+                expected,
+                "{variant}"
+            );
             // Independent noiseless executions draw every random outcome, so each deterministic
             // detector must take the same value in them as in the reference sample.
             let mut frame = StabilizerFrame::try_new(plan.qubit_count()).expect("sampling frame");

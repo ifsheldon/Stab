@@ -32,9 +32,10 @@ pub use stab_model::{
     ValidationErrorCode,
 };
 pub use stab_records::{
-    BitPlaneBatch, BitPlaneBatchView, CodecCapability, CorrectionWidth, DemSampleBatchView,
-    DemSampleSink, DetectionBatchView, DetectionSink, DetectorWidth, EncodedSizeEstimate,
-    FormatError, FormatErrorCode, FormatErrorContext, MeasurementBatchView, MeasurementSink,
-    MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
-    PackedShotBatchView, RecordBatchView, RecordEncoding, RecordFormat, SampledErrorWidth,
+    BitIndex, BitPlaneBatch, BitPlaneBatchView, CodecCapability, CorrectionWidth,
+    DemSampleBatchView, DemSampleSink, DetectionBatchView, DetectionSink, DetectorWidth,
+    EncodedSizeEstimate, FormatError, FormatErrorCode, FormatErrorContext, MeasurementBatchView,
+    MeasurementSink, MeasurementWidth, ObservablePredictionBatch, ObservableWidth, PackedShotBatch,
+    PackedShotBatchView, RecordBatchView, RecordEncoding, RecordFormat, RecordLayout,
+    SampledErrorWidth, ShotIndex,
 };

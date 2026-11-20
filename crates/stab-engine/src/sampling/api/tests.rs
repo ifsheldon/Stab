@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use super::*;
-use stab_records::{MeasurementBatchView, MeasurementCodecSink, RecordFormat};
+use stab_records::{BitIndex, MeasurementBatchView, MeasurementCodecSink, RecordFormat, ShotIndex};
 
 #[derive(Default)]
 struct RecordSink {
@@ -16,7 +16,7 @@ impl MeasurementSink for RecordSink {
             let record = (0..batch.width().get())
                 .map(|bit_index| {
                     batch
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("validated batch dimensions")
                 })
                 .collect();
@@ -44,7 +44,7 @@ impl MeasurementSink for DigestSink {
                 self.digest = self.digest.rotate_left(1)
                     ^ u64::from(
                         batch
-                            .get(shot_index, bit_index)
+                            .get(ShotIndex(shot_index), BitIndex(bit_index))
                             .expect("validated batch dimensions"),
                     );
             }

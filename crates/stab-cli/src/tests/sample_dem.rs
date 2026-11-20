@@ -319,7 +319,7 @@ fn replay_reader_floor(plan: &stab_engine::DemSamplingPlan, format: RecordFormat
             fixed,
         )
         .expect("admit under an unbounded budget");
-    u64::MAX - free
+    u64::MAX - free.bytes()
 }
 
 /// The per-record cap of a text replay input of `format` under `--memory-budget=budget`: the
@@ -477,7 +477,8 @@ fn sample_dem_replay_matches_across_retained_and_released_record_stores() {
             &DemSamplerLimits::new(MemoryBudget::from_bytes(bytes)),
             ShotCount::new(SHOTS as u64),
         )
-        .is_retaining()
+        .state()
+            == stab_engine::DemReplayStoreState::Retaining
     };
     let (mut refused, mut sparse_budget) = (0_u64, MemoryBudget::DEFAULT.bytes());
     while refused + 1 < sparse_budget {

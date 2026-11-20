@@ -330,3 +330,54 @@ fn detect_admits_its_output_encoders_and_file_buffers_before_its_session() {
         unbudgeted
     );
 }
+
+/// A session whose storage does not fit the budget is a budget refusal on every command that
+/// creates one, so it carries the resource-limit code instead of a generic execution failure.
+#[test]
+fn session_storage_refusals_report_the_resource_limit_code() {
+    let scratch = super::support::Scratch::new();
+    let circuit = "H 0\nREPEAT 1000 {\n    CX 0 1\n    M 0 1\n    DETECTOR rec[-1]\n}\nM 5000\n";
+    let circuit_path = scratch.file("wide.stim", circuit);
+    // m2d's reference sample of the wide circuit would refuse at compile time, so it converts
+    // a narrow circuit whose session is still larger than the budget.
+    let narrow_path = scratch.file(
+        "narrow.stim",
+        "R 0\nREPEAT 100 {\n    H 0\n    M 0\n}\nM 0\nDETECTOR rec[-1]\n",
+    );
+    let measurements = scratch.file("narrow.01", format!("{}\n", "0".repeat(101)));
+    for (command, args) in [
+        ("sample", vec!["--shots", "1", "--in", &circuit_path]),
+        ("detect", vec!["--shots", "1", "--in", &circuit_path]),
+        (
+            "m2d",
+            vec![
+                "--circuit",
+                &narrow_path,
+                "--in",
+                &measurements,
+                "--in_format",
+                "01",
+            ],
+        ),
+    ] {
+        let mut argv = vec!["stab", "--error-format=json", command];
+        argv.extend(args);
+        argv.push("--memory-budget=16KiB");
+        let result = run(&argv, b"");
+        assert_eq!(result.status, 1, "{command}: {}", result.stderr_text());
+        let diagnostic: serde_json::Value =
+            serde_json::from_slice(&result.stderr).expect("one JSON diagnostic");
+        assert_eq!(
+            diagnostic.pointer("/code").cloned(),
+            Some("resource-limit-exceeded".into()),
+            "{command}: {diagnostic}"
+        );
+        assert!(
+            diagnostic
+                .pointer("/message")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|message| message.contains("session needs an estimated")),
+            "{command}: {diagnostic}"
+        );
+    }
+}

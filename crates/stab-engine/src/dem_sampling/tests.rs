@@ -12,7 +12,7 @@ use rand::{RngExt as _, SeedableRng as _};
 use stab_bits::BitSlice;
 
 use stab_model::DetectorErrorModel;
-use stab_records::{DemSampleBatchView, DemSampleSink};
+use stab_records::{BitIndex, DemSampleBatchView, DemSampleSink, ShotIndex};
 
 use super::plan::DemSamplingPlanInner;
 use super::program::{
@@ -40,7 +40,7 @@ impl DemSampleSink for CollectingSink {
                 .map(|bit_index| {
                     detection
                         .detectors()
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("detector bit")
                 })
                 .collect();
@@ -48,7 +48,7 @@ impl DemSampleSink for CollectingSink {
                 .map(|bit_index| {
                     detection
                         .observables()
-                        .get(shot_index, bit_index)
+                        .get(ShotIndex(shot_index), BitIndex(bit_index))
                         .expect("observable bit")
                 })
                 .collect();
@@ -61,7 +61,7 @@ impl DemSampleSink for CollectingSink {
                     (0..sampled_errors.bits_per_shot())
                         .map(|bit_index| {
                             sampled_errors
-                                .get(shot_index, bit_index)
+                                .get(ShotIndex(shot_index), BitIndex(bit_index))
                                 .expect("sampled-error bit")
                         })
                         .collect(),
@@ -107,6 +107,7 @@ fn replay_admission_does_not_cap_the_shot_count() {
                 ..DemSampleBlock::default()
             },
             retained_bytes: 0,
+            limits: DemSamplerLimits::default(),
         }),
     };
     plan.validate_replay(ShotCount::new(u64::MAX))
@@ -179,6 +180,7 @@ fn execution_failure_preserves_first_error_progress_and_poisons_session() {
                 ..DemSampleBlock::default()
             },
             retained_bytes: 0,
+            limits: DemSamplerLimits::default(),
         }),
     };
     let mut session = plan
@@ -416,7 +418,7 @@ fn replay_packed(
         .expect("replay session");
     let mut sink = CollectingSink::default();
     let mut transaction = session.start_transaction(&mut sink).expect("transaction");
-    let retained = retain && store.is_retaining();
+    let retained = retain && store.state() == DemReplayStoreState::Retaining;
     if retained {
         transaction.write_retained(&store).expect("replay retained");
     } else {
@@ -524,7 +526,8 @@ fn replay_record_store_keeps_records_only_within_the_budget_a_session_leaves() {
             &DemSamplerLimits::new(stab_model::MemoryBudget::from_bytes(bytes)),
             shots,
         )
-        .is_retaining()
+        .state()
+            == DemReplayStoreState::Retaining
     };
     let (mut low, mut sparse_min_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
     while low + 1 < sparse_min_budget {
@@ -653,7 +656,7 @@ fn sparse_replay_store_admits_u32_ordinals_exactly() {
     let (mut low, mut empty_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
     while low + 1 < empty_budget {
         let middle = low + (empty_budget - low) / 2;
-        if store_at(middle).is_retaining() {
+        if store_at(middle).state() == DemReplayStoreState::Retaining {
             empty_budget = middle;
         } else {
             low = middle;
@@ -705,7 +708,7 @@ fn full_replay_store_keeps_its_whole_batch_prefix_for_a_resumed_replay() {
     let (mut low, mut empty_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
     while low + 1 < empty_budget {
         let middle = low + (empty_budget - low) / 2;
-        if store_at(middle).is_retaining() {
+        if store_at(middle).state() == DemReplayStoreState::Retaining {
             empty_budget = middle;
         } else {
             low = middle;
@@ -729,7 +732,7 @@ fn full_replay_store_keeps_its_whole_batch_prefix_for_a_resumed_replay() {
         64,
         "the declined batch leaves no records"
     );
-    assert!(!store.is_retaining() && !store.is_released());
+    assert_eq!(store.state(), DemReplayStoreState::Full);
     assert_eq!(
         store
             .try_retain(pack(64..65).view())
@@ -794,6 +797,64 @@ fn compiler_admits_retained_bytes_and_honors_cancellation() {
     assert!(matches!(err, super::DemError::Cancelled(_)));
 }
 
+/// Sessions made from a plan run under the budget and cancellation signal the plan was compiled
+/// with, not under the defaults, so a caller who limits the compiler limits its sessions too.
+#[test]
+fn plan_sessions_inherit_the_compiler_budget_and_cancellation() {
+    let model =
+        DetectorErrorModel::from_dem_str("error(0.5) D0\ndetector D99999\n").expect("parse DEM");
+    let compiled_bytes = DemSamplingCompiler::new()
+        .compile(&model)
+        .expect("compile")
+        .retained_bytes();
+    // Admits the plan but not even a one-shot session, which keeps a byte per detector.
+    let small = stab_model::MemoryBudget::from_bytes(compiled_bytes.max(1_000));
+    let plan = DemSamplingCompiler::new()
+        .memory_budget(small)
+        .compile(&model)
+        .expect("compile under a small budget");
+    assert_eq!(plan.limits().memory_budget(), small);
+    let refused_by_budget = |error: &DemSamplingExecutionError| {
+        matches!(
+            error,
+            DemSamplingExecutionError::InvalidRequest(super::DemError::ResourceLimit(limit))
+                if limit.kind() == crate::DemResourceKind::ActiveBatchBytes
+                    && limit.limit() == small.bytes()
+        )
+    };
+    assert!(matches!(
+        plan.session(RandomPolicy::Seeded(Seed::new(1))),
+        Err(ref error) if refused_by_budget(error)
+    ));
+    assert!(matches!(
+        plan.replay_session(ShotCount::new(1)),
+        Err(ref error) if refused_by_budget(error)
+    ));
+
+    let model = DetectorErrorModel::from_dem_str("error(0.5) D0\n").expect("parse DEM");
+    let cancellation = stab_model::Cancellation::new();
+    let plan = DemSamplingCompiler::new()
+        .cancellation(cancellation.clone())
+        .compile(&model)
+        .expect("compile before cancelling");
+    let mut session = plan
+        .session(RandomPolicy::Seeded(Seed::new(1)))
+        .expect("session");
+    let mut replay = plan.replay_session(ShotCount::new(1)).expect("replay");
+    cancellation.cancel();
+    let mut sink = CollectingSink::default();
+    let summary = session
+        .run(ShotCount::new(10), &mut sink)
+        .expect("cancelled run reports a status");
+    assert!(summary.status().is_cancelled());
+    assert_eq!(summary.committed_shots(), ShotCount::new(0));
+    let summary = replay
+        .run(&[vec![true]], &mut sink)
+        .expect("cancelled replay reports a status");
+    assert!(summary.status().is_cancelled());
+    assert!(sink.records.is_empty());
+}
+
 /// Dense records whose error-major words for every expected record exceed the budget, and whose
 /// sparse ordinals would too, keep the whole error-major batches the budget admits instead of
 /// retaining nothing, and that prefix replays like the records it holds.
@@ -819,7 +880,7 @@ fn dense_replay_store_keeps_the_error_major_batches_its_budget_admits() {
     let (mut low, mut sparse_min_budget) = (0_u64, stab_model::MemoryBudget::DEFAULT.bytes());
     while low + 1 < sparse_min_budget {
         let middle = low + (sparse_min_budget - low) / 2;
-        if store_at(middle).is_retaining() {
+        if store_at(middle).state() == DemReplayStoreState::Retaining {
             sparse_min_budget = middle;
         } else {
             low = middle;

@@ -56,6 +56,9 @@ impl DemSamplingExecutionError {
     pub fn into_dem_error(self) -> DemError {
         match self {
             Self::InvalidRequest(error) => error,
+            error @ Self::SessionStorageAllocation { .. } => {
+                DemError::storage_allocation(error.to_string())
+            }
             other => DemError::invalid_sampler_compilation(other.to_string()),
         }
     }
