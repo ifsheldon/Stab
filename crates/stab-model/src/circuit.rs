@@ -3,9 +3,9 @@ use std::io::{self, Write};
 use std::ops::RangeBounds;
 
 use crate::gate::GateTargetGroupKind;
-use crate::model_bytes::{PreparedModelText, RecoveredTags, locate_recovered_tag};
-use crate::model_tag::{ItemTag, ModelTag, RecoveredTag};
-use crate::parse_limits::ParseAdmission;
+use crate::model_bytes::PreparedModelText;
+use crate::model_tag::{ItemTag, ModelTag};
+use crate::model_tree;
 use crate::target::TargetVec;
 use crate::{
     AbsoluteTolerance, Gate, GateArgumentRule, ModelDialect, ModelError, ModelFingerprint,
@@ -14,9 +14,9 @@ use crate::{
 
 mod api;
 mod counts;
-mod equality;
 mod folded;
 mod iter;
+mod tree;
 
 pub use folded::{
     FoldedCircuitEvent, FoldedCircuitSummary, FoldedCount, FoldedVisitError, FoldedWalkError,
@@ -44,19 +44,21 @@ impl std::fmt::Debug for Circuit {
 
 impl Clone for Circuit {
     fn clone(&self) -> Self {
-        drop_impl::clone_circuit(self)
+        Self {
+            items: model_tree::clone_items::<Self>(&self.items),
+        }
     }
 }
 
 impl PartialEq for Circuit {
     fn eq(&self, other: &Self) -> bool {
-        equality::circuits_equal(self, other)
+        tree::circuits_equal(self, other)
     }
 }
 
 impl Drop for Circuit {
     fn drop(&mut self) {
-        drop_impl::drop_items(&mut self.items);
+        model_tree::drop_items::<Self>(&mut self.items);
     }
 }
 
@@ -133,7 +135,7 @@ impl Circuit {
         };
         // Taking the tags freed the sanitized text copy.
         admission.release_sanitized_copy(input.len());
-        circuit.restore_byte_tags(tags, &mut admission, input)?;
+        model_tree::restore_byte_tags::<Self>(&mut circuit.items, tags, &mut admission, input)?;
         circuit.fuse_adjacent_instructions()?;
         // Fusion only removes charged declarations, so the fused circuit's own count is the
         // smaller, exact hold.
@@ -150,40 +152,7 @@ impl Circuit {
     /// Conservative retained bytes of this circuit under [`ParseLimits`] item, target, argument,
     /// and tag accounting, including the display text of tags restored from non-UTF-8 bytes.
     pub fn admitted_bytes(&self) -> u64 {
-        let mut total = 0_u64;
-        let mut stack = vec![self.items.iter()];
-        while let Some(items) = stack.last_mut() {
-            let Some(item) = items.next() else {
-                stack.pop();
-                continue;
-            };
-            match item {
-                CircuitItem::Instruction(instruction) => {
-                    total = total.saturating_add(
-                        crate::parse_limits::model_declaration_admitted_bytes(
-                            ModelDialect::StimCircuit,
-                            instruction.targets().len(),
-                            instruction.args().len(),
-                            instruction.tag_bytes().map_or(0, <[u8]>::len),
-                        ),
-                    );
-                    total = total.saturating_add(opaque_overhead(&instruction.tag));
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    total = total.saturating_add(
-                        crate::parse_limits::model_declaration_admitted_bytes(
-                            ModelDialect::StimCircuit,
-                            0,
-                            0,
-                            repeat.tag_bytes().map_or(0, <[u8]>::len),
-                        ),
-                    );
-                    total = total.saturating_add(opaque_overhead(&repeat.tag));
-                    stack.push(repeat.body().items().iter());
-                }
-            }
-        }
-        total
+        model_tree::admitted_bytes::<Self>(&self.items)
     }
 
     /// Returns the schema-versioned structural identity of this circuit.
@@ -200,7 +169,7 @@ impl Circuit {
     /// Instruction order, gates, targets, tags, repeat counts, and repeat structure remain exact.
     #[must_use]
     pub fn approx_equals(&self, other: &Self, tolerance: AbsoluteTolerance) -> bool {
-        equality::circuits_approx_equal(self, other, tolerance)
+        tree::circuits_approx_equal(self, other, tolerance)
     }
 
     pub fn items(&self) -> &[CircuitItem] {
@@ -378,59 +347,6 @@ impl Circuit {
         })
     }
 
-    /// Replaces the sanitized tags the parser produced with the exact recovered bytes, in
-    /// source order, charging what an opaque tag retains beyond its parsed text before it is
-    /// built.
-    fn restore_byte_tags(
-        &mut self,
-        tags: RecoveredTags,
-        admission: &mut ParseAdmission,
-        input: &[u8],
-    ) -> ModelResult<()> {
-        let expected = self.non_empty_tag_count();
-        if expected != tags.len() {
-            return Err(ModelError::invalid_domain_value(
-                "Stim byte parser",
-                format!(
-                    "metadata scanner found {} tags but parser produced {expected}",
-                    tags.len()
-                ),
-            ));
-        }
-        let mut tags = tags.into_owned_tags().enumerate();
-        let mut restore = |tag: &mut ItemTag| -> ModelResult<()> {
-            if tag.is_none() {
-                return Ok(());
-            }
-            let Some((index, bytes)) = tags.next() else {
-                return Err(ModelError::invalid_domain_value(
-                    "Stim byte parser",
-                    "metadata scanner ran out of tags",
-                ));
-            };
-            let recovered = RecoveredTag::new(bytes);
-            let overhead = ModelTag::opaque_overhead_bytes_of(&recovered);
-            admission.admit_opaque_tag_overhead(overhead, || locate_recovered_tag(input, index))?;
-            *tag = ModelTag::from_recovered(recovered);
-            Ok(())
-        };
-        let mut pending = vec![self.items.iter_mut()];
-        while let Some(items) = pending.last_mut() {
-            let Some(item) = items.next() else {
-                pending.pop();
-                continue;
-            };
-            match item {
-                CircuitItem::Instruction(instruction) => restore(&mut instruction.tag)?,
-                CircuitItem::RepeatBlock(repeat) => {
-                    restore(&mut repeat.tag)?;
-                    pending.push(repeat.body.items.iter_mut());
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Fuses adjacent fusable instructions in every block, without recursing.
     ///
     /// Each fusion run's head reserves exactly the run's targets once, so no block holds spare
@@ -447,25 +363,6 @@ impl Circuit {
             }
         }
         Ok(())
-    }
-
-    fn non_empty_tag_count(&self) -> usize {
-        let mut count = 0_usize;
-        let mut pending = vec![self.items.as_slice()];
-        while let Some(items) = pending.pop() {
-            for item in items {
-                match item {
-                    CircuitItem::Instruction(instruction) => {
-                        count += usize::from(instruction.tag.is_some());
-                    }
-                    CircuitItem::RepeatBlock(repeat) => {
-                        count += usize::from(repeat.tag.is_some());
-                        pending.push(repeat.body.items.as_slice());
-                    }
-                }
-            }
-        }
-        count
     }
 
     fn item_slice(&self, range: impl RangeBounds<usize>) -> ModelResult<&[CircuitItem]> {
@@ -914,14 +811,7 @@ impl Display for Circuit {
 
 pub(crate) mod printing;
 
-mod drop_impl;
 mod parser;
-
-/// Bytes an item's opaque tag retains beyond its tag charge.
-fn opaque_overhead(tag: &ItemTag) -> u64 {
-    tag.as_deref()
-        .map_or(0, |tag| tag.opaque_overhead_bytes() as u64)
-}
 
 /// Fuses the adjacent fusable instructions of one block in place.
 ///

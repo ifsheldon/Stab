@@ -7,8 +7,9 @@ use std::collections::BTreeMap;
 use std::ops::Bound;
 
 use stab_model::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
-    DemRepeatCount, DemTarget, DetectorErrorModel, ModelResult, Probability,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemInstructionView, DemItem,
+    DemObservableId, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel, ModelResult,
+    Probability,
 };
 
 #[test]
@@ -743,4 +744,119 @@ fn pf1_dem_iterators_item_ranges_and_flattened_iterator_are_typed() {
         instruction.kind() == DemInstructionKind::Error
             && instruction.targets() == [DemTarget::relative_detector(0).expect("D0")]
     }));
+}
+
+/// Checks that `instruction.view()` carries exactly what the fallible accessors report.
+fn assert_view_matches_accessors(instruction: &DemInstruction) {
+    let view = instruction.view();
+    assert_eq!(view.kind(), instruction.kind());
+    match view {
+        DemInstructionView::Error {
+            probability,
+            targets,
+        } => {
+            assert_eq!(instruction.args(), [probability.get()]);
+            assert_eq!(targets, instruction.targets());
+        }
+        DemInstructionView::Detector {
+            coordinates,
+            detector,
+        } => {
+            assert_eq!(coordinates, instruction.args());
+            assert_eq!(instruction.targets(), [DemTarget::from_detector(detector)]);
+        }
+        DemInstructionView::LogicalObservable { observable } => {
+            assert!(instruction.args().is_empty());
+            assert_eq!(
+                instruction.targets(),
+                [DemTarget::from_observable(observable)]
+            );
+        }
+        DemInstructionView::ShiftDetectors {
+            coordinate_shift,
+            detector_shift,
+        } => {
+            assert_eq!(coordinate_shift, instruction.args());
+            assert_eq!(instruction.detector_shift(), Some(detector_shift));
+            assert!(instruction.targets().is_empty());
+        }
+    }
+}
+
+#[test]
+fn dem_instruction_view_carries_each_kind_s_data_without_fallible_follow_up() {
+    // The first line takes the canonical fast path and the rest the generic parser; the repeat
+    // makes flattening relocate detectors by the shift.
+    let dem = DetectorErrorModel::from_dem_str(
+        "error(0.125) D0 L1\n\
+         ErRoR[tag](0.25) D1 ^ D2\n\
+         detector(1, 2) D3\n\
+         logical_observable[obs] L7\n\
+         repeat 2 {\n\
+             detector(0, 0) D0\n\
+             shift_detectors(0.5, 1) 4\n\
+         }\n",
+    )
+    .expect("fixture parses");
+
+    let flattened = dem
+        .iter_flattened_instructions()
+        .collect::<ModelResult<Vec<_>>>()
+        .expect("fixture flattens");
+    for instruction in &flattened {
+        assert_view_matches_accessors(instruction);
+    }
+    let views = flattened
+        .iter()
+        .map(DemInstruction::view)
+        .collect::<Vec<_>>();
+    let detector = |id| DemDetectorId::try_new(id).expect("valid detector");
+    assert_eq!(
+        views,
+        [
+            DemInstructionView::Error {
+                probability: Probability::try_new(0.125).expect("valid probability"),
+                targets: &[
+                    DemTarget::from_detector(detector(0)),
+                    DemTarget::logical_observable(1).expect("valid observable"),
+                ],
+            },
+            DemInstructionView::Error {
+                probability: Probability::try_new(0.25).expect("valid probability"),
+                targets: &[
+                    DemTarget::from_detector(detector(1)),
+                    DemTarget::SEPARATOR,
+                    DemTarget::from_detector(detector(2)),
+                ],
+            },
+            DemInstructionView::Detector {
+                coordinates: &[1.0, 2.0],
+                detector: detector(3),
+            },
+            DemInstructionView::LogicalObservable {
+                observable: DemObservableId::try_new(7).expect("valid observable"),
+            },
+            DemInstructionView::Detector {
+                coordinates: &[0.0, 0.0],
+                detector: detector(0),
+            },
+            DemInstructionView::Detector {
+                coordinates: &[0.5, 1.0],
+                detector: detector(4),
+            },
+        ]
+    );
+
+    let shift = DemInstruction::shift_detectors(vec![2.0], 9, None).expect("valid shift");
+    let tagged = DemInstruction::detector(Vec::new(), detector(5), Some("t".to_owned()))
+        .expect("valid detector");
+    assert_view_matches_accessors(&shift);
+    assert_view_matches_accessors(&tagged);
+    assert_eq!(
+        shift.view(),
+        DemInstructionView::ShiftDetectors {
+            coordinate_shift: &[2.0],
+            detector_shift: 9,
+        }
+    );
 }

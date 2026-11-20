@@ -2,6 +2,7 @@ use std::fmt::NumBuffer;
 use std::io::{self, Write};
 
 use super::tag::DemTag;
+use super::target::{DetectorTarget, ObservableTarget};
 use super::{
     DemArgVec, DemDetectorId, DemObservableId, DemTarget, DemTargetVec, normalize_tag,
     write_indent, write_indent_io, write_optional_tag, write_optional_tag_io,
@@ -38,16 +39,54 @@ impl DemInstructionKind {
     }
 }
 
+/// Borrowed, exhaustive view of one [`DemInstruction`], returned by [`DemInstruction::view`].
+///
+/// Each variant is one instruction kind and carries exactly the data valid for that kind, so a
+/// `match` needs no fallible follow-up. The tag is shared by every kind and stays on
+/// [`DemInstruction::tag`] and [`DemInstruction::tag_bytes`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DemInstructionView<'a> {
+    /// `error(p) targets`: the probability and the target list, which may hold `^` separators
+    /// between the components of a decomposed error.
+    Error {
+        probability: Probability,
+        targets: &'a [DemTarget],
+    },
+    /// `detector(coordinates) D<detector>`, with the detector relative to the enclosing shifts.
+    Detector {
+        coordinates: &'a [f64],
+        detector: DemDetectorId,
+    },
+    /// `logical_observable L<observable>`.
+    LogicalObservable { observable: DemObservableId },
+    /// `shift_detectors(coordinate_shift) detector_shift`.
+    ShiftDetectors {
+        coordinate_shift: &'a [f64],
+        detector_shift: u64,
+    },
+}
+
+impl DemInstructionView<'_> {
+    pub const fn kind(&self) -> DemInstructionKind {
+        match self {
+            Self::Error { .. } => DemInstructionKind::Error,
+            Self::Detector { .. } => DemInstructionKind::Detector,
+            Self::LogicalObservable { .. } => DemInstructionKind::LogicalObservable,
+            Self::ShiftDetectors { .. } => DemInstructionKind::ShiftDetectors,
+        }
+    }
+}
+
 /// What an instruction applies to: the targets of an `error`, the single detector or observable
 /// it declares, or the detector offset of a `shift_detectors`.
 ///
-/// `Detector` always holds a relative detector target and `LogicalObservable` always holds a
-/// logical observable target; every constructor builds them from typed ids.
+/// `Detector` and `LogicalObservable` hold targets that are a detector and an observable by
+/// construction.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum DemPayload {
     Error(DemTargetVec),
-    Detector(DemTarget),
-    LogicalObservable(DemTarget),
+    Detector(DetectorTarget),
+    LogicalObservable(ObservableTarget),
     ShiftDetectors(u64),
 }
 
@@ -62,30 +101,19 @@ impl DemPayload {
     }
 
     pub(super) fn detector(detector: DemDetectorId) -> Self {
-        Self::Detector(DemTarget::from_detector(detector))
+        Self::Detector(DetectorTarget::new(detector))
     }
 
     pub(super) fn logical_observable(observable: DemObservableId) -> Self {
-        Self::LogicalObservable(DemTarget::from_observable(observable))
+        Self::LogicalObservable(ObservableTarget::new(observable))
     }
 
     fn targets(&self) -> &[DemTarget] {
         match self {
             Self::Error(targets) => targets,
-            Self::Detector(target) | Self::LogicalObservable(target) => {
-                std::slice::from_ref(target)
-            }
+            Self::Detector(target) => std::slice::from_ref(target.as_target()),
+            Self::LogicalObservable(target) => std::slice::from_ref(target.as_target()),
             Self::ShiftDetectors(_) => &[],
-        }
-    }
-
-    fn targets_mut(&mut self) -> &mut [DemTarget] {
-        match self {
-            Self::Error(targets) => targets,
-            Self::Detector(target) | Self::LogicalObservable(target) => {
-                std::slice::from_mut(target)
-            }
-            Self::ShiftDetectors(_) => &mut [],
         }
     }
 }
@@ -233,6 +261,28 @@ impl DemInstruction {
         self.payload.kind()
     }
 
+    /// Returns the matchable view of this instruction: its kind together with exactly the data
+    /// that kind holds.
+    pub fn view(&self) -> DemInstructionView<'_> {
+        match &self.payload {
+            DemPayload::Error(targets) => DemInstructionView::Error {
+                probability: error_probability(&self.args),
+                targets,
+            },
+            DemPayload::Detector(detector) => DemInstructionView::Detector {
+                coordinates: &self.args,
+                detector: detector.id(),
+            },
+            DemPayload::LogicalObservable(observable) => DemInstructionView::LogicalObservable {
+                observable: observable.id(),
+            },
+            DemPayload::ShiftDetectors(detector_shift) => DemInstructionView::ShiftDetectors {
+                coordinate_shift: &self.args,
+                detector_shift: *detector_shift,
+            },
+        }
+    }
+
     pub fn args(&self) -> &[f64] {
         &self.args
     }
@@ -298,10 +348,20 @@ impl DemInstruction {
         {
             return Err(detector.get());
         }
-        for target in self.payload.targets_mut() {
-            if let Some(lowered) = target.detector().and_then(|id| id.checked_sub(base)) {
-                *target = DemTarget::from_detector(lowered);
+        match &mut self.payload {
+            DemPayload::Error(targets) => {
+                for target in targets.iter_mut() {
+                    if let Some(lowered) = target.detector().and_then(|id| id.checked_sub(base)) {
+                        *target = DemTarget::from_detector(lowered);
+                    }
+                }
             }
+            DemPayload::Detector(target) => {
+                if let Some(lowered) = target.id().checked_sub(base) {
+                    *target = DetectorTarget::new(lowered);
+                }
+            }
+            DemPayload::LogicalObservable(_) | DemPayload::ShiftDetectors(_) => {}
         }
         Ok(())
     }
@@ -347,6 +407,18 @@ impl DemInstruction {
             out.write_all(number.as_bytes())?;
         }
         out.write_all(b"\n")
+    }
+}
+
+/// The probability of an `error` instruction's `args`.
+///
+/// Every constructor validates an `error` with [`validate_dem_args`], which admits exactly one
+/// probability, and the arguments are never changed afterwards, so any other shape is a broken
+/// model invariant rather than an input error.
+fn error_probability(args: &[f64]) -> Probability {
+    match args {
+        [probability] => Probability::from_valid_probability(*probability),
+        _ => unreachable!("a validated error instruction holds exactly one probability"),
     }
 }
 

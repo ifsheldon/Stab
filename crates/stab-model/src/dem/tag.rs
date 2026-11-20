@@ -3,22 +3,16 @@ use std::io::{self, Write};
 use arrayvec::ArrayString;
 
 use crate::model_tag::{
-    RecoveredTag, lossy_display, write_escaped_tag_bytes, write_escaped_tag_text,
+    OpaqueTag, RecoveredTag, TagSlot, write_escaped_tag_bytes, write_escaped_tag_text,
 };
 
 const INLINE_DEM_TAG_BYTES: usize = 16;
 
 #[derive(Clone, Debug, PartialEq)]
-pub(super) enum DemTag {
+pub(crate) enum DemTag {
     Inline(ArrayString<INLINE_DEM_TAG_BYTES>),
     Heap(Box<str>),
-    Opaque(Box<OpaqueDemTag>),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(super) struct OpaqueDemTag {
-    bytes: Box<[u8]>,
-    display: Box<str>,
+    Opaque(Box<OpaqueTag>),
 }
 
 impl DemTag {
@@ -50,25 +44,7 @@ impl DemTag {
     pub(super) fn from_recovered(tag: RecoveredTag) -> Option<Self> {
         match tag {
             RecoveredTag::Text(tag) => Self::from_string(tag),
-            RecoveredTag::Opaque(bytes) => {
-                let bytes = bytes.into_boxed_slice();
-                let display = lossy_display(&bytes);
-                Some(Self::Opaque(Box::new(OpaqueDemTag { bytes, display })))
-            }
-        }
-    }
-
-    /// Bytes `tag` will retain as a DEM tag beyond the tag charge every tag pays; see
-    /// [`RecoveredTag::opaque_overhead_bytes`].
-    pub(super) fn opaque_overhead_bytes_of(tag: &RecoveredTag) -> usize {
-        tag.opaque_overhead_bytes(size_of::<OpaqueDemTag>())
-    }
-
-    /// [`Self::opaque_overhead_bytes_of`] for this tag.
-    pub(super) fn opaque_overhead_bytes(&self) -> usize {
-        match self {
-            Self::Inline(_) | Self::Heap(_) => 0,
-            Self::Opaque(tag) => tag.display.len().saturating_add(size_of::<OpaqueDemTag>()),
+            RecoveredTag::Opaque(bytes) => Some(Self::Opaque(Box::new(OpaqueTag::new(bytes)))),
         }
     }
 
@@ -80,7 +56,7 @@ impl DemTag {
         match self {
             Self::Inline(tag) => tag.as_str(),
             Self::Heap(tag) => tag,
-            Self::Opaque(tag) => &tag.display,
+            Self::Opaque(tag) => tag.display(),
         }
     }
 
@@ -88,7 +64,7 @@ impl DemTag {
         match self {
             Self::Inline(tag) => tag.as_bytes(),
             Self::Heap(tag) => tag.as_bytes(),
-            Self::Opaque(tag) => &tag.bytes,
+            Self::Opaque(tag) => tag.bytes(),
         }
     }
 
@@ -98,5 +74,22 @@ impl DemTag {
 
     pub(super) fn write_escaped_bytes(&self, out: &mut impl Write) -> io::Result<()> {
         write_escaped_tag_bytes(self.as_bytes(), out)
+    }
+}
+
+impl TagSlot for Option<DemTag> {
+    fn bytes(&self) -> Option<&[u8]> {
+        self.as_ref().map(DemTag::as_bytes)
+    }
+
+    fn opaque_overhead_bytes(&self) -> usize {
+        match self {
+            Some(DemTag::Opaque(tag)) => tag.overhead_bytes(),
+            Some(DemTag::Inline(_) | DemTag::Heap(_)) | None => 0,
+        }
+    }
+
+    fn set_recovered(&mut self, tag: RecoveredTag) {
+        *self = DemTag::from_recovered(tag);
     }
 }

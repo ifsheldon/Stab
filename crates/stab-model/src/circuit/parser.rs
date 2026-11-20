@@ -16,9 +16,15 @@ use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 const MAX_STIM_NUMBER_TOKEN_BYTES: usize = 63;
 const MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE: u64 = 1_u64 << 63;
 
+mod diagnostics;
 mod fast;
 mod items;
 mod tag;
+
+use diagnostics::{
+    first_character_span, instruction_context, internal_parser_error, invalid_number_error,
+    repeat_count_error, target_parse_error_code,
+};
 
 use items::BlockItems;
 use tag::{DeferredTag, parse_optional_tag};
@@ -855,38 +861,23 @@ fn validation_span(
 }
 
 fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> ModelResult<u64> {
+    let error = |code, message, span| repeat_count_error(line_number, token, code, message, span);
     if token.text().is_empty() {
-        return Err(line_error(
-            ModelDialect::StimCircuit,
-            line_number,
+        return Err(error(
             ParseErrorCode::MissingRepeatCount,
             "missing repeat count",
-            "missing repeat count",
             token.end_span(),
-            ParseErrorContext::DomainValue {
-                dialect: ModelDialect::StimCircuit,
-                kind: "repeat count",
-                value: String::new(),
-            },
         ));
     }
     let mut value = 0_u64;
     for (offset, character) in token.text().char_indices() {
         if !character.is_ascii_digit() {
-            return Err(line_error(
-                ModelDialect::StimCircuit,
-                line_number,
+            return Err(error(
                 ParseErrorCode::InvalidRepeatCount,
-                "invalid repeat count",
                 "invalid repeat count",
                 token
                     .subspan(offset, character.len_utf8())
                     .unwrap_or_else(|| token.span()),
-                ParseErrorContext::DomainValue {
-                    dialect: ModelDialect::StimCircuit,
-                    kind: "repeat count",
-                    value: bounded_parse_diagnostic_text(token.text()),
-                },
             ));
         }
         let digit = u64::from(character as u8 - b'0');
@@ -894,90 +885,21 @@ fn parse_repeat_count(line_number: usize, token: SourceSlice<'_>) -> ModelResult
             .checked_mul(10)
             .and_then(|value| value.checked_add(digit))
             .ok_or_else(|| {
-                line_error(
-                    ModelDialect::StimCircuit,
-                    line_number,
+                error(
                     ParseErrorCode::IntegerOutOfRange,
                     "invalid repeat count",
-                    "invalid repeat count",
                     token.span(),
-                    ParseErrorContext::DomainValue {
-                        dialect: ModelDialect::StimCircuit,
-                        kind: "repeat count",
-                        value: bounded_parse_diagnostic_text(token.text()),
-                    },
                 )
             })?;
         if value >= MAX_CIRCUIT_REPEAT_COUNT_EXCLUSIVE {
-            return Err(line_error(
-                ModelDialect::StimCircuit,
-                line_number,
+            return Err(error(
                 ParseErrorCode::IntegerOutOfRange,
                 "invalid repeat count",
-                "invalid repeat count",
                 token.span(),
-                ParseErrorContext::DomainValue {
-                    dialect: ModelDialect::StimCircuit,
-                    kind: "repeat count",
-                    value: bounded_parse_diagnostic_text(token.text()),
-                },
             ));
         }
     }
     Ok(value)
-}
-
-fn target_parse_error_code(error: &ModelError) -> ParseErrorCode {
-    match error {
-        ModelError::Validation(ValidationError::InvalidDomainValue { value, .. }) => {
-            let digits = value.trim_prefix('-');
-            if !digits.is_empty() && digits.as_bytes().iter().all(u8::is_ascii_digit) {
-                ParseErrorCode::IntegerOutOfRange
-            } else {
-                ParseErrorCode::InvalidTargetSyntax
-            }
-        }
-        _ => ParseErrorCode::InvalidTargetSyntax,
-    }
-}
-
-fn invalid_number_error(
-    line_number: usize,
-    instruction: &str,
-    token: SourceSlice<'_>,
-    message: &'static str,
-) -> ModelError {
-    let span = token.span();
-    let token = bounded_parse_diagnostic_text(token.text());
-    line_error(
-        ModelDialect::StimCircuit,
-        line_number,
-        ParseErrorCode::InvalidNumber,
-        format!("{message} {token}"),
-        format!("{message} {token}"),
-        span,
-        ParseErrorContext::Argument {
-            dialect: ModelDialect::StimCircuit,
-            instruction: bounded_parse_diagnostic_text(instruction),
-            argument: token,
-        },
-    )
-}
-
-fn instruction_context(instruction: &str) -> ParseErrorContext {
-    ParseErrorContext::Instruction {
-        dialect: ModelDialect::StimCircuit,
-        instruction: bounded_parse_diagnostic_text(instruction),
-    }
-}
-
-fn first_character_span(source: SourceSlice<'_>) -> ByteSpan {
-    source
-        .text()
-        .chars()
-        .next()
-        .and_then(|character| source.subspan(0, character.len_utf8()))
-        .unwrap_or_else(|| source.end_span())
 }
 
 fn trim_target_space_start(mut source: SourceSlice<'_>) -> SourceSlice<'_> {
@@ -1085,11 +1007,4 @@ fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> ModelR
         }
     }
     Ok(())
-}
-
-fn internal_parser_error(line_number: usize, message: impl ToString) -> ModelError {
-    ModelError::invalid_domain_value(
-        "Stim circuit parser",
-        format!("line {line_number}: {}", message.to_string()),
-    )
 }

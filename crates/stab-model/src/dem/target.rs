@@ -174,6 +174,60 @@ impl DemTarget {
     }
 }
 
+/// A [`DemTarget`] that is a relative detector by construction, so its id needs no check.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct DetectorTarget(DemTarget);
+
+impl DetectorTarget {
+    pub(super) const fn new(detector: DemDetectorId) -> Self {
+        Self(DemTarget::from_detector(detector))
+    }
+
+    pub(super) const fn id(self) -> DemDetectorId {
+        // Only `new` builds this target, from a checked id stored unchanged.
+        DemDetectorId(self.0.0)
+    }
+
+    pub(super) const fn as_target(&self) -> &DemTarget {
+        &self.0
+    }
+
+    /// Returns this detector raised by `detector_offset`.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the shifted id exceeds the DEM detector id range.
+    pub(super) fn shifted(self, detector_offset: u64) -> ModelResult<Self> {
+        let shifted = self
+            .id()
+            .get()
+            .checked_add(detector_offset)
+            .ok_or_else(|| {
+                ModelError::invalid_detector_error_model("relative detector id overflowed")
+            })?;
+        DemDetectorId::try_new(shifted).map(Self::new)
+    }
+}
+
+/// A [`DemTarget`] that is a logical observable by construction, so its id needs no check.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ObservableTarget(DemTarget);
+
+impl ObservableTarget {
+    pub(super) const fn new(observable: DemObservableId) -> Self {
+        Self(DemTarget::from_observable(observable))
+    }
+
+    pub(super) const fn id(self) -> DemObservableId {
+        // Only `new` builds this target, so its low bits hold the observable id.
+        DemObservableId(self.0.observable_bits())
+    }
+
+    pub(super) const fn as_target(&self) -> &DemTarget {
+        &self.0
+    }
+}
+
 impl From<DemDetectorId> for DemTarget {
     fn from(detector: DemDetectorId) -> Self {
         Self::from_detector(detector)

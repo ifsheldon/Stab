@@ -144,3 +144,89 @@ fn opaque_dem_tags_restored_from_bytes_are_charged_before_they_are_built() {
     assert_eq!(resource.span().byte_start(), second_tag, "{resource}");
     assert_eq!(resource.span().byte_length(), 4_096, "{resource}");
 }
+
+/// Restores the tags of `outer_tag { inner_tag }` and returns the model's admitted bytes with the
+/// restored repeat and instruction tag bytes.
+fn nested_tags(
+    circuit: bool,
+    outer_tag: &[u8],
+    inner_tag: &[u8],
+) -> (u64, Option<Vec<u8>>, Option<Vec<u8>>) {
+    let (head, open, inner, close) = if circuit {
+        ("REPEAT[", "] 2 {\nH[", "] 0\n", "}\n")
+    } else {
+        ("repeat[", "] 2 {\nerror[", "](0.125) D0\n", "}\n")
+    };
+    let mut input = head.as_bytes().to_vec();
+    input.extend(outer_tag);
+    input.extend(open.as_bytes());
+    input.extend(inner_tag);
+    input.extend(inner.as_bytes());
+    input.extend(close.as_bytes());
+    if circuit {
+        let (model, hold) = Circuit::from_stim_bytes_admitted(&input, ParseLimits::default())
+            .expect("circuit fixture parses");
+        assert_eq!(hold, model.admitted_bytes());
+        let repeat = model
+            .items()
+            .first()
+            .and_then(|item| item.as_repeat_block())
+            .expect("outer item is a repeat block");
+        let instruction = repeat
+            .body()
+            .items()
+            .first()
+            .and_then(|item| item.as_instruction())
+            .expect("inner item is an instruction");
+        (
+            hold,
+            repeat.tag_bytes().map(<[u8]>::to_vec),
+            instruction.tag_bytes().map(<[u8]>::to_vec),
+        )
+    } else {
+        let (model, hold) =
+            DetectorErrorModel::from_dem_bytes_admitted(&input, ParseLimits::default())
+                .expect("DEM fixture parses");
+        assert_eq!(hold, model.admitted_bytes());
+        let repeat = model
+            .items()
+            .first()
+            .and_then(|item| item.as_repeat_block())
+            .expect("outer item is a repeat block");
+        let instruction = repeat
+            .body()
+            .items()
+            .first()
+            .and_then(|item| item.as_instruction())
+            .expect("inner item is an instruction");
+        (
+            hold,
+            repeat.tag_bytes().map(<[u8]>::to_vec),
+            instruction.tag_bytes().map(<[u8]>::to_vec),
+        )
+    }
+}
+
+#[test]
+fn both_dialects_restore_and_charge_nested_opaque_tags_alike() {
+    let outer = b"\xff".repeat(64);
+    let inner = b"\xfe".repeat(32);
+    let [circuit_overhead, dem_overhead] = [true, false].map(|circuit| {
+        let (text_hold, _, _) = nested_tags(circuit, &b"a".repeat(64), &b"b".repeat(32));
+        let (opaque_hold, outer_tag, inner_tag) = nested_tags(circuit, &outer, &inner);
+        // Each tag is restored in source order onto its own item.
+        assert_eq!(outer_tag.as_deref(), Some(&outer[..]), "circuit {circuit}");
+        assert_eq!(inner_tag.as_deref(), Some(&inner[..]), "circuit {circuit}");
+        let overhead = opaque_hold - text_hold;
+        // Every invalid byte displays as a three-byte U+FFFD, on top of the opaque record.
+        assert!(
+            overhead > 3 * (64 + 32),
+            "circuit {circuit}: overhead {overhead}"
+        );
+        overhead
+    });
+    assert_eq!(
+        circuit_overhead, dem_overhead,
+        "dialects charge opaque tags alike"
+    );
+}

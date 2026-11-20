@@ -15,6 +15,7 @@ mod memory_budget;
 mod model_bytes;
 mod model_parse;
 mod model_tag;
+mod model_tree;
 mod parse_limits;
 mod resource_limit;
 mod resources;
@@ -31,8 +32,8 @@ pub use circuit::{
 pub use dem::{
     DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
     DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
-    DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem, DemObservableId,
-    DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
+    DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemInstructionView, DemItem,
+    DemObservableId, DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
 };
 pub use diagnostics::{
     ByteSpan, DiagnosticSeverity, ParseError, ParseErrorCode, ParseErrorContext,

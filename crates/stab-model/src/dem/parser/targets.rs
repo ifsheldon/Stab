@@ -65,12 +65,12 @@ impl ParsedDemTargets<'_> {
                 Ok(DemPayload::Error(std::mem::take(&mut self.values)))
             }
             DemInstructionKind::Detector => {
-                let target = self.single_target("detector", DemTarget::is_detector)?;
-                Ok(DemPayload::Detector(target))
+                let detector = self.single_target("detector", DemTarget::detector)?;
+                Ok(DemPayload::detector(detector))
             }
             DemInstructionKind::LogicalObservable => {
-                let target = self.single_target("logical_observable", DemTarget::is_observable)?;
-                Ok(DemPayload::LogicalObservable(target))
+                let observable = self.single_target("logical_observable", DemTarget::observable)?;
+                Ok(DemPayload::logical_observable(observable))
             }
             DemInstructionKind::ShiftDetectors => match (self.token_count, self.numeric) {
                 (1, Some(numeric)) => Ok(DemPayload::ShiftDetectors(numeric.value)),
@@ -81,11 +81,11 @@ impl ParsedDemTargets<'_> {
         }
     }
 
-    fn single_target(
+    fn single_target<T>(
         &self,
         kind: &'static str,
-        accepts: fn(DemTarget) -> bool,
-    ) -> ModelResult<DemTarget> {
+        accepts: fn(DemTarget) -> Option<T>,
+    ) -> ModelResult<T> {
         if self.token_count != 1 {
             return Err(ModelError::invalid_detector_error_model(format!(
                 "{kind} requires exactly one target"
@@ -98,10 +98,11 @@ impl ParsedDemTargets<'_> {
             )));
         }
         match self.values.as_slice() {
-            [target] if accepts(*target) => Ok(*target),
-            [target] => Err(ModelError::invalid_detector_error_model(format!(
-                "{kind} received invalid target {target}"
-            ))),
+            [target] => accepts(*target).ok_or_else(|| {
+                ModelError::invalid_detector_error_model(format!(
+                    "{kind} received invalid target {target}"
+                ))
+            }),
             _ => Err(ModelError::invalid_detector_error_model(format!(
                 "{kind} requires exactly one target"
             ))),

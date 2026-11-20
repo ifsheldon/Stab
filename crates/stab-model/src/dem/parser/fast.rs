@@ -1,6 +1,7 @@
 use super::super::instruction::{DemPayload, validate_dem_args, validate_error_targets};
 use super::super::{
-    DemArgVec, DemInstruction, DemInstructionKind, DemTag, DemTarget, DemTargetVec,
+    DemArgVec, DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemTag,
+    DemTarget, DemTargetVec,
 };
 use super::{MAX_DEM_TEXT_INTEGER, MAX_STIM_NUMBER_TOKEN_BYTES};
 // Kept out of line: inlined into the parse loop it measurably slows every line.
@@ -120,14 +121,14 @@ fn parse_canonical_payload(kind: DemInstructionKind, rest: &str) -> Option<DemPa
         // A single-target instruction holds exactly one token, so a space means extra targets.
         _ if raw_targets.is_empty() || raw_targets.contains(' ') => None,
         DemInstructionKind::Detector => {
-            DemTarget::relative_detector(parse_prefixed_id(raw_targets, b'D')?)
+            DemDetectorId::try_new(parse_prefixed_id(raw_targets, b'D')?)
                 .ok()
-                .map(DemPayload::Detector)
+                .map(DemPayload::detector)
         }
         DemInstructionKind::LogicalObservable => {
-            DemTarget::logical_observable(parse_prefixed_id(raw_targets, b'L')?)
+            DemObservableId::try_new(parse_prefixed_id(raw_targets, b'L')?)
                 .ok()
-                .map(DemPayload::LogicalObservable)
+                .map(DemPayload::logical_observable)
         }
         DemInstructionKind::ShiftDetectors => {
             parse_canonical_uint60(raw_targets).map(DemPayload::ShiftDetectors)

@@ -5,8 +5,6 @@ use smallvec::SmallVec;
 
 mod api;
 mod coordinate_scan;
-mod drop_impl;
-mod equality;
 mod error_mechanisms;
 mod instruction;
 mod parser;
@@ -14,13 +12,14 @@ mod printing;
 mod tag;
 mod target;
 mod traversal;
+mod tree;
 
 pub use api::DemFlattenedInstructionIter;
 pub use error_mechanisms::{
     DemErrorMechanismTraversalLimits, DemErrorMechanismView, DemErrorMechanismVisitError,
     DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
 };
-pub use instruction::{DemInstruction, DemInstructionKind};
+pub use instruction::{DemInstruction, DemInstructionKind, DemInstructionView};
 pub use target::{DemDetectorId, DemObservableId, DemTarget, DemTargetKind};
 
 /// Advanced borrowed boundary for traversing compact DEM structure.
@@ -39,9 +38,8 @@ pub(crate) mod advanced {
 use traversal::FoldedDemTraversal;
 
 use crate::circuit::printing::DemFloatCache;
-use crate::model_bytes::{PreparedModelText, RecoveredTags, locate_recovered_tag};
-use crate::model_tag::RecoveredTag;
-use crate::parse_limits::ParseAdmission;
+use crate::model_bytes::PreparedModelText;
+use crate::model_tree;
 use crate::{
     AbsoluteTolerance, DemRepeatCount, ModelDialect, ModelError, ModelFingerprint, ModelResult,
     ParseLimits, RepeatNestingLimit,
@@ -88,7 +86,7 @@ impl DetectorErrorModel {
         };
         // Taking the tags freed the sanitized text copy.
         admission.release_sanitized_copy(input.len());
-        model.restore_byte_tags(tags, &mut admission, input)?;
+        model_tree::restore_byte_tags::<Self>(&mut model.items, tags, &mut admission, input)?;
         Ok((model, admission.retained_model_bytes()))
     }
 
@@ -99,40 +97,7 @@ impl DetectorErrorModel {
     /// Conservative retained bytes of this model under [`ParseLimits`] item, target, argument, and
     /// tag accounting, including the display text of tags restored from non-UTF-8 bytes.
     pub fn admitted_bytes(&self) -> u64 {
-        let mut total = 0_u64;
-        let mut stack = vec![self.items.iter()];
-        while let Some(items) = stack.last_mut() {
-            let Some(item) = items.next() else {
-                stack.pop();
-                continue;
-            };
-            match item {
-                DemItem::Instruction(instruction) => {
-                    total = total.saturating_add(
-                        crate::parse_limits::model_declaration_admitted_bytes(
-                            ModelDialect::DetectorErrorModel,
-                            instruction.targets().len(),
-                            instruction.args().len(),
-                            instruction.tag_bytes().map_or(0, <[u8]>::len),
-                        ),
-                    );
-                    total = total.saturating_add(opaque_overhead(instruction.tag.as_ref()));
-                }
-                DemItem::RepeatBlock(repeat) => {
-                    total = total.saturating_add(
-                        crate::parse_limits::model_declaration_admitted_bytes(
-                            ModelDialect::DetectorErrorModel,
-                            0,
-                            0,
-                            repeat.tag_bytes().map_or(0, <[u8]>::len),
-                        ),
-                    );
-                    total = total.saturating_add(opaque_overhead(repeat.tag.as_ref()));
-                    stack.push(repeat.body().items().iter());
-                }
-            }
-        }
-        total
+        model_tree::admitted_bytes::<Self>(&self.items)
     }
 
     /// Returns the schema-versioned structural identity of this detector error model.
@@ -149,7 +114,7 @@ impl DetectorErrorModel {
     /// Instruction order, kinds, targets, tags, repeat counts, and repeat structure remain exact.
     #[must_use]
     pub fn approx_equals(&self, other: &Self, tolerance: AbsoluteTolerance) -> bool {
-        equality::models_approx_equal(self, other, tolerance)
+        tree::models_approx_equal(self, other, tolerance)
     }
 
     fn from_items(items: Vec<DemItem>) -> Self {
@@ -266,78 +231,6 @@ impl DetectorErrorModel {
             }
         })
     }
-
-    /// Replaces the sanitized tags the parser produced with the exact recovered bytes, in
-    /// source order, charging what an opaque tag retains beyond its parsed text before it is
-    /// built.
-    fn restore_byte_tags(
-        &mut self,
-        tags: RecoveredTags,
-        admission: &mut ParseAdmission,
-        input: &[u8],
-    ) -> ModelResult<()> {
-        let expected = self.non_empty_tag_count();
-        if expected != tags.len() {
-            return Err(ModelError::invalid_domain_value(
-                "DEM byte parser",
-                format!(
-                    "metadata scanner found {} tags but parser produced {expected}",
-                    tags.len()
-                ),
-            ));
-        }
-        let mut tags = tags.into_owned_tags().enumerate();
-        let mut restore = |tag: &mut Option<DemTag>| -> ModelResult<()> {
-            if tag.is_none() {
-                return Ok(());
-            }
-            let Some((index, bytes)) = tags.next() else {
-                return Err(ModelError::invalid_domain_value(
-                    "DEM byte parser",
-                    "metadata scanner ran out of tags",
-                ));
-            };
-            let recovered = RecoveredTag::new(bytes);
-            let overhead = DemTag::opaque_overhead_bytes_of(&recovered);
-            admission.admit_opaque_tag_overhead(overhead, || locate_recovered_tag(input, index))?;
-            *tag = DemTag::from_recovered(recovered);
-            Ok(())
-        };
-        let mut pending = vec![self.items.iter_mut()];
-        while let Some(items) = pending.last_mut() {
-            let Some(item) = items.next() else {
-                pending.pop();
-                continue;
-            };
-            match item {
-                DemItem::Instruction(instruction) => restore(&mut instruction.tag)?,
-                DemItem::RepeatBlock(repeat) => {
-                    restore(&mut repeat.tag)?;
-                    pending.push(repeat.body.items.iter_mut());
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn non_empty_tag_count(&self) -> usize {
-        let mut count = 0_usize;
-        let mut pending = vec![self.items.as_slice()];
-        while let Some(items) = pending.pop() {
-            for item in items {
-                match item {
-                    DemItem::Instruction(instruction) => {
-                        count += usize::from(instruction.tag.is_some());
-                    }
-                    DemItem::RepeatBlock(repeat) => {
-                        count += usize::from(repeat.tag.is_some());
-                        pending.push(repeat.body.items.as_slice());
-                    }
-                }
-            }
-        }
-        count
-    }
 }
 
 impl Display for DetectorErrorModel {
@@ -348,7 +241,9 @@ impl Display for DetectorErrorModel {
 
 impl Clone for DetectorErrorModel {
     fn clone(&self) -> Self {
-        drop_impl::clone_model(self)
+        Self {
+            items: model_tree::clone_items::<Self>(&self.items),
+        }
     }
 }
 
@@ -363,13 +258,13 @@ impl std::fmt::Debug for DetectorErrorModel {
 
 impl PartialEq for DetectorErrorModel {
     fn eq(&self, other: &Self) -> bool {
-        equality::models_equal(self, other)
+        tree::models_equal(self, other)
     }
 }
 
 impl Drop for DetectorErrorModel {
     fn drop(&mut self) {
-        drop_impl::drop_items(&mut self.items);
+        model_tree::drop_items::<Self>(&mut self.items);
     }
 }
 
@@ -488,11 +383,6 @@ fn write_indent_io<W: Write>(out: &mut W, indent: usize) -> io::Result<()> {
         out.write_all(b" ")?;
     }
     Ok(())
-}
-
-/// Bytes an item's opaque tag retains beyond its tag charge.
-fn opaque_overhead(tag: Option<&DemTag>) -> u64 {
-    tag.map_or(0, |tag| tag.opaque_overhead_bytes() as u64)
 }
 
 fn normalize_tag(tag: Option<String>) -> Option<DemTag> {

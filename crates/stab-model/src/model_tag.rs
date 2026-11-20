@@ -5,13 +5,42 @@ use std::io::{self, Write};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ModelTag {
     Text(Box<str>),
-    Opaque(Box<OpaqueModelTag>),
+    Opaque(Box<OpaqueTag>),
 }
 
+/// The record a tag restored from non-UTF-8 bytes keeps: the exact bytes, which printing writes
+/// back, and their lossy display text, which text accessors return.
+///
+/// Circuit and DEM tags share this one record, so the overhead the byte parsers charge for an
+/// opaque tag is defined once for both dialects.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct OpaqueModelTag {
+pub(crate) struct OpaqueTag {
     bytes: Box<[u8]>,
     display: Box<str>,
+}
+
+impl OpaqueTag {
+    /// Builds the record for bytes [`RecoveredTag::new`] classified as invalid UTF-8, building
+    /// the display in one exact-size allocation.
+    pub(crate) fn new(bytes: Vec<u8>) -> Self {
+        let bytes = bytes.into_boxed_slice();
+        let display = lossy_display(&bytes);
+        Self { bytes, display }
+    }
+
+    pub(crate) fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub(crate) fn display(&self) -> &str {
+        &self.display
+    }
+
+    /// Bytes this tag retains beyond the tag charge every tag pays: its display text and the
+    /// record holding both.
+    pub(crate) fn overhead_bytes(&self) -> usize {
+        self.display.len().saturating_add(size_of::<Self>())
+    }
 }
 
 /// A circuit item's optional tag, boxed so an untagged item spends one pointer on it.
@@ -32,16 +61,46 @@ impl RecoveredTag {
         }
     }
 
-    /// Bytes an opaque tag retains beyond the tag charge every tag pays: its display text and
-    /// `record_bytes` for the record holding both; zero for valid UTF-8.
+    /// Bytes the tag will retain beyond the tag charge every tag pays, which is
+    /// [`OpaqueTag::overhead_bytes`] of the record it builds; zero for valid UTF-8.
     ///
     /// The display replaces each invalid sequence with U+FFFD, so it can take three bytes per
     /// source byte.
-    pub(crate) fn opaque_overhead_bytes(&self, record_bytes: usize) -> usize {
+    pub(crate) fn opaque_overhead_bytes(&self) -> usize {
         match self {
             Self::Text(_) => 0,
-            Self::Opaque(bytes) => lossy_display_len(bytes).saturating_add(record_bytes),
+            Self::Opaque(bytes) => lossy_display_len(bytes).saturating_add(size_of::<OpaqueTag>()),
         }
+    }
+}
+
+/// An item's tag slot as the shared model-tree walks see it: present or absent, its exact bytes,
+/// what it retains beyond its tag charge, and its replacement by recovered source bytes.
+pub(crate) trait TagSlot {
+    /// The tag's exact bytes, or `None` for an untagged item.
+    fn bytes(&self) -> Option<&[u8]>;
+
+    /// [`OpaqueTag::overhead_bytes`] for an opaque tag; zero otherwise.
+    fn opaque_overhead_bytes(&self) -> usize;
+
+    /// Replaces the tag with one built from `tag`.
+    fn set_recovered(&mut self, tag: RecoveredTag);
+}
+
+impl TagSlot for ItemTag {
+    fn bytes(&self) -> Option<&[u8]> {
+        self.as_deref().map(ModelTag::as_bytes)
+    }
+
+    fn opaque_overhead_bytes(&self) -> usize {
+        match self.as_deref() {
+            Some(ModelTag::Opaque(tag)) => tag.overhead_bytes(),
+            Some(ModelTag::Text(_)) | None => 0,
+        }
+    }
+
+    fn set_recovered(&mut self, tag: RecoveredTag) {
+        *self = ModelTag::from_recovered(tag);
     }
 }
 
@@ -61,32 +120,10 @@ impl ModelTag {
     /// Builds the tag from bytes validated once by [`RecoveredTag::new`].
     pub(crate) fn from_recovered(tag: RecoveredTag) -> ItemTag {
         match tag {
-            RecoveredTag::Text(tag) => Self::from_string(tag),
+            RecoveredTag::Text(text) => Self::from_string(text),
             RecoveredTag::Opaque(bytes) => {
-                let bytes = bytes.into_boxed_slice();
-                let display = lossy_display(&bytes);
-                Some(Box::new(Self::Opaque(Box::new(OpaqueModelTag {
-                    bytes,
-                    display,
-                }))))
+                Some(Box::new(Self::Opaque(Box::new(OpaqueTag::new(bytes)))))
             }
-        }
-    }
-
-    /// Bytes `tag` will retain as a circuit tag beyond the tag charge every tag pays; see
-    /// [`RecoveredTag::opaque_overhead_bytes`].
-    pub(crate) fn opaque_overhead_bytes_of(tag: &RecoveredTag) -> usize {
-        tag.opaque_overhead_bytes(size_of::<OpaqueModelTag>())
-    }
-
-    /// [`Self::opaque_overhead_bytes_of`] for this tag.
-    pub(crate) fn opaque_overhead_bytes(&self) -> usize {
-        match self {
-            Self::Text(_) => 0,
-            Self::Opaque(tag) => tag
-                .display
-                .len()
-                .saturating_add(size_of::<OpaqueModelTag>()),
         }
     }
 
@@ -97,14 +134,14 @@ impl ModelTag {
     pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::Text(tag) => tag,
-            Self::Opaque(tag) => &tag.display,
+            Self::Opaque(tag) => tag.display(),
         }
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Text(tag) => tag.as_bytes(),
-            Self::Opaque(tag) => &tag.bytes,
+            Self::Opaque(tag) => tag.bytes(),
         }
     }
 
@@ -204,7 +241,7 @@ mod tests {
     use proptest::prelude::*;
 
     use super::{
-        RecoveredTag, lossy_display, lossy_display_len, write_escaped_tag_bytes,
+        OpaqueTag, RecoveredTag, lossy_display, lossy_display_len, write_escaped_tag_bytes,
         write_escaped_tag_text,
     };
 
@@ -283,11 +320,19 @@ mod tests {
                     prop_assert_eq!(opaque, &bytes);
                 }
             }
-            let display_len = match &recovered {
+            let charged = recovered.opaque_overhead_bytes();
+            let built = match recovered {
                 RecoveredTag::Text(_) => 0,
-                RecoveredTag::Opaque(opaque) => lossy_display(opaque).len(),
+                RecoveredTag::Opaque(opaque) => {
+                    let opaque = OpaqueTag::new(opaque);
+                    prop_assert_eq!(opaque.display(), &*String::from_utf8_lossy(&bytes));
+                    opaque.overhead_bytes()
+                }
             };
-            prop_assert_eq!(recovered.opaque_overhead_bytes(0), display_len);
+            prop_assert_eq!(charged, built);
+            if built != 0 {
+                prop_assert!(built > size_of::<OpaqueTag>());
+            }
         }
     }
 }

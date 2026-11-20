@@ -6,7 +6,7 @@ use super::traversal::{
     shifted_detector,
 };
 use super::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemRepeatBlock, DemTarget,
+    DemDetectorId, DemInstruction, DemInstructionView, DemObservableId, DemRepeatBlock, DemTarget,
     DemTargetKind, DetectorErrorModel,
 };
 use crate::{ModelError, ModelResult, Probability};
@@ -237,22 +237,16 @@ where
                 limit: self.limits.max_instruction_visits(),
             });
         }
-        if instruction.kind() != DemInstructionKind::Error {
+        let DemInstructionView::Error {
+            probability,
+            targets,
+        } = instruction.view()
+        else {
             return Ok(ControlFlow::Continue(()));
-        }
-
-        let probability = match instruction.args() {
-            [probability] => Probability::try_new(*probability)?,
-            _ => {
-                return Err(ModelError::invalid_detector_error_model(
-                    "error instruction does not contain exactly one probability",
-                )
-                .into());
-            }
         };
         let mechanism = DemErrorMechanismView {
             probability,
-            targets: instruction.targets(),
+            targets,
             detector_offset: state.detector_offset(),
             tag_bytes: instruction.tag_bytes(),
         };
