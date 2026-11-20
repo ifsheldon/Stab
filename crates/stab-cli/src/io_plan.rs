@@ -283,6 +283,17 @@ impl PendingIo {
         Self::preflight_inputs(inputs)?.with_outputs(outputs)
     }
 
+    /// Plans the named outputs of a command that reads no named input.
+    pub(crate) fn preflight_outputs<'output>(
+        outputs: impl IntoIterator<Item = (FileRole, Option<&'output Path>)>,
+    ) -> Result<Self, CliError> {
+        Self {
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+        }
+        .with_outputs(outputs)
+    }
+
     pub(crate) fn preflight_inputs<'input>(
         inputs: impl IntoIterator<Item = (FileRole, Option<&'input Path>)>,
     ) -> Result<Self, CliError> {

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{Circuit, CircuitItem, DemTarget, DemTargetKind};
 
+use crate::AnalysisOperation;
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
@@ -232,7 +233,8 @@ fn run_undo_stack<'a>(
             }
             UndoFrame::UnitaryFold(_) => {
                 let Some(UndoFrame::UnitaryFold(fold)) = stack.pop() else {
-                    return Err(AnalysisError::invalid_detector_error_model(
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::ReverseFrameTracking,
                         "sparse reverse unitary fold frame disappeared from the undo stack",
                     ));
                 };
@@ -249,7 +251,8 @@ fn run_undo_stack<'a>(
                             .repetitions
                             .checked_sub(probe.hare_iterations)
                             .ok_or_else(|| {
-                                AnalysisError::invalid_detector_error_model(
+                                AnalysisError::internal(
+                                    AnalysisOperation::ReverseFrameTracking,
                                     "sparse reverse repeat remainder underflowed",
                                 )
                             })?;
@@ -268,7 +271,8 @@ fn run_undo_stack<'a>(
                 ProbePhase::FinishHare => {
                     probe.hare_iterations =
                         probe.hare_iterations.checked_add(1).ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
+                            AnalysisError::count_overflow(
+                                AnalysisOperation::ReverseFrameTracking,
                                 "shifted recurrence probe step count overflowed",
                             )
                         })?;
@@ -292,7 +296,8 @@ fn run_undo_stack<'a>(
                 ProbePhase::FinishTortoise => {
                     probe.tortoise_iterations =
                         probe.tortoise_iterations.checked_add(1).ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
+                            AnalysisError::count_overflow(
+                                AnalysisOperation::ReverseFrameTracking,
                                 "shifted recurrence tortoise step count overflowed",
                             )
                         })?;
@@ -322,10 +327,14 @@ fn finish_found_recurrence<'a>(
         .hare_iterations
         .checked_sub(probe.tortoise_iterations)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("shifted recurrence period underflowed")
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                "shifted recurrence period underflowed",
+            )
         })?;
     if period == 0 {
-        return Err(AnalysisError::invalid_detector_error_model(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::ReverseFrameTracking,
             "shifted recurrence period was zero",
         ));
     }
@@ -333,7 +342,8 @@ fn finish_found_recurrence<'a>(
         .repetitions
         .checked_sub(probe.hare_iterations)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse repeat cycle end exceeded its repeat count",
             )
         })?;
@@ -343,7 +353,8 @@ fn finish_found_recurrence<'a>(
         .measurement_count
         .checked_sub(probe.hare.measurement_count)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse repeat measurement period underflowed",
             )
         })?;
@@ -352,7 +363,8 @@ fn finish_found_recurrence<'a>(
         .detector_count
         .checked_sub(probe.hare.detector_count)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse repeat detector period underflowed",
             )
         })?;
@@ -366,12 +378,14 @@ fn finish_found_recurrence<'a>(
     let completed_iterations = probe
         .hare_iterations
         .checked_add(skipped_iterations.checked_mul(period).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse repeat skipped step count overflowed",
             )
         })?)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse repeat step count overflowed",
             )
         })?;
@@ -379,7 +393,8 @@ fn finish_found_recurrence<'a>(
         .repetitions
         .checked_sub(completed_iterations)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse repeat remainder underflowed",
             )
         })?;
@@ -441,7 +456,8 @@ pub(super) fn shift(
         let shifted_index = add_signed_usize(index, measurement_offset, "record index")?;
         shift_target_set(&mut targets, detector_offset)?;
         if shifted_records.insert(shifted_index, targets).is_some() {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse repeat shift merged measurement records unexpectedly",
             ));
         }
@@ -568,12 +584,14 @@ fn shifted_detector_target(target: DemTarget, detector_offset: i128) -> Analysis
 
 fn offset_between_usize(left: usize, right: usize) -> AnalysisResult<i128> {
     let left = i128::try_from(left).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
             "sparse reverse tracker count does not fit i128",
         )
     })?;
     let right = i128::try_from(right).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
             "sparse reverse tracker count does not fit i128",
         )
     })?;
@@ -586,15 +604,17 @@ fn signed_product_usize(
     label: &'static str,
 ) -> AnalysisResult<i128> {
     let value = i128::try_from(value).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "sparse reverse repeat {label} value does not fit i128"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse repeat {label} value does not fit i128"),
+        )
     })?;
     let multiplier = i128::from(multiplier);
     value.checked_mul(multiplier).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "sparse reverse repeat skipped {label} count overflowed"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse repeat skipped {label} count overflowed"),
+        )
     })
 }
 
@@ -602,36 +622,46 @@ fn signed_product_u64(value: u64, multiplier: u64, label: &'static str) -> Analy
     let value = i128::from(value);
     let multiplier = i128::from(multiplier);
     value.checked_mul(multiplier).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "sparse reverse repeat skipped {label} count overflowed"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse repeat skipped {label} count overflowed"),
+        )
     })
 }
 
 fn add_signed_usize(value: usize, offset: i128, label: &'static str) -> AnalysisResult<usize> {
     let value = i128::try_from(value).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "sparse reverse {label} does not fit i128"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse {label} does not fit i128"),
+        )
     })?;
     let shifted = value.checked_add(offset).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("sparse reverse {label} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse {label} overflowed"),
+        )
     })?;
     usize::try_from(shifted).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "sparse reverse {label} shifted out of range"
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse {label} shifted out of range"),
+        )
     })
 }
 
 fn add_signed_u64(value: u64, offset: i128, label: &'static str) -> AnalysisResult<u64> {
     let value = i128::from(value);
     let shifted = value.checked_add(offset).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("sparse reverse {label} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse {label} overflowed"),
+        )
     })?;
     u64::try_from(shifted).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "sparse reverse {label} shifted out of range"
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("sparse reverse {label} shifted out of range"),
+        )
     })
 }

@@ -75,6 +75,7 @@ fn model_error_code(error: &ModelError) -> &'static str {
     match error {
         ModelError::Parse(error) => error.code().as_str(),
         ModelError::ResourceLimit(error) => error.code(),
+        ModelError::AllocationFailed { .. } => RESOURCE_LIMIT_CODE,
         ModelError::Validation(error) => error.code().as_str(),
         ModelError::Cancelled(_) => CANCELLED_CODE,
     }
@@ -90,13 +91,27 @@ const RESOURCE_LIMIT_CODE: &str = "resource-limit-exceeded";
 fn analysis_error_code(error: &AnalysisError) -> &'static str {
     match error {
         AnalysisError::Model(error) => model_error_code(error),
-        AnalysisError::InvalidDomainValue { .. } => "invalid-domain-value",
-        AnalysisError::InvalidTableauConversion { .. } => "invalid-tableau-conversion",
-        AnalysisError::InvalidCircuitSimplification { .. } => "invalid-circuit-simplification",
-        AnalysisError::InvalidResultFormat { .. } => "invalid-result-format",
-        AnalysisError::InvalidDetectorErrorModel { .. } => "invalid-detector-error-model",
-        AnalysisError::ResourceLimit(_) => "resource-limit-exceeded",
+        AnalysisError::ResourceLimit(_) | AnalysisError::AllocationFailed { .. } => {
+            RESOURCE_LIMIT_CODE
+        }
         AnalysisError::Cancelled(_) => CANCELLED_CODE,
+        AnalysisError::NonDeterministicTargets(_) => "non-deterministic-targets",
+        AnalysisError::NonUnitaryOperation { .. } => "non-unitary-operation",
+        AnalysisError::PauliNotPreserved { .. } => "pauli-not-preserved",
+        AnalysisError::AntiHermitianPauliProduct { .. } => "anti-hermitian-pauli-product",
+        AnalysisError::UnsupportedInput { .. } => "unsupported-analysis-input",
+        AnalysisError::NoiseRequiresApproximation { .. } => "approximate-disjoint-errors-required",
+        AnalysisError::UnanalyzableNoise(_) => "unanalyzable-noise",
+        AnalysisError::ErrorDecompositionFailed { .. } => "error-decomposition-failed",
+        AnalysisError::NonGraphlikeError => "non-graphlike-error",
+        AnalysisError::NoLogicalErrorFound(_) => "no-logical-error-found",
+        AnalysisError::InvalidRequest(_) => "invalid-analysis-request",
+        AnalysisError::InvalidGeneratorParameter { .. } => "invalid-generator-parameter",
+        AnalysisError::GateDataUnavailable { .. } => "gate-data-unavailable",
+        AnalysisError::CountOverflow { .. } => "analysis-count-overflow",
+        AnalysisError::NonFiniteCoordinate { .. } => "non-finite-coordinate",
+        AnalysisError::MeasurementRecordOutOfRange { .. } => "measurement-record-out-of-range",
+        AnalysisError::InternalInvariant { .. } => "analysis-invariant-failed",
     }
 }
 

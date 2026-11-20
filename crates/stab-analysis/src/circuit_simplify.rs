@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::ops::ControlFlow;
 
@@ -6,7 +7,7 @@ use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, Gate, GateKind, Pauli, QubitId, Target, TargetKind,
 };
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult};
 
 /// Rewrites supported operations into Stim's public `Circuit.decomposed()` base-gate set.
 pub fn decomposed_circuit(circuit: &Circuit) -> AnalysisResult<Circuit> {
@@ -345,7 +346,7 @@ fn append_decomposed_mpp(
     result: &mut Circuit,
 ) -> AnalysisResult<()> {
     for group in instruction.target_groups() {
-        let product = reduce_pauli_product(group)?;
+        let product = reduce_pauli_product(instruction.gate().kind(), group)?;
         if product.terms.is_empty() {
             append_gate_targets(
                 result,
@@ -400,7 +401,7 @@ fn visit_decomposed_spp<Break>(
     visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
 ) -> AnalysisResult<ControlFlow<Break>> {
     for group in instruction.target_groups() {
-        let product = reduce_pauli_product(group)?;
+        let product = reduce_pauli_product(instruction.gate().kind(), group)?;
         if product.terms.is_empty() {
             continue;
         }
@@ -703,14 +704,14 @@ struct ReducedProduct {
     terms: Vec<ProductTerm>,
 }
 
-fn reduce_pauli_product(group: &[Target]) -> AnalysisResult<ReducedProduct> {
+fn reduce_pauli_product(gate: GateKind, group: &[Target]) -> AnalysisResult<ReducedProduct> {
     #[cfg(test)]
     {
-        reduce_pauli_product_impl(group, None)
+        reduce_pauli_product_impl(gate, group, None)
     }
     #[cfg(not(test))]
     {
-        reduce_pauli_product_impl(group)
+        reduce_pauli_product_impl(gate, group)
     }
 }
 
@@ -721,6 +722,7 @@ struct PauliReductionWork {
 }
 
 fn reduce_pauli_product_impl(
+    gate: GateKind,
     group: &[Target],
     #[cfg(test)] mut work: Option<&mut PauliReductionWork>,
 ) -> AnalysisResult<ReducedProduct> {
@@ -768,9 +770,11 @@ fn reduce_pauli_product_impl(
     }
 
     if !phase.is_multiple_of(2) {
-        return Err(invalid_simplification(
-            "Pauli product decomposition encountered an anti-Hermitian product",
-        ));
+        return Err(AnalysisError::AntiHermitianPauliProduct {
+            operation: AnalysisOperation::CircuitSimplification,
+            gate,
+            phase: None,
+        });
     }
 
     Ok(ReducedProduct {
@@ -787,7 +791,7 @@ fn reduce_pauli_product_with_work(
     group: &[Target],
 ) -> AnalysisResult<(ReducedProduct, PauliReductionWork)> {
     let mut work = PauliReductionWork::default();
-    let product = reduce_pauli_product_impl(group, Some(&mut work))?;
+    let product = reduce_pauli_product_impl(GateKind::MPP, group, Some(&mut work))?;
     Ok((product, work))
 }
 
@@ -810,8 +814,9 @@ fn stabilizer_to_simplify_error(error: StabilizerError) -> AnalysisError {
     invalid_simplification(error.to_string())
 }
 
-fn invalid_simplification(message: impl Into<String>) -> AnalysisError {
-    AnalysisError::invalid_circuit_simplification(message)
+/// A decomposition step the gate table and the validated circuit should have excluded.
+fn invalid_simplification(message: impl Into<Cow<'static, str>>) -> AnalysisError {
+    AnalysisError::internal(AnalysisOperation::CircuitSimplification, message)
 }
 
 #[cfg(test)]

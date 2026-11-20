@@ -9,7 +9,8 @@ use stab_model::{
 
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
 use crate::{
-    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
+    AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult, ResourceKind,
+    ResourceLimitError,
     sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
 
@@ -90,7 +91,8 @@ pub fn circuit_detecting_regions_for_targets(
     let tick_count = exact_count(summary.ticks(), "tick")?;
     let measurement_count = usize::try_from(exact_count(summary.measurements(), "measurement")?)
         .map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::DetectingRegions,
                 "detecting-region measurement count does not fit in memory on this platform",
             )
         })?;
@@ -108,7 +110,7 @@ pub fn circuit_detecting_regions_for_targets(
     );
     tracker.set_cancellation(options.cancellation);
     tracker.set_memory_budget(
-        ResourceOperation::DetectingRegions,
+        AnalysisOperation::DetectingRegions,
         ResourceKind::LiveStateUnits,
         options.memory_budget,
     );
@@ -278,7 +280,8 @@ fn undo_circuit_with_snapshots(
             } => {
                 if let Some(iteration_start) = pending_iteration_start.take() {
                     if *current_tick != iteration_start {
-                        return Err(AnalysisError::invalid_detector_error_model(
+                        return Err(AnalysisError::internal(
+                            AnalysisOperation::DetectingRegions,
                             "detecting-region repeat body tick count changed during traversal",
                         ));
                     }
@@ -293,7 +296,8 @@ fn undo_circuit_with_snapshots(
                     current_tick
                         .checked_sub(*ticks_per_iteration)
                         .ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
+                            AnalysisError::internal(
+                                AnalysisOperation::DetectingRegions,
                                 "detecting-region repeat iteration tick span underflowed",
                             )
                         })?;
@@ -327,17 +331,20 @@ fn undo_circuit_with_snapshots(
                 )?;
                 tracker.undo_repeated_circuit(body, skipped)?;
                 let skipped_ticks = ticks_per_iteration.checked_mul(skipped).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::DetectingRegions,
                         "detecting-region skipped tick count overflowed",
                     )
                 })?;
                 *current_tick = current_tick.checked_sub(skipped_ticks).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::DetectingRegions,
                         "detecting-region skipped tick span underflowed",
                     )
                 })?;
                 *remaining = remaining.checked_sub(skipped).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::DetectingRegions,
                         "detecting-region skipped repeat count underflowed",
                     )
                 })?;
@@ -365,12 +372,16 @@ fn prepare_repeat_with_snapshots<'a>(
     let repeated_ticks = ticks_per_iteration
         .checked_mul(repetitions)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::DetectingRegions,
                 "detecting-region repeat tick count overflowed",
             )
         })?;
     let repeat_start = current_tick.checked_sub(repeated_ticks).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model("detecting-region repeat tick span underflowed")
+        AnalysisError::internal(
+            AnalysisOperation::DetectingRegions,
+            "detecting-region repeat tick span underflowed",
+        )
     })?;
     let repeat_start_tick = CircuitTick::new(repeat_start);
     let repeat_end_tick = CircuitTick::new(*current_tick);
@@ -403,23 +414,27 @@ fn skipped_repeat_iterations(
         .checked_sub(repeat_start)
         .map(|offset| offset / ticks_per_iteration)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::DetectingRegions,
                 "detecting-region selected tick preceded its repeat span",
             )
         })?;
     let skipped = remaining
         .checked_sub(selected_iteration.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::DetectingRegions,
                 "detecting-region selected repeat iteration overflowed",
             )
         })?)
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::DetectingRegions,
                 "detecting-region selected repeat iteration exceeded its remaining span",
             )
         })?;
     if skipped == 0 {
-        return Err(AnalysisError::invalid_detector_error_model(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::DetectingRegions,
             "detecting-region repeat skip made no progress",
         ));
     }
@@ -436,7 +451,8 @@ fn undo_instruction_with_snapshots(
 ) -> AnalysisResult<()> {
     if instruction.gate().kind() == GateKind::TICK {
         *current_tick = current_tick.checked_sub(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::DetectingRegions,
                 "tick count underflowed while extracting detecting regions",
             )
         })?;
@@ -610,10 +626,14 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisR
         GateKind::DETECTOR => validate_detector_targets(instruction),
         GateKind::OBSERVABLE_INCLUDE => validate_observable_include_targets(instruction),
         GateKind::QUBIT_COORDS | GateKind::SHIFT_COORDS => Ok(()),
-        GateKind::REPEAT => Err(AnalysisError::invalid_detector_error_model(format!(
-            "simple detecting-region extraction does not support gate {}",
-            instruction.gate().canonical_name()
-        ))),
+        GateKind::REPEAT => Err(AnalysisError::unsupported(
+            AnalysisOperation::DetectingRegions,
+            instruction.gate().kind(),
+            format!(
+                "simple detecting-region extraction does not support gate {}",
+                instruction.gate().canonical_name()
+            ),
+        )),
     }
 }
 
@@ -636,10 +656,14 @@ fn validate_single_measurement_qubit_targets(
 fn validate_plain_qubit_pair_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     for group in instruction.target_groups() {
         let [left, right] = group else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction only supports {} with qubit target pairs",
-                instruction.gate().canonical_name()
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::DetectingRegions,
+                instruction.gate().kind(),
+                format!(
+                    "simple detecting-region extraction only supports {} with qubit target pairs",
+                    instruction.gate().canonical_name()
+                ),
+            ));
         };
         validate_qubit_target(instruction, left, false)?;
         validate_qubit_target(instruction, right, false)?;
@@ -650,10 +674,14 @@ fn validate_plain_qubit_pair_targets(instruction: &CircuitInstruction) -> Analys
 fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     for group in instruction.target_groups() {
         let [left, right] = group else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction only supports {} with paired targets",
-                instruction.gate().canonical_name()
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::DetectingRegions,
+                instruction.gate().kind(),
+                format!(
+                    "simple detecting-region extraction only supports {} with paired targets",
+                    instruction.gate().canonical_name()
+                ),
+            ));
         };
         let gate_name = instruction.gate().canonical_name();
         let slot = controlled_pauli_form(instruction.gate()).map(|form| form.slot);
@@ -680,10 +708,14 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Analys
                 validate_qubit_target(instruction, qubit_target, false)?;
                 continue;
             }
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction only supports {} sweep-controlled groups with exactly one sweep bit and one plain qubit target",
-                gate_name
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::DetectingRegions,
+                instruction.gate().kind(),
+                format!(
+                    "simple detecting-region extraction only supports {} sweep-controlled groups with exactly one sweep bit and one plain qubit target",
+                    gate_name
+                ),
+            ));
         }
         let left_is_record = left.is_measurement_record_target();
         let right_is_record = right.is_measurement_record_target();
@@ -703,10 +735,14 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Analys
                 validate_qubit_target(instruction, feedback_target, false)?;
             }
             (true, true) => {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "simple detecting-region extraction only supports {} measurement-record feedback with exactly one plain qubit target",
-                    gate_name
-                )));
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::DetectingRegions,
+                    instruction.gate().kind(),
+                    format!(
+                        "simple detecting-region extraction only supports {} measurement-record feedback with exactly one plain qubit target",
+                        gate_name
+                    ),
+                ));
             }
         }
     }
@@ -724,20 +760,28 @@ fn validate_control_position(
     if slot.is_some_and(|slot| slot.accepts(control_is_first)) {
         Ok(())
     } else {
-        Err(AnalysisError::invalid_detector_error_model(format!(
-            "simple detecting-region extraction does not support {} {control_kind} in this target position",
-            instruction.gate().canonical_name()
-        )))
+        Err(AnalysisError::unsupported(
+            AnalysisOperation::DetectingRegions,
+            instruction.gate().kind(),
+            format!(
+                "simple detecting-region extraction does not support {} {control_kind} in this target position",
+                instruction.gate().canonical_name()
+            ),
+        ))
     }
 }
 
 fn validate_measurement_qubit_pair_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     for group in instruction.target_groups() {
         let [left, right] = group else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction only supports {} with qubit target pairs",
-                instruction.gate().canonical_name()
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::DetectingRegions,
+                instruction.gate().kind(),
+                format!(
+                    "simple detecting-region extraction only supports {} with qubit target pairs",
+                    instruction.gate().canonical_name()
+                ),
+            ));
         };
         validate_qubit_target(instruction, left, true)?;
         validate_qubit_target(instruction, right, true)?;
@@ -753,18 +797,26 @@ fn validate_pauli_product_targets(instruction: &CircuitInstruction) -> AnalysisR
                 continue;
             }
             if target.pauli_type().is_none() {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "simple detecting-region extraction only supports {} with Pauli-product targets, got {target}",
-                    instruction.gate().canonical_name()
-                )));
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::DetectingRegions,
+                    instruction.gate().kind(),
+                    format!(
+                        "simple detecting-region extraction only supports {} with Pauli-product targets, got {target}",
+                        instruction.gate().canonical_name()
+                    ),
+                ));
             }
             has_pauli_target = true;
         }
         if !has_pauli_target {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction only supports {} with non-empty Pauli-product targets",
-                instruction.gate().canonical_name()
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::DetectingRegions,
+                instruction.gate().kind(),
+                format!(
+                    "simple detecting-region extraction only supports {} with non-empty Pauli-product targets",
+                    instruction.gate().canonical_name()
+                ),
+            ));
         }
     }
     Ok(())
@@ -777,16 +829,24 @@ fn validate_measurement_pad_targets(instruction: &CircuitInstruction) -> Analysi
             inverted: false,
         } = target.kind()
         else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::DetectingRegions,
+                GateKind::MPAD,
+                format!(
+                    "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
+                ),
+            ));
         };
         if id.get() <= 1 {
             continue;
         }
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::DetectingRegions,
+            GateKind::MPAD,
+            format!(
+                "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
+            ),
+        ));
     }
     Ok(())
 }
@@ -806,29 +866,41 @@ fn validate_qubit_target(
     } else {
         "plain qubit targets"
     };
-    Err(AnalysisError::invalid_detector_error_model(format!(
-        "simple detecting-region extraction only supports {} with {shape}, got {target}",
-        instruction.gate().canonical_name()
-    )))
+    Err(AnalysisError::unsupported(
+        AnalysisOperation::DetectingRegions,
+        instruction.gate().kind(),
+        format!(
+            "simple detecting-region extraction only supports {} with {shape}, got {target}",
+            instruction.gate().canonical_name()
+        ),
+    ))
 }
 
 fn validate_target_count(instruction: &CircuitInstruction, expected: usize) -> AnalysisResult<()> {
     if instruction.targets().len() == expected {
         return Ok(());
     }
-    Err(AnalysisError::invalid_detector_error_model(format!(
-        "simple detecting-region extraction expected {} to have {expected} target(s), got {}",
-        instruction.gate().canonical_name(),
-        instruction.targets().len()
-    )))
+    Err(AnalysisError::unsupported(
+        AnalysisOperation::DetectingRegions,
+        instruction.gate().kind(),
+        format!(
+            "simple detecting-region extraction expected {} to have {expected} target(s), got {}",
+            instruction.gate().canonical_name(),
+            instruction.targets().len()
+        ),
+    ))
 }
 
 fn validate_detector_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     for target in instruction.targets() {
         if !target.is_measurement_record_target() {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction only supports DETECTOR measurement-record targets, got {target}"
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::DetectingRegions,
+                None,
+                format!(
+                    "simple detecting-region extraction only supports DETECTOR measurement-record targets, got {target}"
+                ),
+            ));
         }
     }
     Ok(())
@@ -836,7 +908,7 @@ fn validate_detector_targets(instruction: &CircuitInstruction) -> AnalysisResult
 
 fn validate_observable_include_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     instruction.observable_id_argument()?.ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::unsupported(AnalysisOperation::DetectingRegions, GateKind::OBSERVABLE_INCLUDE,
             "simple detecting-region extraction requires OBSERVABLE_INCLUDE to have an observable id",
         )
     })?;
@@ -844,9 +916,13 @@ fn validate_observable_include_targets(instruction: &CircuitInstruction) -> Anal
         if target.is_measurement_record_target() || target.pauli_type().is_some() {
             continue;
         }
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "simple detecting-region extraction only supports OBSERVABLE_INCLUDE measurement-record or Pauli targets, got {target}"
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::DetectingRegions,
+            GateKind::OBSERVABLE_INCLUDE,
+            format!(
+                "simple detecting-region extraction only supports OBSERVABLE_INCLUDE measurement-record or Pauli targets, got {target}"
+            ),
+        ));
     }
     Ok(())
 }
@@ -870,9 +946,10 @@ fn folded_summary(
 
 fn exact_count(count: FoldedCount, label: &str) -> AnalysisResult<u64> {
     count.exact().ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "detecting-region circuit {label} count overflowed"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::DetectingRegions,
+            format!("detecting-region circuit {label} count overflowed"),
+        )
     })
 }
 
@@ -885,24 +962,26 @@ fn validate_targets(
         match target.kind() {
             DemTargetKind::RelativeDetector(detector) => {
                 if detector.get() >= detector_count {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "requested detector D{} but circuit only has {detector_count} detector(s)",
-                        detector.get()
-                    )));
+                    return Err(AnalysisRequestError::DetectorOutOfRange {
+                        detector,
+                        detector_count,
+                    }
+                    .into());
                 }
             }
             DemTargetKind::LogicalObservable(observable) => {
                 if observable.get() >= observable_count {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "requested observable L{} but circuit only has {observable_count} observable(s)",
-                        observable.get()
-                    )));
+                    return Err(AnalysisRequestError::ObservableOutOfRange {
+                        observable,
+                        observable_count,
+                    }
+                    .into());
                 }
             }
             DemTargetKind::Separator => {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "detecting-region target filters only supports detector and logical-observable targets, got {target}",
-                )));
+                return Err(
+                    AnalysisRequestError::NotDetectorOrObservable { target: *target }.into(),
+                );
             }
         }
     }
@@ -912,10 +991,11 @@ fn validate_targets(
 fn validate_ticks(ticks: &BTreeSet<CircuitTick>, tick_count: u64) -> AnalysisResult<()> {
     for tick in ticks {
         if tick.get() >= tick_count {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "requested tick {} but circuit only has {tick_count} tick layer(s)",
-                tick.get()
-            )));
+            return Err(AnalysisRequestError::TickOutOfRange {
+                tick: *tick,
+                tick_count,
+            }
+            .into());
         }
     }
     Ok(())
@@ -1010,7 +1090,7 @@ fn admit_region_bytes(
         return Ok(());
     }
     Err(ResourceLimitError::memory_budget(
-        ResourceOperation::DetectingRegions,
+        AnalysisOperation::DetectingRegions,
         resource,
         required,
         budget.bytes(),

@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::AnalysisResult;
 use stab_model::{Circuit, GateKind};
 
 use super::{
@@ -30,9 +30,8 @@ pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCi
     for y in 0..width {
         for x in 0..(width - y) {
             let coord = ColorCoord::new((2 * x + y) as i32, y as i32);
-            let qubit = u32::try_from(p2q.len()).map_err(|_| {
-                AnalysisError::invalid_domain_value("color code qubit count", p2q.len())
-            })?;
+            let qubit = u32::try_from(p2q.len())
+                .map_err(|_| super::generation_invariant("color code qubit count", p2q.len()))?;
             p2q.insert(coord, qubit);
             if (x + 2 * y) % 3 == 2 {
                 measure_coords.insert(coord);
@@ -57,14 +56,13 @@ pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCi
     let mut data_coord_to_order = BTreeMap::new();
     let mut measure_coord_to_order = BTreeMap::new();
     for qubit in &data_qubits {
-        let order = u32::try_from(data_coord_to_order.len()).map_err(|_| {
-            AnalysisError::invalid_domain_value("data qubit count", data_qubits.len())
-        })?;
+        let order = u32::try_from(data_coord_to_order.len())
+            .map_err(|_| super::generation_invariant("data qubit count", data_qubits.len()))?;
         data_coord_to_order.insert(q2p[qubit], order);
     }
     for qubit in &measurement_qubits {
         let order = u32::try_from(measure_coord_to_order.len()).map_err(|_| {
-            AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+            super::generation_invariant("measurement qubit count", measurement_qubits.len())
         })?;
         measure_coord_to_order.insert(q2p[qubit], order);
     }
@@ -111,11 +109,11 @@ pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCi
     append_repeated_body(&mut head, cycle_actions.clone(), 2)?;
 
     let measurement_count = u32::try_from(measurement_qubits.len()).map_err(|_| {
-        AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+        super::generation_invariant("measurement qubit count", measurement_qubits.len())
     })?;
     for k in (0..measurement_count).rev() {
         let index = usize::try_from(measurement_count - k - 1)
-            .map_err(|_| AnalysisError::invalid_domain_value("measurement index", k))?;
+            .map_err(|_| super::generation_invariant("measurement index", k))?;
         let coord = q2p[&measurement_qubits[index]];
         append_instruction(
             &mut head,
@@ -134,7 +132,7 @@ pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCi
     )?;
     for k in (0..measurement_count).rev() {
         let index = usize::try_from(measurement_count - k - 1)
-            .map_err(|_| AnalysisError::invalid_domain_value("measurement index", k))?;
+            .map_err(|_| super::generation_invariant("measurement index", k))?;
         let coord = q2p[&measurement_qubits[index]];
         append_instruction(
             &mut body,
@@ -156,7 +154,7 @@ pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCi
     };
     append_measure(params, &mut tail, &data_qubits, tail_basis)?;
     let data_count = u32::try_from(data_qubits.len())
-        .map_err(|_| AnalysisError::invalid_domain_value("data qubit count", data_qubits.len()))?;
+        .map_err(|_| super::generation_invariant("data qubit count", data_qubits.len()))?;
     for measurement_qubit in &measurement_qubits {
         let measure = q2p[measurement_qubit];
         let mut detectors = Vec::new();
@@ -208,9 +206,8 @@ pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCi
     }
     let rgb = ['R', 'G', 'B'];
     for coord in &measure_coords {
-        let index = usize::try_from((coord.x2 + coord.y).rem_euclid(3)).map_err(|_| {
-            AnalysisError::invalid_domain_value("color code layout color", coord.x2)
-        })?;
+        let index = usize::try_from((coord.x2 + coord.y).rem_euclid(3))
+            .map_err(|_| super::generation_invariant("color code layout color", coord.x2))?;
         layout.insert((coord.x2 as u32, coord.y as u32), (rgb[index], p2q[coord]));
     }
 

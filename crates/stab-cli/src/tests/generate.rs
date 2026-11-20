@@ -380,3 +380,88 @@ fn gen_rejects_tasks_outside_the_code_family_in_stim_order() {
     run(&gen_args("color_code", "memory_xyz", "4", "2"), b"")
         .assert_err(&["color code distance value 4"]);
 }
+
+/// `gen --out` opens its file through the output preflight every other command uses, after
+/// generation succeeds: a path it cannot open fails exactly as `analyze_errors --out` does, a
+/// symlink or device is written through as in Stim, an existing file is replaced only by a run
+/// that succeeds, and a write failure mid-stream names the path.
+#[test]
+fn gen_named_output_matches_the_shared_output_preflight() {
+    let scratch = Scratch::new();
+    let circuit = scratch.file("circuit.stim", "R 0\nM 0\nDETECTOR rec[-1]\n");
+    std::fs::create_dir(scratch.path_buf("directory")).expect("create directory");
+    let expected = run(REPETITION, b"");
+    assert_eq!(expected.status, 0, "{}", expected.stderr_text());
+    let gen_to = |path: &str| run(&[REPETITION, &["--out", path]].concat(), b"");
+
+    for name in ["missing-directory/generated.stim", "directory"] {
+        let path = scratch.path(name);
+        let generated = gen_to(&path);
+        generated.assert_err(&["failed to write", &path]);
+        let analyzed = run(
+            &["stab", "analyze_errors", "--in", &circuit, "--out", &path],
+            b"",
+        );
+        assert_eq!(generated, analyzed, "{name}");
+    }
+    assert!(!scratch.exists("missing-directory"));
+
+    let longer = "x".repeat(expected.stdout.len() * 2);
+    scratch.file("target.stim", &longer);
+    std::os::unix::fs::symlink(
+        scratch.path_buf("target.stim"),
+        scratch.path_buf("link.stim"),
+    )
+    .expect("create symlink");
+    gen_to(&scratch.path("link.stim")).assert_ok(b"");
+    assert_eq!(scratch.read("target.stim"), expected.stdout);
+
+    std::os::unix::fs::symlink(
+        scratch.path_buf("created.stim"),
+        scratch.path_buf("dangling"),
+    )
+    .expect("create dangling symlink");
+    gen_to(&scratch.path("dangling")).assert_ok(b"");
+    assert_eq!(scratch.read("created.stim"), expected.stdout);
+
+    gen_to("/dev/null").assert_ok(b"");
+
+    scratch.file("existing.stim", &longer);
+    let existing = scratch.path("existing.stim");
+    let mut invalid = REPETITION.to_vec();
+    invalid.extend([
+        "--before_measure_flip_probability",
+        "1.1",
+        "--out",
+        &existing,
+    ]);
+    run(&invalid, b"").assert_err(&["probability"]);
+    let mut refused = REPETITION.to_vec();
+    let fresh = scratch.path("fresh.stim");
+    refused.extend(["--memory-budget=1KiB", "--out", &fresh]);
+    run(&refused, b"").assert_err(&["memory budget"]);
+    assert_eq!(scratch.read("existing.stim"), longer.as_bytes());
+    assert!(!scratch.exists("fresh.stim"), "refusal created the output");
+    gen_to(&existing).assert_ok(b"");
+    assert_eq!(scratch.read("existing.stim"), expected.stdout);
+
+    // Rotated distance 25 spills the output buffer several times before the final flush.
+    run(
+        &[
+            "stab",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_x",
+            "--distance",
+            "25",
+            "--rounds",
+            "3",
+            "--out",
+            "/dev/full",
+        ],
+        b"",
+    )
+    .assert_err(&["failed to write /dev/full", "No space left on device"]);
+}

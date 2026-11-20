@@ -7,11 +7,11 @@ use std::assert_matches;
 
 use stab_algebra::SingleQubitClifford;
 use stab_analysis::{
-    AnalysisError, circuit_without_tags, gate_decomposition_to_circuit,
+    AnalysisError, GateData, circuit_without_tags, gate_decomposition_to_circuit,
     gate_h_s_cx_m_r_decomposition, gate_has_h_s_cx_m_r_decomposition, gate_has_tableau,
     gate_tableau, single_qubit_clifford_for_gate,
 };
-use stab_model::{Circuit, Gate};
+use stab_model::{Circuit, Gate, GateKind};
 
 #[test]
 fn single_qubit_clifford_gate_conversion_covers_the_complete_algebra_set() {
@@ -38,9 +38,12 @@ fn gate_decomposition_is_a_valid_model_without_implying_tableau_support() {
     let error = gate_tableau(measurement).expect_err("measurement has no unitary tableau");
     assert_matches!(
         error,
-        AnalysisError::InvalidTableauConversion { ref message }
-            if message.contains("does not have tableau data")
+        AnalysisError::GateDataUnavailable {
+            gate: GateKind::M,
+            data: GateData::Tableau,
+        }
     );
+    assert!(error.to_string().contains("does not have tableau data"));
 }
 
 #[test]

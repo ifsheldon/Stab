@@ -3,7 +3,7 @@ use stab_model::advanced::CancellationCountdown;
 use stab_model::{DemTarget, QubitId};
 
 use super::{SparseReverseFrameTracker, qubit_index};
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
 
 const REGION_CHUNK_QUBITS: usize = CancellationCountdown::INTERVAL as usize;
 
@@ -18,7 +18,7 @@ impl SparseReverseFrameTracker {
             target,
             self.qubit_count,
             budget,
-            ResourceOperation::DetectingRegions,
+            AnalysisOperation::DetectingRegions,
         )
     }
 
@@ -43,7 +43,7 @@ impl SparseReverseFrameTracker {
             .map(|max_id| qubit_index(QubitId::new(max_id)?).map(|index| index + 1))
             .transpose()?
             .unwrap_or(0);
-        self.region_for_target_with_len(target, len, budget, ResourceOperation::FlowCheck)
+        self.region_for_target_with_len(target, len, budget, AnalysisOperation::FlowCheck)
     }
 
     fn region_for_target_with_len(
@@ -51,7 +51,7 @@ impl SparseReverseFrameTracker {
         target: DemTarget,
         len: usize,
         budget: AlgebraMemoryBudget,
-        operation: ResourceOperation,
+        operation: AnalysisOperation,
     ) -> AnalysisResult<FlexPauliString> {
         let signal = self.cancellation_signal();
         signal.check()?;
@@ -77,10 +77,13 @@ impl SparseReverseFrameTracker {
             if xs.contains(&target) {
                 let index = qubit_index(*qubit)?;
                 let basis = bases.get_mut(index).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "X-basis sensitivity qubit {} is outside its sparse region",
-                        qubit.get()
-                    ))
+                    AnalysisError::internal(
+                        AnalysisOperation::ReverseFrameTracking,
+                        format!(
+                            "X-basis sensitivity qubit {} is outside its sparse region",
+                            qubit.get()
+                        ),
+                    )
                 })?;
                 *basis = PauliBasis::X;
             }
@@ -90,19 +93,25 @@ impl SparseReverseFrameTracker {
             if zs.contains(&target) {
                 let index = qubit_index(*qubit)?;
                 let basis = bases.get_mut(index).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "Z-basis sensitivity qubit {} is outside its sparse region",
-                        qubit.get()
-                    ))
+                    AnalysisError::internal(
+                        AnalysisOperation::ReverseFrameTracking,
+                        format!(
+                            "Z-basis sensitivity qubit {} is outside its sparse region",
+                            qubit.get()
+                        ),
+                    )
                 })?;
                 *basis = match *basis {
                     PauliBasis::I => PauliBasis::Z,
                     PauliBasis::X => PauliBasis::Y,
                     actual => {
-                        return Err(AnalysisError::invalid_detector_error_model(format!(
-                            "unexpected {actual:?} basis while building sparse region for qubit {}",
-                            qubit.get()
-                        )));
+                        return Err(AnalysisError::internal(
+                            AnalysisOperation::ReverseFrameTracking,
+                            format!(
+                                "unexpected {actual:?} basis while building sparse region for qubit {}",
+                                qubit.get()
+                            ),
+                        ));
                     }
                 };
             }
@@ -121,9 +130,10 @@ impl SparseReverseFrameTracker {
                     budget_bytes,
                 )
                 .into(),
-                error => AnalysisError::invalid_detector_error_model(format!(
-                    "failed to build detecting region for {target}: {error}"
-                )),
+                error => AnalysisError::internal(
+                    AnalysisOperation::ReverseFrameTracking,
+                    format!("failed to build detecting region for {target}: {error}"),
+                ),
             },
         )
     }

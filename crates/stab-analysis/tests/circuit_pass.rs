@@ -9,8 +9,8 @@ use std::cell::Cell;
 use std::convert::Infallible;
 
 use stab_analysis::{
-    CircuitPass, CircuitPassContext, CircuitPassError, CircuitPassInput, CircuitPassLimits,
-    CircuitPassOutput, CircuitPassResources, CircuitPassStage, ResourceKind, ResourceOperation,
+    AnalysisOperation, CircuitPass, CircuitPassContext, CircuitPassError, CircuitPassInput,
+    CircuitPassLimits, CircuitPassOutput, CircuitPassResources, CircuitPassStage, ResourceKind,
     WithoutNoiseOptions, WithoutNoisePass, circuit_without_noise, run_circuit_pass,
 };
 use stab_model::{
@@ -200,7 +200,7 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
             .expect_err("reject input before dispatch");
         let resource = error.resource_limit_error().expect("input resource error");
         assert_eq!(resource.resource(), expected_resource);
-        assert_eq!(resource.operation(), ResourceOperation::CircuitPass);
+        assert_eq!(resource.operation(), AnalysisOperation::CircuitPass);
         assert!(resource.actual() > resource.limit());
         assert_eq!(error.resource_stage(), Some(CircuitPassStage::Input));
         assert!(!pass.ran.get());
@@ -238,7 +238,7 @@ fn circuit_pass_resource_admission_is_atomic_across_framework_stages() {
             .resource_limit_error()
             .expect("projection resource error");
         assert_eq!(resource.resource(), expected_resource);
-        assert_eq!(resource.operation(), ResourceOperation::CircuitPass);
+        assert_eq!(resource.operation(), AnalysisOperation::CircuitPass);
         assert!(resource.actual() > resource.limit());
         assert_eq!(
             error.resource_stage(),

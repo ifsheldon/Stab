@@ -1,7 +1,7 @@
 use stab_algebra::Flow;
 use stab_model::{Circuit, MemoryBudget, ParseLimits};
 
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
 
 /// Admits owned flow rows against the caller's flow-generator budget: `2n + m` rows for `n`
 /// qubits and `m` measurements. The ignored-only and unitary generators return the `2n`
@@ -16,7 +16,7 @@ pub(super) fn admit_flow_generator_rows(
         measurement_rich_flow_generator_projected_bytes(qubit_count, measurement_count);
     if !budget.admits(u128::from(projected_bytes)) {
         return Err(ResourceLimitError::memory_budget(
-            ResourceOperation::FlowGeneration,
+            AnalysisOperation::FlowGeneration,
             ResourceKind::ProjectedPayloadBytes,
             projected_bytes,
             budget.bytes(),
@@ -50,6 +50,6 @@ pub(super) fn validate_flow_generator_repeat_nesting(circuit: &Circuit) -> Analy
 }
 
 fn flow_resource_error(resource: ResourceKind, actual: u64, limit: u64) -> AnalysisError {
-    ResourceLimitError::fixed_operation(ResourceOperation::FlowGeneration, resource, actual, limit)
+    ResourceLimitError::fixed_operation(AnalysisOperation::FlowGeneration, resource, actual, limit)
         .into()
 }

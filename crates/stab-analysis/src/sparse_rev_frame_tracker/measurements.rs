@@ -8,6 +8,7 @@ use super::pauli_product::{
     pair_measurement_terms_reversed, pauli_product_measurement_terms_reversed, qubits_reversed,
 };
 use super::{SparseReverseFrameTracker, TrackerBasis, held_set_bytes};
+use crate::AnalysisOperation;
 use crate::target_xor_set::TargetXorSet;
 use crate::{AnalysisError, AnalysisResult};
 
@@ -145,7 +146,8 @@ impl SparseReverseFrameTracker {
 
     pub(crate) fn pop_record_sensitivity(&mut self) -> AnalysisResult<TargetXorSet> {
         self.measurement_count = self.measurement_count.checked_sub(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "measurement count underflowed during sparse reverse tracking",
             )
         })?;

@@ -1,44 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-/// Analysis operation whose configurable resource budget was exceeded.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ResourceOperation {
-    CircuitToDetectorErrorModel,
-    CircuitPass,
-    CircuitFlatten,
-    DetectingRegions,
-    DetectorErrorModelFlatten,
-    FeedbackInlining,
-    FlowCheck,
-    FlowGeneration,
-    LogicalErrorSearch,
-    MissingDetectorDiscovery,
-    PauliConjugation,
-    SatMaterialization,
-    TableauConversion,
-    TimeReversal,
-}
-
-impl ResourceOperation {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::CircuitToDetectorErrorModel => "circuit-to-detector-error-model",
-            Self::CircuitPass => "circuit-pass",
-            Self::CircuitFlatten => "circuit-flatten",
-            Self::DetectingRegions => "detecting-regions",
-            Self::DetectorErrorModelFlatten => "detector-error-model-flatten",
-            Self::FeedbackInlining => "feedback-inlining",
-            Self::FlowCheck => "flow-check",
-            Self::FlowGeneration => "flow-generation",
-            Self::LogicalErrorSearch => "logical-error-search",
-            Self::MissingDetectorDiscovery => "missing-detector-discovery",
-            Self::PauliConjugation => "pauli-conjugation",
-            Self::SatMaterialization => "sat-materialization",
-            Self::TableauConversion => "tableau-conversion",
-            Self::TimeReversal => "time-reversal",
-        }
-    }
-}
+use crate::{AnalysisOperation, CodeTask};
 
 /// Analysis resource dimension whose configurable budget was exceeded.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -141,11 +103,11 @@ pub(crate) enum LogicalErrorSearchResource {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ResourceLimitCause {
     FixedOperation {
-        operation: ResourceOperation,
+        operation: AnalysisOperation,
         resource: ResourceKind,
     },
     MemoryBudget {
-        operation: ResourceOperation,
+        operation: AnalysisOperation,
         resource: ResourceKind,
     },
     CircuitToDetectorErrorModel {
@@ -176,6 +138,10 @@ enum ResourceLimitCause {
     },
     LogicalErrorTraversalRepeatIterations {
         context: &'static str,
+    },
+    GeneratedCircuit {
+        task: CodeTask,
+        physical_qubits: u64,
     },
 }
 
@@ -211,7 +177,7 @@ pub struct ResourceLimitError {
 
 impl ResourceLimitError {
     pub(crate) const fn fixed_operation(
-        operation: ResourceOperation,
+        operation: AnalysisOperation,
         resource: ResourceKind,
         actual: u64,
         limit: u64,
@@ -228,7 +194,7 @@ impl ResourceLimitError {
 
     /// A conservative byte requirement that exceeds the operation's caller-selected budget.
     pub(crate) const fn memory_budget(
-        operation: ResourceOperation,
+        operation: AnalysisOperation,
         resource: ResourceKind,
         actual: u64,
         limit: u64,
@@ -361,37 +327,69 @@ impl ResourceLimitError {
         }
     }
 
+    /// A generated circuit whose projected peak memory exceeds the caller-selected budget.
+    pub(crate) const fn generated_circuit(
+        task: CodeTask,
+        physical_qubits: u64,
+        required_bytes: u64,
+        budget_bytes: u64,
+    ) -> Self {
+        Self {
+            cause: ResourceLimitCause::GeneratedCircuit {
+                task,
+                physical_qubits,
+            },
+            actual: required_bytes,
+            limit: budget_bytes,
+        }
+    }
+
+    /// Whether a caller-selected memory budget, rather than a fixed safety limit, refused the
+    /// work; raising the budget admits it.
+    pub const fn is_memory_budget(self) -> bool {
+        matches!(
+            self.cause,
+            ResourceLimitCause::MemoryBudget { .. }
+                | ResourceLimitCause::CircuitPass {
+                    resource: ResourceKind::ProjectedPayloadBytes,
+                    ..
+                }
+                | ResourceLimitCause::GeneratedCircuit { .. }
+        )
+    }
+
     pub const fn code(self) -> &'static str {
         "resource-limit-exceeded"
     }
 
-    pub const fn operation(self) -> ResourceOperation {
+    pub const fn operation(self) -> AnalysisOperation {
         match self.cause {
             ResourceLimitCause::MemoryBudget { operation, .. } => operation,
             ResourceLimitCause::FixedOperation { operation, .. } => operation,
             ResourceLimitCause::CircuitToDetectorErrorModel { .. } => {
-                ResourceOperation::CircuitToDetectorErrorModel
+                AnalysisOperation::CircuitToDetectorErrorModel
             }
-            ResourceLimitCause::CircuitPass { .. } => ResourceOperation::CircuitPass,
-            ResourceLimitCause::DetectingRegions { .. } => ResourceOperation::DetectingRegions,
+            ResourceLimitCause::CircuitPass { .. } => AnalysisOperation::CircuitPass,
+            ResourceLimitCause::DetectingRegions { .. } => AnalysisOperation::DetectingRegions,
             ResourceLimitCause::CircuitFlattenRepeatNesting
             | ResourceLimitCause::CircuitFlattenMaterializedUnits => {
-                ResourceOperation::CircuitFlatten
+                AnalysisOperation::CircuitFlatten
             }
             ResourceLimitCause::DemFlattenMaterializedUnits => {
-                ResourceOperation::DetectorErrorModelFlatten
+                AnalysisOperation::DetectorErrorModelFlatten
             }
             ResourceLimitCause::SatMaterialization { .. }
             | ResourceLimitCause::SatTraversalRepeatIterations { .. } => {
-                ResourceOperation::SatMaterialization
+                AnalysisOperation::SatMaterialization
             }
             ResourceLimitCause::LogicalErrorSearch { .. }
             | ResourceLimitCause::LogicalErrorTraversalRepeatIterations { .. } => {
-                ResourceOperation::LogicalErrorSearch
+                AnalysisOperation::LogicalErrorSearch
             }
             ResourceLimitCause::MissingDetectorDiscovery { .. } => {
-                ResourceOperation::MissingDetectorDiscovery
+                AnalysisOperation::MissingDetectorDiscovery
             }
+            ResourceLimitCause::GeneratedCircuit { .. } => AnalysisOperation::CircuitGeneration,
         }
     }
 
@@ -450,6 +448,7 @@ impl ResourceLimitError {
                 ResourceKind::RepeatIterations
             }
             ResourceLimitCause::MissingDetectorDiscovery { resource } => resource,
+            ResourceLimitCause::GeneratedCircuit { .. } => ResourceKind::MaterializedBytes,
         }
     }
 
@@ -673,6 +672,16 @@ impl Display for ResourceLimitError {
                 formatter,
                 "missing-detector discovery {} value {} exceeds current limit {}",
                 resource.as_str(),
+                self.actual,
+                self.limit
+            ),
+            ResourceLimitCause::GeneratedCircuit {
+                task,
+                physical_qubits,
+            } => write!(
+                formatter,
+                "invalid generated circuit size value {physical_qubits} physical qubits for {} need at least {} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
+                crate::circuit_generation::budget_family_name(task),
                 self.actual,
                 self.limit
             ),

@@ -1,6 +1,6 @@
 //! Repetition-code memory circuits.
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::AnalysisResult;
 use stab_model::{Circuit, GateKind};
 
 use super::{
@@ -15,9 +15,7 @@ pub(super) fn generate(params: &CodeCircuitParams) -> AnalysisResult<GeneratedCi
     let qubit_count = measurement_count
         .checked_mul(2)
         .and_then(|value| value.checked_add(1))
-        .ok_or_else(|| {
-            AnalysisError::invalid_domain_value("code distance", params.distance.get())
-        })?;
+        .ok_or_else(|| super::generation_invariant("code distance", params.distance.get()))?;
 
     let all_qubits = (0..qubit_count).collect::<Vec<_>>();
     let data_qubits = all_qubits

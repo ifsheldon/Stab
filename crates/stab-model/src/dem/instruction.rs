@@ -316,9 +316,9 @@ impl DemInstruction {
                 targets,
             } => {
                 let mut shifted = DemTargetVec::new();
-                shifted.try_reserve_exact(targets.len()).map_err(|_| {
-                    ModelError::invalid_detector_error_model("target allocation failed")
-                })?;
+                shifted
+                    .try_reserve_exact(targets.len())
+                    .map_err(|_| ModelError::dem_allocation_failed("target allocation failed"))?;
                 for target in targets {
                     shifted.push(target.shifted(detector_offset)?);
                 }
@@ -344,7 +344,7 @@ impl DemInstruction {
             DemPayload::ShiftDetectors { coordinates, shift } => {
                 let mut copied = DemArgVec::new();
                 copied.try_reserve_exact(coordinates.len()).map_err(|_| {
-                    ModelError::invalid_detector_error_model(
+                    ModelError::dem_allocation_failed(
                         "flattened instruction argument allocation failed",
                     )
                 })?;

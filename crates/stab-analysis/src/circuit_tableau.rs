@@ -4,7 +4,10 @@ use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, MemoryBudget, Target,
 };
 
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{
+    AnalysisError, AnalysisOperation, AnalysisResult, NonUnitaryReason, ResourceKind,
+    ResourceLimitError,
+};
 
 /// Options for [`circuit_to_tableau_with_options`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -148,25 +151,28 @@ impl Conversion<'_> {
         let options = self.options;
 
         if !options.ignore_measurement && gate.produces_measurements() {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "measurement operation {}",
-                gate.canonical_name()
-            )));
+            return Err(AnalysisError::non_unitary(
+                AnalysisOperation::TableauConversion,
+                gate.kind(),
+                NonUnitaryReason::Measurement,
+            ));
         }
         if !options.ignore_reset && gate.is_reset() {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "reset operation {}",
-                gate.canonical_name()
-            )));
+            return Err(AnalysisError::non_unitary(
+                AnalysisOperation::TableauConversion,
+                gate.kind(),
+                NonUnitaryReason::Reset,
+            ));
         }
         if !options.ignore_noise
             && gate.is_noisy()
             && instruction.args().iter().any(|argument| *argument > 0.0)
         {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "noisy operation {}",
-                gate.canonical_name()
-            )));
+            return Err(AnalysisError::non_unitary(
+                AnalysisOperation::TableauConversion,
+                gate.kind(),
+                NonUnitaryReason::Noise,
+            ));
         }
 
         match gate.category() {
@@ -198,7 +204,7 @@ impl Conversion<'_> {
             GateCategory::PauliProduct => {
                 let decomposed = crate::advanced::decomposed_single_instruction(instruction)
                     .map_err(|error| {
-                        AnalysisError::invalid_tableau_conversion(error.to_string())
+                        error.into_nested_pauli_product_error(AnalysisOperation::TableauConversion)
                     })?;
                 self.apply_circuit(&decomposed, result)
             }
@@ -243,11 +249,15 @@ fn apply_unitary_group_to_tableau(
         }
     };
     if local.len() != target_ids.len() {
-        return Err(AnalysisError::invalid_tableau_conversion(format!(
-            "gate {gate_name} expected {} tableau targets but got {}",
-            local.len(),
-            target_ids.len()
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::TableauConversion,
+            None,
+            format!(
+                "gate {gate_name} expected {} tableau targets but got {}",
+                local.len(),
+                target_ids.len()
+            ),
+        ));
     }
     result.append(local, target_ids).map_err(map_tableau_error)
 }
@@ -257,9 +267,11 @@ fn target_qubit_index(gate_name: &str, target: &Target) -> AnalysisResult<usize>
         .qubit_id()
         .map(|qubit| qubit.get() as usize)
         .ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(format!(
-                "gate {gate_name} has non-qubit tableau target {target}"
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::TableauConversion,
+                None,
+                format!("gate {gate_name} has non-qubit tableau target {target}"),
+            )
         })
 }
 
@@ -271,12 +283,12 @@ pub(crate) fn map_tableau_error(error: StabilizerError) -> AnalysisError {
             budget_bytes,
             ..
         } => ResourceLimitError::memory_budget(
-            ResourceOperation::TableauConversion,
+            AnalysisOperation::TableauConversion,
             ResourceKind::MaterializedBytes,
             u64::try_from(requested_bytes).unwrap_or(u64::MAX),
             budget_bytes,
         )
         .into(),
-        other => AnalysisError::invalid_tableau_conversion(other.to_string()),
+        other => AnalysisError::internal(AnalysisOperation::TableauConversion, other.to_string()),
     }
 }

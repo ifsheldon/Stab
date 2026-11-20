@@ -65,11 +65,7 @@ fn pfm_b4_flow_solver_rejects_invalid_circuits_without_exhaustive_fallback() {
     ] {
         let error = solve_for_flow_measurements(&circuit(&circuit_text), &[flow("Z0 -> Z0")])
             .expect_err("invalid generator shape must fail closed");
-        assert_matches!(
-            error,
-            AnalysisError::InvalidTableauConversion { .. }
-                | AnalysisError::InvalidCircuitSimplification { .. }
-        );
+        assert_matches!(error, AnalysisError::AntiHermitianPauliProduct { .. });
         assert!(error.to_string().contains("Hermitian"), "{error}");
         assert!(!error.to_string().contains("fallback"), "{error}");
     }

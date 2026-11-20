@@ -4,8 +4,8 @@
 )]
 
 use stab_analysis::{
-    CircuitPassContext, CircuitPassLimits, CircuitPassResources, CircuitPassStage, ResourceKind,
-    ResourceOperation, run_circuit_pass,
+    AnalysisOperation, CircuitPassContext, CircuitPassLimits, CircuitPassResources,
+    CircuitPassStage, ResourceKind, run_circuit_pass,
 };
 use stab_model::{Circuit, MemoryBudget, Probability};
 use stab_reference_noise_pass::{
@@ -155,7 +155,7 @@ fn common_admission_rejects_expanded_output_after_admitting_input() {
     .expect_err("one admitted input item becomes two output items");
 
     let resource = error.resource_limit_error().expect("resource diagnostic");
-    assert_eq!(resource.operation(), ResourceOperation::CircuitPass);
+    assert_eq!(resource.operation(), AnalysisOperation::CircuitPass);
     assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
     assert!(resource.actual() > resource.limit());
     assert_eq!(resource.limit(), input_bytes);

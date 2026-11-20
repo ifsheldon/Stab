@@ -7,8 +7,8 @@ use stab_model::{
 use crate::folded_walk::{check_repeat_nesting, walk_folded};
 
 use crate::{
-    AnalysisError, AnalysisResult, CircuitPass, CircuitPassInput, CircuitPassOutput,
-    CircuitPassResources, ResourceKind, ResourceLimitError, ResourceOperation,
+    AnalysisError, AnalysisOperation, AnalysisResult, CircuitPass, CircuitPassInput,
+    CircuitPassOutput, CircuitPassResources, ResourceKind, ResourceLimitError,
 };
 
 /// Resource policy for operation-owned circuit flattening.
@@ -108,10 +108,10 @@ pub fn flattened_circuit_operations_with_limits(
     let capacity = validate_materialized_instruction_capacity(estimate.operations)?;
     let mut result = Vec::new();
     result.try_reserve_exact(capacity).map_err(|error| {
-        AnalysisError::invalid_domain_value(
-            "flattened circuit allocation",
+        AnalysisError::allocation_failed(
+            AnalysisOperation::CircuitFlatten,
             format!(
-                "unable to reserve {} instruction slots: {error}",
+                "flattened circuit allocation value unable to reserve {} instruction slots: {error}",
                 estimate.operations
             ),
         )
@@ -304,7 +304,7 @@ fn validate_flattening_budget(
     let budget = limits.memory_budget();
     if !budget.admits(u128::from(materialized_bytes)) {
         return Err(ResourceLimitError::memory_budget(
-            ResourceOperation::CircuitFlatten,
+            AnalysisOperation::CircuitFlatten,
             ResourceKind::MaterializedBytes,
             materialized_bytes,
             budget.bytes(),
@@ -335,9 +335,9 @@ impl CircuitFlattenEstimate {
             self.tag_bytes,
         )
         .ok_or_else(|| {
-            AnalysisError::invalid_domain_value(
-                "flattened circuit resource estimate",
-                "byte count overflowed",
+            AnalysisError::count_overflow(
+                AnalysisOperation::CircuitFlatten,
+                "flattened circuit resource estimate value byte count overflowed",
             )
         })
     }
@@ -407,25 +407,29 @@ fn flattened_materialization_estimate(circuit: &Circuit) -> AnalysisResult<Circu
 
 fn checked_flatten_sum(left: u64, right: u64, resource: &'static str) -> AnalysisResult<u64> {
     left.checked_add(right).ok_or_else(|| {
-        AnalysisError::invalid_domain_value(
-            "flattened circuit resource estimate",
-            format!("{resource} overflowed"),
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitFlatten,
+            format!("flattened circuit resource estimate value {resource} overflowed"),
         )
     })
 }
 
 fn checked_flatten_product(left: u64, right: u64, resource: &'static str) -> AnalysisResult<u64> {
     left.checked_mul(right).ok_or_else(|| {
-        AnalysisError::invalid_domain_value(
-            "flattened circuit resource estimate",
-            format!("{resource} overflowed"),
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitFlatten,
+            format!("flattened circuit resource estimate value {resource} overflowed"),
         )
     })
 }
 
 fn usize_to_u64(value: usize) -> AnalysisResult<u64> {
-    u64::try_from(value)
-        .map_err(|_| AnalysisError::invalid_domain_value("flattened circuit count", "exceeds u64"))
+    u64::try_from(value).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitFlatten,
+            "flattened circuit count value exceeds u64",
+        )
+    })
 }
 
 fn validate_flattened_repeat_nesting(circuit: &Circuit) -> AnalysisResult<()> {
@@ -639,9 +643,12 @@ fn append_noiseless_instruction<R: WithoutNoiseRecorder>(
 }
 
 fn increment_pass_report_counter(counter: &mut u64, kind: &'static str) -> AnalysisResult<()> {
-    *counter = counter
-        .checked_add(1)
-        .ok_or_else(|| AnalysisError::invalid_domain_value(kind, "overflowed"))?;
+    *counter = counter.checked_add(1).ok_or_else(|| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitPass,
+            format!("{kind} value overflowed"),
+        )
+    })?;
     Ok(())
 }
 
@@ -675,22 +682,22 @@ fn add_coordinate_shift_mul(
     if shift.len() < delta.len() {
         let additional = delta.len() - shift.len();
         shift.try_reserve_exact(additional).map_err(|error| {
-            AnalysisError::invalid_domain_value(
-                "flattened circuit coordinate allocation",
-                format!("unable to reserve {additional} coordinate slots: {error}"),
+            AnalysisError::allocation_failed(
+                AnalysisOperation::CircuitFlatten,
+                format!(
+                    "flattened circuit coordinate allocation value unable to reserve {additional} coordinate slots: {error}"
+                ),
             )
         })?;
         shift.resize(delta.len(), 0.0);
     }
-    for (index, value) in delta.iter().enumerate() {
-        let coordinate = shift.get_mut(index).ok_or_else(|| {
-            AnalysisError::invalid_result_format("coordinate shift dimension missing")
-        })?;
+    // `shift` now has a dimension for every value of `delta`.
+    for (coordinate, value) in shift.iter_mut().zip(delta) {
         *coordinate += value * multiplier;
         if !coordinate.is_finite() {
-            return Err(AnalysisError::invalid_result_format(
-                "coordinate shift overflowed",
-            ));
+            return Err(AnalysisError::NonFiniteCoordinate {
+                operation: AnalysisOperation::CircuitFlatten,
+            });
         }
     }
     Ok(())
@@ -702,9 +709,9 @@ fn shifted_flattened_coordinates(args: &[f64], shift: &[f64]) -> AnalysisResult<
         if let Some(offset) = shift.get(index) {
             *coordinate += *offset;
             if !coordinate.is_finite() {
-                return Err(AnalysisError::invalid_result_format(
-                    "coordinate shift overflowed",
-                ));
+                return Err(AnalysisError::NonFiniteCoordinate {
+                    operation: AnalysisOperation::CircuitFlatten,
+                });
             }
         }
     }
@@ -726,9 +733,12 @@ fn clone_instruction_with_args(
 fn try_clone_slice<T: Clone>(values: &[T], context: &'static str) -> AnalysisResult<Vec<T>> {
     let mut cloned = Vec::new();
     cloned.try_reserve_exact(values.len()).map_err(|error| {
-        AnalysisError::invalid_domain_value(
-            context,
-            format!("unable to reserve {} values: {error}", values.len()),
+        AnalysisError::allocation_failed(
+            AnalysisOperation::CircuitFlatten,
+            format!(
+                "{context} value unable to reserve {} values: {error}",
+                values.len()
+            ),
         )
     })?;
     cloned.extend_from_slice(values);
@@ -740,7 +750,10 @@ fn is_heralded_noise(gate: Gate) -> bool {
 }
 
 fn flattened_operation_count_error() -> AnalysisError {
-    AnalysisError::invalid_domain_value("flattened circuit operation count", "overflowed")
+    AnalysisError::count_overflow(
+        AnalysisOperation::CircuitFlatten,
+        "flattened circuit operation count value overflowed",
+    )
 }
 
 #[cfg(test)]

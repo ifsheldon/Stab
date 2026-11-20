@@ -7,7 +7,7 @@ use std::assert_matches;
 
 use stab_algebra::Tableau;
 use stab_analysis::{
-    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceOperation,
+    AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, ResourceKind,
     circuit_to_tableau, circuit_to_tableau_with_options,
 };
 use stab_model::{Cancellation, Circuit, MemoryBudget};
@@ -439,7 +439,7 @@ fn circuit_to_tableau_admits_bytes_and_squares_repeats_cancellably() {
     let error = circuit_to_tableau_with_options(&wide, &options(required - 1))
         .expect_err("first excess byte");
     let resource = error.resource_limit_error().expect("typed budget refusal");
-    assert_eq!(resource.operation(), ResourceOperation::TableauConversion);
+    assert_eq!(resource.operation(), AnalysisOperation::TableauConversion);
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert_eq!(
         (resource.actual(), resource.limit()),

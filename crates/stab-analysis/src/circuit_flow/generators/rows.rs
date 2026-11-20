@@ -1,33 +1,38 @@
 //! Flow-row building blocks shared by the direct and composed generators.
 
-use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
-use stab_model::Target;
+use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, StabilizerError};
+use stab_model::{Gate, Target};
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult};
 
 use super::helpers::{
     internal_flow_error, pauli_basis, rows_matching, stabilizer_to_circuit_error,
 };
 
 pub(super) fn measured_pauli_product(
-    gate_name: &'static str,
+    gate: Gate,
     qubit_count: usize,
     targets: &[Target],
 ) -> AnalysisResult<PauliString> {
+    let gate_name = gate.canonical_name();
     let mut product = stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count);
     for target in targets {
         if target.is_combiner() {
             continue;
         }
         let qubit = target.qubit_id().ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(format!(
-                "{gate_name} flow generator target {target} does not identify a qubit"
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::FlowGeneration,
+                gate.kind(),
+                format!("{gate_name} flow generator target {target} does not identify a qubit"),
+            )
         })?;
         let pauli = target.pauli_type().ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(format!(
-                "{gate_name} flow generator target {target} is not a Pauli target"
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::FlowGeneration,
+                gate.kind(),
+                format!("{gate_name} flow generator target {target} is not a Pauli target"),
+            )
         })?;
         let term = single_pauli_with_sign(
             qubit_count,
@@ -39,10 +44,18 @@ pub(super) fn measured_pauli_product(
                 PauliSign::Plus
             },
         );
-        product = product.multiply_real(&term).map_err(|error| {
-            AnalysisError::invalid_tableau_conversion(format!(
-                "{gate_name} flow generator Pauli product is not Hermitian: {error}"
-            ))
+        product = product.multiply_real(&term).map_err(|error| match error {
+            StabilizerError::ImaginaryProduct { phase } => {
+                AnalysisError::AntiHermitianPauliProduct {
+                    operation: AnalysisOperation::FlowGeneration,
+                    gate: gate.kind(),
+                    phase: Some(phase),
+                }
+            }
+            error => AnalysisError::internal(
+                AnalysisOperation::FlowGeneration,
+                format!("{gate_name} flow generator Pauli product is not Hermitian: {error}"),
+            ),
         })?;
     }
     Ok(product)

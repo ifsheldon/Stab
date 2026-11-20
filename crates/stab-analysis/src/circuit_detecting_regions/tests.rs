@@ -9,7 +9,7 @@
 )]
 
 use super::*;
-use crate::ResourceOperation;
+use crate::AnalysisOperation;
 use stab_model::{RepeatBlock, RepeatCount};
 
 mod generated;
@@ -561,7 +561,7 @@ fn detecting_regions_target_api_admits_dense_helpers_against_the_memory_budget()
     let AnalysisError::ResourceLimit(resource) = error else {
         panic!("expected typed target-helper rejection, got {error}");
     };
-    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
+    assert_eq!(resource.operation(), AnalysisOperation::DetectingRegions);
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert!(resource.actual() > resource.limit());
     assert_eq!(resource.limit(), MemoryBudget::DEFAULT.bytes());

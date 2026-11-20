@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use stab_model::{CircuitInstruction, QubitId, Target};
+use stab_model::{CircuitInstruction, Gate, QubitId, Target};
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult};
 
 use super::TrackerBasis;
 
@@ -15,10 +15,14 @@ pub(super) fn qubits_reversed(
 ) -> impl Iterator<Item = AnalysisResult<QubitId>> {
     instruction.targets().iter().rev().map(|target| {
         target.qubit_id().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} target {target} is not a qubit",
-                instruction.gate().canonical_name()
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                instruction.gate().kind(),
+                format!(
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
+                ),
+            )
         })
     })
 }
@@ -33,22 +37,34 @@ pub(super) fn pair_measurement_terms_reversed(
         .rev()
         .map(|group| {
             let [left, right] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "{} expected paired targets during sparse reverse tracking",
-                    instruction.gate().canonical_name()
-                )));
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!(
+                        "{} expected paired targets during sparse reverse tracking",
+                        instruction.gate().canonical_name()
+                    ),
+                ));
             };
             let left = left.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {left} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!(
+                        "{} target {left} is not a qubit",
+                        instruction.gate().canonical_name()
+                    ),
+                )
             })?;
             let right = right.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {right} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!(
+                        "{} target {right} is not a qubit",
+                        instruction.gate().canonical_name()
+                    ),
+                )
             })?;
             Ok(vec![(left, basis), (right, basis)])
         })
@@ -62,7 +78,7 @@ pub(super) fn pauli_product_terms_reversed(
         .target_groups()
         .into_iter()
         .rev()
-        .map(|group| normalize_pauli_product_terms(instruction.gate().canonical_name(), group))
+        .map(|group| normalize_pauli_product_terms(instruction.gate(), group))
         .collect()
 }
 
@@ -73,9 +89,10 @@ pub(super) fn pauli_product_measurement_terms_reversed(
 }
 
 fn normalize_pauli_product_terms(
-    gate_name: &str,
+    gate: Gate,
     group: &[Target],
 ) -> AnalysisResult<Vec<(QubitId, TrackerBasis)>> {
+    let gate_name = gate.canonical_name();
     let mut terms = BTreeMap::new();
     let mut phase = 0u8;
     for target in group {
@@ -83,14 +100,18 @@ fn normalize_pauli_product_terms(
             continue;
         }
         let pauli = target.pauli_type().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{gate_name} target {target} is not a Pauli target"
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                gate.kind(),
+                format!("{gate_name} target {target} is not a Pauli target"),
+            )
         })?;
         let qubit = target.qubit_id().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{gate_name} target {target} does not identify a qubit"
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                gate.kind(),
+                format!("{gate_name} target {target} does not identify a qubit"),
+            )
         })?;
         multiply_tracker_term(
             &mut terms,
@@ -101,9 +122,11 @@ fn normalize_pauli_product_terms(
     }
     match phase {
         0 | 2 => Ok(terms.into_iter().collect()),
-        _ => Err(AnalysisError::invalid_detector_error_model(format!(
-            "{gate_name} Pauli product is anti-Hermitian"
-        ))),
+        _ => Err(AnalysisError::AntiHermitianPauliProduct {
+            operation: AnalysisOperation::ReverseFrameTracking,
+            gate: gate.kind(),
+            phase: None,
+        }),
     }
 }
 

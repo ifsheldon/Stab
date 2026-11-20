@@ -6,7 +6,7 @@
 use std::assert_matches;
 
 use stab_analysis::{
-    AnalysisError, AnalysisResult, ErrorAnalyzerOptions, ResourceKind, ResourceOperation,
+    AnalysisError, AnalysisOperation, AnalysisResult, ErrorAnalyzerOptions, ResourceKind,
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
     circuit_to_detector_error_model, circuit_with_inlined_feedback, circuit_without_noise,
     decomposed_circuit, flattened_circuit, flattened_circuit_operations,
@@ -583,7 +583,7 @@ fn with_inlined_feedback_rejects_synthesized_negative_zero_detector_target() {
         .with_inlined_feedback()
         .expect_err("Stim rejects a rewritten detector with a surviving zero lookback");
 
-    assert_matches!(error, AnalysisError::InvalidDetectorErrorModel { .. });
+    assert_matches!(error, AnalysisError::MeasurementRecordOutOfRange { .. });
     assert!(error.to_string().contains("rec[-0]"));
 }
 
@@ -603,11 +603,7 @@ fn with_inlined_feedback_rejects_non_deterministic_detectors_and_observables() {
             .with_inlined_feedback()
             .expect_err("Stim refuses non-deterministic detectors while inlining feedback");
 
-        assert_matches!(
-            error,
-            AnalysisError::InvalidDetectorErrorModel { .. },
-            "{text}"
-        );
+        assert_matches!(error, AnalysisError::NonDeterministicTargets(_), "{text}");
         assert!(error.to_string().contains(target), "{text}: {error}");
     }
 }
@@ -905,7 +901,7 @@ fn with_inlined_feedback_refuses_unrolling_beyond_the_memory_budget() {
     let resource = error
         .resource_limit_error()
         .expect("typed feedback resource error");
-    assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+    assert_eq!(resource.operation(), AnalysisOperation::FeedbackInlining);
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert!(resource.actual() > resource.limit());
     assert_eq!(resource.limit(), 1 << 30);
@@ -917,6 +913,11 @@ fn flattened_rejects_coordinate_overflow() {
         .flattened()
         .expect_err("reject coordinate overflow");
 
-    assert_matches!(error, AnalysisError::InvalidResultFormat { .. });
+    assert_matches!(
+        error,
+        AnalysisError::NonFiniteCoordinate {
+            operation: AnalysisOperation::CircuitFlatten
+        }
+    );
     assert!(error.to_string().contains("coordinate shift overflowed"));
 }

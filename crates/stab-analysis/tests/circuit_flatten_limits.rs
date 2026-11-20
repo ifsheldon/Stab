@@ -6,7 +6,7 @@
 use std::hint::black_box;
 
 use stab_analysis::{
-    CircuitFlattenLimits, ResourceKind, ResourceOperation, flattened_circuit,
+    AnalysisOperation, CircuitFlattenLimits, ResourceKind, flattened_circuit,
     flattened_circuit_operations_with_limits, flattened_circuit_with_limits,
 };
 use stab_model::{
@@ -48,7 +48,7 @@ fn default_budget_refuses_compact_expansion_beyond_the_budget() {
     let error = flattened_circuit(&hostile).expect_err("a compact repeat beyond the budget");
     let resource = error.resource_limit_error().expect("typed budget refusal");
     assert_eq!(resource.code(), "resource-limit-exceeded");
-    assert_eq!(resource.operation(), ResourceOperation::CircuitFlatten);
+    assert_eq!(resource.operation(), AnalysisOperation::CircuitFlatten);
     assert_eq!(resource.operation().as_str(), "circuit-flatten");
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert_eq!(resource.limit(), MemoryBudget::DEFAULT.bytes());
@@ -161,7 +161,7 @@ fn caller_raised_limit_cannot_exceed_platform_materialization_capacity() {
         let resource = error
             .resource_limit_error()
             .expect("platform materialization rejection should remain typed");
-        assert_eq!(resource.operation(), ResourceOperation::CircuitFlatten);
+        assert_eq!(resource.operation(), AnalysisOperation::CircuitFlatten);
         assert_eq!(resource.resource(), ResourceKind::MaterializedUnits);
         assert_eq!(resource.actual(), u64::MAX);
         assert!(resource.limit() < resource.actual());
@@ -214,7 +214,7 @@ fn programmatic_repeat_depth_is_admitted_before_recursive_flattening() {
         let resource = error
             .resource_limit_error()
             .expect("flatten nesting rejection should expose typed context");
-        assert_eq!(resource.operation(), ResourceOperation::CircuitFlatten);
+        assert_eq!(resource.operation(), AnalysisOperation::CircuitFlatten);
         assert_eq!(resource.resource(), ResourceKind::RepeatNesting);
         assert_eq!(resource.actual(), (RepeatNestingLimit::HARD_MAX + 1) as u64);
         assert_eq!(resource.limit(), RepeatNestingLimit::HARD_MAX as u64);

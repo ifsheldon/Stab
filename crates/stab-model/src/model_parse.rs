@@ -46,7 +46,10 @@ pub(crate) fn validation_error(
     prefix_line: bool,
 ) -> ModelError {
     let validation = match error {
-        ModelError::Parse(_) | ModelError::ResourceLimit(_) | ModelError::Cancelled(_) => {
+        ModelError::Parse(_)
+        | ModelError::ResourceLimit(_)
+        | ModelError::AllocationFailed { .. }
+        | ModelError::Cancelled(_) => {
             return error;
         }
         ModelError::Validation(validation) => validation,

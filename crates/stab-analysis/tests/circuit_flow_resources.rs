@@ -4,7 +4,7 @@
 )]
 
 use stab_algebra::Flow;
-use stab_analysis::{ResourceKind, ResourceOperation, circuit_flow_generators};
+use stab_analysis::{AnalysisOperation, ResourceKind, circuit_flow_generators};
 use stab_model::{Circuit, RepeatBlock, RepeatCount};
 
 #[test]
@@ -32,7 +32,7 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
     let resource = error
         .resource_limit_error()
         .expect("typed projected-payload error");
-    assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
+    assert_eq!(resource.operation(), AnalysisOperation::FlowGeneration);
     assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
     assert!(resource.actual() > resource.limit());
     assert_eq!(resource.limit(), 1 << 30);
@@ -52,7 +52,7 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
     let resource = error
         .resource_limit_error()
         .expect("typed repeat-nesting error");
-    assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
+    assert_eq!(resource.operation(), AnalysisOperation::FlowGeneration);
     assert_eq!(resource.resource(), ResourceKind::RepeatNesting);
     assert_eq!(resource.actual(), 257);
     assert_eq!(resource.limit(), 256);
@@ -71,7 +71,7 @@ fn circuit_flow_generators_admit_owned_rows_and_report_typed_limits() {
         let resource = error
             .resource_limit_error()
             .expect("typed measurement-free projected-storage error");
-        assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
+        assert_eq!(resource.operation(), AnalysisOperation::FlowGeneration);
         assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
         let qubits = 100_001_u64;
         let row_bytes = std::mem::size_of::<Flow>() as u64 + 2 * qubits;
@@ -108,7 +108,7 @@ fn rejected_mpp_storage_is_admitted_before_product_allocation() {
             let resource = error
                 .resource_limit_error()
                 .expect("typed projected MPP storage error");
-            assert_eq!(resource.operation(), ResourceOperation::FlowGeneration);
+            assert_eq!(resource.operation(), AnalysisOperation::FlowGeneration);
             assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
         })
     }

@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, StabilizerError, Tableau};
 use stab_model::{CircuitInstruction, Pauli, Target};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 use super::rows::single_pauli;
@@ -42,9 +43,10 @@ pub(super) fn apply_local_tableau_to_global_pauli(
             internal_flow_error("local tableau output length did not match targets")
         })?;
         let Some(slot) = bases.get_mut(qubit) else {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "flow tableau target qubit {qubit} is outside {qubit_count}-qubit state"
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::FlowGeneration,
+                format!("flow tableau target qubit {qubit} is outside {qubit_count}-qubit state"),
+            ));
         };
         *slot = basis;
     }
@@ -123,7 +125,8 @@ pub(super) fn measurement_indices_reversed(
     let mut indices = Vec::with_capacity(count);
     for _ in 0..count {
         *measurements_in_past = measurements_in_past.checked_sub(1).ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(
+            AnalysisError::internal(
+                AnalysisOperation::FlowGeneration,
                 "measurement count underflowed during flow generation",
             )
         })?;
@@ -134,27 +137,30 @@ pub(super) fn measurement_indices_reversed(
 
 pub(super) fn pair_measurement_target_index(target: &Target) -> AnalysisResult<(usize, bool)> {
     let qubit = target.qubit_id().ok_or_else(|| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "pair-measurement flow generator target {target} does not identify a qubit"
-        ))
+        AnalysisError::unsupported(
+            AnalysisOperation::FlowGeneration,
+            None,
+            format!("pair-measurement flow generator target {target} does not identify a qubit"),
+        )
     })?;
     Ok((qubit.get() as usize, target.is_inverted_result_target()))
 }
 
 pub(super) fn record_index_i32(record_index: usize) -> AnalysisResult<i32> {
     i32::try_from(record_index).map_err(|_| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "flow measurement record index {record_index} does not fit i32"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::FlowGeneration,
+            format!("flow measurement record index {record_index} does not fit i32"),
+        )
     })
 }
 
 pub(super) fn stabilizer_to_circuit_error(error: StabilizerError) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(error.to_string())
+    AnalysisError::internal(AnalysisOperation::FlowGeneration, error.to_string())
 }
 
 pub(super) fn internal_flow_error(message: &'static str) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(message)
+    AnalysisError::internal(AnalysisOperation::FlowGeneration, message)
 }
 
 pub(super) fn rows_matching(flows: &[Flow], predicate: impl Fn(&Flow) -> bool) -> Vec<usize> {

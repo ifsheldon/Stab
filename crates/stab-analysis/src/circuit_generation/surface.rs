@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::AnalysisResult;
 use stab_model::{Circuit, GateKind};
 
 use super::{
@@ -241,14 +241,13 @@ fn finish_surface_code_circuit(
     let mut data_coord_to_order = BTreeMap::new();
     let mut measure_coord_to_order = BTreeMap::new();
     for qubit in &data_qubits {
-        let order = u32::try_from(data_coord_to_order.len()).map_err(|_| {
-            AnalysisError::invalid_domain_value("data qubit count", data_qubits.len())
-        })?;
+        let order = u32::try_from(data_coord_to_order.len())
+            .map_err(|_| super::generation_invariant("data qubit count", data_qubits.len()))?;
         data_coord_to_order.insert(q2p[qubit], order);
     }
     for qubit in &measurement_qubits {
         let order = u32::try_from(measure_coord_to_order.len()).map_err(|_| {
-            AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+            super::generation_invariant("measurement qubit count", measurement_qubits.len())
         })?;
         measure_coord_to_order.insert(q2p[qubit], order);
     }
@@ -312,10 +311,7 @@ fn finish_surface_code_circuit(
             vec![f64::from(measure.x), f64::from(measure.y), 0.0],
             vec![rec_target(
                 u32::try_from(measurement_qubits.len()).map_err(|_| {
-                    AnalysisError::invalid_domain_value(
-                        "measurement qubit count",
-                        measurement_qubits.len(),
-                    )
+                    super::generation_invariant("measurement qubit count", measurement_qubits.len())
                 })? - measure_coord_to_order[measure],
             )?],
         )?;
@@ -323,7 +319,7 @@ fn finish_surface_code_circuit(
 
     let mut body = cycle_actions;
     let measurement_count = u32::try_from(measurement_qubits.len()).map_err(|_| {
-        AnalysisError::invalid_domain_value("measurement qubit count", measurement_qubits.len())
+        super::generation_invariant("measurement qubit count", measurement_qubits.len())
     })?;
     append_instruction(
         &mut body,
@@ -345,7 +341,7 @@ fn finish_surface_code_circuit(
     let mut tail = Circuit::new();
     append_measure(params, &mut tail, &data_qubits, measurement_basis)?;
     let data_count = u32::try_from(data_qubits.len())
-        .map_err(|_| AnalysisError::invalid_domain_value("data qubit count", data_qubits.len()))?;
+        .map_err(|_| super::generation_invariant("data qubit count", data_qubits.len()))?;
     for measure in chosen_basis_measure_coords {
         let mut detectors = Vec::new();
         for delta in z_order {
@@ -407,18 +403,16 @@ fn rotated_surface_coord_to_index(coord: SurfaceCoord, distance: u32) -> Analysi
     let width = distance
         .checked_mul(2)
         .and_then(|value| value.checked_add(1))
-        .ok_or_else(|| AnalysisError::invalid_domain_value("surface code distance", distance))?;
+        .ok_or_else(|| super::generation_invariant("surface code distance", distance))?;
     let index = i64::from(coord.x) + i64::from(adjusted_y / 2) * i64::from(width);
-    u32::try_from(index)
-        .map_err(|_| AnalysisError::invalid_domain_value("surface code qubit index", index))
+    u32::try_from(index).map_err(|_| super::generation_invariant("surface code qubit index", index))
 }
 
 fn unrotated_surface_coord_to_index(coord: SurfaceCoord, distance: u32) -> AnalysisResult<u32> {
     let width = distance
         .checked_mul(2)
         .and_then(|value| value.checked_sub(1))
-        .ok_or_else(|| AnalysisError::invalid_domain_value("surface code distance", distance))?;
+        .ok_or_else(|| super::generation_invariant("surface code distance", distance))?;
     let index = i64::from(coord.x) + i64::from(coord.y) * i64::from(width);
-    u32::try_from(index)
-        .map_err(|_| AnalysisError::invalid_domain_value("surface code qubit index", index))
+    u32::try_from(index).map_err(|_| super::generation_invariant("surface code qubit index", index))
 }

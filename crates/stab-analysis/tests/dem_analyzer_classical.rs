@@ -323,7 +323,7 @@ fn dem_analyzer_rejects_feedback_record_lookback_before_first_measurement() {
             let error = circuit_to_detector_error_model(&circuit, options.clone())
                 .expect_err("lookback before the first measurement must be rejected");
             assert!(
-                matches!(error, AnalysisError::InvalidDetectorErrorModel { .. }),
+                matches!(error, AnalysisError::MeasurementRecordOutOfRange { .. }),
                 "{rejected:?} (fold_loops={fold_loops}): {error:?}"
             );
             assert_eq!(

@@ -1,6 +1,5 @@
 //! `stab gen`: generates Stim's example error-correction circuits.
 
-use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -9,9 +8,11 @@ use clap::builder::{PossibleValuesParser, TypedValueParser as _};
 use stab_analysis::{CodeCircuitParams, CodeDistance, CodeFamily, GeneratedCircuit, RoundCount};
 use stab_model::{ModelResult, Probability};
 
+use crate::io_plan::{FileRole, PendingIo};
 use crate::ledger::Hold;
 use crate::output_storage::{EncodedBatches, OutputStorage};
-use crate::{CliError, MemoryBudgetArg, MemoryLedger, io_plan, parse_stim_u64};
+use crate::streaming::OutputSink;
+use crate::{CliError, MemoryBudgetArg, MemoryLedger, parse_stim_u64};
 
 /// Parses `--code` against the family names `stab-analysis` owns, listing them in `--help` and
 /// in the refusal of an unknown name.
@@ -73,21 +74,14 @@ where
     let mut ledger = MemoryLedger::new(args.memory);
     let (params, generated, _output_hold) = generate_circuit(&args, &mut ledger)?;
     // The circuit text streams to its destination instead of being rendered into a `String`
-    // first, which for large codes held one or two extra copies of the whole text. Output opens
-    // only after generation succeeds, so a rejected request never creates or truncates `--out`.
-    let write = |out: &mut dyn Write| write_generated_circuit(out, &params, &generated);
-    if let Some(path) = args.output.as_ref() {
-        let write_path_error = |source| CliError::WritePath {
-            path: path.clone(),
-            source,
-        };
-        let mut file = io_plan::buffered_output(File::create(path).map_err(write_path_error)?);
-        write(&mut file)
-            .and_then(|()| file.flush())
-            .map_err(write_path_error)
-    } else {
-        write(stdout).map_err(CliError::WriteOutput)
-    }
+    // first, which for large codes held one or two extra copies of the whole text. A named
+    // output goes through the same preflight as every other command's `--out`, but only after
+    // generation succeeds, so a rejected request never creates or truncates it, as in Stim.
+    let mut outputs =
+        PendingIo::preflight_outputs([(FileRole::Output, args.output.as_deref())])?.activate()?;
+    let mut output = OutputSink::from_output(outputs.take(FileRole::Output), stdout);
+    output.write_with(|out| write_generated_circuit(out, &params, &generated))?;
+    output.flush()
 }
 
 /// Validates the arguments, holds a named output's write buffer, and generates the circuit

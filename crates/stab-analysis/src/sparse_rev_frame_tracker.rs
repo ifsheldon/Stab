@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::PauliBasis;
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, DemTarget, MemoryBudget, Pauli, QubitId, Target,
-    TargetKind,
+    Cancellation, Circuit, CircuitInstruction, DemTarget, GateKind, MemoryBudget, Pauli, QubitId,
+    Target, TargetKind,
 };
 
 mod budget;
@@ -20,7 +20,7 @@ mod unitary_repeat;
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::controlled_pauli::{ControlSlot, ControlledPauliForm, controlled_pauli_form};
 use crate::target_xor_set::{TargetXorSet, xor_merge_into};
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceOperation};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind};
 use budget::{TrackerMeter, recompute_live_bytes, set_entry_bytes};
 use clifford_action::{single_qubit_action, two_qubit_action};
 use pauli_product::{pauli_product_terms_reversed, qubits_reversed};
@@ -35,10 +35,14 @@ fn tracked_controlled_pauli(
     instruction: &CircuitInstruction,
 ) -> AnalysisResult<ControlledPauliForm> {
     controlled_pauli_form(instruction.gate()).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "{} is not a supported sparse reverse feedback gate",
-            instruction.gate().canonical_name()
-        ))
+        AnalysisError::unsupported(
+            AnalysisOperation::ReverseFrameTracking,
+            instruction.gate().kind(),
+            format!(
+                "{} is not a supported sparse reverse feedback gate",
+                instruction.gate().canonical_name()
+            ),
+        )
     })
 }
 
@@ -47,7 +51,8 @@ type TargetSets<K> = BTreeMap<K, TargetXorSet>;
 
 fn tracker_basis(basis: PauliBasis) -> AnalysisResult<TrackerBasis> {
     TrackerBasis::from_pauli_basis(basis).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::internal(
+            AnalysisOperation::ReverseFrameTracking,
             "identity basis is not a reverse stabilizer transition",
         )
     })
@@ -119,7 +124,7 @@ impl SparseReverseFrameTracker {
     /// `(operation, resource)`.
     pub(crate) fn set_memory_budget(
         &mut self,
-        operation: ResourceOperation,
+        operation: AnalysisOperation,
         resource: ResourceKind,
         budget: MemoryBudget,
     ) {
@@ -261,9 +266,12 @@ impl SparseReverseFrameTracker {
         target: DemTarget,
     ) -> AnalysisResult<()> {
         if index >= self.measurement_count {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "measurement record index {index} is outside the sparse reverse tracker history"
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!(
+                    "measurement record index {index} is outside the sparse reverse tracker history"
+                ),
+            ));
         }
         self.toggle_record_target(index, target)
     }
@@ -305,9 +313,12 @@ impl SparseReverseFrameTracker {
     /// Borrows the sorted sensitivity of one measurement record.
     pub(crate) fn record_targets_slice_at(&self, index: usize) -> AnalysisResult<&[DemTarget]> {
         if index >= self.measurement_count {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "measurement record index {index} is outside the sparse reverse tracker history"
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!(
+                    "measurement record index {index} is outside the sparse reverse tracker history"
+                ),
+            ));
         }
         Ok(sorted_slice(self.rec_bits.get(&index)))
     }
@@ -384,12 +395,14 @@ impl SparseReverseFrameTracker {
             ReverseFlowTransition::SweepControlledPauliNoop | ReverseFlowTransition::Ignored => {
                 Ok(())
             }
-            ReverseFlowTransition::Unsupported => {
-                Err(AnalysisError::invalid_detector_error_model(format!(
+            ReverseFlowTransition::Unsupported => Err(AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                instruction.gate().kind(),
+                format!(
                     "sparse reverse frame tracker does not support gate {}",
                     instruction.gate().canonical_name()
-                )))
-            }
+                ),
+            )),
         };
         result?;
         self.check_live_budget()
@@ -446,9 +459,11 @@ impl SparseReverseFrameTracker {
         for group in instruction.target_groups().into_iter().rev() {
             let gate_name = instruction.gate().canonical_name();
             let [first, second] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "{gate_name} expected paired targets during sparse reverse tracking",
-                )));
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!("{gate_name} expected paired targets during sparse reverse tracking",),
+                ));
             };
             let (control, target) = match form.slot {
                 ControlSlot::Second => (second, first),
@@ -476,9 +491,11 @@ impl SparseReverseFrameTracker {
                 // of ignoring classical-control groups instead, so only
                 // error-analysis mode rejects here.
                 if self.error_analysis_mode {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "{gate_name} target {target} is not a qubit"
-                    )));
+                    return Err(AnalysisError::unsupported(
+                        AnalysisOperation::ReverseFrameTracking,
+                        instruction.gate().kind(),
+                        format!("{gate_name} target {target} is not a qubit"),
+                    ));
                 }
             } else {
                 self.undo_classical_pauli(instruction, control, target)?;
@@ -510,16 +527,24 @@ impl SparseReverseFrameTracker {
         target: &Target,
     ) -> AnalysisResult<()> {
         let record = control.measurement_record_offset().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} classical control {control} is not a measurement record",
-                instruction.gate().canonical_name()
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                instruction.gate().kind(),
+                format!(
+                    "{} classical control {control} is not a measurement record",
+                    instruction.gate().canonical_name()
+                ),
+            )
         })?;
         let qubit = target.qubit_id().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} feedback target {target} is not a qubit",
-                instruction.gate().canonical_name()
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                instruction.gate().kind(),
+                format!(
+                    "{} feedback target {target} is not a qubit",
+                    instruction.gate().canonical_name()
+                ),
+            )
         })?;
         let basis = TrackerBasis::from_pauli(tracked_controlled_pauli(instruction)?.pauli);
         let mut sensitivity = self.scratch.take_operand();
@@ -539,24 +564,36 @@ impl SparseReverseFrameTracker {
         target: &Target,
     ) -> AnalysisResult<()> {
         let control = control.qubit_id().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} control target {control} is not a qubit",
-                instruction.gate().canonical_name()
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                instruction.gate().kind(),
+                format!(
+                    "{} control target {control} is not a qubit",
+                    instruction.gate().canonical_name()
+                ),
+            )
         })?;
         let target = target.qubit_id().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} target {target} is not a qubit",
-                instruction.gate().canonical_name()
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::ReverseFrameTracking,
+                instruction.gate().kind(),
+                format!(
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
+                ),
+            )
         })?;
         let target_basis = match controlled_pauli_form(instruction.gate()) {
             Some(form) if form.slot != ControlSlot::Second => TrackerBasis::from_pauli(form.pauli),
             Some(_) | None => {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "{} sparse reverse tracking is not implemented for qubit-qubit controls",
-                    instruction.gate().canonical_name()
-                )));
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!(
+                        "{} sparse reverse tracking is not implemented for qubit-qubit controls",
+                        instruction.gate().canonical_name()
+                    ),
+                ));
             }
         };
         // Undoing a controlled Pauli moves the target's anticommuting sensitivity onto the
@@ -587,19 +624,25 @@ impl SparseReverseFrameTracker {
         let action = two_qubit_action(instruction.gate())?;
         for group in instruction.target_groups().into_iter().rev() {
             let [left, right] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "{gate_name} expected paired targets during sparse reverse tracking"
-                )));
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!("{gate_name} expected paired targets during sparse reverse tracking"),
+                ));
             };
             let left = left.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{gate_name} target {left} is not a qubit"
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!("{gate_name} target {left} is not a qubit"),
+                )
             })?;
             let right = right.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{gate_name} target {right} is not a qubit"
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    instruction.gate().kind(),
+                    format!("{gate_name} target {right} is not a qubit"),
+                )
             })?;
             self.apply_two_qubit_action(action, left, right)?;
             self.check_live_budget()?;
@@ -609,16 +652,19 @@ impl SparseReverseFrameTracker {
 
     fn undo_detector(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         self.detector_count = self.detector_count.checked_sub(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "detector count underflowed during sparse reverse tracking",
             )
         })?;
         let detector = DemTarget::relative_detector(self.detector_count)?;
         for target in instruction.targets() {
             let offset = target.measurement_record_offset().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "DETECTOR target {target} is not a measurement record"
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::ReverseFrameTracking,
+                    GateKind::DETECTOR,
+                    format!("DETECTOR target {target} is not a measurement record"),
+                )
             })?;
             let index = self.record_index_from_offset(offset.get())?;
             let existing = self.rec_bits.get(&index);
@@ -636,7 +682,8 @@ impl SparseReverseFrameTracker {
 
     fn undo_observable_include(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "OBSERVABLE_INCLUDE is missing an observable id",
             )
         })?;
@@ -689,9 +736,13 @@ impl SparseReverseFrameTracker {
                     )?;
                 }
                 TargetKind::Qubit { .. } | TargetKind::SweepBit { .. } | TargetKind::Combiner => {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "OBSERVABLE_INCLUDE target {target} is not a measurement record or Pauli target"
-                    )));
+                    return Err(AnalysisError::unsupported(
+                        AnalysisOperation::ReverseFrameTracking,
+                        GateKind::OBSERVABLE_INCLUDE,
+                        format!(
+                            "OBSERVABLE_INCLUDE target {target} is not a measurement record or Pauli target"
+                        ),
+                    ));
                 }
             }
             self.check_live_budget()?;
@@ -866,10 +917,13 @@ impl SparseReverseFrameTracker {
         gate: &'static str,
     ) -> AnalysisResult<()> {
         if self.measurement_count < count {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "{gate} needs {count} prior measurement(s), but sparse reverse tracker only has {}",
-                self.measurement_count
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!(
+                    "{gate} needs {count} prior measurement(s), but sparse reverse tracker only has {}",
+                    self.measurement_count
+                ),
+            ));
         }
         Ok(())
     }
@@ -877,34 +931,41 @@ impl SparseReverseFrameTracker {
     fn validate_qubit(&self, qubit: QubitId) -> AnalysisResult<()> {
         let index = qubit_index(qubit)?;
         if index >= self.qubit_count {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "qubit {} is outside the sparse reverse tracker",
-                qubit.get()
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!(
+                    "qubit {} is outside the sparse reverse tracker",
+                    qubit.get()
+                ),
+            ));
         }
         Ok(())
     }
 
     fn record_index_from_offset(&self, offset: i32) -> AnalysisResult<usize> {
         let measurement_count = i64::try_from(self.measurement_count).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::ReverseFrameTracking,
                 "measurement count does not fit i64 during sparse reverse tracking",
             )
         })?;
         let index = measurement_count
             .checked_add(i64::from(offset))
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::ReverseFrameTracking,
                     "measurement record offset overflowed during sparse reverse tracking",
                 )
             })?;
         if index < 0 || index > measurement_count {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "measurement record offset rec[{offset}] is out of range"
-            )));
+            return Err(AnalysisError::record_out_of_range(
+                AnalysisOperation::ReverseFrameTracking,
+                format!("measurement record offset rec[{offset}] is out of range"),
+            ));
         }
         usize::try_from(index).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::ReverseFrameTracking,
                 "measurement record index does not fit usize during sparse reverse tracking",
             )
         })
@@ -966,10 +1027,13 @@ impl TrackerBasis {
 
 fn qubit_index(qubit: QubitId) -> AnalysisResult<usize> {
     usize::try_from(qubit.get()).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "qubit id {} does not fit usize during sparse reverse tracking",
-            qubit.get()
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!(
+                "qubit id {} does not fit usize during sparse reverse tracking",
+                qubit.get()
+            ),
+        )
     })
 }
 

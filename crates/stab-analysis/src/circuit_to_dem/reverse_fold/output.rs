@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use stab_model::advanced::dem_instruction_rebase_detectors;
 use stab_model::{DemInstruction, DemInstructionView, DemItem, DemTarget, DetectorErrorModel};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 /// Error symptoms already emitted.
@@ -28,25 +29,29 @@ pub(super) fn unreverse_model(
                 let old_base = *base_detector_id;
                 unreverse_model(repeat.body_mut(), base_detector_id, seen)?;
                 let one_body_shift = base_detector_id.checked_sub(old_base).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
                         "folded analyzer repeat detector shift underflowed",
                     )
                 })?;
                 let extra_repetitions = repeat_count.checked_sub(1).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
                         "folded analyzer repeat count underflowed",
                     )
                 })?;
                 *base_detector_id = base_detector_id
                     .checked_add(one_body_shift.checked_mul(extra_repetitions).ok_or_else(
                         || {
-                            AnalysisError::invalid_detector_error_model(
+                            AnalysisError::count_overflow(
+                                AnalysisOperation::CircuitToDetectorErrorModel,
                                 "folded analyzer repeat detector shift overflowed",
                             )
                         },
                     )?)
                     .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
+                        AnalysisError::count_overflow(
+                            AnalysisOperation::CircuitToDetectorErrorModel,
                             "folded analyzer detector base overflowed",
                         )
                     })?;
@@ -67,7 +72,8 @@ fn unreverse_instruction(
             *base_detector_id = base_detector_id
                 .checked_add(detector_shift)
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
                         "folded analyzer detector base overflowed",
                     )
                 })?;
@@ -96,8 +102,9 @@ fn unreverse_instruction(
 
 fn rebase(instruction: &mut DemInstruction, base_detector_id: u64) -> AnalysisResult<()> {
     dem_instruction_rebase_detectors(instruction, base_detector_id).map_err(|detector| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "folded analyzer detector D{detector} precedes base D{base_detector_id}"
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            format!("folded analyzer detector D{detector} precedes base D{base_detector_id}"),
+        )
     })
 }

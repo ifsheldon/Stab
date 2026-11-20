@@ -24,6 +24,7 @@ use super::{
     traversal::{FoldedDemTraversal, shifted_targets},
     values::{DetectorIndex, ObservableMask, SearchGraphKind},
 };
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -45,7 +46,10 @@ impl Edge {
             .len()
             .checked_add(usize::from(self.detector.is_some()))
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model("graphlike edge term count overflowed")
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
+                    "graphlike edge term count overflowed",
+                )
             })
     }
 }
@@ -78,7 +82,8 @@ impl Node {
         let edge_hash = self.edge_index.hash(&edge);
         let admission = budget.preflight_unique_edge(edge.term_count()?, 1, 1)?;
         self.edges.try_reserve(1).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::allocation_failed(
+                AnalysisOperation::LogicalErrorSearch,
                 "graphlike search cannot allocate another outward edge",
             )
         })?;
@@ -154,9 +159,10 @@ impl Graph {
         let node_count = detectors.len();
         let mut nodes = Vec::new();
         nodes.try_reserve_exact(node_count).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "graphlike search cannot allocate {node_count} sparse detector nodes"
-            ))
+            AnalysisError::allocation_failed(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("graphlike search cannot allocate {node_count} sparse detector nodes"),
+            )
         })?;
         nodes.resize(node_count, Node::default());
 
@@ -207,10 +213,13 @@ impl Graph {
     ) -> AnalysisResult<()> {
         let source_index = self.node_index_for_detector(source)?;
         let Some(node) = self.nodes.get_mut(source_index) else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "graphlike source detector D{} is outside the graph",
-                source.get()
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
+                format!(
+                    "graphlike source detector D{} is outside the graph",
+                    source.get()
+                ),
+            ));
         };
         node.add_edge(
             Edge::new(destination, observables),
@@ -233,9 +242,7 @@ impl Graph {
                         if ignore_ungraphlike_errors {
                             return Ok(());
                         }
-                        return Err(AnalysisError::invalid_detector_error_model(
-                            "The detector error model contained a non-graphlike error mechanism.\nYou can ignore such errors using `ignore_ungraphlike_errors`.\nYou can use `decompose_errors` when converting a circuit into a model to ensure no such errors are present.",
-                        ));
+                        return Err(AnalysisError::NonGraphlikeError);
                     }
                     detectors.push(detector);
                 }
@@ -271,7 +278,8 @@ impl Graph {
                     return Ok(());
                 }
                 let component = targets.get(start..index).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::LogicalErrorSearch,
                         "graphlike target component range is invalid",
                     )
                 })?;
@@ -280,7 +288,8 @@ impl Graph {
             }
         }
         let component = targets.get(start..).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "graphlike target component range is invalid",
             )
         })?;
@@ -316,7 +325,10 @@ impl Graph {
             limits,
         )?;
         let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-            AnalysisError::invalid_detector_error_model("observable count does not fit usize")
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
+                "observable count does not fit usize",
+            )
         })?;
         let mut graph = Self::try_new_sparse_with_limits(
             effective_detectors,
@@ -367,7 +379,8 @@ impl SearchState {
             .checked_add(usize::from(self.detector_active.is_some()))
             .and_then(|count| count.checked_add(usize::from(self.detector_held.is_some())))
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
                     "graphlike search state term count overflowed",
                 )
             })

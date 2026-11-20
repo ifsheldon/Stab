@@ -17,7 +17,9 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use stab_analysis::{AnalysisError, ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_analysis::{
+    AnalysisError, AnalysisOperation, ErrorAnalyzerOptions, circuit_to_detector_error_model,
+};
 use stab_model::{Circuit, Probability};
 
 #[path = "support/dem_semantics.rs"]
@@ -127,7 +129,7 @@ fn decomposed_matrix_errors_preserve_symptoms_and_are_graphlike() {
                         "{context}: ignoring failures changed a successful decomposition"
                     );
                 }
-                Err(AnalysisError::InvalidDetectorErrorModel { .. }) => {
+                Err(AnalysisError::ErrorDecompositionFailed { .. }) => {
                     assert!(
                         has_non_graphlike_component,
                         "{context}: strict decomposition failed but every lenient component is graphlike"
@@ -253,7 +255,7 @@ fn decomposition_of_components_past_32_terms_preserves_every_term() {
         )
         .expect_err("components of 64 or more terms are not decomposed");
         assert!(
-            matches!(&error, AnalysisError::InvalidDetectorErrorModel { message } if message.contains("more than 64 terms")),
+            matches!(&error, AnalysisError::UnsupportedInput { operation: AnalysisOperation::CircuitToDetectorErrorModel, detail, .. } if detail.contains("more than 64 terms")),
             "{context}: {error}"
         );
     }

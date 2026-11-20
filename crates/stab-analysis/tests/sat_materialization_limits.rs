@@ -5,7 +5,7 @@
 )]
 
 use stab_analysis::{
-    AnalysisResult, ResourceKind, ResourceOperation, SatMaterializationLimits,
+    AnalysisOperation, AnalysisResult, ResourceKind, SatMaterializationLimits,
     likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
     shortest_error_sat_problem, shortest_error_sat_problem_with_limits,
 };
@@ -50,7 +50,7 @@ fn assert_first_excess(
             .expect("SAT rejection must retain typed resource context");
         assert_eq!(
             resource.operation(),
-            ResourceOperation::SatMaterialization,
+            AnalysisOperation::SatMaterialization,
             "{name}"
         );
         assert_eq!(resource.resource(), expected_resource, "{name}");

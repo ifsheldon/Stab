@@ -8,7 +8,7 @@
 
 use stab_analysis::{
     AnalysisError, CodeCircuitParams, CodeDistance, CodeFamily, CodeTask, ColorCodeTask,
-    RepetitionCodeTask, RoundCount, SurfaceCodeTask,
+    GeneratorParameter, RepetitionCodeTask, RoundCount, SurfaceCodeTask,
 };
 use stab_model::Probability;
 
@@ -19,17 +19,20 @@ fn probability(value: f64) -> Probability {
     Probability::try_new(value).expect("valid probability")
 }
 
-fn assert_invalid_domain_value<T>(
+fn assert_invalid_generator_parameter<T>(
     result: Result<T, AnalysisError>,
-    expected_kind: &'static str,
-    expected_value: &str,
+    parameter: GeneratorParameter,
+    value: u64,
+    message: &str,
 ) {
+    let error = result.err();
     assert_eq!(
-        result.err(),
-        Some(AnalysisError::InvalidDomainValue {
-            kind: expected_kind,
-            value: expected_value.to_string(),
-        })
+        error,
+        Some(AnalysisError::InvalidGeneratorParameter { parameter, value })
+    );
+    assert_eq!(
+        error.map(|error| error.to_string()).as_deref(),
+        Some(message)
     );
 }
 
@@ -39,15 +42,35 @@ fn cq2_generation_parameter_contract_covers_typed_values_and_noise_builders() {
     let maximum_distance = CodeDistance::try_new(2047).expect("maximum distance");
     assert_eq!(minimum_distance.get(), 2);
     assert_eq!(maximum_distance.get(), 2047);
-    assert_invalid_domain_value(CodeDistance::try_new(0), "code distance", "0");
-    assert_invalid_domain_value(CodeDistance::try_new(1), "code distance", "1");
-    assert_invalid_domain_value(CodeDistance::try_new(2048), "code distance", "2048");
+    assert_invalid_generator_parameter(
+        CodeDistance::try_new(0),
+        GeneratorParameter::CodeDistance,
+        0,
+        "invalid code distance value 0",
+    );
+    assert_invalid_generator_parameter(
+        CodeDistance::try_new(1),
+        GeneratorParameter::CodeDistance,
+        1,
+        "invalid code distance value 1",
+    );
+    assert_invalid_generator_parameter(
+        CodeDistance::try_new(2048),
+        GeneratorParameter::CodeDistance,
+        2048,
+        "invalid code distance value 2048",
+    );
 
     let minimum_rounds = RoundCount::try_new(1).expect("minimum rounds");
     let maximum_rounds = RoundCount::try_new(u64::MAX).expect("maximum rounds");
     assert_eq!(minimum_rounds.get(), 1);
     assert_eq!(maximum_rounds.get(), u64::MAX);
-    assert_invalid_domain_value(RoundCount::try_new(0), "round count", "0");
+    assert_invalid_generator_parameter(
+        RoundCount::try_new(0),
+        GeneratorParameter::RoundCount,
+        0,
+        "invalid round count value 0",
+    );
 
     let before_round = probability(0.0625);
     let before_measure = probability(0.125);
@@ -709,14 +732,25 @@ fn cq2_generation_color_rejects_invalid_family_parameters() {
             RoundCount::try_new(rounds).expect("rounds"),
         )
     };
-    assert_invalid_domain_value(color(3, 1), "color code round count", "1");
+    assert_invalid_generator_parameter(
+        color(3, 1),
+        GeneratorParameter::ColorCodeRoundCount,
+        1,
+        "invalid color code round count value 1",
+    );
     // The round count is checked first, as Stim does.
-    assert_invalid_domain_value(color(2, 1), "color code round count", "1");
+    assert_invalid_generator_parameter(
+        color(2, 1),
+        GeneratorParameter::ColorCodeRoundCount,
+        1,
+        "invalid color code round count value 1",
+    );
     for distance in [2, 4, 2046] {
-        assert_invalid_domain_value(
+        assert_invalid_generator_parameter(
             color(distance, 2),
-            "color code distance",
-            &distance.to_string(),
+            GeneratorParameter::ColorCodeDistance,
+            u64::from(distance),
+            &format!("invalid color code distance value {distance}"),
         );
     }
     color(3, 2)

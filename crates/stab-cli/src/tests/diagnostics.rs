@@ -213,6 +213,93 @@ fn json_sampling_budget_refusal_names_the_budget_and_how_to_raise_it() {
     assert_eq!(stdout, b"0\n");
 }
 
+/// Analysis failures carry a code for what happened instead of the model's
+/// `invalid-detector-error-model`, which now means only malformed DEM input.
+#[test]
+fn json_analysis_diagnostics_name_what_failed_with_typed_context() {
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "--error-format=json", "analyze_errors"],
+        b"H 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    );
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(field(&diagnostic, "/code"), "non-deterministic-targets");
+    assert_eq!(
+        field(&diagnostic, "/message"),
+        "invalid detector error model: The circuit contains non-deterministic observables.\n\
+         The circuit contains non-deterministic detectors.\n\
+         The collapse anti-commuted with these detectors/observables:\n    D0\n    L0"
+    );
+    assert_eq!(
+        field(&diagnostic, "/context/targets"),
+        &serde_json::json!(["D0", "L0"])
+    );
+
+    let (status, _, stderr) = run_parts(
+        ["stab", "--error-format=json", "analyze_errors"],
+        b"HERALDED_ERASE(0.3) 0\nM 0\nDETECTOR rec[-1]\n",
+    );
+    assert_eq!(status, 1);
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(
+        field(&diagnostic, "/code"),
+        "approximate-disjoint-errors-required"
+    );
+    assert_eq!(field(&diagnostic, "/context/gate"), "HERALDED_ERASE");
+    assert!(field(&diagnostic, "/context/threshold").is_null());
+}
+
+/// The generation budget refusal is a typed resource limit, so it gets the resource code, its
+/// context, and the budget help in both diagnostic formats.
+#[test]
+fn gen_budget_refusal_is_a_typed_resource_limit_with_budget_help() {
+    let args = [
+        "--code=surface_code",
+        "--task=rotated_memory_x",
+        "--distance=301",
+        "--rounds=2",
+        "--memory-budget=4MiB",
+    ];
+    let (status, stdout, stderr) = run_parts(
+        ["stab", "--error-format=json", "gen"]
+            .into_iter()
+            .chain(args),
+        b"",
+    );
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    let diagnostic = only_json_line(&stderr);
+    assert_eq!(field(&diagnostic, "/code"), "resource-limit-exceeded");
+    assert_eq!(
+        field(&diagnostic, "/context/operation"),
+        "circuit-generation"
+    );
+    assert_eq!(
+        field(&diagnostic, "/context/resource"),
+        "materialized-bytes"
+    );
+    assert_eq!(field(&diagnostic, "/context/limit"), 4 * 1024 * 1024);
+    assert!(
+        field(&diagnostic, "/help")
+            .as_str()
+            .is_some_and(|help| help.contains("--memory-budget")),
+        "{diagnostic}"
+    );
+
+    let (status, _, stderr) = run_parts(["stab", "gen"].into_iter().chain(args), b"");
+    assert_eq!(status, 1);
+    let stderr = String::from_utf8_lossy(&stderr);
+    assert!(
+        stderr.starts_with("error: invalid generated circuit size value 181201 physical qubits"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("\nhelp: Raise the budget with `--memory-budget"),
+        "{stderr}"
+    );
+}
+
 #[test]
 fn compact_sampling_work_far_above_u64_is_refused_by_its_record_storage() {
     // 10^24 expanded instructions and 10^12 measurements per shot: the compact program fits, but

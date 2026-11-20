@@ -10,7 +10,8 @@ use stab_model::advanced::{
 };
 use stab_model::{Circuit, Gate, GateDecomposition, GateKind};
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::AnalysisOperation;
+use crate::{AnalysisError, AnalysisResult, GateData};
 
 /// Fixed-shape unitary matrix metadata for a one- or two-qubit Stim gate.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -148,14 +149,10 @@ pub fn gate_tableau(gate: Gate) -> AnalysisResult<Tableau> {
     if let Ok(clifford) = single_qubit_clifford_for_gate(gate) {
         return Ok(clifford.tableau());
     }
-    let outputs = two_qubit_outputs(gate.kind()).ok_or_else(|| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "gate {} does not have tableau data",
-            gate.canonical_name()
-        ))
-    })?;
+    let outputs = two_qubit_outputs(gate.kind())
+        .ok_or_else(|| AnalysisError::gate_data_unavailable(gate.kind(), GateData::Tableau))?;
     Tableau::gate2(outputs[0], outputs[1], outputs[2], outputs[3])
-        .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string()))
+        .map_err(|error| AnalysisError::internal(AnalysisOperation::GateData, error.to_string()))
 }
 
 /// Returns true when [`gate_tableau`] can produce local Clifford tableau metadata for `gate`.
@@ -171,17 +168,19 @@ pub fn gate_flows(gate: Gate) -> AnalysisResult<Vec<Flow>> {
             .iter()
             .map(|descriptor| {
                 Flow::from_str(descriptor).map_err(|error| {
-                    AnalysisError::invalid_tableau_conversion(format!(
-                        "gate {gate_name} flow metadata is invalid: {error}"
-                    ))
+                    AnalysisError::internal(
+                        AnalysisOperation::GateData,
+                        format!("gate {gate_name} flow metadata is invalid: {error}"),
+                    )
                 })
             })
             .collect();
     }
     if !gate_has_flows(gate) {
-        return Err(AnalysisError::invalid_tableau_conversion(format!(
-            "gate {gate_name} does not have flow metadata"
-        )));
+        return Err(AnalysisError::gate_data_unavailable(
+            gate.kind(),
+            GateData::Flows,
+        ));
     }
     let tableau = gate_tableau(gate)?;
     let mut flows = Vec::with_capacity(tableau.len() * 2);
@@ -216,12 +215,7 @@ pub fn gate_unitary_matrix(gate: Gate) -> AnalysisResult<GateUnitaryMatrix> {
             GateUnitaryRows::One(rows) => GateUnitaryMatrix::One(complex_matrix(rows)),
             GateUnitaryRows::Two(rows) => GateUnitaryMatrix::Two(complex_matrix(rows)),
         })
-        .ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(format!(
-                "gate {} does not have fixed-shape unitary matrix data",
-                gate.canonical_name()
-            ))
-        })
+        .ok_or_else(|| AnalysisError::gate_data_unavailable(gate.kind(), GateData::UnitaryMatrix))
 }
 
 /// Returns true when [`gate_unitary_matrix`] can produce fixed-shape unitary metadata.
@@ -232,10 +226,7 @@ pub fn gate_has_unitary_matrix(gate: Gate) -> bool {
 /// Returns Stim v1.16.0's H/S/CX/M/R decomposition metadata for `gate`.
 pub fn gate_h_s_cx_m_r_decomposition(gate: Gate) -> AnalysisResult<GateDecomposition> {
     gate_decomposition(gate).ok_or_else(|| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "gate {} does not have H/S/CX/M/R decomposition data",
-            gate.canonical_name()
-        ))
+        AnalysisError::gate_data_unavailable(gate.kind(), GateData::HSCxMRDecomposition)
     })
 }
 
@@ -267,7 +258,7 @@ fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
 }
 
 fn stabilizer_to_analysis_error(error: StabilizerError) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(error.to_string())
+    AnalysisError::internal(AnalysisOperation::GateData, error.to_string())
 }
 
 fn two_qubit_outputs(kind: GateKind) -> Option<[&'static str; 4]> {

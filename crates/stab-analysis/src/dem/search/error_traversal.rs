@@ -11,6 +11,7 @@ use stab_model::{
 };
 
 use super::budget::LogicalErrorSearchLimits;
+use crate::AnalysisOperation;
 use crate::resources::LogicalErrorSearchResource;
 use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
@@ -197,7 +198,8 @@ impl SearchBlockPolicies {
 
     fn policy_for(&self, block: &FoldedDemBlock<'_>) -> AnalysisResult<&SearchBlockPolicy> {
         self.by_block.get(&block.compact_id()).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "DEM search compact policy is missing a folded block",
             )
         })
@@ -241,7 +243,8 @@ fn summarize_search_block_policy(
                         return Ok(None);
                     }
                     count.checked_add(child_count).map(Some).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
+                        AnalysisError::count_overflow(
+                            AnalysisOperation::LogicalErrorSearch,
                             "DEM search compact-repeat error count overflowed",
                         )
                     })
@@ -295,7 +298,8 @@ fn update_search_instruction_count(
                 return Ok(Some(count));
             }
             count.checked_add(1).map(Some).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
                     "DEM search compact-repeat error count overflowed",
                 )
             })
@@ -317,7 +321,10 @@ fn is_nonzero_probability_error(instruction: &DemInstruction) -> bool {
 }
 
 fn traversal_error(context: &'static str, message: &'static str) -> AnalysisError {
-    AnalysisError::invalid_detector_error_model(format!("DEM {context} {message}"))
+    AnalysisError::internal(
+        AnalysisOperation::LogicalErrorSearch,
+        format!("DEM {context} {message}"),
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -370,7 +377,8 @@ fn include_graphlike_error_targets(
     for (index, target) in targets.iter().enumerate() {
         if target.is_separator() {
             let component = targets.get(start..index).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::LogicalErrorSearch,
                     "graphlike target component range is invalid",
                 )
             })?;
@@ -385,7 +393,10 @@ fn include_graphlike_error_targets(
         }
     }
     let component = targets.get(start..).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model("graphlike target component range is invalid")
+        AnalysisError::internal(
+            AnalysisOperation::LogicalErrorSearch,
+            "graphlike target component range is invalid",
+        )
     })?;
     include_graphlike_target_component(
         component,
@@ -410,9 +421,7 @@ fn include_graphlike_target_component(
                 if ignore_ungraphlike_errors {
                     return Ok(());
                 }
-                return Err(AnalysisError::invalid_detector_error_model(
-                    "The detector error model contained a non-graphlike error mechanism.\nYou can ignore such errors using `ignore_ungraphlike_errors`.\nYou can use `decompose_errors` when converting a circuit into a model to ensure no such errors are present.",
-                ));
+                return Err(AnalysisError::NonGraphlikeError);
             }
             detectors.push(detector);
         }
@@ -458,7 +467,10 @@ fn shifted_detector(
     detector_offset: u64,
 ) -> AnalysisResult<DemDetectorId> {
     let detector_id = detector_offset.checked_add(detector.get()).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model("DEM nonzero-error detector target overflowed")
+        AnalysisError::count_overflow(
+            AnalysisOperation::LogicalErrorSearch,
+            "DEM nonzero-error detector target overflowed",
+        )
     })?;
     DemDetectorId::try_new(detector_id).map_err(Into::into)
 }
@@ -486,9 +498,10 @@ impl DemErrorTargetCounts {
             return Ok(());
         }
         let next = self.detectors.len().checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{context} effective detector node count overflowed"
-            ))
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("{context} effective detector node count overflowed"),
+            )
         })?;
         if next > self.max_detector_nodes {
             return Err(self.too_many_detectors_error(context, next));

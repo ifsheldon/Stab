@@ -468,9 +468,9 @@ fn parse_optional_args<'a>(
             return Err(invalid_number_error(line_number, instruction, token));
         }
         admission.admit_argument(line_number, token.span())?;
-        values.try_reserve(1).map_err(|_| {
-            ModelError::invalid_detector_error_model("DEM argument allocation failed")
-        })?;
+        values
+            .try_reserve(1)
+            .map_err(|_| ModelError::dem_allocation_failed("DEM argument allocation failed"))?;
         values.push(value);
         if token_end == raw_args.text().len() {
             break;

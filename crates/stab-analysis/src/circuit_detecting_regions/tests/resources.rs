@@ -26,7 +26,7 @@ fn assert_resource_error(
     let AnalysisError::ResourceLimit(resource) = error else {
         panic!("expected typed detecting-region resource error, got {error}");
     };
-    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
+    assert_eq!(resource.operation(), AnalysisOperation::DetectingRegions);
     assert_eq!(resource.resource(), expected_resource);
     assert_eq!(resource.actual(), expected_actual);
     assert_eq!(resource.limit(), expected_limit);
@@ -328,7 +328,7 @@ fn live_tracker_sensitivity_is_metered_without_reset_round_overcounting() {
     let AnalysisError::ResourceLimit(resource) = error else {
         panic!("expected live sensitivity budget refusal, got {error}");
     };
-    assert_eq!(resource.operation(), ResourceOperation::DetectingRegions);
+    assert_eq!(resource.operation(), AnalysisOperation::DetectingRegions);
     assert_eq!(resource.resource(), ResourceKind::LiveStateUnits);
     assert_eq!(resource.limit(), represented_only.bytes());
     assert!(resource.actual() > resource.limit());

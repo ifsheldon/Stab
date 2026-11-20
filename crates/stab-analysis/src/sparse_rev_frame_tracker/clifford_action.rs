@@ -15,6 +15,7 @@ use super::sets::{buffer_growth_bytes, unknown_buffer_growth_bytes};
 use super::{
     SparseReverseFrameTracker, TargetXorSet, TrackerScratch, replace_qubit_set, sorted_slice,
 };
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult, gate_tableau, single_qubit_clifford_for_gate};
 
 /// Input slots XORed into each output slot, as bitmasks over input slot indices.
@@ -142,9 +143,11 @@ pub(super) fn two_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<4>> 
 fn derive_single_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<2>> {
     let name = gate.canonical_name();
     let clifford = single_qubit_clifford_for_gate(gate).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "sparse reverse frame tracker does not support tableau gate {name}"
-        ))
+        AnalysisError::unsupported(
+            AnalysisOperation::ReverseFrameTracking,
+            gate.kind(),
+            format!("sparse reverse frame tracker does not support tableau gate {name}"),
+        )
     })?;
     let inverse = clifford.inverse();
     let image = |basis| {
@@ -162,19 +165,21 @@ fn derive_two_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<4>> {
     let inverse_tableau = two_qubit_inverse_tableau(gate)?;
     let bits = |output: Result<stab_algebra::PauliString, _>| {
         let output = output.map_err(|error: stab_algebra::StabilizerError| {
-            AnalysisError::invalid_detector_error_model(format!(
+            AnalysisError::internal(AnalysisOperation::ReverseFrameTracking, format!(
                 "failed to apply inverse tableau for {name} during sparse reverse tracking: {error}"
             ))
         })?;
         let left = output.get(0).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "inverse tableau for {name} did not return left output basis"
-            ))
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!("inverse tableau for {name} did not return left output basis"),
+            )
         })?;
         let right = output.get(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "inverse tableau for {name} did not return right output basis"
-            ))
+            AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!("inverse tableau for {name} did not return right output basis"),
+            )
         })?;
         Ok::<_, AnalysisError>([left.x_bit(), left.z_bit(), right.x_bit(), right.z_bit()])
     };
@@ -189,19 +194,21 @@ fn derive_two_qubit_action(gate: Gate) -> AnalysisResult<CliffordAction<4>> {
 pub(super) fn two_qubit_inverse_tableau(gate: Gate) -> AnalysisResult<Tableau> {
     let gate_name = gate.canonical_name();
     let inverse = gate.inverse().ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "{gate_name} does not have a unitary inverse for sparse reverse tracking"
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("{gate_name} does not have a unitary inverse for sparse reverse tracking"),
+        )
     })?;
     let inverse_tableau = gate_tableau(inverse).map_err(|error| {
-        AnalysisError::invalid_detector_error_model(format!(
+        AnalysisError::internal(AnalysisOperation::ReverseFrameTracking, format!(
             "failed to load inverse tableau for {gate_name} during sparse reverse tracking: {error}"
         ))
     })?;
     if inverse_tableau.len() != 2 {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "{gate_name} expected a two-qubit tableau during sparse reverse tracking"
-        )));
+        return Err(AnalysisError::internal(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("{gate_name} expected a two-qubit tableau during sparse reverse tracking"),
+        ));
     }
     Ok(inverse_tableau)
 }

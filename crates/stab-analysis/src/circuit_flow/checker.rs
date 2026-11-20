@@ -12,8 +12,8 @@ use stab_model::{
 
 use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
 use crate::{
-    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceLimitError,
-    ResourceOperation, circuit_to_tableau_with_options,
+    AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, ResourceKind,
+    ResourceLimitError, circuit_to_tableau_with_options,
     folded_walk::walk_folded,
     sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
@@ -227,7 +227,7 @@ fn dense_flow_image_or_reason(
             ..
         }) => {
             return Err(ResourceLimitError::memory_budget(
-                ResourceOperation::FlowCheck,
+                AnalysisOperation::FlowCheck,
                 ResourceKind::MaterializedBytes,
                 u64::try_from(requested_bytes).unwrap_or(u64::MAX),
                 budget_bytes,
@@ -474,7 +474,7 @@ fn pull_back_paulis_with_sparse_tracker(
         SparseReverseFrameTracker::new(qubit_count, 0, 0, AnticommutationPolicy::Record);
     tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
-        ResourceOperation::FlowCheck,
+        AnalysisOperation::FlowCheck,
         ResourceKind::LiveStateUnits,
         options.memory_budget,
     );
@@ -609,7 +609,8 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
         return Ok(Vec::new());
     }
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FlowCheck,
             "circuit measurement count does not fit usize during flow checking",
         )
     })?;
@@ -629,7 +630,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
     );
     tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
-        ResourceOperation::FlowCheck,
+        AnalysisOperation::FlowCheck,
         ResourceKind::LiveStateUnits,
         options.memory_budget,
     );
@@ -668,7 +669,10 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
             }
             tracker.check_cancelled()?;
             let tracked_target = *labels.get(flow_index).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model("flow check lost a flow label")
+                AnalysisError::internal(
+                    AnalysisOperation::FlowCheck,
+                    "flow check lost a flow label",
+                )
             })?;
             if tracker.target_anticommuted(tracked_target) {
                 return Ok(UnsignedStabilizerFlowCheck::failed(
@@ -723,7 +727,7 @@ fn flow_labels(
         cancellation,
         |depth, limit| {
             ResourceLimitError::fixed_operation(
-                ResourceOperation::FlowCheck,
+                AnalysisOperation::FlowCheck,
                 ResourceKind::RepeatNesting,
                 depth,
                 limit,
@@ -745,13 +749,18 @@ fn flow_labels(
         cancellation.check()?;
         if !included.contains(&candidate) {
             labels.push(DemTarget::logical_observable(candidate).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::unsupported(
+                    AnalysisOperation::FlowCheck,
+                    None,
                     "the circuit's observables and the flows exceed the observable id range",
                 )
             })?);
         }
         candidate = candidate.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("flow label search overflowed")
+            AnalysisError::count_overflow(
+                AnalysisOperation::FlowCheck,
+                "flow label search overflowed",
+            )
         })?;
     }
     Ok(labels)
@@ -783,9 +792,12 @@ fn seed_flow_pauli_output(
             .ok()
             .and_then(|index| QubitId::new(index).ok())
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "flow output qubit index {index} is outside the supported target range"
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::FlowCheck,
+                    format!(
+                        "flow output qubit index {index} is outside the supported target range"
+                    ),
+                )
             })?;
         tracker.toggle_pauli_target(qubit, basis, target)?;
     }

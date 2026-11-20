@@ -3,6 +3,7 @@
 use stab_algebra::{Flow, PauliBasis, PauliSign};
 use stab_model::{CircuitInstruction, MemoryBudget};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 use super::canonicalize::final_canonicalize_measurement_generators;
@@ -226,8 +227,7 @@ pub(super) fn simple_pauli_product_measurement_flows(
     admit_flow_generator_rows(qubit_count, groups.len(), budget)?;
     let mut measured_products = Vec::with_capacity(groups.len());
     for (record_index, group) in groups.into_iter().enumerate() {
-        let product =
-            measured_pauli_product(instruction.gate().canonical_name(), qubit_count, group)?;
+        let product = measured_pauli_product(instruction.gate(), qubit_count, group)?;
         measured_products.push((product, record_index_i32(record_index)?));
     }
 
@@ -251,9 +251,10 @@ pub(super) fn measurement_pad_flows(
             Some(0) => positive_records.push(record_index),
             Some(1) => negative_records.push(record_index),
             _ => {
-                return Err(AnalysisError::invalid_tableau_conversion(format!(
-                    "MPAD flow generator has invalid pad target {target}"
-                )));
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::FlowGeneration,
+                    format!("MPAD flow generator has invalid pad target {target}"),
+                ));
             }
         }
     }

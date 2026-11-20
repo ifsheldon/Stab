@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::ControlFlow;
 
+use crate::AnalysisOperation;
 use crate::resources::SatMaterializationResource;
-use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
+use crate::{AnalysisError, AnalysisRequestError, AnalysisResult, ResourceLimitError};
 use stab_model::advanced::{
     CancellationCountdown, DemRepeatSelection, DemTraversalState, FoldedDemBlock,
     FoldedDemTraversal, FoldedDemVisitor, shifted_detector, shifted_targets,
@@ -71,10 +72,13 @@ impl SatTargetIndex {
             .get(&detector)
             .copied()
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "SAT detector target D{} has no compressed slot",
-                    detector.get()
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::SatMaterialization,
+                    format!(
+                        "SAT detector target D{} has no compressed slot",
+                        detector.get()
+                    ),
+                )
             })
     }
 
@@ -83,10 +87,13 @@ impl SatTargetIndex {
             .get(&observable)
             .copied()
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "SAT observable target L{} has no compressed slot",
-                    observable.get()
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::SatMaterialization,
+                    format!(
+                        "SAT observable target L{} has no compressed slot",
+                        observable.get()
+                    ),
+                )
             })
     }
 }
@@ -118,7 +125,8 @@ fn preflight_sat_shape(
                 DemTargetKind::RelativeDetector(detector) => {
                     let slot = target_index.detector_slot(detector)?;
                     seen_detectors.get_mut(slot).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
+                        AnalysisError::internal(
+                            AnalysisOperation::SatMaterialization,
                             "SAT detector preflight slot is outside its state vector",
                         )
                     })?
@@ -126,7 +134,8 @@ fn preflight_sat_shape(
                 DemTargetKind::LogicalObservable(observable) => {
                     let slot = target_index.observable_slot(observable)?;
                     seen_observables.get_mut(slot).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
+                        AnalysisError::internal(
+                            AnalysisOperation::SatMaterialization,
                             "SAT observable preflight slot is outside its state vector",
                         )
                     })?
@@ -212,16 +221,14 @@ pub fn likeliest_error_sat_problem(
 /// # Errors
 ///
 /// Fails like [`shortest_error_sat_problem_with_limits`], and with
-/// [`AnalysisError::InvalidDetectorErrorModel`] when `quantization` is zero.
+/// [`AnalysisError::InvalidRequest`] when `quantization` is zero.
 pub fn likeliest_error_sat_problem_with_limits(
     model: &DetectorErrorModel,
     quantization: u32,
     limits: SatMaterializationLimits,
 ) -> AnalysisResult<String> {
     if quantization < 1 {
-        return Err(AnalysisError::invalid_detector_error_model(
-            "weighted SAT quantization must be at least 1",
-        ));
+        return Err(AnalysisRequestError::ZeroSatQuantization.into());
     }
     sat_problem_as_wcnf_string(model, SatProblemMode::Weighted { quantization }, &limits)
 }
@@ -249,10 +256,13 @@ fn sat_problem_as_wcnf_string(
     errors_activated
         .try_reserve_exact(errors.len())
         .map_err(|_| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "SAT problem generation cannot reserve {} error variables",
-                errors.len()
-            ))
+            AnalysisError::allocation_failed(
+                AnalysisOperation::SatMaterialization,
+                format!(
+                    "SAT problem generation cannot reserve {} error variables",
+                    errors.len()
+                ),
+            )
         })?;
     let mut countdown = CancellationCountdown::new();
     for _ in &errors {
@@ -264,10 +274,12 @@ fn sat_problem_as_wcnf_string(
     let mut observables_flipped = vec![BoolRef::false_ref(); target_index.observable_to_slot.len()];
     for (error_index, error) in errors.iter().enumerate() {
         countdown.tick(limits.cancellation())?;
-        let error_ref = errors_activated
-            .get(error_index)
-            .copied()
-            .ok_or_else(|| AnalysisError::invalid_detector_error_model("missing SAT error ref"))?;
+        let error_ref = errors_activated.get(error_index).copied().ok_or_else(|| {
+            AnalysisError::internal(
+                AnalysisOperation::SatMaterialization,
+                "missing SAT error ref",
+            )
+        })?;
         if error_participates_in_constraints(mode, error.probability) {
             add_error_parity_terms(
                 &mut instance,
@@ -331,34 +343,46 @@ fn add_error_parity_terms(
             DemTargetKind::RelativeDetector(detector) => {
                 let index = target_index.detector_slot(detector)?;
                 let current = detectors_activated.get(index).copied().ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "SAT detector target D{} is outside the detector vector",
-                        detector.get()
-                    ))
+                    AnalysisError::internal(
+                        AnalysisOperation::SatMaterialization,
+                        format!(
+                            "SAT detector target D{} is outside the detector vector",
+                            detector.get()
+                        ),
+                    )
                 })?;
                 let next = instance.xor(current, error_ref)?;
                 let Some(slot) = detectors_activated.get_mut(index) else {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "SAT detector target D{} is outside the detector vector",
-                        detector.get()
-                    )));
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::SatMaterialization,
+                        format!(
+                            "SAT detector target D{} is outside the detector vector",
+                            detector.get()
+                        ),
+                    ));
                 };
                 *slot = next;
             }
             DemTargetKind::LogicalObservable(observable) => {
                 let index = target_index.observable_slot(observable)?;
                 let current = observables_flipped.get(index).copied().ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "SAT observable target L{} is outside the observable vector",
-                        observable.get()
-                    ))
+                    AnalysisError::internal(
+                        AnalysisOperation::SatMaterialization,
+                        format!(
+                            "SAT observable target L{} is outside the observable vector",
+                            observable.get()
+                        ),
+                    )
                 })?;
                 let next = instance.xor(current, error_ref)?;
                 let Some(slot) = observables_flipped.get_mut(index) else {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "SAT observable target L{} is outside the observable vector",
-                        observable.get()
-                    )));
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::SatMaterialization,
+                        format!(
+                            "SAT observable target L{} is outside the observable vector",
+                            observable.get()
+                        ),
+                    ));
                 };
                 *slot = next;
             }
@@ -420,7 +444,8 @@ fn flattened_error_instructions(
     errors
         .try_reserve_exact(expected_counts.error_mechanisms)
         .map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::allocation_failed(
+                AnalysisOperation::SatMaterialization,
                 "SAT problem generation cannot allocate another error mechanism",
             )
         })?;
@@ -430,7 +455,8 @@ fn flattened_error_instructions(
         collector.counts
     };
     if collected_counts != expected_counts || errors.len() != expected_counts.error_mechanisms {
-        return Err(AnalysisError::invalid_detector_error_model(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::SatMaterialization,
             "SAT traversal shape changed between admission and materialization",
         ));
     }
@@ -470,7 +496,8 @@ impl SatErrorVisitor<'_> {
             .expanded_instructions
             .checked_add(1)
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::SatMaterialization,
                     "DEM SAT problem generation expanded instruction count overflowed",
                 )
             })?;
@@ -493,7 +520,10 @@ impl SatErrorVisitor<'_> {
         detector_offset: u64,
     ) -> AnalysisResult<()> {
         let next_error_count = self.counts.error_mechanisms.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("SAT error mechanism count overflowed")
+            AnalysisError::count_overflow(
+                AnalysisOperation::SatMaterialization,
+                "SAT error mechanism count overflowed",
+            )
         })?;
         if next_error_count > self.limits.max_error_mechanisms() {
             return Err(ResourceLimitError::sat_materialization(
@@ -515,7 +545,8 @@ impl SatErrorVisitor<'_> {
             .target_occurrences
             .checked_add(added_occurrences)
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::SatMaterialization,
                     "SAT target occurrence count overflowed",
                 )
             })?;
@@ -609,20 +640,27 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
 
 fn sat_resource_amount(value: usize, context: &str) -> AnalysisResult<u64> {
     u64::try_from(value).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "{context} does not fit resource diagnostics"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::SatMaterialization,
+            format!("{context} does not fit resource diagnostics"),
+        )
     })
 }
 
 fn checked_sat_add(left: usize, right: usize, context: &str) -> AnalysisResult<usize> {
     left.checked_add(right).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("SAT {context} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::SatMaterialization,
+            format!("SAT {context} overflowed"),
+        )
     })
 }
 
 fn checked_sat_product(left: usize, right: usize, context: &str) -> AnalysisResult<usize> {
     left.checked_mul(right).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("SAT {context} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::SatMaterialization,
+            format!("SAT {context} overflowed"),
+        )
     })
 }

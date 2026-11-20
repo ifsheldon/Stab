@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use stab_model::{DemTarget, DemTargetKind, Probability};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 use super::error_accumulator::ErrorAccumulator;
@@ -87,9 +88,14 @@ fn decompose_targets(
             components.push(component.to_vec());
             continue;
         }
-        return Err(AnalysisError::invalid_detector_error_model(
-            decomposition_failure_message(component, block_remnant_edges),
-        ));
+        return Err(AnalysisError::ErrorDecompositionFailed {
+            component: component
+                .iter()
+                .copied()
+                .filter(|target| !target.is_separator())
+                .collect(),
+            remnant_edges_blocked: block_remnant_edges,
+        });
     }
     Ok(join_components(&components))
 }
@@ -148,7 +154,9 @@ fn exact_decomposition(
     known_graphlike: &KnownGraphlikeComponents,
 ) -> AnalysisResult<Option<Vec<Vec<DemTarget>>>> {
     if problem.len() >= MAX_PROBLEM_TERMS {
-        return Err(AnalysisError::invalid_detector_error_model(
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            None,
             "Not implemented: decomposing errors with more than 64 terms.",
         ));
     }
@@ -181,7 +189,9 @@ fn observable_masks(problem: &[DemTarget]) -> AnalysisResult<(u64, u64)> {
             DemTargetKind::LogicalObservable(id) => {
                 let id = id.get();
                 if id >= 64 {
-                    return Err(AnalysisError::invalid_detector_error_model(
+                    return Err(AnalysisError::unsupported(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
+                        None,
                         "Not implemented: decomposing errors observable ids larger than 63.",
                     ));
                 }
@@ -190,7 +200,8 @@ fn observable_masks(problem: &[DemTarget]) -> AnalysisResult<(u64, u64)> {
             }
             DemTargetKind::RelativeDetector(_) => {}
             DemTargetKind::Separator => {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "error decomposition components cannot contain separators",
                 ));
             }
@@ -387,26 +398,4 @@ fn join_components(components: &[Vec<DemTarget>]) -> Vec<DemTarget> {
         joined.extend_from_slice(component);
     }
     joined
-}
-
-fn decomposition_failure_message(component: &[DemTarget], block_remnant_edges: bool) -> String {
-    let mut message = format!(
-        "Failed to decompose errors into graphlike components with at most two symptoms.\nThe error component that failed to decompose is '{}'.",
-        format_component(component)
-    );
-    if block_remnant_edges {
-        message.push_str(
-            "\n\nNote: `block_decomposition_from_introducing_remnant_edges` is ON.\nTurning it off may prevent this error.",
-        );
-    }
-    message
-}
-
-fn format_component(targets: &[DemTarget]) -> String {
-    targets
-        .iter()
-        .filter(|target| !target.is_separator())
-        .map(ToString::to_string)
-        .collect::<Vec<_>>()
-        .join(", ")
 }

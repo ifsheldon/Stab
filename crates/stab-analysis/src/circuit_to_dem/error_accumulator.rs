@@ -13,7 +13,7 @@ use hashbrown::HashTable;
 use stab_model::{DemTarget, MemoryBudget, Probability};
 
 use super::probabilities::xor_probability;
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
 
 /// Conservative factor covering geometric `Vec` growth and `HashTable` load-factor slack while
 /// keeping admission strictly monotonic in the caller's memory budget.
@@ -104,7 +104,7 @@ impl ErrorAccumulator {
             return Ok(());
         }
         Err(ResourceLimitError::memory_budget(
-            ResourceOperation::CircuitToDetectorErrorModel,
+            AnalysisOperation::CircuitToDetectorErrorModel,
             ResourceKind::MaterializedBytes,
             total,
             self.budget.bytes(),
@@ -124,7 +124,8 @@ impl ErrorAccumulator {
             .and_then(|count| count.checked_add(1))
             .map(TagId)
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "error analysis interned more distinct tags than fit u32",
                 )
             })?;
@@ -164,7 +165,8 @@ impl ErrorAccumulator {
         self.targets
             .get(entry.start..entry.start + entry.len)
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "error class targets fall outside the accumulator arena",
                 )
             })
@@ -318,7 +320,10 @@ fn hash_with(hash_builder: &RandomState, targets: &[DemTarget], tag: TagId) -> u
 }
 
 fn missing_class() -> AnalysisError {
-    AnalysisError::invalid_detector_error_model("error decomposition lost a planned rewrite class")
+    AnalysisError::internal(
+        AnalysisOperation::CircuitToDetectorErrorModel,
+        "error decomposition lost a planned rewrite class",
+    )
 }
 
 #[cfg(test)]

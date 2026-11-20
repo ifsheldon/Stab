@@ -3,7 +3,7 @@ use stab_model::{
     Cancellation, DemInstruction, DemItem, DemTarget, DetectorErrorModel, MemoryBudget,
 };
 
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
 
 const OPAQUE_TAG_STORAGE_MULTIPLIER: u64 = 4;
 
@@ -72,9 +72,11 @@ fn validate_flattening_budget_items(
     budget: &mut DemFlatteningBudget,
 ) -> AnalysisResult<()> {
     if depth > MAX_DEM_REPEAT_NESTING {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::DetectorErrorModelFlatten,
+            None,
+            format!("DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"),
+        ));
     }
     for item in model.items() {
         match item {
@@ -88,9 +90,10 @@ fn validate_flattening_budget_items(
                 }
                 let repeated_multiplier =
                     multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(format!(
-                            "DEM {context} repeat expansion count overflowed"
-                        ))
+                        AnalysisError::count_overflow(
+                            AnalysisOperation::DetectorErrorModelFlatten,
+                            format!("DEM {context} repeat expansion count overflowed"),
+                        )
                     })?;
                 validate_flattening_budget_items(
                     repeat.body(),
@@ -174,7 +177,7 @@ impl DemFlatteningBudget {
         let budget = self.memory_budget;
         if !budget.admits(u128::from(self.materialized_bytes)) {
             return Err(ResourceLimitError::memory_budget(
-                ResourceOperation::DetectorErrorModelFlatten,
+                AnalysisOperation::DetectorErrorModelFlatten,
                 ResourceKind::MaterializedBytes,
                 self.materialized_bytes,
                 budget.bytes(),
@@ -193,9 +196,10 @@ impl DemFlatteningBudget {
             self.expanded_instructions
                 .checked_add(count)
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "DEM {context} expanded instruction count overflowed"
-                    ))
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::DetectorErrorModelFlatten,
+                        format!("DEM {context} expanded instruction count overflowed"),
+                    )
                 })?;
         dem_item_capacity(self.expanded_instructions)?;
         Ok(())
@@ -234,7 +238,10 @@ fn checked_dem_sum(
     context: &'static str,
 ) -> AnalysisResult<u64> {
     left.checked_add(right).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("DEM {context} {resource} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::DetectorErrorModelFlatten,
+            format!("DEM {context} {resource} overflowed"),
+        )
     })
 }
 
@@ -245,11 +252,18 @@ fn checked_dem_product(
     context: &'static str,
 ) -> AnalysisResult<u64> {
     left.checked_mul(right).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("DEM {context} {resource} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::DetectorErrorModelFlatten,
+            format!("DEM {context} {resource} overflowed"),
+        )
     })
 }
 
 fn usize_to_dem_u64(value: usize) -> AnalysisResult<u64> {
-    u64::try_from(value)
-        .map_err(|_| AnalysisError::invalid_detector_error_model("DEM flattened count exceeds u64"))
+    u64::try_from(value).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::DetectorErrorModelFlatten,
+            "DEM flattened count exceeds u64",
+        )
+    })
 }

@@ -18,7 +18,7 @@ use crate::circuit_flow::checker::{
 };
 use crate::circuit_inverse::{TimeReversedForFlowsOptions, time_reversed_for_flows_using};
 use crate::{
-    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceOperation, circuit_to_tableau,
+    AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, circuit_to_tableau,
     circuit_to_tableau_with_options,
 };
 use stab_model::{Cancellation, Cancelled, MemoryBudget};
@@ -362,7 +362,7 @@ fn a_refused_tableau_falls_back_to_the_sparse_tracker_but_cancellation_does_not(
         refusal
             .resource_limit_error()
             .map(|error| error.operation()),
-        Some(ResourceOperation::TableauConversion)
+        Some(AnalysisOperation::TableauConversion)
     );
 
     let defaults = UnsignedFlowCheckOptions::default();

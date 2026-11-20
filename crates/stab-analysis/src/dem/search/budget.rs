@@ -1,6 +1,7 @@
 use stab_model::Cancellation;
 use stab_model::advanced::CancellationCountdown;
 
+use crate::AnalysisOperation;
 use crate::resources::LogicalErrorSearchResource;
 use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
@@ -285,10 +286,10 @@ impl GraphConstructionBudget {
         adjacency_stored_terms: usize,
     ) -> AnalysisResult<GraphEdgeAdmission> {
         let edges = self.edges.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} graph edge count overflowed",
-                self.context
-            ))
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("{} graph edge count overflowed", self.context),
+            )
         })?;
         let limit = self.limits.max_unique_graph_edges();
         if edges > limit {
@@ -304,10 +305,10 @@ impl GraphConstructionBudget {
             .checked_mul(edge_stored_copies)
             .and_then(|terms| terms.checked_add(adjacency_stored_terms))
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} stored graph term count overflowed",
-                    self.context
-                ))
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!("{} stored graph term count overflowed", self.context),
+                )
             })?;
         let stored_terms = self.checked_stored_terms(added_terms)?;
         Ok(GraphEdgeAdmission {
@@ -324,10 +325,13 @@ impl GraphConstructionBudget {
     ) -> AnalysisResult<()> {
         if self.edges != admission.prior_edges || self.stored_terms != admission.prior_stored_terms
         {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "{} graph construction admission became stale before commit",
-                self.context
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
+                format!(
+                    "{} graph construction admission became stale before commit",
+                    self.context
+                ),
+            ));
         }
         self.edges = admission.edges;
         self.stored_terms = admission.stored_terms;
@@ -342,10 +346,10 @@ impl GraphConstructionBudget {
 
     fn checked_stored_terms(&self, added_terms: usize) -> AnalysisResult<usize> {
         let stored_terms = self.stored_terms.checked_add(added_terms).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} stored graph term count overflowed",
-                self.context
-            ))
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("{} stored graph term count overflowed", self.context),
+            )
         })?;
         let limit = self.limits.max_stored_graph_terms();
         if stored_terms > limit {
@@ -422,10 +426,10 @@ impl SearchBudget {
         self.preflight_state_terms(state_terms)?;
         self.preflight_state_terms(predecessor_terms)?;
         let next = self.states.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} search state count overflowed",
-                self.context
-            ))
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("{} search state count overflowed", self.context),
+            )
         })?;
         let state_limit = self.limits.max_search_states();
         if next > state_limit {
@@ -442,19 +446,19 @@ impl SearchBudget {
             .checked_mul(state_copies)
             .and_then(|terms| terms.checked_add(predecessor_terms))
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} stored search-state term count overflowed",
-                    self.context
-                ))
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!("{} stored search-state term count overflowed", self.context),
+                )
             })?;
         let stored_state_terms = self
             .stored_state_terms
             .checked_add(added_state_terms)
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} stored search-state term count overflowed",
-                    self.context
-                ))
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!("{} stored search-state term count overflowed", self.context),
+                )
             })?;
         let stored_limit = self.limits.max_stored_search_state_terms();
         if stored_state_terms > stored_limit {
@@ -474,10 +478,10 @@ impl SearchBudget {
     pub(super) fn record_transition(&mut self) -> AnalysisResult<()> {
         self.poll_cancellation()?;
         let next = self.transitions.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} search transition count overflowed",
-                self.context
-            ))
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("{} search transition count overflowed", self.context),
+            )
         })?;
         let limit = self.limits.max_search_transitions();
         if next > limit {

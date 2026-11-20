@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_algebra::{Flow, PauliSign, PauliString};
@@ -7,7 +8,7 @@ use stab_model::{
 };
 
 use crate::{
-    AnalysisError, AnalysisResult, ResourceKind, ResourceOperation,
+    AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult, ResourceKind,
     circuit_flow::transitions::ReverseFlowTransition,
     sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
@@ -58,8 +59,12 @@ pub(super) fn reverse_flows(
 ) -> AnalysisResult<(Circuit, Vec<Flow>)> {
     reject_flow_observable_terms(flows)?;
     validate_general_reversal(circuit, options.memory_budget)?;
-    let measurement_count = usize::try_from(circuit.count_measurements()?)
-        .map_err(|_| reverse_error("measurement count does not fit the platform index width"))?;
+    let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            "measurement count does not fit the platform index width",
+        )
+    })?;
     let detector_count = circuit.count_detectors()?;
     let observable_count = circuit.count_observables()?;
     let qubit_count = flow_aware_qubit_count(circuit, flows)?;
@@ -72,7 +77,7 @@ pub(super) fn reverse_flows(
     );
     tracker.set_cancellation(options.cancellation.clone());
     tracker.set_memory_budget(
-        ResourceOperation::TimeReversal,
+        AnalysisOperation::TimeReversal,
         ResourceKind::MaterializedBytes,
         options.memory_budget,
     );
@@ -132,7 +137,9 @@ impl ReverseFlowState<'_> {
             self.measurements.iter().copied(),
             [],
         )
-        .map_err(|error| reverse_error(error.to_string()))
+        .map_err(|error| {
+            AnalysisError::internal(AnalysisOperation::TimeReversal, error.to_string())
+        })
     }
 }
 
@@ -160,7 +167,10 @@ impl ReverseFlowEngine {
     fn toggle_pauli(&mut self, pauli: &PauliString, target: DemTarget) -> AnalysisResult<()> {
         for (index, basis) in pauli.active_terms() {
             let qubit = QubitId::new(u32::try_from(index).map_err(|_| {
-                reverse_error(format!("flow qubit index {index} exceeds {}", u32::MAX))
+                AnalysisError::count_overflow(
+                    AnalysisOperation::TimeReversal,
+                    format!("flow qubit index {index} exceeds {}", u32::MAX),
+                )
             })?)?;
             self.tracker.toggle_pauli_target(qubit, basis, target)?;
         }
@@ -186,10 +196,14 @@ impl ReverseFlowEngine {
             | ReverseFlowTransition::Tableau => self.reverse_simple(instruction),
             ReverseFlowTransition::HeraldedMeasurement => self.reverse_simple(instruction),
             ReverseFlowTransition::Ignored => self.reverse_ignored(instruction),
-            ReverseFlowTransition::Unsupported => Err(reverse_error(format!(
-                "don't know how to time-reverse {}",
-                instruction_text(instruction)
-            ))),
+            ReverseFlowTransition::Unsupported => Err(AnalysisError::unsupported(
+                AnalysisOperation::TimeReversal,
+                instruction.gate().kind(),
+                format!(
+                    "don't know how to time-reverse {}",
+                    instruction_text(instruction)
+                ),
+            )),
         }
     }
 
@@ -197,19 +211,30 @@ impl ReverseFlowEngine {
         let reset_gate = measurement_reset_gate(instruction.gate())?;
         for group in instruction.target_groups().into_iter().rev() {
             let [target] = group else {
-                return Err(reverse_error(format!(
-                    "measurement target group is not a single qubit in {}",
-                    instruction_text(instruction)
-                )));
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::TimeReversal,
+                    format!(
+                        "measurement target group is not a single qubit in {}",
+                        instruction_text(instruction)
+                    ),
+                ));
             };
             let qubit = target.qubit_id().ok_or_else(|| {
-                reverse_error(format!("measurement target {target} is not a qubit"))
+                AnalysisError::internal(
+                    AnalysisOperation::TimeReversal,
+                    format!("measurement target {target} is not a qubit"),
+                )
             })?;
-            let record_index = self
-                .tracker
-                .measurement_count()
-                .checked_sub(1)
-                .ok_or_else(|| reverse_error("measurement count underflowed during reversal"))?;
+            let record_index =
+                self.tracker
+                    .measurement_count()
+                    .checked_sub(1)
+                    .ok_or_else(|| {
+                        AnalysisError::internal(
+                            AnalysisOperation::TimeReversal,
+                            "measurement count underflowed during reversal",
+                        )
+                    })?;
             let record_targets = self.tracker.record_targets_at(record_index)?;
             let pauli_targets = self.tracker.pauli_targets_at(qubit)?;
             let turn_into_reset = !self.options.dont_turn_measurements_into_resets
@@ -260,10 +285,16 @@ impl ReverseFlowEngine {
                     .targets()
                     .get(segment_start - 1)
                     .ok_or_else(|| {
-                        reverse_error("reset segment index escaped the instruction target list")
+                        AnalysisError::internal(
+                            AnalysisOperation::TimeReversal,
+                            "reset segment index escaped the instruction target list",
+                        )
                     })?;
                 let qubit = target.qubit_id().ok_or_else(|| {
-                    reverse_error(format!("reset target {target} is not a qubit"))
+                    AnalysisError::internal(
+                        AnalysisOperation::TimeReversal,
+                        format!("reset target {target} is not a qubit"),
+                    )
                 })?;
                 if !segment_qubits.insert(qubit) {
                     break;
@@ -286,12 +317,20 @@ impl ReverseFlowEngine {
         let segment_targets = instruction
             .targets()
             .get(start..end)
-            .ok_or_else(|| reverse_error("reset segment range escaped the instruction targets"))?
+            .ok_or_else(|| {
+                AnalysisError::internal(
+                    AnalysisOperation::TimeReversal,
+                    "reset segment range escaped the instruction targets",
+                )
+            })?
             .to_vec();
         for target in segment_targets.iter().rev() {
-            let qubit = target
-                .qubit_id()
-                .ok_or_else(|| reverse_error(format!("reset target {target} is not a qubit")))?;
+            let qubit = target.qubit_id().ok_or_else(|| {
+                AnalysisError::internal(
+                    AnalysisOperation::TimeReversal,
+                    format!("reset target {target} is not a qubit"),
+                )
+            })?;
             let pauli_targets = self.tracker.pauli_targets_at(qubit)?;
             self.record_new_measurement(&pauli_targets);
         }
@@ -393,10 +432,14 @@ impl ReverseFlowEngine {
                 | GateKind::MXX
                 | GateKind::MYY
                 | GateKind::MZZ => {
-                    return Err(reverse_error(format!(
-                        "don't know how to eject measurement noise from {}",
-                        instruction.gate().canonical_name()
-                    )));
+                    return Err(AnalysisError::unsupported(
+                        AnalysisOperation::TimeReversal,
+                        instruction.gate().kind(),
+                        format!(
+                            "don't know how to eject measurement noise from {}",
+                            instruction.gate().canonical_name()
+                        ),
+                    ));
                 }
             };
             self.append_instruction(
@@ -416,10 +459,13 @@ impl ReverseFlowEngine {
         let measurement_count = instruction.target_groups().len();
         let remaining_measurements = self.tracker.measurement_count();
         if remaining_measurements < measurement_count {
-            return Err(reverse_error(format!(
-                "measurement count underflowed while reversing {}",
-                instruction_text(instruction)
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::TimeReversal,
+                format!(
+                    "measurement count underflowed while reversing {}",
+                    instruction_text(instruction)
+                ),
+            ));
         }
         for offset in 0..measurement_count {
             let record_index = remaining_measurements - offset - 1;
@@ -449,9 +495,12 @@ impl ReverseFlowEngine {
     }
 
     fn reverse_observable(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        let observable = instruction
-            .observable_id_argument()?
-            .ok_or_else(|| reverse_error("OBSERVABLE_INCLUDE is missing an observable id"))?;
+        let observable = instruction.observable_id_argument()?.ok_or_else(|| {
+            AnalysisError::internal(
+                AnalysisOperation::TimeReversal,
+                "OBSERVABLE_INCLUDE is missing an observable id",
+            )
+        })?;
         let target = DemTarget::logical_observable(observable.get())?;
         let pauli_targets = instruction
             .targets()
@@ -610,9 +659,10 @@ impl ReverseFlowEngine {
             .collect::<Vec<_>>();
         for target in ready {
             let measurements = self.detector_measurements.remove(&target).ok_or_else(|| {
-                reverse_error(format!(
-                    "ready reverse-flow target {target} lost its measurement mapping"
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::TimeReversal,
+                    format!("ready reverse-flow target {target} lost its measurement mapping"),
+                )
             })?;
             let record_targets = measurements
                 .into_iter()
@@ -624,9 +674,10 @@ impl ReverseFlowEngine {
             match target.kind() {
                 DemTargetKind::RelativeDetector(_) => {
                     let coordinates = self.target_coordinates.remove(&target).ok_or_else(|| {
-                        reverse_error(format!(
-                            "ready detector target {target} lost its coordinate mapping"
-                        ))
+                        AnalysisError::internal(
+                            AnalysisOperation::TimeReversal,
+                            format!("ready detector target {target} lost its coordinate mapping"),
+                        )
                     })?;
                     self.append_instruction(
                         GateKind::DETECTOR.gate(),
@@ -644,9 +695,10 @@ impl ReverseFlowEngine {
                     )?;
                 }
                 DemTargetKind::Separator => {
-                    return Err(reverse_error(format!(
-                        "unexpected reverse-flow target {target}"
-                    )));
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::TimeReversal,
+                        format!("unexpected reverse-flow target {target}"),
+                    ));
                 }
             }
         }
@@ -658,12 +710,12 @@ impl ReverseFlowEngine {
         if let Some(target) = active.first() {
             if let Some(state) = states.iter().find(|state| state.target == *target) {
                 let original_flow = state.original_flow()?;
-                return Err(reverse_error(format!(
+                return Err(invalid_flow_request(format!(
                     "the circuit didn't satisfy one of the given flows (ignoring sign): {}",
                     original_flow
                 )));
             }
-            return Err(reverse_error(format!(
+            return Err(invalid_flow_request(format!(
                 "the detecting region of {target} reached the start of the circuit; only flows given as arguments may touch the circuit boundary"
             )));
         }
@@ -690,7 +742,9 @@ impl ReverseFlowEngine {
                     measurements,
                     [],
                 )
-                .map_err(|error| reverse_error(error.to_string()))
+                .map_err(|error| {
+                    AnalysisError::internal(AnalysisOperation::TimeReversal, error.to_string())
+                })
             })
             .collect()
     }
@@ -742,10 +796,10 @@ fn flow_aware_qubit_count(circuit: &Circuit, flows: &[Flow]) -> AnalysisResult<u
         .unwrap_or(0);
     let count = stab_model::advanced::circuit_simulated_qubit_count(circuit).max(flow_qubits);
     if count > u32::MAX as usize {
-        return Err(reverse_error(format!(
-            "flow qubit count {count} exceeds {}",
-            u32::MAX
-        )));
+        return Err(AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            format!("flow qubit count {count} exceeds {}", u32::MAX),
+        ));
     }
     Ok(count)
 }
@@ -760,11 +814,18 @@ fn reverse_flow_states<'a>(
         .enumerate()
         .map(|(index, flow)| {
             reject_measurement_record_aliases(index, flow, measurement_count)?;
-            let index =
-                u64::try_from(index).map_err(|_| reverse_error("flow count does not fit u64"))?;
-            let observable = observable_count
-                .checked_add(index)
-                .ok_or_else(|| reverse_error("flow target observable id overflowed"))?;
+            let index = u64::try_from(index).map_err(|_| {
+                AnalysisError::count_overflow(
+                    AnalysisOperation::TimeReversal,
+                    "flow count does not fit u64",
+                )
+            })?;
+            let observable = observable_count.checked_add(index).ok_or_else(|| {
+                AnalysisError::count_overflow(
+                    AnalysisOperation::TimeReversal,
+                    "flow target observable id overflowed",
+                )
+            })?;
             Ok(ReverseFlowState {
                 target: DemTarget::logical_observable(observable)?,
                 input: flow.input(),
@@ -776,23 +837,34 @@ fn reverse_flow_states<'a>(
 }
 
 fn absolute_measurement_index(index: i32, measurement_count: usize) -> AnalysisResult<usize> {
-    let count = i64::try_from(measurement_count)
-        .map_err(|_| reverse_error("measurement count does not fit i64"))?;
+    let count = i64::try_from(measurement_count).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            "measurement count does not fit i64",
+        )
+    })?;
     let index = i64::from(index);
     let absolute = if index < 0 {
-        count
-            .checked_add(index)
-            .ok_or_else(|| reverse_error("flow measurement index underflowed"))?
+        count.checked_add(index).ok_or_else(|| {
+            AnalysisError::internal(
+                AnalysisOperation::TimeReversal,
+                "flow measurement index underflowed",
+            )
+        })?
     } else {
         index
     };
     if !(0..count).contains(&absolute) {
-        return Err(reverse_error(format!(
+        return Err(invalid_flow_request(format!(
             "out of range measurement rec[{index}] in a flow with {measurement_count} circuit measurements"
         )));
     }
-    usize::try_from(absolute)
-        .map_err(|_| reverse_error("absolute flow measurement index does not fit usize"))
+    usize::try_from(absolute).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            "absolute flow measurement index does not fit usize",
+        )
+    })
 }
 
 fn output_measurement_target(index: usize, count: usize) -> AnalysisResult<Target> {
@@ -802,12 +874,24 @@ fn output_measurement_target(index: usize, count: usize) -> AnalysisResult<Targe
 }
 
 fn output_measurement_index(index: usize, count: usize) -> AnalysisResult<i32> {
-    let index = i64::try_from(index)
-        .map_err(|_| reverse_error("output measurement index does not fit i64"))?;
-    let count = i64::try_from(count)
-        .map_err(|_| reverse_error("output measurement count does not fit i64"))?;
-    i32::try_from(index - count)
-        .map_err(|_| reverse_error("output measurement record offset does not fit i32"))
+    let index = i64::try_from(index).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            "output measurement index does not fit i64",
+        )
+    })?;
+    let count = i64::try_from(count).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            "output measurement count does not fit i64",
+        )
+    })?;
+    i32::try_from(index - count).map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            "output measurement record offset does not fit i32",
+        )
+    })
 }
 
 fn measurement_reset_gate(measurement: Gate) -> AnalysisResult<Gate> {
@@ -892,10 +976,14 @@ fn measurement_reset_gate(measurement: Gate) -> AnalysisResult<Gate> {
         | GateKind::ISWAP_DAG
         | GateKind::MXX
         | GateKind::MYY
-        | GateKind::MZZ => Err(reverse_error(format!(
-            "don't know how to turn measurement {} into a reset",
-            measurement.canonical_name()
-        ))),
+        | GateKind::MZZ => Err(AnalysisError::unsupported(
+            AnalysisOperation::TimeReversal,
+            measurement.kind(),
+            format!(
+                "don't know how to turn measurement {} into a reset",
+                measurement.canonical_name()
+            ),
+        )),
     }
 }
 
@@ -921,6 +1009,10 @@ fn instruction_text(instruction: &CircuitInstruction) -> String {
     circuit.to_stim_string().trim().to_owned()
 }
 
-fn reverse_error(message: impl Into<String>) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(message)
+/// A flow request time reversal cannot serve for this circuit.
+fn invalid_flow_request(detail: impl Into<Cow<'static, str>>) -> AnalysisError {
+    AnalysisRequestError::IrreversibleFlow {
+        detail: detail.into(),
+    }
+    .into()
 }

@@ -5,6 +5,7 @@ use stab_algebra::{Flow, PauliBasis, PauliSign};
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{Cancellation, Circuit, CircuitInstruction, CircuitItem, MemoryBudget, Target};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult, gate_tableau};
 
 use super::canonicalize::final_canonicalize_measurement_generators;
@@ -30,7 +31,8 @@ pub(super) fn composed_measurement_flow_generators(
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = stab_model::advanced::circuit_simulated_qubit_count(circuit);
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        AnalysisError::invalid_tableau_conversion(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FlowGeneration,
             "circuit measurement count does not fit usize during flow generation",
         )
     })?;
@@ -291,11 +293,7 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
     ) -> AnalysisResult<bool> {
         let mut products = Vec::with_capacity(instruction.target_groups().len());
         for group in instruction.target_groups() {
-            let product = measured_pauli_product(
-                instruction.gate().canonical_name(),
-                self.qubit_count,
-                group,
-            )?;
+            let product = measured_pauli_product(instruction.gate(), self.qubit_count, group)?;
             products.push(product);
         }
         for (product, record_index) in products.iter().rev().zip(measurement_indices_reversed(
@@ -496,26 +494,32 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
 
 fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> AnalysisResult<i32> {
     let measurements_in_past = i64::try_from(measurements_in_past).map_err(|_| {
-        AnalysisError::invalid_tableau_conversion(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FlowGeneration,
             "measurement count does not fit i64 during feedback flow generation",
         )
     })?;
     let index = measurements_in_past
         .checked_add(i64::from(record_offset))
         .ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(
+            AnalysisError::count_overflow(
+                AnalysisOperation::FlowGeneration,
                 "measurement record index overflowed during feedback flow generation",
             )
         })?;
     if index < 0 || index > measurements_in_past {
-        return Err(AnalysisError::invalid_tableau_conversion(format!(
-            "measurement record offset {record_offset} is outside the flow generation history"
-        )));
+        return Err(AnalysisError::record_out_of_range(
+            AnalysisOperation::FlowGeneration,
+            format!(
+                "measurement record offset {record_offset} is outside the flow generation history"
+            ),
+        ));
     }
     i32::try_from(index).map_err(|_| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "flow measurement record index {index} does not fit i32"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::FlowGeneration,
+            format!("flow measurement record index {index} does not fit i32"),
+        )
     })
 }
 

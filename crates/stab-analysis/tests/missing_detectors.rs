@@ -4,7 +4,7 @@
 )]
 
 use stab_analysis::{
-    AnalysisError, MissingDetectorOptions, ResourceKind, ResourceOperation, decomposed_circuit,
+    AnalysisError, AnalysisOperation, MissingDetectorOptions, ResourceKind, decomposed_circuit,
     missing_detectors,
 };
 use stab_model::{Circuit, RepeatBlock, RepeatCount};
@@ -567,7 +567,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     };
     assert_eq!(
         resource.operation(),
-        ResourceOperation::MissingDetectorDiscovery
+        AnalysisOperation::MissingDetectorDiscovery
     );
     assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
     assert!(resource.actual() > resource.limit());
@@ -591,7 +591,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     };
     assert_eq!(
         resource.operation(),
-        ResourceOperation::MissingDetectorDiscovery
+        AnalysisOperation::MissingDetectorDiscovery
     );
     assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
     assert!(resource.actual() > resource.limit());
@@ -619,7 +619,7 @@ fn assert_missing_detector_budget_and_nesting_limits() -> Result<(), Box<dyn std
     };
     assert_eq!(
         resource.operation(),
-        ResourceOperation::MissingDetectorDiscovery
+        AnalysisOperation::MissingDetectorDiscovery
     );
     assert_eq!(resource.resource(), ResourceKind::RepeatNesting);
     assert!(resource.actual() > resource.limit());
@@ -774,7 +774,7 @@ fn assert_missing_detector_projected_storage_and_allocation_bounds()
         };
         assert_eq!(
             resource.operation(),
-            ResourceOperation::MissingDetectorDiscovery
+            AnalysisOperation::MissingDetectorDiscovery
         );
         assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
         assert!(resource.actual() > resource.limit());
@@ -824,7 +824,7 @@ fn pf5_missing_detectors_repeat_refuses_expansion_beyond_the_budget()
     };
     assert_eq!(
         resource.operation(),
-        ResourceOperation::MissingDetectorDiscovery
+        AnalysisOperation::MissingDetectorDiscovery
     );
     assert_eq!(resource.resource(), ResourceKind::ProjectedPayloadBytes);
     assert!(resource.actual() > resource.limit());

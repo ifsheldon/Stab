@@ -5,7 +5,7 @@ use stab_model::{
 };
 
 use crate::{
-    AnalysisError, AnalysisResult,
+    AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult, NonUnitaryReason,
     circuit_flow::{
         FlowCheckAlgorithm, FlowCheckCost, UnsignedFlowCheckOptions,
         check_unsigned_flows_with_sparse_tracker, stops_flow_check,
@@ -77,7 +77,8 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> AnalysisResult<Circuit> {
             let mut result = Circuit::new();
             for item in prefix {
                 let CircuitItem::Instruction(instruction) = item else {
-                    return Err(AnalysisError::invalid_tableau_conversion(
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::CircuitInverse,
                         "leading-coordinate prefix unexpectedly contained a repeat block",
                     ));
                 };
@@ -146,8 +147,12 @@ fn rebuild_reversed<'a>(
     mut instruction: impl FnMut(&CircuitInstruction) -> AnalysisResult<Option<CircuitInstruction>>,
     repeat_bodies: RepeatBodies,
 ) -> AnalysisResult<Circuit> {
-    let stack_error =
-        || AnalysisError::invalid_tableau_conversion("circuit inversion lost its body stack");
+    let stack_error = || {
+        AnalysisError::internal(
+            AnalysisOperation::CircuitInverse,
+            "circuit inversion lost its body stack",
+        )
+    };
     let (result, items) = begin(circuit)?;
     let mut stack = vec![ReversedBody {
         items: items.iter().rev(),
@@ -256,9 +261,13 @@ pub(crate) fn time_reversed_for_flows_using(
         reject_non_unitary_flow_terms(index, flow)?;
     }
     let inverse = circuit_inverse_unitary_strict(circuit).map_err(|error| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows unitary fast path requires a unitary circuit: {error}"
-        ))
+        AnalysisError::unsupported(
+            AnalysisOperation::TimeReversal,
+            None,
+            format!(
+                "time_reversed_for_flows unitary fast path requires a unitary circuit: {error}"
+            ),
+        )
     })?;
     if flows.is_empty() {
         return Ok((inverse, Vec::new()));
@@ -270,9 +279,11 @@ pub(crate) fn time_reversed_for_flows_using(
         .enumerate()
     {
         if !satisfied {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "time_reversed_for_flows unitary fast path requires input circuit to satisfy flow {index}: {flow}"
-            )));
+            return Err(AnalysisRequestError::UnsatisfiedFlow {
+                index,
+                flow: Box::new(flow.clone()),
+            }
+            .into());
         }
     }
     let reversed_flows = flows
@@ -288,15 +299,19 @@ pub(crate) fn time_reversed_for_flows_using(
         if stops_flow_check(&error) {
             return error;
         }
-        AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows could not validate reversed unitary flows: {error}"
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::TimeReversal,
+            format!("time_reversed_for_flows could not validate reversed unitary flows: {error}"),
+        )
     })?;
     for (index, (flow, satisfied)) in reversed_flows.iter().zip(reversed_checks).enumerate() {
         if !satisfied {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "time_reversed_for_flows produced an invalid reversed unitary flow {index}: {flow}"
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::TimeReversal,
+                format!(
+                    "time_reversed_for_flows produced an invalid reversed unitary flow {index}: {flow}"
+                ),
+            ));
         }
     }
     Ok((inverse, reversed_flows))
@@ -358,7 +373,9 @@ fn inverse_public_instruction(
         GateKind::TICK => instruction.args().to_vec(),
         GateKind::SHIFT_COORDS => instruction.args().iter().map(|arg| -*arg).collect(),
         GateKind::QUBIT_COORDS => {
-            return Err(AnalysisError::invalid_tableau_conversion(
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::CircuitInverse,
+                GateKind::QUBIT_COORDS,
                 "inverting QUBIT_COORDS is supported only at the start of a circuit or repeat block",
             ));
         }
@@ -392,10 +409,11 @@ fn inverse_public_instruction(
         | GateKind::MXX
         | GateKind::MYY
         | GateKind::MZZ => {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "operation {} has no strict circuit inverse",
-                gate.canonical_name()
-            )));
+            return Err(AnalysisError::non_unitary(
+                AnalysisOperation::CircuitInverse,
+                gate.kind(),
+                NonUnitaryReason::NoStrictInverse,
+            ));
         }
     };
     Ok(stab_model::advanced::circuit_instruction_with_tag_bytes(
@@ -422,10 +440,10 @@ fn inverse_unitary_instruction(
 ) -> AnalysisResult<CircuitInstruction> {
     let gate = instruction.gate();
     if !gate.is_unitary() {
-        return Err(AnalysisError::invalid_tableau_conversion(format!(
-            "operation {} is not unitary",
-            gate.canonical_name()
-        )));
+        return Err(AnalysisError::internal(
+            AnalysisOperation::CircuitInverse,
+            format!("operation {} is not unitary", gate.canonical_name()),
+        ));
     }
     let inverse_gate = gate.generalized_inverse();
     let targets = reversed_target_groups(instruction);
@@ -457,9 +475,13 @@ fn reversed_pauli_only_flow(flow: &Flow) -> Flow {
 
 fn reject_non_unitary_flow_terms(index: usize, flow: &Flow) -> AnalysisResult<()> {
     if flow.measurements().next().is_some() || flow.observables().next().is_some() {
-        return Err(AnalysisError::invalid_tableau_conversion(format!(
-            "time_reversed_for_flows unitary fast path does not support measurement-record or observable terms in flow {index}: {flow}"
-        )));
+        // `requires_general_reversal` routes every such flow to the general reversal.
+        return Err(AnalysisError::internal(
+            AnalysisOperation::TimeReversal,
+            format!(
+                "time_reversed_for_flows unitary fast path does not support measurement-record or observable terms in flow {index}: {flow}"
+            ),
+        ));
     }
     Ok(())
 }
@@ -535,7 +557,7 @@ impl FlowValidation {
                 if stops_flow_check(&error) {
                     error
                 } else {
-                    AnalysisError::invalid_tableau_conversion(error.to_string())
+                    AnalysisError::internal(AnalysisOperation::TimeReversal, error.to_string())
                 }
             }),
         }
@@ -544,9 +566,9 @@ impl FlowValidation {
 
 fn unitary_flow_is_satisfied_by_tableau(tableau: &Tableau, flow: &Flow) -> AnalysisResult<bool> {
     let prefix_input = pauli_prefix(flow.input(), tableau.len());
-    let actual_prefix = tableau
-        .apply(&prefix_input)
-        .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string()))?;
+    let actual_prefix = tableau.apply(&prefix_input).map_err(|error| {
+        AnalysisError::internal(AnalysisOperation::TimeReversal, error.to_string())
+    })?;
     let len = flow
         .input()
         .len()

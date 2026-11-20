@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{DemDetectorId, DemObservableId, DemTarget};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -106,20 +107,23 @@ impl DetectorIndex {
             #[cfg(test)]
             Self::Identity => {
                 let index = u64::try_from(index).map_err(|_| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "{} node index does not fit detector id",
-                        kind.name()
-                    ))
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::LogicalErrorSearch,
+                        format!("{} node index does not fit detector id", kind.name()),
+                    )
                 })?;
                 DemDetectorId::try_new(index).map_err(Into::into)
             }
             Self::Sparse {
                 node_to_detector, ..
             } => node_to_detector.get(index).copied().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} sparse node index {index} is outside the graph",
-                    kind.name()
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!(
+                        "{} sparse node index {index} is outside the graph",
+                        kind.name()
+                    ),
+                )
             }),
         }
     }
@@ -132,20 +136,26 @@ impl DetectorIndex {
         match self {
             #[cfg(test)]
             Self::Identity => usize::try_from(detector.get()).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} detector D{} does not fit usize",
-                    kind.name(),
-                    detector.get()
-                ))
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!(
+                        "{} detector D{} does not fit usize",
+                        kind.name(),
+                        detector.get()
+                    ),
+                )
             }),
             Self::Sparse {
                 detector_to_node, ..
             } => detector_to_node.get(&detector).copied().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} detector D{} is outside the sparse graph",
-                    kind.name(),
-                    detector.get()
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!(
+                        "{} detector D{} is outside the sparse graph",
+                        kind.name(),
+                        detector.get()
+                    ),
+                )
             }),
         }
     }

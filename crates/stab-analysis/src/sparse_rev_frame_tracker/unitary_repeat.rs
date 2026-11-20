@@ -9,6 +9,7 @@ use super::budget::slot_transform_bytes;
 use super::{
     AnticommutationPolicy, SparseReverseFrameTracker, TargetXorSet, qubit_index, replace_qubit_set,
 };
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult, gate_has_tableau, single_qubit_clifford_for_gate};
 
 /// One supported unitary repeat being folded into a qubit-slot transform.
@@ -35,12 +36,14 @@ impl<'a> UnitaryFold<'a> {
         }
         let qubits = touched_qubits(repeat.body());
         if let Some(&qubit) = qubits.iter().find(|&&qubit| qubit >= parent.qubit_count) {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "unitary repeat touches qubit {qubit} outside the sparse reverse tracker"
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!("unitary repeat touches qubit {qubit} outside the sparse reverse tracker"),
+            ));
         }
         let slot_count = qubits.len().checked_mul(2).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse unitary repeat slot count overflowed",
             )
         })?;
@@ -55,7 +58,8 @@ impl<'a> UnitaryFold<'a> {
             let qubit = qubit_id_from_index(qubit)?;
             basis.toggle_xs(qubit, &[slot_target(local)?])?;
             let z_slot = local.checked_add(qubits.len()).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::ReverseFrameTracking,
                     "sparse reverse unitary repeat slot overflowed",
                 )
             })?;
@@ -134,7 +138,8 @@ impl SlotTransform {
     ) -> AnalysisResult<Self> {
         let active_qubit_count = qubits.len();
         let slot_count = active_qubit_count.checked_mul(2).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse unitary repeat slot count overflowed",
             )
         })?;
@@ -144,13 +149,17 @@ impl SlotTransform {
             for (qubit, targets) in sets {
                 parent.check_cancelled()?;
                 let local = qubits.binary_search(&qubit_index(*qubit)?).map_err(|_| {
-                    AnalysisError::invalid_detector_error_model(format!(
-                        "unitary repeat moved a slot onto untouched qubit {}",
-                        qubit.get()
-                    ))
+                    AnalysisError::internal(
+                        AnalysisOperation::ReverseFrameTracking,
+                        format!(
+                            "unitary repeat moved a slot onto untouched qubit {}",
+                            qubit.get()
+                        ),
+                    )
                 })?;
                 let slot = local.checked_add(offset).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::ReverseFrameTracking,
                         "unitary repeat target slot overflowed",
                     )
                 })?;
@@ -161,9 +170,10 @@ impl SlotTransform {
                     destinations
                         .get_mut(source)
                         .ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(format!(
-                                "unitary repeat source slot {source} is out of bounds"
-                            ))
+                            AnalysisError::internal(
+                                AnalysisOperation::ReverseFrameTracking,
+                                format!("unitary repeat source slot {source} is out of bounds"),
+                            )
                         })?
                         .insert(slot);
                 }
@@ -199,7 +209,8 @@ impl SlotTransform {
 
     fn then(&self, next: &Self) -> AnalysisResult<Self> {
         if self.qubits != next.qubits {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
                 "unitary repeat transforms have different active qubit mappings",
             ));
         }
@@ -210,9 +221,10 @@ impl SlotTransform {
                 let mut result = BTreeSet::new();
                 for middle in middle_slots {
                     let next_slots = next.destinations.get(*middle).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(format!(
-                            "unitary repeat transform slot {middle} is out of bounds"
-                        ))
+                        AnalysisError::internal(
+                            AnalysisOperation::ReverseFrameTracking,
+                            format!("unitary repeat transform slot {middle} is out of bounds"),
+                        )
                     })?;
                     toggle_slots(&mut result, next_slots.iter().copied());
                 }
@@ -259,14 +271,15 @@ impl SlotTransform {
                 continue;
             }
             let destination_slots = self.destinations.get(source_slot).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "unitary repeat source slot {source_slot} is out of bounds"
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::ReverseFrameTracking,
+                    format!("unitary repeat source slot {source_slot} is out of bounds"),
+                )
             })?;
             for destination_slot in destination_slots {
                 let destination_targets =
                     new_slots.get_mut(*destination_slot).ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(format!(
+                        AnalysisError::internal(AnalysisOperation::ReverseFrameTracking, format!(
                             "unitary repeat destination slot {destination_slot} is out of bounds"
                         ))
                     })?;
@@ -307,9 +320,10 @@ impl SlotTransform {
 }
 
 fn active_slot_error(basis: &str, qubit: usize) -> AnalysisError {
-    AnalysisError::invalid_detector_error_model(format!(
-        "missing active {basis} slot for qubit {qubit} during unitary repeat folding"
-    ))
+    AnalysisError::internal(
+        AnalysisOperation::ReverseFrameTracking,
+        format!("missing active {basis} slot for qubit {qubit} during unitary repeat folding"),
+    )
 }
 
 fn touched_qubits(circuit: &Circuit) -> Vec<usize> {
@@ -385,15 +399,17 @@ fn is_plain_qubit_target(target: &Target) -> bool {
 
 fn qubit_id_from_index(index: usize) -> AnalysisResult<QubitId> {
     Ok(QubitId::new(u32::try_from(index).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "unitary repeat qubit index {index} does not fit u32"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
+            format!("unitary repeat qubit index {index} does not fit u32"),
+        )
     })?)?)
 }
 
 fn slot_target(slot: usize) -> AnalysisResult<DemTarget> {
     let observable = u64::try_from(slot).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
             "sparse reverse unitary repeat slot does not fit u64",
         )
     })?;
@@ -403,14 +419,16 @@ fn slot_target(slot: usize) -> AnalysisResult<DemTarget> {
 fn slot_from_target(target: DemTarget) -> AnalysisResult<usize> {
     match target.kind() {
         DemTargetKind::LogicalObservable(slot) => usize::try_from(slot.get()).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::ReverseFrameTracking,
                 "sparse reverse unitary repeat slot does not fit usize",
             )
         }),
         DemTargetKind::RelativeDetector(_) | DemTargetKind::Separator => {
-            Err(AnalysisError::invalid_detector_error_model(format!(
-                "unitary repeat basis tracker holds non-slot target {target}"
-            )))
+            Err(AnalysisError::internal(
+                AnalysisOperation::ReverseFrameTracking,
+                format!("unitary repeat basis tracker holds non-slot target {target}"),
+            ))
         }
     }
 }

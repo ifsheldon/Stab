@@ -10,13 +10,15 @@ use stab_model::{
     ParseLimits, Target,
 };
 
-use super::{absolute_measurement_index, any_nested_instruction, instruction_text, reverse_error};
+use super::{
+    absolute_measurement_index, any_nested_instruction, instruction_text, invalid_flow_request,
+};
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::circuit_flow::{
     UnsignedFlowCheckOptions, check_unsigned_flows_with_sparse_tracker, stops_flow_check,
 };
 use crate::controlled_pauli::{ControlSlot, controlled_pauli_form};
-use crate::{AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
 
 /// Measurement-rich reversal expands every repeat into the inverted circuit, its detector and
 /// coordinate maps, and the finished copy.
@@ -28,10 +30,15 @@ pub(super) fn validate_general_reversal(
 ) -> AnalysisResult<()> {
     let projected = projected_reversal_bytes(circuit)?
         .checked_mul(MEASUREMENT_RICH_RETAINED_COPIES)
-        .ok_or_else(|| reverse_error("measurement-rich repeat expansion size overflowed"))?;
+        .ok_or_else(|| {
+            AnalysisError::count_overflow(
+                AnalysisOperation::TimeReversal,
+                "measurement-rich repeat expansion size overflowed",
+            )
+        })?;
     if !budget.admits(u128::from(projected)) {
         return Err(ResourceLimitError::memory_budget(
-            ResourceOperation::TimeReversal,
+            AnalysisOperation::TimeReversal,
             ResourceKind::MaterializedBytes,
             projected,
             budget.bytes(),
@@ -43,16 +50,25 @@ pub(super) fn validate_general_reversal(
 
 /// Conservative retained bytes of one expanded copy of `circuit`, with checked arithmetic.
 fn projected_reversal_bytes(circuit: &Circuit) -> AnalysisResult<u64> {
-    let overflow = || reverse_error("measurement-rich repeat expansion size overflowed");
+    let overflow = || {
+        AnalysisError::count_overflow(
+            AnalysisOperation::TimeReversal,
+            "measurement-rich repeat expansion size overflowed",
+        )
+    };
     let mut total = 0_u64;
     crate::folded_walk::walk_folded(
         circuit,
         ParseLimits::DEFAULT_REPEAT_NESTING,
         &Cancellation::never(),
         |depth, limit| {
-            reverse_error(format!(
-                "measurement-rich repeat expansion nests repeat blocks {depth} deep, beyond the {limit}-level envelope"
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::TimeReversal,
+                None,
+                format!(
+                    "measurement-rich repeat expansion nests repeat blocks {depth} deep, beyond the {limit}-level envelope"
+                ),
+            )
         },
         |event| {
             let FoldedCircuitEvent::Instruction {
@@ -92,10 +108,14 @@ fn validate_instructions(circuit: &Circuit) -> AnalysisResult<()> {
 
 fn validate_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> {
     if instruction.args().iter().any(|arg| !arg.is_finite()) {
-        return Err(reverse_error(format!(
-            "time reversal requires finite instruction arguments: {}",
-            instruction_text(instruction)
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::TimeReversal,
+            instruction.gate().kind(),
+            format!(
+                "time reversal requires finite instruction arguments: {}",
+                instruction_text(instruction)
+            ),
+        ));
     }
     if matches!(
         reverse_flow_transition(instruction),
@@ -105,10 +125,14 @@ fn validate_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> 
         .iter()
         .any(Target::is_measurement_record_target)
     {
-        return Err(reverse_error(format!(
-            "time-reversing feedback isn't supported yet; found feedback in: {}",
-            instruction_text(instruction)
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::TimeReversal,
+            instruction.gate().kind(),
+            format!(
+                "time-reversing feedback isn't supported yet; found feedback in: {}",
+                instruction_text(instruction)
+            ),
+        ));
     }
     validate_sweep_target_order(instruction)?;
     if instruction.gate().kind() == GateKind::ELSE_CORRELATED_ERROR
@@ -117,10 +141,14 @@ fn validate_instruction(instruction: &CircuitInstruction) -> AnalysisResult<()> 
             ReverseFlowTransition::Unsupported
         )
     {
-        return Err(reverse_error(format!(
-            "don't know how to time-reverse {}",
-            instruction_text(instruction)
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::TimeReversal,
+            instruction.gate().kind(),
+            format!(
+                "don't know how to time-reverse {}",
+                instruction_text(instruction)
+            ),
+        ));
     }
     Ok(())
 }
@@ -141,10 +169,14 @@ fn validate_sweep_target_order(instruction: &CircuitInstruction) -> AnalysisResu
             SweepInvalidSide::Right => right,
         };
         if target.is_sweep_bit_target() {
-            return Err(reverse_error(format!(
-                "time reversal requires gate-valid sweep target ordering; {} has sweep target {target} on its qubit-only side",
-                instruction_text(instruction)
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::TimeReversal,
+                instruction.gate().kind(),
+                format!(
+                    "time reversal requires gate-valid sweep target ordering; {} has sweep target {target} on its qubit-only side",
+                    instruction_text(instruction)
+                ),
+            ));
         }
     }
     Ok(())
@@ -159,7 +191,7 @@ enum SweepInvalidSide {
 pub(super) fn reject_flow_observable_terms(flows: &[Flow]) -> AnalysisResult<()> {
     for (flow_index, flow) in flows.iter().enumerate() {
         if let Some(observable) = flow.observables().next() {
-            return Err(reverse_error(format!(
+            return Err(invalid_flow_request(format!(
                 "flow {flow_index} contains obs[{observable}], but time reversal does not define how observable dependencies map into returned flows"
             )));
         }
@@ -178,7 +210,7 @@ pub(super) fn reject_measurement_record_aliases(
         if let Some(previous) = resolved.insert(absolute, measurement)
             && previous != measurement
         {
-            return Err(reverse_error(format!(
+            return Err(invalid_flow_request(format!(
                 "flow {flow_index} contains distinct measurement terms rec[{previous}] and rec[{measurement}] that alias absolute record {absolute}; pinned Stim rejects this flow instead of XOR-cancelling the aliases"
             )));
         }
@@ -196,14 +228,18 @@ pub(super) fn validate_output_flows(
             if stops_flow_check(&error) {
                 error
             } else {
-                reverse_error(format!("failed to validate reversed flows: {error}"))
+                AnalysisError::internal(
+                    AnalysisOperation::TimeReversal,
+                    format!("failed to validate reversed flows: {error}"),
+                )
             }
         })?;
     for (index, (flow, satisfied)) in flows.iter().zip(checks).enumerate() {
         if !satisfied {
-            return Err(reverse_error(format!(
-                "reversed flow {index} is not satisfied by the reversed circuit: {flow}"
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::TimeReversal,
+                format!("reversed flow {index} is not satisfied by the reversed circuit: {flow}"),
+            ));
         }
     }
     Ok(())

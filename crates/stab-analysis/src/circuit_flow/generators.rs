@@ -1,6 +1,7 @@
 use stab_algebra::{Flow, PauliBasis};
 use stab_model::{Cancellation, Circuit, CircuitItem, MemoryBudget};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 mod canonicalize;
@@ -134,8 +135,12 @@ fn simple_measurement_rich_flow_generators(
 }
 
 fn unsupported_flow_generator_error(circuit: &Circuit) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(format!(
-        "circuit_flow_generators cannot derive generators for the supplied gate or target shape; got {} top-level item(s)",
-        circuit.items().len()
-    ))
+    AnalysisError::unsupported(
+        AnalysisOperation::FlowGeneration,
+        None,
+        format!(
+            "circuit_flow_generators cannot derive generators for the supplied gate or target shape; got {} top-level item(s)",
+            circuit.items().len()
+        ),
+    )
 }

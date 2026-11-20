@@ -20,8 +20,10 @@ use stab_model::{
 use stab_records::{ByteSpan as RecordByteSpan, DetsResultType, FormatError, FormatErrorContext};
 use thiserror::Error;
 
+mod analysis;
 mod codes;
 
+use analysis::analysis_error_context;
 use codes::cli_error_code;
 
 const JSON_DIAGNOSTIC_SCHEMA_VERSION: u8 = 1;
@@ -282,10 +284,24 @@ pub(crate) fn write_cli_error(
 const MEMORY_BUDGET_HELP: &str =
     "Raise the budget with `--memory-budget <SIZE>`, for example `--memory-budget 4GiB`.";
 
-/// Every typed budget refusal renders the budget it exceeded as an `N-byte memory budget`.
+/// Whether raising `--memory-budget` admits the refused work.
+///
+/// Analysis refusals are classified by their typed cause, and a command-ledger refusal wraps only
+/// budget refusals. The other typed budget refusals render the budget they exceeded as an
+/// `N-byte memory budget`, which still identifies them.
 pub(crate) fn is_memory_budget_refusal(error: &CliError) -> bool {
-    matches!(error, CliError::InputTooLarge { .. })
-        || error.to_string().contains("-byte memory budget")
+    match analysis_error(error) {
+        Some(AnalysisError::Model(_)) | None => {}
+        Some(error) => {
+            return error
+                .resource_limit_error()
+                .is_some_and(|error| error.is_memory_budget());
+        }
+    }
+    matches!(
+        error,
+        CliError::InputTooLarge { .. } | CliError::CommandMemoryBudget { .. }
+    ) || error.to_string().contains("-byte memory budget")
 }
 
 pub(crate) fn write_clap_error(writer: &mut impl Write, error: &clap::Error) -> io::Result<()> {
@@ -683,6 +699,9 @@ fn model_error_context(error: &ModelError) -> Value {
         ModelError::Parse(error) => parse_error_context(error),
         ModelError::ResourceLimit(error) => model_resource_context(error),
         ModelError::Validation(error) => validation_error_context(error),
+        ModelError::AllocationFailed { dialect, .. } => json!({
+            "dialect": model_dialect_name(*dialect),
+        }),
         ModelError::Cancelled(_) => json!({}),
     }
 }
@@ -724,18 +743,6 @@ fn validation_error_context(error: &ValidationError) -> Value {
             "index": index,
             "detector_count": detector_count,
         }),
-        _ => json!({}),
-    }
-}
-
-fn analysis_error_context(error: &AnalysisError) -> Value {
-    match error {
-        AnalysisError::Model(error) => model_error_context(error),
-        AnalysisError::InvalidDomainValue { kind, value } => json!({
-            "domain": kind,
-            "value": value,
-        }),
-        AnalysisError::ResourceLimit(error) => analysis_resource_context(error),
         _ => json!({}),
     }
 }

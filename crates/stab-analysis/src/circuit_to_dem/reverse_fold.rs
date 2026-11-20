@@ -10,7 +10,10 @@ use super::{
 };
 use crate::sparse_rev_frame_tracker::SparseReverseFrameTracker;
 use crate::target_xor_set::TargetXorSet;
-use crate::{AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{
+    AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError,
+    UnanalyzableNoise,
+};
 
 mod local_decomposition;
 mod loop_folding;
@@ -68,7 +71,8 @@ struct ReverseFoldAnalyzer<'c> {
 impl<'c> ReverseFoldAnalyzer<'c> {
     fn new(circuit: &Circuit, options: ErrorAnalyzerOptions) -> AnalysisResult<Self> {
         let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "analyze_errors measurement count does not fit usize",
             )
         })?;
@@ -81,7 +85,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         );
         tracker.set_cancellation(options.cancellation.clone());
         tracker.set_memory_budget(
-            ResourceOperation::CircuitToDetectorErrorModel,
+            AnalysisOperation::CircuitToDetectorErrorModel,
             ResourceKind::MaterializedBytes,
             options.memory_budget,
         );
@@ -128,7 +132,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         let total = next_output.saturating_add(live);
         if !budget.admits(u128::from(total)) {
             return Err(ResourceLimitError::memory_budget(
-                ResourceOperation::CircuitToDetectorErrorModel,
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 ResourceKind::MaterializedBytes,
                 total,
                 budget.bytes(),
@@ -239,7 +243,8 @@ impl<'c> ReverseFoldAnalyzer<'c> {
             GateKind::OBSERVABLE_INCLUDE => {
                 self.tracker.undo_instruction(instruction)?;
                 let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
                         "OBSERVABLE_INCLUDE is missing an observable id",
                     )
                 })?;
@@ -327,9 +332,7 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         if self.stacked_else_correlated.is_empty() {
             Ok(())
         } else {
-            Err(AnalysisError::invalid_detector_error_model(
-                "ELSE_CORRELATED_ERROR wasn't preceded by ELSE_CORRELATED_ERROR or CORRELATED_ERROR (E)",
-            ))
+            Err(UnanalyzableNoise::UnprecededElseCorrelatedError.into())
         }
     }
 

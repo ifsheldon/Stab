@@ -5,7 +5,7 @@
 )]
 
 use stab_analysis::{
-    AnalysisResult, DemFlattenLimits, ResourceKind, ResourceOperation,
+    AnalysisOperation, AnalysisResult, DemFlattenLimits, ResourceKind,
     flattened_detector_error_model, flattened_detector_error_model_with_limits,
 };
 use stab_model::{
@@ -66,7 +66,7 @@ fn materialized_bytes_admit_the_exact_budget_and_reject_the_first_excess_before_
     let resource = error.resource_limit_error().expect("typed budget refusal");
     assert_eq!(
         resource.operation(),
-        ResourceOperation::DetectorErrorModelFlatten
+        AnalysisOperation::DetectorErrorModelFlatten
     );
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert_eq!(
@@ -123,7 +123,7 @@ fn caller_raised_budget_cannot_exceed_platform_materialization_capacity() {
         .expect("platform materialization rejection should remain typed");
     assert_eq!(
         resource.operation(),
-        ResourceOperation::DetectorErrorModelFlatten
+        AnalysisOperation::DetectorErrorModelFlatten
     );
     assert_eq!(resource.resource(), ResourceKind::MaterializedUnits);
     assert_eq!(resource.actual(), u64::MAX);

@@ -351,7 +351,7 @@ impl DetectorErrorModel {
             )));
         }
         self.items.try_reserve(1).map_err(|_| {
-            ModelError::invalid_detector_error_model("DEM item insertion allocation failed")
+            ModelError::dem_allocation_failed("DEM item insertion allocation failed")
         })?;
         self.items.insert(index, item);
         Ok(())

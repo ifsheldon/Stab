@@ -9,8 +9,8 @@ use stab_model::{
 
 use crate::folded_walk::walk_folded;
 use crate::{
-    AnalysisError, AnalysisResult, FlowGeneratorOptions, ResourceKind, ResourceLimitError,
-    ResourceOperation, circuit_flow::flow_record_index, circuit_flow_generators_with_options,
+    AnalysisError, AnalysisOperation, AnalysisResult, FlowGeneratorOptions, ResourceKind,
+    ResourceLimitError, circuit_flow::flow_record_index, circuit_flow_generators_with_options,
 };
 
 mod final_repeat;
@@ -84,7 +84,8 @@ pub(super) fn missing_detectors_bounded(
     qubit_count: usize,
 ) -> AnalysisResult<Circuit> {
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::MissingDetectorDiscovery,
             "measurement count does not fit usize during missing-detector analysis",
         )
     })?;
@@ -112,7 +113,8 @@ pub(super) fn terminal_state_signature(
     qubit_count: usize,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::MissingDetectorDiscovery,
             "measurement count does not fit usize during missing-detector state proof",
         )
     })?;
@@ -153,7 +155,8 @@ fn collect_declared_rows(
             measurement_offset = measurement_offset
                 .checked_add(instruction.target_groups().len())
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::MissingDetectorDiscovery,
                         "measurement offset overflowed during missing-detector analysis",
                     )
                 })?;
@@ -170,7 +173,8 @@ fn collect_declared_rows(
                 let observable = instruction
                     .observable_id_argument()?
                     .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
+                        AnalysisError::internal(
+                            AnalysisOperation::MissingDetectorDiscovery,
                             "OBSERVABLE_INCLUDE is missing an observable id argument",
                         )
                     })?
@@ -271,9 +275,12 @@ fn collect_declared_rows(
         }
     }
     if measurement_offset != measurement_count {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "missing-detector scan counted {measurement_offset} measurements but the circuit reports {measurement_count}"
-        )));
+        return Err(AnalysisError::internal(
+            AnalysisOperation::MissingDetectorDiscovery,
+            format!(
+                "missing-detector scan counted {measurement_offset} measurements but the circuit reports {measurement_count}"
+            ),
+        ));
     }
 
     let mut known = detector_rows;
@@ -307,7 +314,7 @@ fn admit_missing_detector_bytes(
 ) -> AnalysisResult<()> {
     if !budget.admits(u128::from(projected)) {
         return Err(ResourceLimitError::memory_budget(
-            ResourceOperation::MissingDetectorDiscovery,
+            AnalysisOperation::MissingDetectorDiscovery,
             resource,
             projected,
             budget.bytes(),
@@ -392,10 +399,14 @@ fn row_from_record_targets(
                 ignored_logical_rows.insert(observable.get());
             }
         } else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "{} target {target} is not supported by missing-detector analysis",
-                instruction.gate().canonical_name()
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::MissingDetectorDiscovery,
+                instruction.gate().kind(),
+                format!(
+                    "{} target {target} is not supported by missing-detector analysis",
+                    instruction.gate().canonical_name()
+                ),
+            ));
         }
     }
     Ok(row)
@@ -406,25 +417,31 @@ fn absolute_record_index(
     measurement_offset: usize,
 ) -> AnalysisResult<usize> {
     let current = i64::try_from(measurement_offset).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::MissingDetectorDiscovery,
             "measurement offset does not fit i64 during missing-detector analysis",
         )
     })?;
     let index = current
         .checked_add(i64::from(offset.get()))
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::MissingDetectorDiscovery,
                 "measurement record offset overflowed during missing-detector analysis",
             )
         })?;
     if index < 0 || index >= current {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "measurement record target rec[{}] is outside missing-detector analysis history",
-            offset.stim_text()
-        )));
+        return Err(AnalysisError::record_out_of_range(
+            AnalysisOperation::MissingDetectorDiscovery,
+            format!(
+                "measurement record target rec[{}] is outside missing-detector analysis history",
+                offset.stim_text()
+            ),
+        ));
     }
     usize::try_from(index).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::MissingDetectorDiscovery,
             "measurement record index does not fit usize during missing-detector analysis",
         )
     })
@@ -447,9 +464,10 @@ fn circuit_with_known_input_resets(
             .ok()
             .and_then(|index| QubitId::new(index).ok())
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "qubit index {index} is outside the supported target range"
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::MissingDetectorDiscovery,
+                    format!("qubit index {index} is outside the supported target range"),
+                )
             })?;
         targets.push(Target::qubit(id, false));
     }
@@ -479,9 +497,12 @@ fn collect_measurement_invariants(
         let mut row = MeasurementRow::default();
         for record in generator.measurements() {
             let index = flow_record_index(record, measurement_count).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "flow generator record {record} is outside {measurement_count} measurements"
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::MissingDetectorDiscovery,
+                    format!(
+                        "flow generator record {record} is outside {measurement_count} measurements"
+                    ),
+                )
             })?;
             row.toggle(index);
         }
@@ -540,24 +561,28 @@ fn build_missing_detector_output(
 
 fn relative_offset(index: usize, total: usize) -> AnalysisResult<MeasureRecordOffset> {
     let index = i64::try_from(index).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::MissingDetectorDiscovery,
             "measurement index does not fit i64 during missing-detector output",
         )
     })?;
     let total = i64::try_from(total).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::MissingDetectorDiscovery,
             "measurement count does not fit i64 during missing-detector output",
         )
     })?;
     let offset = index.checked_sub(total).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::internal(
+            AnalysisOperation::MissingDetectorDiscovery,
             "measurement record offset underflowed during missing-detector output",
         )
     })?;
     let offset = i32::try_from(offset).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "measurement record offset {offset} does not fit i32"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::MissingDetectorDiscovery,
+            format!("measurement record offset {offset} does not fit i32"),
+        )
     })?;
     MeasureRecordOffset::try_new(offset).map_err(AnalysisError::from)
 }

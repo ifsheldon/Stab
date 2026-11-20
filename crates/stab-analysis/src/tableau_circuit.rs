@@ -1,6 +1,7 @@
 use stab_algebra::{PauliBasis, PauliSign, Tableau, TableauAppender};
 use stab_model::{Circuit, Gate, GateKind, QubitId, Target};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult, gate_tableau};
 
 struct SynthesisContext {
@@ -113,10 +114,13 @@ impl SynthesisContext {
     #[inline]
     fn target(&self, qubit: usize) -> AnalysisResult<Target> {
         self.qubit_targets.get(qubit).cloned().ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(format!(
-                "tableau synthesis qubit index {qubit} is outside width {}",
-                self.qubit_targets.len()
-            ))
+            AnalysisError::internal(
+                AnalysisOperation::TableauSynthesis,
+                format!(
+                    "tableau synthesis qubit index {qubit} is outside width {}",
+                    self.qubit_targets.len()
+                ),
+            )
         })
     }
 }
@@ -137,7 +141,8 @@ const fn basis_code(basis: PauliBasis) -> u8 {
 /// semantic: converting the result back to a tableau reproduces `tableau` exactly.
 pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
     if !tableau.satisfies_invariants().map_err(map_tableau_error)? {
-        return Err(AnalysisError::invalid_tableau_conversion(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::TableauSynthesis,
             "tableau synthesis requires canonical symplectic generators",
         ));
     }
@@ -153,9 +158,10 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
                 matches!((x, z), (Ok(x), Ok(z)) if x != 0 && z != 0 && x != z)
             })
             .ok_or_else(|| {
-                AnalysisError::invalid_tableau_conversion(format!(
-                    "tableau synthesis could not find a pivot for generator {column}"
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::TableauSynthesis,
+                    format!("tableau synthesis could not find a pivot for generator {column}"),
+                )
             })?;
 
         if pivot != column {
@@ -252,7 +258,8 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
 
     let final_tableau = ctx.remaining.finish().map_err(map_tableau_error)?;
     if !final_tableau.is_identity() {
-        return Err(AnalysisError::invalid_tableau_conversion(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::TableauSynthesis,
             "tableau synthesis did not eliminate every generator",
         ));
     }
@@ -261,13 +268,14 @@ pub fn tableau_to_circuit(tableau: &Tableau) -> AnalysisResult<Circuit> {
 
 fn qubit_target(index: usize) -> AnalysisResult<Target> {
     let index = u32::try_from(index).map_err(|_| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "tableau synthesis qubit index {index} does not fit in a Stim target"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::TableauSynthesis,
+            format!("tableau synthesis qubit index {index} does not fit in a Stim target"),
+        )
     })?;
     Ok(Target::qubit(QubitId::new(index)?, false))
 }
 
 fn map_tableau_error(error: stab_algebra::StabilizerError) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(error.to_string())
+    AnalysisError::internal(AnalysisOperation::TableauSynthesis, error.to_string())
 }

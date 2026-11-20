@@ -3,6 +3,7 @@ use std::fmt::Write as _;
 use stab_model::advanced::CancellationCountdown;
 
 use super::SatMaterializationLimits;
+use crate::AnalysisOperation;
 use crate::resources::SatMaterializationResource;
 use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
 
@@ -147,10 +148,13 @@ impl MaxSatInstance {
         let shape = shape.validate(limits)?;
         let mut clauses = Vec::new();
         clauses.try_reserve_exact(shape.clauses).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "SAT problem generation cannot reserve {} clauses",
-                shape.clauses
-            ))
+            AnalysisError::allocation_failed(
+                AnalysisOperation::SatMaterialization,
+                format!(
+                    "SAT problem generation cannot reserve {} clauses",
+                    shape.clauses
+                ),
+            )
         })?;
         Ok(Self {
             limits: limits.clone(),
@@ -162,7 +166,10 @@ impl MaxSatInstance {
     pub(super) fn new_bool(&mut self) -> AnalysisResult<BoolRef> {
         let variable = self.num_variables;
         let next = self.num_variables.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("SAT variable count overflowed")
+            AnalysisError::count_overflow(
+                AnalysisOperation::SatMaterialization,
+                "SAT variable count overflowed",
+            )
         })?;
         validate_limit(
             SatMaterializationResource::Variables,
@@ -181,14 +188,18 @@ impl MaxSatInstance {
         }
         if let ClauseWeight::Soft(weight) = clause.weight {
             if !weight.is_finite() || weight <= 0.0 {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::SatMaterialization,
                     "SAT soft clause weight must be finite and positive",
                 ));
             }
             self.max_weight = self.max_weight.max(weight);
         }
         let clause_count = self.clauses.len().checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("SAT clause count overflowed")
+            AnalysisError::count_overflow(
+                AnalysisOperation::SatMaterialization,
+                "SAT clause count overflowed",
+            )
         })?;
         validate_limit(
             SatMaterializationResource::Clauses,
@@ -199,7 +210,10 @@ impl MaxSatInstance {
             .clause_literals
             .checked_add(clause.vars.len())
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model("SAT clause literal count overflowed")
+                AnalysisError::count_overflow(
+                    AnalysisOperation::SatMaterialization,
+                    "SAT clause literal count overflowed",
+                )
             })?;
         validate_limit(
             SatMaterializationResource::ClauseLiterals,
@@ -233,15 +247,18 @@ impl MaxSatInstance {
             || self.clauses.len() != shape.clauses
             || self.clause_literals != shape.clause_literals
         {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "SAT preflight shape changed during encoding: expected {} variables, {} clauses, and {} literals; got {}, {}, and {}",
-                shape.variables,
-                shape.clauses,
-                shape.clause_literals,
-                self.num_variables,
-                self.clauses.len(),
-                self.clause_literals
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::SatMaterialization,
+                format!(
+                    "SAT preflight shape changed during encoding: expected {} variables, {} clauses, and {} literals; got {}, {}, and {}",
+                    shape.variables,
+                    shape.clauses,
+                    shape.clause_literals,
+                    self.num_variables,
+                    self.clauses.len(),
+                    self.clause_literals
+                ),
+            ));
         }
         Ok(())
     }
@@ -257,9 +274,12 @@ impl MaxSatInstance {
         )?;
         let mut out = String::new();
         out.try_reserve(output_bound).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "SAT problem generation cannot reserve {output_bound} WDIMACS output bytes"
-            ))
+            AnalysisError::allocation_failed(
+                AnalysisOperation::SatMaterialization,
+                format!(
+                    "SAT problem generation cannot reserve {output_bound} WDIMACS output bytes"
+                ),
+            )
         })?;
         out.push_str("p wcnf ");
         out.push_str(&self.num_variables.to_string());
@@ -276,23 +296,33 @@ impl MaxSatInstance {
             if weight == 0 {
                 continue;
             }
-            write!(out, "{weight}")
-                .map_err(|_| AnalysisError::invalid_detector_error_model("SAT format failed"))?;
+            write!(out, "{weight}").map_err(|_| {
+                AnalysisError::internal(AnalysisOperation::SatMaterialization, "SAT format failed")
+            })?;
             for var in &clause.vars {
                 countdown.tick(self.limits.cancellation())?;
                 let Some(index) = var.variable_index() else {
                     continue;
                 };
                 let one_based = index.checked_add(1).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model("SAT variable index overflowed")
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::SatMaterialization,
+                        "SAT variable index overflowed",
+                    )
                 })?;
                 if var.negated {
                     write!(out, " -{one_based}").map_err(|_| {
-                        AnalysisError::invalid_detector_error_model("SAT format failed")
+                        AnalysisError::internal(
+                            AnalysisOperation::SatMaterialization,
+                            "SAT format failed",
+                        )
                     })?;
                 } else {
                     write!(out, " {one_based}").map_err(|_| {
-                        AnalysisError::invalid_detector_error_model("SAT format failed")
+                        AnalysisError::internal(
+                            AnalysisOperation::SatMaterialization,
+                            "SAT format failed",
+                        )
                     })?;
                 }
             }
@@ -324,7 +354,8 @@ impl MaxSatInstance {
                     continue;
                 };
                 let one_based = index.checked_add(1).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::SatMaterialization,
                         "SAT variable index overflowed while sizing output",
                     )
                 })?;
@@ -352,12 +383,14 @@ impl MaxSatInstance {
             ClauseWeight::Soft(_) if matches!(mode, SatProblemMode::Unweighted) => Ok(1),
             ClauseWeight::Soft(weight) => {
                 let SatProblemMode::Weighted { quantization } = mode else {
-                    return Err(AnalysisError::invalid_detector_error_model(
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::SatMaterialization,
                         "unweighted SAT problem received weighted clause",
                     ));
                 };
                 if self.max_weight <= 0.0 {
-                    return Err(AnalysisError::invalid_detector_error_model(
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::SatMaterialization,
                         "weighted SAT problem has no positive soft-clause weight",
                     ));
                 }
@@ -370,11 +403,15 @@ impl MaxSatInstance {
 fn top_weight_for_clause_count(mode: SatProblemMode, clause_count: usize) -> AnalysisResult<usize> {
     match mode {
         SatProblemMode::Unweighted => clause_count.checked_add(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("unweighted SAT top weight overflowed")
+            AnalysisError::count_overflow(
+                AnalysisOperation::SatMaterialization,
+                "unweighted SAT top weight overflowed",
+            )
         }),
         SatProblemMode::Weighted { quantization } => {
             let quantization = usize::try_from(quantization).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::SatMaterialization,
                     "weighted SAT quantization does not fit usize",
                 )
             })?;
@@ -382,7 +419,8 @@ fn top_weight_for_clause_count(mode: SatProblemMode, clause_count: usize) -> Ana
                 .checked_mul(clause_count)
                 .and_then(|value| value.checked_add(1))
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::SatMaterialization,
                         "weighted SAT top weight overflowed",
                     )
                 })
@@ -392,7 +430,10 @@ fn top_weight_for_clause_count(mode: SatProblemMode, clause_count: usize) -> Ana
 
 fn checked_output_add(left: usize, right: usize) -> AnalysisResult<usize> {
     left.checked_add(right).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model("SAT exact output byte count overflowed")
+        AnalysisError::count_overflow(
+            AnalysisOperation::SatMaterialization,
+            "SAT exact output byte count overflowed",
+        )
     })
 }
 
@@ -404,19 +445,24 @@ fn decimal_digits(value: usize) -> usize {
 
 fn rounded_nonnegative_usize(value: f64) -> AnalysisResult<usize> {
     if !value.is_finite() || value < 0.0 {
-        return Err(AnalysisError::invalid_detector_error_model(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::SatMaterialization,
             "SAT quantized weight is not a finite nonnegative value",
         ));
     }
     let rounded = value.round();
     if rounded > usize::MAX as f64 {
-        return Err(AnalysisError::invalid_detector_error_model(
+        return Err(AnalysisError::count_overflow(
+            AnalysisOperation::SatMaterialization,
             "SAT quantized weight exceeds usize",
         ));
     }
-    format!("{rounded:.0}")
-        .parse::<usize>()
-        .map_err(|_| AnalysisError::invalid_detector_error_model("SAT quantized weight overflowed"))
+    format!("{rounded:.0}").parse::<usize>().map_err(|_| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::SatMaterialization,
+            "SAT quantized weight overflowed",
+        )
+    })
 }
 
 pub(super) fn validate_limit(
@@ -426,12 +472,14 @@ pub(super) fn validate_limit(
 ) -> AnalysisResult<()> {
     if actual > limit {
         let actual = u64::try_from(actual).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::SatMaterialization,
                 "SAT resource amount does not fit resource diagnostics",
             )
         })?;
         let limit = u64::try_from(limit).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::SatMaterialization,
                 "SAT resource limit does not fit resource diagnostics",
             )
         })?;

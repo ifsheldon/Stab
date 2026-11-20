@@ -5,7 +5,7 @@
 )]
 
 use stab_analysis::{
-    ErrorAnalyzerOptions, ResourceKind, ResourceOperation, circuit_to_detector_error_model,
+    AnalysisOperation, ErrorAnalyzerOptions, ResourceKind, circuit_to_detector_error_model,
 };
 use stab_model::Circuit;
 
@@ -66,7 +66,7 @@ fn pf4_dem_analyzer_repeat_resource_policy_is_source_owned() {
     let resource = error.resource_limit_error().expect("typed resource limit");
     assert_eq!(
         resource.operation(),
-        ResourceOperation::CircuitToDetectorErrorModel
+        AnalysisOperation::CircuitToDetectorErrorModel
     );
     assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
     assert!(resource.actual() > resource.limit());

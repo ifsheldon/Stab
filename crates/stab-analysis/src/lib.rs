@@ -91,13 +91,17 @@ pub use dem::{
     shortest_graphlike_undetectable_logical_error,
     shortest_graphlike_undetectable_logical_error_with_limits,
 };
-pub use error::{AnalysisError, AnalysisResult};
+pub use error::{
+    AnalysisError, AnalysisOperation, AnalysisRequestError, AnalysisResult, GateData,
+    GeneratorParameter, LogicalErrorSearchKind, NoLogicalErrorReport, NonDeterministicTargets,
+    NonUnitaryReason, PauliCollapse, ThresholdExcess, UnanalyzableNoise,
+};
 pub use gate::{
     GateUnitaryMatrix, gate_decomposition_to_circuit, gate_flows, gate_h_s_cx_m_r_decomposition,
     gate_has_flows, gate_has_h_s_cx_m_r_decomposition, gate_has_tableau, gate_has_unitary_matrix,
     gate_tableau, gate_unitary_matrix, single_qubit_clifford_for_gate,
 };
-pub use resources::{CircuitPassStage, ResourceKind, ResourceLimitError, ResourceOperation};
+pub use resources::{CircuitPassStage, ResourceKind, ResourceLimitError};
 pub use tableau_circuit::tableau_to_circuit;
 
 /// Low-level lowering operations shared with compilation engines.

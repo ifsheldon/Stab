@@ -15,8 +15,9 @@ use super::{
     traversal::{FoldedDemTraversal, shifted_targets},
     values::{DetectorIndex, ObservableMask, SearchGraphKind},
 };
+use crate::AnalysisOperation;
 use crate::resources::LogicalErrorSearchResource;
-use crate::{AnalysisError, AnalysisResult, ResourceLimitError};
+use crate::{AnalysisError, AnalysisResult, NoLogicalErrorReport, ResourceLimitError};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Edge {
@@ -37,7 +38,10 @@ impl Edge {
             .len()
             .checked_add(self.observables.len())
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model("hypergraph edge term count overflowed")
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
+                    "hypergraph edge term count overflowed",
+                )
             })
     }
 }
@@ -54,7 +58,8 @@ impl Node {
             return Ok(false);
         }
         self.edge_ids.try_reserve(1).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::allocation_failed(
+                AnalysisOperation::LogicalErrorSearch,
                 "hypergraph search cannot allocate another edge incidence",
             )
         })?;
@@ -144,9 +149,10 @@ impl Graph {
         let node_count = detectors.len();
         let mut nodes = Vec::new();
         nodes.try_reserve_exact(node_count).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "hypergraph search cannot allocate {node_count} sparse detector nodes"
-            ))
+            AnalysisError::allocation_failed(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("hypergraph search cannot allocate {node_count} sparse detector nodes"),
+            )
         })?;
         nodes.resize(node_count, Node::default());
 
@@ -178,7 +184,8 @@ impl Graph {
                     graph.construction_budget.admit_adjacency(2)?;
                 }
                 let node = graph.nodes.get_mut(node_index).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::LogicalErrorSearch,
                         "hypergraph test node index is outside the graph",
                     )
                 })?;
@@ -192,9 +199,10 @@ impl Graph {
 
     fn edge(&self, edge_id: usize) -> AnalysisResult<&Edge> {
         self.edges.get(edge_id).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "hypergraph edge index {edge_id} is outside the edge arena"
-            ))
+            AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
+                format!("hypergraph edge index {edge_id} is outside the edge arena"),
+            )
         })
     }
 
@@ -210,7 +218,8 @@ impl Graph {
         let edge_id = self.edges.len();
         let stored_index_and_adjacency_terms =
             adjacency_stored_terms.checked_add(1).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
                     "hypergraph stored graph index count overflowed",
                 )
             })?;
@@ -220,7 +229,8 @@ impl Graph {
             stored_index_and_adjacency_terms,
         )?;
         self.edges.try_reserve(1).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::allocation_failed(
+                AnalysisOperation::LogicalErrorSearch,
                 "hypergraph search cannot allocate another edge",
             )
         })?;
@@ -278,7 +288,8 @@ impl Graph {
             .edge_incidences
             .checked_add(detectors.len())
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
                     "hypergraph edge incidence count overflowed",
                 )
             })?;
@@ -294,7 +305,8 @@ impl Graph {
         }
 
         let adjacency_stored_terms = detectors.len().checked_mul(2).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
                 "hypergraph stored edge incidence count overflowed",
             )
         })?;
@@ -307,14 +319,18 @@ impl Graph {
             countdown.tick(&cancellation)?;
             let index = self.node_index_for_detector(detector)?;
             let Some(node) = self.nodes.get_mut(index) else {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "hypergraph detector D{} is outside the graph",
-                    detector.get()
-                )));
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!(
+                        "hypergraph detector D{} is outside the graph",
+                        detector.get()
+                    ),
+                ));
             };
             let inserted = node.add_edge_id(edge_id)?;
             if !inserted {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::LogicalErrorSearch,
                     "hypergraph search inserted a new edge into the same detector twice",
                 ));
             }
@@ -345,7 +361,10 @@ impl Graph {
             limits,
         )?;
         let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-            AnalysisError::invalid_detector_error_model("observable count does not fit usize")
+            AnalysisError::count_overflow(
+                AnalysisOperation::LogicalErrorSearch,
+                "observable count does not fit usize",
+            )
         })?;
         let mut graph = Self::try_new_sparse_with_limits(
             effective_detectors,
@@ -402,7 +421,8 @@ impl SearchState {
             .len()
             .checked_add(self.observables.len())
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::LogicalErrorSearch,
                     "hypergraph search state term count overflowed",
                 )
             })
@@ -508,7 +528,8 @@ pub fn find_undetectable_logical_error_with_limits(
                 .len()
                 .checked_add(edge.observables.len())
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::LogicalErrorSearch,
                         "hypergraph initial search state term count overflowed",
                     )
                 })?;
@@ -517,7 +538,8 @@ pub fn find_undetectable_logical_error_with_limits(
             if !back_map.contains_key(&start) {
                 budget.admit_state(start_terms, 0, true)?;
                 if back_map.insert(start.clone(), empty.clone()).is_some() {
-                    return Err(AnalysisError::invalid_detector_error_model(
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::LogicalErrorSearch,
                         "hypergraph initial search state was inserted twice",
                     ));
                 }
@@ -529,13 +551,15 @@ pub fn find_undetectable_logical_error_with_limits(
     while let Some(current) = queue.pop_front() {
         budget.poll_cancellation()?;
         let Some(active) = current.detectors.iter().next().copied() else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "hypergraph search reached a state without an active detector",
             ));
         };
         let active_index = graph.node_index_for_detector(active)?;
         let Some(node) = graph.nodes.get(active_index) else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "hypergraph active detector is outside the graph",
             ));
         };
@@ -567,7 +591,8 @@ pub fn find_undetectable_logical_error_with_limits(
                         .symmetric_difference_len(&edge.observables),
                 )
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::LogicalErrorSearch,
                         "hypergraph next search state term count overflowed",
                     )
                 })?;
@@ -579,13 +604,15 @@ pub fn find_undetectable_logical_error_with_limits(
             let undetected = next.is_undetected();
             budget.admit_state(next_terms, current_terms, !undetected)?;
             if back_map.insert(next.clone(), current.clone()).is_some() {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::LogicalErrorSearch,
                     "hypergraph search state was inserted twice",
                 ));
             }
             if undetected {
                 if next.observables.is_empty() {
-                    return Err(AnalysisError::invalid_detector_error_model(
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::LogicalErrorSearch,
                         "hypergraph search reached an empty logical state unexpectedly",
                     ));
                 }
@@ -595,9 +622,7 @@ pub fn find_undetectable_logical_error_with_limits(
         }
     }
 
-    Err(AnalysisError::invalid_detector_error_model(
-        no_hypergraph_logical_error_message(model, &graph)?,
-    ))
+    Err(no_hypergraph_logical_error(model, &graph)?)
 }
 
 fn backtrack_path(
@@ -610,7 +635,8 @@ fn backtrack_path(
     loop {
         budget.poll_cancellation()?;
         let Some(previous) = back_map.get(&current) else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "hypergraph search backtracking reached an unknown state",
             ));
         };
@@ -629,7 +655,8 @@ fn sorted_error_model_with_cancelled_pairs(
     let mut instructions = Vec::new();
     for item in model.items() {
         let DemItem::Instruction(instruction) = item else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "hypergraph search produced a repeat block unexpectedly",
             ));
         };
@@ -656,27 +683,17 @@ fn sorted_error_model_with_cancelled_pairs(
     Ok(sorted)
 }
 
-fn no_hypergraph_logical_error_message(
+fn no_hypergraph_logical_error(
     model: &DetectorErrorModel,
     graph: &Graph,
-) -> AnalysisResult<String> {
-    let mut message = String::from("Failed to find any logical errors.");
-    if graph.num_observables == 0 {
-        message.push_str(
-            "\n    WARNING: NO OBSERVABLES. The circuit or detector error model didn't define any observables, making it vacuously impossible to find a logical error.",
-        );
-    }
-    if !graph.has_declared_detectors {
-        message.push_str(
-            "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.",
-        );
-    }
-    if model.count_errors()? == 0 {
-        message.push_str(
-            "\n    WARNING: NO ERRORS. The circuit or detector error model didn't include any errors, making it vacuously impossible to find a logical error.",
-        );
-    }
-    Ok(message)
+) -> AnalysisResult<AnalysisError> {
+    Ok(AnalysisError::NoLogicalErrorFound(
+        NoLogicalErrorReport::hypergraph(
+            graph.num_observables == 0,
+            !graph.has_declared_detectors,
+            model.count_errors()? == 0,
+        ),
+    ))
 }
 
 fn toggled_dem_targets(

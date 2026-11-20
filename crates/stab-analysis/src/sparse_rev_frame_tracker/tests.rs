@@ -13,7 +13,8 @@ use crate::{circuit_to_tableau, decomposed_circuit};
 
 fn measurement_record_count(circuit: &Circuit) -> AnalysisResult<usize> {
     usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::ReverseFrameTracking,
             "test circuit measurement count does not fit usize",
         )
     })
@@ -847,7 +848,7 @@ fn wide_product_merge_is_refused_before_it_outgrows_the_budget() {
             SparseReverseFrameTracker::new(TERMS, 1, DETECTORS, AnticommutationPolicy::Fail);
         if let Some(budget) = budget {
             tracker.set_memory_budget(
-                ResourceOperation::DetectingRegions,
+                AnalysisOperation::DetectingRegions,
                 ResourceKind::LiveStateUnits,
                 budget,
             );

@@ -1,6 +1,6 @@
 use stab_model::Probability;
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisResult, UnanalyzableNoise};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IndependentPauliProbabilities {
@@ -179,9 +179,7 @@ pub(super) fn depolarize1_independent_channel_probability(
     probability: Probability,
 ) -> AnalysisResult<Probability> {
     if probability.get() > 0.75 {
-        return Err(AnalysisError::invalid_detector_error_model(
-            "cannot analyze over-mixing DEPOLARIZE1 probability above 3/4",
-        ));
+        return Err(UnanalyzableNoise::OverMixingDepolarize1.into());
     }
     let root = (1.0 - (4.0 * probability.get()) / 3.0).sqrt();
     Ok(Probability::try_new((-0.5_f64).mul_add(root, 0.5))?)
@@ -191,9 +189,7 @@ pub(super) fn depolarize2_independent_channel_probability(
     probability: Probability,
 ) -> AnalysisResult<Probability> {
     if probability.get() > 15.0 / 16.0 {
-        return Err(AnalysisError::invalid_detector_error_model(
-            "cannot analyze over-mixing DEPOLARIZE2 probability above 15/16",
-        ));
+        return Err(UnanalyzableNoise::OverMixingDepolarize2.into());
     }
     let root = (1.0 - (16.0 * probability.get()) / 15.0).powf(0.125);
     Ok(Probability::try_new((-0.5_f64).mul_add(root, 0.5))?)

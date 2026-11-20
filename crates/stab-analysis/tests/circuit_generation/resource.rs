@@ -1,6 +1,6 @@
 use stab_analysis::{
-    CodeCircuitParams, CodeDistance, CodeTask, ColorCodeTask, GeneratedCircuit, RepetitionCodeTask,
-    RoundCount, SurfaceCodeTask,
+    AnalysisOperation, CodeCircuitParams, CodeDistance, CodeTask, ColorCodeTask, GeneratedCircuit,
+    GeneratorParameter, RepetitionCodeTask, ResourceKind, RoundCount, SurfaceCodeTask,
 };
 use stab_model::{CircuitItem, MemoryBudget, Probability};
 
@@ -48,7 +48,12 @@ fn assert_repetition_generation_boundary() {
         .expect("maximum repetition distance remains admissible");
     assert_eq!(generated.circuit().count_qubits(), 4093);
     assert_eq!(accepted.physical_qubit_count(), 4093);
-    super::assert_invalid_domain_value(CodeDistance::try_new(2048), "code distance", "2048");
+    super::assert_invalid_generator_parameter(
+        CodeDistance::try_new(2048),
+        GeneratorParameter::CodeDistance,
+        2048,
+        "invalid code distance value 2048",
+    );
 }
 
 fn params(task: CodeTask, distance: u32, rounds: u64) -> CodeCircuitParams {
@@ -120,10 +125,26 @@ fn assert_generation_boundary(task: CodeTask, accepted_distance: u32, rejected_d
 
     let rejected_qubits = physical_qubits(task, rejected_distance);
     assert!(rejected_qubits > BUDGET_QUBITS);
-    super::assert_invalid_domain_value(
-        params(task, rejected_distance, 2).generate(),
-        "generated circuit size",
-        &budget_refusal(rejected_qubits, family_name(task)),
+    let error = params(task, rejected_distance, 2)
+        .generate()
+        .expect_err("a generation beyond the budget is refused");
+    let resource = error
+        .resource_limit_error()
+        .expect("the generation budget refusal is a resource limit");
+    assert_eq!(resource.operation(), AnalysisOperation::CircuitGeneration);
+    assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
+    assert_eq!(
+        resource.actual(),
+        FIXED_BYTES + rejected_qubits * BYTES_PER_QUBIT
+    );
+    assert_eq!(resource.limit(), BUDGET.bytes());
+    assert!(resource.is_memory_budget());
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "invalid generated circuit size value {}",
+            budget_refusal(rejected_qubits, family_name(task))
+        )
     );
 }
 

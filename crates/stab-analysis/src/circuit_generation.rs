@@ -2,7 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use crate::{AnalysisError, AnalysisResult};
+use std::fmt::Display;
+
+use crate::{
+    AnalysisError, AnalysisOperation, AnalysisResult, GeneratorParameter, ResourceLimitError,
+};
 use stab_model::{
     Circuit, CircuitInstruction, CircuitItem, GateKind, MeasureRecordOffset, MemoryBudget,
     Probability, QubitId, RepeatBlock, RepeatCount, Target,
@@ -14,6 +18,28 @@ mod surface;
 mod task;
 #[cfg(test)]
 mod tests;
+
+/// Names the code family in a generation budget refusal.
+pub(crate) const fn budget_family_name(task: CodeTask) -> &'static str {
+    match task {
+        CodeTask::Repetition(_) => "repetition code",
+        CodeTask::Surface(SurfaceCodeTask::RotatedMemoryX | SurfaceCodeTask::RotatedMemoryZ) => {
+            "rotated surface code"
+        }
+        CodeTask::Surface(
+            SurfaceCodeTask::UnrotatedMemoryX | SurfaceCodeTask::UnrotatedMemoryZ,
+        ) => "unrotated surface code",
+        CodeTask::Color(_) => "color code",
+    }
+}
+
+/// A generator-internal value out of its range; [`CodeCircuitParams`] admission excludes it.
+pub(crate) fn generation_invariant(kind: &'static str, value: impl Display) -> AnalysisError {
+    AnalysisError::internal(
+        AnalysisOperation::CircuitGeneration,
+        format!("{kind} value {value}"),
+    )
+}
 
 pub use task::{
     CodeFamily, CodeTask, ColorCodeTask, RepetitionCodeTask, SurfaceCodeTask, UnknownCodeFamily,
@@ -38,7 +64,10 @@ pub struct CodeDistance(u32);
 impl CodeDistance {
     pub fn try_new(value: u32) -> AnalysisResult<Self> {
         if !(2..=2047).contains(&value) {
-            return Err(AnalysisError::invalid_domain_value("code distance", value));
+            return Err(AnalysisError::invalid_generator_parameter(
+                GeneratorParameter::CodeDistance,
+                u64::from(value),
+            ));
         }
         Ok(Self(value))
     }
@@ -54,7 +83,10 @@ pub struct RoundCount(u64);
 impl RoundCount {
     pub fn try_new(value: u64) -> AnalysisResult<Self> {
         if value == 0 {
-            return Err(AnalysisError::invalid_domain_value("round count", value));
+            return Err(AnalysisError::invalid_generator_parameter(
+                GeneratorParameter::RoundCount,
+                value,
+            ));
         }
         Ok(Self(value))
     }
@@ -94,15 +126,15 @@ impl CodeCircuitParams {
     ) -> AnalysisResult<Self> {
         if let CodeTask::Color(_) = task {
             if rounds.get() < 2 {
-                return Err(AnalysisError::invalid_domain_value(
-                    "color code round count",
+                return Err(AnalysisError::invalid_generator_parameter(
+                    GeneratorParameter::ColorCodeRoundCount,
                     rounds.get(),
                 ));
             }
             if distance.get() < 3 || distance.get().is_multiple_of(2) {
-                return Err(AnalysisError::invalid_domain_value(
-                    "color code distance",
-                    distance.get(),
+                return Err(AnalysisError::invalid_generator_parameter(
+                    GeneratorParameter::ColorCodeDistance,
+                    u64::from(distance.get()),
                 ));
             }
         }
@@ -225,24 +257,13 @@ impl CodeCircuitParams {
         if self.memory_budget.admits(u128::from(required)) {
             return Ok(());
         }
-        let family = match self.task {
-            CodeTask::Repetition(_) => "repetition code",
-            CodeTask::Surface(
-                SurfaceCodeTask::RotatedMemoryX | SurfaceCodeTask::RotatedMemoryZ,
-            ) => "rotated surface code",
-            CodeTask::Surface(
-                SurfaceCodeTask::UnrotatedMemoryX | SurfaceCodeTask::UnrotatedMemoryZ,
-            ) => "unrotated surface code",
-            CodeTask::Color(_) => "color code",
-        };
-        Err(AnalysisError::invalid_domain_value(
-            "generated circuit size",
-            format!(
-                "{} physical qubits for {family} need at least {required} bytes, exceeding the {}-byte memory budget; raise the memory budget to admit it",
-                self.physical_qubit_count(),
-                self.memory_budget.bytes()
-            ),
-        ))
+        Err(ResourceLimitError::generated_circuit(
+            self.task,
+            self.physical_qubit_count(),
+            required,
+            self.memory_budget.bytes(),
+        )
+        .into())
     }
 }
 
@@ -382,7 +403,7 @@ fn reset_gate(basis: char) -> AnalysisResult<GateKind> {
         'X' => Ok(GateKind::RX),
         'Y' => Ok(GateKind::RY),
         'Z' => Ok(GateKind::R),
-        _ => Err(AnalysisError::invalid_domain_value("reset basis", basis)),
+        _ => Err(generation_invariant("reset basis", basis)),
     }
 }
 
@@ -391,7 +412,7 @@ fn measure_gate(basis: char) -> AnalysisResult<GateKind> {
         'X' => Ok(GateKind::MX),
         'Y' => Ok(GateKind::MY),
         'Z' => Ok(GateKind::M),
-        _ => Err(AnalysisError::invalid_domain_value("measure basis", basis)),
+        _ => Err(generation_invariant("measure basis", basis)),
     }
 }
 
@@ -400,10 +421,7 @@ fn measure_reset_gate(basis: char) -> AnalysisResult<GateKind> {
         'X' => Ok(GateKind::MRX),
         'Y' => Ok(GateKind::MRY),
         'Z' => Ok(GateKind::MR),
-        _ => Err(AnalysisError::invalid_domain_value(
-            "measure-reset basis",
-            basis,
-        )),
+        _ => Err(generation_invariant("measure-reset basis", basis)),
     }
 }
 
@@ -532,7 +550,7 @@ fn qubit_targets(targets: &[u32]) -> AnalysisResult<Vec<Target>> {
 
 fn rec_target(offset: u32) -> AnalysisResult<Target> {
     let offset = i32::try_from(offset)
-        .map_err(|_| AnalysisError::invalid_domain_value("measurement record offset", offset))?;
+        .map_err(|_| generation_invariant("measurement record offset", offset))?;
     Ok(Target::measurement_record(MeasureRecordOffset::try_new(
         -offset,
     )?))

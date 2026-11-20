@@ -12,7 +12,7 @@ use stab_model::{
 
 use crate::folded_walk::walk_folded;
 use crate::{
-    AnalysisError, AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation,
+    AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError,
     sparse_rev_frame_tracker::{AnticommutationPolicy, SparseReverseFrameTracker},
 };
 /// The unrolled reversed buffer and the rebuilt output circuit each retain the expansion.
@@ -71,7 +71,8 @@ pub fn circuit_with_inlined_feedback_with_limits(
 ) -> AnalysisResult<Circuit> {
     validate_feedback_repeat_budget(circuit, limits.memory_budget())?;
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FeedbackInlining,
             "measurement count does not fit usize while inlining feedback",
         )
     })?;
@@ -84,7 +85,7 @@ pub fn circuit_with_inlined_feedback_with_limits(
     );
     tracker.set_cancellation(limits.cancellation().clone());
     tracker.set_memory_budget(
-        ResourceOperation::FeedbackInlining,
+        AnalysisOperation::FeedbackInlining,
         ResourceKind::MaterializedBytes,
         limits.memory_budget(),
     );
@@ -150,10 +151,14 @@ impl WithoutFeedbackHelper {
                 .iter()
                 .any(Target::is_classical_bit_target)
         {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "feedback inlining does not support {} with classical controls",
-                instruction.gate().canonical_name()
-            )));
+            return Err(AnalysisError::unsupported(
+                AnalysisOperation::FeedbackInlining,
+                instruction.gate().kind(),
+                format!(
+                    "feedback inlining does not support {} with classical controls",
+                    instruction.gate().canonical_name()
+                ),
+            ));
         }
         self.reversed_output
             .push(CircuitItem::Instruction(instruction.clone()));
@@ -192,10 +197,14 @@ impl WithoutFeedbackHelper {
                     }
                 }
                 ControlledPauliTargetPair::Unsupported => {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "{} has an unsupported controlled-Pauli target orientation during feedback inlining",
-                        instruction.gate().canonical_name()
-                    )));
+                    return Err(AnalysisError::unsupported(
+                        AnalysisOperation::FeedbackInlining,
+                        instruction.gate().kind(),
+                        format!(
+                            "{} has an unsupported controlled-Pauli target orientation during feedback inlining",
+                            instruction.gate().canonical_name()
+                        ),
+                    ));
                 }
             }
         }
@@ -229,9 +238,10 @@ impl WithoutFeedbackHelper {
                     );
                 }
                 DemTargetKind::Separator => {
-                    return Err(AnalysisError::invalid_detector_error_model(format!(
-                        "feedback sensitivity unexpectedly contained DEM target {target}"
-                    )));
+                    return Err(AnalysisError::internal(
+                        AnalysisOperation::FeedbackInlining,
+                        format!("feedback sensitivity unexpectedly contained DEM target {target}"),
+                    ));
                 }
             }
         }
@@ -286,14 +296,16 @@ impl WithoutFeedbackHelper {
                             ),
                         )
                         .ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
+                            AnalysisError::count_overflow(
+                                AnalysisOperation::FeedbackInlining,
                                 "measurement count overflowed while building feedback-free circuit",
                             )
                         })?;
                     if instruction.gate().kind() == GateKind::DETECTOR {
                         let detector_id = *detectors_in_past;
                         *detectors_in_past = detectors_in_past.checked_add(1).ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
+                            AnalysisError::count_overflow(
+                                AnalysisOperation::FeedbackInlining,
                                 "detector count overflowed while building feedback-free circuit",
                             )
                         })?;
@@ -355,7 +367,8 @@ fn fuse_identical_adjacent_loops(circuit: Circuit) -> AnalysisResult<Circuit> {
                         .repetitions
                         .checked_add(repeat.repeat_count().get())
                         .ok_or_else(|| {
-                            AnalysisError::invalid_detector_error_model(
+                            AnalysisError::count_overflow(
+                                AnalysisOperation::FeedbackInlining,
                                 "feedback inlining fused repeat count overflowed",
                             )
                         })?;
@@ -421,7 +434,7 @@ impl FeedbackRepeatBudget {
             .saturating_add(count.saturating_mul(FEEDBACK_RETAINED_COPIES));
         if !self.budget.admits(u128::from(actual)) {
             return Err(ResourceLimitError::memory_budget(
-                ResourceOperation::FeedbackInlining,
+                AnalysisOperation::FeedbackInlining,
                 ResourceKind::MaterializedBytes,
                 actual,
                 self.budget.bytes(),
@@ -435,7 +448,7 @@ impl FeedbackRepeatBudget {
 
 fn feedback_resource_error(resource: ResourceKind, actual: u64, limit: u64) -> AnalysisError {
     ResourceLimitError::fixed_operation(
-        ResourceOperation::FeedbackInlining,
+        AnalysisOperation::FeedbackInlining,
         resource,
         actual,
         limit,
@@ -489,9 +502,11 @@ fn rewritten_detector(
     let mut targets = changes.clone();
     for target in instruction.targets() {
         let offset = target.measurement_record_offset().ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "DETECTOR target {target} is not a measurement record"
-            ))
+            AnalysisError::unsupported(
+                AnalysisOperation::FeedbackInlining,
+                GateKind::DETECTOR,
+                format!("DETECTOR target {target} is not a measurement record"),
+            )
         })?;
         let index = absolute_record_index(measurements_in_past, offset)?;
         toggle_value(&mut targets, index);
@@ -523,7 +538,12 @@ fn detector_count(circuit: &Circuit) -> AnalysisResult<u64> {
     })?
     .detectors()
     .exact()
-    .ok_or_else(|| AnalysisError::invalid_detector_error_model("detector count overflowed"))
+    .ok_or_else(|| {
+        AnalysisError::count_overflow(
+            AnalysisOperation::FeedbackInlining,
+            "detector count overflowed",
+        )
+    })
 }
 
 fn instruction_with_targets(
@@ -540,10 +560,11 @@ fn instruction_with_targets(
 
 fn feedback_pauli(gate: Gate) -> AnalysisResult<Pauli> {
     gate.controlled_pauli().ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "{} is not a supported feedback gate",
-            gate.canonical_name()
-        ))
+        AnalysisError::unsupported(
+            AnalysisOperation::FeedbackInlining,
+            gate.kind(),
+            format!("{} is not a supported feedback gate", gate.canonical_name()),
+        )
     })
 }
 
@@ -552,25 +573,31 @@ fn absolute_record_index(
     offset: MeasureRecordOffset,
 ) -> AnalysisResult<usize> {
     let current = i64::try_from(measurements_in_past).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FeedbackInlining,
             "measurement count does not fit i64 while rewriting detector",
         )
     })?;
     let index = current
         .checked_add(i64::from(offset.get()))
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::count_overflow(
+                AnalysisOperation::FeedbackInlining,
                 "measurement record offset overflowed while rewriting detector",
             )
         })?;
     if index < 0 || index >= current {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "measurement record target rec[{}] is outside feedback rewrite history",
-            offset.stim_text()
-        )));
+        return Err(AnalysisError::record_out_of_range(
+            AnalysisOperation::FeedbackInlining,
+            format!(
+                "measurement record target rec[{}] is outside feedback rewrite history",
+                offset.stim_text()
+            ),
+        ));
     }
     usize::try_from(index).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FeedbackInlining,
             "measurement record index does not fit usize while rewriting detector",
         )
     })
@@ -581,25 +608,29 @@ fn relative_record_target(
     measurements_in_past: usize,
 ) -> AnalysisResult<Target> {
     let absolute = i64::try_from(absolute_index).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FeedbackInlining,
             "absolute measurement index does not fit i64 while rewriting detector",
         )
     })?;
     let current = i64::try_from(measurements_in_past).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FeedbackInlining,
             "measurement count does not fit i64 while rewriting detector",
         )
     })?;
     let offset = absolute.checked_sub(current).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(
+        AnalysisError::count_overflow(
+            AnalysisOperation::FeedbackInlining,
             "relative measurement offset overflowed while rewriting detector",
         )
     })?;
     Ok(Target::measurement_record(MeasureRecordOffset::try_new(
         i32::try_from(offset).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "relative measurement offset {offset} does not fit i32"
-            ))
+            AnalysisError::count_overflow(
+                AnalysisOperation::FeedbackInlining,
+                format!("relative measurement offset {offset} does not fit i32"),
+            )
         })?,
     )?))
 }
@@ -918,7 +949,7 @@ mod tests {
             validate_feedback_repeat_budget(&one_iteration, MemoryBudget::from_bytes(exact - 1))
                 .unwrap_err();
         let resource = error.resource_limit_error().unwrap();
-        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+        assert_eq!(resource.operation(), AnalysisOperation::FeedbackInlining);
         assert_eq!(resource.resource(), ResourceKind::MaterializedBytes);
         assert_eq!((resource.actual(), resource.limit()), (exact, exact - 1));
         assert!(error.to_string().contains("memory budget"), "{error}");
@@ -944,7 +975,7 @@ mod tests {
         }
         let error = validate_feedback_repeat_budget(&nested, MemoryBudget::DEFAULT).unwrap_err();
         let resource = error.resource_limit_error().unwrap();
-        assert_eq!(resource.operation(), ResourceOperation::FeedbackInlining);
+        assert_eq!(resource.operation(), AnalysisOperation::FeedbackInlining);
         assert_eq!(resource.resource(), ResourceKind::RepeatNesting);
         assert_eq!(resource.actual(), 257);
         assert_eq!(

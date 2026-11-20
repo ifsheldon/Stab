@@ -3,8 +3,9 @@ use std::collections::{BTreeMap, VecDeque, btree_map::Entry};
 use stab_model::{DemItem, DetectorErrorModel};
 
 use super::{Graph, ObservableMask, SearchState};
+use crate::AnalysisOperation;
 use crate::dem::search::budget::{LogicalErrorSearchLimits, SearchBudget};
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisResult, NoLogicalErrorReport};
 
 pub fn shortest_graphlike_undetectable_logical_error(
     model: &DetectorErrorModel,
@@ -56,7 +57,8 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
                     .checked_add(1)
                     .and_then(|count| count.checked_add(usize::from(edge.detector.is_some())))
                     .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
+                        AnalysisError::count_overflow(
+                            AnalysisOperation::LogicalErrorSearch,
                             "graphlike initial search state term count overflowed",
                         )
                     })?;
@@ -74,13 +76,15 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
     while let Some(current) = queue.pop_front() {
         budget.poll_cancellation()?;
         let Some(active) = current.detector_active else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "graphlike search reached a state without an active detector",
             ));
         };
         let active_index = graph.node_index_for_detector(active)?;
         let Some(node) = graph.nodes.get(active_index) else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "graphlike active detector is outside the graph",
             ));
         };
@@ -94,7 +98,8 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
                 .checked_add(usize::from(edge.detector.is_some()))
                 .and_then(|count| count.checked_add(usize::from(current.detector_held.is_some())))
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::count_overflow(
+                        AnalysisOperation::LogicalErrorSearch,
                         "graphlike next search state term count overflowed",
                     )
                 })?;
@@ -120,9 +125,7 @@ pub fn shortest_graphlike_undetectable_logical_error_with_limits(
         }
     }
 
-    Err(AnalysisError::invalid_detector_error_model(
-        no_graphlike_logical_error_message(model, &graph, &mut budget)?,
-    ))
+    Err(no_graphlike_logical_error(model, &graph, &mut budget)?)
 }
 
 fn backtrack_path(
@@ -135,7 +138,8 @@ fn backtrack_path(
     loop {
         budget.poll_cancellation()?;
         let Some(previous) = back_map.get(&current) else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "graphlike search backtracking reached an unknown state",
             ));
         };
@@ -152,7 +156,8 @@ fn sorted_error_model(model: DetectorErrorModel) -> AnalysisResult<DetectorError
     let mut instructions = Vec::new();
     for item in model.items() {
         let DemItem::Instruction(instruction) = item else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::LogicalErrorSearch,
                 "graphlike search produced a repeat block unexpectedly",
             ));
         };
@@ -167,32 +172,22 @@ fn sorted_error_model(model: DetectorErrorModel) -> AnalysisResult<DetectorError
     Ok(sorted)
 }
 
-fn no_graphlike_logical_error_message(
+fn no_graphlike_logical_error(
     model: &DetectorErrorModel,
     graph: &Graph,
     budget: &mut SearchBudget,
-) -> AnalysisResult<String> {
-    let mut message = String::from("Failed to find any graphlike logical errors.");
-    if graph.num_observables == 0 {
-        message.push_str(
-            "\n    WARNING: NO OBSERVABLES. The circuit or detector error model didn't define any observables, making it vacuously impossible to find a logical error.",
-        );
-    }
-    if !graph.has_declared_detectors {
-        message.push_str(
-            "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.",
-        );
-    }
-    if model.count_errors()? == 0 {
-        message.push_str(
-            "\n    WARNING: NO ERRORS. The circuit or detector error model didn't include any errors, making it vacuously impossible to find a logical error.",
-        );
-    } else if !graph_has_edges(graph, budget)? {
-        message.push_str(
-            "\n    WARNING: NO GRAPHLIKE ERRORS. Although the circuit or detector error model does define some errors, none of them are graphlike (i.e. have at most two detection events), making it vacuously impossible to find a graphlike logical error.",
-        );
-    }
-    Ok(message)
+) -> AnalysisResult<AnalysisError> {
+    let no_errors = model.count_errors()? == 0;
+    // Pinned Stim inspects the graph's edges only when the model has errors.
+    let no_graphlike_errors = !no_errors && !graph_has_edges(graph, budget)?;
+    Ok(AnalysisError::NoLogicalErrorFound(
+        NoLogicalErrorReport::graphlike(
+            graph.num_observables == 0,
+            !graph.has_declared_detectors,
+            no_errors,
+            no_graphlike_errors,
+        ),
+    ))
 }
 
 fn graph_has_edges(graph: &Graph, budget: &mut SearchBudget) -> AnalysisResult<bool> {

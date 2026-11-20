@@ -2,7 +2,7 @@ use stab_model::{DemTarget, MemoryBudget};
 
 use super::SparseReverseFrameTracker;
 use crate::target_xor_set::TargetXorSet;
-use crate::{AnalysisResult, ResourceKind, ResourceLimitError, ResourceOperation};
+use crate::{AnalysisOperation, AnalysisResult, ResourceKind, ResourceLimitError};
 
 pub(super) const SET_ENTRY_OVERHEAD_BYTES: u64 = size_of::<(u64, TargetXorSet)>() as u64;
 const GAUGE_SET_OVERHEAD_BYTES: u64 = size_of::<TargetXorSet>() as u64;
@@ -10,7 +10,7 @@ const TARGET_BYTES: u64 = size_of::<DemTarget>() as u64;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct TrackerBudgetPolicy {
-    operation: ResourceOperation,
+    operation: AnalysisOperation,
     resource: ResourceKind,
     budget: MemoryBudget,
 }
@@ -42,7 +42,7 @@ impl Eq for TrackerMeter {}
 impl TrackerMeter {
     pub(super) fn set_policy(
         &mut self,
-        operation: ResourceOperation,
+        operation: AnalysisOperation,
         resource: ResourceKind,
         budget: MemoryBudget,
     ) {

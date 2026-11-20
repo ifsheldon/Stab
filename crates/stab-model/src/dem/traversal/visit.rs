@@ -98,9 +98,7 @@ impl CoordinateShifts {
         if self.by_block.len() <= compact_id {
             let additional = compact_id - self.by_block.len() + 1;
             self.by_block.try_reserve(additional).map_err(|_| {
-                ModelError::invalid_detector_error_model(
-                    "DEM coordinate shift cache allocation failed",
-                )
+                ModelError::dem_allocation_failed("DEM coordinate shift cache allocation failed")
             })?;
             self.by_block.resize_with(compact_id + 1, || None);
         }

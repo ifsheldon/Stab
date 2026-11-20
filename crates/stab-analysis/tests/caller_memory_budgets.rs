@@ -9,8 +9,8 @@
 
 use stab_algebra::{Flow, PauliString};
 use stab_analysis::{
-    AnalysisError, FlowGeneratorOptions, InverseQecOptions, MissingDetectorOptions,
-    PauliConjugationOptions, ResourceKind, ResourceOperation, TimeReversedForFlowsOptions,
+    AnalysisError, AnalysisOperation, FlowGeneratorOptions, InverseQecOptions,
+    MissingDetectorOptions, PauliConjugationOptions, ResourceKind, TimeReversedForFlowsOptions,
     UnsignedFlowCheckOptions, all_detecting_region_targets_with_budget,
     all_detecting_region_ticks_with_budget, check_if_circuit_has_unsigned_stabilizer_flows,
     check_if_circuit_has_unsigned_stabilizer_flows_with_options,
@@ -28,7 +28,7 @@ fn circuit(text: &str) -> Circuit {
 
 fn assert_refused(
     error: AnalysisError,
-    operation: ResourceOperation,
+    operation: AnalysisOperation,
     resource: ResourceKind,
     required: u64,
     budget: MemoryBudget,
@@ -69,7 +69,7 @@ fn measurement_rich_time_reversal_takes_the_caller_budget() {
     let error = reverse(short).expect_err("one byte short");
     assert_refused(
         error,
-        ResourceOperation::TimeReversal,
+        AnalysisOperation::TimeReversal,
         ResourceKind::MaterializedBytes,
         required,
         short,
@@ -88,7 +88,7 @@ fn measurement_rich_time_reversal_takes_the_caller_budget() {
     };
     assert_refused(
         inverse_qec(short).expect_err("QEC inverse one byte short"),
-        ResourceOperation::TimeReversal,
+        AnalysisOperation::TimeReversal,
         ResourceKind::MaterializedBytes,
         required,
         short,
@@ -116,7 +116,7 @@ fn flow_generation_takes_the_caller_budget() {
         let short = MemoryBudget::from_bytes(required - 1);
         assert_refused(
             generate(text, short).expect_err("one byte short"),
-            ResourceOperation::FlowGeneration,
+            AnalysisOperation::FlowGeneration,
             ResourceKind::ProjectedPayloadBytes,
             required,
             short,
@@ -145,7 +145,7 @@ fn missing_detector_discovery_takes_the_caller_budget() {
     };
     assert_refused(
         discover(short).expect_err("one byte short"),
-        ResourceOperation::MissingDetectorDiscovery,
+        AnalysisOperation::MissingDetectorDiscovery,
         ResourceKind::ProjectedPayloadBytes,
         required,
         short,
@@ -181,7 +181,7 @@ fn detecting_region_helpers_take_the_caller_budget() {
     ] {
         assert_refused(
             refused.expect_err("one byte short"),
-            ResourceOperation::DetectingRegions,
+            AnalysisOperation::DetectingRegions,
             ResourceKind::MaterializedBytes,
             required,
             MemoryBudget::from_bytes(required - 1),
@@ -227,7 +227,7 @@ fn sparse_flow_checking_takes_the_caller_budget() {
             &options(required - 1),
         )
         .expect_err("one byte short"),
-        ResourceOperation::FlowCheck,
+        AnalysisOperation::FlowCheck,
         ResourceKind::MaterializedBytes,
         required,
         short,
@@ -239,7 +239,7 @@ fn sparse_flow_checking_takes_the_caller_budget() {
             &options(required - 1),
         )
         .expect_err("diagnostics one byte short"),
-        ResourceOperation::FlowCheck,
+        AnalysisOperation::FlowCheck,
         ResourceKind::MaterializedBytes,
         required,
         short,
@@ -289,7 +289,7 @@ fn sparse_flow_checking_takes_the_caller_budget() {
     let resource = error
         .resource_limit_error()
         .expect("typed live-state refusal");
-    assert_eq!(resource.operation(), ResourceOperation::FlowCheck);
+    assert_eq!(resource.operation(), AnalysisOperation::FlowCheck);
     assert_eq!(resource.resource(), ResourceKind::LiveStateUnits);
     assert_eq!(resource.limit(), 1024);
     assert!(resource.actual() > 1024);
@@ -325,7 +325,7 @@ fn pauli_conjugation_takes_the_caller_budget() {
     ] {
         assert_refused(
             conjugate(&pauli, &source, &options(required - 1)).expect_err("one byte short"),
-            ResourceOperation::PauliConjugation,
+            AnalysisOperation::PauliConjugation,
             ResourceKind::MaterializedBytes,
             required,
             MemoryBudget::from_bytes(required - 1),

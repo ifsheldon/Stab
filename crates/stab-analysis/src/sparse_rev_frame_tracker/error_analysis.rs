@@ -1,7 +1,7 @@
 use stab_model::{DemTarget, DemTargetKind, Pauli, QubitId};
 
 use crate::target_xor_set::TargetXorSet;
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisResult, NonDeterministicTargets};
 
 use super::{
     Anticommutation, AnticommutationPolicy, SparseReverseFrameTracker, TrackerBasis,
@@ -117,28 +117,13 @@ impl SparseReverseFrameTracker {
                 // observables are never eliminated even with gauge detectors
                 // allowed, and allowing gauge detectors suppresses only the
                 // detector line of the failure message.
-                let has_detectors = !self.eliminate_detector_gauges
-                    && gauge.iter().any(|target| target.is_detector());
-                let mut message = String::new();
-                if has_observables {
-                    message.push_str("The circuit contains non-deterministic observables.\n");
-                }
-                if has_detectors {
-                    message.push_str("The circuit contains non-deterministic detectors.\n");
-                }
-                message.push_str("The collapse anti-commuted with these detectors/observables:");
-                for target in &gauge {
-                    message.push_str("\n    ");
-                    message.push_str(&target.to_string());
-                }
-                return Err(AnalysisError::invalid_detector_error_model(message));
+                return Err(NonDeterministicTargets::error_analysis(
+                    gauge.iter().copied().collect(),
+                    !self.eliminate_detector_gauges,
+                )
+                .into());
             }
-            let mut message = String::from("collapse anti-commuted with tracked targets:");
-            for target in &gauge {
-                message.push_str("\n    ");
-                message.push_str(&target.to_string());
-            }
-            return Err(AnalysisError::invalid_detector_error_model(message));
+            return Err(NonDeterministicTargets::tracking(gauge.iter().copied().collect()).into());
         }
         self.check_live_budget_with_extra(super::budget::anticommutation_bytes(
             terms.len().saturating_mul(gauge.len()),

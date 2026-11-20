@@ -135,7 +135,7 @@ impl DetectorErrorModel {
 
     pub(crate) fn try_reserve_items_exact(&mut self, additional: usize) -> ModelResult<()> {
         self.items.try_reserve_exact(additional).map_err(|error| {
-            ModelError::invalid_detector_error_model(format!(
+            ModelError::dem_allocation_failed(format!(
                 "unable to reserve {additional} flattened instruction slots: {error}"
             ))
         })

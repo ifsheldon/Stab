@@ -4,7 +4,7 @@
 )]
 
 use stab_analysis::{
-    ResourceKind, ResourceOperation, find_undetectable_logical_error, likeliest_error_sat_problem,
+    AnalysisOperation, ResourceKind, find_undetectable_logical_error, likeliest_error_sat_problem,
     shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
 use stab_model::DetectorErrorModel;
@@ -121,7 +121,7 @@ fn pfm_b3_folded_traversal_sat() {
         let resource = error
             .resource_limit_error()
             .expect("typed SAT materialization error");
-        assert_eq!(resource.operation(), ResourceOperation::SatMaterialization);
+        assert_eq!(resource.operation(), AnalysisOperation::SatMaterialization);
         assert_eq!(resource.resource(), ResourceKind::ErrorMechanisms);
         assert_eq!(resource.actual(), 250_001);
         assert_eq!(resource.limit(), 250_000);

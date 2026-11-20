@@ -817,7 +817,7 @@ pub fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> ModelResu
     let mut shifted = Vec::new();
     shifted
         .try_reserve_exact(targets.len())
-        .map_err(|_| detector_summary_error("target allocation failed"))?;
+        .map_err(|_| ModelError::dem_allocation_failed("target allocation failed"))?;
     for target in targets {
         shifted.push(target.shifted(detector_offset)?);
     }
@@ -828,7 +828,7 @@ pub fn shifted_coordinates(coordinates: &[f64], coordinate_shift: &[f64]) -> Mod
     let mut shifted = Vec::new();
     shifted
         .try_reserve_exact(coordinates.len())
-        .map_err(|_| detector_summary_error("coordinate allocation failed"))?;
+        .map_err(|_| ModelError::dem_allocation_failed("coordinate allocation failed"))?;
     shifted.extend_from_slice(coordinates);
     for (index, coordinate) in shifted.iter_mut().enumerate() {
         if let Some(delta) = coordinate_shift.get(index) {

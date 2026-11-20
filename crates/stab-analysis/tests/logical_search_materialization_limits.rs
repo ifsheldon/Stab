@@ -5,7 +5,7 @@
 )]
 
 use stab_analysis::{
-    AnalysisResult, LogicalErrorSearchLimits, ResourceKind, ResourceOperation,
+    AnalysisOperation, AnalysisResult, LogicalErrorSearchLimits, ResourceKind,
     find_undetectable_logical_error, find_undetectable_logical_error_with_limits,
     shortest_graphlike_undetectable_logical_error,
     shortest_graphlike_undetectable_logical_error_with_limits,
@@ -57,7 +57,7 @@ fn assert_search_limit(
         .expect("logical-search rejection must retain typed resource context");
     assert_eq!(
         resource.operation(),
-        ResourceOperation::LogicalErrorSearch,
+        AnalysisOperation::LogicalErrorSearch,
         "{name}"
     );
     assert_eq!(resource.resource(), expected_resource, "{name}: {error}");

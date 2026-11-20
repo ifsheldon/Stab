@@ -610,7 +610,7 @@ fn pf6_dem_analyzer_no_recurrence_unrolls_within_the_memory_budget() {
     let resource = error.resource_limit_error().expect("typed resource limit");
     assert_eq!(
         resource.operation(),
-        stab_analysis::ResourceOperation::CircuitToDetectorErrorModel
+        stab_analysis::AnalysisOperation::CircuitToDetectorErrorModel
     );
     assert_eq!(
         resource.resource(),
@@ -667,7 +667,7 @@ fn pf6_dem_analyzer_no_recurrence_delayed_dependency_unrolls_within_the_memory_b
     let resource = error.resource_limit_error().expect("typed resource limit");
     assert_eq!(
         resource.operation(),
-        stab_analysis::ResourceOperation::CircuitToDetectorErrorModel
+        stab_analysis::AnalysisOperation::CircuitToDetectorErrorModel
     );
     assert_eq!(
         resource.resource(),

@@ -1,5 +1,6 @@
 use stab_model::{DemDetectorId, DemTarget, Probability};
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 /// Pinned Stim assigns each detector of a composite error one bit of a 16-bit local mask.
@@ -43,7 +44,9 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
                     .any(|seen| *seen == Some(detector))
             {
                 let slot = involved_detectors.get_mut(involved_count).ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::unsupported(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
+                        None,
                         "an error case in a composite error exceeded 16 detector symptoms",
                     )
                 })?;
@@ -54,10 +57,14 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
     }
 
     if combinations.len() > MAX_COMBINATIONS {
-        return Err(AnalysisError::invalid_detector_error_model(format!(
-            "composite error has {} combinations, more than the {MAX_COMBINATIONS} supported",
-            combinations.len()
-        )));
+        return Err(AnalysisError::unsupported(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            None,
+            format!(
+                "composite error has {} combinations, more than the {MAX_COMBINATIONS} supported",
+                combinations.len()
+            ),
+        ));
     }
     let mut detector_masks = [0_u64; MAX_COMBINATIONS];
     for (slot, targets) in detector_masks.iter_mut().zip(combinations.iter()).skip(1) {
@@ -69,7 +76,8 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
                     .take(involved_count)
                     .position(|seen| *seen == Some(detector))
                     .ok_or_else(|| {
-                        AnalysisError::invalid_detector_error_model(
+                        AnalysisError::internal(
+                            AnalysisOperation::CircuitToDetectorErrorModel,
                             "composite error detector has no local mask",
                         )
                     })?;
@@ -186,7 +194,8 @@ pub(super) fn locally_decompose_combinations<B: AsRef<[DemTarget]>>(
                 }
             }
             let Some((single, detector_mask)) = single_match else {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "composite error local decomposition left an unsolved detector",
                 ));
             };
@@ -243,7 +252,8 @@ pub(super) fn merge_indistinguishable_disjoint_probabilities(
     probabilities: &mut [Probability],
 ) -> AnalysisResult<()> {
     if targets.len() != probabilities.len() {
-        return Err(AnalysisError::invalid_detector_error_model(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::CircuitToDetectorErrorModel,
             "disjoint probability and target table lengths differ",
         ));
     }
@@ -285,9 +295,10 @@ pub(super) fn merge_indistinguishable_disjoint_probabilities(
 
 fn indexed<'a, T>(values: &'a [T], index: usize, context: &str) -> AnalysisResult<&'a T> {
     values.get(index).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "folded analyzer {context} index {index} is out of range"
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            format!("folded analyzer {context} index {index} is out of range"),
+        )
     })
 }
 
@@ -297,9 +308,10 @@ fn indexed_mut<'a, T>(
     context: &str,
 ) -> AnalysisResult<&'a mut T> {
     values.get_mut(index).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "folded analyzer {context} index {index} is out of range"
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            format!("folded analyzer {context} index {index} is out of range"),
+        )
     })
 }
 

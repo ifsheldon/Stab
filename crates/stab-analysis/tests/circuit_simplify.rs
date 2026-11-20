@@ -6,8 +6,8 @@
 
 use std::assert_matches;
 
-use stab_analysis::{AnalysisError, decomposed_circuit};
-use stab_model::{Circuit, CircuitItem};
+use stab_analysis::{AnalysisError, AnalysisOperation, decomposed_circuit};
+use stab_model::{Circuit, CircuitItem, GateKind};
 use std::ops::ControlFlow;
 
 #[test]
@@ -22,9 +22,13 @@ fn decomposed_circuit_reports_typed_anti_hermitian_failures() {
     let error = decomposed_circuit(&circuit("SPP X0*Z0\n")).expect_err("anti-Hermitian product");
     assert_matches!(
         error,
-        AnalysisError::InvalidCircuitSimplification { ref message }
-            if message.contains("anti-Hermitian")
+        AnalysisError::AntiHermitianPauliProduct {
+            operation: AnalysisOperation::CircuitSimplification,
+            gate: GateKind::SPP,
+            ..
+        }
     );
+    assert!(error.to_string().contains("anti-Hermitian"));
 }
 
 #[test]

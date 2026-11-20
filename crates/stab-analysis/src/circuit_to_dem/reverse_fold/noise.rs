@@ -1,7 +1,7 @@
 //! Error recording: turns each noise channel, noisy measurement, and correlated-error chain
 //! into independent error classes over the tracker's current sensitivities.
 
-use stab_model::{CircuitInstruction, DemTarget, Pauli, Probability, QubitId, Target};
+use stab_model::{CircuitInstruction, DemTarget, GateKind, Pauli, Probability, QubitId, Target};
 
 use super::ReverseFoldAnalyzer;
 use super::local_decomposition::{
@@ -13,7 +13,7 @@ use crate::circuit_to_dem::error_decomp::{
 };
 use crate::circuit_to_dem::try_disjoint_to_independent_xyz_errors;
 use crate::target_xor_set::xor_merge_into;
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ThresholdExcess};
 
 impl ReverseFoldAnalyzer<'_> {
     pub(super) fn record_measurement_errors(
@@ -29,10 +29,13 @@ impl ReverseFoldAnalyzer<'_> {
         }
         let end = self.tracker.measurement_count();
         let start = end.checked_sub(measurement_count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(format!(
-                "{} consumes more measurements than remain during folded error analysis",
-                instruction.gate().canonical_name()
-            ))
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
+                format!(
+                    "{} consumes more measurements than remain during folded error analysis",
+                    instruction.gate().canonical_name()
+                ),
+            )
         })?;
         let tag = self.errors.intern_tag(instruction.tag_bytes())?;
         for index in (start..end).rev() {
@@ -53,10 +56,14 @@ impl ReverseFoldAnalyzer<'_> {
         let tag = self.errors.intern_tag(instruction.tag_bytes())?;
         for target in instruction.targets() {
             let qubit = target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {target} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    instruction.gate().kind(),
+                    format!(
+                        "{} target {target} is not a qubit",
+                        instruction.gate().canonical_name()
+                    ),
+                )
             })?;
             self.tracker
                 .error_sensitivity_into(qubit, pauli, &mut self.scratch.sensitivity)?;
@@ -85,9 +92,10 @@ impl ReverseFoldAnalyzer<'_> {
         }
         let mut stacked = std::mem::take(&mut self.stacked_else_correlated);
         let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
-            return Err(AnalysisError::invalid_detector_error_model(
-                "ELSE_CORRELATED_ERROR requires approximate_disjoint_errors during error analysis",
-            ));
+            return Err(AnalysisError::NoiseRequiresApproximation {
+                gate: GateKind::ELSE_CORRELATED_ERROR,
+                excess: None,
+            });
         };
         let mut remaining = 1.0_f64;
         for &instruction in std::iter::once(&leading).chain(stacked.iter().rev()) {
@@ -96,17 +104,19 @@ impl ReverseFoldAnalyzer<'_> {
             };
             let actual = probability.get() * remaining;
             remaining *= 1.0 - probability.get();
-            if actual > threshold.get() {
-                return Err(AnalysisError::invalid_detector_error_model(format!(
-                    "CORRELATED_ERROR/ELSE_CORRELATED_ERROR block has a component probability '{actual}' larger than the approximate_disjoint_errors threshold of '{}'.",
-                    threshold.get()
-                )));
-            }
+            // Both factors lie in [0, 1], so the component is a probability.
             let actual = Probability::try_new(actual).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "ELSE_CORRELATED_ERROR chain produced an invalid component probability",
                 )
             })?;
+            if actual.get() > threshold.get() {
+                return Err(AnalysisError::NoiseRequiresApproximation {
+                    gate: GateKind::ELSE_CORRELATED_ERROR,
+                    excess: Some(ThresholdExcess::new(actual, threshold)),
+                });
+            }
             self.record_correlated_error(instruction, actual)?;
         }
         stacked.clear();
@@ -139,14 +149,16 @@ impl ReverseFoldAnalyzer<'_> {
         let Some(argument) = instruction.probability_argument()? else {
             return Ok(());
         };
-        self.validate_disjoint_threshold("HERALDED_ERASE", &[argument], false)?;
+        self.validate_disjoint_threshold(GateKind::HERALDED_ERASE, &[argument], false)?;
         let channel = Probability::try_new(argument.get() * 0.25).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "HERALDED_ERASE channel probability is invalid",
             )
         })?;
         let identity = Probability::try_new((1.0 - argument.get()).max(0.0)).map_err(|_| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "HERALDED_ERASE identity probability is invalid",
             )
         })?;
@@ -163,15 +175,17 @@ impl ReverseFoldAnalyzer<'_> {
             return Ok(());
         };
         let [hi, hx, hy, hz] = probabilities.as_slice() else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "HERALDED_PAULI_CHANNEL_1 expects four probability arguments",
             ));
         };
-        self.validate_disjoint_threshold("HERALDED_PAULI_CHANNEL_1", &probabilities, true)?;
+        self.validate_disjoint_threshold(GateKind::HERALDED_PAULI_CHANNEL_1, &probabilities, true)?;
         let identity =
             Probability::try_new((1.0 - hi.get() - hx.get() - hy.get() - hz.get()).max(0.0))
                 .map_err(|_| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
                         "HERALDED_PAULI_CHANNEL_1 identity probability is invalid",
                     )
                 })?;
@@ -188,19 +202,27 @@ impl ReverseFoldAnalyzer<'_> {
         channels: [Probability; 5],
     ) -> AnalysisResult<()> {
         let zero = Probability::try_new(0.0).map_err(|_| {
-            AnalysisError::invalid_detector_error_model("zero probability is invalid")
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
+                "zero probability is invalid",
+            )
         })?;
         for target in instruction.targets().iter().rev() {
             let qubit = target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{} target {target} is not a qubit",
-                    instruction.gate().canonical_name()
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    instruction.gate().kind(),
+                    format!(
+                        "{} target {target} is not a qubit",
+                        instruction.gate().canonical_name()
+                    ),
+                )
             })?;
             let herald = self.tracker.pop_record_sensitivity()?;
             self.load_bases(&[(qubit, Pauli::Z), (qubit, Pauli::X)])?;
             let herald_basis = self.scratch.bases.get_mut(2).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "heralded error basis slot is out of range",
                 )
             })?;
@@ -235,9 +257,11 @@ impl ReverseFoldAnalyzer<'_> {
         let independent = depolarize1_independent_channel_probability(probability)?;
         for target in instruction.targets() {
             let qubit = target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "DEPOLARIZE1 target {target} is not a qubit"
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::DEPOLARIZE1,
+                    format!("DEPOLARIZE1 target {target} is not a qubit"),
+                )
             })?;
             self.load_bases(&[(qubit, Pauli::Z), (qubit, Pauli::X)])?;
             self.record_error_combinations(
@@ -265,17 +289,23 @@ impl ReverseFoldAnalyzer<'_> {
         let independent = depolarize2_independent_channel_probability(probability)?;
         for group in instruction.target_groups() {
             let [left, right] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::DEPOLARIZE2,
                     "DEPOLARIZE2 expected paired qubit targets",
                 ));
             };
             let left = left.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::DEPOLARIZE2,
                     "DEPOLARIZE2 left target is not a qubit",
                 )
             })?;
             let right = right.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::DEPOLARIZE2,
                     "DEPOLARIZE2 right target is not a qubit",
                 )
             })?;
@@ -305,7 +335,8 @@ impl ReverseFoldAnalyzer<'_> {
             return Ok(());
         };
         let [x, y, z] = probabilities.as_slice() else {
-            return Err(AnalysisError::invalid_detector_error_model(
+            return Err(AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "PAULI_CHANNEL_1 expected three probabilities",
             ));
         };
@@ -313,13 +344,17 @@ impl ReverseFoldAnalyzer<'_> {
         let (ix, iy, iz, is_disjoint) = if let Some(independent) = independent {
             (independent.x, independent.y, independent.z, false)
         } else {
-            self.validate_disjoint_threshold("PAULI_CHANNEL_1", &probabilities, true)?;
+            self.validate_disjoint_threshold(GateKind::PAULI_CHANNEL_1, &probabilities, true)?;
             (*x, *y, *z, true)
         };
         let zero = Probability::try_new(0.0)?;
         for target in instruction.targets() {
             let qubit = target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model("PAULI_CHANNEL_1 target is not a qubit")
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::PAULI_CHANNEL_1,
+                    "PAULI_CHANNEL_1 target is not a qubit",
+                )
             })?;
             self.load_bases(&[(qubit, Pauli::X), (qubit, Pauli::Z)])?;
             self.record_error_combinations(
@@ -344,16 +379,19 @@ impl ReverseFoldAnalyzer<'_> {
         };
         // Pinned Stim validates before looking at the targets, so a target-less channel with two
         // or more non-zero components is refused without `approximate_disjoint_errors` too.
-        self.validate_disjoint_threshold("PAULI_CHANNEL_2", &probabilities, true)?;
+        self.validate_disjoint_threshold(GateKind::PAULI_CHANNEL_2, &probabilities, true)?;
         if instruction.targets().is_empty() {
             return Ok(());
         }
         let probabilities: [Probability; 15] =
             probabilities.try_into().map_err(|values: Vec<_>| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "PAULI_CHANNEL_2 expected 15 probabilities, got {}",
-                    values.len()
-                ))
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    format!(
+                        "PAULI_CHANNEL_2 expected 15 probabilities, got {}",
+                        values.len()
+                    ),
+                )
             })?;
         let zero = Probability::try_new(0.0)?;
         let mut table = [zero; 16];
@@ -366,17 +404,23 @@ impl ReverseFoldAnalyzer<'_> {
         }
         for group in instruction.target_groups() {
             let [left, right] = group else {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::PAULI_CHANNEL_2,
                     "PAULI_CHANNEL_2 expected paired qubit targets",
                 ));
             };
             let left = left.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::PAULI_CHANNEL_2,
                     "PAULI_CHANNEL_2 left target is not a qubit",
                 )
             })?;
             let right = right.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    GateKind::PAULI_CHANNEL_2,
                     "PAULI_CHANNEL_2 right target is not a qubit",
                 )
             })?;
@@ -403,7 +447,7 @@ impl ReverseFoldAnalyzer<'_> {
     /// independent error, so it needs neither `approximate_disjoint_errors` nor the threshold.
     fn validate_disjoint_threshold(
         &self,
-        gate_name: &str,
+        gate: GateKind,
         probabilities: &[Probability],
         allow_single_component: bool,
     ) -> AnalysisResult<()> {
@@ -417,19 +461,16 @@ impl ReverseFoldAnalyzer<'_> {
             return Ok(());
         }
         let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "{gate_name} requires approximate_disjoint_errors during error analysis"
-            )));
+            return Err(AnalysisError::NoiseRequiresApproximation { gate, excess: None });
         };
         if let Some(probability) = probabilities
             .iter()
             .find(|probability| probability.get() > threshold.get())
         {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "{gate_name} has a probability argument ({}) larger than the approximate_disjoint_errors threshold ({})",
-                probability.get(),
-                threshold.get()
-            )));
+            return Err(AnalysisError::NoiseRequiresApproximation {
+                gate,
+                excess: Some(ThresholdExcess::new(*probability, threshold)),
+            });
         }
         Ok(())
     }
@@ -438,7 +479,8 @@ impl ReverseFoldAnalyzer<'_> {
     fn load_bases(&mut self, errors: &[(QubitId, Pauli)]) -> AnalysisResult<()> {
         for (index, &(qubit, pauli)) in errors.iter().enumerate() {
             let basis = self.scratch.bases.get_mut(index).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "composite error basis index is out of range",
                 )
             })?;
@@ -458,23 +500,29 @@ impl ReverseFoldAnalyzer<'_> {
     ) -> AnalysisResult<()> {
         let combination_count = 1_usize
             .checked_shl(u32::try_from(basis_count).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "composite error basis count does not fit u32",
                 )
             })?)
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "composite error combination count overflowed",
                 )
             })?;
         if probabilities.len() != combination_count {
-            return Err(AnalysisError::invalid_detector_error_model(format!(
-                "composite error expected {combination_count} probabilities, got {}",
-                probabilities.len()
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
+                format!(
+                    "composite error expected {combination_count} probabilities, got {}",
+                    probabilities.len()
+                ),
+            ));
         }
         let bases = self.scratch.bases.get(..basis_count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "composite error basis index is out of range",
             )
         })?;
@@ -483,7 +531,8 @@ impl ReverseFoldAnalyzer<'_> {
             combinations.resize_with(combination_count, Vec::new);
         }
         let combinations = combinations.get_mut(..combination_count).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "composite error target index is out of range",
             )
         })?;
@@ -494,18 +543,21 @@ impl ReverseFoldAnalyzer<'_> {
             let bit = mask.trailing_zeros() as usize;
             let previous = mask & (mask - 1);
             let basis = bases.get(bit).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "composite error basis index is out of range",
                 )
             })?;
             let (earlier, later) = combinations.split_at_mut(mask);
             let previous = earlier.get(previous).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "composite error predecessor is out of range",
                 )
             })?;
             let slot = later.first_mut().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "composite error target index is out of range",
                 )
             })?;
@@ -543,14 +595,18 @@ impl ReverseFoldAnalyzer<'_> {
                 continue;
             }
             let pauli = target.pauli_type().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "correlated error target {target} is not a Pauli target"
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    None,
+                    format!("correlated error target {target} is not a Pauli target"),
+                )
             })?;
             let qubit = target.qubit_id().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "correlated error target {target} does not identify a qubit"
-                ))
+                AnalysisError::unsupported(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                    None,
+                    format!("correlated error target {target} does not identify a qubit"),
+                )
             })?;
             self.tracker
                 .error_sensitivity_into(qubit, pauli, &mut self.scratch.sensitivity)?;

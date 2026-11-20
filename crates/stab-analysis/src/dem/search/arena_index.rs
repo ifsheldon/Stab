@@ -3,6 +3,7 @@ use std::hash::{BuildHasher, Hash};
 
 use hashbrown::HashTable;
 
+use crate::AnalysisOperation;
 use crate::{AnalysisError, AnalysisResult};
 
 #[derive(Clone, Debug)]
@@ -56,9 +57,10 @@ impl ArenaIndex {
                     .map_or(0, |value| hash_builder.hash_one(value))
             })
             .map_err(|_| {
-                AnalysisError::invalid_detector_error_model(format!(
-                    "{context} cannot allocate another arena index entry"
-                ))
+                AnalysisError::allocation_failed(
+                    AnalysisOperation::LogicalErrorSearch,
+                    format!("{context} cannot allocate another arena index entry"),
+                )
             })
     }
 

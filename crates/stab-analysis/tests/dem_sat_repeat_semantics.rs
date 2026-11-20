@@ -7,7 +7,7 @@
 use std::collections::BTreeSet;
 
 use stab_analysis::{
-    AnalysisResult, ResourceKind, ResourceOperation, SatMaterializationLimits,
+    AnalysisOperation, AnalysisResult, ResourceKind, SatMaterializationLimits,
     likeliest_error_sat_problem, likeliest_error_sat_problem_with_limits,
 };
 use stab_model::DetectorErrorModel;
@@ -228,7 +228,7 @@ fn likeliest_wcnf_repeat_semantics_match_direct_exhaustion() -> AnalysisResult<(
     let resource = first_excess
         .resource_limit_error()
         .expect("typed aggregate repeat-iteration error");
-    assert_eq!(resource.operation(), ResourceOperation::SatMaterialization);
+    assert_eq!(resource.operation(), AnalysisOperation::SatMaterialization);
     assert_eq!(resource.resource(), ResourceKind::RepeatIterations);
     assert_eq!(resource.actual(), 100_001);
     assert_eq!(resource.limit(), 100_000);

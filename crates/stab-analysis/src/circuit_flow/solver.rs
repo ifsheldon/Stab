@@ -1,7 +1,8 @@
 use stab_algebra::{Flow, PauliBasis, PauliString};
 use stab_model::Circuit;
 
-use crate::{AnalysisError, AnalysisResult};
+use crate::AnalysisOperation;
+use crate::{AnalysisError, AnalysisRequestError, AnalysisResult};
 
 use super::circuit_flow_generators;
 
@@ -29,9 +30,7 @@ pub fn solve_for_flow_measurements(
 fn validate_non_empty_flow_queries(flows: &[Flow]) -> AnalysisResult<()> {
     for flow in flows {
         if flow.input().has_no_pauli_terms() && flow.output().has_no_pauli_terms() {
-            return Err(AnalysisError::invalid_tableau_conversion(
-                "solve_for_flow_measurements only supports flows with non-empty Pauli input or output",
-            ));
+            return Err(AnalysisRequestError::EmptyFlowQuery.into());
         }
     }
     Ok(())
@@ -112,7 +111,8 @@ fn add_basis_row(
     }
     if let Some(pivot) = row.pivot() {
         let slot = basis.get_mut(pivot).ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(
+            AnalysisError::internal(
+                AnalysisOperation::FlowMeasurementSolving,
                 "flow solver pivot row is outside the basis table",
             )
         })?;

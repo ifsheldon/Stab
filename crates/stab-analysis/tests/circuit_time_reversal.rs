@@ -196,7 +196,7 @@ fn time_reversal_admits_measurement_rich_repeat_expansion_against_the_memory_bud
         .expect("typed time-reversal budget refusal");
     assert_eq!(
         resource.operation(),
-        stab_analysis::ResourceOperation::TimeReversal
+        stab_analysis::AnalysisOperation::TimeReversal
     );
     assert_eq!(resource.limit(), stab_model::MemoryBudget::DEFAULT.bytes());
     assert!(error.to_string().contains("memory budget"), "{error}");

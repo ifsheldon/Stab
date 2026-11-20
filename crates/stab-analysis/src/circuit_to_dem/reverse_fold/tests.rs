@@ -41,7 +41,7 @@ fn analyzer_output_is_admitted_against_the_memory_budget_for_folded_and_unrolled
         let resource = error.resource_limit_error().expect("typed budget refusal");
         assert_eq!(
             resource.operation(),
-            crate::ResourceOperation::CircuitToDetectorErrorModel
+            crate::AnalysisOperation::CircuitToDetectorErrorModel
         );
         assert_eq!(resource.resource(), crate::ResourceKind::MaterializedBytes);
         assert_eq!(resource.limit(), low - 1);
@@ -90,7 +90,7 @@ fn error_accumulator_admits_live_classes_before_flushing_to_dem() {
         .expect("typed accumulator budget refusal");
     assert_eq!(
         resource.operation(),
-        crate::ResourceOperation::CircuitToDetectorErrorModel
+        crate::AnalysisOperation::CircuitToDetectorErrorModel
     );
     assert_eq!(resource.resource(), crate::ResourceKind::MaterializedBytes);
     assert_eq!(resource.limit(), tight.bytes());

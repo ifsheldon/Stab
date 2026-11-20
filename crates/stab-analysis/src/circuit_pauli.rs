@@ -8,8 +8,8 @@ use stab_model::{
 };
 
 use crate::{
-    AnalysisError, AnalysisResult, CircuitToTableauOptions, ResourceKind, ResourceLimitError,
-    ResourceOperation, circuit_to_tableau_with_options,
+    AnalysisError, AnalysisOperation, AnalysisResult, CircuitToTableauOptions, PauliCollapse,
+    ResourceKind, ResourceLimitError, circuit_to_tableau_with_options,
 };
 
 /// Options for [`pauli_after_circuit_with_options`] and [`pauli_before_circuit_with_options`].
@@ -40,7 +40,7 @@ pub fn pauli_after_circuit(pauli: &PauliString, circuit: &Circuit) -> AnalysisRe
 ///
 /// Returns [`AnalysisError::Cancelled`] once the options' signal is observed,
 /// [`AnalysisError::ResourceLimit`] when the conjugated string exceeds the budget, and
-/// [`AnalysisError::InvalidTableauConversion`] when the observable is not well defined after the
+/// [`AnalysisError::PauliNotPreserved`] when the observable is not well defined after the
 /// circuit.
 pub fn pauli_after_circuit_with_options(
     pauli: &PauliString,
@@ -139,11 +139,14 @@ fn validate_compact_pauli_circuit(
                     if let Some(qubit) = target.qubit_id()
                         && qubit.get() as usize >= width
                     {
-                        return Err(AnalysisError::invalid_tableau_conversion(format!(
-                            "{} targets qubit {} outside Pauli width {width}",
-                            instruction.gate().canonical_name(),
-                            qubit.get()
-                        )));
+                        return Err(AnalysisError::internal(
+                            AnalysisOperation::PauliConjugation,
+                            format!(
+                                "{} targets qubit {} outside Pauli width {width}",
+                                instruction.gate().canonical_name(),
+                                qubit.get()
+                            ),
+                        ));
                     }
                 }
             }
@@ -433,8 +436,10 @@ fn apply_unitary_instruction(
     inverse: bool,
 ) -> AnalysisResult<()> {
     if instruction.gate().category() == GateCategory::PauliProduct {
-        let decomposed = crate::advanced::decomposed_single_instruction(instruction)
-            .map_err(|error| AnalysisError::invalid_tableau_conversion(error.to_string()))?;
+        let decomposed =
+            crate::advanced::decomposed_single_instruction(instruction).map_err(|error| {
+                error.into_nested_pauli_product_error(AnalysisOperation::PauliConjugation)
+            })?;
         if inverse {
             for piece in decomposed.iter_flattened_instructions_reverse() {
                 apply_unitary_instruction(pauli, piece, true)?;
@@ -467,18 +472,25 @@ fn apply_unitary_instruction(
                         Pauli::Y => PauliBasis::Y,
                         Pauli::Z => PauliBasis::Z,
                     };
-                    let target = target.get() as usize;
-                    if anticommutes(pauli_basis(pauli, target)?, conditional_basis) {
-                        return Err(AnalysisError::invalid_tableau_conversion(format!(
-                            "Pauli observable is affected by classically controlled {gate_name} on qubit {target}"
-                        )));
+                    if anticommutes(
+                        pauli_basis(pauli, target.get() as usize)?,
+                        conditional_basis,
+                    ) {
+                        return Err(AnalysisError::pauli_not_preserved(
+                            instruction.gate().kind(),
+                            PauliCollapse::ClassicallyControlled { qubit: target },
+                        ));
                     }
                 }
                 ControlledPauliTargetPair::ClassicalNoop { .. } => {}
                 ControlledPauliTargetPair::Unsupported => {
-                    return Err(AnalysisError::invalid_tableau_conversion(format!(
-                        "{gate_name} has an unsupported controlled-Pauli target orientation"
-                    )));
+                    return Err(AnalysisError::unsupported(
+                        AnalysisOperation::PauliConjugation,
+                        instruction.gate().kind(),
+                        format!(
+                            "{gate_name} has an unsupported controlled-Pauli target orientation"
+                        ),
+                    ));
                 }
             }
         } else {
@@ -486,9 +498,11 @@ fn apply_unitary_instruction(
                 .iter()
                 .map(|target| {
                     target.qubit_id().ok_or_else(|| {
-                        AnalysisError::invalid_tableau_conversion(format!(
-                            "{gate_name} target {target} is not a qubit"
-                        ))
+                        AnalysisError::unsupported(
+                            AnalysisOperation::PauliConjugation,
+                            instruction.gate().kind(),
+                            format!("{gate_name} target {target} is not a qubit"),
+                        )
                     })
                 })
                 .collect::<AnalysisResult<Vec<_>>>()?;
@@ -508,11 +522,14 @@ fn apply_local_tableau_group(
     output_sign: &mut stab_algebra::PauliSign,
 ) -> AnalysisResult<()> {
     if tableau.len() != targets.len() {
-        return Err(AnalysisError::invalid_tableau_conversion(format!(
-            "gate tableau width {} does not match {} target(s)",
-            tableau.len(),
-            targets.len()
-        )));
+        return Err(AnalysisError::internal(
+            AnalysisOperation::PauliConjugation,
+            format!(
+                "gate tableau width {} does not match {} target(s)",
+                tableau.len(),
+                targets.len()
+            ),
+        ));
     }
     for (index, target) in targets.iter().enumerate() {
         if targets
@@ -520,10 +537,10 @@ fn apply_local_tableau_group(
             .take(index)
             .any(|previous| previous == target)
         {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "gate tableau target qubit {} is repeated",
-                target.get()
-            )));
+            return Err(AnalysisError::internal(
+                AnalysisOperation::PauliConjugation,
+                format!("gate tableau target qubit {} is repeated", target.get()),
+            ));
         }
     }
     let local_input = PauliString::from_bases(
@@ -540,7 +557,8 @@ fn apply_local_tableau_group(
     }
     for (index, target) in targets.iter().enumerate() {
         let basis = local_output.get(index).ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(
+            AnalysisError::internal(
+                AnalysisOperation::PauliConjugation,
                 "local tableau output was narrower than its target group",
             )
         })?;
@@ -593,7 +611,8 @@ fn apply_tableau_at_width(
     .map_err(map_tableau_error)?;
     let output = tableau.apply(&padded).map_err(map_tableau_error)?;
     if (pauli.len()..output.len()).any(|index| output.get(index) != Some(PauliBasis::I)) {
-        return Err(AnalysisError::invalid_tableau_conversion(
+        return Err(AnalysisError::internal(
+            AnalysisOperation::PauliConjugation,
             "Pauli conjugation produced support outside the input width",
         ));
     }
@@ -610,12 +629,12 @@ fn check_reset_avoided(
     instruction: &CircuitInstruction,
 ) -> AnalysisResult<()> {
     for target in instruction.targets() {
-        let index = target_qubit_index(instruction, target)?;
-        if pauli.get(index) != Some(PauliBasis::I) {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "Pauli observable touches reset {} at qubit {index}",
-                instruction.gate().canonical_name()
-            )));
+        let qubit = target_qubit(instruction, target)?;
+        if pauli.get(qubit.get() as usize) != Some(PauliBasis::I) {
+            return Err(AnalysisError::pauli_not_preserved(
+                instruction.gate().kind(),
+                PauliCollapse::TouchesReset { qubit },
+            ));
         }
     }
     Ok(())
@@ -624,16 +643,16 @@ fn check_reset_avoided(
 fn undo_reset(pauli: &mut PauliString, instruction: &CircuitInstruction) -> AnalysisResult<()> {
     let measured_basis = single_result_basis(instruction)?;
     for target in instruction.targets() {
-        let index = target_qubit_index(instruction, target)?;
-        if anticommutes(pauli_basis(pauli, index)?, measured_basis) {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "Pauli observable anticommutes with reset {} at qubit {index}",
-                instruction.gate().canonical_name()
-            )));
+        let qubit = target_qubit(instruction, target)?;
+        if anticommutes(pauli_basis(pauli, qubit.get() as usize)?, measured_basis) {
+            return Err(AnalysisError::pauli_not_preserved(
+                instruction.gate().kind(),
+                PauliCollapse::AnticommutesWithReset { qubit },
+            ));
         }
     }
     for target in instruction.targets() {
-        let index = target_qubit_index(instruction, target)?;
+        let index = target_qubit(instruction, target)?.get() as usize;
         pauli.set(index, PauliBasis::I).map_err(map_tableau_error)?;
     }
     Ok(())
@@ -645,12 +664,12 @@ fn check_measurement_commutes(
 ) -> AnalysisResult<()> {
     let measured_basis = single_result_basis(instruction)?;
     for target in instruction.targets() {
-        let index = target_qubit_index(instruction, target)?;
-        if anticommutes(pauli_basis(pauli, index)?, measured_basis) {
-            return Err(AnalysisError::invalid_tableau_conversion(format!(
-                "Pauli observable anticommutes with measurement {} at qubit {index}",
-                instruction.gate().canonical_name()
-            )));
+        let qubit = target_qubit(instruction, target)?;
+        if anticommutes(pauli_basis(pauli, qubit.get() as usize)?, measured_basis) {
+            return Err(AnalysisError::pauli_not_preserved(
+                instruction.gate().kind(),
+                PauliCollapse::AnticommutesWithMeasurement { qubit },
+            ));
         }
     }
     Ok(())
@@ -676,8 +695,9 @@ fn check_mpp_commutes(pauli: &PauliString, instruction: &CircuitInstruction) -> 
             group_anticommutes ^= anticommutes(pauli_basis(pauli, id.get() as usize)?, basis);
         }
         if group_anticommutes {
-            return Err(AnalysisError::invalid_tableau_conversion(
-                "Pauli observable anticommutes with an MPP measurement",
+            return Err(AnalysisError::pauli_not_preserved(
+                instruction.gate().kind(),
+                PauliCollapse::AnticommutesWithProductMeasurement,
             ));
         }
     }
@@ -689,31 +709,35 @@ fn single_result_basis(instruction: &CircuitInstruction) -> AnalysisResult<Pauli
         Some(Pauli::Z) => Ok(PauliBasis::Z),
         Some(Pauli::X) => Ok(PauliBasis::X),
         Some(Pauli::Y) => Ok(PauliBasis::Y),
-        None => Err(AnalysisError::invalid_tableau_conversion(format!(
-            "{} does not have a single-result Pauli basis",
-            instruction.gate().canonical_name()
-        ))),
+        None => Err(AnalysisError::internal(
+            AnalysisOperation::PauliConjugation,
+            format!(
+                "{} does not have a single-result Pauli basis",
+                instruction.gate().canonical_name()
+            ),
+        )),
     }
 }
 
-fn target_qubit_index(instruction: &CircuitInstruction, target: &Target) -> AnalysisResult<usize> {
-    target
-        .qubit_id()
-        .map(|id| id.get() as usize)
-        .ok_or_else(|| {
-            AnalysisError::invalid_tableau_conversion(format!(
+fn target_qubit(instruction: &CircuitInstruction, target: &Target) -> AnalysisResult<QubitId> {
+    target.qubit_id().ok_or_else(|| {
+        AnalysisError::unsupported(
+            AnalysisOperation::PauliConjugation,
+            instruction.gate().kind(),
+            format!(
                 "{} target {target} is not a qubit",
                 instruction.gate().canonical_name()
-            ))
-        })
+            ),
+        )
+    })
 }
 
 fn pauli_basis(pauli: &PauliString, index: usize) -> AnalysisResult<PauliBasis> {
     pauli.get(index).ok_or_else(|| {
-        AnalysisError::invalid_tableau_conversion(format!(
-            "qubit {index} is outside Pauli width {}",
-            pauli.len()
-        ))
+        AnalysisError::internal(
+            AnalysisOperation::PauliConjugation,
+            format!("qubit {index} is outside Pauli width {}", pauli.len()),
+        )
     })
 }
 
@@ -730,10 +754,14 @@ fn toggled_sign(sign: stab_algebra::PauliSign) -> stab_algebra::PauliSign {
 }
 
 fn unsupported_instruction(instruction: &CircuitInstruction, direction: &str) -> AnalysisError {
-    AnalysisError::invalid_tableau_conversion(format!(
-        "Pauli conjugation {direction} {} is not defined",
-        instruction.gate().canonical_name()
-    ))
+    AnalysisError::unsupported(
+        AnalysisOperation::PauliConjugation,
+        instruction.gate().kind(),
+        format!(
+            "Pauli conjugation {direction} {} is not defined",
+            instruction.gate().canonical_name()
+        ),
+    )
 }
 
 /// Maps algebra failures, reporting a conjugated string the budget refuses as a resource error.
@@ -744,12 +772,12 @@ fn map_tableau_error(error: StabilizerError) -> AnalysisError {
             budget_bytes,
             ..
         } => ResourceLimitError::memory_budget(
-            ResourceOperation::PauliConjugation,
+            AnalysisOperation::PauliConjugation,
             ResourceKind::MaterializedBytes,
             u64::try_from(requested_bytes).unwrap_or(u64::MAX),
             budget_bytes,
         )
         .into(),
-        other => AnalysisError::invalid_tableau_conversion(other.to_string()),
+        other => AnalysisError::internal(AnalysisOperation::PauliConjugation, other.to_string()),
     }
 }

@@ -6,6 +6,7 @@ use stab_model::{
 };
 
 use super::ReverseFoldAnalyzer;
+use crate::AnalysisOperation;
 use crate::sparse_rev_frame_tracker::SparseReverseFrameTracker;
 use crate::{AnalysisError, AnalysisResult};
 
@@ -52,17 +53,20 @@ impl<'c> ReverseFoldAnalyzer<'c> {
                 .cycle_end_iterations
                 .checked_sub(tortoise_iterations)
                 .ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
+                    AnalysisError::internal(
+                        AnalysisOperation::CircuitToDetectorErrorModel,
                         "folded analyzer recurrence period underflowed",
                     )
                 })?;
             if period == 0 {
-                return Err(AnalysisError::invalid_detector_error_model(
+                return Err(AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "folded analyzer recurrence period was zero",
                 ));
             }
             let remaining = iterations.checked_sub(tortoise_iterations).ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "folded analyzer repeat remainder underflowed",
                 )
             })?;
@@ -80,7 +84,8 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         }
 
         let remaining = iterations.checked_sub(tortoise_iterations).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "folded analyzer repeat remainder underflowed",
             )
         })?;
@@ -173,7 +178,8 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         self.flush()?;
         let outer_reversed = std::mem::take(&mut self.reversed_model);
         let skipped_periods = period_repetitions.checked_sub(1).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "folded analyzer skipped period count underflowed",
             )
         })?;
@@ -185,7 +191,8 @@ impl<'c> ReverseFoldAnalyzer<'c> {
             checked_product_u64(detectors_per_period, skipped_periods, "detector skip")?;
         self.tracker.shift_counts(
             -i128::try_from(skipped_measurements).map_err(|_| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::count_overflow(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "folded analyzer measurement skip does not fit i128",
                 )
             })?,
@@ -208,7 +215,8 @@ impl<'c> ReverseFoldAnalyzer<'c> {
         let remaining_shift = detectors_per_period
             .checked_sub(nested_shift)
             .ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
+                AnalysisError::internal(
+                    AnalysisOperation::CircuitToDetectorErrorModel,
                     "folded analyzer nested detector shifts exceed the period delta",
                 )
             })?;
@@ -260,7 +268,8 @@ fn found(
         .measurement_count()
         .checked_sub(hare.measurement_count())
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "folded analyzer measurement period underflowed",
             )
         })?;
@@ -268,7 +277,8 @@ fn found(
         .detector_count()
         .checked_sub(hare.detector_count())
         .ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model(
+            AnalysisError::internal(
+                AnalysisOperation::CircuitToDetectorErrorModel,
                 "folded analyzer detector period underflowed",
             )
         })?;
@@ -291,7 +301,10 @@ fn prepend_detector_shift(
         && let Some(existing_shift) = instruction.detector_shift()
     {
         let combined = existing_shift.checked_add(detector_shift).ok_or_else(|| {
-            AnalysisError::invalid_detector_error_model("folded analyzer detector shift overflowed")
+            AnalysisError::count_overflow(
+                AnalysisOperation::CircuitToDetectorErrorModel,
+                "folded analyzer detector shift overflowed",
+            )
         })?;
         *instruction = stab_model::advanced::dem_shift_detectors_instruction_with_tag_bytes(
             instruction.args().to_vec(),
@@ -313,23 +326,33 @@ fn prepend_detector_shift(
 
 fn checked_add(left: u64, right: u64, context: &str) -> AnalysisResult<u64> {
     left.checked_add(right).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("folded analyzer {context} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            format!("folded analyzer {context} overflowed"),
+        )
     })
 }
 
 fn checked_product_u64(left: u64, right: u64, context: &str) -> AnalysisResult<u64> {
     left.checked_mul(right).ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("folded analyzer {context} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            format!("folded analyzer {context} overflowed"),
+        )
     })
 }
 
 fn checked_product_usize(left: usize, right: u64, context: &str) -> AnalysisResult<usize> {
     left.checked_mul(usize::try_from(right).map_err(|_| {
-        AnalysisError::invalid_detector_error_model(format!(
-            "folded analyzer {context} does not fit usize"
-        ))
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            format!("folded analyzer {context} does not fit usize"),
+        )
     })?)
     .ok_or_else(|| {
-        AnalysisError::invalid_detector_error_model(format!("folded analyzer {context} overflowed"))
+        AnalysisError::count_overflow(
+            AnalysisOperation::CircuitToDetectorErrorModel,
+            format!("folded analyzer {context} overflowed"),
+        )
     })
 }
