@@ -8,7 +8,7 @@ Timings quoted here are shared-host diagnostics and promote no performance claim
 
 ## Outcome
 
-Every scheduled step is finished as of 2026-11-20; Phase D and the areas listed under "Not Reviewed" remain open.
+Every scheduled step is finished as of 2026-11-20 and Phase D as of 2026-11-21; the open items at the end of Phase D and the areas listed under "Not Reviewed" remain.
 
 | Step | Outcome |
 | --- | --- |
@@ -23,7 +23,7 @@ Every scheduled step is finished as of 2026-11-20; Phase D and the areas listed 
 | B6 | Done. A `CliffordString` is charged exactly its six planes. |
 | B7 | Done for the passes that can exceed a millisecond; the three left unpolled are listed in the architecture README. |
 | B8 | Done. A 300-million-bit fold went from about 0.55 s unpolled to negligible. |
-| B9 | Done for `analyze_errors`. Dropped for `gen`, which writes its named output in one call and has no buffer to charge. |
+| B9 | Done for `analyze_errors`, and for `gen` once Phase D made it stream its text through a buffer. |
 | C1 | Done. Analysis also stopped refusing circuits with more than `u64::MAX` ticks, matching Stim. |
 | C2 | Done with a lazily resolved flag instead of a batch clear; 200,000-qubit reset 92.8 ms to 1.4 ms, and the flow generators 2.35 s to 0.38 s at 4,000 qubits. |
 | C3 | Done. Replay of a wide model fell from 76 MB to 26 MB peak. |
@@ -33,7 +33,7 @@ Every scheduled step is finished as of 2026-11-20; Phase D and the areas listed 
 | C8 | Done. Printing 20,000 long tags fell from 36.6 ms to 17.5 ms for circuits and 27.7 ms to 8.5 ms for models. |
 | C9 | Done. `DemTarget` is eight bytes and the shift offset is no longer a target; the quadratic-output case needs about 735 MiB instead of 1,468 MiB and now runs at the default budget. |
 
-Found during the work and added to Phase D below: the measurement-to-detection compiler takes 13 to 32 seconds on one million `MPP` products where detection compilation takes 0.1 seconds, the flow generators remain cubic for wide resets, and `CircuitReferenceSigns` still returns `Vec<bool>`.
+Three items found during the work were added to Phase D, and two of their premises turned out wrong when measured there: the measurement-to-detection compile is not superlinear, and the flow generators were already quadratic.
 
 ## Priority Rule
 
@@ -202,25 +202,60 @@ An item whose measured gain is within noise is dropped, not committed.
 C3 and C4 change how many shots a batch holds.
 Seeded output is documented as independent of capacity, and both steps re-run the seeded-determinism tests and the `sample_dem` two-sample oracle rows to confirm it.
 
-## Phase D: Larger Changes, Each Needing Its Own Decision
+## Phase D: Larger Changes
 
-These are not scheduled by this plan.
-Each would be proposed separately with measurements, because it restructures an algorithm or is a large mechanical move, not because it would change an API.
+These were not scheduled by the plan above and were done afterwards as one batch.
+Each performance item was reproduced and measured first, and dropped with its numbers when the premise did not hold.
 
-- **Find the superlinear step in `MeasurementToDetectionCompiler::compile` on `MPP`-heavy circuits.** One million two-term products take 13 to 32 seconds, against 0.1 seconds for detection compilation of the same circuit; pinned Stim's `m2d` takes 137 seconds, so this is not a parity gap.
-- **Remove the remaining cubic cost in `circuit_flow_generators` for wide resets,** where `remove_single_anticommutations` scans every flow per qubit.
-- **Give analysis errors a taxonomy that fits them.** A circuit whose detector anticommutes with a reset is reported as `InvalidDetectorErrorModel`, and a public matchable view of `DemInstruction` would remove one internal-invariant error in the reverse-fold output.
-- **Pack `CircuitReferenceSigns`,** which still returns detector and observable signs as `Vec<bool>`.
-- **Share the periodic word fill** between `stab-algebra`'s `bit_runs` and `stab-engine`'s `ReferenceBits::append_repeated` by moving it into `stab-bits`.
-- **Review the public API surface for design quality.** The review looked mainly for bugs; under the priority rule a dedicated pass over each crate's public types and functions is worth doing, looking for `bool` and `Vec<bool>` parameters, enums with variants that are invalid in some positions (as `DemTarget::Numeric` was), free functions that belong on a type, and budget-less variants that should not exist.
-- **Run the fold search with the analyzer as the tortoise.** Today the search holds two tracker clones and replays the transient iterations; Stim holds one. This is the root cause behind B4, which only adds the fallback.
-- **Store `ConversionPlan` detector terms in one arena** instead of a `Vec` per detector, as `ProgramArena` already does for the frame program.
-- **Share one tree walk between the circuit and DEM models** for admission, tag restore, equality, and drop, and share one opaque-tag record. The two copies drifted once already (`99283291`).
-- **Split the files at the 1,200-line limit:** `record_stream.rs` by decoder, `reverse_fold.rs` into dispatch, noise recording, and loop folding, `circuit_flow/generators.rs`, and `dem/parser.rs` diagnostics.
-- **Rewrite the unitary-to-tableau conversion** to identify each generator from `n + 1` columns. This matters only if that path is used at ten or more qubits.
-- **Add a short-length path before SIMD dispatch in the XOR kernel.** This is a suspicion and needs a measurement before anything else.
-- **Stream `gen` output** instead of building the whole text.
-- **Release tooling:** poll the sparse index, not only the crates.io API, before packaging the next crate, and add a test that the Cargo sandbox runs outside the repository so the three-day cooldown can never apply to sibling crates.
+| Item | Outcome |
+| --- | --- |
+| Superlinear `MeasurementToDetectionCompiler::compile` on `MPP`-heavy circuits | Dropped; the premise was wrong. The time is the reference sample, which `sample --shots 1` pays as well, and it grows linearly: 1.48 s at 120,000 products and 13.18 s at one million. With `--skip_reference_sample` the one-million-product circuit takes 0.05 s. The comparison against detection compilation misled because detection sampling needs no reference sample. |
+| Cubic `circuit_flow_generators` for wide resets | The premise was wrong; growth was already about quadratic, which is the floor because the output has about `N²` bits. A per-pivot memmove, a second scan, and scans of untouched columns were removed: a 4,000-qubit reset went from 0.536 s to 0.229 s with identical generators. |
+| Analysis error taxonomy | Done. `AnalysisError` names what failed in typed variants, the CLI codes follow them, and message text is unchanged across a 7,666-run comparison. The migration guide lists the mapping. |
+| Matchable `DemInstruction` view | Done. `DemInstruction::view()`, and each kind now stores exactly its own data, so an item is 88 bytes instead of 112. |
+| Pack `CircuitReferenceSigns` | Done. |
+| Share the periodic word fill | Done as `stab_bits::fill_periodic_words`; the `CliffordString` repeat cases went from about 38 ms to about 23 ms. |
+| Public API review | Done as a review of every crate, about 90 findings. The fixes that remove a real hazard were applied; the rest are listed below. |
+| Fold search with the analyzer as tortoise | Done as a port of Stim's `run_loop`. Successful output was byte-identical on 1,128 runs; a wide-tracker case fell from 31.7 MB to 23.7 MB peak. A failed search now falls back to unrolling, so the reported error is the unrolled run's, as in Stim. |
+| `ConversionPlan` detector terms in one arena | Done. One million two-term detectors fell from 140.0 MB to 117.0 MB. The arena first cost about 3% in `m2d`; hoisting the arena lookup and simplifying the term index left `m2d` about 9% faster than before the change. |
+| One tree walk for the circuit and DEM models | Done for clone, drop, equality, admitted bytes, and tag restore, with one opaque-tag record. The walks that compute different things per dialect stayed separate. |
+| File splits | Done: `record_stream.rs`, `reverse_fold.rs`, `circuit_flow/generators.rs`, both parsers' diagnostics, and four other files near the limit. |
+| Unitary-to-tableau rewrite | Done. Ten qubits went from 67.3 s to 0.023 s, where pinned Stim takes 0.169 s. Acceptance follows Stim's snapping, and Stab keeps a column-norm check that Stim lacks, recorded in the ledger. |
+| Short-length path in the XOR kernel | Dropped. The kernel and a scalar loop differed by under 0.6 ns per call in both directions, and a short path was slower at eight words. |
+| Stream `gen` output | Done. Rotated distance 301 fell from 180 MB to 112 MB peak, the admission bound was re-derived as one mebibyte plus 768 bytes per physical qubit, and a named output's buffer is charged. |
+| Release tooling | Done. The publish wait requires the sparse index as well as the API, and a test fails if release-time Cargo could discover the repository's Cargo configuration. |
+
+Three Stim divergences were found and fixed along the way: the sparse-form rule for flow text, a `PAULI_CHANNEL_2` with one non-zero component, and a target-less `PAULI_CHANNEL_2` with two.
+
+### Open After Phase D
+
+Decisions that change the crate graph or a parity surface, each needing its own answer:
+
+- **One memory-budget type.** `MemoryBudget` and `AlgebraMemoryBudget` are converted by hand in several files; a shared leaf crate would also hold cancellation, estimates, byte spans, and diagnostic severity, which are each defined twice.
+- **One representation of a refused budget.** The engine, analysis, model, and algebra each report "memory budget exceeded" in their own shape, and the CLI still decides budget help from message text for the non-analysis error types.
+- **The observable-id domain.** A circuit `ObservableId` is 64 bits and a `DemObservableId` is 32, so an out-of-range id fails only during circuit-to-DEM conversion.
+- **Symlinks and unsafe path components on outputs.** No command rejects them, and neither does Stim; rejecting them would be a deliberate divergence for every command.
+
+Larger redesigns the API review proposed and this batch did not do:
+
+- Return a three-way verdict from the flow checks, which answer `false` when they failed or do not know.
+- Make "no logical error found" a search outcome instead of an error, and give the searches named options.
+- Return `Option` from the gate-data getters instead of `GateDataUnavailable`.
+- Collapse the roughly twenty `f` and `f_with_options` twins in analysis and the telescoping session constructors in the engine into one function per operation taking an options value.
+- Write the engine's run progress, status, summary, and error types once as generic types instead of once per family.
+- Give `stab-model` typed gate-argument and target-group views, which would remove about forty impossible branches in analysis.
+- Replace `ErrorAnalyzerOptions`' five independent booleans with nested option types.
+- Budget or remove the `Vec<Vec<bool>>` record codec family, which only CLI tests use outside `stab-records`.
+- Publish gate flow and decomposition metadata as typed values instead of strings that are parsed again at run time.
+- Trim `stab_model::advanced`, which has about sixteen items with no caller outside the crate.
+
+Smaller items noticed and left:
+
+- Stab is 2.6 to 4.8 times slower than Stim on `--fold_loops` circuits with a long transient, in the tracker's set operations.
+- `ConversionOperation` is 40 bytes because of its repeat fields; a side table could save about 16 MB per million detectors.
+- `circuit_reference_signs` computes a byte per bit before packing.
+- A public `Tableau::to_unitary` needs a more efficient construction than the test helper.
+- Two fixed caps in `stab-model` still report an invalid detector error model.
 
 ## Order And Delegation
 

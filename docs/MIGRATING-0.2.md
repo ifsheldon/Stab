@@ -84,8 +84,8 @@ Every admitted workload produces byte-identical output; only workloads that the 
 
 `ErrorAnalyzerOptions`, `TimeReversedForFlowsOptions`, `InverseQecOptions`, `FlowGeneratorOptions`, `MissingDetectorOptions`, `DetectingRegionOptions`, and `DetectingRegionTargetOptions` gained the public `memory_budget` field, so struct literals must add it, for example `memory_budget: MemoryBudget::DEFAULT`, or use `..Default::default()`.
 One caller budget governs each of these operations end to end: flow generation passes it to the Tableau of a unitary circuit, missing-detector discovery to the flow generators it runs, time reversal to the dense Tableau that validates unitary input flows, and detecting regions to the Pauli strings of each output region.
-Measurement-rich time reversal and the QEC inverse now refuse an expansion above the budget with `AnalysisError::ResourceLimit` for the new `stab_analysis::ResourceOperation::TimeReversal` operation (`time-reversal`, resource `materialized-bytes`) instead of an invalid-conversion message, so exhaustive matches on `ResourceOperation` must add it.
-The flow-check and Pauli-conjugation `*_with_options` functions return `AnalysisResult`: a Tableau the budget refuses falls back to the sparse tracker or the expanded instruction walk, and live sparse-tracker sensitivity state or an extracted or conjugated Pauli string the budget refuses is reported as `ResourceLimit` for the new `ResourceOperation::FlowCheck` (`flow-check`) or for `ResourceOperation::PauliConjugation`, so exhaustive matches on `ResourceOperation` must add `FlowCheck`.
+Measurement-rich time reversal and the QEC inverse now refuse an expansion above the budget with `AnalysisError::ResourceLimit` for the new `stab_analysis::AnalysisOperation::TimeReversal` operation (`time-reversal`, resource `materialized-bytes`) instead of an invalid-conversion message.
+The flow-check and Pauli-conjugation `*_with_options` functions return `AnalysisResult`: a Tableau the budget refuses falls back to the sparse tracker or the expanded instruction walk, and live sparse-tracker sensitivity state or an extracted or conjugated Pauli string the budget refuses is reported as `ResourceLimit` for the new `AnalysisOperation::FlowCheck` (`flow-check`) or for `AnalysisOperation::PauliConjugation`, so exhaustive matches on `AnalysisOperation` must add `FlowCheck`.
 The unbudgeted `check_if_circuit_has_unsigned_stabilizer_flows` family still returns plain values and fails such a flow closed.
 `Flow` text whose sparse term requests more than the budget, such as `X1000000000000 -> Z0`, now fails with `StabilizerError::MemoryBudgetExceeded` instead of `StabilizerError::InvalidFlowText`, and a detecting region the budget refuses reports `ResourceLimit` for `DetectingRegions` instead of an invalid-model message.
 The CLI's fixed 64 MiB input caps and 1 MiB or 64 MiB per-record caps are replaced by `--memory-budget`, which bounds whole inputs at the budget and streamed records at half of it.
@@ -132,7 +132,7 @@ Constructors that turn a requested size into storage admit its bytes before allo
 | `Tableau::x_output` and `Tableau::z_output` returning `&PauliString` | Both return an owned `PauliString`, because generator images are packed rows rather than stored strings |
 | `stab_algebra::advanced::{tableau_identity_unchecked, tableau_from_output_columns_unchecked}` | `Tableau::identity_with_budget` and `Tableau::from_conjugated_generators`; a Tableau with mismatched generator shapes can no longer be constructed |
 | None | `PauliString::{identity_with_budget, random_with_budget, from_bases_with_budget, from_str_with_budget}`, `FlexPauliString::{identity_with_budget, from_phase_and_bases_with_budget, from_str_with_budget}`, `CliffordString::{identity_with_budget, random_with_budget, from_gates_with_budget, concat_with_budget, repeat_with_budget}`, `PauliStringIterator::new_with_budget`, `Tableau::{from_pauli_string_with_budget, embedded_with_budget}`; each takes an `AlgebraMemoryBudget` and the unbudgeted constructor, method, or `FromStr` impl delegates to it with `AlgebraMemoryBudget::DEFAULT` |
-| None | `Tableau::identity_with_budget`, `Tableau::random_with_budget`, `Tableau::from_stabilizers_with_budget`, `Tableau::is_identity`, `stab_analysis::circuit_to_tableau_with_options` with `CircuitToTableauOptions`, and `stab_analysis::ResourceOperation::TableauConversion`, which exhaustive matches on `ResourceOperation` must add |
+| None | `Tableau::identity_with_budget`, `Tableau::random_with_budget`, `Tableau::from_stabilizers_with_budget`, `Tableau::is_identity`, `stab_analysis::circuit_to_tableau_with_options` with `CircuitToTableauOptions`, and `stab_analysis::AnalysisOperation::TableauConversion` |
 | None | `Tableau::prepend(&mut self, gate: &Tableau, targets: &[usize])`, which rewrites only the target generator rows, and `stab_algebra::TableauAppender` with `identity_with_budget`, `new(Tableau)`, `append`, `x_output_basis`, `z_output_basis`, `x_output_sign`, `z_output_sign`, `len`, `is_empty`, and `finish`, which holds a Tableau transposed so each appended one- or two-qubit gate costs `O(n / 64)` word operations; `stab_bits::transpose_bit_tile` exposes the 64 by 64 block transpose it uses |
 
 Behavior changes for workloads the removed caps admitted:
@@ -375,6 +375,32 @@ The algebra error messages for anticommuting, redundant, and inconsistent stabil
 `circuit_to_detector_error_model` and `analyze_errors` now accept a `PAULI_CHANNEL_2` with at most one non-zero probability without `approximate_disjoint_errors` and ignore the threshold for it, and refuse a target-less `PAULI_CHANNEL_2` with two or more non-zero probabilities unless approximation is allowed; both match Stim.
 With `fold_loops`, a period search that fails for any reason other than cancellation now falls back to unrolling, so the error reported is the unrolled analysis's first error, as in Stim.
 The search holds one tracker clone instead of two, and a budget that admits the analyzer and that clone but not their later growth is refused at the step that grows them.
+
+## Analysis Error Taxonomy
+
+`AnalysisError` used to funnel circuit refusals, unsupported input, arithmetic overflow, allocator refusals, and internal invariants into `InvalidDetectorErrorModel { message }`, so a circuit whose detector anticommutes with a reset was reported as an invalid detector error model and callers could not match on what happened.
+Its variants now name the failure, and every message a user can reach keeps its text byte for byte.
+
+| Removed variant | Replacement |
+| --- | --- |
+| `InvalidDetectorErrorModel { message }` | `NonDeterministicTargets`, `NoiseRequiresApproximation`, `UnanalyzableNoise`, `ErrorDecompositionFailed`, `NonGraphlikeError`, `NoLogicalErrorFound`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, `AllocationFailed`, or `InternalInvariant`, by meaning |
+| `InvalidTableauConversion { message }` | `NonUnitaryOperation`, `PauliNotPreserved`, `GateDataUnavailable`, `InvalidRequest`, `AntiHermitianPauliProduct`, `MeasurementRecordOutOfRange`, `UnsupportedInput`, `CountOverflow`, or `InternalInvariant` |
+| `InvalidCircuitSimplification { message }` | `AntiHermitianPauliProduct` or `InternalInvariant` |
+| `InvalidDomainValue { kind, value }` | `InvalidGeneratorParameter { parameter, value }`, `ResourceLimit` for the generation budget, `CountOverflow`, `AllocationFailed`, or `InternalInvariant` |
+| `InvalidResultFormat { message }` | `NonFiniteCoordinate { operation }` |
+| `stab_analysis::ResourceOperation` | `stab_analysis::AnalysisOperation`, now `#[non_exhaustive]`, with the added operations `CircuitGeneration`, `CircuitInverse`, `CircuitSimplification`, `FlowMeasurementSolving`, `GateData`, `ReverseFrameTracking`, and `TableauSynthesis` |
+
+The typed variants carry data instead of prose: `NonDeterministicTargets` holds the detector and observable targets, `NonUnitaryOperation` the gate and a `NonUnitaryReason`, `PauliNotPreserved` the gate and a `PauliCollapse`, `NoiseRequiresApproximation` the gate and an optional `ThresholdExcess`, `ErrorDecompositionFailed` the component, `InvalidRequest` an `AnalysisRequestError`, `InvalidGeneratorParameter` a `GeneratorParameter`, `GateDataUnavailable` the gate and a `GateData`, and `NoLogicalErrorFound` a `NoLogicalErrorReport`.
+`CountOverflow`, `AllocationFailed`, `UnsupportedInput`, `MeasurementRecordOutOfRange`, and `InternalInvariant` carry their `AnalysisOperation` and a detail string, and `AnalysisError::operation()` returns the operation of any variant that has one.
+`AnalysisError` is deliberately not `#[non_exhaustive]`, so a consumer that maps it to codes fails to compile when a variant is added.
+
+The generation budget refusal is now `AnalysisError::ResourceLimit` for `AnalysisOperation::CircuitGeneration`, and `ResourceLimitError::is_memory_budget()` reports whether a refusal came from the memory budget.
+`stab_model::ModelError::AllocationFailed { dialect, detail }` is new and replaces the allocator refusals that were reported as an invalid detector error model.
+
+The command line's machine-readable codes follow the variants.
+The analysis use of `invalid-detector-error-model` is split into `non-deterministic-targets`, `approximate-disjoint-errors-required`, `unanalyzable-noise`, `error-decomposition-failed`, `non-graphlike-error`, `no-logical-error-found`, `invalid-analysis-request`, `anti-hermitian-pauli-product`, `measurement-record-out-of-range`, `unsupported-analysis-input`, `analysis-count-overflow`, and `analysis-invariant-failed`, and that code now means only a malformed detector error model.
+`invalid-tableau-conversion` and `invalid-circuit-simplification` are removed in favour of `non-unitary-operation`, `pauli-not-preserved`, `gate-data-unavailable`, and the codes above; the analysis uses of `invalid-domain-value` and `invalid-result-format` become `invalid-generator-parameter` and `non-finite-coordinate`; and allocator refusals from analysis and from the model carry `resource-limit-exceeded`.
+The JSON `context` of these diagnostics, which was empty, now carries the typed fields, for example `targets` for non-deterministic targets and `operation`, `gate`, and `reason` for a non-unitary operation.
 
 ## DEM Sampled-Error Streams
 

@@ -18,6 +18,10 @@ Domain crates expose typed errors and losslessly convert them into structured di
 
 Parser locations use byte spans.
 
+A diagnostic code names what failed, not the crate or output format that happened to report it.
+Analysis errors therefore carry one variant and one code per kind of failure, such as `non-deterministic-targets`, `non-unitary-operation`, `approximate-disjoint-errors-required`, `unsupported-analysis-input`, `analysis-count-overflow`, and `analysis-invariant-failed`, with typed context fields, and `invalid-detector-error-model` means only a malformed detector error model.
+An allocator refusal is reported as `resource-limit-exceeded` whichever crate met it, and budget help is selected from the error's type wherever the type carries it, not from its message text.
+
 CLI human output remains the default and JSON schema version 1 is additive.
 
 Established human parser output remains stable where the old behavior already matches pinned Stim. Direct Stim v1.16.0 evidence takes precedence over preserving an incompatible old Stab acceptance or rejection.
