@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use stab_model::advanced::{
     dem_instruction_rebase_detectors, dem_model_items_mut, dem_repeat_block_body_mut,
 };
-use stab_model::{DemInstruction, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel};
+use stab_model::{DemInstruction, DemInstructionView, DemItem, DemTarget, DetectorErrorModel};
 
 use crate::{AnalysisError, AnalysisResult};
 
@@ -80,13 +80,8 @@ fn unreverse_instruction(
     base_detector_id: &mut u64,
     seen: &mut SeenTargets,
 ) -> AnalysisResult<bool> {
-    match instruction.kind() {
-        DemInstructionKind::ShiftDetectors => {
-            let detector_shift = instruction.detector_shift().ok_or_else(|| {
-                AnalysisError::invalid_detector_error_model(
-                    "shift_detectors instruction has no detector shift",
-                )
-            })?;
+    match instruction.view() {
+        DemInstructionView::ShiftDetectors { detector_shift, .. } => {
             *base_detector_id = base_detector_id
                 .checked_add(detector_shift)
                 .ok_or_else(|| {
@@ -96,12 +91,12 @@ fn unreverse_instruction(
                 })?;
             Ok(true)
         }
-        DemInstructionKind::Error => {
-            seen.extend(instruction.targets().iter().copied());
+        DemInstructionView::Error { targets, .. } => {
+            seen.extend(targets.iter().copied());
             rebase(instruction, *base_detector_id)?;
             Ok(true)
         }
-        DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {
+        DemInstructionView::Detector { .. } | DemInstructionView::LogicalObservable { .. } => {
             let target_is_seen = instruction
                 .targets()
                 .first()

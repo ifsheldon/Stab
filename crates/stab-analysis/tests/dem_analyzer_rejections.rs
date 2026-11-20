@@ -52,6 +52,27 @@ fn rows() -> Vec<Row> {
             options: approximate_disjoint(0.3),
         },
         Row {
+            // A single non-zero component is an independent error and needs no approximation.
+            name: "PAULI_CHANNEL_2 with two non-zero components without approximate_disjoint_errors",
+            rejected: "PAULI_CHANNEL_2(0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05) 0 1\nM 0 1\nDETECTOR rec[-1]\n",
+            accepted: "PAULI_CHANNEL_2(0.6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\nM 0 1\nDETECTOR rec[-1]\n",
+            options: ErrorAnalyzerOptions::default(),
+        },
+        Row {
+            // The threshold applies only once two components make the channel disjoint.
+            name: "PAULI_CHANNEL_2 component above approximate-disjoint threshold",
+            rejected: "PAULI_CHANNEL_2(0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05) 0 1\nM 0 1\nDETECTOR rec[-1]\n",
+            accepted: "PAULI_CHANNEL_2(0.6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\nM 0 1\nDETECTOR rec[-1]\n",
+            options: approximate_disjoint(0.08),
+        },
+        Row {
+            // Pinned Stim checks the arguments before it looks at the (absent) targets.
+            name: "target-less PAULI_CHANNEL_2 with two non-zero components",
+            rejected: "PAULI_CHANNEL_2(0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05)\nM 0\nDETECTOR rec[-1]\n",
+            accepted: "PAULI_CHANNEL_2(0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)\nM 0\nDETECTOR rec[-1]\n",
+            options: ErrorAnalyzerOptions::default(),
+        },
+        Row {
             name: "over-mixing DEPOLARIZE1 above 3/4",
             rejected: "DEPOLARIZE1(0.76) 0\nM 0\nDETECTOR rec[-1]\n",
             accepted: "DEPOLARIZE1(0.75) 0\nM 0\nDETECTOR rec[-1]\n",

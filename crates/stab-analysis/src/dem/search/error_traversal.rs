@@ -7,7 +7,7 @@ use stab_model::advanced::{
     FoldedDemVisitor,
 };
 use stab_model::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget, DemTargetKind,
+    DemDetectorId, DemInstruction, DemInstructionView, DemRepeatBlock, DemTarget, DemTargetKind,
 };
 
 use super::budget::LogicalErrorSearchLimits;
@@ -84,9 +84,7 @@ where
         state: &DemTraversalState,
     ) -> AnalysisResult<ControlFlow<()>> {
         self.countdown.tick(self.limits.cancellation())?;
-        if instruction.kind() == DemInstructionKind::Error
-            && instruction.args().first().copied().unwrap_or(0.0) != 0.0
-        {
+        if is_nonzero_probability_error(instruction) {
             let visited_error_mechanisms = self
                 .visited_error_mechanisms
                 .checked_add(1)
@@ -216,9 +214,7 @@ fn summarize_search_block_policy(
     for item in block.items() {
         match item {
             FoldedDemItem::Instruction(instruction) => {
-                if instruction.kind() == DemInstructionKind::Error
-                    && instruction.args().first().copied().unwrap_or(0.0) != 0.0
-                {
+                if is_nonzero_probability_error(instruction) {
                     has_nonzero_probability_error = true;
                 }
                 let Some(count) = active_compact_count(&compact_error_count) else {
@@ -273,14 +269,17 @@ fn update_search_instruction_count(
     count: u64,
     instruction: &DemInstruction,
 ) -> AnalysisResult<Option<u64>> {
-    match instruction.kind() {
-        DemInstructionKind::Error => {
-            if instruction.args().first().copied().unwrap_or(0.0) == 0.0 {
+    match instruction.view() {
+        DemInstructionView::Error {
+            probability,
+            targets,
+        } => {
+            if probability.get() == 0.0 {
                 return Ok(Some(count));
             }
             let mut has_any_target = false;
             let mut has_search_target = false;
-            for target in instruction.targets() {
+            for target in targets {
                 has_any_target = true;
                 match target.kind() {
                     DemTargetKind::RelativeDetector(_) | DemTargetKind::LogicalObservable(_) => {
@@ -301,12 +300,20 @@ fn update_search_instruction_count(
                 )
             })
         }
-        DemInstructionKind::ShiftDetectors if instruction.detector_shift() == Some(0) => {
-            Ok(Some(count))
+        DemInstructionView::ShiftDetectors {
+            detector_shift: 0, ..
         }
-        DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => Ok(Some(count)),
-        DemInstructionKind::ShiftDetectors => Ok(None),
+        | DemInstructionView::Detector { .. }
+        | DemInstructionView::LogicalObservable { .. } => Ok(Some(count)),
+        DemInstructionView::ShiftDetectors { .. } => Ok(None),
     }
+}
+
+fn is_nonzero_probability_error(instruction: &DemInstruction) -> bool {
+    matches!(
+        instruction.view(),
+        DemInstructionView::Error { probability, .. } if probability.get() != 0.0
+    )
 }
 
 fn traversal_error(context: &'static str, message: &'static str) -> AnalysisError {

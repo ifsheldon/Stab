@@ -35,6 +35,37 @@ const GENERATOR_GOLDENS: &[(&str, &[&str])] = &[
         "MR 1\n",
         &["1 -> _Z", "_Z -> rec[0]", "X_ -> X_", "Z_ -> Z_"],
     ),
+    // Resets undone on entangled rows: several rows anticommute with the reset, so one is
+    // sacrificed (and swap-removed) and the reset qubit is cleared from the rest.
+    (
+        "R 0\nH 0\nCX 0 1 0 2\nM 1 2\n",
+        &[
+            "1 -> __Z xor rec[1]",
+            "1 -> _Z_ xor rec[0]",
+            "__Z -> Z__ xor rec[1]",
+            "_XX -> X__",
+            "_Z_ -> Z__ xor rec[0]",
+        ],
+    ),
+    (
+        "H 0 1\nCX 0 2 1 2\nMR 2\nRX 0 1\nCX 0 1\nM 0 1\n",
+        &[
+            "1 -> __Z",
+            "1 -> _Z_ xor rec[2]",
+            "1 -> Z__ xor rec[1]",
+            "XXZ -> rec[0]",
+        ],
+    ),
+    (
+        "H 0\nCX 0 1 0 2 0 3\nR 3 0 2\nMX 1\n",
+        &[
+            "1 -> ___Z",
+            "1 -> __Z_",
+            "1 -> _X__ xor rec[0]",
+            "1 -> Z___",
+            "_X__ -> rec[0]",
+        ],
+    ),
     // Single-instruction measurements and resets in every basis, with inversion.
     ("MX 0\n", &["1 -> X xor rec[0]", "X -> rec[0]"]),
     ("MY 0\n", &["1 -> Y xor rec[0]", "Y -> rec[0]"]),

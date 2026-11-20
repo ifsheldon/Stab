@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use stab_model::{
-    DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DetectorErrorModel, Probability,
+    DemInstruction, DemInstructionView, DemItem, DemRepeatBlock, DetectorErrorModel, Probability,
 };
 
 use super::flatten::{DemFlattenLimits, validate_flattening_budget_with_limits};
@@ -77,13 +77,16 @@ pub fn rounded_detector_error_model(
 }
 
 fn rounded_instruction(instruction: &DemInstruction, digits: u8) -> AnalysisResult<DemInstruction> {
-    let (DemInstructionKind::Error, [probability]) = (instruction.kind(), instruction.args())
+    let DemInstructionView::Error {
+        probability,
+        targets,
+    } = instruction.view()
     else {
         return Ok(instruction.clone());
     };
     Ok(stab_model::advanced::dem_error_instruction_from_targets(
-        Probability::try_new(rounded_probability_arg(*probability, digits))?,
-        instruction.targets(),
+        Probability::try_new(rounded_probability_arg(probability.get(), digits))?,
+        targets,
         instruction.tag_bytes(),
     )?)
 }

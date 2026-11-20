@@ -8,7 +8,7 @@ use stab_model::advanced::{
     FoldedDemTraversal, FoldedDemVisitor, shifted_detector, shifted_targets,
 };
 use stab_model::{
-    Cancellation, DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId,
+    Cancellation, DemDetectorId, DemInstruction, DemInstructionView, DemObservableId,
     DemRepeatBlock, DemTarget, DemTargetKind, DetectorErrorModel,
 };
 
@@ -561,20 +561,18 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
         state: &DemTraversalState,
     ) -> AnalysisResult<ControlFlow<()>> {
         self.countdown.tick(self.limits.cancellation())?;
-        match instruction.kind() {
-            DemInstructionKind::Error => {
-                let probability = instruction.args().first().copied().ok_or_else(|| {
-                    AnalysisError::invalid_detector_error_model(
-                        "SAT error instruction is missing probability",
-                    )
-                })?;
+        match instruction.view() {
+            DemInstructionView::Error {
+                probability,
+                targets,
+            } => {
                 self.add_expanded_instruction()?;
-                self.push_error(probability, instruction.targets(), state.detector_offset())?;
+                self.push_error(probability.get(), targets, state.detector_offset())?;
             }
-            DemInstructionKind::ShiftDetectors => {
+            DemInstructionView::ShiftDetectors { .. } => {
                 self.add_expanded_instruction()?;
             }
-            DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
+            DemInstructionView::Detector { .. } | DemInstructionView::LogicalObservable { .. } => {}
         }
         Ok(ControlFlow::Continue(()))
     }

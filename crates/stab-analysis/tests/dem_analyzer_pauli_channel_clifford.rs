@@ -1,6 +1,7 @@
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
+    clippy::panic,
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
@@ -145,4 +146,79 @@ fn pauli_channels_match_pinned_stim_combination_order_and_local_decomposition() 
          error(0.07000000000000000666133814775093924) D1\n\
          error(0.06999999999999999278355033993648249) D1 ^ D0\n",
     );
+}
+
+#[test]
+fn pauli_channel2_with_one_component_is_independent_without_approximation_like_pinned_stim() {
+    // Pinned Stim's `check_can_approximate_disjoint` lets a channel with at most one non-zero
+    // component through without `approximate_disjoint_errors` and ignores the threshold, because
+    // such a channel is already an independent error. Expected DEMs were recorded with pinned
+    // `stim analyze_errors` under each listed flag set.
+    let threshold = |value| Some(Probability::try_new(value).expect("threshold"));
+    let unfolded = ErrorAnalyzerOptions::default();
+    let folded = ErrorAnalyzerOptions {
+        fold_loops: true,
+        ..ErrorAnalyzerOptions::default()
+    };
+    let decomposed_below_threshold = ErrorAnalyzerOptions {
+        fold_loops: true,
+        decompose_errors: true,
+        approximate_disjoint_errors_threshold: threshold(0.01),
+        ..ErrorAnalyzerOptions::default()
+    };
+    let crossing = "R 0 1 2\n\
+         PAULI_CHANNEL_2(0, 0, 0, 0, 0.125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1 1 2\n\
+         M 0 1 2\n\
+         DETECTOR rec[-3]\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let looped = "REPEAT 4 {\n\
+         R 0 1\n\
+         PAULI_CHANNEL_2[tagged](0, 0, 0, 0, 0.375, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\n\
+         M 0 1\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n\
+         }\n";
+    let zero = "R 0 1\n\
+         PAULI_CHANNEL_2(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\n\
+         M 0 1\n\
+         DETECTOR rec[-1]\n";
+    for (circuit, options, expected) in [
+        (
+            crossing,
+            unfolded.clone(),
+            "error(0.125) D0 D1\nerror(0.125) D1 D2 L0\n",
+        ),
+        (
+            crossing,
+            ErrorAnalyzerOptions {
+                decompose_errors: true,
+                ..ErrorAnalyzerOptions::default()
+            },
+            "error(0.125) D1 ^ D0\nerror(0.125) D2 L0 ^ D1\n",
+        ),
+        (
+            looped,
+            unfolded.clone(),
+            "error[tagged](0.375) D0 D1\nerror[tagged](0.375) D2 D3\nerror[tagged](0.375) D4 D5\nerror[tagged](0.375) D6 D7\n",
+        ),
+        (
+            looped,
+            folded,
+            "repeat 4 {\n    error[tagged](0.375) D0 D1\n    shift_detectors 2\n}\n",
+        ),
+        (
+            looped,
+            decomposed_below_threshold,
+            "repeat 4 {\n    error[tagged](0.375) D1 ^ D0\n    shift_detectors 2\n}\n",
+        ),
+        (zero, unfolded, "detector D0\n"),
+    ] {
+        let parsed = Circuit::from_stim_str(circuit).expect("circuit");
+        let dem = circuit_to_detector_error_model(&parsed, options.clone())
+            .unwrap_or_else(|error| panic!("{circuit:?} with {options:?}: {error}"))
+            .to_dem_string();
+        assert_eq!(dem, expected, "{circuit:?} with {options:?}");
+    }
 }

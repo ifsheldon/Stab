@@ -9,22 +9,33 @@ pub(super) fn final_canonicalize_measurement_generators(
     qubit_count: usize,
     measurement_count: usize,
 ) -> AnalysisResult<()> {
+    // Row products only ever set bits some row already has, so a column absent from the union of
+    // every row stays absent throughout elimination and needs no scan.
+    let support = ColumnSupport::of(flows);
     let mut eliminated = 0;
     for qubit in 0..qubit_count {
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.input().get(qubit).is_some_and(|basis| basis.x_bit())
-        })?;
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.input().get(qubit).is_some_and(|basis| basis.z_bit())
-        })?;
+        if support.input_x.has(qubit) {
+            eliminate_rows_with(flows, &mut eliminated, |flow| {
+                flow.input().get(qubit).is_some_and(|basis| basis.x_bit())
+            })?;
+        }
+        if support.input_z.has(qubit) {
+            eliminate_rows_with(flows, &mut eliminated, |flow| {
+                flow.input().get(qubit).is_some_and(|basis| basis.z_bit())
+            })?;
+        }
     }
     for qubit in 0..qubit_count {
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.output().get(qubit).is_some_and(|basis| basis.x_bit())
-        })?;
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.output().get(qubit).is_some_and(|basis| basis.z_bit())
-        })?;
+        if support.output_x.has(qubit) {
+            eliminate_rows_with(flows, &mut eliminated, |flow| {
+                flow.output().get(qubit).is_some_and(|basis| basis.x_bit())
+            })?;
+        }
+        if support.output_z.has(qubit) {
+            eliminate_rows_with(flows, &mut eliminated, |flow| {
+                flow.output().get(qubit).is_some_and(|basis| basis.z_bit())
+            })?;
+        }
     }
     for measurement in 0..measurement_count {
         let measurement = record_index_i32(measurement)?;
@@ -38,6 +49,49 @@ pub(super) fn final_canonicalize_measurement_generators(
     }
     flows.sort();
     Ok(())
+}
+
+/// Union of one packed Pauli plane over every row.
+struct PlaneUnion(Vec<u64>);
+
+impl PlaneUnion {
+    fn of<'a>(planes: impl Iterator<Item = &'a [u64]>) -> Self {
+        let mut union = Vec::new();
+        for plane in planes {
+            if union.len() < plane.len() {
+                union.resize(plane.len(), 0);
+            }
+            for (word, bits) in union.iter_mut().zip(plane) {
+                *word |= bits;
+            }
+        }
+        Self(union)
+    }
+
+    fn has(&self, qubit: usize) -> bool {
+        self.0
+            .get(qubit / u64::BITS as usize)
+            .is_some_and(|word| word >> (qubit % u64::BITS as usize) & 1 == 1)
+    }
+}
+
+/// Which Pauli columns any row touches.
+struct ColumnSupport {
+    input_x: PlaneUnion,
+    input_z: PlaneUnion,
+    output_x: PlaneUnion,
+    output_z: PlaneUnion,
+}
+
+impl ColumnSupport {
+    fn of(flows: &[Flow]) -> Self {
+        Self {
+            input_x: PlaneUnion::of(flows.iter().map(|flow| flow.input().x_bits())),
+            input_z: PlaneUnion::of(flows.iter().map(|flow| flow.input().z_bits())),
+            output_x: PlaneUnion::of(flows.iter().map(|flow| flow.output().x_bits())),
+            output_z: PlaneUnion::of(flows.iter().map(|flow| flow.output().z_bits())),
+        }
+    }
 }
 
 fn eliminate_rows_with(

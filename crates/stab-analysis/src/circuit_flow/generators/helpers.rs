@@ -5,7 +5,7 @@ use stab_model::{CircuitInstruction, Pauli, Target};
 
 use crate::{AnalysisError, AnalysisResult};
 
-use super::single_pauli;
+use super::rows::single_pauli;
 
 pub(super) fn plain_tableau_targets(targets: &[Target]) -> Option<Vec<usize>> {
     let mut qubits = Vec::with_capacity(targets.len());

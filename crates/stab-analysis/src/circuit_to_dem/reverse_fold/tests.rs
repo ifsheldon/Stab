@@ -185,7 +185,7 @@ fn tracker_growth_is_refused_against_the_bytes_the_analyzer_already_holds() {
     }
 }
 
-/// When the fold search's two tracker clones do not fit, `--fold_loops` falls back to unrolling
+/// When the fold search's hare tracker does not fit, `--fold_loops` falls back to unrolling
 /// instead of refusing a circuit that the unfolded run completes under the same budget.
 #[test]
 fn fold_search_that_does_not_fit_falls_back_to_unrolling() {
@@ -226,6 +226,35 @@ fn fold_search_that_does_not_fit_falls_back_to_unrolling() {
         error.resource_limit_error().map(|error| error.limit()),
         Some(low - 1)
     );
+}
+
+/// A failing fold-search hare abandons folding, as pinned Stim's `run_loop` does when its hare
+/// throws, so the analyzer reports its own first error in unrolled order: here the
+/// `PAULI_CHANNEL_2` refusal undone before the hare's later non-deterministic `RX` collapse, the
+/// error Stim v1.16.0 reports with and without `--fold_loops`.
+#[test]
+fn folded_analysis_reports_the_unrolled_first_error_when_the_hare_fails() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 10 {\n    RX 0\n    M 0\n    DETECTOR rec[-1]\n    PAULI_CHANNEL_2(0.1, 0.1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\n}\n",
+    )
+    .expect("valid precedence circuit");
+    let error = |fold_loops| {
+        try_analyze(
+            &circuit,
+            ErrorAnalyzerOptions {
+                fold_loops,
+                ..ErrorAnalyzerOptions::default()
+            },
+        )
+        .expect_err("the channel needs approximate_disjoint_errors")
+        .to_string()
+    };
+    let folded = error(true);
+    assert!(
+        folded.contains("PAULI_CHANNEL_2 requires approximate_disjoint_errors"),
+        "{folded}"
+    );
+    assert_eq!(folded, error(false));
 }
 
 /// Pinned Stim saturates its tick count, so more than `2^64` ticks is not an error. Expected
