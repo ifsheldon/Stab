@@ -151,6 +151,42 @@ fn flow_display_and_sparse_round_trip_match_stim() {
         flow("X20*I21 -> Y xor rec[-1]").to_string(),
         "____________________X_ -> Y xor rec[-1]"
     );
+    flow_display_sparse_veto_matches_stim();
+}
+
+fn flow_display_sparse_veto_matches_stim() {
+    // Each pair was recorded with `str(stim.Flow(text))` from Stim v1.16.0. An identity last qubit
+    // on either side vetoes the sparse form for both sides, even when the other side would choose
+    // it; a side with no qubits does not veto.
+    for (text, expected) in [
+        (
+            "___X_____ -> ________X xor rec[5]",
+            "___X_____ -> ________X xor rec[5]",
+        ),
+        ("X3 -> X8 xor rec[5]", "X3 -> X8 xor rec[5]"),
+        ("X8 -> rec[0]", "X8 -> rec[0]"),
+        ("X8 -> X__", "________X -> X__"),
+        ("1 -> _________Z", "1 -> Z9"),
+        ("1 -> rec[-1]", "1 -> rec[-1]"),
+        ("1 -> obs[2]", "1 -> obs[2]"),
+        ("1 -> 1", "1 -> 1"),
+        ("-X9 -> -Z0*Z9 xor obs[1]", "-X9 -> -Z0*Z9 xor obs[1]"),
+        ("X0*X9 -> _X", "X________X -> _X"),
+        ("X0*X9 -> _", "X________X -> _"),
+        ("__________ -> Z9", "__________ -> _________Z"),
+        ("X9 -> __________", "_________X -> __________"),
+        ("Z0 -> Z0", "Z -> Z"),
+        (
+            "X100 -> Y50*Z100 xor rec[-3] xor obs[0]",
+            "X100 -> Y50*Z100 xor rec[-3] xor obs[0]",
+        ),
+        ("X7 -> Z7", "_______X -> _______Z"),
+        ("X0*Y1*Z17 -> Z17", "X0*Y1*Z17 -> Z17"),
+    ] {
+        let parsed = flow(text);
+        assert_eq!(parsed.to_string(), expected, "{text:?}");
+        assert_eq!(flow(expected), parsed, "{expected:?} must round-trip");
+    }
 }
 
 fn flow_ordering_matches_stim_examples() {

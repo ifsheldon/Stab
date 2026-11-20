@@ -173,7 +173,7 @@ impl Flow {
 
 impl Display for Flow {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let use_sparse = should_use_sparse(&self.input) || should_use_sparse(&self.output);
+        let use_sparse = should_use_sparse(&self.input, &self.output);
         let mut text = String::new();
         if !write_pauli(&mut text, &self.input, use_sparse) {
             text.push('1');
@@ -449,11 +449,15 @@ fn invalid_flow_text(text: &str) -> StabilizerError {
     }
 }
 
-fn should_use_sparse(pauli: &PauliString) -> bool {
-    if pauli.len() > 8 && pauli.weight().saturating_mul(8) <= pauli.len() {
-        return !pauli_ends_with_identity(pauli);
-    }
-    false
+/// Stim v1.16.0's `operator<<(ostream&, const Flow&)` rule: either side being mostly identity
+/// selects the sparse form for both sides, but an identity last qubit on either side vetoes it,
+/// because sparse text cannot carry that side's length.
+fn should_use_sparse(input: &PauliString, output: &PauliString) -> bool {
+    let mostly_identity =
+        |pauli: &PauliString| pauli.len() > 8 && pauli.weight().saturating_mul(8) <= pauli.len();
+    (mostly_identity(input) || mostly_identity(output))
+        && !pauli_ends_with_identity(input)
+        && !pauli_ends_with_identity(output)
 }
 
 fn pauli_ends_with_identity(pauli: &PauliString) -> bool {

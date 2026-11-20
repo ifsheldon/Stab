@@ -1,6 +1,7 @@
 //! Stable packed bit storage, checked views, scalar kernels, and layout primitives.
 
 mod iter;
+mod periodic;
 mod scalar;
 mod transpose;
 
@@ -12,6 +13,7 @@ use std::ops::{
 use thiserror::Error;
 
 pub use iter::BitIter;
+pub use periodic::fill_periodic_words;
 
 pub const BIT_BLOCK_WORDS: usize = 4;
 const WORD_BITS: usize = u64::BITS as usize;
@@ -300,6 +302,19 @@ impl BitVec {
         }
     }
 
+    /// Builds the same vector as [`Self::zeros`], reserving its words fallibly, for lengths that
+    /// come from untrusted input.
+    ///
+    /// # Errors
+    ///
+    /// [`BitError::StorageAllocationFailed`] when the allocator refuses the words.
+    pub fn try_zeros(bit_len: impl Into<BitLen>) -> BitResult<Self> {
+        let bit_len = bit_len.into();
+        let mut words = Vec::new();
+        try_grow_zeroed(&mut words, bit_len.word_count())?;
+        Ok(Self { words, bit_len })
+    }
+
     pub fn from_words_truncated(bit_len: impl Into<BitLen>, mut words: Vec<u64>) -> Self {
         let bit_len = bit_len.into();
         words.resize(bit_len.word_count(), 0);
@@ -354,6 +369,21 @@ impl BitVec {
         self.words.resize(bit_len.word_count(), 0);
         self.bit_len = bit_len;
         self.mask_unused_tail_bits();
+    }
+
+    /// Resizes like [`Self::resize_zeros`], reserving any new words fallibly; on an allocation
+    /// failure the vector is left unchanged.
+    ///
+    /// # Errors
+    ///
+    /// [`BitError::StorageAllocationFailed`] when the allocator refuses the new words.
+    pub fn try_resize_zeros(&mut self, bit_len: impl Into<BitLen>) -> BitResult<()> {
+        let bit_len = bit_len.into();
+        try_grow_zeroed(&mut self.words, bit_len.word_count())?;
+        self.words.truncate(bit_len.word_count());
+        self.bit_len = bit_len;
+        self.mask_unused_tail_bits();
+        Ok(())
     }
 
     pub fn as_bitslice(&self) -> BitSlice<'_> {
@@ -951,6 +981,18 @@ fn xor_assign_word_slices(lhs: &mut [u64], rhs: &[u64]) -> BitResult<()> {
         left: mismatch.expected.saturating_mul(WORD_BITS),
         right: mismatch.actual.saturating_mul(WORD_BITS),
     })
+}
+
+/// Grows `words` to `word_count` zero words when it is shorter, reserving the growth fallibly so
+/// the resize never reallocates.
+fn try_grow_zeroed(words: &mut Vec<u64>, word_count: usize) -> BitResult<()> {
+    if let Some(additional) = word_count.checked_sub(words.len()) {
+        words
+            .try_reserve_exact(additional)
+            .map_err(|_| BitError::StorageAllocationFailed { words: word_count })?;
+        words.resize(word_count, 0);
+    }
+    Ok(())
 }
 
 fn ensure_same_bit_len(left: usize, right: usize) -> BitResult<()> {

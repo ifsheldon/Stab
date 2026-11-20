@@ -313,6 +313,34 @@ fn bits_bitvec_owned_storage_contract_preserves_tail_and_resize_semantics() {
     assert_eq!(bits.popcount(), 2);
 }
 
+/// Hostile lengths get a typed refusal instead of an allocator abort, a refused resize leaves the
+/// vector as it was, and the fallible forms build exactly what the infallible ones do.
+#[test]
+fn bits_bitvec_fallible_allocation_refuses_without_side_effects() {
+    let huge_words = usize::MAX.div_ceil(WORD_BITS);
+    assert_eq!(
+        BitVec::try_zeros(usize::MAX),
+        Err(BitError::StorageAllocationFailed { words: huge_words })
+    );
+    let mut bits = BitVec::from_bits([true, false, true]);
+    assert_eq!(
+        bits.try_resize_zeros(usize::MAX),
+        Err(BitError::StorageAllocationFailed { words: huge_words })
+    );
+    assert_eq!(bits, BitVec::from_bits([true, false, true]));
+
+    assert_eq!(BitVec::try_zeros(130), Ok(BitVec::zeros(130)));
+    let mut expected = bits.clone();
+    expected.resize_zeros(65);
+    bits.try_resize_zeros(65).expect("small resize");
+    assert_eq!(bits, expected);
+    bits.words_mut()[0] = u64::MAX;
+    expected.words_mut()[0] = u64::MAX;
+    expected.resize_zeros(2);
+    bits.try_resize_zeros(2).expect("shrink");
+    assert_eq!(bits, expected);
+}
+
 #[test]
 fn bits_width_and_range_mismatches_are_rejected_without_mutation() {
     let mut left = BitVec::from_words_truncated(257, vec![0x55aa_1234_9876_cdef; 5]);
