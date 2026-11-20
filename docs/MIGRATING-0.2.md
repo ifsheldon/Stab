@@ -314,6 +314,43 @@ Every byte charge derived from a target's or an item's size shrinks with it, so 
 A bare number in an `error` line is reported at the number itself instead of at the surrounding target region.
 Flow checking labels each flow with an observable id the circuit does not use instead of a numeric target, which changes no result.
 
+## Typed Batch Indices, Record Layouts, And Review Follow-Ups
+
+These changes come from Phase D of the review fix plan and from its public API review.
+
+| Removed or changed item | Replacement |
+| --- | --- |
+| `PackedShotBatch::get/set(usize, usize)`, `PackedShotBatchView::get`, `BitPlaneBatch::get/set(bit, shot)`, `BitPlaneBatchView::get`, `RecordBatchView::get`, `MeasurementBatchView::get` | Every batch accessor takes `(stab_records::ShotIndex, stab_records::BitIndex)` in that order, so swapped arguments no longer compile; the bit-plane types change their argument order from `(bit, shot)` to `(shot, bit)` |
+| `RecordBatchView::{shot_major_records, bit_planes}` and `MeasurementBatchView::{shot_major_records, bit_planes}` returning `Option` | `layout()` returns `stab_records::RecordLayout`, a two-variant enum of `ShotMajor(PackedShotBatchView)` and `BitPlanes(BitPlaneBatchView)` |
+| `ObservablePredictionBatch::records_mut()` | `ObservablePredictionBatch::view_mut()`, which cannot change the batch width |
+| `CircuitReferenceSigns::detector_signs()` and `observable_signs()` returning `&[bool]` | Both return `stab_bits::BitSlice<'_>`; use `iter`, `get`, `len`, or `words` |
+| `SamplingPlan::try_count_determined_measurements(bool)` and `count_determined_measurements(&Circuit, bool)` | Both take `stab_engine::InitialState`, either `Zero` or `Unknown` |
+| `DemReplayRecordStore::{is_retaining, is_released}` | `DemReplayRecordStore::state()` returns `DemReplayStoreState`, one of `Retaining`, `Full`, or `Released` |
+| `DemSamplingPlan::admit_replay_input` returning `u64` | Returns `MemoryBudget` |
+| `SamplingCompileErrorCode` and `SamplingCompileError::code()` | Removed; the CLI diagnostic codes are the one code surface |
+| `stab_engine::biased_randomize_bits` | Removed; it had no caller |
+| None | `stab_model::DemInstructionView` and `DemInstruction::view()`, a borrowed enum with one variant per instruction kind carrying exactly that kind's data: `Error { probability, targets }`, `Detector { coordinates, detector }`, `LogicalObservable { observable }`, and `ShiftDetectors { coordinate_shift, detector_shift }` |
+| None | `stab_bits::fill_periodic_words`, `BitVec::try_zeros`, and `BitVec::try_resize_zeros` |
+| None | `DemSamplingPlan::limits()`, `DetectionResourceKind::SessionStorageBytes`, and a `StorageAllocation { message }` variant on `DetectionError`, `DemError`, and `SamplingCompileError` |
+
+`DemSamplingPlan::session` and `replay_session` now inherit the memory budget and cancellation of the compiler that built the plan, as `SamplingPlan` and the detection plans already did; a caller that budgeted the compiler can therefore see a session refused under that budget, and the `_with_limits` forms still override it.
+`circuit_reference_signs_with_limits` also admits the packed signs it returns, so its minimum budget rises by eight bytes per started 64 detectors and per started 64 observables.
+
+Allocator refusals that were reported as `InvalidSamplerCompilation` are now the `StorageAllocation` variant of the same error, with unchanged message text, and a session storage refusal converts to `DetectionError::ResourceLimit` with `DetectionResourceKind::SessionStorageBytes`.
+On the command line, a session storage refusal in `sample`, `detect`, `m2d`, or `sample_dem` and every `StorageAllocation` error now carry the code `resource-limit-exceeded`; they previously carried `sampling-execution-failed`, `detection-execution-failed`, `dem-sampling-execution-failed`, or `invalid-sampler-compilation`.
+
+`unitary_to_tableau` keeps its signature and has a new acceptance rule.
+With `b` the largest-magnitude entry of the first column, a matrix is accepted exactly when every entry is finite, every column's squared norm is within `1e-4` of one, every ratio of an entry to `b` is within squared distance `0.125` of one of `0`, `1`, `-1`, `i`, and `-i`, and the snapped matrix is exactly a scalar multiple of a Clifford unitary on every entry.
+The snapping threshold is Stim v1.16.0's, so `RX(0.3)` is now accepted as the identity as Stim accepts it, where the earlier per-entry check rejected it; unlike Stim, Stab keeps the column-norm check and rejects a scaled matrix such as `2·I`.
+Rejections keep their two classes, `MatrixNotUnitary` and `UnitaryMatrixNotClifford`.
+Accepting a matrix of dimension `d` on `n` qubits now costs about `n·d` work per non-zero of a column plus `d²`, instead of `n·d³`.
+
+`Flow` text now follows Stim v1.16.0's rule for choosing the sparse form: a side whose last qubit is identity makes both sides print dense, so `___X_____ -> ________X xor rec[5]` is no longer printed as `X3 -> X8 xor rec[5]`.
+
+`circuit_to_detector_error_model` and `analyze_errors` now accept a `PAULI_CHANNEL_2` with at most one non-zero probability without `approximate_disjoint_errors` and ignore the threshold for it, and refuse a target-less `PAULI_CHANNEL_2` with two or more non-zero probabilities unless approximation is allowed; both match Stim.
+With `fold_loops`, a period search that fails for any reason other than cancellation now falls back to unrolling, so the error reported is the unrolled analysis's first error, as in Stim.
+The search holds one tracker clone instead of two, and a budget that admits the analyzer and that clone but not their later growth is refused at the step that grows them.
+
 ## DEM Sampled-Error Streams
 
 Seeded `sample_dem` detector and observable output no longer depends on `--err_out`. A run that records sampled errors, through `--err_out` or `DemSamplingSession::run_with_sampled_errors`, now draws exactly the random streams of a run that does not, so its detector and observable records are byte-identical to the plain seeded run, and replaying its sampled-error file with `--replay_err_in` reproduces them. Pinned Stim's detector output is likewise independent of the flag.

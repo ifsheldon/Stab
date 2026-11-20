@@ -1,0 +1,4 @@
+repeat 4 {
+    error[tagged](0.375) D0 D1
+    shift_detectors 2
+}

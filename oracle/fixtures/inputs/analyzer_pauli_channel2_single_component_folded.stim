@@ -1,0 +1,7 @@
+REPEAT 4 {
+    R 0 1
+    PAULI_CHANNEL_2[tagged](0, 0, 0, 0, 0.375, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1
+    M 0 1
+    DETECTOR rec[-2]
+    DETECTOR rec[-1]
+}
