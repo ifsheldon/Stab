@@ -245,7 +245,7 @@ Larger redesigns the API review proposed and this batch did not do:
 - Return `Option` from the gate-data getters instead of `GateDataUnavailable`.
 - Collapse the roughly twenty `f` and `f_with_options` twins in analysis and the telescoping session constructors in the engine into one function per operation taking an options value.
 - Write the engine's run progress, status, summary, and error types once as generic types instead of once per family.
-- Give `stab-model` typed gate-argument and target-group views, which would remove about forty impossible branches in analysis.
+- Done on 2026-11-21: `CircuitInstruction::gate_arguments()` and `gate_targets()` are typed, infallible views, which removed about 120 impossible branches in analysis and the engine.
 - Replace `ErrorAnalyzerOptions`' five independent booleans with nested option types.
 - Budget or remove the `Vec<Vec<bool>>` record codec family, which only CLI tests use outside `stab-records`.
 - Publish gate flow and decomposition metadata as typed values instead of strings that are parsed again at run time.

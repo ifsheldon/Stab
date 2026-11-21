@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use stab_algebra::Flow;
 use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, FoldedCount, GateKind, MemoryBudget,
-    ParseLimits, Target,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, FoldedCount, GateKind, GateTargets,
+    MemoryBudget, ParseLimits, Target,
 };
 
 use super::{
@@ -158,10 +158,10 @@ fn validate_sweep_target_order(instruction: &CircuitInstruction) -> AnalysisResu
         Some(ControlSlot::Second) => SweepInvalidSide::Left,
         Some(ControlSlot::Either) | None => return Ok(()),
     };
-    for group in instruction.target_groups() {
-        let [left, right] = group else {
-            continue;
-        };
+    let GateTargets::ControlledPairs(pairs) = instruction.gate_targets() else {
+        return Ok(());
+    };
+    for [left, right] in pairs.as_target_pairs() {
         let target = match invalid_side {
             SweepInvalidSide::Left => left,
             SweepInvalidSide::Right => right,

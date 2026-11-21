@@ -21,7 +21,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | R3 | `Option` from the gate-data getters | M | Do, together with R9. |
 | R4 | One function per operation taking an options value | L | Do, after R1 and R2, and before any Python binding. |
 | R5 | Engine run progress, status, summary, and error written once | M | Do, in the same pass as the engine half of R4. |
-| R6 | Typed gate-argument and target-group views in `stab-model` | L | Do. Highest leverage of the model items. |
+| R6 | Typed gate-argument and target-group views in `stab-model` | L | Done on 2026-11-21. |
 | R7 | Nested option types for `ErrorAnalyzerOptions` | M | Do, in the same pass as R4 so call sites change once. |
 | R8 | The `Vec<Vec<bool>>` record codec family | M | Remove from the public surface; keep as a test oracle. |
 | R9 | Typed gate flow and decomposition metadata | M to L | Do after R6. |
@@ -33,7 +33,7 @@ Priorities follow the root `AGENTS.md`: API design, performance, and architectur
 | S5 | Fixed caps in `stab-model` reported an invalid detector error model | S | Done with D2. |
 | N1 | Areas the review did not read | M | Run a second review pass before the next release. |
 
-Suggested order after R1, R2, and R10: R6 with R3 and R9, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
+Suggested order after R1, R2, R10, and R6: R9 with R3, then R4 with R5 and R7, then R8, with S1 as an independent performance task at any point.
 R4 goes late on purpose: R1, R2, R3, and R7 each delete or reshape functions that R4 would otherwise rewrite twice.
 
 ## Decided And Done
@@ -242,6 +242,14 @@ No per-family aliases, so there is one name to learn.
 It halves what a binding has to wrap.
 
 ### R6. Typed gate-argument and target-group views in `stab-model`
+
+**Outcome, 2026-11-21.** Done.
+`CircuitInstruction::gate_arguments()` and `gate_targets()` return infallible, allocation-free views with one variant per rule, and `target_groups()` returns a named iterator.
+The views yield typed items through small iterator types instead of slices, because arguments are stored as `f64` and targets as packed values.
+About 120 impossible branches were removed, far more than the 37 counted below, and every construction path was checked to validate.
+What remains is one narrowing step per instruction where code dispatches on `GateKind`, since the relation between a gate kind and its rule is table data; R9 can remove some of those.
+A diagnostic timing of nine `analyze_errors`, `sample`, and `detect` runs showed no measurable difference, and their outputs were byte-identical.
+The rest of this section is the proposal as written before the work.
 
 **Today.** `CircuitInstruction` exposes `probability_argument() -> ModelResult<Option<Probability>>`, `probability_arguments() -> ModelResult<Option<Vec<Probability>>>`, `observable_id_argument() -> ModelResult<Option<ObservableId>>`, and `target_groups() -> Vec<&[Target]>`.
 The instruction was validated against its gate's rules when it was built, so the `Err` arms cannot occur.

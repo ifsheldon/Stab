@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, DemTargetKind, FoldedCircuitSummary,
-    FoldedWalkError, Gate, GateCategory, GateKind, MeasureRecordOffset, MemoryBudget, ObservableId,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, ClassicalControl, ControlledPairs,
+    ControlledPauliTargetPair, DemTargetKind, FoldedCircuitSummary, FoldedWalkError, Gate,
+    GateCategory, GateKind, GateTargets, MeasureRecordOffset, MemoryBudget, ObservableId,
     ParseLimits, Pauli, QubitId, RepeatBlock, RepeatCount, Target,
-    advanced::{CircuitBuilder, ClassicalControl, ControlledPauliTargetPair, FoldedCircuitEvent},
+    advanced::{CircuitBuilder, FoldedCircuitEvent},
 };
 
 use crate::folded_walk::walk_folded;
@@ -139,8 +140,8 @@ impl WithoutFeedbackHelper {
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        if instruction.gate().controlled_pauli().is_some() {
-            return self.undo_feedback_capable_controlled_pauli(instruction);
+        if let GateTargets::ControlledPairs(pairs) = instruction.gate_targets() {
+            return self.undo_feedback_capable_controlled_pauli(instruction, pairs);
         }
         if instruction.gate().category() == GateCategory::Controlled
             && instruction
@@ -166,10 +167,12 @@ impl WithoutFeedbackHelper {
     fn undo_feedback_capable_controlled_pauli(
         &mut self,
         instruction: &CircuitInstruction,
+        pairs: ControlledPairs<'_>,
     ) -> AnalysisResult<()> {
-        for group in instruction.target_groups().into_iter().rev() {
-            let piece = instruction_with_targets(instruction, group.to_vec())?;
-            match ControlledPauliTargetPair::classify(instruction.gate(), group) {
+        let raw_pairs = pairs.as_target_pairs().iter().rev();
+        for (raw_pair, pair) in raw_pairs.zip(pairs.rev()) {
+            let piece = instruction_with_targets(instruction, raw_pair.to_vec())?;
+            match pair {
                 ControlledPauliTargetPair::Quantum { .. } => {
                     self.reversed_output
                         .push(CircuitItem::Instruction(piece.clone()));
@@ -493,14 +496,9 @@ fn rewritten_detector(
     measurements_in_past: usize,
 ) -> AnalysisResult<CircuitInstruction> {
     let mut targets = changes.clone();
-    for target in instruction.targets() {
-        let offset = target.measurement_record_offset().ok_or_else(|| {
-            AnalysisError::unsupported(
-                AnalysisOperation::FeedbackInlining,
-                GateKind::DETECTOR,
-                format!("DETECTOR target {target} is not a measurement record"),
-            )
-        })?;
+    for offset in
+        crate::instruction_shape::records(instruction, AnalysisOperation::FeedbackInlining)?
+    {
         let index = absolute_record_index(measurements_in_past, offset)?;
         toggle_value(&mut targets, index);
     }

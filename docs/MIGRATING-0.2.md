@@ -443,9 +443,30 @@ Refusals that were misreported are now typed:
 - A budget refusal raised while a sample run is writing reports `resource-limit-exceeded` instead of `sampling-execution-failed`.
 - The JSON `span` of a refusal that has no source position is `null` instead of an empty span at byte zero.
 
+## Typed Instruction Views
+
+A `CircuitInstruction` is validated against its gate's rules when it is built, so its arguments and targets are read through two infallible, allocation-free views instead of fallible getters.
+
+- `CircuitInstruction::gate_arguments()` returns `GateArguments`: `None`, `Coordinates(&[f64])`, `OptionalProbability(Option<Probability>)`, `Probability(Probability)`, `Probabilities(ProbabilityArgs)`, or `Observable(ObservableId)`.
+- `CircuitInstruction::gate_targets()` returns `GateTargets`, with one variant per `GateTargetRule`: `None`, `Qubits`, `MeasuredQubits`, `MeasurementPads`, `QubitPairs`, `ControlledPairs`, `MeasuredQubitPairs`, `Records`, `ObservableTargets`, `QubitCoords`, `PauliProducts`, and `PauliTerms`. Each carries a view that iterates typed items such as `QubitId`, `QubitTarget`, `[QubitId; 2]`, `ControlledPauliTargetPair`, `MeasureRecordOffset`, `ObservableTarget`, `PauliProduct`, and `PauliTarget`.
+- `CircuitInstruction::target_groups()` returns the named iterator `TargetGroups` instead of a `Vec`.
+
+| Removed | Replacement |
+| --- | --- |
+| `CircuitInstruction::probability_argument()` | `CircuitInstruction::probability()`, or match `gate_arguments()` |
+| `CircuitInstruction::probability_arguments()` | `GateArguments::Probabilities`; a single-probability gate such as `X_ERROR` reports `GateArguments::Probability` |
+| `CircuitInstruction::observable_id_argument()` | `GateArguments::Observable` |
+| `CircuitInstruction::coordinate_arguments()` | `GateArguments::Coordinates` |
+| `target_groups()` returning `Vec<&[Target]>` | The `TargetGroups` iterator; drop `.iter()` and `.into_iter()` |
+| `stab_model::advanced::{ClassicalControl, ControlledPauliTargetPair}` | `stab_model::{ClassicalControl, ControlledPauliTargetPair}` |
+| `ControlledPauliTargetPair::classify` | `GateTargets::ControlledPairs` |
+
+No command output, error variant, or diagnostic code changes.
+The view types are exported from `stab_model` and are not root re-exports of `stab_core`, as with `DemInstructionView`.
+
 ## Trimmed `stab_model::advanced`
 
-`stab_model::advanced` keeps only operations that rely on an invariant the caller has already established: `CircuitBuilder`, the folded circuit and DEM traversals, the tag-byte constructors, the controlled-Pauli pair classification, the raw gate tables, and the admission formula the engine shares.
+`stab_model::advanced` keeps only operations that rely on an invariant the caller has already established: `CircuitBuilder`, the folded circuit and DEM traversals, the tag-byte constructors, the raw gate tables, and the admission formula the engine shares.
 Free functions that wrapped a method are inherent methods or associated items on their type.
 
 | Removed from `stab_model::advanced` | Replacement |
@@ -458,7 +479,7 @@ Free functions that wrapped a method are inherent methods or associated items on
 | `dem_instruction_clear_tag(&mut instruction)` | `DemInstruction::clear_tag()` |
 | `model_dialect_fingerprint_discriminator(dialect)` | `ModelDialect::fingerprint_discriminator()` |
 | `validate_gate(gate, args, targets)` and `validate_gate_targets(gate, targets)` | `Gate::validate(args, targets)` and `Gate::validate_targets(targets)` |
-| `classify_controlled_pauli_target_pair(gate, targets)` | `advanced::ControlledPauliTargetPair::classify(gate, targets)` |
+| `classify_controlled_pauli_target_pair(gate, targets)` | `CircuitInstruction::gate_targets()`, whose `GateTargets::ControlledPairs` yields classified pairs (see [Typed Instruction Views](#typed-instruction-views)) |
 | `shifted_detector(detector, offset)` | `DemDetectorId::shifted(offset)` |
 | `STIM_TARGET_VALUE_LIMIT` | `QubitId::MAX`, the largest qubit id, which is the limit minus one |
 | `MAX_DEM_REPEAT_NESTING` | `RepeatNestingLimit::HARD_MAX` |

@@ -101,10 +101,8 @@ impl<'a> BodySummaries<'a> {
         loop {
             match items.next() {
                 Some(CircuitItem::Instruction(instruction)) => {
-                    if instruction.gate() == Gate::SHIFT_COORDS
-                        && let Some(args) = instruction.coordinate_arguments()
-                    {
-                        add_coordinate_shift_mul(&mut shift, args, 1.0)?;
+                    if instruction.gate() == Gate::SHIFT_COORDS {
+                        add_coordinate_shift_mul(&mut shift, instruction.args(), 1.0)?;
                     }
                 }
                 Some(CircuitItem::RepeatBlock(repeat)) => {

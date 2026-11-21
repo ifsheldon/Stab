@@ -4,13 +4,12 @@
 use stab_model::{CircuitInstruction, QubitId};
 
 use super::budget::set_entry_bytes;
-use super::pauli_product::{
-    pair_measurement_terms_reversed, pauli_product_measurement_terms_reversed, qubits_reversed,
-};
+use super::pauli_product::pauli_product_terms_reversed;
 use super::{SparseReverseFrameTracker, TrackerBasis, held_set_bytes};
-use crate::AnalysisOperation;
 use crate::target_xor_set::TargetXorSet;
-use crate::{AnalysisError, AnalysisResult};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, instruction_shape};
+
+const OPERATION: AnalysisOperation = AnalysisOperation::ReverseFrameTracking;
 
 impl SparseReverseFrameTracker {
     pub(super) fn undo_measure_resets(
@@ -25,8 +24,7 @@ impl SparseReverseFrameTracker {
         // Vendor ErrorAnalyzer::undo_MR* resolves each target completely (reset gauge, clear,
         // record merge) before the previous target; the post-merge measurement gauge check is
         // vacuous because the cleared frame only holds the measured basis.
-        for qubit in qubits_reversed(instruction) {
-            let qubit = qubit?;
+        for qubit in instruction_shape::single_qubits(instruction, OPERATION)?.rev() {
             self.check_reset_gauge(qubit, basis)?;
             self.clear_qubit(qubit)?;
             self.undo_measurement_target(qubit, basis)?;
@@ -47,8 +45,7 @@ impl SparseReverseFrameTracker {
         // Vendor ErrorAnalyzer::undo_M*_with_context merges each target's record before
         // checking that target for a gauge, one target at a time in reverse, so each check sees
         // the merged records and eliminated gauges of the targets after it.
-        for qubit in qubits_reversed(instruction) {
-            let qubit = qubit?;
+        for qubit in instruction_shape::single_qubits(instruction, OPERATION)?.rev() {
             self.undo_measurement_target(qubit, basis)?;
             self.check_measurement_gauge(qubit, basis)?;
             self.check_live_budget()?;
@@ -61,12 +58,12 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
-        let terms = pair_measurement_terms_reversed(instruction, basis)?;
-        self.ensure_measurements_available(terms.len(), instruction.gate().canonical_name())?;
+        let pairs = instruction_shape::measured_qubit_pairs(instruction, OPERATION)?;
+        self.ensure_measurements_available(pairs.len(), instruction.gate().canonical_name())?;
         // Vendor undo_M{XX,YY,ZZ} resolve one pair at a time in reverse order, so a later
         // pair's record is merged before an earlier, possibly overlapping pair is checked.
-        for term in terms {
-            self.undo_product_measurement_term(&term)?;
+        for [left, right] in pairs.rev() {
+            self.undo_product_measurement_term(&[(left.id, basis), (right.id, basis)])?;
         }
         Ok(())
     }
@@ -75,7 +72,7 @@ impl SparseReverseFrameTracker {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<()> {
-        let terms = pauli_product_measurement_terms_reversed(instruction)?;
+        let terms = pauli_product_terms_reversed(instruction)?;
         self.ensure_measurements_available(terms.len(), instruction.gate().canonical_name())?;
         // Vendor undo_MPP resolves one product at a time in reverse order, so a later product's
         // record is merged before an earlier, possibly anticommuting product is checked.
@@ -161,8 +158,7 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
         basis: TrackerBasis,
     ) -> AnalysisResult<()> {
-        for qubit in qubits_reversed(instruction) {
-            let qubit = qubit?;
+        for qubit in instruction_shape::single_qubits(instruction, OPERATION)?.rev() {
             self.check_reset_gauge(qubit, basis)?;
             self.clear_qubit(qubit)?;
         }

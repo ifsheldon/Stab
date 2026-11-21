@@ -246,17 +246,17 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
         instruction: &CircuitInstruction,
         basis: PauliBasis,
     ) -> AnalysisResult<bool> {
-        let groups = instruction.target_groups();
-        let mut pairs = Vec::with_capacity(groups.len());
-        for group in &groups {
-            let [left, right] = *group else {
-                return Ok(false);
-            };
-            pairs.push((
-                pair_measurement_target_index(left)?,
-                pair_measurement_target_index(right)?,
-            ));
-        }
+        let pairs = crate::instruction_shape::measured_qubit_pairs(
+            instruction,
+            AnalysisOperation::FlowGeneration,
+        )?
+        .map(|[left, right]| {
+            (
+                (left.id.get() as usize, left.inverted),
+                (right.id.get() as usize, right.inverted),
+            )
+        })
+        .collect::<Vec<_>>();
         for (&((left, left_inverted), (right, right_inverted)), record_index) in
             pairs.iter().rev().zip(measurement_indices_reversed(
                 &mut self.measurements_in_past,
@@ -291,8 +291,12 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<bool> {
-        let mut products = Vec::with_capacity(instruction.target_groups().len());
-        for group in instruction.target_groups() {
+        let groups = crate::instruction_shape::pauli_products(
+            instruction,
+            AnalysisOperation::FlowGeneration,
+        )?;
+        let mut products = Vec::with_capacity(groups.len());
+        for group in groups {
             let product = measured_pauli_product(instruction.gate(), self.qubit_count, group)?;
             products.push(product);
         }
@@ -311,14 +315,14 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
     }
 
     fn undo_measurement_pad(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<bool> {
-        let mut record_indices = measurement_indices_reversed(
-            &mut self.measurements_in_past,
-            instruction.targets().len(),
-        )?;
+        let pads =
+            crate::instruction_shape::pad_values(instruction, AnalysisOperation::FlowGeneration)?;
+        let mut record_indices =
+            measurement_indices_reversed(&mut self.measurements_in_past, pads.len())?;
         record_indices.reverse();
-        for (target, record_index) in instruction.targets().iter().rev().zip(record_indices) {
-            match target.qubit_id().map(|id| id.get()) {
-                Some(0) => self.flows.push(
+        for (pad, record_index) in pads.rev().zip(record_indices) {
+            match pad {
+                false => self.flows.push(
                     Flow::new(
                         stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
                         stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
@@ -327,7 +331,7 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
                     )
                     .map_err(stabilizer_to_circuit_error)?,
                 ),
-                Some(1) => self.flows.push(
+                true => self.flows.push(
                     Flow::new(
                         stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
                         stab_algebra::advanced::pauli_from_bases_unbudgeted(
@@ -339,7 +343,6 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
                     )
                     .map_err(stabilizer_to_circuit_error)?,
                 ),
-                _ => return Ok(false),
             }
         }
         Ok(true)
@@ -349,19 +352,10 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<bool> {
-        for (target, record_index) in
-            instruction
-                .targets()
-                .iter()
-                .rev()
-                .zip(measurement_indices_reversed(
-                    &mut self.measurements_in_past,
-                    instruction.targets().len(),
-                )?)
-        {
-            if target.qubit_id().is_none() || target.is_inverted_result_target() {
-                return Ok(false);
-            }
+        // Heralded noise targets plain qubits, and each target appends one herald record.
+        let heralds =
+            crate::instruction_shape::qubits(instruction, AnalysisOperation::FlowGeneration)?.len();
+        for record_index in measurement_indices_reversed(&mut self.measurements_in_past, heralds)? {
             self.flows.push(
                 Flow::new(
                     stab_algebra::advanced::pauli_identity_unbudgeted(self.qubit_count),
@@ -380,10 +374,12 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
         instruction: &CircuitInstruction,
         basis: PauliBasis,
     ) -> AnalysisResult<bool> {
-        for group in instruction.target_groups().into_iter().rev() {
-            let [left, right] = group else {
-                return Ok(false);
-            };
+        let pairs = crate::instruction_shape::controlled_pairs(
+            instruction,
+            AnalysisOperation::FlowGeneration,
+        )?;
+        for group in pairs.as_target_pairs().iter().rev() {
+            let [left, right] = group;
             let feedback = match (
                 left.measurement_record_offset(),
                 right.measurement_record_offset(),
@@ -426,7 +422,7 @@ impl<'a> MeasurementFeedbackFlowSolver<'a> {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> AnalysisResult<bool> {
-        for group in instruction.target_groups().into_iter().rev() {
+        for group in instruction.target_groups().rev() {
             if !self.undo_tableau_target_group(instruction, group)? {
                 return Ok(false);
             }

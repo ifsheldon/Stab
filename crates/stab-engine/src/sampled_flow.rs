@@ -4,9 +4,9 @@ use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString};
 use stab_analysis::advanced::flow_record_index;
 use stab_model::advanced::{CancellationCountdown, circuit_declaration_admitted_bytes};
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateCategory, GateKind,
-    MeasureRecordOffset, MemoryBudget, MemoryBudgetExceeded, QubitId, ResourceAmount, Target,
-    TargetKind,
+    Cancellation, Circuit, CircuitInstruction, CircuitItem, GateArguments, GateCategory, GateKind,
+    GateTargets, MeasureRecordOffset, MemoryBudget, MemoryBudgetExceeded, ObservableTarget, Pauli,
+    PauliTarget, QubitId, ResourceAmount, Target, TargetKind,
 };
 use stab_records::{BitIndex, MeasurementBatchView, MeasurementSink, ShotIndex};
 use thiserror::Error;
@@ -497,8 +497,7 @@ fn collect_circuit_qubits(
         match item {
             CircuitItem::Instruction(instruction) => {
                 let gate = instruction.gate();
-                let selected_observable = gate.kind() == GateKind::OBSERVABLE_INCLUDE
-                    && observable_is_selected(instruction, observables)?;
+                let selected_observable = observable_is_selected(instruction, observables);
                 if gate.category() == GateCategory::Annotation && !selected_observable {
                     continue;
                 }
@@ -536,8 +535,7 @@ fn append_flow_test_block_for_circuit(
         admission.countdown.tick(admission.cancellation)?;
         match item {
             CircuitItem::Instruction(instruction)
-                if instruction.gate().kind() == GateKind::OBSERVABLE_INCLUDE
-                    && observable_is_selected(instruction, observables)? =>
+                if observable_is_selected(instruction, observables) =>
             {
                 append_selected_observable_feedback(
                     output,
@@ -648,60 +646,52 @@ fn append_selected_observable_feedback(
     ancilla: QubitId,
     qubits: &DenseQubitMap,
 ) -> SampledFlowResult<()> {
-    for target in instruction.targets() {
-        if target.is_inverted_result_target() {
-            append_one_target_instruction(
-                output,
-                admission,
-                GateKind::X,
-                Vec::new(),
-                Target::qubit(ancilla, false),
-                instruction.tag_bytes(),
-            )?;
-        }
-        if target.is_measurement_record_target() {
-            append_two_target_instruction(
+    let GateTargets::ObservableTargets(targets) = instruction.gate_targets() else {
+        return Err(SampledFlowError::invalid_flow(format!(
+            "sampled flow checking expected {} to be an observable include",
+            instruction.gate().canonical_name()
+        )));
+    };
+    for (raw, target) in targets.as_targets().iter().zip(targets) {
+        match target {
+            ObservableTarget::MeasurementRecord(_) => append_two_target_instruction(
                 output,
                 admission,
                 GateKind::CX,
-                *target,
+                *raw,
                 Target::qubit(ancilla, false),
                 instruction.tag_bytes(),
-            )?;
-        } else if target.is_x_target() {
-            append_pauli_observable_feedback(
-                output,
-                admission,
-                GateKind::XCX,
-                target,
-                ancilla,
-                instruction,
-                qubits,
-            )?;
-        } else if target.is_y_target() {
-            append_pauli_observable_feedback(
-                output,
-                admission,
-                GateKind::YCX,
-                target,
-                ancilla,
-                instruction,
-                qubits,
-            )?;
-        } else if target.is_z_target() {
-            append_pauli_observable_feedback(
-                output,
-                admission,
-                GateKind::CX,
-                target,
-                ancilla,
-                instruction,
-                qubits,
-            )?;
-        } else {
-            return Err(SampledFlowError::invalid_flow(format!(
-                "sampled flow checking does not support OBSERVABLE_INCLUDE target {target}"
-            )));
+            )?,
+            ObservableTarget::Pauli(PauliTarget {
+                pauli,
+                id,
+                inverted,
+            }) => {
+                if inverted {
+                    append_one_target_instruction(
+                        output,
+                        admission,
+                        GateKind::X,
+                        Vec::new(),
+                        Target::qubit(ancilla, false),
+                        instruction.tag_bytes(),
+                    )?;
+                }
+                let gate = match pauli {
+                    Pauli::X => GateKind::XCX,
+                    Pauli::Y => GateKind::YCX,
+                    Pauli::Z => GateKind::CX,
+                };
+                append_pauli_observable_feedback(
+                    output,
+                    admission,
+                    gate,
+                    id,
+                    ancilla,
+                    instruction,
+                    qubits,
+                )?;
+            }
         }
     }
     Ok(())
@@ -711,16 +701,11 @@ fn append_pauli_observable_feedback(
     output: &mut Circuit,
     admission: &mut AugmentedAdmission<'_>,
     gate: GateKind,
-    target: &Target,
+    qubit: QubitId,
     ancilla: QubitId,
     source: &CircuitInstruction,
     qubits: &DenseQubitMap,
 ) -> SampledFlowResult<()> {
-    let qubit = target.qubit_id().ok_or_else(|| {
-        SampledFlowError::invalid_flow(format!(
-            "sampled flow checking expected Pauli observable target {target} to contain a qubit"
-        ))
-    })?;
     append_two_target_instruction(
         output,
         admission,
@@ -768,16 +753,15 @@ fn append_pauli_controlled_not(
     Ok(())
 }
 
+/// Reports whether `instruction` includes one of the selected observables.
 fn observable_is_selected(
     instruction: &CircuitInstruction,
     selected_observables: &BTreeSet<u32>,
-) -> SampledFlowResult<bool> {
-    let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-        SampledFlowError::invalid_flow(
-            "OBSERVABLE_INCLUDE missing observable index during sampled flow checking",
-        )
-    })?;
-    Ok(selected_observables.contains(&observable.get()))
+) -> bool {
+    matches!(
+        instruction.gate_arguments(),
+        GateArguments::Observable(observable) if selected_observables.contains(&observable.get())
+    )
 }
 
 fn sampled_flow_measurement_target(

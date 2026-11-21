@@ -2,14 +2,13 @@ use std::fmt::{Display, Formatter};
 use std::io::{self, Write};
 use std::ops::RangeBounds;
 
-use crate::gate::GateTargetGroupKind;
 use crate::model_bytes::PreparedModelText;
 use crate::model_tag::{ItemTag, ModelTag};
 use crate::model_tree;
 use crate::target::TargetVec;
 use crate::{
-    AbsoluteTolerance, Gate, GateArgumentRule, ModelDialect, ModelError, ModelFingerprint,
-    ModelResult, ObservableId, ParseLimits, Probability, RepeatCount, Target, ValidationError,
+    AbsoluteTolerance, Gate, ModelDialect, ModelError, ModelFingerprint, ModelResult, ParseLimits,
+    RepeatCount, Target,
 };
 
 mod api;
@@ -17,12 +16,18 @@ mod counts;
 mod folded;
 mod iter;
 mod tree;
+mod views;
 
 pub use folded::{
     FoldedCircuitEvent, FoldedCircuitSummary, FoldedCount, FoldedVisitError, FoldedWalkError,
     visit_folded_circuit,
 };
 pub use iter::{CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter};
+pub use views::{
+    ControlledPairs, GateArguments, GateTargets, ObservableTarget, ObservableTargets, PadValues,
+    PauliProduct, PauliProducts, PauliTerms, ProbabilityArgs, QubitIds, QubitPairs,
+    QubitTargetPairs, QubitTargets, RecordTargets, TargetGroups,
+};
 
 use self::iter::{checked_item_range, circuit_item_range_error};
 
@@ -454,54 +459,6 @@ impl CircuitInstruction {
         &self.args
     }
 
-    /// Returns this instruction's optional probability argument when the gate has one.
-    pub fn probability_argument(&self) -> ModelResult<Option<Probability>> {
-        if !matches!(
-            self.gate.argument_rule(),
-            GateArgumentRule::OptionalProbability | GateArgumentRule::ProbabilityList(1)
-        ) {
-            return Ok(None);
-        }
-        self.args
-            .first()
-            .copied()
-            .map(|arg| probability_from_validated_arg(self.gate.canonical_name(), arg))
-            .transpose()
-    }
-
-    /// Returns this instruction's disjoint probability-list arguments when the gate has them.
-    pub fn probability_arguments(&self) -> ModelResult<Option<Vec<Probability>>> {
-        if !matches!(
-            self.gate.argument_rule(),
-            GateArgumentRule::ProbabilityList(_) | GateArgumentRule::AnyProbabilityList
-        ) {
-            return Ok(None);
-        }
-        self.args
-            .iter()
-            .copied()
-            .map(|arg| probability_from_validated_arg(self.gate.canonical_name(), arg))
-            .collect::<ModelResult<Vec<_>>>()
-            .map(Some)
-    }
-
-    /// Returns this instruction's observable id argument when the gate has one.
-    pub fn observable_id_argument(&self) -> ModelResult<Option<ObservableId>> {
-        if self.gate.argument_rule() != GateArgumentRule::UnsignedInteger {
-            return Ok(None);
-        }
-        self.args
-            .first()
-            .copied()
-            .map(|arg| observable_id_from_validated_arg(self.gate.canonical_name(), arg))
-            .transpose()
-    }
-
-    /// Returns coordinate-like arguments for gates whose argument list is arbitrary floats.
-    pub fn coordinate_arguments(&self) -> Option<&[f64]> {
-        (self.gate.argument_rule() == GateArgumentRule::Any).then_some(&self.args)
-    }
-
     pub fn targets(&self) -> &[Target] {
         &self.targets
     }
@@ -519,31 +476,9 @@ impl CircuitInstruction {
         self.tag.as_deref().map(ModelTag::as_bytes)
     }
 
-    pub fn target_groups(&self) -> Vec<&[Target]> {
-        match self.gate.target_group_kind() {
-            GateTargetGroupKind::None => Vec::new(),
-            GateTargetGroupKind::Singles => self.targets.chunks(1).collect(),
-            GateTargetGroupKind::Pairs => self.targets.chunks(2).collect(),
-            GateTargetGroupKind::PauliProducts => pauli_product_target_groups(&self.targets),
-            GateTargetGroupKind::AllTargets => {
-                if self.targets.is_empty() {
-                    Vec::new()
-                } else {
-                    vec![self.targets.as_slice()]
-                }
-            }
-        }
-    }
-
-    /// Returns [`Self::target_groups`]'s length without materializing the groups.
+    /// Returns [`Self::target_groups`]'s length.
     pub(crate) fn target_group_count(&self) -> usize {
-        match self.gate.target_group_kind() {
-            GateTargetGroupKind::None => 0,
-            GateTargetGroupKind::Singles => self.targets.len(),
-            GateTargetGroupKind::Pairs => self.targets.len() / 2,
-            GateTargetGroupKind::PauliProducts => pauli_product_target_group_count(&self.targets),
-            GateTargetGroupKind::AllTargets => usize::from(!self.targets.is_empty()),
-        }
+        self.target_groups().len()
     }
 
     /// Splits this instruction into maximal segments whose target groups touch disjoint qubits.
@@ -587,7 +522,7 @@ impl CircuitInstruction {
         let mut current_targets = Vec::new();
         let mut current_qubits = Vec::new();
 
-        for group in self.target_groups().into_iter().rev() {
+        for group in self.target_groups().rev() {
             let group_qubits = group
                 .iter()
                 .filter_map(Target::qubit_id)
@@ -843,42 +778,6 @@ fn fuse_block(items: &mut Vec<CircuitItem>) -> ModelResult<()> {
     Ok(())
 }
 
-fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
-    let mut groups = Vec::new();
-    let mut start = 0;
-    while start < targets.len() {
-        let mut end = start + 1;
-        while matches!(targets.get(end), Some(target) if target.is_combiner()) {
-            end = (end + 2).min(targets.len());
-        }
-        if let Some(group) = targets.get(start..end) {
-            groups.push(group);
-        }
-        start = end;
-    }
-    groups
-}
-
-/// Counts [`pauli_product_target_groups`]'s groups without materializing them.
-///
-/// A group is one Pauli target followed by any number of combiner-target pairs, so on the
-/// combiner-validated target lists every constructed instruction carries, both walks agree.
-fn pauli_product_target_group_count(targets: &[Target]) -> usize {
-    let mut group_count = 0;
-    let mut previous_was_combiner = false;
-    for target in targets {
-        if target.is_combiner() {
-            previous_was_combiner = true;
-        } else {
-            if !previous_was_combiner {
-                group_count += 1;
-            }
-            previous_was_combiner = false;
-        }
-    }
-    group_count
-}
-
 fn write_indent(out: &mut String, indent: usize) {
     out.extend(std::iter::repeat_n(' ', indent));
 }
@@ -925,24 +824,4 @@ fn write_targets_io(out: &mut impl Write, targets: &[Target]) -> io::Result<()> 
         printing::write_target_io(out, target)?;
     }
     Ok(())
-}
-
-fn probability_from_validated_arg(gate: &'static str, arg: f64) -> ModelResult<Probability> {
-    Probability::try_new(arg).map_err(|_| {
-        ValidationError::InvalidArgument {
-            gate,
-            argument: arg.to_string(),
-        }
-        .into()
-    })
-}
-
-fn observable_id_from_validated_arg(gate: &'static str, arg: f64) -> ModelResult<ObservableId> {
-    ObservableId::from_gate_arg(arg).ok_or_else(|| {
-        ValidationError::InvalidArgument {
-            gate,
-            argument: arg.to_string(),
-        }
-        .into()
-    })
 }

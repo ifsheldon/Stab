@@ -54,6 +54,24 @@ impl ObservableId {
         Self(value)
     }
 
+    /// Converts a gate argument that [`Self::from_gate_arg`] already admitted.
+    ///
+    /// The cast is total (it saturates and maps NaN to zero), so an argument outside the domain,
+    /// which no validated instruction holds, cannot panic; debug builds assert the domain.
+    #[inline]
+    pub(crate) fn from_validated_gate_arg(arg: f64) -> Self {
+        debug_assert!(
+            Self::from_gate_arg(arg).is_some(),
+            "{arg} is not an observable id"
+        );
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "construction-time validation admitted an integral id in 0..=u32::MAX"
+        )]
+        Self(arg as u32)
+    }
+
     /// Converts a gate argument to an id when it is an integral value in the id domain.
     pub(crate) fn from_gate_arg(arg: f64) -> Option<Self> {
         if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 || arg > f64::from(u32::MAX) {
@@ -189,6 +207,14 @@ impl Probability {
     #[inline(always)]
     pub fn get(self) -> f64 {
         self.0
+    }
+
+    /// Wraps a gate argument that construction-time validation already admitted as a
+    /// probability; debug builds assert the domain.
+    #[inline(always)]
+    pub(crate) fn from_validated(value: f64) -> Self {
+        debug_assert!(Self::try_new(value).is_ok(), "{value} is not a probability");
+        Self(value)
     }
 
     /// Borrows the stored value, so a model can lend it as a one-element argument slice.

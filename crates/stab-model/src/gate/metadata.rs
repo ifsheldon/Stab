@@ -60,6 +60,13 @@ impl Gate {
         self.info.arg_rule.into()
     }
 
+    /// The internal argument rule, which is more precise than [`Self::argument_rule`] about the
+    /// zero-argument and single-probability shapes.
+    #[inline]
+    pub(crate) fn arg_rule(self) -> ArgRule {
+        self.info.arg_rule
+    }
+
     #[inline]
     pub fn target_rule(self) -> GateTargetRule {
         self.info.target_rule.into()
@@ -213,9 +220,10 @@ impl Gate {
 impl From<ArgRule> for GateArgumentRule {
     fn from(value: ArgRule) -> Self {
         match value {
-            ArgRule::Exact(count) => Self::Exact(count),
+            ArgRule::None => Self::Exact(0),
             ArgRule::Any => Self::Any,
             ArgRule::ZeroOrOneProbability => Self::OptionalProbability,
+            ArgRule::Probability => Self::ProbabilityList(1),
             ArgRule::ProbabilityList(count) => Self::ProbabilityList(count),
             ArgRule::AnyProbabilityList => Self::AnyProbabilityList,
             ArgRule::UnsignedInteger => Self::UnsignedInteger,

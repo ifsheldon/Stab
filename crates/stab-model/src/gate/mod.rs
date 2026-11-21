@@ -81,9 +81,7 @@ impl Gate {
     }
 
     pub(crate) const DETECTOR: Self = GateKind::DETECTOR.gate();
-    pub(crate) const OBSERVABLE_INCLUDE: Self = GateKind::OBSERVABLE_INCLUDE.gate();
     pub(crate) const TICK: Self = GateKind::TICK.gate();
-    pub(crate) const QUBIT_COORDS: Self = GateKind::QUBIT_COORDS.gate();
     pub(crate) const SHIFT_COORDS: Self = GateKind::SHIFT_COORDS.gate();
     pub(crate) const H: Self = GateKind::H.gate();
     pub(crate) const S: Self = GateKind::S.gate();
@@ -205,9 +203,13 @@ impl GateFlags {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ArgRule {
-    Exact(usize),
+    /// No arguments; reported publicly as [`GateArgumentRule::Exact`]`(0)`.
+    None,
     Any,
     ZeroOrOneProbability,
+    /// Exactly one probability; reported publicly as [`GateArgumentRule::ProbabilityList`]`(1)`.
+    Probability,
+    /// Exactly this many (at least two) disjoint probabilities.
     ProbabilityList(usize),
     AnyProbabilityList,
     UnsignedInteger,
@@ -216,20 +218,13 @@ pub(crate) enum ArgRule {
 impl ArgRule {
     fn validate(self, gate: &'static str, args: &[f64]) -> ModelResult<()> {
         match self {
-            Self::Exact(expected) if args.len() != expected => {
-                Err(ValidationError::InvalidArgumentCount {
-                    gate,
-                    expected: match expected {
-                        0 => "0",
-                        1 => "1",
-                        2 => "2",
-                        _ => "fixed",
-                    },
-                    actual: args.len(),
-                }
-                .into())
+            Self::None if !args.is_empty() => Err(ValidationError::InvalidArgumentCount {
+                gate,
+                expected: "0",
+                actual: args.len(),
             }
-            Self::Exact(_) => Ok(()),
+            .into()),
+            Self::None => Ok(()),
             Self::Any => {
                 for arg in args {
                     validate_finite_arg(gate, *arg)?;
@@ -255,17 +250,8 @@ impl ArgRule {
                 }
                 Ok(())
             }
-            Self::ProbabilityList(expected) => {
-                if args.len() != expected {
-                    return Err(ValidationError::InvalidArgumentCount {
-                        gate,
-                        expected: "probability list",
-                        actual: args.len(),
-                    }
-                    .into());
-                }
-                validate_probability_list(gate, args)
-            }
+            Self::Probability => validate_probability_count(gate, args, 1),
+            Self::ProbabilityList(expected) => validate_probability_count(gate, args, expected),
             Self::AnyProbabilityList => validate_probability_list(gate, args),
             Self::UnsignedInteger => {
                 if args.len() != 1 {
@@ -297,6 +283,22 @@ impl ArgRule {
             }
         }
     }
+}
+
+fn validate_probability_count(
+    gate: &'static str,
+    args: &[f64],
+    expected: usize,
+) -> ModelResult<()> {
+    if args.len() != expected {
+        return Err(ValidationError::InvalidArgumentCount {
+            gate,
+            expected: "probability list",
+            actual: args.len(),
+        }
+        .into());
+    }
+    validate_probability_list(gate, args)
 }
 
 fn validate_probability_list(gate: &'static str, args: &[f64]) -> ModelResult<()> {

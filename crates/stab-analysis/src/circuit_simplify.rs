@@ -4,9 +4,11 @@ use std::ops::ControlFlow;
 
 use stab_algebra::{SingleQubitClifford, StabilizerError};
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateKind, Pauli, QubitId, Target, TargetKind,
+    Circuit, CircuitInstruction, CircuitItem, Gate, GateKind, Pauli, PauliProduct, PauliTarget,
+    QubitId, Target, TargetKind,
 };
 
+use crate::instruction_shape;
 use crate::{AnalysisError, AnalysisOperation, AnalysisResult};
 
 /// Rewrites supported operations into Stim's public `Circuit.decomposed()` base-gate set.
@@ -270,7 +272,7 @@ fn append_template_decomposition(
         };
         let mut targets = Vec::new();
         for template_group in template_instruction.target_groups() {
-            for actual_group in &actual_groups {
+            for actual_group in actual_groups.clone() {
                 for template_target in template_group {
                     let target = substitute_template_target(
                         template_target,
@@ -347,7 +349,9 @@ fn append_decomposed_mpp(
     instruction: &CircuitInstruction,
     result: &mut Circuit,
 ) -> AnalysisResult<()> {
-    for group in instruction.target_groups() {
+    let products =
+        instruction_shape::pauli_products(instruction, AnalysisOperation::CircuitSimplification)?;
+    for group in products {
         let product = reduce_pauli_product(instruction.gate().kind(), group)?;
         if product.terms.is_empty() {
             append_gate_targets(
@@ -402,7 +406,9 @@ fn visit_decomposed_spp<Break>(
     dagger: bool,
     visitor: &mut impl FnMut(CircuitInstruction) -> ControlFlow<Break>,
 ) -> AnalysisResult<ControlFlow<Break>> {
-    for group in instruction.target_groups() {
+    let products =
+        instruction_shape::pauli_products(instruction, AnalysisOperation::CircuitSimplification)?;
+    for group in products {
         let product = reduce_pauli_product(instruction.gate().kind(), group)?;
         if product.terms.is_empty() {
             continue;
@@ -706,7 +712,7 @@ struct ReducedProduct {
     terms: Vec<ProductTerm>,
 }
 
-fn reduce_pauli_product(gate: GateKind, group: &[Target]) -> AnalysisResult<ReducedProduct> {
+fn reduce_pauli_product(gate: GateKind, group: PauliProduct<'_>) -> AnalysisResult<ReducedProduct> {
     #[cfg(test)]
     {
         reduce_pauli_product_impl(gate, group, None)
@@ -725,50 +731,41 @@ struct PauliReductionWork {
 
 fn reduce_pauli_product_impl(
     gate: GateKind,
-    group: &[Target],
+    group: PauliProduct<'_>,
     #[cfg(test)] mut work: Option<&mut PauliReductionWork>,
 ) -> AnalysisResult<ReducedProduct> {
     let mut phase = 0_u8;
     let mut term_indexes = BTreeMap::<QubitId, usize>::new();
     let mut terms = Vec::<(QubitId, Option<Pauli>)>::new();
 
-    for target in group {
-        match target.kind() {
-            TargetKind::Pauli {
-                pauli,
-                id,
-                inverted,
-            } => {
-                if inverted {
-                    phase = (phase + 2) % 4;
-                }
-                #[cfg(test)]
-                if let Some(work) = work.as_deref_mut() {
-                    work.index_lookups += 1;
-                }
-                let index = if let Some(index) = term_indexes.get(&id) {
-                    *index
-                } else {
-                    let index = terms.len();
-                    terms.push((id, None));
-                    term_indexes.insert(id, index);
-                    index
-                };
-                let slot = terms.get_mut(index).ok_or_else(|| {
-                    invalid_simplification("Pauli product index disagreed with retained terms")
-                })?;
-                let current = slot.1.take();
-                let (next_phase, next_pauli) = multiply_pauli(current, pauli);
-                phase = (phase + next_phase) % 4;
-                slot.1 = next_pauli;
-            }
-            TargetKind::Combiner => {}
-            _ => {
-                return Err(invalid_simplification(format!(
-                    "Pauli product decomposition expected Pauli targets, got {target}"
-                )));
-            }
+    for PauliTarget {
+        pauli,
+        id,
+        inverted,
+    } in group
+    {
+        if inverted {
+            phase = (phase + 2) % 4;
         }
+        #[cfg(test)]
+        if let Some(work) = work.as_deref_mut() {
+            work.index_lookups += 1;
+        }
+        let index = if let Some(index) = term_indexes.get(&id) {
+            *index
+        } else {
+            let index = terms.len();
+            terms.push((id, None));
+            term_indexes.insert(id, index);
+            index
+        };
+        let slot = terms.get_mut(index).ok_or_else(|| {
+            invalid_simplification("Pauli product index disagreed with retained terms")
+        })?;
+        let current = slot.1.take();
+        let (next_phase, next_pauli) = multiply_pauli(current, pauli);
+        phase = (phase + next_phase) % 4;
+        slot.1 = next_pauli;
     }
 
     if !phase.is_multiple_of(2) {
@@ -790,7 +787,7 @@ fn reduce_pauli_product_impl(
 
 #[cfg(test)]
 fn reduce_pauli_product_with_work(
-    group: &[Target],
+    group: PauliProduct<'_>,
 ) -> AnalysisResult<(ReducedProduct, PauliReductionWork)> {
     let mut work = PauliReductionWork::default();
     let product = reduce_pauli_product_impl(GateKind::MPP, group, Some(&mut work))?;
@@ -852,8 +849,10 @@ mod tests {
                 CircuitItem::RepeatBlock(_) => None,
             })
             .expect("fixture contains one MPP instruction");
-        let groups = instruction.target_groups();
-        let group = groups.first().expect("MPP instruction has one product");
+        let stab_model::GateTargets::PauliProducts(mut groups) = instruction.gate_targets() else {
+            unreachable!("MPP targets are Pauli products");
+        };
+        let group = groups.next().expect("MPP instruction has one product");
 
         let (product, work) =
             reduce_pauli_product_with_work(group).expect("hostile MPP product reduces");

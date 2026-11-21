@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::resource_limit::admit_detector_coordinate_map;
 use crate::{
-    CircuitDetectorId, Gate, MemoryBudget, ModelDialect, ModelError, ModelResult, QubitId,
-    RepeatCount, ValidationError,
+    CircuitDetectorId, Gate, GateArguments, GateTargets, MemoryBudget, ModelDialect, ModelError,
+    ModelResult, QubitId, RepeatCount, ValidationError,
 };
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
@@ -167,13 +167,10 @@ impl Circuit {
 
     pub fn count_observables(&self) -> ModelResult<u64> {
         max_operation_property(self, |instruction| {
-            if instruction.gate() == Gate::OBSERVABLE_INCLUDE {
-                instruction
-                    .observable_id_argument()
-                    .map(|id| id.map(|id| u64::from(id.get()) + 1))
-            } else {
-                Ok(None)
-            }
+            Ok(match instruction.gate_arguments() {
+                GateArguments::Observable(id) => Some(u64::from(id.get()) + 1),
+                _ => None,
+            })
         })
     }
 
@@ -422,10 +419,8 @@ fn coordinate_shift_of(circuit: &Circuit) -> ModelResult<Vec<f64>> {
     loop {
         match items.next() {
             Some(CircuitItem::Instruction(instruction)) => {
-                if instruction.gate() == Gate::SHIFT_COORDS
-                    && let Some(args) = instruction.coordinate_arguments()
-                {
-                    add_coordinate_shift_mul(&mut shift, args, 1.0)?;
+                if instruction.gate() == Gate::SHIFT_COORDS {
+                    add_coordinate_shift_mul(&mut shift, instruction.args(), 1.0)?;
                 }
             }
             Some(CircuitItem::RepeatBlock(repeat)) => {
@@ -461,18 +456,12 @@ fn apply_final_qubit_coordinates(
     loop {
         match items.next() {
             Some(CircuitItem::Instruction(instruction)) => {
-                let gate = instruction.gate();
-                if gate == Gate::QUBIT_COORDS {
-                    let args = instruction.coordinate_arguments().unwrap_or_default();
-                    for target in instruction.targets() {
-                        if let Some(qubit) = target.qubit_id() {
-                            coordinates.insert(qubit, shifted_coordinates(args, shift)?);
-                        }
+                if let GateTargets::QubitCoords(qubits) = instruction.gate_targets() {
+                    for qubit in qubits {
+                        coordinates.insert(qubit, shifted_coordinates(instruction.args(), shift)?);
                     }
-                } else if gate == Gate::SHIFT_COORDS
-                    && let Some(args) = instruction.coordinate_arguments()
-                {
-                    add_coordinate_shift_mul(shift, args, 1.0)?;
+                } else if instruction.gate() == Gate::SHIFT_COORDS {
+                    add_coordinate_shift_mul(shift, instruction.args(), 1.0)?;
                 }
             }
             Some(CircuitItem::RepeatBlock(repeat)) => {
@@ -626,9 +615,7 @@ impl DetectorCoordinateScan {
     ) -> ModelResult<()> {
         let gate = instruction.gate();
         if gate == Gate::SHIFT_COORDS {
-            if let Some(args) = instruction.coordinate_arguments() {
-                add_coordinate_shift_mul(shift, args, 1.0)?;
-            }
+            add_coordinate_shift_mul(shift, instruction.args(), 1.0)?;
         } else if gate == Gate::DETECTOR {
             self.visit_detector(instruction, shift)?;
         }

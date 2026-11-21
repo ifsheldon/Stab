@@ -460,7 +460,7 @@ fn reversed_target_groups(instruction: &CircuitInstruction) -> Vec<Target> {
         return instruction.targets().iter().rev().cloned().collect();
     }
     let mut targets = Vec::with_capacity(instruction.targets().len());
-    for group in instruction.target_groups().into_iter().rev() {
+    for group in instruction.target_groups().rev() {
         targets.extend_from_slice(group);
     }
     targets

@@ -1,6 +1,7 @@
 use stab_algebra::PauliBasis;
-use stab_model::advanced::{ClassicalControl, ControlledPauliTargetPair};
-use stab_model::{CircuitInstruction, GateKind, Pauli};
+use stab_model::{
+    CircuitInstruction, ClassicalControl, ControlledPauliTargetPair, GateKind, GateTargets, Pauli,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ReverseFlowTransition {
@@ -141,14 +142,13 @@ pub(crate) fn reverse_flow_transition(instruction: &CircuitInstruction) -> Rever
 /// controlled-Pauli classifier owns that orientation, so a sweep bit in the Pauli slot falls
 /// through to the tracker's not-a-qubit rejection instead of classifying as a no-op.
 pub(crate) fn sweep_controlled_pauli_is_sign_only_noop(instruction: &CircuitInstruction) -> bool {
-    if instruction.gate().controlled_pauli().is_none() {
+    let GateTargets::ControlledPairs(mut pairs) = instruction.gate_targets() else {
         return false;
-    }
-    let groups = instruction.target_groups();
-    !groups.is_empty()
-        && groups.iter().all(|group| {
+    };
+    pairs.len() > 0
+        && pairs.all(|pair| {
             matches!(
-                ControlledPauliTargetPair::classify(instruction.gate(), group),
+                pair,
                 ControlledPauliTargetPair::Classical {
                     control: ClassicalControl::Sweep(_),
                     ..

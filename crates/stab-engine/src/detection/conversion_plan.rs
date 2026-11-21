@@ -1,6 +1,7 @@
 use arrayvec::ArrayVec;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, GateKind, MeasureRecordOffset, RepeatNestingLimit,
+    Cancellation, Circuit, CircuitInstruction, GateArguments, GateKind, GateTargets,
+    MeasureRecordOffset, ObservableTarget, RepeatNestingLimit,
 };
 
 use super::buffers::{resource_amount, validate_vector_capacity};
@@ -497,13 +498,14 @@ impl ConversionPlan {
         self.detector_count = next_detector_count;
         self.validate_compiled_bytes()?;
 
+        let GateTargets::Records(records) = instruction.gate_targets() else {
+            return Err(DetectionError::invalid_result_format(format!(
+                "{} does not take measurement-record targets",
+                instruction.gate().canonical_name()
+            )));
+        };
         let start = self.program.terms.len();
-        for target in instruction.targets() {
-            let offset = target.measurement_record_offset().ok_or_else(|| {
-                DetectionError::invalid_result_format(format!(
-                    "DETECTOR target {target} is not a measurement record"
-                ))
-            })?;
+        for offset in records {
             self.validate_measurement_offset(offset)?;
             if self.collect_program {
                 self.program.push_term(offset)?;
@@ -561,9 +563,14 @@ impl ConversionPlan {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> DetectionResult<()> {
-        let observable_id = instruction.observable_id_argument()?.ok_or_else(|| {
-            DetectionError::invalid_result_format("OBSERVABLE_INCLUDE missing id")
-        })?;
+        let (GateArguments::Observable(observable_id), GateTargets::ObservableTargets(targets)) =
+            (instruction.gate_arguments(), instruction.gate_targets())
+        else {
+            return Err(DetectionError::invalid_result_format(format!(
+                "{} is not an observable include",
+                instruction.gate().canonical_name()
+            )));
+        };
         let observable_id = usize::try_from(observable_id.get()).map_err(|_| {
             DetectionError::invalid_result_format(format!(
                 "observable id {} does not fit usize",
@@ -572,22 +579,16 @@ impl ConversionPlan {
         })?;
         self.ensure_observable(observable_id)?;
 
-        let term_count = instruction
-            .targets()
-            .iter()
-            .filter(|target| target.measurement_record_offset().is_some())
-            .count();
+        let records = targets.filter_map(|target| match target {
+            ObservableTarget::MeasurementRecord(offset) => Some(offset),
+            ObservableTarget::Pauli(_) => None,
+        });
+        let term_count = records.clone().count();
         let start = self.program.terms.len();
-        for target in instruction.targets() {
-            if let Some(offset) = target.measurement_record_offset() {
-                self.validate_measurement_offset(offset)?;
-                if self.collect_program {
-                    self.program.push_term(offset)?;
-                }
-            } else if !target.is_pauli_target() {
-                return Err(DetectionError::invalid_result_format(format!(
-                    "OBSERVABLE_INCLUDE target {target} is not supported"
-                )));
+        for offset in records {
+            self.validate_measurement_offset(offset)?;
+            if self.collect_program {
+                self.program.push_term(offset)?;
             }
         }
         if term_count == 0 {

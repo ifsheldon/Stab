@@ -5,8 +5,8 @@
 )]
 
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateCategory, ObservableId, Pauli, Probability,
-    QubitId, RepeatBlock, RepeatCount, Target,
+    Circuit, CircuitInstruction, CircuitItem, Gate, GateArguments, GateCategory, ObservableId,
+    Pauli, Probability, QubitId, RepeatBlock, RepeatCount, Target,
 };
 
 #[test]
@@ -428,7 +428,7 @@ fn parses_spp_and_spp_dag_pauli_products_like_stim() {
             .and_then(CircuitItemExt::as_instruction)
             .expect("SPP instruction");
         assert_eq!(
-            instruction.target_groups(),
+            instruction.target_groups().collect::<Vec<_>>(),
             &[
                 &[Target::pauli(Pauli::X, QubitId::new(0).unwrap(), false)][..],
                 &[
@@ -760,30 +760,32 @@ fn instruction_typed_argument_accessors_preserve_stim_domains() {
     assert!(instructions.next().is_none());
 
     assert_eq!(
-        x_error.probability_argument().unwrap(),
-        Some(Probability::try_new(0.125).unwrap())
+        x_error.gate_arguments(),
+        GateArguments::Probability(Probability::try_new(0.125).unwrap())
+    );
+    std::assert_matches!(
+        pauli_channel.gate_arguments(),
+        GateArguments::Probabilities(probabilities)
+            if probabilities.to_array::<3>() == Some([
+                Probability::try_new(0.1).unwrap(),
+                Probability::try_new(0.2).unwrap(),
+                Probability::try_new(0.3).unwrap(),
+            ])
     );
     assert_eq!(
-        pauli_channel.probability_arguments().unwrap(),
-        Some(vec![
-            Probability::try_new(0.1).unwrap(),
-            Probability::try_new(0.2).unwrap(),
-            Probability::try_new(0.3).unwrap(),
-        ])
+        observable.gate_arguments(),
+        GateArguments::Observable(ObservableId::from(7))
     );
     assert_eq!(
-        observable.observable_id_argument().unwrap(),
-        Some(ObservableId::from(7))
+        large_observable.gate_arguments(),
+        GateArguments::Observable(ObservableId::MAX)
     );
     assert_eq!(
-        large_observable.observable_id_argument().unwrap(),
-        Some(ObservableId::MAX)
+        detector.gate_arguments(),
+        GateArguments::Coordinates(&[2.0, 3.5])
     );
-    assert_eq!(detector.coordinate_arguments(), Some(&[2.0, 3.5][..]));
-    assert_eq!(h.probability_argument().unwrap(), None);
-    assert_eq!(h.probability_arguments().unwrap(), None);
-    assert_eq!(h.observable_id_argument().unwrap(), None);
-    assert_eq!(h.coordinate_arguments(), None);
+    assert_eq!(h.gate_arguments(), GateArguments::None);
+    assert_eq!(h.probability(), None);
 }
 
 #[test]
@@ -904,7 +906,6 @@ fn target_groups(item: &CircuitItem) -> Vec<Vec<Target>> {
     item.as_instruction()
         .expect("instruction")
         .target_groups()
-        .into_iter()
         .map(<[Target]>::to_vec)
         .collect()
 }

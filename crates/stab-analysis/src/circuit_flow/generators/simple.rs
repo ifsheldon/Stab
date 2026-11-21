@@ -4,7 +4,7 @@ use stab_algebra::{Flow, PauliBasis, PauliSign};
 use stab_model::{CircuitInstruction, MemoryBudget};
 
 use crate::AnalysisOperation;
-use crate::{AnalysisError, AnalysisResult};
+use crate::AnalysisResult;
 
 use super::canonicalize::final_canonicalize_measurement_generators;
 use super::helpers::{
@@ -175,16 +175,16 @@ pub(super) fn simple_pair_measurement_flows(
     budget: MemoryBudget,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
-    let groups = instruction.target_groups();
-    admit_flow_generator_rows(qubit_count, groups.len(), budget)?;
-    let mut measured_pairs = Vec::with_capacity(groups.len());
-    for (record_index, group) in groups.iter().enumerate() {
-        let [left, right] = *group else {
-            return Ok(None);
-        };
+    let pairs = crate::instruction_shape::measured_qubit_pairs(
+        instruction,
+        AnalysisOperation::FlowGeneration,
+    )?;
+    admit_flow_generator_rows(qubit_count, pairs.len(), budget)?;
+    let mut measured_pairs = Vec::with_capacity(pairs.len());
+    for (record_index, [left, right]) in pairs.enumerate() {
         measured_pairs.push((
-            pair_measurement_target_index(left)?,
-            pair_measurement_target_index(right)?,
+            (left.id.get() as usize, left.inverted),
+            (right.id.get() as usize, right.inverted),
             record_index_i32(record_index)?,
         ));
     }
@@ -223,10 +223,11 @@ pub(super) fn simple_pauli_product_measurement_flows(
     budget: MemoryBudget,
 ) -> AnalysisResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
-    let groups = instruction.target_groups();
-    admit_flow_generator_rows(qubit_count, groups.len(), budget)?;
-    let mut measured_products = Vec::with_capacity(groups.len());
-    for (record_index, group) in groups.into_iter().enumerate() {
+    let products =
+        crate::instruction_shape::pauli_products(instruction, AnalysisOperation::FlowGeneration)?;
+    admit_flow_generator_rows(qubit_count, products.len(), budget)?;
+    let mut measured_products = Vec::with_capacity(products.len());
+    for (record_index, group) in products.enumerate() {
         let product = measured_pauli_product(instruction.gate(), qubit_count, group)?;
         measured_products.push((product, record_index_i32(record_index)?));
     }
@@ -243,19 +244,16 @@ pub(super) fn measurement_pad_flows(
     instruction: &CircuitInstruction,
     budget: MemoryBudget,
 ) -> AnalysisResult<Vec<Flow>> {
-    admit_flow_generator_rows(0, instruction.targets().len(), budget)?;
+    let pads =
+        crate::instruction_shape::pad_values(instruction, AnalysisOperation::FlowGeneration)?;
+    admit_flow_generator_rows(0, pads.len(), budget)?;
     let mut positive_records = Vec::new();
     let mut negative_records = Vec::new();
-    for (record_index, target) in instruction.targets().iter().rev().enumerate() {
-        match target.qubit_id().map(|id| id.get()) {
-            Some(0) => positive_records.push(record_index),
-            Some(1) => negative_records.push(record_index),
-            _ => {
-                return Err(AnalysisError::internal(
-                    AnalysisOperation::FlowGeneration,
-                    format!("MPAD flow generator has invalid pad target {target}"),
-                ));
-            }
+    for (record_index, pad) in pads.rev().enumerate() {
+        if pad {
+            negative_records.push(record_index);
+        } else {
+            positive_records.push(record_index);
         }
     }
     let mut flows = Vec::with_capacity(positive_records.len() + negative_records.len());

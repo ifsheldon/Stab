@@ -209,22 +209,13 @@ impl ReverseFlowEngine {
 
     fn reverse_measurement(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let reset_gate = measurement_reset_gate(instruction.gate())?;
-        for group in instruction.target_groups().into_iter().rev() {
-            let [target] = group else {
-                return Err(AnalysisError::internal(
-                    AnalysisOperation::TimeReversal,
-                    format!(
-                        "measurement target group is not a single qubit in {}",
-                        instruction_text(instruction)
-                    ),
-                ));
-            };
-            let qubit = target.qubit_id().ok_or_else(|| {
-                AnalysisError::internal(
-                    AnalysisOperation::TimeReversal,
-                    format!("measurement target {target} is not a qubit"),
-                )
-            })?;
+        let measured = crate::instruction_shape::measured_qubits(
+            instruction,
+            AnalysisOperation::TimeReversal,
+        )?;
+        for measured_target in measured.rev() {
+            let qubit = measured_target.id;
+            let target = Target::from(measured_target);
             let record_index =
                 self.tracker
                     .measurement_count()
@@ -246,7 +237,7 @@ impl ReverseFlowEngine {
                 self.append_instruction(
                     reset_gate,
                     Vec::new(),
-                    vec![*target],
+                    vec![target],
                     instruction.tag_bytes(),
                 )?;
             } else {
@@ -254,7 +245,7 @@ impl ReverseFlowEngine {
                 self.append_instruction(
                     instruction.gate().generalized_inverse(),
                     instruction.args().to_vec(),
-                    vec![*target],
+                    vec![target],
                     instruction.tag_bytes(),
                 )?;
             }
@@ -262,7 +253,7 @@ impl ReverseFlowEngine {
             let tracker_instruction = stab_model::advanced::circuit_instruction_with_tag_bytes(
                 instruction.gate(),
                 Vec::new(),
-                vec![*target],
+                vec![target],
                 instruction.tag_bytes(),
             )?;
             self.tracker.undo_instruction(&tracker_instruction)?;
@@ -276,24 +267,17 @@ impl ReverseFlowEngine {
     ) -> AnalysisResult<()> {
         let transition = reverse_flow_transition(instruction);
         let is_measure_reset = matches!(transition, ReverseFlowTransition::MeasureReset(_));
-        let mut segment_end = instruction.targets().len();
+        let qubits =
+            crate::instruction_shape::single_qubits(instruction, AnalysisOperation::TimeReversal)?;
+        let mut segment_end = qubits.len();
         while segment_end > 0 {
             let mut segment_qubits = BTreeSet::new();
             let mut segment_start = segment_end;
             while segment_start > 0 {
-                let target = instruction
-                    .targets()
-                    .get(segment_start - 1)
-                    .ok_or_else(|| {
-                        AnalysisError::internal(
-                            AnalysisOperation::TimeReversal,
-                            "reset segment index escaped the instruction target list",
-                        )
-                    })?;
-                let qubit = target.qubit_id().ok_or_else(|| {
+                let qubit = qubits.get(segment_start - 1).ok_or_else(|| {
                     AnalysisError::internal(
                         AnalysisOperation::TimeReversal,
-                        format!("reset target {target} is not a qubit"),
+                        "reset segment index escaped the instruction target list",
                     )
                 })?;
                 if !segment_qubits.insert(qubit) {
@@ -301,7 +285,13 @@ impl ReverseFlowEngine {
                 }
                 segment_start -= 1;
             }
-            self.reverse_reset_segment(instruction, segment_start, segment_end, is_measure_reset)?;
+            self.reverse_reset_segment(
+                instruction,
+                qubits.clone(),
+                segment_start,
+                segment_end,
+                is_measure_reset,
+            )?;
             segment_end = segment_start;
         }
         self.flush_detectors_and_observables()
@@ -310,6 +300,7 @@ impl ReverseFlowEngine {
     fn reverse_reset_segment(
         &mut self,
         instruction: &CircuitInstruction,
+        qubits: crate::instruction_shape::SingleQubits<'_>,
         start: usize,
         end: usize,
         is_measure_reset: bool,
@@ -324,13 +315,7 @@ impl ReverseFlowEngine {
                 )
             })?
             .to_vec();
-        for target in segment_targets.iter().rev() {
-            let qubit = target.qubit_id().ok_or_else(|| {
-                AnalysisError::internal(
-                    AnalysisOperation::TimeReversal,
-                    format!("reset target {target} is not a qubit"),
-                )
-            })?;
+        for qubit in qubits.skip(start).take(segment_targets.len()).rev() {
             let pauli_targets = self.tracker.pauli_targets_at(qubit)?;
             self.record_new_measurement(&pauli_targets);
         }
@@ -495,12 +480,8 @@ impl ReverseFlowEngine {
     }
 
     fn reverse_observable(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-            AnalysisError::internal(
-                AnalysisOperation::TimeReversal,
-                "OBSERVABLE_INCLUDE is missing an observable id",
-            )
-        })?;
+        let observable =
+            crate::instruction_shape::observable(instruction, AnalysisOperation::TimeReversal)?;
         let target = DemTarget::from_observable(observable);
         let pauli_targets = instruction
             .targets()

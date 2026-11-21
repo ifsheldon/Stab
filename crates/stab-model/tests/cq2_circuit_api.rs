@@ -5,8 +5,9 @@
 )]
 
 use stab_model::{
-    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, Gate, ModelError, ObservableId,
-    ParseErrorCode, Probability, QubitId, RepeatBlock, RepeatCount, Target, ValidationError,
+    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, Gate, GateArguments, ModelError,
+    ObservableId, ParseErrorCode, Probability, QubitId, RepeatBlock, RepeatCount, Target,
+    ValidationError,
 };
 
 #[test]
@@ -22,25 +23,10 @@ fn cq2_circuit_api_instruction_value_contract_matches_stim() {
     assert_eq!(x_error.targets(), &[q(5)]);
     assert_eq!(x_error.args(), &[0.5]);
     assert_eq!(
-        x_error
-            .probability_argument()
-            .expect("typed probability")
-            .expect("probability")
-            .get(),
-        0.5
+        x_error.gate_arguments(),
+        GateArguments::Probability(Probability::try_new(0.5).expect("probability"))
     );
-    assert_eq!(
-        x_error
-            .probability_arguments()
-            .expect("typed probabilities")
-            .expect("probability list")
-            .into_iter()
-            .map(Probability::get)
-            .collect::<Vec<_>>(),
-        vec![0.5]
-    );
-    assert_eq!(x_error.observable_id_argument().unwrap(), None);
-    assert_eq!(x_error.coordinate_arguments(), None);
+    assert_eq!(x_error.probability().map(Probability::get), Some(0.5));
     assert_eq!(x_error.tag(), None);
     let tagged = CircuitInstruction::new(
         Gate::from_name("H").expect("H gate"),
@@ -60,27 +46,21 @@ fn cq2_circuit_api_instruction_value_contract_matches_stim() {
     assert_eq!(empty_tag.tag(), None);
     let tagged_detector = instruction("DETECTOR[tag](1, 2.5) rec[-1]\n");
     assert_eq!(
-        tagged_detector.coordinate_arguments(),
-        Some(&[1.0, 2.5][..])
+        tagged_detector.gate_arguments(),
+        GateArguments::Coordinates(&[1.0, 2.5])
     );
     assert_eq!(tagged_detector.tag(), Some("tag"));
-    assert_eq!(tagged_detector.probability_argument().unwrap(), None);
+    assert_eq!(tagged_detector.probability(), None);
 
     let observable = instruction("OBSERVABLE_INCLUDE(17) rec[-1]\n");
     assert_eq!(
-        observable
-            .observable_id_argument()
-            .expect("typed observable")
-            .expect("observable id")
-            .get(),
-        17
+        observable.gate_arguments(),
+        GateArguments::Observable(ObservableId::from(17))
     );
     let largest_observable = instruction("OBSERVABLE_INCLUDE(4294967295) rec[-1]\n");
     assert_eq!(
-        largest_observable
-            .observable_id_argument()
-            .expect("typed largest observable"),
-        Some(ObservableId::MAX)
+        largest_observable.gate_arguments(),
+        GateArguments::Observable(ObservableId::MAX)
     );
     // Ids above the detector error model's `L` range are refused at parse time, not later.
     let overflowing_observable =
@@ -96,16 +76,11 @@ fn cq2_circuit_api_instruction_value_contract_matches_stim() {
     );
 
     let channel = instruction("PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\n");
-    assert_eq!(channel.probability_argument().unwrap(), None);
-    assert_eq!(
-        channel
-            .probability_arguments()
-            .expect("typed probabilities")
-            .expect("probability list")
-            .into_iter()
-            .map(Probability::get)
-            .collect::<Vec<_>>(),
-        vec![0.1, 0.2, 0.3]
+    assert_eq!(channel.probability(), None);
+    std::assert_matches!(
+        channel.gate_arguments(),
+        GateArguments::Probabilities(probabilities)
+            if probabilities.as_f64_slice() == [0.1, 0.2, 0.3]
     );
 
     let target_group_cases: [(&str, &[&str]); 13] = [
@@ -364,7 +339,6 @@ fn instruction_lines(instructions: Vec<CircuitInstruction>) -> Vec<String> {
 fn target_group_text(instruction: &CircuitInstruction) -> Vec<String> {
     instruction
         .target_groups()
-        .into_iter()
         .map(|group| {
             group
                 .iter()

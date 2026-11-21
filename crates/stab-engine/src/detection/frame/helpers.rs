@@ -1,6 +1,7 @@
 use stab_algebra::PauliBasis;
 use stab_model::{
-    CircuitInstruction, Gate, GateCategory, MeasureRecordOffset, Pauli, Probability, Target,
+    CircuitInstruction, ControlledPairs, Gate, GateArguments, GateCategory, GateTargets,
+    MeasureRecordOffset, Pauli, Probability, Target,
 };
 
 use super::super::error::{DetectionError, DetectionResult};
@@ -66,23 +67,29 @@ pub(super) fn measurement_record_word<W: FrameWord>(
     })
 }
 
+/// The probability of a gate whose argument rule is exactly one probability.
 pub(super) fn single_probability_argument(
     instruction: &CircuitInstruction,
 ) -> DetectionResult<Probability> {
-    if instruction.args().len() != 1 {
-        return Err(unsupported_frame_instruction(instruction));
+    match instruction.gate_arguments() {
+        GateArguments::Probability(probability) => Ok(probability),
+        _ => Err(unsupported_frame_instruction(instruction)),
     }
-    instruction
-        .probability_argument()?
-        .ok_or_else(|| unsupported_frame_instruction(instruction))
 }
 
-pub(super) fn measurement_flip_probability(
+/// The optional flip probability of a measurement, zero when it is absent.
+pub(super) fn measurement_flip_probability(instruction: &CircuitInstruction) -> f64 {
+    instruction.probability().map_or(0.0, Probability::get)
+}
+
+/// The target pairs of a controlled-Pauli gate, which the lowering reaches only for gates whose
+/// target rule is classical-control pairs.
+pub(super) fn controlled_target_pairs(
     instruction: &CircuitInstruction,
-) -> DetectionResult<f64> {
-    match instruction.probability_argument()? {
-        None => Ok(0.0),
-        Some(probability) => Ok(probability.get()),
+) -> DetectionResult<ControlledPairs<'_>> {
+    match instruction.gate_targets() {
+        GateTargets::ControlledPairs(pairs) => Ok(pairs),
+        _ => Err(unsupported_frame_instruction(instruction)),
     }
 }
 

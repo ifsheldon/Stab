@@ -5,8 +5,8 @@ use stab_algebra::{
 };
 use stab_model::advanced::{CancellationCountdown, FoldedCircuitEvent};
 use stab_model::{
-    Cancellation, Circuit, CircuitItem, DemTarget, GateCategory, MemoryBudget, ObservableId,
-    ParseLimits, QubitId, Target,
+    Cancellation, Circuit, CircuitItem, DemTarget, GateArguments, GateCategory, MemoryBudget,
+    ObservableId, ParseLimits, QubitId, Target,
 };
 
 use super::check_algorithm::{FlowCheckAlgorithm, FlowCheckCost};
@@ -573,7 +573,7 @@ fn flow_labels(
         },
         |event| {
             if let FoldedCircuitEvent::Instruction { instruction, .. } = event
-                && let Some(observable) = instruction.observable_id_argument()?
+                && let GateArguments::Observable(observable) = instruction.gate_arguments()
             {
                 included.insert(u64::from(observable.get()));
             }

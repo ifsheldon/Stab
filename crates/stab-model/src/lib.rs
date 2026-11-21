@@ -23,9 +23,12 @@ mod validation;
 
 pub use circuit::{
     Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
-    CircuitInstruction, CircuitItem, FoldedCircuitSummary, FoldedCount, FoldedWalkError,
-    RepeatBlock,
+    CircuitInstruction, CircuitItem, ControlledPairs, FoldedCircuitSummary, FoldedCount,
+    FoldedWalkError, GateArguments, GateTargets, ObservableTarget, ObservableTargets, PadValues,
+    PauliProduct, PauliProducts, PauliTerms, ProbabilityArgs, QubitIds, QubitPairs,
+    QubitTargetPairs, QubitTargets, RecordTargets, RepeatBlock, TargetGroups,
 };
+pub use controlled_pauli::{ClassicalControl, ControlledPauliTargetPair};
 pub use dem::{
     DemDetectorId, DemErrorMechanismTraversalLimits, DemErrorMechanismView,
     DemErrorMechanismVisitError, DemErrorMechanismVisitor, DemErrorTarget, DemErrorTargetIter,
@@ -51,7 +54,7 @@ pub use stab_foundation::{
     ByteSpan, Cancellation, Cancelled, DiagnosticSeverity, Estimate, MemoryBudget,
     MemoryBudgetExceeded, MemoryBudgetParseError, ResourceAmount,
 };
-pub use target::{Pauli, Target, TargetKind};
+pub use target::{Pauli, PauliTarget, QubitTarget, Target, TargetKind};
 pub use validation::{ValidationError, ValidationErrorCode};
 
 /// Low-level model operations for parsers and admitted algorithms.
@@ -65,7 +68,6 @@ pub mod advanced {
         Probability, RepeatBlock, RepeatCount, Target,
     };
     pub use crate::circuit::{FoldedCircuitEvent, FoldedVisitError, visit_folded_circuit};
-    pub use crate::controlled_pauli::{ClassicalControl, ControlledPauliTargetPair};
     pub use crate::dem::advanced::{
         DemBlockSummary, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
         FoldedDemTraversal, FoldedDemVisitor, shifted_targets,

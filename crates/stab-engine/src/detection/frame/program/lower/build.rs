@@ -1,13 +1,13 @@
 //! Materialization of one lowered instruction into its compiled entry and arena payload.
 
 use stab_model::{
-    CircuitInstruction, Gate, GateKind, Target,
-    advanced::{ClassicalControl, ControlledPauliTargetPair},
+    CircuitInstruction, ClassicalControl, ControlledPauliTargetPair, Gate, GateArguments, GateKind,
+    GateTargets, ObservableTarget, QubitId, Target,
 };
 
 use super::super::super::helpers::{
-    measurement_flip_probability, pauli_basis, probability_list, single_probability_argument,
-    unsupported_frame_instruction,
+    controlled_target_pairs, measurement_flip_probability, pauli_basis, probability_list,
+    single_probability_argument, unsupported_frame_instruction,
 };
 use super::super::arena::{ArenaSpan, PauliProduct, PauliTerm, ProgramArena};
 use super::super::{
@@ -36,16 +36,39 @@ fn qubit_targets(
     qubit_targets_inline(instruction, arena)
 }
 
+/// The frame qubits of an instruction's targets, in target order.
+///
+/// Every target rule but classical-control pairs names only qubits; a controlled Pauli lowers
+/// to a qubit-only entry only when its pairs are all quantum, which [`frame_qubit`] checks.
 #[inline(always)]
 fn qubit_targets_inline(
     instruction: &CircuitInstruction,
     arena: &mut ProgramArena,
 ) -> DetectionResult<ArenaSpan<u32>> {
-    let start = arena.mark::<u32>();
-    for target in instruction.targets() {
-        arena.push(frame_qubit(instruction, target)?)?;
+    match instruction.gate_targets() {
+        GateTargets::Qubits(qubits) => arena.extend(qubits.map(QubitId::get)),
+        GateTargets::QubitPairs(pairs) => {
+            arena.extend(pairs.flat_map(|pair| pair.map(QubitId::get)))
+        }
+        GateTargets::MeasuredQubits(qubits) => arena.extend(qubits.map(|qubit| qubit.id.get())),
+        GateTargets::MeasuredQubitPairs(pairs) => {
+            arena.extend(pairs.flat_map(|pair| pair.map(|qubit| qubit.id.get())))
+        }
+        GateTargets::ControlledPairs(_) => {
+            let start = arena.mark::<u32>();
+            for target in instruction.targets() {
+                arena.push(frame_qubit(instruction, target)?)?;
+            }
+            arena.span_since(start)
+        }
+        GateTargets::None
+        | GateTargets::MeasurementPads(_)
+        | GateTargets::Records(_)
+        | GateTargets::ObservableTargets(_)
+        | GateTargets::QubitCoords(_)
+        | GateTargets::PauliProducts(_)
+        | GateTargets::PauliTerms(_) => Err(unsupported_frame_instruction(instruction)),
     }
-    arena.span_since(start)
 }
 
 fn inversion_flags(
@@ -63,24 +86,27 @@ fn inversion_flags(
     )
 }
 
+/// The Pauli terms of a correlated error or a Pauli observable include.
+///
+/// Pinned Stim consults only the Pauli X/Z bits of correlated-error targets, so combiner targets
+/// and inversion bits are ignored decoration (frame_simulator.inl:767-775). Observable record
+/// targets belong to detection conversion.
 fn pauli_terms(
     instruction: &CircuitInstruction,
     arena: &mut ProgramArena,
 ) -> DetectionResult<ArenaSpan<PauliTerm>> {
-    let start = arena.mark::<PauliTerm>();
-    for target in instruction.targets() {
-        // Pinned Stim consults only the Pauli X/Z bits of correlated-error targets, so combiner
-        // targets and inversion bits are ignored decoration (frame_simulator.inl:767-775).
-        // Observable record targets belong to detection conversion.
-        if target.is_combiner() || target.measurement_record_offset().is_some() {
-            continue;
+    match instruction.gate_targets() {
+        GateTargets::PauliTerms(terms) => {
+            arena.extend(terms.map(|term| (term.id.get(), pauli_basis(term.pauli))))
         }
-        let Some(pauli) = target.pauli_type() else {
-            return Err(unsupported_frame_instruction(instruction));
-        };
-        arena.push((frame_qubit(instruction, target)?, pauli_basis(pauli)))?;
+        GateTargets::ObservableTargets(targets) => {
+            arena.extend(targets.filter_map(|target| match target {
+                ObservableTarget::Pauli(term) => Some((term.id.get(), pauli_basis(term.pauli))),
+                ObservableTarget::MeasurementRecord(_) => None,
+            }))
+        }
+        _ => Err(unsupported_frame_instruction(instruction)),
     }
-    arena.span_since(start)
 }
 
 #[inline(always)]
@@ -126,26 +152,25 @@ pub(super) fn build(
         EntryKind::Measure { basis, reset } => ProgramInstruction::Measure {
             basis,
             reset,
-            flip_probability: measurement_flip_probability(instruction)?,
+            flip_probability: measurement_flip_probability(instruction),
             targets: qubit_targets(instruction, arena)?,
             inverted: inversion_flags(instruction, arena)?,
             fusion,
         },
         EntryKind::MeasurePairs(basis) => ProgramInstruction::MeasurePairs {
             basis,
-            flip_probability: measurement_flip_probability(instruction)?,
+            flip_probability: measurement_flip_probability(instruction),
             targets: qubit_targets(instruction, arena)?,
             inverted: inversion_flags(instruction, arena)?,
             fusion,
         },
         EntryKind::MeasurePads => {
-            let start = arena.mark::<bool>();
-            for target in instruction.targets() {
-                arena.push(frame_qubit(instruction, target)? == 1)?;
-            }
+            let GateTargets::MeasurementPads(pads) = instruction.gate_targets() else {
+                return Err(unsupported_frame_instruction(instruction));
+            };
             ProgramInstruction::MeasurePads {
-                flip_probability: measurement_flip_probability(instruction)?,
-                values: arena.span_since(start)?,
+                flip_probability: measurement_flip_probability(instruction),
+                values: arena.extend(pads)?,
             }
         }
         EntryKind::PauliProducts { .. } => {
@@ -198,9 +223,9 @@ pub(super) fn build(
             pairs: controlled_pairs(instruction, arena)?,
         },
         EntryKind::Observable => {
-            let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-                DetectionError::invalid_result_format("OBSERVABLE_INCLUDE missing id")
-            })?;
+            let GateArguments::Observable(observable) = instruction.gate_arguments() else {
+                return Err(unsupported_frame_instruction(instruction));
+            };
             let id = usize::try_from(observable.get()).map_err(|_| {
                 DetectionError::invalid_result_format(format!(
                     "observable id {} does not fit usize",
@@ -220,17 +245,12 @@ fn controlled_pairs(
     arena: &mut ProgramArena,
 ) -> DetectionResult<ArenaSpan<ControlledPair>> {
     let start = arena.mark::<ControlledPair>();
-    for target_group in instruction.targets().chunks(2) {
-        let pair = match ControlledPauliTargetPair::classify(instruction.gate(), target_group) {
-            ControlledPauliTargetPair::Quantum { .. } => {
-                let [control, target] = target_group else {
-                    return Err(unsupported_frame_instruction(instruction));
-                };
-                ControlledPair::Quantum {
-                    control: frame_qubit(instruction, control)?,
-                    target: frame_qubit(instruction, target)?,
-                }
-            }
+    for pair in controlled_target_pairs(instruction)? {
+        let pair = match pair {
+            ControlledPauliTargetPair::Quantum { first, second } => ControlledPair::Quantum {
+                control: first.get(),
+                target: second.get(),
+            },
             ControlledPauliTargetPair::Classical { control, target } => {
                 let qubit = target.get();
                 match control {
@@ -257,21 +277,13 @@ fn build_pauli_products(
     // One pair of buffers serves every product of the instruction.
     let mut raw_terms = Vec::new();
     let mut normalized = Vec::new();
-    for target_group in instruction.target_groups() {
+    let GateTargets::PauliProducts(products_view) = instruction.gate_targets() else {
+        return Err(unsupported_frame_instruction(instruction));
+    };
+    for product in products_view {
         raw_terms.clear();
-        for target in target_group {
-            if target.is_combiner() {
-                continue;
-            }
-            let Some(pauli) = target.pauli_type() else {
-                return Err(unsupported_frame_instruction(instruction));
-            };
-            raw_terms.push((
-                frame_qubit(instruction, target)?,
-                pauli_basis(pauli),
-                target.is_inverted_result_target(),
-            ));
-        }
+        raw_terms
+            .extend(product.map(|term| (term.id.get(), pauli_basis(term.pauli), term.inverted)));
         let product_inverted = crate::sampling::pauli_product::normalize_terms_into(
             &raw_terms,
             false,
@@ -283,7 +295,7 @@ fn build_pauli_products(
     Ok(PauliProductMeasurement {
         terms: arena.span_since(terms)?,
         products: arena.span_since(products)?,
-        flip_probability: measurement_flip_probability(instruction)?,
+        flip_probability: measurement_flip_probability(instruction),
     })
 }
 

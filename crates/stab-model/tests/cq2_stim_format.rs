@@ -7,8 +7,8 @@
 )]
 
 use stab_model::{
-    Circuit, CircuitInstruction, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind,
-    GateTargetRule, MeasureRecordOffset, Pauli, QubitId, Target,
+    Circuit, CircuitInstruction, CircuitItem, Gate, GateArgumentRule, GateArguments,
+    GateTargetGroupKind, GateTargetRule, MeasureRecordOffset, Pauli, QubitId, Target,
 };
 
 #[test]
@@ -587,10 +587,13 @@ fn cq2_stim_format_repeat_coordinate_and_newline_edges_match_stim() {
         })
         .collect::<Vec<_>>();
     assert_eq!(
-        instructions[0].coordinate_arguments(),
-        Some(&[-1.0, -2.0, -3.0][..])
+        instructions[0].gate_arguments(),
+        GateArguments::Coordinates(&[-1.0, -2.0, -3.0])
     );
-    assert_eq!(instructions[2].coordinate_arguments(), Some(&[-3.5][..]));
+    assert_eq!(
+        instructions[2].gate_arguments(),
+        GateArguments::Coordinates(&[-3.5])
+    );
     assert!(Circuit::from_stim_str("M(-0.1) 0\n").is_err());
     assert!(Circuit::from_stim_str("QUBIT_COORDS(1e10000) 0\n").is_err());
     for exponent in ["1e20", "1E+20"] {
@@ -599,7 +602,10 @@ fn cq2_stim_format_repeat_coordinate_and_newline_edges_match_stim() {
         let CircuitItem::Instruction(instruction) = &parsed.items()[0] else {
             panic!("coordinate fixture contains one instruction")
         };
-        assert_eq!(instruction.coordinate_arguments(), Some(&[1e20][..]));
+        assert_eq!(
+            instruction.gate_arguments(),
+            GateArguments::Coordinates(&[1e20])
+        );
     }
 
     assert_eq!(
@@ -655,7 +661,7 @@ fn cq2_stim_format_target_groups_cover_stim_gate_shapes() {
             None,
         )
         .unwrap_or_else(|error| panic!("construct {}: {error}", gate.canonical_name()));
-        let groups = instruction.target_groups();
+        let groups = instruction.target_groups().collect::<Vec<_>>();
         assert_eq!(
             groups
                 .iter()
@@ -710,7 +716,6 @@ fn instruction_groups(item: &CircuitItem) -> Vec<Vec<Target>> {
     };
     instruction
         .target_groups()
-        .into_iter()
         .map(<[Target]>::to_vec)
         .collect()
 }

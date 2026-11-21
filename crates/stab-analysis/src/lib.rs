@@ -22,6 +22,7 @@ mod dem;
 mod error;
 mod folded_walk;
 pub mod gate;
+mod instruction_shape;
 mod resources;
 mod sparse_rev_frame_tracker;
 mod tableau_circuit;

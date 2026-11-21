@@ -242,12 +242,10 @@ impl<'c> ReverseFoldAnalyzer<'c> {
             }
             GateKind::OBSERVABLE_INCLUDE => {
                 self.tracker.undo_instruction(instruction)?;
-                let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-                    AnalysisError::internal(
-                        AnalysisOperation::CircuitToDetectorErrorModel,
-                        "OBSERVABLE_INCLUDE is missing an observable id",
-                    )
-                })?;
+                let observable = crate::instruction_shape::observable(
+                    instruction,
+                    AnalysisOperation::CircuitToDetectorErrorModel,
+                )?;
                 self.push_output_instruction(
                     stab_model::advanced::dem_logical_observable_instruction_with_tag_bytes(
                         observable,

@@ -98,7 +98,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     not_fusable_gate(
         id!(TICK),
         GateCategory::Annotation,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::None,
     ),
     not_fusable_gate(
@@ -116,7 +116,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     not_fusable_gate(
         id!(REPEAT),
         GateCategory::ControlFlow,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::None,
     ),
     gate(
@@ -180,7 +180,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(RX),
         GateKind::MX,
         GateCategory::Collapsing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     )
     .with_collapse_basis(Pauli::X)
@@ -189,7 +189,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(RY),
         GateKind::MY,
         GateCategory::Collapsing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     )
     .with_collapse_basis(Pauli::Y)
@@ -198,7 +198,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(R),
         GateKind::M,
         GateCategory::Collapsing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     )
     .with_collapse_basis(Pauli::Z)
@@ -207,47 +207,47 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     gate(
         id!(XCX),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
         id!(XCY),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     ),
     gate(
         id!(XCZ),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::ClassicalControlPairs,
     )
     .with_controlled_pauli(Pauli::X),
     gate(
         id!(YCX),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     ),
     gate(
         id!(YCY),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
         id!(YCZ),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::ClassicalControlPairs,
     )
     .with_controlled_pauli(Pauli::Y),
     gate(
         id!(CX),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::ClassicalControlPairs,
     )
     .with_controlled_pauli(Pauli::X)
@@ -255,7 +255,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     gate(
         id!(CY),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::ClassicalControlPairs,
     )
     .with_controlled_pauli(Pauli::Y)
@@ -263,7 +263,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     gate(
         id!(CZ),
         GateCategory::Controlled,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::ClassicalControlPairs,
     )
     .with_controlled_pauli(Pauli::Z)
@@ -272,69 +272,69 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     gate(
         id!(H),
         GateCategory::HadamardLike,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     )
     .with_aliases(&["H", "H_XZ"]),
     gate(
         id!(H_XY),
         GateCategory::HadamardLike,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(H_YZ),
         GateCategory::HadamardLike,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(H_NXY),
         GateCategory::HadamardLike,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(H_NXZ),
         GateCategory::HadamardLike,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(H_NYZ),
         GateCategory::HadamardLike,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(DEPOLARIZE1),
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(DEPOLARIZE2),
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
     gate(
         id!(X_ERROR),
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(Y_ERROR),
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(Z_ERROR),
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::AnySingleQubit,
     ),
     gate(
@@ -365,20 +365,20 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     not_fusable_gate(
         id!(E),
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::PauliList,
     )
     .with_aliases(&["CORRELATED_ERROR", "E"]),
     not_fusable_gate(
         id!(ELSE_CORRELATED_ERROR),
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::PauliList,
     ),
     gate(
         id!(HERALDED_ERASE),
         GateCategory::HeraldedNoise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::Probability,
         TargetRule::AnySingleQubit,
     )
     .with_flags(GateFlags::PRODUCES_RESULTS),
@@ -392,116 +392,116 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
     gate(
         id!(I),
         GateCategory::Pauli,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(X),
         GateCategory::Pauli,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(Y),
         GateCategory::Pauli,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate(
         id!(Z),
         GateCategory::Pauli,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_XYZ),
         GateKind::C_ZYX,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_ZYX),
         GateKind::C_XYZ,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_NXYZ),
         GateKind::C_ZYNX,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_XNYZ),
         GateKind::C_ZNYX,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_XYNZ),
         GateKind::C_NZYX,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_NZYX),
         GateKind::C_XYNZ,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_ZNYX),
         GateKind::C_XNYZ,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(C_ZYNX),
         GateKind::C_NXYZ,
         GateCategory::Period3,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(SQRT_X),
         GateKind::SQRT_X_DAG,
         GateCategory::Period4,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(SQRT_X_DAG),
         GateKind::SQRT_X,
         GateCategory::Period4,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(SQRT_Y),
         GateKind::SQRT_Y_DAG,
         GateCategory::Period4,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(SQRT_Y_DAG),
         GateKind::SQRT_Y,
         GateCategory::Period4,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     ),
     gate_with_inverse(
         id!(S),
         GateKind::S_DAG,
         GateCategory::Period4,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     )
     .with_aliases(&["S", "SQRT_Z"]),
@@ -509,14 +509,14 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(S_DAG),
         GateKind::S,
         GateCategory::Period4,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::AnySingleQubit,
     )
     .with_aliases(&["S_DAG", "SQRT_Z_DAG"]),
     gate(
         id!(II),
         GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -524,7 +524,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(SQRT_XX),
         GateKind::SQRT_XX_DAG,
         GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -532,7 +532,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(SQRT_XX_DAG),
         GateKind::SQRT_XX,
         GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -540,7 +540,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(SQRT_YY),
         GateKind::SQRT_YY_DAG,
         GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -548,7 +548,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(SQRT_YY_DAG),
         GateKind::SQRT_YY,
         GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -556,7 +556,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(SQRT_ZZ),
         GateKind::SQRT_ZZ_DAG,
         GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -564,7 +564,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(SQRT_ZZ_DAG),
         GateKind::SQRT_ZZ,
         GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -579,20 +579,20 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(SPP),
         GateKind::SPP_DAG,
         GateCategory::PauliProduct,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PauliProducts,
     ),
     gate_with_inverse(
         id!(SPP_DAG),
         GateKind::SPP,
         GateCategory::PauliProduct,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PauliProducts,
     ),
     gate(
         id!(SWAP),
         GateCategory::Swap,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -600,7 +600,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(ISWAP),
         GateKind::ISWAP_DAG,
         GateCategory::Swap,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),
@@ -608,20 +608,20 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(CXSWAP),
         GateKind::SWAPCX,
         GateCategory::Swap,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         id!(SWAPCX),
         GateKind::CXSWAP,
         GateCategory::Swap,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     ),
     gate(
         id!(CZSWAP),
         GateCategory::Swap,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR)
@@ -630,7 +630,7 @@ pub(super) const GATES: [GateInfo; GateKind::COUNT] = [
         id!(ISWAP_DAG),
         GateKind::ISWAP,
         GateCategory::Swap,
-        ArgRule::Exact(0),
+        ArgRule::None,
         TargetRule::PlainPairs,
     )
     .with_flags(GateFlags::SYMMETRIC_PAIR),

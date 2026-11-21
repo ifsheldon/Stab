@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use stab_algebra::PauliBasis;
 use stab_model::advanced::CancellationCountdown;
 use stab_model::{
-    Cancellation, Circuit, CircuitInstruction, DemTarget, GateKind, MemoryBudget, ObservableId,
-    Pauli, QubitId, Target, TargetKind,
+    Cancellation, Circuit, CircuitInstruction, ClassicalControl, ControlledPauliTargetPair,
+    DemTarget, MemoryBudget, ObservableId, ObservableTarget, Pauli, PauliTarget, QubitId,
 };
 
 mod budget;
@@ -20,10 +20,12 @@ mod unitary_repeat;
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 use crate::controlled_pauli::{ControlSlot, ControlledPauliForm, controlled_pauli_form};
 use crate::target_xor_set::{TargetXorSet, xor_merge_into};
-use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind};
+use crate::{AnalysisError, AnalysisOperation, AnalysisResult, ResourceKind, instruction_shape};
+
+const OPERATION: AnalysisOperation = AnalysisOperation::ReverseFrameTracking;
 use budget::{TrackerMeter, recompute_live_bytes, set_entry_bytes};
 use clifford_action::{single_qubit_action, two_qubit_action};
-use pauli_product::{pauli_product_terms_reversed, qubits_reversed};
+use pauli_product::pauli_product_terms_reversed;
 use sets::{
     TrackerScratch, buffer_growth_bytes, replace_qubit_set, toggle_qubit_set, xor_growth_bytes,
     xor_item_growth_bytes,
@@ -365,18 +367,7 @@ impl SparseReverseFrameTracker {
                 self.undo_heralded_measurements(instruction)
             }
             ReverseFlowTransition::PauliProductUnitary => self.undo_spp(instruction),
-            ReverseFlowTransition::ControlledPauli(_) => {
-                if tracked_controlled_pauli(instruction)?.slot != ControlSlot::Second
-                    || instruction
-                        .targets()
-                        .iter()
-                        .any(Target::is_classical_bit_target)
-                {
-                    self.undo_controlled_pauli(instruction)
-                } else {
-                    self.undo_two_qubit_tableau(instruction)
-                }
-            }
+            ReverseFlowTransition::ControlledPauli(_) => self.undo_controlled_pauli(instruction),
             ReverseFlowTransition::Detector => self.undo_detector(instruction),
             ReverseFlowTransition::Observable => self.undo_observable_include(instruction),
             ReverseFlowTransition::Tableau => {
@@ -384,8 +375,9 @@ impl SparseReverseFrameTracker {
                     self.undo_two_qubit_tableau(instruction)
                 } else {
                     let action = single_qubit_action(instruction.gate())?;
-                    for qubit in qubits_reversed(instruction) {
-                        self.apply_single_qubit_action(action, qubit?)?;
+                    let qubits = instruction_shape::qubits(instruction, OPERATION)?;
+                    for qubit in qubits.rev() {
+                        self.apply_single_qubit_action(action, qubit)?;
                         self.check_live_budget()?;
                     }
                     Ok(())
@@ -455,49 +447,49 @@ impl SparseReverseFrameTracker {
 
     fn undo_controlled_pauli(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
         let form = tracked_controlled_pauli(instruction)?;
-        for group in instruction.target_groups().into_iter().rev() {
-            let gate_name = instruction.gate().canonical_name();
-            let [first, second] = group else {
-                return Err(AnalysisError::unsupported(
-                    AnalysisOperation::ReverseFrameTracking,
-                    instruction.gate().kind(),
-                    format!("{gate_name} expected paired targets during sparse reverse tracking",),
-                ));
-            };
-            let (control, target) = match form.slot {
-                ControlSlot::Second => (second, first),
-                ControlSlot::First | ControlSlot::Either => (first, second),
-            };
-            if let (Some(left), Some(right)) = (first.qubit_id(), second.qubit_id()) {
-                if form.slot != ControlSlot::Second {
-                    self.undo_quantum_controlled_pauli(instruction, control, target)?;
-                } else {
-                    let action = two_qubit_action(instruction.gate())?;
-                    self.apply_two_qubit_action(action, left, right)?;
+        let pairs = instruction_shape::controlled_pairs(instruction, OPERATION)?;
+        // XCZ and YCZ put the control second, so a qubit pair undoes as a plain two-qubit
+        // Clifford instead of as a qubit-controlled Pauli.
+        let quantum_action = match form.slot {
+            ControlSlot::Second => Some(two_qubit_action(instruction.gate())?),
+            ControlSlot::First | ControlSlot::Either => None,
+        };
+        let raw_pairs = pairs.as_target_pairs().iter().rev();
+        for ([first, second], pair) in raw_pairs.zip(pairs.rev()) {
+            match pair {
+                ControlledPauliTargetPair::Quantum {
+                    first: left,
+                    second: right,
+                } => match quantum_action {
+                    Some(action) => self.apply_two_qubit_action(action, left, right)?,
+                    None => self.undo_quantum_controlled_pauli(form.pauli, left, right)?,
+                },
+                // A classical bit in either CZ slot Z-controls the other slot; two classical
+                // bits have no effect (undo_ZCZ_single).
+                ControlledPauliTargetPair::Classical { control, target } => {
+                    self.undo_classical_pauli(form, control, target)?;
                 }
-            } else if form.slot == ControlSlot::Either {
-                // A classical bit in either CZ slot Z-controls the other
-                // slot; two classical bits have no effect (undo_ZCZ_single).
-                if target.qubit_id().is_some() {
-                    self.undo_classical_pauli(instruction, control, target)?;
-                } else if control.qubit_id().is_some() {
-                    self.undo_classical_pauli(instruction, target, control)?;
+                ControlledPauliTargetPair::ClassicalNoop { .. } => {}
+                ControlledPauliTargetPair::Unsupported => {
+                    // Vendor undo_ZC{X,Y}_single throws whenever the Pauli slot is not a qubit;
+                    // the analyzer surface pins that rejection. The flow solver and checker keep
+                    // the pinned PFM-B4 contract of ignoring classical-control groups instead,
+                    // so only error-analysis mode rejects here.
+                    if self.error_analysis_mode {
+                        let target = match form.slot {
+                            ControlSlot::Second => first,
+                            ControlSlot::First | ControlSlot::Either => second,
+                        };
+                        return Err(AnalysisError::unsupported(
+                            OPERATION,
+                            instruction.gate().kind(),
+                            format!(
+                                "{} target {target} is not a qubit",
+                                instruction.gate().canonical_name()
+                            ),
+                        ));
+                    }
                 }
-            } else if target.qubit_id().is_none() {
-                // Vendor undo_ZC{X,Y}_single throws whenever the Pauli slot
-                // is not a qubit; the analyzer surface pins that rejection.
-                // The flow solver and checker keep the pinned PFM-B4 contract
-                // of ignoring classical-control groups instead, so only
-                // error-analysis mode rejects here.
-                if self.error_analysis_mode {
-                    return Err(AnalysisError::unsupported(
-                        AnalysisOperation::ReverseFrameTracking,
-                        instruction.gate().kind(),
-                        format!("{gate_name} target {target} is not a qubit"),
-                    ));
-                }
-            } else {
-                self.undo_classical_pauli(instruction, control, target)?;
             }
             self.check_live_budget()?;
         }
@@ -509,43 +501,14 @@ impl SparseReverseFrameTracker {
     /// flipped bases (measurement records); vendor `undo_classical_pauli`.
     fn undo_classical_pauli(
         &mut self,
-        instruction: &CircuitInstruction,
-        control: &Target,
-        target: &Target,
+        form: ControlledPauliForm,
+        control: ClassicalControl,
+        qubit: QubitId,
     ) -> AnalysisResult<()> {
-        if control.is_sweep_bit_target() {
+        let ClassicalControl::Record(record) = control else {
             return Ok(());
-        }
-        self.undo_classical_feedback(instruction, control, target)
-    }
-
-    fn undo_classical_feedback(
-        &mut self,
-        instruction: &CircuitInstruction,
-        control: &Target,
-        target: &Target,
-    ) -> AnalysisResult<()> {
-        let record = control.measurement_record_offset().ok_or_else(|| {
-            AnalysisError::unsupported(
-                AnalysisOperation::ReverseFrameTracking,
-                instruction.gate().kind(),
-                format!(
-                    "{} classical control {control} is not a measurement record",
-                    instruction.gate().canonical_name()
-                ),
-            )
-        })?;
-        let qubit = target.qubit_id().ok_or_else(|| {
-            AnalysisError::unsupported(
-                AnalysisOperation::ReverseFrameTracking,
-                instruction.gate().kind(),
-                format!(
-                    "{} feedback target {target} is not a qubit",
-                    instruction.gate().canonical_name()
-                ),
-            )
-        })?;
-        let basis = TrackerBasis::from_pauli(tracked_controlled_pauli(instruction)?.pauli);
+        };
+        let basis = TrackerBasis::from_pauli(form.pauli);
         let mut sensitivity = self.scratch.take_operand();
         self.anticommuting_sensitivity_into(qubit, basis, &mut sensitivity)?;
         let index = self.record_index_from_offset(record.get())?;
@@ -556,45 +519,14 @@ impl SparseReverseFrameTracker {
         toggled
     }
 
+    /// Undoes a qubit-controlled `pauli` of a gate whose control is first (`CX`, `CY`, `CZ`).
     fn undo_quantum_controlled_pauli(
         &mut self,
-        instruction: &CircuitInstruction,
-        control: &Target,
-        target: &Target,
+        pauli: Pauli,
+        control: QubitId,
+        target: QubitId,
     ) -> AnalysisResult<()> {
-        let control = control.qubit_id().ok_or_else(|| {
-            AnalysisError::unsupported(
-                AnalysisOperation::ReverseFrameTracking,
-                instruction.gate().kind(),
-                format!(
-                    "{} control target {control} is not a qubit",
-                    instruction.gate().canonical_name()
-                ),
-            )
-        })?;
-        let target = target.qubit_id().ok_or_else(|| {
-            AnalysisError::unsupported(
-                AnalysisOperation::ReverseFrameTracking,
-                instruction.gate().kind(),
-                format!(
-                    "{} target {target} is not a qubit",
-                    instruction.gate().canonical_name()
-                ),
-            )
-        })?;
-        let target_basis = match controlled_pauli_form(instruction.gate()) {
-            Some(form) if form.slot != ControlSlot::Second => TrackerBasis::from_pauli(form.pauli),
-            Some(_) | None => {
-                return Err(AnalysisError::unsupported(
-                    AnalysisOperation::ReverseFrameTracking,
-                    instruction.gate().kind(),
-                    format!(
-                        "{} sparse reverse tracking is not implemented for qubit-qubit controls",
-                        instruction.gate().canonical_name()
-                    ),
-                ));
-            }
-        };
+        let target_basis = TrackerBasis::from_pauli(pauli);
         // Undoing a controlled Pauli moves the target's anticommuting sensitivity onto the
         // control's Z slot, then the control's X sensitivity onto the target's Pauli slots.
         // Each operand is copied before the toggle that could alias it.
@@ -619,30 +551,8 @@ impl SparseReverseFrameTracker {
     }
 
     fn undo_two_qubit_tableau(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        let gate_name = instruction.gate().canonical_name();
         let action = two_qubit_action(instruction.gate())?;
-        for group in instruction.target_groups().into_iter().rev() {
-            let [left, right] = group else {
-                return Err(AnalysisError::unsupported(
-                    AnalysisOperation::ReverseFrameTracking,
-                    instruction.gate().kind(),
-                    format!("{gate_name} expected paired targets during sparse reverse tracking"),
-                ));
-            };
-            let left = left.qubit_id().ok_or_else(|| {
-                AnalysisError::unsupported(
-                    AnalysisOperation::ReverseFrameTracking,
-                    instruction.gate().kind(),
-                    format!("{gate_name} target {left} is not a qubit"),
-                )
-            })?;
-            let right = right.qubit_id().ok_or_else(|| {
-                AnalysisError::unsupported(
-                    AnalysisOperation::ReverseFrameTracking,
-                    instruction.gate().kind(),
-                    format!("{gate_name} target {right} is not a qubit"),
-                )
-            })?;
+        for [left, right] in instruction_shape::qubit_pairs(instruction, OPERATION)?.rev() {
             self.apply_two_qubit_action(action, left, right)?;
             self.check_live_budget()?;
         }
@@ -657,14 +567,7 @@ impl SparseReverseFrameTracker {
             )
         })?;
         let detector = DemTarget::relative_detector(self.detector_count)?;
-        for target in instruction.targets() {
-            let offset = target.measurement_record_offset().ok_or_else(|| {
-                AnalysisError::unsupported(
-                    AnalysisOperation::ReverseFrameTracking,
-                    GateKind::DETECTOR,
-                    format!("DETECTOR target {target} is not a measurement record"),
-                )
-            })?;
+        for offset in instruction_shape::records(instruction, OPERATION)? {
             let index = self.record_index_from_offset(offset.get())?;
             let existing = self.rec_bits.get(&index);
             self.scratch
@@ -680,12 +583,7 @@ impl SparseReverseFrameTracker {
     }
 
     fn undo_observable_include(&mut self, instruction: &CircuitInstruction) -> AnalysisResult<()> {
-        let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-            AnalysisError::internal(
-                AnalysisOperation::ReverseFrameTracking,
-                "OBSERVABLE_INCLUDE is missing an observable id",
-            )
-        })?;
+        let observable = instruction_shape::observable(instruction, OPERATION)?;
         let mut sensitivity = self.scratch.take_operand();
         let effects = self.observable_effects.get(&observable);
         self.scratch.admit_growth(
@@ -710,9 +608,9 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
         sensitivity: &[DemTarget],
     ) -> AnalysisResult<()> {
-        for target in instruction.targets() {
-            match target.kind() {
-                TargetKind::MeasurementRecord { offset } => {
+        for target in instruction_shape::observable_targets(instruction, OPERATION)? {
+            match target {
+                ObservableTarget::MeasurementRecord(offset) => {
                     let index = self.record_index_from_offset(offset.get())?;
                     let existing = self.rec_bits.get(&index);
                     let growth = xor_growth_bytes(
@@ -728,20 +626,11 @@ impl SparseReverseFrameTracker {
                     let after = set_entry_bytes(Some(set));
                     self.meter.adjust(before, after);
                 }
-                TargetKind::Pauli { pauli, id, .. } => {
+                ObservableTarget::Pauli(PauliTarget { pauli, id, .. }) => {
                     self.toggle_product_sensitivity(
                         &[(id, TrackerBasis::from_pauli(pauli))],
                         sensitivity,
                     )?;
-                }
-                TargetKind::Qubit { .. } | TargetKind::SweepBit { .. } | TargetKind::Combiner => {
-                    return Err(AnalysisError::unsupported(
-                        AnalysisOperation::ReverseFrameTracking,
-                        GateKind::OBSERVABLE_INCLUDE,
-                        format!(
-                            "OBSERVABLE_INCLUDE target {target} is not a measurement record or Pauli target"
-                        ),
-                    ));
                 }
             }
             self.check_live_budget()?;

@@ -12,8 +12,8 @@ use std::str::FromStr;
 use stab_model::{
     Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, DemDetectorId, DemInstruction,
     DemInstructionKind, DemItem, DemRepeatBlock, DemRepeatCount, DemTarget, DetectorErrorModel,
-    Gate, MeasureRecordOffset, ModelError, ObservableId, Pauli, Probability, QubitId, RepeatBlock,
-    RepeatCount, Target, ValidationError,
+    Gate, GateArguments, MeasureRecordOffset, ModelError, ObservableId, Pauli, Probability,
+    QubitId, RepeatBlock, RepeatCount, Target, ValidationError,
 };
 
 #[test]
@@ -199,10 +199,8 @@ fn circuit_mutation_and_value_lifecycle_preserves_semantics() {
     )
     .expect("largest observable id");
     assert_eq!(
-        observable
-            .observable_id_argument()
-            .expect("valid observable argument"),
-        Some(ObservableId::MAX)
+        observable.gate_arguments(),
+        GateArguments::Observable(ObservableId::MAX)
     );
     // The constructor refuses an id no detector error model can hold, so the typed accessor
     // never meets one.
@@ -394,7 +392,6 @@ fn circuit_target_grammar_and_gate_roles_are_enforced() {
     let mpp = parse_instruction("MPP X0*!Y1 Z2\n");
     assert_eq!(
         mpp.target_groups()
-            .into_iter()
             .map(<[Target]>::to_vec)
             .collect::<Vec<_>>(),
         [

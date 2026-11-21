@@ -284,6 +284,81 @@ impl Target {
     pub fn pauli_type(&self) -> Option<Pauli> {
         self.pauli_class()
     }
+
+    // Typed decoders for the instruction views in `circuit::views`.
+    //
+    // Each decoder reads the packed value bits of a target that its gate's target rule already
+    // admitted when the instruction was built. They are total on every packed value, so a target
+    // of an unexpected class (which no validated instruction holds) decodes its value bits as the
+    // item instead of panicking; debug builds assert the class.
+
+    #[inline(always)]
+    pub(crate) fn decode_qubit_id(self) -> QubitId {
+        debug_assert!(self.is_qubit_target(), "{self} is not a qubit target");
+        QubitId::from_packed(self.value())
+    }
+
+    #[inline(always)]
+    pub(crate) fn decode_qubit_target(self) -> QubitTarget {
+        debug_assert!(self.is_qubit_target(), "{self} is not a qubit target");
+        QubitTarget {
+            id: QubitId::from_packed(self.value()),
+            inverted: self.inverted_flag(),
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn decode_record(self) -> MeasureRecordOffset {
+        debug_assert!(
+            self.is_measurement_record_target(),
+            "{self} is not a measurement-record target"
+        );
+        MeasureRecordOffset::from_packed_distance(self.value())
+    }
+
+    #[inline(always)]
+    pub(crate) fn decode_pauli(self) -> PauliTarget {
+        debug_assert!(self.is_pauli_target(), "{self} is not a Pauli target");
+        let pauli = match self.class() {
+            CLASS_PAULI_X => Pauli::X,
+            CLASS_PAULI_Y => Pauli::Y,
+            _ => Pauli::Z,
+        };
+        PauliTarget {
+            pauli,
+            id: QubitId::from_packed(self.value()),
+            inverted: self.inverted_flag(),
+        }
+    }
+}
+
+/// A qubit target together with its `!` inversion flag, as a measurement gate reads it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct QubitTarget {
+    pub id: QubitId,
+    /// Whether the target was written `!q`, which inverts the recorded result.
+    pub inverted: bool,
+}
+
+impl From<QubitTarget> for Target {
+    fn from(target: QubitTarget) -> Self {
+        Self::qubit(target.id, target.inverted)
+    }
+}
+
+/// One Pauli target such as `X0` or `!Z1`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PauliTarget {
+    pub pauli: Pauli,
+    pub id: QubitId,
+    /// Whether the target was written with `!`, which negates the Pauli.
+    pub inverted: bool,
+}
+
+impl From<PauliTarget> for Target {
+    fn from(target: PauliTarget) -> Self {
+        Self::pauli(target.pauli, target.id, target.inverted)
+    }
 }
 
 impl std::fmt::Debug for Target {

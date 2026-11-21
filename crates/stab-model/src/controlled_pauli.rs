@@ -1,5 +1,6 @@
 use crate::{Gate, GateKind, MeasureRecordOffset, QubitId, Target};
 
+/// A classical control bit: a measurement record or a sweep bit.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClassicalControl {
     Record(MeasureRecordOffset),
@@ -19,29 +20,30 @@ impl ClassicalControl {
     }
 }
 
+/// One target pair of a classically controllable controlled-Pauli gate (`CX`, `CY`, `CZ`, `XCZ`,
+/// and `YCZ`), classified by which slot holds the classical control.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ControlledPauliTargetPair {
-    Quantum {
-        first: QubitId,
-        second: QubitId,
-    },
+    /// Both slots are qubits.
+    Quantum { first: QubitId, second: QubitId },
+    /// A classical bit controls the Pauli applied to `target`.
     Classical {
         control: ClassicalControl,
         target: QubitId,
     },
+    /// `CZ` between two classical bits, which has no effect.
     ClassicalNoop {
         first: ClassicalControl,
         second: ClassicalControl,
     },
+    /// A classical bit sits in a slot that the gate's target rule admits but that cannot hold a
+    /// control for this gate, such as `CX 0 rec[-1]` or `CX rec[-1] sweep[0]`.
     Unsupported,
 }
 
 impl ControlledPauliTargetPair {
-    /// Classifies one two-target group of a controlled-Pauli instruction.
-    pub fn classify(gate: Gate, targets: &[Target]) -> Self {
-        let [first, second] = targets else {
-            return ControlledPauliTargetPair::Unsupported;
-        };
+    /// Classifies one target pair of a validated controlled-Pauli instruction.
+    pub(crate) fn classify(gate: Gate, [first, second]: &[Target; 2]) -> Self {
         if let (Some(first), Some(second)) = (first.qubit_id(), second.qubit_id()) {
             return ControlledPauliTargetPair::Quantum { first, second };
         }

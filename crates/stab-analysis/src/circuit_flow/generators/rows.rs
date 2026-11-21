@@ -1,7 +1,7 @@
 //! Flow-row building blocks shared by the direct and composed generators.
 
 use stab_algebra::{Flow, PauliBasis, PauliSign, PauliString, StabilizerError};
-use stab_model::{Gate, Target};
+use stab_model::{Gate, PauliProduct, PauliTarget};
 
 use crate::{AnalysisError, AnalysisOperation, AnalysisResult};
 
@@ -12,33 +12,20 @@ use super::helpers::{
 pub(super) fn measured_pauli_product(
     gate: Gate,
     qubit_count: usize,
-    targets: &[Target],
+    targets: PauliProduct<'_>,
 ) -> AnalysisResult<PauliString> {
-    let gate_name = gate.canonical_name();
     let mut product = stab_algebra::advanced::pauli_identity_unbudgeted(qubit_count);
-    for target in targets {
-        if target.is_combiner() {
-            continue;
-        }
-        let qubit = target.qubit_id().ok_or_else(|| {
-            AnalysisError::unsupported(
-                AnalysisOperation::FlowGeneration,
-                gate.kind(),
-                format!("{gate_name} flow generator target {target} does not identify a qubit"),
-            )
-        })?;
-        let pauli = target.pauli_type().ok_or_else(|| {
-            AnalysisError::unsupported(
-                AnalysisOperation::FlowGeneration,
-                gate.kind(),
-                format!("{gate_name} flow generator target {target} is not a Pauli target"),
-            )
-        })?;
+    for PauliTarget {
+        pauli,
+        id: qubit,
+        inverted,
+    } in targets
+    {
         let term = single_pauli_with_sign(
             qubit_count,
             qubit.get() as usize,
             pauli_basis(pauli),
-            if target.is_inverted_result_target() {
+            if inverted {
                 PauliSign::Minus
             } else {
                 PauliSign::Plus
@@ -54,7 +41,10 @@ pub(super) fn measured_pauli_product(
             }
             error => AnalysisError::internal(
                 AnalysisOperation::FlowGeneration,
-                format!("{gate_name} flow generator Pauli product is not Hermitian: {error}"),
+                format!(
+                    "{} flow generator Pauli product is not Hermitian: {error}",
+                    gate.canonical_name()
+                ),
             ),
         })?;
     }

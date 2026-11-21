@@ -4,10 +4,11 @@ use stab_algebra::Flow;
 use stab_model::advanced::FoldedCircuitEvent;
 use stab_model::{
     Cancellation, Circuit, CircuitInstruction, CircuitItem, GateKind, MeasureRecordOffset,
-    MemoryBudget, ObservableId, ParseLimits, QubitId, Target,
+    MemoryBudget, ObservableId, ObservableTarget, ParseLimits, QubitId, Target,
 };
 
 use crate::folded_walk::walk_folded;
+use crate::instruction_shape;
 use crate::{
     AnalysisError, AnalysisOperation, AnalysisResult, FlowGeneratorOptions, ResourceKind,
     ResourceLimitError, circuit_flow::flow_record_index, circuit_flow_generators_with_options,
@@ -163,32 +164,24 @@ fn collect_declared_rows(
         }
 
         match instruction.gate().kind() {
-            GateKind::DETECTOR => detector_rows.push(row_from_record_targets(
-                instruction,
-                measurement_offset,
-                false,
-                &mut ignored_logical_rows,
-            )?),
+            GateKind::DETECTOR => {
+                detector_rows.push(detector_row(instruction, measurement_offset)?);
+            }
             GateKind::OBSERVABLE_INCLUDE => {
-                let observable = instruction.observable_id_argument()?.ok_or_else(|| {
-                    AnalysisError::internal(
-                        AnalysisOperation::MissingDetectorDiscovery,
-                        "OBSERVABLE_INCLUDE is missing an observable id argument",
-                    )
-                })?;
-                let delta = row_from_record_targets(
+                let observable = instruction_shape::observable(
                     instruction,
+                    AnalysisOperation::MissingDetectorDiscovery,
+                )?;
+                let delta = observable_row(
+                    instruction,
+                    observable,
                     measurement_offset,
-                    true,
                     &mut ignored_logical_rows,
                 )?;
                 logical_rows
                     .entry(observable)
                     .or_default()
                     .xor_assign(&delta);
-                if instruction.targets().iter().any(Target::is_pauli_target) {
-                    ignored_logical_rows.insert(observable);
-                }
             }
             GateKind::TICK
             | GateKind::QUBIT_COORDS
@@ -378,32 +371,44 @@ fn validate_declaration_scan(circuit: &Circuit, budget: MemoryBudget) -> Analysi
     )
 }
 
-fn row_from_record_targets(
+fn detector_row(
     instruction: &CircuitInstruction,
     measurement_offset: usize,
-    allow_pauli: bool,
+) -> AnalysisResult<MeasurementRow> {
+    let mut row = MeasurementRow::default();
+    for offset in
+        instruction_shape::records(instruction, AnalysisOperation::MissingDetectorDiscovery)?
+    {
+        if !offset.is_negative_zero() {
+            row.toggle(absolute_record_index(offset, measurement_offset)?);
+        }
+    }
+    Ok(row)
+}
+
+/// The record row an `OBSERVABLE_INCLUDE` toggles; a Pauli target marks the observable as one
+/// the analysis ignores.
+fn observable_row(
+    instruction: &CircuitInstruction,
+    observable: ObservableId,
+    measurement_offset: usize,
     ignored_logical_rows: &mut BTreeSet<ObservableId>,
 ) -> AnalysisResult<MeasurementRow> {
     let mut row = MeasurementRow::default();
-    for target in instruction.targets() {
-        if let Some(offset) = target.measurement_record_offset() {
-            if offset.is_negative_zero() {
-                continue;
+    let targets = instruction_shape::observable_targets(
+        instruction,
+        AnalysisOperation::MissingDetectorDiscovery,
+    )?;
+    for target in targets {
+        match target {
+            ObservableTarget::MeasurementRecord(offset) => {
+                if !offset.is_negative_zero() {
+                    row.toggle(absolute_record_index(offset, measurement_offset)?);
+                }
             }
-            row.toggle(absolute_record_index(offset, measurement_offset)?);
-        } else if allow_pauli && target.is_pauli_target() {
-            if let Some(observable) = instruction.observable_id_argument()? {
+            ObservableTarget::Pauli(_) => {
                 ignored_logical_rows.insert(observable);
             }
-        } else {
-            return Err(AnalysisError::unsupported(
-                AnalysisOperation::MissingDetectorDiscovery,
-                instruction.gate().kind(),
-                format!(
-                    "{} target {target} is not supported by missing-detector analysis",
-                    instruction.gate().canonical_name()
-                ),
-            ));
         }
     }
     Ok(row)

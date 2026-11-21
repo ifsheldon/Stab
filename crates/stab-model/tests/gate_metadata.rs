@@ -6,8 +6,8 @@
 )]
 
 use stab_model::{
-    Circuit, CircuitItem, Gate, GateArgumentRule, GateKind, GateTargetGroupKind, GateTargetRule,
-    Probability,
+    Circuit, CircuitItem, Gate, GateArgumentRule, GateArguments, GateKind, GateTargetGroupKind,
+    GateTargetRule,
 };
 
 #[test]
@@ -241,19 +241,15 @@ fn parses_identity_error_disjoint_probability_lists_like_stim() {
     let i_error = instructions.next().expect("I_ERROR");
     let ii_error = instructions.next().expect("II_ERROR");
     assert!(instructions.next().is_none());
-    assert_eq!(
-        i_error.probability_arguments().unwrap(),
-        Some(vec![
-            Probability::try_new(0.1).unwrap(),
-            Probability::try_new(0.2).unwrap(),
-        ])
+    std::assert_matches!(
+        i_error.gate_arguments(),
+        GateArguments::Probabilities(probabilities)
+            if probabilities.as_f64_slice() == [0.1, 0.2]
     );
-    assert_eq!(
-        ii_error.probability_arguments().unwrap(),
-        Some(vec![
-            Probability::try_new(0.1).unwrap(),
-            Probability::try_new(0.2).unwrap(),
-        ])
+    std::assert_matches!(
+        ii_error.gate_arguments(),
+        GateArguments::Probabilities(probabilities)
+            if probabilities.as_f64_slice() == [0.1, 0.2]
     );
 
     for invalid in [

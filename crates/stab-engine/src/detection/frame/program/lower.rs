@@ -5,13 +5,14 @@ use std::ops::ControlFlow;
 use arrayvec::ArrayVec;
 use stab_algebra::PauliBasis;
 use stab_model::{
-    Circuit, CircuitInstruction, Gate, GateKind, RepeatNestingLimit, Target,
-    advanced::{ClassicalControl, ControlledPauliTargetPair},
+    Circuit, CircuitInstruction, ClassicalControl, ControlledPauliTargetPair, Gate, GateKind,
+    GateTargets, QubitId, RepeatNestingLimit, Target,
 };
 
 use super::super::clifford::{FrameCliffordAction, FrameCliffordActionCache, TwoQubitFrameMap};
 use super::super::helpers::{
-    pauli_basis, unsupported_frame_instruction, unsupported_frame_target, zero_probability_noise,
+    controlled_target_pairs, pauli_basis, unsupported_frame_instruction, unsupported_frame_target,
+    zero_probability_noise,
 };
 use super::arena::{ArenaCounts, ProgramArena};
 use super::{
@@ -670,18 +671,21 @@ fn plain_clifford(
         return Ok(None);
     }
     let targets = instruction.targets();
-    let mut largest = None::<u32>;
-    for target in targets {
-        let Some(qubit) = target.qubit_id() else {
-            return Ok(None);
-        };
-        largest = largest.max(Some(qubit.get()));
-    }
-    // Every target pair of a controlled Pauli on qubits is a quantum pair, which records nothing;
-    // an unpaired target takes the general lowering and its error.
-    if gate.controlled_pauli().is_some() && !targets.len().is_multiple_of(2) {
-        return Ok(None);
-    }
+    let largest = match instruction.gate_targets() {
+        GateTargets::Qubits(qubits) => qubits.map(QubitId::get).max(),
+        GateTargets::QubitPairs(pairs) => pairs.flat_map(|pair| pair.map(QubitId::get)).max(),
+        // A controlled Pauli is plain only when every pair is quantum, which records nothing.
+        _ => {
+            let mut largest = None::<u32>;
+            for target in targets {
+                let Some(qubit) = target.qubit_id() else {
+                    return Ok(None);
+                };
+                largest = largest.max(Some(qubit.get()));
+            }
+            largest
+        }
+    };
     let qubits = match largest {
         None => 0,
         Some(qubit) => match usize::try_from(qubit).ok().and_then(|q| q.checked_add(1)) {
@@ -875,11 +879,8 @@ const fn measure(basis: PauliBasis, reset: bool) -> EntryKind {
 }
 
 fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> DetectionResult<()> {
-    for target_group in instruction.targets().chunks(2) {
-        if matches!(
-            ControlledPauliTargetPair::classify(instruction.gate(), target_group),
-            ControlledPauliTargetPair::Unsupported
-        ) {
+    for pair in controlled_target_pairs(instruction)? {
+        if matches!(pair, ControlledPauliTargetPair::Unsupported) {
             return Err(DetectionError::invalid_sampler_compilation(format!(
                 "sampling execution does not support the {} target shape",
                 instruction.gate().canonical_name()
@@ -963,8 +964,8 @@ fn record_controls(
     counts: &mut CountState,
 ) -> DetectionResult<usize> {
     let mut operations = 0_usize;
-    for target_group in instruction.targets().chunks(2) {
-        match ControlledPauliTargetPair::classify(instruction.gate(), target_group) {
+    for pair in controlled_target_pairs(instruction)? {
+        match pair {
             ControlledPauliTargetPair::Quantum { .. } => operations += 1,
             ControlledPauliTargetPair::Classical { control, .. } => {
                 admit_control(instruction, counts, control)?;

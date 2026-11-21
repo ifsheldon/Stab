@@ -7,7 +7,7 @@
 
 use super::*;
 use stab_algebra::{PauliSign, SingleQubitClifford};
-use stab_model::{CircuitItem, Gate, MeasureRecordOffset};
+use stab_model::{CircuitItem, Gate, MeasureRecordOffset, Target};
 
 use crate::{circuit_to_tableau, decomposed_circuit};
 

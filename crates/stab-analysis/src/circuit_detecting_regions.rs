@@ -571,7 +571,7 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisR
         | GateKind::SQRT_Y
         | GateKind::SQRT_Y_DAG
         | GateKind::S
-        | GateKind::S_DAG => validate_single_plain_qubit_targets(instruction),
+        | GateKind::S_DAG => Ok(()),
         GateKind::CX | GateKind::CY | GateKind::CZ | GateKind::XCZ | GateKind::YCZ => {
             validate_controlled_pauli_targets(instruction)
         }
@@ -591,7 +591,7 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisR
         | GateKind::CXSWAP
         | GateKind::SWAPCX
         | GateKind::CZSWAP
-        | GateKind::ISWAP_DAG => validate_plain_qubit_pair_targets(instruction),
+        | GateKind::ISWAP_DAG => Ok(()),
         GateKind::DEPOLARIZE1
         | GateKind::DEPOLARIZE2
         | GateKind::X_ERROR
@@ -603,29 +603,31 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisR
         | GateKind::PAULI_CHANNEL_2
         | GateKind::E
         | GateKind::ELSE_CORRELATED_ERROR => Ok(()),
-        GateKind::R | GateKind::RX | GateKind::RY => {
-            validate_single_plain_qubit_targets(instruction)
-        }
-        GateKind::M
+        // The gate's target rule, checked when the instruction was built, already admits
+        // exactly the target shapes extraction supports for these gates.
+        GateKind::R
+        | GateKind::RX
+        | GateKind::RY
+        | GateKind::M
         | GateKind::MX
         | GateKind::MY
         | GateKind::MR
         | GateKind::MRX
-        | GateKind::MRY => validate_single_measurement_qubit_targets(instruction),
-        GateKind::MXX | GateKind::MYY | GateKind::MZZ => {
-            validate_measurement_qubit_pair_targets(instruction)
-        }
-        GateKind::MPP | GateKind::SPP | GateKind::SPP_DAG => {
-            validate_pauli_product_targets(instruction)
-        }
-        GateKind::MPAD => validate_measurement_pad_targets(instruction),
-        GateKind::HERALDED_ERASE | GateKind::HERALDED_PAULI_CHANNEL_1 => {
-            validate_single_plain_qubit_targets(instruction)
-        }
-        GateKind::TICK => validate_target_count(instruction, 0),
-        GateKind::DETECTOR => validate_detector_targets(instruction),
-        GateKind::OBSERVABLE_INCLUDE => validate_observable_include_targets(instruction),
-        GateKind::QUBIT_COORDS | GateKind::SHIFT_COORDS => Ok(()),
+        | GateKind::MRY
+        | GateKind::MXX
+        | GateKind::MYY
+        | GateKind::MZZ
+        | GateKind::MPP
+        | GateKind::SPP
+        | GateKind::SPP_DAG
+        | GateKind::MPAD
+        | GateKind::HERALDED_ERASE
+        | GateKind::HERALDED_PAULI_CHANNEL_1
+        | GateKind::TICK
+        | GateKind::DETECTOR
+        | GateKind::OBSERVABLE_INCLUDE
+        | GateKind::QUBIT_COORDS
+        | GateKind::SHIFT_COORDS => Ok(()),
         GateKind::REPEAT => Err(AnalysisError::unsupported(
             AnalysisOperation::DetectingRegions,
             instruction.gate().kind(),
@@ -637,52 +639,14 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> AnalysisR
     }
 }
 
-fn validate_single_plain_qubit_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    for target in instruction.targets() {
-        validate_qubit_target(instruction, target, false)?;
-    }
-    Ok(())
-}
-
-fn validate_single_measurement_qubit_targets(
-    instruction: &CircuitInstruction,
-) -> AnalysisResult<()> {
-    for target in instruction.targets() {
-        validate_qubit_target(instruction, target, true)?;
-    }
-    Ok(())
-}
-
-fn validate_plain_qubit_pair_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    for group in instruction.target_groups() {
-        let [left, right] = group else {
-            return Err(AnalysisError::unsupported(
-                AnalysisOperation::DetectingRegions,
-                instruction.gate().kind(),
-                format!(
-                    "simple detecting-region extraction only supports {} with qubit target pairs",
-                    instruction.gate().canonical_name()
-                ),
-            ));
-        };
-        validate_qubit_target(instruction, left, false)?;
-        validate_qubit_target(instruction, right, false)?;
-    }
-    Ok(())
-}
-
+/// Admits the controlled-Pauli target pairs whose classical control, if any, sits in the gate's
+/// control slot; the target rule already admitted only qubits, records, and sweep bits.
 fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    for group in instruction.target_groups() {
-        let [left, right] = group else {
-            return Err(AnalysisError::unsupported(
-                AnalysisOperation::DetectingRegions,
-                instruction.gate().kind(),
-                format!(
-                    "simple detecting-region extraction only supports {} with paired targets",
-                    instruction.gate().canonical_name()
-                ),
-            ));
-        };
+    let pairs = crate::instruction_shape::controlled_pairs(
+        instruction,
+        AnalysisOperation::DetectingRegions,
+    )?;
+    for [left, right] in pairs.as_target_pairs() {
         let gate_name = instruction.gate().canonical_name();
         let slot = controlled_pauli_form(instruction.gate()).map(|form| form.slot);
         if slot == Some(ControlSlot::Either)
@@ -720,10 +684,7 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Analys
         let left_is_record = left.is_measurement_record_target();
         let right_is_record = right.is_measurement_record_target();
         match (left_is_record, right_is_record) {
-            (false, false) => {
-                validate_qubit_target(instruction, left, false)?;
-                validate_qubit_target(instruction, right, false)?;
-            }
+            (false, false) => {}
             (true, false) | (false, true) => {
                 validate_control_position(
                     instruction,
@@ -731,8 +692,6 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Analys
                     left_is_record,
                     "measurement-record feedback",
                 )?;
-                let feedback_target = if left_is_record { right } else { left };
-                validate_qubit_target(instruction, feedback_target, false)?;
             }
             (true, true) => {
                 return Err(AnalysisError::unsupported(
@@ -771,86 +730,6 @@ fn validate_control_position(
     }
 }
 
-fn validate_measurement_qubit_pair_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    for group in instruction.target_groups() {
-        let [left, right] = group else {
-            return Err(AnalysisError::unsupported(
-                AnalysisOperation::DetectingRegions,
-                instruction.gate().kind(),
-                format!(
-                    "simple detecting-region extraction only supports {} with qubit target pairs",
-                    instruction.gate().canonical_name()
-                ),
-            ));
-        };
-        validate_qubit_target(instruction, left, true)?;
-        validate_qubit_target(instruction, right, true)?;
-    }
-    Ok(())
-}
-
-fn validate_pauli_product_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    for group in instruction.target_groups() {
-        let mut has_pauli_target = false;
-        for target in group {
-            if target.is_combiner() {
-                continue;
-            }
-            if target.pauli_type().is_none() {
-                return Err(AnalysisError::unsupported(
-                    AnalysisOperation::DetectingRegions,
-                    instruction.gate().kind(),
-                    format!(
-                        "simple detecting-region extraction only supports {} with Pauli-product targets, got {target}",
-                        instruction.gate().canonical_name()
-                    ),
-                ));
-            }
-            has_pauli_target = true;
-        }
-        if !has_pauli_target {
-            return Err(AnalysisError::unsupported(
-                AnalysisOperation::DetectingRegions,
-                instruction.gate().kind(),
-                format!(
-                    "simple detecting-region extraction only supports {} with non-empty Pauli-product targets",
-                    instruction.gate().canonical_name()
-                ),
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn validate_measurement_pad_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    for target in instruction.targets() {
-        let TargetKind::Qubit {
-            id,
-            inverted: false,
-        } = target.kind()
-        else {
-            return Err(AnalysisError::unsupported(
-                AnalysisOperation::DetectingRegions,
-                GateKind::MPAD,
-                format!(
-                    "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
-                ),
-            ));
-        };
-        if id.get() <= 1 {
-            continue;
-        }
-        return Err(AnalysisError::unsupported(
-            AnalysisOperation::DetectingRegions,
-            GateKind::MPAD,
-            format!(
-                "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
-            ),
-        ));
-    }
-    Ok(())
-}
-
 fn validate_qubit_target(
     instruction: &CircuitInstruction,
     target: &Target,
@@ -874,57 +753,6 @@ fn validate_qubit_target(
             instruction.gate().canonical_name()
         ),
     ))
-}
-
-fn validate_target_count(instruction: &CircuitInstruction, expected: usize) -> AnalysisResult<()> {
-    if instruction.targets().len() == expected {
-        return Ok(());
-    }
-    Err(AnalysisError::unsupported(
-        AnalysisOperation::DetectingRegions,
-        instruction.gate().kind(),
-        format!(
-            "simple detecting-region extraction expected {} to have {expected} target(s), got {}",
-            instruction.gate().canonical_name(),
-            instruction.targets().len()
-        ),
-    ))
-}
-
-fn validate_detector_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    for target in instruction.targets() {
-        if !target.is_measurement_record_target() {
-            return Err(AnalysisError::unsupported(
-                AnalysisOperation::DetectingRegions,
-                None,
-                format!(
-                    "simple detecting-region extraction only supports DETECTOR measurement-record targets, got {target}"
-                ),
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn validate_observable_include_targets(instruction: &CircuitInstruction) -> AnalysisResult<()> {
-    instruction.observable_id_argument()?.ok_or_else(|| {
-        AnalysisError::unsupported(AnalysisOperation::DetectingRegions, GateKind::OBSERVABLE_INCLUDE,
-            "simple detecting-region extraction requires OBSERVABLE_INCLUDE to have an observable id",
-        )
-    })?;
-    for target in instruction.targets() {
-        if target.is_measurement_record_target() || target.pauli_type().is_some() {
-            continue;
-        }
-        return Err(AnalysisError::unsupported(
-            AnalysisOperation::DetectingRegions,
-            GateKind::OBSERVABLE_INCLUDE,
-            format!(
-                "simple detecting-region extraction only supports OBSERVABLE_INCLUDE measurement-record or Pauli targets, got {target}"
-            ),
-        ));
-    }
-    Ok(())
 }
 
 /// Summarizes a circuit whose nesting `validate_supported_subset` already admitted.
