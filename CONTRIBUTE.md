@@ -59,10 +59,22 @@ Additional pinned checks are:
 ```text
 just oracle::result-formats --check
 just oracle::run --all-rows
+just oracle::record --check-clean
 cargo test -p stab-oracle -- --ignored pinned_stim
 ```
 
-The result-format corpus, fixture manifest, gate helper, and pinned-Stim probes run the actual pinned Stim source. Every manifest row compares Stab against live pinned Stim or a stored pinned-Stim artifact; rows own their commands, comparators, source attribution, and statistical plans, and they do not promote semantic family status. Comparators are `exact-output`, `help-health`, in-process `structural`, one-sample `statistical` (each side against hand-written analytic probabilities), and `two-sample` (Stim's and Stab's `01` outputs from the same seeded argv tested against each other per column and per declared joint statistic); `just oracle::run --all-rows --statistical` runs both statistical kinds. Pinned Stim prints DEM decimals at `long double` precision, so live DEM text parity is defined on 128-bit `long double` hosts such as the AArch64 baseline, and CI runs these checks on an AArch64 runner.
+The result-format corpus, fixture manifest, gate helper, and pinned-Stim probes run the actual pinned Stim source. Every manifest row compares Stab against live pinned Stim or a stored pinned-Stim artifact; rows own their commands, comparators, source attribution, and statistical plans, and they do not promote semantic family status. Comparators are `exact-output`, `help-health`, in-process `structural`, one-sample `statistical` (each side against hand-written analytic probabilities), and `two-sample` (Stim's and Stab's `01` outputs from the same seeded argv tested against each other per column and per declared joint statistic); `just oracle::run --all-rows --statistical` runs both statistical kinds.
+The statistical rules are:
+
+- A `two-sample` column or joint statistic is tested with a pooled two-proportion z-test, except that when exactly one side is constant (its count is zero or every shot) it is tested with Fisher's exact conditional test, because the z-test has little power there.
+- A one-sample `statistical` row tests both Stim's and Stab's outputs against the analytic plan, so its Bonferroni bound counts both outputs and must still fit the row's declared `false_positive_rate`.
+- A plan may state `sample_count=`, `fixed_seed=`, `false_positive_rate<=`, and its tolerance at most once each; a repeated token is rejected when the manifest is loaded.
+- Stim's exit status and stderr class are checked against the row on every command row, as Stab's are.
+
+`just oracle::record --check-clean` rechecks every stored exact-output golden against pinned Stim without rewriting it, including the core parse-print rows, which go through the `stab_stim_parse_print` libstim helper, and CI runs it.
+Edit a golden only by recording it from pinned Stim, never to match Stab's output.
+The oracle runs the `stab` binary whose path Cargo reports for a locked build, so a `CARGO_TARGET_DIR` or build-target override cannot make it test a stale binary.
+Pinned Stim prints DEM decimals at `long double` precision, so live DEM text parity is defined on 128-bit `long double` hosts such as the AArch64 baseline, and CI runs these checks on an AArch64 runner.
 
 ## Performance
 
@@ -74,7 +86,7 @@ just bench::e2e-run --tier smoke --out target/benchmarks/<unique-name>
 just bench::e2e-replay --input target/benchmarks/<bundle>
 ```
 
-Smoke timing is diagnostic. Formal full and soak evidence requires a clean commit, controlled host, release binaries, fixed CPU affinity, temperature below `100 C`, and no swap I/O during measured samples. Every output path must be new. Do not delete samples, waive a failed ratio, relax the `1.25x` Stim parity gate, relax the `1.15x` self-regression gate, or reduce semantic work to obtain a pass.
+Smoke timing is diagnostic. Formal full and soak evidence requires a clean commit, controlled host, release binaries, fixed CPU affinity, no competing benchmark, measured-binary, Cargo, rustc, or CMake process, temperature below `100 C`, and no swap I/O during measured samples. Every output path must be new. Do not delete samples, waive a failed ratio, relax the `1.25x` Stim parity gate, relax the `1.15x` self-regression gate, or reduce semantic work to obtain a pass.
 
 Formal runs use `--tier full|soak --affinity-cpu <cpu>`. Release authorization is `just bench::e2e-release-check`; it requires the checked AArch64 evidence pair and permits only the documented evidence descendants of its measured source.
 
