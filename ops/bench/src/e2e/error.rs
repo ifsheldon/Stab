@@ -1,9 +1,9 @@
 //! Typed domain errors for the end-to-end suite, grouped by the area that raises them.
 //!
 //! Every area error converts into [`E2eError`] and from there into
-//! [`BenchError::E2e`](crate::error::BenchError::E2e), whose rendering keeps the
+//! [`BenchError::E2e`], whose rendering keeps the
 //! `end-to-end benchmark validation failed:` prefix. Supervisor failures stay
-//! [`BenchError::Process`](crate::error::BenchError::Process).
+//! [`BenchError::Process`].
 
 use std::fmt;
 
