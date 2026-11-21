@@ -9,6 +9,7 @@ This directory contains Stab's active plans, architecture records, generated par
 - [plans/open-items.md](plans/open-items.md) lists known gaps that no milestone owns.
 - [plans/review-fix-plan.md](plans/review-fix-plan.md) records the plan and outcome for the findings of the 2026-11-19 code review, including Phase D, and lists the decisions and redesigns still open after it.
 - [plans/open-after-phase-d.md](plans/open-after-phase-d.md) expands each item left open after Phase D with its current state, the proposed design, its cost, and a recommendation.
+- [plans/stim-main-rebaseline-plan.md](plans/stim-main-rebaseline-plan.md) is the decided plan for moving the Stim baseline from v1.16.0 to current `main`; the work is not started.
 - [stim-parity.md](stim-parity.md) is the generated Stim v1.16.0 feature and evidence view. Its source is `oracle/stim-v1.16-parity.toml` and the bounded family fragments it names.
 - [architecture/](architecture/) owns durable product dependency rules and architecture decisions.
 - [MIGRATING-0.2.md](MIGRATING-0.2.md) covers the component-crate and public-path migration.
